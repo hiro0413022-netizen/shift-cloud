@@ -410,135 +410,120 @@ app.get('/orders/new', async (c) => {
     WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 600
   `).all<Record<string,unknown>>()
 
-  const scripts = `<script>
-var PRODUCTS = ${JSON.stringify(products.results)};
-var rowIndex = 0;
-function addRow() {
-  var tbody = document.querySelector('#line-table tbody');
-  var idx = rowIndex++;
-  var opts = PRODUCTS.map(function(p){
-    return '<option value="'+p.id+'" data-ic="'+(p.item_category||'')+'" data-mf="'+(p.manufacturer||'')+'" data-nm="'+(p.name||'')+'" data-sp="'+(p.spec||'')+'" data-ct="'+(p.club_type||'')+'" data-lp="'+(p.list_price||'')+'" data-rt="'+(p.default_rate||'')+'">'+(p.item_category||'')+' / '+(p.manufacturer||'')+' / '+(p.name||'')+'</option>';
-  }).join('');
-  var tr = document.createElement('tr');
-  tr.innerHTML =
-    '<td><input type="hidden" name="row_index" value="'+idx+'">' +
-    '<select class="form-select form-select-sm psel" name="product_id_'+idx+'" style="min-width:190px">' +
-    '<option value="">手入力</option>'+opts+'</select></td>' +
-    '<td><input class="form-control form-control-sm" name="item_category_'+idx+'" style="min-width:70px"></td>' +
-    '<td><input class="form-control form-control-sm" name="manufacturer_'+idx+'" style="min-width:90px"></td>' +
-    '<td><input class="form-control form-control-sm" name="product_name_'+idx+'" style="min-width:150px"></td>' +
-    '<td><input class="form-control form-control-sm" name="spec_'+idx+'" style="min-width:60px"></td>' +
-    '<td><input class="form-control form-control-sm" name="color_'+idx+'" style="min-width:55px"></td>' +
-    '<td><input class="form-control form-control-sm" name="club_type_'+idx+'" style="min-width:65px"></td>' +
-    '<td><input class="form-control form-control-sm text-center" type="number" min="1" name="quantity_'+idx+'" value="1" style="min-width:55px"></td>' +
-    '<td><input class="form-control form-control-sm text-end" type="number" step="1" min="0" name="list_price_'+idx+'" style="min-width:75px"></td>' +
-    '<td><input class="form-control form-control-sm text-end" type="number" step="0.001" min="0" name="rate_'+idx+'" style="min-width:65px"></td>' +
-    '<td><input class="form-control form-control-sm text-end" type="number" step="1" min="0" name="unit_price_'+idx+'" style="min-width:75px"></td>' +
-    '<td><input class="form-control form-control-sm" name="line_note_'+idx+'" style="min-width:90px"></td>' +
-    '<td><button type="button" class="btn btn-sm btn-outline-danger remrow"><i class="fas fa-trash"></i></button></td>';
-  tbody.appendChild(tr);
-  tr.querySelector('.psel').addEventListener('change', function(e){
-    var opt = e.target.selectedOptions[0];
-    if (!opt || !opt.value) return;
-    var m = {'item_category_'+idx: opt.dataset.ic, 'manufacturer_'+idx: opt.dataset.mf,
-             'product_name_'+idx: opt.dataset.nm, 'spec_'+idx: opt.dataset.sp,
-             'club_type_'+idx: opt.dataset.ct, 'list_price_'+idx: opt.dataset.lp,
-             'rate_'+idx: opt.dataset.rt};
-    Object.keys(m).forEach(function(k){
-      var el = tr.querySelector('[name="'+k+'"]');
-      if (el && !el.value) el.value = m[k] || '';
-    });
-  });
-  tr.querySelector('.remrow').addEventListener('click', function(){ tr.remove(); });
-}
-document.getElementById('add-row').addEventListener('click', addRow);
-document.getElementById('order-form').addEventListener('submit', async function(e){
-  e.preventDefault();
-  var form = e.target;
-  var indexes = Array.from(form.querySelectorAll('input[name="row_index"]')).map(function(el){ return el.value; });
-  var lines = indexes.map(function(idx){
-    return {
-      product_id: form.querySelector('[name="product_id_'+idx+'"]')?.value || null,
-      item_category: form.querySelector('[name="item_category_'+idx+'"]')?.value || '',
-      manufacturer: form.querySelector('[name="manufacturer_'+idx+'"]')?.value || '',
-      product_name: form.querySelector('[name="product_name_'+idx+'"]')?.value || '',
-      spec: form.querySelector('[name="spec_'+idx+'"]')?.value || '',
-      color: form.querySelector('[name="color_'+idx+'"]')?.value || '',
-      club_type: form.querySelector('[name="club_type_'+idx+'"]')?.value || '',
-      quantity: parseInt(form.querySelector('[name="quantity_'+idx+'"]')?.value || '0'),
-      list_price: parseFloat(form.querySelector('[name="list_price_'+idx+'"]')?.value) || null,
-      rate: parseFloat(form.querySelector('[name="rate_'+idx+'"]')?.value) || null,
-      unit_price: parseFloat(form.querySelector('[name="unit_price_'+idx+'"]')?.value) || null,
-      line_note: form.querySelector('[name="line_note_'+idx+'"]')?.value || ''
-    };
-  }).filter(function(l){ return (l.product_name || l.item_category) && l.quantity > 0; });
-  if (!lines.length){ showFlash('発注明細を1件以上入力してください。','danger'); return; }
-  var payload = {
-    ordered_by: form.querySelector('[name="ordered_by"]').value,
-    order_date: form.querySelector('[name="order_date"]').value,
-    customer_name: form.querySelector('[name="customer_name"]').value,
-    usage_type: form.querySelector('[name="usage_type"]').value,
-    requested_delivery_date: form.querySelector('[name="requested_delivery_date"]').value,
-    order_note: form.querySelector('[name="order_note"]').value,
-    lines: lines
-  };
-  var btn = form.querySelector('button[type=submit]');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
-  try {
-    var resp = await fetch('/api/orders', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-    var result = await resp.json();
-    if (!resp.ok){ showFlash(result.error || '発注作成に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成'; return; }
-    window.location.href = '/mail-batch/' + result.batch_code;
-  } catch(err){
-    showFlash('通信エラー: '+err.message,'danger');
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成';
-  }
-});
-addRow(); addRow();
-</script>`
+  // 外部JSに商品データを渡すインライン変数のみ定義
+  const dataScript = `<script>var PRODUCTS = ${JSON.stringify(products.results)};</script>`
+
+  // モーダル HTML
+  const modalHtml = `
+<div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+          <button type="button" id="modal-back" class="btn btn-sm btn-outline-secondary" style="display:none">
+            <i class="fas fa-chevron-left me-1"></i>戻る
+          </button>
+          <h6 class="modal-title mb-0 fw-bold" id="modal-title">カテゴリーを選択</h6>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="px-3 pt-2 pb-1" id="modal-search-wrap" style="display:none">
+        <input type="text" id="modal-search" class="form-control form-control-sm"
+               placeholder="商品名・仕様・種類で絞り込み…">
+      </div>
+      <div class="modal-body p-0" id="modal-body" style="max-height:440px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>`
 
   const content = `
+${dataScript}
+${modalHtml}
 <div class="mb-3">
   <h1 class="h3 mb-1"><i class="fas fa-plus-circle me-2 text-primary"></i>新規発注</h1>
-  <p class="text-muted mb-0">商品を入力すると、仕入先判定ルールに基づいて発注先別のメール下書きをまとめて作成します。</p>
+  <p class="text-muted mb-0">
+    <i class="fas fa-search me-1 text-success"></i>ボタンでカテゴリーから商品を選択し、発注明細を作成してください。
+  </p>
 </div>
 <form id="order-form">
   <div class="card shadow-sm mb-3">
     <div class="card-header bg-white"><strong><i class="fas fa-info-circle me-1"></i>発注ヘッダ</strong></div>
     <div class="card-body row g-3">
-      <div class="col-md-2"><label class="form-label">発注日</label><input class="form-control" type="date" name="order_date" value="${todayStr()}"></div>
-      <div class="col-md-2"><label class="form-label">発注者 <span class="text-danger">*</span></label><input class="form-control" name="ordered_by" placeholder="古川" required></div>
-      <div class="col-md-2"><label class="form-label">顧客名</label><input class="form-control" name="customer_name" placeholder="上田様"></div>
-      <div class="col-md-2"><label class="form-label">用途</label><input class="form-control" name="usage_type" placeholder="取り寄せ / 在庫用"></div>
-      <div class="col-md-2"><label class="form-label">希望納期</label><input class="form-control" type="date" name="requested_delivery_date"></div>
-      <div class="col-12"><label class="form-label">発注備考</label><textarea class="form-control" name="order_note" rows="2" placeholder="メール本文へ差し込む全体備考"></textarea></div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">発注日</label>
+        <input class="form-control" type="date" name="order_date" value="${todayStr()}">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">発注者 <span class="text-danger">*</span></label>
+        <input class="form-control" name="ordered_by" placeholder="古川" required>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">顧客名</label>
+        <input class="form-control" name="customer_name" placeholder="上田様">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">用途</label>
+        <input class="form-control" name="usage_type" placeholder="取り寄せ / 在庫用">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">希望納期</label>
+        <input class="form-control" type="date" name="requested_delivery_date">
+      </div>
+      <div class="col-12">
+        <label class="form-label">発注備考</label>
+        <textarea class="form-control" name="order_note" rows="2"
+                  placeholder="メール本文へ差し込む全体備考"></textarea>
+      </div>
     </div>
   </div>
+
   <div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-      <strong><i class="fas fa-table me-1"></i>発注明細</strong>
-      <button type="button" class="btn btn-sm btn-outline-primary" id="add-row"><i class="fas fa-plus me-1"></i>行を追加</button>
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-3">
+        <strong><i class="fas fa-table me-1"></i>発注明細</strong>
+        <span class="text-muted small">
+          合計金額：<strong id="total-amount" class="text-primary fs-6">―</strong>
+        </span>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-primary" id="add-row">
+        <i class="fas fa-plus me-1"></i>行を追加
+      </button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0" id="line-table">
-        <thead class="table-light"><tr>
-          <th style="min-width:190px">商品候補</th>
-          <th>品目</th><th>メーカー</th><th style="min-width:160px">商品名</th>
-          <th>仕様</th><th>色</th><th>種類</th><th>数量</th>
-          <th>定価</th><th>掛率</th><th>単価</th><th>備考</th><th></th>
-        </tr></thead>
+        <thead class="table-light">
+          <tr>
+            <th style="min-width:160px">選択商品</th>
+            <th style="min-width:72px">品目</th>
+            <th style="min-width:90px">メーカー</th>
+            <th style="min-width:150px">商品名</th>
+            <th style="min-width:60px">仕様</th>
+            <th style="min-width:55px">色</th>
+            <th style="min-width:65px">種類</th>
+            <th style="min-width:55px">数量</th>
+            <th style="min-width:80px">定価</th>
+            <th style="min-width:68px">掛率</th>
+            <th style="min-width:80px">単価</th>
+            <th style="min-width:90px">備考</th>
+            <th></th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
     </div>
-    <div class="sticky-actions text-end">
-      <button type="submit" class="btn btn-primary btn-lg">
+    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
+      <p class="text-muted small mb-0">
+        <i class="fas fa-lightbulb me-1 text-warning"></i>
+        定価・掛率を入力すると単価が自動計算されます
+      </p>
+      <button type="submit" class="btn btn-primary btn-lg px-4">
         <i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成
       </button>
     </div>
   </div>
-</form>`
-  return layout('新規発注', content, scripts)
+</form>
+<script src="/static/new-order.js"></script>`
+  return layout('新規発注', content)
 })
 
 // ============================================================
