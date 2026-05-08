@@ -1,1 +1,172 @@
-h1 { font-family: Arial, Helvetica, sans-serif; }
+/* ゴルフウィング発注管理システム */
+
+body {
+  background: #f7f8fb;
+  font-size: 0.92rem;
+}
+
+/* ナビゲーション */
+.navbar-brand {
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+/* メトリクスカード */
+.metric-card {
+  border: 0;
+  box-shadow: 0 4px 16px rgba(0,0,0,.06);
+  transition: box-shadow 0.2s;
+}
+.metric-card:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,.10);
+}
+.metric-card .metric-label {
+  color: #6c757d;
+  font-size: .85rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.metric-card .metric-value {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.2;
+  margin-top: 4px;
+}
+.metric-card.danger {
+  background: #fff5f5;
+  border-left: 4px solid #dc3545;
+}
+.metric-card.danger .metric-value {
+  color: #dc3545;
+}
+
+/* テーブル */
+.table td,
+.table th {
+  vertical-align: middle;
+  padding: 0.5rem 0.75rem;
+}
+.table th {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+}
+
+/* プリフォーマットテキスト（メール本文） */
+.small-pre {
+  white-space: pre-wrap;
+  font-size: .88rem;
+  line-height: 1.6;
+  font-family: 'Courier New', Courier, monospace;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* 固定フッター（発注フォーム） */
+.sticky-actions {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 12px 16px;
+  border-top: 1px solid #dee2e6;
+  z-index: 10;
+  box-shadow: 0 -4px 12px rgba(0,0,0,.06);
+}
+
+/* カードヘッダー */
+.card-header {
+  font-size: 0.9rem;
+}
+
+/* バッジ調整 */
+.badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+}
+
+/* フォーム */
+.form-control,
+.form-select {
+  font-size: 0.88rem;
+}
+.form-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.3rem;
+  color: #495057;
+}
+
+/* カード */
+.card {
+  border: 1px solid rgba(0,0,0,.08);
+}
+.card-header {
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+
+/* リンク */
+a {
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* フォントモノスペース */
+.font-monospace {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+}
+
+/* ナビリンク アクティブ */
+.nav-link {
+  font-size: 0.88rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.nav-link:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+/* dl行 */
+dt {
+  font-weight: 500;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+dd {
+  font-size: 0.9rem;
+}
+
+/* テーブル内の強調残数 */
+.text-danger.fw-bold {
+  font-size: 1.05em;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .container-fluid {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .metric-card .metric-value {
+    font-size: 1.8rem;
+  }
+  .d-flex.gap-2 {
+    flex-wrap: wrap;
+  }
+}
+
+/* フラッシュメッセージ */
+#flash-container .alert {
+  animation: slideIn 0.3s ease;
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

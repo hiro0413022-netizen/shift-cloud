@@ -1,12 +1,19 @@
 import { Hono } from 'hono'
-import { renderer } from './renderer'
+import { cors } from 'hono/cors'
+import { serveStatic } from 'hono/cloudflare-workers'
+import { apiRoutes } from './routes/api'
+import { pageRoutes } from './routes/pages'
 
-const app = new Hono()
+type Bindings = {
+  DB: D1Database
+}
 
-app.use(renderer)
+const app = new Hono<{ Bindings: Bindings }>()
 
-app.get('/', (c) => {
-  return c.render(<h1>Hello!</h1>)
-})
+app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/api/*', cors())
+
+app.route('/api', apiRoutes)
+app.route('/', pageRoutes)
 
 export default app

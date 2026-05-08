@@ -1,12 +1,16 @@
 {
-  "name": "webapp",
+  "name": "golfwing-order",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "wrangler pages dev",
-    "deploy": "npm run build && wrangler pages deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+    "preview": "wrangler pages dev dist",
+    "dev:sandbox": "wrangler pages dev dist --d1=golfwing-production --local --ip 0.0.0.0 --port 3000",
+    "deploy": "npm run build && wrangler pages deploy dist --project-name golfwing-order",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:migrate:local": "wrangler d1 migrations apply golfwing-production --local",
+    "db:seed": "wrangler d1 execute golfwing-production --local --file=./seed.sql",
+    "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed"
   },
   "dependencies": {
     "hono": "^4.12.12"
@@ -14,6 +18,7 @@
   "devDependencies": {
     "@hono/vite-build": "^1.2.0",
     "@hono/vite-dev-server": "^0.18.2",
+    "@cloudflare/workers-types": "^4.20250705.0",
     "vite": "^6.3.5",
     "wrangler": "^4.4.0"
   }
