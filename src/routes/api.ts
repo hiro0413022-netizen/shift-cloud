@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { buildXlsx } from '../xlsxHelper'
 
 type Bindings = { DB: D1Database }
 const app = new Hono<{ Bindings: Bindings }>()
@@ -678,6 +679,153 @@ app.get('/products-for-order', async (c) => {
     )
     .all<Record<string, unknown>>()
   return c.json({ products: rows.results })
+})
+
+// ============================================================
+// API: 納品履歴 Excel ダウンロード
+// ============================================================
+app.get('/receipts/download', async (c) => {
+  const db = c.env.DB
+
+  // クエリパラメータで絞り込み (省略時は全件)
+  const from = c.req.query('from') || ''
+  const to   = c.req.query('to')   || ''
+  const supplierId = c.req.query('supplier_id') || ''
+
+  let sql = `
+    SELECT
+      po.order_date,
+      po.order_no,
+      s.name              AS supplier_name,
+      po.customer_name,
+      po.usage_type,
+      r.received_date,
+      r.slip_date,
+      r.inspected_by,
+      poi.item_category,
+      poi.manufacturer,
+      poi.product_name,
+      poi.spec,
+      poi.color,
+      poi.club_type,
+      ri.received_quantity,
+      poi.list_price,
+      poi.rate,
+      poi.unit_price,
+      (ri.received_quantity * poi.unit_price) AS line_amount,
+      ri.note             AS item_note,
+      r.note              AS receipt_note
+    FROM receipt_items ri
+    JOIN receipts r             ON ri.receipt_id = r.id
+    JOIN purchase_orders po     ON r.purchase_order_id = po.id
+    JOIN suppliers s            ON po.supplier_id = s.id
+    JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
+    WHERE 1=1`
+
+  const binds: unknown[] = []
+  if (from) { sql += ` AND r.received_date >= ?`; binds.push(from) }
+  if (to)   { sql += ` AND r.received_date <= ?`; binds.push(to)   }
+  if (supplierId) { sql += ` AND po.supplier_id = ?`; binds.push(Number(supplierId)) }
+  sql += ` ORDER BY r.received_date DESC, r.id DESC, poi.id ASC`
+
+  let stmt = db.prepare(sql)
+  if (binds.length) {
+    // D1 の bind は引数を展開する
+    stmt = (stmt.bind as (...args: unknown[]) => typeof stmt)(...binds)
+  }
+  const res = await stmt.all<Record<string, unknown>>()
+  const data = res.results
+
+  // ── ヘッダ行 ──────────────────────────────────────────────
+  const HEADERS = [
+    '入荷日', '納品書日付', '発注番号', '発注日', '仕入先',
+    '顧客名', '用途', '品目', 'メーカー', '商品名',
+    '仕様', '色', '種類', '入荷数', '定価',
+    '掛率', '単価', '金額', '検品者', '商品備考', '納品備考',
+  ]
+
+  // styleId: 0=通常 1=ヘッダ 2=数値カンマ 3=パーセント 4=日付 5=合計行
+  const headerRow = {
+    cells: HEADERS as (string | number | null)[],
+    rowStyle: 1,
+  }
+
+  // ── データ行 ──────────────────────────────────────────────
+  const dataRows = data.map(r => ({
+    cells: [
+      r['received_date'],   // 入荷日
+      r['slip_date'],       // 納品書日付
+      r['order_no'],        // 発注番号
+      r['order_date'],      // 発注日
+      r['supplier_name'],   // 仕入先
+      r['customer_name'],   // 顧客名
+      r['usage_type'],      // 用途
+      r['item_category'],   // 品目
+      r['manufacturer'],    // メーカー
+      r['product_name'],    // 商品名
+      r['spec'],            // 仕様
+      r['color'],           // 色
+      r['club_type'],       // 種類
+      r['received_quantity'] != null ? Number(r['received_quantity']) : null,
+      r['list_price']  != null ? Number(r['list_price'])  : null,
+      r['rate']        != null ? Number(r['rate'])        : null,
+      r['unit_price']  != null ? Number(r['unit_price'])  : null,
+      r['line_amount'] != null ? Number(r['line_amount']) : null,
+      r['inspected_by'],
+      r['item_note'],
+      r['receipt_note'],
+    ] as (string | number | null)[],
+    styles: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 2, 2, 0, 0, 0],
+  }))
+
+  // ── 合計行 ────────────────────────────────────────────────
+  const totalQty    = data.reduce((s, r) => s + (Number(r['received_quantity']) || 0), 0)
+  const totalAmount = data.reduce((s, r) => s + (Number(r['line_amount'])       || 0), 0)
+  const totalRow = {
+    cells: ['合計', null, null, null, null, null, null, null, null, null,
+            null, null, null, totalQty, null, null, null, totalAmount, null, null, null] as (string | number | null)[],
+    styles: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+  }
+
+  const colWidths = [
+    { col: 0,  width: 12 }, // 入荷日
+    { col: 1,  width: 12 }, // 納品書日付
+    { col: 2,  width: 22 }, // 発注番号
+    { col: 3,  width: 12 }, // 発注日
+    { col: 4,  width: 22 }, // 仕入先
+    { col: 5,  width: 16 }, // 顧客名
+    { col: 6,  width: 10 }, // 用途
+    { col: 7,  width: 12 }, // 品目
+    { col: 8,  width: 20 }, // メーカー
+    { col: 9,  width: 30 }, // 商品名
+    { col: 10, width: 20 }, // 仕様
+    { col: 11, width: 10 }, // 色
+    { col: 12, width: 10 }, // 種類
+    { col: 13, width: 8  }, // 入荷数
+    { col: 14, width: 10 }, // 定価
+    { col: 15, width: 8  }, // 掛率
+    { col: 16, width: 10 }, // 単価
+    { col: 17, width: 12 }, // 金額
+    { col: 18, width: 10 }, // 検品者
+    { col: 19, width: 20 }, // 商品備考
+    { col: 20, width: 20 }, // 納品備考
+  ]
+
+  const xlsxBytes = buildXlsx([headerRow, ...dataRows, totalRow], colWidths)
+
+  // ファイル名: 納品履歴_YYYYMMDD.xlsx
+  const dateStr = new Date().toLocaleDateString('ja-JP', {
+    year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo',
+  }).replace(/\//g, '')
+  const filename = encodeURIComponent(`納品履歴_${dateStr}.xlsx`)
+
+  return new Response(xlsxBytes, {
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename*=UTF-8''${filename}`,
+      'Content-Length': String(xlsxBytes.length),
+    },
+  })
 })
 
 export { app as apiRoutes }

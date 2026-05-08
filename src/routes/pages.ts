@@ -760,33 +760,131 @@ document.getElementById('btn-mark-ordered').addEventListener('click', async func
 // ============================================================
 app.get('/receipts', async (c) => {
   const db = c.env.DB
-  const res = await db.prepare(`
-    SELECT r.*, po.order_no, po.id AS purchase_order_id, s.name AS supplier_name
+
+  // 絞り込みパラメータ
+  const from       = c.req.query('from')        || ''
+  const to         = c.req.query('to')          || ''
+  const supplierId = c.req.query('supplier_id') || ''
+
+  // 仕入先一覧（フィルタ用）
+  const supplierRes = await db.prepare(
+    'SELECT id, name FROM suppliers ORDER BY name'
+  ).all<Record<string,unknown>>()
+  const supplierOptions = supplierRes.results.map(s =>
+    `<option value="${esc(s['id'])}" ${supplierId === String(s['id']) ? 'selected' : ''}>${esc(s['name'])}</option>`
+  ).join('')
+
+  // 絞り込み付きクエリ
+  let sql = `
+    SELECT r.id, r.received_date, r.slip_date, r.inspected_by, r.note,
+           po.order_no, po.id AS purchase_order_id, po.customer_name,
+           s.name AS supplier_name, s.id AS supplier_id,
+           COUNT(ri.id) AS item_count,
+           SUM(ri.received_quantity) AS total_qty,
+           SUM(ri.received_quantity * poi.unit_price) AS total_amount
     FROM receipts r
     JOIN purchase_orders po ON r.purchase_order_id=po.id
     JOIN suppliers s ON po.supplier_id=s.id
-    ORDER BY r.id DESC LIMIT 200
-  `).all<Record<string,unknown>>()
+    LEFT JOIN receipt_items ri ON ri.receipt_id=r.id
+    LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id=poi.id
+    WHERE 1=1`
+  const binds: unknown[] = []
+  if (from) { sql += ` AND r.received_date >= ?`; binds.push(from) }
+  if (to)   { sql += ` AND r.received_date <= ?`; binds.push(to) }
+  if (supplierId) { sql += ` AND po.supplier_id = ?`; binds.push(Number(supplierId)) }
+  sql += ` GROUP BY r.id ORDER BY r.received_date DESC, r.id DESC LIMIT 300`
+
+  let stmt = db.prepare(sql)
+  if (binds.length) stmt = (stmt.bind as (...a: unknown[]) => typeof stmt)(...binds)
+  const res = await stmt.all<Record<string,unknown>>()
+
+  // サマリー計算
+  const totalQty    = res.results.reduce((s, r) => s + (Number(r['total_qty'])    || 0), 0)
+  const totalAmount = res.results.reduce((s, r) => s + (Number(r['total_amount']) || 0), 0)
 
   const rows = res.results.map(r => `<tr>
-    <td>${esc(r['received_date'])}</td><td>${esc(r['slip_date'])}</td>
-    <td><a href="/orders/${r['purchase_order_id']}">${esc(r['order_no'])}</a></td>
+    <td class="fw-semibold">${esc(r['received_date'])}</td>
+    <td class="text-muted">${esc(r['slip_date']) || '―'}</td>
+    <td><a href="/orders/${r['purchase_order_id']}" class="text-decoration-none fw-semibold">${esc(r['order_no'])}</a></td>
     <td>${esc(r['supplier_name'])}</td>
-    <td>${esc(r['inspected_by'])}</td><td>${esc(r['note'])}</td>
+    <td>${esc(r['customer_name']) || '―'}</td>
+    <td class="text-center">${esc(r['item_count'])}</td>
+    <td class="text-end">${Number(r['total_qty'])||0} 個</td>
+    <td class="text-end fw-semibold">${yen(r['total_amount'])}</td>
+    <td>${esc(r['inspected_by']) || '―'}</td>
+    <td class="text-muted small">${esc(r['note']) || ''}</td>
   </tr>`).join('')
 
+  // ダウンロードURL組み立て
+  const dlParams = new URLSearchParams()
+  if (from) dlParams.set('from', from)
+  if (to)   dlParams.set('to', to)
+  if (supplierId) dlParams.set('supplier_id', supplierId)
+  const dlUrl = `/api/receipts/download${dlParams.toString() ? '?' + dlParams.toString() : ''}`
+
   const content = `
-<div class="mb-3">
-  <h1 class="h3 mb-1"><i class="fas fa-truck me-2 text-primary"></i>納品履歴</h1>
-  <p class="text-muted mb-0">登録済みの納品データ一覧です。</p>
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-truck me-2 text-primary"></i>納品履歴</h1>
+    <p class="text-muted mb-0">登録済みの納品データ一覧です。</p>
+  </div>
+  <a href="${dlUrl}" class="btn btn-success btn-sm px-3">
+    <i class="fas fa-file-excel me-1"></i>Excel ダウンロード
+  </a>
 </div>
+
+<!-- フィルタカード -->
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <form method="GET" action="/receipts" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label form-label-sm mb-1">入荷日 From</label>
+        <input type="date" name="from" value="${esc(from)}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label class="form-label form-label-sm mb-1">To</label>
+        <input type="date" name="to" value="${esc(to)}" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label class="form-label form-label-sm mb-1">仕入先</label>
+        <select name="supplier_id" class="form-select form-select-sm" style="min-width:160px">
+          <option value="">― すべて ―</option>
+          ${supplierOptions}
+        </select>
+      </div>
+      <div class="col-auto d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search me-1"></i>絞り込み</button>
+        <a href="/receipts" class="btn btn-outline-secondary btn-sm">リセット</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- サマリーバッジ -->
+<div class="d-flex gap-3 mb-2 flex-wrap">
+  <span class="badge bg-secondary fs-6 fw-normal px-3 py-2">
+    <i class="fas fa-list me-1"></i>件数: <strong>${res.results.length}</strong> 件
+  </span>
+  <span class="badge bg-info text-dark fs-6 fw-normal px-3 py-2">
+    <i class="fas fa-boxes me-1"></i>合計入荷数: <strong>${totalQty}</strong> 個
+  </span>
+  <span class="badge bg-success fs-6 fw-normal px-3 py-2">
+    <i class="fas fa-yen-sign me-1"></i>合計金額: <strong>${yen(totalAmount)}</strong>
+  </span>
+</div>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
-        <th>入荷日</th><th>納品書日付</th><th>発注番号</th><th>仕入先</th><th>検品者</th><th>備考</th>
-      </tr></thead>
-      <tbody>${rows || '<tr><td colspan="6" class="text-center text-muted py-4">納品履歴がありません。</td></tr>'}</tbody>
+    <table class="table table-hover align-middle mb-0 small">
+      <thead class="table-dark">
+        <tr>
+          <th>入荷日</th><th>納品書日付</th><th>発注番号</th><th>仕入先</th>
+          <th>顧客名</th><th class="text-center">品目数</th>
+          <th class="text-end">入荷数</th><th class="text-end">金額</th>
+          <th>検品者</th><th>備考</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="10" class="text-center text-muted py-4">納品履歴がありません。</td></tr>'}</tbody>
     </table>
   </div>
 </div>`
