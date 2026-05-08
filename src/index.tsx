@@ -11,6 +11,7 @@ type Bindings = {
 const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('/static/*', serveStatic({ root: './public' }))
+app.get('/favicon.ico', (c) => c.body(null, 204))
 app.use('/api/*', cors())
 
 app.route('/api', apiRoutes)
