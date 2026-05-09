@@ -828,4 +828,227 @@ app.get('/receipts/download', async (c) => {
   })
 })
 
+// ============================================================
+// API: 仕入先 CRUD
+// ============================================================
+app.post('/suppliers', async (c) => {
+  const db = c.env.DB
+  const b = await c.req.json<Record<string, string>>()
+  const r = await db.prepare(`
+    INSERT INTO suppliers
+      (name, alias_names, contact_name, honorific, order_method, order_method_detail,
+       phone, fax, fax_number, email, line_id, line_group_id,
+       payment_method, shipping_rule, website, postal_code, address, notes, is_active, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP)
+  `).bind(
+    normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
+    normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
+    normalize(b['phone']), normalize(b['fax']), normalize(b['fax_number']),
+    normalize(b['email']), normalize(b['line_id']), normalize(b['line_group_id']),
+    normalize(b['payment_method']), normalize(b['shipping_rule']),
+    normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
+    normalize(b['notes'])
+  ).run()
+  return c.json({ ok: true, id: r.meta.last_row_id })
+})
+
+app.put('/suppliers/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  const b = await c.req.json<Record<string, string>>()
+  await db.prepare(`
+    UPDATE suppliers SET
+      name=?, alias_names=?, contact_name=?, honorific=?, order_method=?, order_method_detail=?,
+      phone=?, fax=?, fax_number=?, email=?, line_id=?, line_group_id=?,
+      payment_method=?, shipping_rule=?, website=?, postal_code=?, address=?, notes=?,
+      updated_at=CURRENT_TIMESTAMP
+    WHERE id=?
+  `).bind(
+    normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
+    normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
+    normalize(b['phone']), normalize(b['fax']), normalize(b['fax_number']),
+    normalize(b['email']), normalize(b['line_id']), normalize(b['line_group_id']),
+    normalize(b['payment_method']), normalize(b['shipping_rule']),
+    normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
+    normalize(b['notes']), id
+  ).run()
+  return c.json({ ok: true })
+})
+
+app.delete('/suppliers/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  await db.prepare('UPDATE suppliers SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(id).run()
+  return c.json({ ok: true })
+})
+
+// ============================================================
+// API: 商品マスタ CRUD
+// ============================================================
+app.post('/products', async (c) => {
+  const db = c.env.DB
+  const b = await c.req.json<Record<string, unknown>>()
+  const r = await db.prepare(`
+    INSERT INTO products
+      (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
+       list_price, default_rate, default_supplier_id, unit, source, is_active)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
+  `).bind(
+    normalize(b['product_code'] as string), normalize(b['barcode'] as string),
+    normalize(b['item_category'] as string), normalize(b['manufacturer'] as string),
+    normalize(b['name'] as string), normalize(b['spec'] as string),
+    normalize(b['color'] as string), normalize(b['club_type'] as string),
+    b['list_price'] ? Number(b['list_price']) : null,
+    b['default_rate'] ? Number(b['default_rate']) : null,
+    b['default_supplier_id'] ? Number(b['default_supplier_id']) : null,
+    normalize(b['unit'] as string) || '本',
+    normalize(b['source'] as string)
+  ).run()
+  return c.json({ ok: true, id: r.meta.last_row_id })
+})
+
+app.put('/products/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  const b = await c.req.json<Record<string, unknown>>()
+  await db.prepare(`
+    UPDATE products SET
+      product_code=?, barcode=?, item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
+      list_price=?, default_rate=?, default_supplier_id=?, unit=?, source=?
+    WHERE id=?
+  `).bind(
+    normalize(b['product_code'] as string), normalize(b['barcode'] as string),
+    normalize(b['item_category'] as string), normalize(b['manufacturer'] as string),
+    normalize(b['name'] as string), normalize(b['spec'] as string),
+    normalize(b['color'] as string), normalize(b['club_type'] as string),
+    b['list_price'] ? Number(b['list_price']) : null,
+    b['default_rate'] ? Number(b['default_rate']) : null,
+    b['default_supplier_id'] ? Number(b['default_supplier_id']) : null,
+    normalize(b['unit'] as string) || '本',
+    normalize(b['source'] as string),
+    id
+  ).run()
+  return c.json({ ok: true })
+})
+
+app.delete('/products/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  await db.prepare('UPDATE products SET is_active=0 WHERE id=?').bind(id).run()
+  return c.json({ ok: true })
+})
+
+// ============================================================
+// API: 判定ルール CRUD
+// ============================================================
+app.post('/rules', async (c) => {
+  const db = c.env.DB
+  const b = await c.req.json<Record<string, unknown>>()
+  const r = await db.prepare(`
+    INSERT INTO supplier_rules (item_category, manufacturer, club_type, supplier_id, rate, priority, notes)
+    VALUES (?,?,?,?,?,?,?)
+  `).bind(
+    normalize(b['item_category'] as string) || null,
+    normalize(b['manufacturer'] as string) || null,
+    normalize(b['club_type'] as string) || null,
+    Number(b['supplier_id']),
+    b['rate'] ? Number(b['rate']) : null,
+    Number(b['priority']) || 100,
+    normalize(b['notes'] as string)
+  ).run()
+  return c.json({ ok: true, id: r.meta.last_row_id })
+})
+
+app.put('/rules/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  const b = await c.req.json<Record<string, unknown>>()
+  await db.prepare(`
+    UPDATE supplier_rules SET
+      item_category=?, manufacturer=?, club_type=?, supplier_id=?, rate=?, priority=?, notes=?
+    WHERE id=?
+  `).bind(
+    normalize(b['item_category'] as string) || null,
+    normalize(b['manufacturer'] as string) || null,
+    normalize(b['club_type'] as string) || null,
+    Number(b['supplier_id']),
+    b['rate'] ? Number(b['rate']) : null,
+    Number(b['priority']) || 100,
+    normalize(b['notes'] as string),
+    id
+  ).run()
+  return c.json({ ok: true })
+})
+
+app.delete('/rules/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  await db.prepare('DELETE FROM supplier_rules WHERE id=?').bind(id).run()
+  return c.json({ ok: true })
+})
+
+// ============================================================
+// API: 発注コピー（再発注）
+// ============================================================
+app.post('/orders/:id/copy', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  const src = await db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(id).first<Record<string,unknown>>()
+  if (!src) return c.json({ error: 'Not found' }, 404)
+  const items = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(id).all<Record<string,unknown>>()
+
+  const batchCode = nowCode() + '-' + Math.random().toString(36).substring(2, 8)
+  const orderNo = 'PO-' + today().replace(/-/g,'') + '-' + uuid5()
+  const ins = await db.prepare(`
+    INSERT INTO purchase_orders
+      (batch_code, order_no, order_date, ordered_by, supplier_id, customer_name,
+       usage_type, requested_delivery_date, status, order_note)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
+  `).bind(
+    batchCode, orderNo, today(),
+    src['ordered_by'], src['supplier_id'], src['customer_name'],
+    src['usage_type'], src['requested_delivery_date'], 'draft_created', src['order_note']
+  ).run()
+  const newOrderId = ins.meta.last_row_id as number
+
+  for (const item of items.results) {
+    await db.prepare(`
+      INSERT INTO purchase_order_items
+        (purchase_order_id, product_id, item_category, manufacturer, product_name,
+         spec, color, club_type, quantity, list_price, rate, unit_price, amount,
+         customer_name, usage_type, requested_delivery_date, line_note)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `).bind(
+      newOrderId, item['product_id'], item['item_category'], item['manufacturer'], item['product_name'],
+      item['spec'], item['color'], item['club_type'], item['quantity'], item['list_price'],
+      item['rate'], item['unit_price'], item['amount'],
+      item['customer_name'], item['usage_type'], item['requested_delivery_date'], item['line_note']
+    ).run()
+  }
+
+  // メール文生成
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?').bind(src['supplier_id']).first<Record<string,unknown>>()
+  const newOrder = await db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(newOrderId).first<Record<string,unknown>>()
+  const newItems = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(newOrderId).all<Record<string,unknown>>()
+  if (supplier && newOrder) {
+    const { subject, body } = composeMail(newOrder, newItems.results, supplier)
+    await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?').bind(subject, body, newOrderId).run()
+  }
+
+  return c.json({ ok: true, order_id: newOrderId, batch_code: batchCode })
+})
+
+// ============================================================
+// API: 発注ステータス変更
+// ============================================================
+app.post('/orders/:id/status', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  const { status } = await c.req.json<{ status: string }>()
+  const allowed = ['draft','draft_created','ordered','partial','completed','cancelled']
+  if (!allowed.includes(status)) return c.json({ error: 'invalid status' }, 400)
+  await db.prepare('UPDATE purchase_orders SET status=? WHERE id=?').bind(status, id).run()
+  return c.json({ ok: true })
+})
+
 export { app as apiRoutes }

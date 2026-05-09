@@ -186,58 +186,223 @@ app.get('/', async (c) => {
 app.get('/products', async (c) => {
   const db = c.env.DB
   const q = (c.req.query('q') || '').replace(/　/g, ' ').trim()
+  const cat = (c.req.query('cat') || '').trim()
 
-  let sql = `SELECT p.*, s.name AS supplier_name
+  let sql = `SELECT p.*, s.name AS supplier_name, s.id AS supplier_id
     FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
     WHERE p.is_active=1`
   const params: unknown[] = []
+  if (cat) { sql += ' AND p.item_category=?'; params.push(cat) }
   if (q) {
-    sql += ' AND (p.name LIKE ? OR p.manufacturer LIKE ? OR p.barcode LIKE ? OR p.item_category LIKE ? OR p.club_type LIKE ?)'
+    sql += ' AND (p.name LIKE ? OR p.manufacturer LIKE ? OR p.barcode LIKE ? OR p.item_category LIKE ? OR p.club_type LIKE ? OR p.spec LIKE ?)'
     const like = `%${q}%`
-    params.push(like, like, like, like, like)
+    params.push(like, like, like, like, like, like)
   }
-  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 300'
+  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 500'
 
   const stmt = db.prepare(sql)
   const res = params.length ? await stmt.bind(...params).all<Record<string,unknown>>() : await stmt.all<Record<string,unknown>>()
 
-  const rows = res.results.map(r => `<tr>
+  // カテゴリ一覧
+  const cats = await db.prepare('SELECT DISTINCT item_category FROM products WHERE is_active=1 ORDER BY item_category').all<{item_category:string}>()
+  // 仕入先一覧（モーダル用）
+  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  const supplierOpts = suppliers.results.map(s => `<option value="${s['id']}">${esc(s['name'])}</option>`).join('')
+  const catOpts = cats.results.map(c2 => `<option value="${esc(c2.item_category)}">${esc(c2.item_category)}</option>`).join('')
+  const catFilter = cats.results.map(c2 =>
+    `<a class="btn btn-sm ${cat===c2.item_category?'btn-primary':'btn-outline-secondary'}" href="/products?cat=${encodeURIComponent(c2.item_category)}${q?'&q='+encodeURIComponent(q):''}">` +
+    `${esc(c2.item_category)}</a>`
+  ).join('')
+
+  const rows = res.results.map(r => `<tr data-id="${r['id']}">
     <td class="text-muted small">${r['id']}</td>
-    <td>${esc(r['item_category'])}</td>
+    <td><span class="badge bg-secondary">${esc(r['item_category'])}</span></td>
     <td>${esc(r['manufacturer'])}</td>
     <td><strong>${esc(r['name'])}</strong></td>
-    <td>${esc(r['spec'])}</td>
-    <td>${esc(r['club_type'])}</td>
-    <td class="text-end">${yen(r['list_price'])}</td>
-    <td class="text-center">${r['default_rate'] ?? ''}</td>
-    <td>${esc(r['supplier_name'])}</td>
+    <td class="text-muted small">${esc(r['spec'])}</td>
+    <td class="text-muted small">${esc(r['club_type'])}</td>
+    <td class="text-end fw-semibold">${yen(r['list_price'])}</td>
+    <td class="text-center">${r['default_rate'] != null ? (Number(r['default_rate'])*100).toFixed(1)+'%' : ''}</td>
+    <td class="small">${esc(r['supplier_name'])}</td>
     <td class="text-muted small">${esc(r['barcode'])}</td>
+    <td>
+      <button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-row='${JSON.stringify(r)}'><i class="fas fa-edit"></i></button>
+      <button class="btn btn-xs btn-outline-danger btn-del-product py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}"><i class="fas fa-trash"></i></button>
+    </td>
   </tr>`).join('')
 
+  const scripts = `<script>
+// ── 商品 モーダル制御 ─────────────────────────────────
+var productModal = new bootstrap.Modal(document.getElementById('productModal'));
+var editingId = null;
+
+function openAddProduct(){
+  editingId = null;
+  document.getElementById('pmTitle').textContent = '商品を追加';
+  document.getElementById('productForm').reset();
+  productModal.show();
+}
+
+document.querySelectorAll('.btn-edit-product').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var r = JSON.parse(this.dataset.row);
+    editingId = r.id;
+    document.getElementById('pmTitle').textContent = '商品を編集';
+    var f = document.getElementById('productForm');
+    ['product_code','barcode','item_category','manufacturer','name','spec','color','club_type',
+     'list_price','default_rate','unit','source'].forEach(function(k){ if(f[k]) f[k].value = r[k]??''; });
+    f['default_supplier_id'].value = r['default_supplier_id']??'';
+    productModal.show();
+  });
+});
+
+document.querySelectorAll('.btn-del-product').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    if(!confirm(this.dataset.name + ' を無効化しますか？')) return;
+    var id = this.dataset.id;
+    fetch('/api/products/'+id, {method:'DELETE'}).then(function(r){
+      if(r.ok){ showFlash('削除しました','success'); setTimeout(function(){ location.reload(); },800); }
+      else showFlash('削除に失敗しました','danger');
+    });
+  });
+});
+
+document.getElementById('productForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  var fd = new FormData(this);
+  var body = {};
+  fd.forEach(function(v,k){ body[k]=v; });
+  var url = editingId ? '/api/products/'+editingId : '/api/products';
+  var method = editingId ? 'PUT' : 'POST';
+  var resp = await fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(resp.ok){
+    showFlash(editingId?'更新しました':'追加しました','success');
+    productModal.hide();
+    setTimeout(function(){ location.reload(); },800);
+  } else {
+    var err = await resp.json().catch(function(){ return {}; });
+    showFlash(err.error||'保存に失敗しました','danger');
+  }
+});
+</script>`
+
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div><h1 class="h3 mb-1"><i class="fas fa-box me-2 text-primary"></i>商品マスタ</h1>
-  <p class="text-muted mb-0">登録済み商品の確認ができます。</p></div>
+  <p class="text-muted mb-0">${res.results.length} 件表示</p></div>
+  <button class="btn btn-success" onclick="openAddProduct()"><i class="fas fa-plus me-1"></i>商品を追加</button>
 </div>
-<form class="row g-2 mb-3">
-  <div class="col-md-4"><input class="form-control" type="text" name="q" value="${esc(q)}" placeholder="メーカー・商品名・バーコードで検索"></div>
-  <div class="col-auto"><button class="btn btn-outline-primary"><i class="fas fa-search me-1"></i>検索</button></div>
-  ${q ? '<div class="col-auto"><a href="/products" class="btn btn-outline-secondary">クリア</a></div>' : ''}
+
+<!-- カテゴリフィルタ -->
+<div class="d-flex gap-2 flex-wrap mb-2">
+  <a class="btn btn-sm ${!cat?'btn-dark':'btn-outline-secondary'}" href="/products${q?'?q='+encodeURIComponent(q):''}">すべて</a>
+  ${catFilter}
+</div>
+
+<!-- 検索バー -->
+<form class="row g-2 mb-3" method="GET" action="/products">
+  ${cat ? `<input type="hidden" name="cat" value="${esc(cat)}">` : ''}
+  <div class="col">
+    <input class="form-control" type="text" name="q" value="${esc(q)}"
+      placeholder="メーカー・商品名・仕様・バーコードで絞り込み" autofocus>
+  </div>
+  <div class="col-auto d-flex gap-2">
+    <button class="btn btn-primary"><i class="fas fa-search me-1"></i>検索</button>
+    ${(q||cat) ? '<a href="/products" class="btn btn-outline-secondary">クリア</a>' : ''}
+  </div>
 </form>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
+      <thead class="table-dark"><tr>
         <th>ID</th><th>品目</th><th>メーカー</th><th>商品名</th><th>仕様</th>
         <th>種類</th><th class="text-end">定価</th><th class="text-center">掛率</th>
-        <th>標準仕入先</th><th>バーコード</th>
+        <th>標準仕入先</th><th>バーコード</th><th>操作</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="10" class="text-center py-4 text-muted">対象データがありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="11" class="text-center py-4 text-muted">対象データがありません。</td></tr>'}</tbody>
     </table>
   </div>
-  <div class="card-footer text-muted small">${res.results.length}件表示</div>
+</div>
+
+<!-- 商品追加・編集モーダル -->
+<div class="modal fade" id="productModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="pmTitle">商品を追加</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="productForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">品目 <span class="text-danger">*</span></label>
+              <input class="form-control" name="item_category" list="dl-cat" placeholder="シャフト / スリーブ..." required>
+              <datalist id="dl-cat">${catOpts}</datalist>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">メーカー</label>
+              <input class="form-control" name="manufacturer" placeholder="フジクラ, グラファイトデザイン...">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">種類 (club_type)</label>
+              <input class="form-control" name="club_type" placeholder="DR / FW / IRON...">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">商品名 <span class="text-danger">*</span></label>
+              <input class="form-control" name="name" placeholder="例: Tour AD CQ 6X" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">仕様</label>
+              <input class="form-control" name="spec" placeholder="例: 6X, S, R">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">色</label>
+              <input class="form-control" name="color" placeholder="例: 白, 黒">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">定価 (円)</label>
+              <input class="form-control text-end" name="list_price" type="number" min="0" step="100" placeholder="50000">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">掛率 (例: 0.54)</label>
+              <input class="form-control text-end" name="default_rate" type="number" min="0" max="1" step="0.01" placeholder="0.54">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">単位</label>
+              <input class="form-control" name="unit" value="本" placeholder="本 / 個 / 組">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">標準仕入先</label>
+              <select class="form-select" name="default_supplier_id">
+                <option value="">― 未設定 ―</option>
+                ${supplierOpts}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">バーコード</label>
+              <input class="form-control" name="barcode" placeholder="JANコードなど">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">品番 (product_code)</label>
+              <input class="form-control" name="product_code">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">出典 / メモ</label>
+              <input class="form-control" name="source">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>`
-  return layout('商品マスタ', content)
+  return layout('商品マスタ', content, scripts)
 })
 
 // ============================================================
@@ -247,34 +412,229 @@ app.get('/suppliers', async (c) => {
   const db = c.env.DB
   const res = await db.prepare('SELECT * FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
 
-  const rows = res.results.map(r => `<tr>
-    <td><strong>${esc(r['name'])}</strong></td>
-    <td>${esc(r['contact_name'])}${esc(r['honorific'])}</td>
-    <td>${esc(r['order_method'])}</td>
-    <td class="small">${esc(r['email'])}</td>
-    <td>${esc(r['phone'])}</td>
-    <td>${esc(r['payment_method'])}</td>
+  // 発注方法バッジ
+  function omBadge(m: unknown, detail: unknown): string {
+    const d = String(detail||m||'').toLowerCase()
+    if(d==='line'||d.includes('ライン')) return '<span class="badge" style="background:#06C755"><i class="fab fa-line me-1"></i>LINE</span>'
+    if(d==='fax'||d.includes('ファックス')||d.includes('fax')) return '<span class="badge bg-secondary"><i class="fas fa-fax me-1"></i>FAX</span>'
+    if(d==='email'||d==='mail'||d.includes('メール')) return '<span class="badge bg-primary"><i class="fas fa-envelope me-1"></i>メール</span>'
+    if(d==='tel'||d.includes('電話')) return '<span class="badge bg-warning text-dark"><i class="fas fa-phone me-1"></i>電話</span>'
+    if(d) return `<span class="badge bg-light text-dark border">${esc(String(m||detail))}</span>`
+    return '<span class="text-muted small">未設定</span>'
+  }
+
+  const rows = res.results.map(r => `<tr data-id="${r['id']}">
+    <td>
+      <div class="fw-semibold">${esc(r['name'])}</div>
+      ${esc(r['alias_names']) ? `<div class="text-muted small">${esc(r['alias_names'])}</div>` : ''}
+    </td>
+    <td>${esc(r['contact_name'])||''}${esc(r['honorific'])||''}</td>
+    <td>${omBadge(r['order_method'], r['order_method_detail'])}</td>
+    <td class="small">
+      ${r['email'] ? `<a href="mailto:${esc(r['email'])}" class="text-decoration-none">${esc(r['email'])}</a>` : ''}
+      ${r['line_id'] ? `<br><span class="badge" style="background:#06C755;font-size:0.7rem"><i class="fab fa-line me-1"></i>${esc(r['line_id'])}</span>` : ''}
+      ${r['fax']||r['fax_number'] ? `<br><span class="text-muted"><i class="fas fa-fax me-1"></i>${esc(r['fax']||r['fax_number'])}</span>` : ''}
+    </td>
+    <td class="small">${r['phone'] ? `<a href="tel:${esc(r['phone'])}" class="text-decoration-none">${esc(r['phone'])}</a>` : ''}</td>
+    <td class="small">${esc(r['payment_method'])}</td>
     <td class="small">${esc(r['shipping_rule'])}</td>
-    <td class="small">${esc(r['notes'])}</td>
+    <td class="small text-muted">${esc(r['notes'])}</td>
+    <td>
+      <button class="btn btn-xs btn-outline-primary btn-edit-sup py-0 px-2" data-row='${JSON.stringify(r).replace(/'/g,'&#39;')}'><i class="fas fa-edit"></i></button>
+      <button class="btn btn-xs btn-outline-danger btn-del-sup py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}"><i class="fas fa-trash"></i></button>
+    </td>
   </tr>`).join('')
 
+  const scripts = `<script>
+var supModal = new bootstrap.Modal(document.getElementById('supModal'));
+var editingSupId = null;
+
+function openAddSup(){
+  editingSupId = null;
+  document.getElementById('supTitle').textContent = '仕入先を追加';
+  document.getElementById('supForm').reset();
+  document.getElementById('fld-honorific').value='様';
+  updateMethodFields();
+  supModal.show();
+}
+
+function updateMethodFields(){
+  var v = document.getElementById('fld-om-detail').value.toLowerCase();
+  document.getElementById('row-email').style.display = (v===''||v==='email'||v==='mail') ? '' : 'none';
+  document.getElementById('row-line').style.display  = (v==='line') ? '' : 'none';
+  document.getElementById('row-fax').style.display   = (v==='fax') ? '' : 'none';
+}
+document.getElementById('fld-om-detail').addEventListener('change', updateMethodFields);
+
+document.querySelectorAll('.btn-edit-sup').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var r = JSON.parse(this.dataset.row);
+    editingSupId = r.id;
+    document.getElementById('supTitle').textContent = '仕入先を編集';
+    var f = document.getElementById('supForm');
+    ['name','alias_names','contact_name','honorific','order_method','order_method_detail',
+     'phone','fax','fax_number','email','line_id','line_group_id',
+     'payment_method','shipping_rule','website','postal_code','address','notes'
+    ].forEach(function(k){ if(f[k]) f[k].value = r[k]??''; });
+    updateMethodFields();
+    supModal.show();
+  });
+});
+
+document.querySelectorAll('.btn-del-sup').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    if(!confirm(this.dataset.name + ' を無効化しますか？')) return;
+    fetch('/api/suppliers/'+this.dataset.id, {method:'DELETE'}).then(function(r){
+      if(r.ok){ showFlash('無効化しました','success'); setTimeout(function(){ location.reload(); },800); }
+      else showFlash('削除に失敗しました','danger');
+    });
+  });
+});
+
+document.getElementById('supForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  var fd = new FormData(this); var body = {};
+  fd.forEach(function(v,k){ body[k]=v; });
+  var url = editingSupId ? '/api/suppliers/'+editingSupId : '/api/suppliers';
+  var resp = await fetch(url, {method: editingSupId?'PUT':'POST',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(resp.ok){
+    showFlash(editingSupId?'更新しました':'追加しました','success');
+    supModal.hide(); setTimeout(function(){ location.reload(); },800);
+  } else {
+    var err = await resp.json().catch(function(){ return {}; });
+    showFlash(err.error||'保存に失敗しました','danger');
+  }
+});
+</script>`
+
   const content = `
-<div class="mb-3">
-  <h1 class="h3 mb-1"><i class="fas fa-building me-2 text-primary"></i>仕入先マスタ</h1>
-  <p class="text-muted mb-0">登録済み仕入先の一覧です。</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div><h1 class="h3 mb-1"><i class="fas fa-building me-2 text-primary"></i>仕入先マスタ</h1>
+  <p class="text-muted mb-0">${res.results.length} 件登録</p></div>
+  <button class="btn btn-success" onclick="openAddSup()"><i class="fas fa-plus me-1"></i>仕入先を追加</button>
 </div>
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
-        <th>仕入先名</th><th>担当者</th><th>発注方法</th><th>メール</th>
-        <th>電話</th><th>支払い</th><th>送料条件</th><th>備考</th>
+      <thead class="table-dark"><tr>
+        <th>仕入先名</th><th>担当者</th><th>発注方法</th><th>連絡先</th>
+        <th>電話</th><th>支払い</th><th>送料条件</th><th>備考</th><th>操作</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" class="text-center py-4 text-muted">仕入先データがありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="9" class="text-center py-4 text-muted">仕入先データがありません。</td></tr>'}</tbody>
     </table>
   </div>
+</div>
+
+<!-- 仕入先モーダル -->
+<div class="modal fade" id="supModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="supTitle">仕入先を追加</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="supForm">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">仕入先名 <span class="text-danger">*</span></label>
+              <input class="form-control" name="name" required placeholder="例: フジクラシャフト株式会社">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">別名 / 略称</label>
+              <input class="form-control" name="alias_names" placeholder="例: フジクラ, Fujikura">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">担当者名</label>
+              <input class="form-control" name="contact_name" id="fld-contact" placeholder="山田">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">敬称</label>
+              <select class="form-select" name="honorific" id="fld-honorific">
+                <option value="様">様</option><option value="御中">御中</option>
+                <option value="さん">さん</option><option value="">なし</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">発注方法</label>
+              <div class="d-flex gap-2">
+                <input class="form-control" name="order_method" placeholder="メール / LINE / FAX など">
+                <select class="form-select" name="order_method_detail" id="fld-om-detail" style="min-width:120px">
+                  <option value="">― 区分 ―</option>
+                  <option value="email">📧 メール</option>
+                  <option value="line">💬 LINE</option>
+                  <option value="fax">📠 FAX</option>
+                  <option value="tel">📞 電話</option>
+                  <option value="other">その他</option>
+                </select>
+              </div>
+              <div class="form-text">区分を選ぶと関連フォームが表示されます</div>
+            </div>
+
+            <!-- メール -->
+            <div class="col-12" id="row-email">
+              <label class="form-label fw-semibold"><i class="fas fa-envelope text-primary me-1"></i>メールアドレス</label>
+              <input class="form-control" name="email" type="email" placeholder="order@example.com">
+            </div>
+            <!-- LINE -->
+            <div class="col-md-6" id="row-line" style="display:none">
+              <label class="form-label fw-semibold"><i class="fab fa-line me-1" style="color:#06C755"></i>LINE ID / トークID</label>
+              <input class="form-control" name="line_id" placeholder="@xxxx または個人ID">
+            </div>
+            <div class="col-md-6" id="row-line2" style="display:none">
+              <label class="form-label fw-semibold">LINEグループID (任意)</label>
+              <input class="form-control" name="line_group_id">
+            </div>
+            <!-- FAX -->
+            <div class="col-md-6" id="row-fax" style="display:none">
+              <label class="form-label fw-semibold"><i class="fas fa-fax me-1"></i>FAX番号</label>
+              <input class="form-control" name="fax_number" placeholder="03-XXXX-XXXX">
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">電話番号</label>
+              <input class="form-control" name="phone" placeholder="03-XXXX-XXXX">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">FAX (旧フィールド)</label>
+              <input class="form-control" name="fax" placeholder="03-XXXX-XXXX">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">支払い方法</label>
+              <input class="form-control" name="payment_method" placeholder="売掛 / 現金 / 振込">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">送料条件</label>
+              <input class="form-control" name="shipping_rule" placeholder="例: 3万円以上送料無料">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Webサイト</label>
+              <input class="form-control" name="website" type="url" placeholder="https://...">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">郵便番号</label>
+              <input class="form-control" name="postal_code" placeholder="000-0000">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">住所</label>
+              <input class="form-control" name="address">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">備考</label>
+              <textarea class="form-control" name="notes" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>`
-  return layout('仕入先マスタ', content)
+  return layout('仕入先マスタ', content, scripts)
 })
 
 // ============================================================
@@ -288,33 +648,160 @@ app.get('/rules', async (c) => {
     ORDER BY sr.item_category, sr.manufacturer, sr.club_type, sr.priority
   `).all<Record<string,unknown>>()
 
-  const rows = res.results.map(r => `<tr>
-    <td>${r['item_category'] ? esc(r['item_category']) : '<span class="text-muted">全品目</span>'}</td>
-    <td>${r['manufacturer'] ? esc(r['manufacturer']) : '<span class="text-muted">全メーカー</span>'}</td>
-    <td>${r['club_type'] ? esc(r['club_type']) : '<span class="text-muted">全種類</span>'}</td>
+  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  const supplierOpts = suppliers.results.map(s => `<option value="${s['id']}">${esc(s['name'])}</option>`).join('')
+
+  const cats = await db.prepare('SELECT DISTINCT item_category FROM products WHERE is_active=1 ORDER BY item_category').all<{item_category:string}>()
+  const catOpts = cats.results.map(c2 => `<option value="${esc(c2.item_category)}">${esc(c2.item_category)}</option>`).join('')
+
+  const rows = res.results.map(r => `<tr data-id="${r['id']}">
+    <td>${r['item_category'] ? `<span class="badge bg-secondary">${esc(r['item_category'])}</span>` : '<span class="text-muted small">全品目</span>'}</td>
+    <td>${r['manufacturer'] ? esc(r['manufacturer']) : '<span class="text-muted small">全メーカー</span>'}</td>
+    <td>${r['club_type'] ? esc(r['club_type']) : '<span class="text-muted small">全種類</span>'}</td>
     <td><strong>${esc(r['supplier_name'])}</strong></td>
-    <td class="text-center">${r['rate'] ?? ''}</td>
-    <td class="text-center">${r['priority']}</td>
-    <td class="small">${esc(r['notes'])}</td>
+    <td class="text-center">${r['rate'] != null ? (Number(r['rate'])*100).toFixed(1)+'%' : '―'}</td>
+    <td class="text-center"><span class="badge bg-light text-dark border">${r['priority']}</span></td>
+    <td class="small text-muted">${esc(r['notes'])}</td>
+    <td>
+      <button class="btn btn-xs btn-outline-primary btn-edit-rule py-0 px-2" data-row='${JSON.stringify(r).replace(/'/g,"&#39;")}'>  <i class="fas fa-edit"></i></button>
+      <button class="btn btn-xs btn-outline-danger btn-del-rule py-0 px-2 ms-1" data-id="${r['id']}"><i class="fas fa-trash"></i></button>
+    </td>
   </tr>`).join('')
 
+  const scripts = `<script>
+var ruleModal = new bootstrap.Modal(document.getElementById('ruleModal'));
+var editingRuleId = null;
+
+function openAddRule(){
+  editingRuleId=null;
+  document.getElementById('ruleTitle').textContent='ルールを追加';
+  document.getElementById('ruleForm').reset();
+  document.getElementById('rl-priority').value=100;
+  ruleModal.show();
+}
+
+document.querySelectorAll('.btn-edit-rule').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var r=JSON.parse(this.dataset.row);
+    editingRuleId=r.id;
+    document.getElementById('ruleTitle').textContent='ルールを編集';
+    var f=document.getElementById('ruleForm');
+    f['item_category'].value=r.item_category??'';
+    f['manufacturer'].value=r.manufacturer??'';
+    f['club_type'].value=r.club_type??'';
+    f['supplier_id'].value=r.supplier_id;
+    f['rate'].value=r.rate!=null?r.rate:'';
+    f['priority'].value=r.priority??100;
+    f['notes'].value=r.notes??'';
+    ruleModal.show();
+  });
+});
+
+document.querySelectorAll('.btn-del-rule').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    if(!confirm('このルールを削除しますか？')) return;
+    fetch('/api/rules/'+this.dataset.id,{method:'DELETE'}).then(function(r){
+      if(r.ok){showFlash('削除しました','success');setTimeout(function(){location.reload();},800);}
+      else showFlash('削除に失敗しました','danger');
+    });
+  });
+});
+
+document.getElementById('ruleForm').addEventListener('submit',async function(e){
+  e.preventDefault();
+  var fd=new FormData(this);var body={};
+  fd.forEach(function(v,k){body[k]=v;});
+  var url=editingRuleId?'/api/rules/'+editingRuleId:'/api/rules';
+  var resp=await fetch(url,{method:editingRuleId?'PUT':'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(resp.ok){
+    showFlash(editingRuleId?'更新しました':'追加しました','success');
+    ruleModal.hide();setTimeout(function(){location.reload();},800);
+  }else{showFlash('保存に失敗しました','danger');}
+});
+</script>`
+
   const content = `
-<div class="mb-3">
-  <h1 class="h3 mb-1"><i class="fas fa-cog me-2 text-primary"></i>仕入先判定ルール</h1>
-  <p class="text-muted mb-0">品目・メーカー・種類から発注先を自動判定するルールです。</p>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-sitemap me-2 text-primary"></i>仕入先判定ルール</h1>
+    <p class="text-muted mb-0">品目・メーカー・種類から発注先を自動判定するルールです。優先順位の小さい方が優先されます。</p>
+  </div>
+  <button class="btn btn-success" onclick="openAddRule()"><i class="fas fa-plus me-1"></i>ルールを追加</button>
 </div>
+
+<div class="alert alert-info py-2 small mb-3">
+  <i class="fas fa-info-circle me-1"></i>
+  <strong>判定ロジック:</strong> 商品を発注する際、品目 → メーカー → 種類の順に絞り込み、最も優先度の高いルールの仕入先に自動振り分けされます。空欄は「すべて」にマッチします。
+</div>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
+      <thead class="table-dark"><tr>
         <th>品目</th><th>メーカー</th><th>種類</th><th>仕入先</th>
-        <th class="text-center">掛率</th><th class="text-center">優先順位</th><th>備考</th>
+        <th class="text-center">掛率</th><th class="text-center">優先順位</th><th>備考</th><th>操作</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="7" class="text-center py-4 text-muted">ルールがありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="8" class="text-center py-4 text-muted">ルールがありません。</td></tr>'}</tbody>
     </table>
   </div>
+</div>
+
+<!-- ルール追加・編集モーダル -->
+<div class="modal fade" id="ruleModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="ruleTitle">ルールを追加</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="ruleForm">
+        <div class="modal-body">
+          <div class="alert alert-warning py-2 small"><i class="fas fa-lightbulb me-1"></i>空欄にすると「すべての品目 / メーカー / 種類」にマッチします。</div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">品目</label>
+              <input class="form-control" name="item_category" list="rl-cat" placeholder="空欄=全品目">
+              <datalist id="rl-cat">${catOpts}</datalist>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">メーカー</label>
+              <input class="form-control" name="manufacturer" placeholder="空欄=全メーカー">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">種類</label>
+              <input class="form-control" name="club_type" placeholder="空欄=全種類">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">仕入先 <span class="text-danger">*</span></label>
+              <select class="form-select" name="supplier_id" required>
+                <option value="">― 選択 ―</option>
+                ${supplierOpts}
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">掛率 (例: 0.54)</label>
+              <input class="form-control text-end" name="rate" type="number" min="0" max="1" step="0.01" placeholder="0.54">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">優先順位 <small class="text-muted">(小=優先)</small></label>
+              <input class="form-control text-end" name="priority" id="rl-priority" type="number" min="1" value="100">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label fw-semibold">備考</label>
+              <input class="form-control" name="notes">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">キャンセル</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>`
-  return layout('判定ルール', content)
+  return layout('判定ルール', content, scripts)
 })
 
 // ============================================================
@@ -633,7 +1120,8 @@ app.get('/orders/:id', async (c) => {
 
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
-           s.contact_name, s.order_method, s.phone
+           s.contact_name, s.honorific, s.order_method, s.order_method_detail,
+           s.phone, s.line_id, s.fax, s.fax_number, s.website
     FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?
   `).bind(id).first<Record<string,unknown>>()
   if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>')
@@ -648,103 +1136,252 @@ app.get('/orders/:id', async (c) => {
     'SELECT * FROM receipts WHERE purchase_order_id=? ORDER BY id DESC'
   ).bind(id).all<Record<string,unknown>>()
 
+  // 合計金額
+  const totalAmount = items.results.reduce((s, i) => s + (Number(i['amount'])||0), 0)
+
   const itemRows = items.results.map(item => {
     const remaining = Number(item['quantity']||0) - Number(item['received_qty']||0)
+    const pct = Number(item['quantity']||0) > 0
+      ? Math.round(Number(item['received_qty']||0) / Number(item['quantity']||0) * 100) : 0
     return `<tr>
-      <td>${esc(item['item_category'])}</td><td>${esc(item['manufacturer'])}</td>
+      <td><span class="badge bg-secondary">${esc(item['item_category'])}</span></td>
+      <td class="small">${esc(item['manufacturer'])}</td>
       <td><strong>${esc(item['product_name'])}</strong></td>
-      <td>${esc(item['spec'])} ${esc(item['color'])}</td>
-      <td>${esc(item['club_type'])}</td>
-      <td class="text-center">${item['quantity']}</td>
-      <td class="text-center text-success">${item['received_qty']}</td>
-      <td class="text-center ${remaining>0?'text-danger fw-bold':''}">${remaining}</td>
+      <td class="small text-muted">${[esc(item['spec']), esc(item['color'])].filter(Boolean).join(' / ')}</td>
+      <td class="small">${esc(item['club_type'])}</td>
+      <td class="text-center fw-semibold">${item['quantity']}</td>
+      <td class="text-center">
+        <span class="text-success fw-semibold">${item['received_qty']}</span>
+        <div class="progress" style="height:4px;width:48px;margin:2px auto 0">
+          <div class="progress-bar bg-success" style="width:${pct}%"></div>
+        </div>
+      </td>
+      <td class="text-center ${remaining>0?'text-danger fw-bold':'text-muted'}">${remaining}</td>
       <td class="text-end">${yen(item['unit_price'])}</td>
-      <td class="text-end">${yen(item['amount'])}</td>
-      <td class="small">${esc(item['line_note'])}</td>
+      <td class="text-end fw-semibold">${yen(item['amount'])}</td>
+      <td class="small text-muted">${esc(item['line_note'])}</td>
     </tr>`
   }).join('')
 
   const receiptRows = receipts.results.length
     ? receipts.results.map(r => `<tr>
-        <td>${esc(r['received_date'])}</td><td>${esc(r['slip_date'])}</td>
-        <td>${esc(r['inspected_by'])}</td><td>${esc(r['note'])}</td>
+        <td>${esc(r['received_date'])}</td><td>${esc(r['slip_date'])||'―'}</td>
+        <td>${esc(r['inspected_by'])||'―'}</td><td>${esc(r['note'])}</td>
       </tr>`).join('')
     : '<tr><td colspan="4" class="text-center py-3 text-muted">まだ納品登録がありません。</td></tr>'
 
-  const emailBody = String(order['email_body'] ?? '')
+  // ── 発注方法別アクションパネル ───────────────────────────────
+  const emailBody    = String(order['email_body']    ?? '')
   const emailSubject = String(order['email_subject'] ?? '')
   const supplierEmail = String(order['supplier_email'] ?? '')
-  const mailtoLink = supplierEmail
-    ? `<a class="btn btn-sm btn-outline-secondary mt-2" href="mailto:${esc(supplierEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>`
-    : ''
+  const lineId       = String(order['line_id']       ?? '')
+  const faxNum       = String((order['fax_number'] || order['fax']) ?? '')
+  const phone        = String(order['phone']         ?? '')
+  const omDetail     = String(order['order_method_detail'] ?? order['order_method'] ?? '').toLowerCase()
+  const bodyEsc      = emailBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  const bodyJson     = JSON.stringify(emailBody)
 
-  const mailSection = emailBody
-    ? `<div class="mb-1"><strong>宛先:</strong> <span class="text-muted">${esc(supplierEmail)}</span></div>
-       <div class="mb-2"><strong>件名:</strong> ${esc(emailSubject)}</div>
-       <pre class="small-pre border rounded p-3 bg-light">${emailBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
-       ${mailtoLink}`
-    : '<span class="text-muted">メール下書きがありません。</span>'
+  // メールパネル
+  const emailPanel = `
+<div class="mb-2 d-flex gap-2 flex-wrap align-items-center">
+  <span class="fw-semibold text-muted small">宛先:</span>
+  <span>${supplierEmail ? `<a href="mailto:${esc(supplierEmail)}">${esc(supplierEmail)}</a>` : '<em class="text-muted">未設定</em>'}</span>
+</div>
+<div class="mb-2">
+  <span class="fw-semibold text-muted small">件名:</span>
+  <span class="ms-1">${esc(emailSubject)}</span>
+</div>
+<div class="mb-2 position-relative">
+  <textarea id="email-body-ta" class="form-control font-monospace" rows="10" readonly>${bodyEsc}</textarea>
+</div>
+<div class="d-flex gap-2 flex-wrap">
+  ${supplierEmail ? `<a class="btn btn-primary btn-sm" href="mailto:${esc(supplierEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>` : ''}
+  <button class="btn btn-outline-success btn-sm" id="btn-copy-body"><i class="fas fa-copy me-1"></i>本文をコピー</button>
+</div>`
+
+  // LINEパネル
+  const linePanel = `
+<div class="alert alert-success py-2 mb-2">
+  <i class="fab fa-line me-1"></i>
+  LINE ID: <strong>${lineId || '未設定'}</strong>
+  ${lineId ? `<a class="btn btn-sm btn-success ms-3" href="https://line.me/R/ti/p/${esc(lineId)}" target="_blank"><i class="fab fa-line me-1"></i>LINEで開く</a>` : ''}
+</div>
+<div class="mb-2 position-relative">
+  <label class="form-label fw-semibold small text-muted">送信テキスト（コピーしてLINEに貼り付け）</label>
+  <textarea id="line-body-ta" class="form-control font-monospace" rows="10" readonly>${bodyEsc}</textarea>
+</div>
+<div class="d-flex gap-2">
+  <button class="btn btn-success btn-sm" id="btn-copy-line"><i class="fas fa-copy me-1"></i>テキストをコピー</button>
+</div>`
+
+  // FAXパネル
+  const faxPanel = `
+<div class="alert alert-secondary py-2 mb-2">
+  <i class="fas fa-fax me-1"></i>
+  FAX番号: <strong>${faxNum || '未設定'}</strong>
+  ${phone ? ` / TEL: <strong>${esc(phone)}</strong>` : ''}
+</div>
+<div class="mb-2">
+  <label class="form-label fw-semibold small text-muted">FAX本文（印刷またはコピーしてご利用ください）</label>
+  <textarea id="fax-body-ta" class="form-control font-monospace" rows="10" readonly>${bodyEsc}</textarea>
+</div>
+<div class="d-flex gap-2">
+  <button class="btn btn-secondary btn-sm" onclick="window.print()"><i class="fas fa-print me-1"></i>印刷</button>
+  <button class="btn btn-outline-secondary btn-sm" id="btn-copy-fax"><i class="fas fa-copy me-1"></i>本文をコピー</button>
+</div>`
+
+  // 発注方法に応じてパネルを選択
+  let orderPanel: string
+  let orderPanelTitle: string
+  let orderPanelIcon: string
+  if (omDetail === 'line' || omDetail.includes('ライン')) {
+    orderPanel = linePanel; orderPanelTitle = 'LINE送信'; orderPanelIcon = 'fab fa-line text-success'
+  } else if (omDetail === 'fax' || omDetail.includes('fax') || omDetail.includes('ファックス')) {
+    orderPanel = faxPanel; orderPanelTitle = 'FAX送信'; orderPanelIcon = 'fas fa-fax text-secondary'
+  } else {
+    orderPanel = emailPanel; orderPanelTitle = 'メール下書き'; orderPanelIcon = 'fas fa-envelope text-primary'
+  }
+
+  // ステータス変更ボタン群
+  const statusButtons: Record<string,string> = {
+    ordered: '<button class="btn btn-sm btn-primary" id="btn-s-ordered"><i class="fas fa-paper-plane me-1"></i>発注済に更新</button>',
+    completed: '<button class="btn btn-sm btn-success" id="btn-s-completed"><i class="fas fa-check-double me-1"></i>完納にする</button>',
+    cancelled: '<button class="btn btn-sm btn-outline-danger" id="btn-s-cancelled"><i class="fas fa-ban me-1"></i>キャンセル</button>',
+  }
+  const curStatus = String(order['status'])
+  const showButtons = curStatus === 'draft_created' ? [statusButtons.ordered, statusButtons.cancelled]
+    : curStatus === 'ordered'  ? [statusButtons.completed, statusButtons.cancelled]
+    : curStatus === 'partial'  ? [statusButtons.completed, statusButtons.cancelled]
+    : []
 
   const scripts = `<script>
-document.getElementById('btn-mark-ordered').addEventListener('click', async function(){
-  if(!confirm('発注ステータスを「発注済」に更新しますか？')) return;
+// コピーボタン汎用
+function makeCopyBtn(btnId, taId){
+  var btn = document.getElementById(btnId);
+  if(!btn) return;
+  btn.addEventListener('click', function(){
+    var text = document.getElementById(taId).value;
+    navigator.clipboard.writeText(text).then(function(){
+      var orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-check me-1"></i>コピーしました';
+      btn.classList.add('btn-success'); btn.classList.remove('btn-outline-success','btn-outline-secondary');
+      setTimeout(function(){ btn.innerHTML=orig; btn.classList.remove('btn-success'); btn.classList.add('btn-outline-success'); },2000);
+    });
+  });
+}
+makeCopyBtn('btn-copy-body','email-body-ta');
+makeCopyBtn('btn-copy-line','line-body-ta');
+makeCopyBtn('btn-copy-fax','fax-body-ta');
+
+// ステータス変更
+function bindStatus(btnId, status, label){
+  var btn = document.getElementById(btnId);
+  if(!btn) return;
+  btn.addEventListener('click', async function(){
+    if(!confirm(label + 'に変更しますか？')) return;
+    btn.disabled=true;
+    var r = await fetch('/api/orders/${id}/status', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status: status})
+    });
+    if(r.ok){ showFlash(label+'に更新しました','success'); setTimeout(function(){ location.reload(); },900); }
+    else { showFlash('更新に失敗しました','danger'); btn.disabled=false; }
+  });
+}
+bindStatus('btn-s-ordered','ordered','発注済');
+bindStatus('btn-s-completed','completed','完納');
+bindStatus('btn-s-cancelled','cancelled','キャンセル');
+
+// 発注コピー
+document.getElementById('btn-copy-order').addEventListener('click', async function(){
+  if(!confirm('この発注をコピーして再発注データを作成しますか？')) return;
   this.disabled=true;
-  var resp = await fetch('/api/orders/${id}/mark-ordered',{method:'POST'});
-  if(resp.ok){ showFlash('ステータスを「発注済」に更新しました。','success'); setTimeout(function(){ location.reload(); },1000); }
-  else { showFlash('更新に失敗しました。','danger'); this.disabled=false; }
+  var r = await fetch('/api/orders/${id}/copy',{method:'POST'});
+  var res = await r.json();
+  if(r.ok){
+    showFlash('再発注データを作成しました（発注番号: '+res.order_id+'）','success');
+    setTimeout(function(){ location.href='/orders/'+res.order_id; },1200);
+  } else { showFlash(res.error||'コピーに失敗しました','danger'); this.disabled=false; }
 });
 </script>`
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div><h1 class="h3 mb-1"><i class="fas fa-file-alt me-2 text-primary"></i>発注詳細</h1>
-  <p class="text-muted mb-0">${esc(order['order_no'])} / ${esc(order['supplier_name'])}</p></div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-truck me-1"></i>納品登録</a>
-    <button id="btn-mark-ordered" class="btn btn-primary"><i class="fas fa-check me-1"></i>発注済に更新</button>
-    <a class="btn btn-outline-secondary" href="/orders"><i class="fas fa-arrow-left me-1"></i>一覧へ</a>
+<!-- ページヘッダ -->
+<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-file-alt me-2 text-primary"></i>発注詳細</h1>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <span class="text-muted">${esc(order['order_no'])}</span>
+      <span class="mx-1 text-muted">|</span>
+      <strong>${esc(order['supplier_name'])}</strong>
+      ${statusBadge(curStatus)}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    ${showButtons.join('')}
+    <a class="btn btn-sm btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-truck me-1"></i>納品登録</a>
+    <button class="btn btn-sm btn-outline-secondary" id="btn-copy-order"><i class="fas fa-copy me-1"></i>再発注</button>
+    <a class="btn btn-sm btn-outline-secondary" href="/orders"><i class="fas fa-arrow-left me-1"></i>一覧へ</a>
   </div>
 </div>
-<div class="row g-3 mb-4">
-  <div class="col-md-6">
+
+<!-- 上段: ヘッダ情報 + 発注方法別パネル -->
+<div class="row g-3 mb-3">
+  <div class="col-lg-4">
     <div class="card shadow-sm h-100">
-      <div class="card-header bg-white"><strong><i class="fas fa-info-circle me-1"></i>ヘッダ情報</strong></div>
-      <div class="card-body">
-        <dl class="row mb-0">
-          <dt class="col-sm-4">発注日</dt><dd class="col-sm-8">${esc(order['order_date'])}</dd>
-          <dt class="col-sm-4">発注者</dt><dd class="col-sm-8">${esc(order['ordered_by'])}</dd>
-          <dt class="col-sm-4">顧客名</dt><dd class="col-sm-8">${esc(order['customer_name'])}</dd>
-          <dt class="col-sm-4">用途</dt><dd class="col-sm-8">${esc(order['usage_type'])}</dd>
-          <dt class="col-sm-4">希望納期</dt><dd class="col-sm-8">${esc(order['requested_delivery_date'])}</dd>
-          <dt class="col-sm-4">担当 / TEL</dt><dd class="col-sm-8">${esc(order['contact_name'])} / ${esc(order['phone'])}</dd>
-          <dt class="col-sm-4">状態</dt><dd class="col-sm-8">${statusBadge(String(order['status']))}</dd>
-          <dt class="col-sm-4">備考</dt><dd class="col-sm-8">${esc(order['order_note'])}</dd>
+      <div class="card-header bg-white py-2"><strong><i class="fas fa-info-circle me-1 text-primary"></i>発注情報</strong></div>
+      <div class="card-body py-2">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">発注日</dt><dd class="col-7 fw-semibold">${esc(order['order_date'])}</dd>
+          <dt class="col-5 text-muted">発注者</dt><dd class="col-7">${esc(order['ordered_by'])}</dd>
+          <dt class="col-5 text-muted">顧客名</dt><dd class="col-7">${esc(order['customer_name'])||'―'}</dd>
+          <dt class="col-5 text-muted">用途</dt><dd class="col-7">${esc(order['usage_type'])||'―'}</dd>
+          <dt class="col-5 text-muted">希望納期</dt><dd class="col-7">${esc(order['requested_delivery_date'])||'―'}</dd>
+          <dt class="col-5 text-muted">合計金額</dt><dd class="col-7 fw-bold text-primary fs-6">${yen(totalAmount)}</dd>
+          <dt class="col-5 text-muted">担当者</dt><dd class="col-7">${esc(order['contact_name'])||''} ${esc(order['honorific'])||''}</dd>
+          <dt class="col-5 text-muted">発注方法</dt><dd class="col-7">${esc(order['order_method'])||'―'}</dd>
+          <dt class="col-5 text-muted">備考</dt><dd class="col-7 text-muted">${esc(order['order_note'])||'―'}</dd>
         </dl>
       </div>
     </div>
   </div>
-  <div class="col-md-6">
+  <div class="col-lg-8">
     <div class="card shadow-sm h-100">
-      <div class="card-header bg-white"><strong><i class="fas fa-envelope me-1"></i>メール下書き</strong></div>
-      <div class="card-body">${mailSection}</div>
+      <div class="card-header bg-white py-2">
+        <strong><i class="${orderPanelIcon} me-1"></i>${orderPanelTitle}</strong>
+        <span class="ms-2 badge bg-light text-dark border small">${esc(order['order_method'])||'方法未設定'}</span>
+      </div>
+      <div class="card-body">${orderPanel}</div>
     </div>
   </div>
 </div>
-<div class="card shadow-sm mb-4">
-  <div class="card-header bg-white"><strong><i class="fas fa-table me-1"></i>発注明細</strong></div>
+
+<!-- 発注明細 -->
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+    <strong><i class="fas fa-table me-1 text-primary"></i>発注明細</strong>
+    <span class="badge bg-primary">${items.results.length} 品目 / 合計 ${yen(totalAmount)}</span>
+  </div>
   <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-dark"><tr>
         <th>品目</th><th>メーカー</th><th>商品名</th><th>仕様・色</th><th>種類</th>
-        <th class="text-center">発注数</th><th class="text-center">入荷済</th><th class="text-center">残数</th>
+        <th class="text-center">発注数</th>
+        <th class="text-center">入荷済</th>
+        <th class="text-center">残数</th>
         <th class="text-end">単価</th><th class="text-end">金額</th><th>備考</th>
       </tr></thead>
       <tbody>${itemRows || '<tr><td colspan="11" class="text-center text-muted py-3">明細がありません。</td></tr>'}</tbody>
     </table>
   </div>
 </div>
+
+<!-- 納品履歴 -->
 <div class="card shadow-sm">
-  <div class="card-header bg-white"><strong><i class="fas fa-history me-1"></i>納品履歴</strong></div>
+  <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+    <strong><i class="fas fa-truck me-1 text-success"></i>納品履歴</strong>
+    <a class="btn btn-sm btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-plus me-1"></i>納品登録</a>
+  </div>
   <div class="table-responsive">
     <table class="table table-sm mb-0">
       <thead class="table-light"><tr><th>入荷日</th><th>納品書日付</th><th>検品者</th><th>備考</th></tr></thead>
