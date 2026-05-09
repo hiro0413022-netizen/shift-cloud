@@ -105,7 +105,13 @@ function showFlash(message, type) {
 ${extraScripts}
 </body>
 </html>`
-  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+  return new Response(html, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+    }
+  })
 }
 
 // ============================================================
@@ -1712,20 +1718,21 @@ app.get('/orders/:id', async (c) => {
     const remaining = Number(item['quantity']||0) - Number(item['received_qty']||0)
     const pct = Number(item['quantity']||0) > 0
       ? Math.round(Number(item['received_qty']||0) / Number(item['quantity']||0) * 100) : 0
-    return `<tr>
+    // data-poi-id を付与 → JS側でAjax更新対象を特定
+    return `<tr data-poi-id="${item['id']}">
       <td><span class="badge bg-secondary">${esc(item['item_category'])}</span></td>
       <td class="small">${esc(item['manufacturer'])}</td>
       <td><strong>${esc(item['product_name'])}</strong></td>
       <td class="small text-muted">${[esc(item['spec']), esc(item['color'])].filter(Boolean).join(' / ')}</td>
       <td class="small">${esc(item['club_type'])}</td>
       <td class="text-center fw-semibold">${item['quantity']}</td>
-      <td class="text-center">
-        <span class="text-success fw-semibold">${item['received_qty']}</span>
+      <td class="text-center cell-received">
+        <span class="text-success fw-semibold recv-qty">${item['received_qty']}</span>
         <div class="progress" style="height:4px;width:48px;margin:2px auto 0">
-          <div class="progress-bar bg-success" style="width:${pct}%"></div>
+          <div class="progress-bar bg-success recv-bar" style="width:${pct}%"></div>
         </div>
       </td>
-      <td class="text-center ${remaining>0?'text-danger fw-bold':'text-muted'}">${remaining}</td>
+      <td class="text-center cell-remaining ${remaining>0?'text-danger fw-bold':'text-muted'}">${remaining}</td>
       <td class="text-end">${yen(item['unit_price'])}</td>
       <td class="text-end fw-semibold">${yen(item['amount'])}</td>
       <td class="small text-muted">${esc(item['line_note'])}</td>
@@ -1824,6 +1831,90 @@ app.get('/orders/:id', async (c) => {
     : []
 
   const scripts = `<script>
+// ============================================================
+// 納品履歴・入荷済数をAjaxで即時更新
+// ============================================================
+(function(){
+  var ORDER_ID = ${id};
+
+  function yenFmt(v){
+    if(v===null||v===undefined||v==='') return '';
+    var n = parseFloat(String(v));
+    return isNaN(n) ? '' : '\u00a5' + n.toLocaleString('ja-JP',{maximumFractionDigits:0});
+  }
+
+  function refreshReceipts(){
+    var spinner = document.getElementById('receipt-updating');
+    if(spinner) spinner.style.display = '';
+
+    fetch('/api/orders/' + ORDER_ID, {cache:'no-store'})
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        // ── 発注明細の入荷済・残数を更新 ──
+        (data.items||[]).forEach(function(item){
+          var tr = document.querySelector('#order-items-tbody tr[data-poi-id="'+item.id+'"]');
+          if(!tr) return;
+          var qty = Number(item.quantity||0);
+          var recv = Number(item.received_qty||0);
+          var rem  = qty - recv;
+          var pct  = qty > 0 ? Math.round(recv/qty*100) : 0;
+
+          var recvSpan = tr.querySelector('.recv-qty');
+          if(recvSpan) recvSpan.textContent = recv;
+
+          var recvBar = tr.querySelector('.recv-bar');
+          if(recvBar) recvBar.style.width = pct + '%';
+
+          var remCell = tr.querySelector('.cell-remaining');
+          if(remCell){
+            remCell.textContent = rem;
+            remCell.className = 'text-center cell-remaining ' + (rem>0?'text-danger fw-bold':'text-muted');
+          }
+        });
+
+        // ── 納品履歴テーブルを更新 ──
+        var tbody = document.getElementById('receipt-tbody');
+        if(!tbody) return;
+        var receipts = data.receipts||[];
+        if(receipts.length === 0){
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted">まだ納品登録がありません。</td></tr>';
+        } else {
+          tbody.innerHTML = receipts.map(function(r){
+            return '<tr>'+
+              '<td>'+(r.received_date||'')+'</td>'+
+              '<td>'+(r.slip_date||'―')+'</td>'+
+              '<td>'+(r.inspected_by||'―')+'</td>'+
+              '<td>'+(r.note||'')+'</td>'+
+            '</tr>';
+          }).join('');
+        }
+      })
+      .catch(function(err){ console.warn('receipt refresh error', err); })
+      .finally(function(){
+        if(spinner) spinner.style.display = 'none';
+      });
+  }
+
+  // ページロード直後に1回更新（URLに ?_r= が付いている場合＝納品登録直後）
+  var isAfterReceipt = location.search.indexOf('_r=') >= 0;
+  if(isAfterReceipt){
+    // URLから ?_r= を除去（ブラウザ履歴を汚さない）
+    var cleanUrl = location.pathname + location.search.replace(/[?&]_r=\d+/,'').replace(/^&/,'?');
+    if(cleanUrl.endsWith('?')) cleanUrl = cleanUrl.slice(0,-1);
+    history.replaceState(null,'',cleanUrl);
+    // 納品登録直後は確実に最新データを取得
+    refreshReceipts();
+  }
+
+  // 「納品登録」リンクから戻った際にも更新（ページ表示イベント）
+  window.addEventListener('pageshow', function(e){
+    if(e.persisted){
+      // bfcache から復元された場合は強制更新
+      refreshReceipts();
+    }
+  });
+})();
+
 // コピーボタン汎用
 function makeCopyBtn(btnId, taId){
   var btn = document.getElementById(btnId);
@@ -1932,7 +2023,7 @@ document.getElementById('btn-copy-order').addEventListener('click', async functi
     <span class="badge bg-primary">${items.results.length} 品目 / 合計 ${yen(totalAmount)}</span>
   </div>
   <div class="table-responsive">
-    <table class="table table-sm table-hover align-middle mb-0">
+    <table class="table table-sm table-hover align-middle mb-0" id="order-items-table">
       <thead class="table-dark"><tr>
         <th>品目</th><th>メーカー</th><th>商品名</th><th>仕様・色</th><th>種類</th>
         <th class="text-center">発注数</th>
@@ -1940,7 +2031,7 @@ document.getElementById('btn-copy-order').addEventListener('click', async functi
         <th class="text-center">残数</th>
         <th class="text-end">単価</th><th class="text-end">金額</th><th>備考</th>
       </tr></thead>
-      <tbody>${itemRows || '<tr><td colspan="11" class="text-center text-muted py-3">明細がありません。</td></tr>'}</tbody>
+      <tbody id="order-items-tbody">${itemRows || '<tr><td colspan="11" class="text-center text-muted py-3">明細がありません。</td></tr>'}</tbody>
     </table>
   </div>
 </div>
@@ -1948,13 +2039,16 @@ document.getElementById('btn-copy-order').addEventListener('click', async functi
 <!-- 納品履歴 -->
 <div class="card shadow-sm">
   <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-    <strong><i class="fas fa-truck me-1 text-success"></i>納品履歴</strong>
+    <div class="d-flex align-items-center gap-2">
+      <strong><i class="fas fa-truck me-1 text-success"></i>納品履歴</strong>
+      <span id="receipt-updating" class="spinner-border spinner-border-sm text-success" style="display:none" title="更新中"></span>
+    </div>
     <a class="btn btn-sm btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-plus me-1"></i>納品登録</a>
   </div>
   <div class="table-responsive">
     <table class="table table-sm mb-0">
       <thead class="table-light"><tr><th>入荷日</th><th>納品書日付</th><th>検品者</th><th>備考</th></tr></thead>
-      <tbody>${receiptRows}</tbody>
+      <tbody id="receipt-tbody">${receiptRows}</tbody>
     </table>
   </div>
 </div>`
@@ -2158,8 +2252,8 @@ document.getElementById('receipt-form').addEventListener('submit', async functio
     var resp = await fetch('/api/receipts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var result = await resp.json();
     if(!resp.ok){ showFlash(result.error||'登録に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>納品登録を保存'; return; }
-    showFlash('納品登録を保存しました（入荷数量合計: '+result.added_quantity+'）','success');
-    setTimeout(function(){ window.location.href='/orders/${orderId}'; },1200);
+    // 保存完了 → 即リダイレクト（キャッシュバスト付き）
+    window.location.replace('/orders/${orderId}?_r=' + Date.now());
   } catch(err){
     showFlash('通信エラー: '+err.message,'danger');
     btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>納品登録を保存';
