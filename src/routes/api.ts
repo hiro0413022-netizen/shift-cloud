@@ -1166,4 +1166,207 @@ app.post('/orders/:id/status', async (c) => {
   return c.json({ ok: true })
 })
 
+// ============================================================
+// API: バックアップ / リストア
+// ============================================================
+
+const BACKUP_TABLES = ['suppliers', 'supplier_rules', 'products', 'purchase_orders', 'purchase_order_items', 'receipts', 'receipt_items'] as const
+type BackupTable = typeof BACKUP_TABLES[number]
+
+// CSVエスケープ
+function csvEscape(v: unknown): string {
+  if (v === null || v === undefined) return ''
+  const s = String(v)
+  if (s.includes(',') || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+    return '"' + s.replace(/"/g, '""') + '"'
+  }
+  return s
+}
+
+function rowsToCsv(rows: Record<string, unknown>[]): string {
+  if (rows.length === 0) return ''
+  const keys = Object.keys(rows[0])
+  const header = keys.join(',')
+  const body = rows.map(r => keys.map(k => csvEscape(r[k])).join(',')).join('\n')
+  return header + '\n' + body
+}
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = []
+  let cur = ''
+  let inQuote = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQuote) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++ }
+        else inQuote = false
+      } else {
+        cur += ch
+      }
+    } else {
+      if (ch === '"') { inQuote = true }
+      else if (ch === ',') { result.push(cur); cur = '' }
+      else { cur += ch }
+    }
+  }
+  result.push(cur)
+  return result
+}
+
+function parseCsv(text: string): Record<string, string>[] {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim())
+  if (lines.length < 2) return []
+  const headers = parseCsvLine(lines[0])
+  return lines.slice(1).map(line => {
+    const vals = parseCsvLine(line)
+    const obj: Record<string, string> = {}
+    headers.forEach((h, i) => { obj[h] = vals[i] ?? '' })
+    return obj
+  })
+}
+
+// ── GET /api/backup/all ────────────────────────────────────
+app.get('/backup/all', async (c) => {
+  const db = c.env.DB
+  const data: Record<string, unknown[]> = {}
+  for (const tbl of BACKUP_TABLES) {
+    const res = await db.prepare(`SELECT * FROM ${tbl} ORDER BY id`).all<Record<string, unknown>>()
+    data[tbl] = res.results
+  }
+  const payload = {
+    exported_at: new Date().toISOString(),
+    version: '1.0',
+    tables: data
+  }
+  const filename = `golfwing_backup_${today()}.json`
+  return new Response(JSON.stringify(payload, null, 2), {
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`
+    }
+  })
+})
+
+// ── GET /api/backup/csv/:table ─────────────────────────────
+app.get('/backup/csv/:table', async (c) => {
+  const tbl = c.req.param('table') as BackupTable
+  if (!BACKUP_TABLES.includes(tbl)) return c.json({ error: 'Unknown table' }, 400)
+  const db = c.env.DB
+  const res = await db.prepare(`SELECT * FROM ${tbl} ORDER BY id`).all<Record<string, unknown>>()
+  const csv = rowsToCsv(res.results)
+  const filename = `${tbl}_${today()}.csv`
+  return new Response('\uFEFF' + csv, {   // BOM付きUTF-8 → Excelで開ける
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${filename}"`
+    }
+  })
+})
+
+// ── POST /api/backup/restore/all ──────────────────────────
+// Body: JSON file content (same format as /api/backup/all output)
+app.post('/backup/restore/all', async (c) => {
+  let payload: { tables?: Record<string, unknown[]> }
+  try {
+    payload = await c.req.json()
+  } catch {
+    return c.json({ error: 'JSONパースエラー' }, 400)
+  }
+  if (!payload?.tables) return c.json({ error: 'tables フィールドがありません' }, 400)
+
+  const db = c.env.DB
+  const stats: Record<string, number> = {}
+
+  // 外部キー制約があるため削除順序を逆にする
+  const deleteOrder: BackupTable[] = ['receipt_items', 'receipts', 'purchase_order_items', 'purchase_orders', 'supplier_rules', 'products', 'suppliers']
+
+  try {
+    // 全テーブル削除
+    for (const tbl of deleteOrder) {
+      await db.prepare(`DELETE FROM ${tbl}`).run()
+    }
+
+    // インサート順序（親→子）
+    const insertOrder: BackupTable[] = ['suppliers', 'products', 'supplier_rules', 'purchase_orders', 'purchase_order_items', 'receipts', 'receipt_items']
+    for (const tbl of insertOrder) {
+      const rows = (payload.tables[tbl] ?? []) as Record<string, unknown>[]
+      if (rows.length === 0) { stats[tbl] = 0; continue }
+      const keys = Object.keys(rows[0]).filter(k => k !== 'id')  // idはAUTOINCREMENT
+      // idを含めて強制的に挿入（シーケンスの整合性のためにIDも復元）
+      const allKeys = Object.keys(rows[0])
+      let inserted = 0
+      for (const row of rows) {
+        const placeholders = allKeys.map(() => '?').join(',')
+        const vals = allKeys.map(k => row[k] ?? null)
+        await db.prepare(`INSERT OR REPLACE INTO ${tbl} (${allKeys.join(',')}) VALUES (${placeholders})`).bind(...vals).run()
+        inserted++
+      }
+      stats[tbl] = inserted
+      void keys  // 未使用変数警告抑制
+    }
+
+    return c.json({ ok: true, stats })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return c.json({ error: 'リストア中にエラーが発生しました: ' + msg }, 500)
+  }
+})
+
+// ── POST /api/backup/restore/csv ──────────────────────────
+// Body: { table: string, mode: 'append'|'replace', csv: string }
+app.post('/backup/restore/csv', async (c) => {
+  let body: { table?: string; mode?: string; csv?: string }
+  try {
+    body = await c.req.json()
+  } catch {
+    return c.json({ error: 'JSONパースエラー' }, 400)
+  }
+  const { table, mode = 'append', csv } = body
+  if (!table || !BACKUP_TABLES.includes(table as BackupTable)) {
+    return c.json({ error: '不正なテーブル名です' }, 400)
+  }
+  if (!csv || csv.trim() === '') return c.json({ error: 'CSVデータが空です' }, 400)
+
+  const rows = parseCsv(csv)
+  if (rows.length === 0) return c.json({ error: 'CSVに有効なデータがありません' }, 400)
+
+  const db = c.env.DB
+  let inserted = 0
+  const errors: string[] = []
+
+  try {
+    if (mode === 'replace') {
+      await db.prepare(`DELETE FROM ${table}`).run()
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      // 空行スキップ
+      if (Object.values(row).every(v => v === '')) continue
+      try {
+        const keys = Object.keys(row)
+        const placeholders = keys.map(() => '?').join(',')
+        const vals = keys.map(k => {
+          const v = row[k]
+          if (v === '' || v === null || v === undefined) return null
+          // 数値カラムは変換
+          const numCols = ['id','is_active','list_price','default_rate','rate','priority','quantity','unit_price','amount','supplier_id','default_supplier_id','purchase_order_id','product_id','purchase_order_item_id']
+          if (numCols.includes(k) && v !== '') return isNaN(Number(v)) ? null : Number(v)
+          return v
+        })
+        await db.prepare(`INSERT OR REPLACE INTO ${table} (${keys.join(',')}) VALUES (${placeholders})`).bind(...vals).run()
+        inserted++
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        errors.push(`行${i + 2}: ${msg}`)
+      }
+    }
+    return c.json({ ok: true, inserted, errors })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return c.json({ error: 'CSVリストア中にエラー: ' + msg }, 500)
+  }
+})
+
 export { app as apiRoutes }

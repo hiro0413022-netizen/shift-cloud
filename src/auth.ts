@@ -1,0 +1,198 @@
+// ============================================================
+// 認証モジュール
+// Cookie に HMAC-SHA256 署名付きトークンを保存する方式
+// Workers の Web Crypto API を使用（Node.js crypto不要）
+// ============================================================
+
+export type AuthBindings = {
+  DB: D1Database
+  AUTH_SECRET?: string      // wrangler secret / .dev.vars で設定
+  AUTH_USERNAME?: string    // 省略時: admin
+  AUTH_PASSWORD?: string    // 省略時: golfwing2024
+}
+
+const COOKIE_NAME = 'gw_session'
+const SESSION_TTL = 60 * 60 * 24 * 7  // 7日（秒）
+
+// デフォルト認証情報（本番では必ず環境変数で上書き）
+const DEFAULT_USER = 'admin'
+const DEFAULT_PASS = 'golfwing2024'
+const DEFAULT_SECRET = 'golfwing-secret-key-change-in-production'
+
+// ── HMAC 署名 ────────────────────────────────────────────
+async function sign(payload: string, secret: string): Promise<string> {
+  const enc = new TextEncoder()
+  const key = await crypto.subtle.importKey(
+    'raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(payload))
+  return btoa(String.fromCharCode(...new Uint8Array(sig)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+async function verify(payload: string, signature: string, secret: string): Promise<boolean> {
+  const expected = await sign(payload, secret)
+  // タイミング攻撃対策の定数時間比較
+  if (expected.length !== signature.length) return false
+  let diff = 0
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i)
+  }
+  return diff === 0
+}
+
+// ── トークン生成・検証 ─────────────────────────────────
+export async function createToken(username: string, secret: string): Promise<string> {
+  const expires = Math.floor(Date.now() / 1000) + SESSION_TTL
+  const payload = `${username}:${expires}`
+  const sig = await sign(payload, secret)
+  return `${payload}:${sig}`
+}
+
+export async function verifyToken(token: string, secret: string): Promise<string | null> {
+  if (!token) return null
+  const parts = token.split(':')
+  if (parts.length < 3) return null
+  const username = parts[0]
+  const expires = parseInt(parts[1])
+  const sig = parts.slice(2).join(':')
+  if (isNaN(expires) || Date.now() / 1000 > expires) return null
+  const payload = `${username}:${expires}`
+  const ok = await verify(payload, sig, secret)
+  return ok ? username : null
+}
+
+// ── Cookie パース ──────────────────────────────────────
+export function parseCookie(header: string | null): Record<string, string> {
+  if (!header) return {}
+  return Object.fromEntries(
+    header.split(';').map(s => s.trim().split('=').map(v => decodeURIComponent(v.trim())))
+      .filter(p => p.length === 2)
+  )
+}
+
+// ── 現在ユーザー取得（認証済みなら username を返す）──
+export async function getCurrentUser(
+  req: Request,
+  secret: string
+): Promise<string | null> {
+  const cookies = parseCookie(req.headers.get('Cookie'))
+  const token = cookies[COOKIE_NAME]
+  if (!token) return null
+  return verifyToken(token, secret)
+}
+
+// ── ログイン処理 ──────────────────────────────────────
+export async function attemptLogin(
+  username: string,
+  password: string,
+  env: AuthBindings
+): Promise<Response | null> {
+  const validUser = env.AUTH_USERNAME || DEFAULT_USER
+  const validPass = env.AUTH_PASSWORD || DEFAULT_PASS
+  const secret    = env.AUTH_SECRET   || DEFAULT_SECRET
+
+  // 定数時間比較（タイミング攻撃対策）
+  const userMatch = username === validUser
+  const passMatch = password === validPass
+  if (!userMatch || !passMatch) return null
+
+  const token = await createToken(username, secret)
+  const cookie = [
+    `${COOKIE_NAME}=${encodeURIComponent(token)}`,
+    'Path=/',
+    `Max-Age=${SESSION_TTL}`,
+    'HttpOnly',
+    'SameSite=Strict',
+  ].join('; ')
+
+  return new Response(null, {
+    status: 302,
+    headers: { 'Location': '/', 'Set-Cookie': cookie }
+  })
+}
+
+// ── ログアウト（Cookie削除）──────────────────────────
+export function logoutResponse(): Response {
+  const cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict`
+  return new Response(null, {
+    status: 302,
+    headers: { 'Location': '/login', 'Set-Cookie': cookie }
+  })
+}
+
+// ── 未認証リダイレクト ────────────────────────────────
+export function unauthorizedRedirect(path: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { 'Location': `/login?next=${encodeURIComponent(path)}` }
+  })
+}
+
+// ── ログインページHTML ────────────────────────────────
+export function loginPage(error = false, next = '/'): Response {
+  const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ログイン | ゴルフウィング 発注管理</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; display:flex; align-items:center; justify-content:center; }
+    .login-card { width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+    .login-header { background: linear-gradient(135deg, #0f3460, #16213e); border-radius: 16px 16px 0 0; padding: 2rem; text-align:center; }
+    .login-body { background: #fff; border-radius: 0 0 16px 16px; padding: 2rem; }
+    .form-control:focus { border-color: #0f3460; box-shadow: 0 0 0 .2rem rgba(15,52,96,.25); }
+    .btn-login { background: linear-gradient(135deg, #0f3460, #16213e); border: none; font-size: 1rem; padding: .75rem; }
+    .btn-login:hover { background: linear-gradient(135deg, #16213e, #0f3460); }
+    .input-group-text { background: #f8f9fa; }
+  </style>
+</head>
+<body>
+<div class="login-card">
+  <div class="login-header text-white">
+    <div class="mb-3" style="font-size:3rem; opacity:.9">
+      <i class="fas fa-golf-ball"></i>
+    </div>
+    <h1 class="h4 fw-bold mb-1">ゴルフウィング</h1>
+    <p class="mb-0 opacity-75 small">発注管理システム</p>
+  </div>
+  <div class="login-body">
+    ${error ? `
+    <div class="alert alert-danger py-2 small">
+      <i class="fas fa-exclamation-circle me-1"></i>
+      ユーザー名またはパスワードが正しくありません
+    </div>` : ''}
+    <form method="POST" action="/login">
+      <input type="hidden" name="next" value="${next}">
+      <div class="mb-3">
+        <label class="form-label fw-semibold small text-muted">ユーザー名</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="fas fa-user text-muted"></i></span>
+          <input type="text" class="form-control" name="username" autofocus autocomplete="username"
+            placeholder="username" required>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold small text-muted">パスワード</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="fas fa-lock text-muted"></i></span>
+          <input type="password" class="form-control" name="password" autocomplete="current-password"
+            placeholder="••••••••" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-login btn-primary w-100 text-white fw-semibold">
+        <i class="fas fa-sign-in-alt me-2"></i>ログイン
+      </button>
+    </form>
+    <p class="text-center text-muted small mt-3 mb-0">
+      <i class="fas fa-shield-alt me-1"></i>社内専用システム
+    </p>
+  </div>
+</div>
+</body>
+</html>`
+  return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+}

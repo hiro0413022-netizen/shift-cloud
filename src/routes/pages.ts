@@ -40,7 +40,7 @@ function esc(s: unknown): string {
 // ============================================================
 // 共通レイアウト
 // ============================================================
-function layout(title: string, content: string, extraScripts = ''): Response {
+function layout(title: string, content: string, extraScripts = '', username = ''): Response {
   const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -60,7 +60,7 @@ function layout(title: string, content: string, extraScripts = ''): Response {
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
-      <div class="navbar-nav gap-1 ms-auto">
+      <div class="navbar-nav gap-1 ms-auto align-items-lg-center">
         <a class="nav-link" href="/"><i class="fas fa-chart-line me-1"></i>ダッシュボード</a>
         <a class="nav-link" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注</a>
         <a class="nav-link" href="/orders"><i class="fas fa-list me-1"></i>発注一覧</a>
@@ -69,6 +69,19 @@ function layout(title: string, content: string, extraScripts = ''): Response {
         <a class="nav-link" href="/products"><i class="fas fa-box me-1"></i>商品マスタ</a>
         <a class="nav-link" href="/suppliers"><i class="fas fa-building me-1"></i>仕入先</a>
         <a class="nav-link" href="/rules"><i class="fas fa-cog me-1"></i>判定ルール</a>
+        <div class="nav-item dropdown ms-lg-2">
+          <a class="nav-link dropdown-toggle d-flex align-items-center gap-1 border border-secondary rounded px-2"
+             href="#" data-bs-toggle="dropdown">
+            <i class="fas fa-user-circle"></i>
+            <span class="small">${username || 'admin'}</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end shadow">
+            <li><h6 class="dropdown-header"><i class="fas fa-user me-1"></i>${username || 'admin'}</h6></li>
+            <li><a class="dropdown-item" href="/admin/backup"><i class="fas fa-database me-2 text-primary"></i>バックアップ管理</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>ログアウト</a></li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -204,23 +217,41 @@ app.get('/products', async (c) => {
     return sortDir === 'ASC' ? 'desc' : 'asc'
   }
 
-  let sql = `SELECT p.*, s.name AS supplier_name, s.id AS supplier_id
-    FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
-    WHERE p.is_active=1`
-  const params: unknown[] = []
-  if (cat) { sql += ' AND p.item_category=?'; params.push(cat) }
+  // ページネーションパラメータ
+  const PAGE_SIZE = 100
+  const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1)
+
+  // WHERE句を共通化
+  let whereSql = 'WHERE p.is_active=1'
+  const whereParams: unknown[] = []
+  if (cat) { whereSql += ' AND p.item_category=?'; whereParams.push(cat) }
   if (q) {
-    sql += ' AND (p.name LIKE ? OR p.manufacturer LIKE ? OR p.barcode LIKE ? OR p.item_category LIKE ? OR p.club_type LIKE ? OR p.spec LIKE ?)'
+    whereSql += ' AND (p.name LIKE ? OR p.manufacturer LIKE ? OR p.barcode LIKE ? OR p.item_category LIKE ? OR p.club_type LIKE ? OR p.spec LIKE ?)'
     const like = `%${q}%`
-    params.push(like, like, like, like, like, like)
+    whereParams.push(like, like, like, like, like, like)
   }
+
+  // 総件数取得
+  const countSql = `SELECT COUNT(*) AS c FROM products p ${whereSql}`
+  const countRes = whereParams.length
+    ? await db.prepare(countSql).bind(...whereParams).first<{ c: number }>()
+    : await db.prepare(countSql).first<{ c: number }>()
+  const totalCount = countRes?.c ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const currentOffset = (currentPage - 1) * PAGE_SIZE
+
+  // データ取得（ページ分のみ）
   const secondary = sortCol === 'p.manufacturer' ? ', p.name ASC'
                   : sortCol === 'p.name'          ? ', p.manufacturer ASC'
                   : ', p.manufacturer ASC, p.name ASC'
-  sql += ` ORDER BY ${sortCol} ${sortDir}${secondary} LIMIT 5000`
+  let sql = `SELECT p.*, s.name AS supplier_name, s.id AS supplier_id
+    FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
+    ${whereSql} ORDER BY ${sortCol} ${sortDir}${secondary} LIMIT ? OFFSET ?`
+  const params: unknown[] = [...whereParams, PAGE_SIZE, currentOffset]
 
   const stmt = db.prepare(sql)
-  const res = params.length ? await stmt.bind(...params).all<Record<string,unknown>>() : await stmt.all<Record<string,unknown>>()
+  const res = await stmt.bind(...params).all<Record<string,unknown>>()
 
   // カテゴリ一覧
   const cats = await db.prepare('SELECT DISTINCT item_category FROM products WHERE is_active=1 ORDER BY item_category').all<{item_category:string}>()
@@ -228,16 +259,63 @@ app.get('/products', async (c) => {
   const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
   const supplierOpts = suppliers.results.map(s => `<option value="${s['id']}">${esc(s['name'])}</option>`).join('')
   const catOpts = cats.results.map(c2 => `<option value="${esc(c2.item_category)}">${esc(c2.item_category)}</option>`).join('')
-  const catFilter = cats.results.map(c2 =>
-    `<a class="btn btn-sm ${cat===c2.item_category?'btn-primary':'btn-outline-secondary'}" href="/products?cat=${encodeURIComponent(c2.item_category)}${q?'&q='+encodeURIComponent(q):''}">` +
-    `${esc(c2.item_category)}</a>`
-  ).join('')
+  const catFilter = cats.results.map(c2 => {
+    const sp2 = new URLSearchParams()
+    sp2.set('cat', c2.item_category)
+    if (q) sp2.set('q', q)
+    if (sortKey !== 'item_category') sp2.set('sort', sortKey)
+    if (sortDir === 'DESC') sp2.set('dir', 'desc')
+    return `<a class="btn btn-sm ${cat===c2.item_category?'btn-primary':'btn-outline-secondary'}" href="/products?${sp2.toString()}">${esc(c2.item_category)}</a>`
+  }).join('')
 
   // club_type バッジ色マップ
   const ctColorMap: Record<string,string> = {
     DR: 'danger', FW: 'success', UT: 'warning text-dark',
     IR: 'secondary', PT: 'dark', 'DR/FW': 'info text-dark'
   }
+  // ページネーションリンク生成ヘルパー
+  const pageUrl = (p: number) => {
+    const sp = new URLSearchParams()
+    if (q)   sp.set('q',   q)
+    if (cat) sp.set('cat', cat)
+    if (sortKey !== 'item_category') sp.set('sort', sortKey)
+    if (sortDir === 'DESC') sp.set('dir', 'desc')
+    if (p > 1) sp.set('page', String(p))
+    return '/products?' + sp.toString()
+  }
+
+  // ページネーションHTML生成
+  const buildPager = () => {
+    if (totalPages <= 1) return ''
+    const WINDOW = 2  // 現在ページの前後N件を表示
+    const pages: (number | '...')[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      if (i === 1 || i === totalPages ||
+          (i >= currentPage - WINDOW && i <= currentPage + WINDOW)) {
+        pages.push(i)
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...')
+      }
+    }
+    const items = pages.map(p => {
+      if (p === '...') return `<li class="page-item disabled"><span class="page-link">…</span></li>`
+      const active = p === currentPage
+      return `<li class="page-item ${active ? 'active' : ''}">
+        <a class="page-link" href="${pageUrl(p)}">${p}</a></li>`
+    }).join('')
+    const prev = currentPage > 1
+      ? `<li class="page-item"><a class="page-link" href="${pageUrl(currentPage - 1)}"><i class="fas fa-chevron-left"></i></a></li>`
+      : `<li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-left"></i></span></li>`
+    const next = currentPage < totalPages
+      ? `<li class="page-item"><a class="page-link" href="${pageUrl(currentPage + 1)}"><i class="fas fa-chevron-right"></i></a></li>`
+      : `<li class="page-item disabled"><span class="page-link"><i class="fas fa-chevron-right"></i></span></li>`
+    return `<nav aria-label="ページネーション" class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center mb-0">
+    ${prev}${items}${next}
+  </ul>
+</nav>`
+  }
+
   // ソートリンク生成
   const sortLink = (col: string, label: string, extraCls = '') => {
     const active = sortCol === ALLOWED_COLS[col]
@@ -301,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
     liveQ.value = '';
     document.querySelectorAll('#product-tbody tr').forEach(function(tr){ tr.style.display = ''; });
     var lbl = document.getElementById('row-count-label');
-    if (lbl) lbl.textContent = '${res.results.length} 件表示';
+    if (lbl) lbl.textContent = '${res.results.length} 件表示（このページ）';
   });
 });
 
@@ -602,7 +680,7 @@ document.getElementById('btn-do-import').addEventListener('click', async functio
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
   <div>
     <h1 class="h3 mb-1"><i class="fas fa-box me-2 text-primary"></i>商品マスタ</h1>
-    <p class="text-muted mb-0" id="row-count-label">${res.results.length} 件表示</p>
+    <p class="text-muted mb-0" id="row-count-label"><strong>${totalCount.toLocaleString()}</strong> 件中 ${res.results.length} 件表示（${currentPage}/${totalPages} ページ）</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <button class="btn btn-outline-secondary" id="btn-dl-template" title="CSVテンプレートをダウンロード">
@@ -679,9 +757,10 @@ document.getElementById('btn-do-import').addEventListener('click', async functio
       ソート: <strong>${currentSortLabel}</strong>
       ${sortDir === 'ASC' ? '<i class="fas fa-arrow-up ms-1 text-success"></i> 昇順' : '<i class="fas fa-arrow-down ms-1 text-danger"></i> 降順'}
     </span>
-    <span class="text-muted">ヘッダーをクリックしてソート切り替え</span>
+    <span class="text-muted">全 ${totalCount.toLocaleString()} 件 / ${PAGE_SIZE}件/ページ</span>
   </div>
 </div>
+${buildPager()}
 
 <!-- ════ Excel/CSV 一括インポートモーダル ════ -->
 <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
@@ -2185,6 +2264,247 @@ app.get('/backorders', async (c) => {
   <div class="card-footer text-muted small">${res.results.length}件の残注明細</div>
 </div>`
   return layout('残注一覧', content)
+})
+
+// ============================================================
+// バックアップ管理ページ
+// ============================================================
+app.get('/admin/backup', async (c) => {
+  const db = c.env.DB
+
+  // 各テーブルの件数を取得
+  const [p, s, po, poi, sr, r, ri] = await Promise.all([
+    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM purchase_order_items').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM supplier_rules').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM receipts').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM receipt_items').first<{c:number}>(),
+  ])
+
+  const tables = [
+    { key: 'products',             label: '商品マスタ',     icon: 'fa-box',               count: p?.c ?? 0,   color: 'primary' },
+    { key: 'suppliers',            label: '仕入先マスタ',   icon: 'fa-building',          count: s?.c ?? 0,   color: 'success' },
+    { key: 'purchase_orders',      label: '発注ヘッダー',   icon: 'fa-file-alt',          count: po?.c ?? 0,  color: 'info' },
+    { key: 'purchase_order_items', label: '発注明細',       icon: 'fa-list',              count: poi?.c ?? 0, color: 'info' },
+    { key: 'supplier_rules',       label: '判定ルール',     icon: 'fa-cog',               count: sr?.c ?? 0,  color: 'warning' },
+    { key: 'receipts',             label: '納品ヘッダー',   icon: 'fa-truck',             count: r?.c ?? 0,   color: 'secondary' },
+    { key: 'receipt_items',        label: '納品明細',       icon: 'fa-clipboard-list',    count: ri?.c ?? 0,  color: 'secondary' },
+  ]
+
+  const tableRows = tables.map(t => `
+    <tr>
+      <td><i class="fas ${t.icon} me-2 text-${t.color}"></i>${t.label}</td>
+      <td class="text-center"><span class="badge bg-secondary">${t.count.toLocaleString('ja-JP')}件</span></td>
+      <td>
+        <a href="/api/backup/csv/${t.key}" class="btn btn-xs btn-outline-primary py-0 px-2">
+          <i class="fas fa-download me-1"></i>CSV
+        </a>
+      </td>
+    </tr>`).join('')
+
+  const content = `
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-database me-2 text-primary"></i>バックアップ管理</h1>
+    <p class="text-muted mb-0">データのエクスポート・インポートを行います。定期的なバックアップを推奨します。</p>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- エクスポート -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="fas fa-download me-2"></i>エクスポート（バックアップ）</h5>
+      </div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">
+          <i class="fas fa-info-circle me-1 text-primary"></i>
+          全テーブルを一括でCSV（ZIP）としてダウンロードします。<br>
+          個別テーブルのみダウンロードすることもできます。
+        </p>
+        <a href="/api/backup/all" class="btn btn-primary w-100 mb-3">
+          <i class="fas fa-file-archive me-2"></i>全データを一括エクスポート（JSON）
+        </a>
+        <div class="card border-0 bg-light">
+          <div class="card-body p-2">
+            <p class="small fw-semibold mb-2 text-muted">テーブル別CSVダウンロード</p>
+            <table class="table table-sm mb-0">
+              <thead class="table-light"><tr>
+                <th>テーブル</th><th class="text-center">件数</th><th>DL</th>
+              </tr></thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- インポート（リストア） -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0"><i class="fas fa-upload me-2"></i>インポート（リストア）</h5>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-warning py-2 small mb-3">
+          <i class="fas fa-exclamation-triangle me-1"></i>
+          <strong>注意:</strong> リストアは既存データを<strong>完全に削除</strong>してから復元します。<br>
+          必ずエクスポートでバックアップを取ってから実行してください。
+        </div>
+
+        <!-- 全体リストア -->
+        <div class="card border-danger mb-3">
+          <div class="card-body py-3">
+            <p class="fw-semibold mb-2"><i class="fas fa-database me-1 text-danger"></i>全データ一括リストア（JSON）</p>
+            <div class="mb-2">
+              <input type="file" class="form-control form-control-sm" id="restore-file-all" accept=".json">
+            </div>
+            <button class="btn btn-danger btn-sm w-100" id="btn-restore-all">
+              <i class="fas fa-undo me-1"></i>リストア実行
+            </button>
+          </div>
+        </div>
+
+        <!-- テーブル別リストア -->
+        <div class="card border-0 bg-light">
+          <div class="card-body py-3">
+            <p class="fw-semibold mb-2 small text-muted"><i class="fas fa-table me-1"></i>テーブル別CSVリストア</p>
+            <div class="row g-2 mb-2">
+              <div class="col-7">
+                <select class="form-select form-select-sm" id="restore-table-select">
+                  ${tables.map(t => `<option value="${t.key}">${t.label}</option>`).join('')}
+                </select>
+              </div>
+              <div class="col-5">
+                <select class="form-select form-select-sm" id="restore-mode-select">
+                  <option value="append">追記（既存保持）</option>
+                  <option value="replace">置換（全削除後）</option>
+                </select>
+              </div>
+            </div>
+            <div class="mb-2">
+              <input type="file" class="form-control form-control-sm" id="restore-file-csv" accept=".csv">
+            </div>
+            <button class="btn btn-warning btn-sm w-100 text-dark" id="btn-restore-csv">
+              <i class="fas fa-file-import me-1"></i>CSVリストア実行
+            </button>
+          </div>
+        </div>
+
+        <!-- 結果表示 -->
+        <div id="restore-result" class="mt-3" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 運用アドバイス -->
+<div class="card mt-4 border-0 bg-light">
+  <div class="card-body">
+    <h6 class="fw-semibold mb-3"><i class="fas fa-lightbulb me-1 text-warning"></i>バックアップ運用のポイント</h6>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="d-flex gap-2">
+          <div class="text-primary flex-shrink-0 mt-1"><i class="fas fa-calendar-week"></i></div>
+          <div>
+            <div class="fw-semibold small">定期バックアップ</div>
+            <div class="text-muted small">週1回を目安に「全データ一括エクスポート」を実行し、日付付きで保存してください。</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="d-flex gap-2">
+          <div class="text-success flex-shrink-0 mt-1"><i class="fas fa-folder"></i></div>
+          <div>
+            <div class="fw-semibold small">保存場所</div>
+            <div class="text-muted small">社内共有フォルダやクラウドストレージ（OneDrive等）に保存し、複数世代を保持してください。</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="d-flex gap-2">
+          <div class="text-warning flex-shrink-0 mt-1"><i class="fas fa-history"></i></div>
+          <div>
+            <div class="fw-semibold small">リストアのタイミング</div>
+            <div class="text-muted small">誤操作や障害発生時のみ使用します。必ず現在のデータをエクスポートしてから実行してください。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>`
+
+  const scripts = `<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+// ── 全データJSONリストア ──────────────────────────────
+document.getElementById('btn-restore-all').addEventListener('click', async function() {
+  var file = document.getElementById('restore-file-all').files[0];
+  if (!file) { alert('ファイルを選択してください'); return; }
+  if (!confirm('全データを削除して復元します。本当によろしいですか？\\n\\nこの操作は取り消せません。')) return;
+  var text = await file.text();
+  var data;
+  try { data = JSON.parse(text); } catch(e) { alert('JSONファイルの解析に失敗しました: ' + e.message); return; }
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>リストア中…';
+  var resp = await fetch('/api/backup/restore/all', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  var result = await resp.json();
+  showRestoreResult(resp.ok, result);
+  this.disabled = false;
+  this.innerHTML = '<i class="fas fa-undo me-1"></i>リストア実行';
+});
+
+// ── テーブル別CSVリストア ─────────────────────────────
+document.getElementById('btn-restore-csv').addEventListener('click', async function() {
+  var file = document.getElementById('restore-file-csv').files[0];
+  var table = document.getElementById('restore-table-select').value;
+  var mode  = document.getElementById('restore-mode-select').value;
+  if (!file) { alert('ファイルを選択してください'); return; }
+  var modeLabel = mode === 'replace' ? '（全削除後に復元）' : '（既存データに追記）';
+  if (!confirm(table + ' を' + modeLabel + 'リストアします。よろしいですか？')) return;
+
+  var text = await file.text();
+  var wb = XLSX.read(text, {type:'string', codepage:65001});
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  var rows = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>リストア中…';
+  var resp = await fetch('/api/backup/restore/csv', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ table: table, mode: mode, rows: rows })
+  });
+  var result = await resp.json();
+  showRestoreResult(resp.ok, result);
+  this.disabled = false;
+  this.innerHTML = '<i class="fas fa-file-import me-1"></i>CSVリストア実行';
+});
+
+function showRestoreResult(ok, result) {
+  var el = document.getElementById('restore-result');
+  if (ok) {
+    el.innerHTML = '<div class="alert alert-success py-2 small"><i class="fas fa-check-circle me-1"></i>'
+      + '<strong>リストア完了！</strong> '
+      + (result.inserted !== undefined ? '挿入: ' + result.inserted + '件' : '')
+      + (result.details ? '<ul class="mt-1 mb-0">' + Object.entries(result.details).map(function(e){ return '<li>' + e[0] + ': ' + e[1] + '件</li>'; }).join('') + '</ul>' : '')
+      + '</div>';
+  } else {
+    el.innerHTML = '<div class="alert alert-danger py-2 small"><i class="fas fa-exclamation-circle me-1"></i>'
+      + '<strong>エラー:</strong> ' + (result.error || 'リストアに失敗しました') + '</div>';
+  }
+  el.style.display = '';
+}
+</script>`
+
+  return layout('バックアップ管理', content, scripts)
 })
 
 export { app as pageRoutes }
