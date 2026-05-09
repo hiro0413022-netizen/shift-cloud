@@ -185,8 +185,24 @@ app.get('/', async (c) => {
 // ============================================================
 app.get('/products', async (c) => {
   const db = c.env.DB
-  const q = (c.req.query('q') || '').replace(/　/g, ' ').trim()
+  const q   = (c.req.query('q')   || '').replace(/　/g, ' ').trim()
   const cat = (c.req.query('cat') || '').trim()
+
+  // ソートパラメータ
+  const ALLOWED_COLS: Record<string, string> = {
+    manufacturer:  'p.manufacturer',
+    name:          'p.name',
+    list_price:    'p.list_price',
+    club_type:     'p.club_type',
+    item_category: 'p.item_category',
+  }
+  const sortKey = c.req.query('sort') || 'item_category'
+  const sortCol = ALLOWED_COLS[sortKey] || 'p.item_category'
+  const sortDir = c.req.query('dir') === 'desc' ? 'DESC' : 'ASC'
+  const nextDir = (col: string) => {
+    if (sortCol !== ALLOWED_COLS[col]) return 'asc'
+    return sortDir === 'ASC' ? 'desc' : 'asc'
+  }
 
   let sql = `SELECT p.*, s.name AS supplier_name, s.id AS supplier_id
     FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
@@ -198,7 +214,10 @@ app.get('/products', async (c) => {
     const like = `%${q}%`
     params.push(like, like, like, like, like, like)
   }
-  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000'
+  const secondary = sortCol === 'p.manufacturer' ? ', p.name ASC'
+                  : sortCol === 'p.name'          ? ', p.manufacturer ASC'
+                  : ', p.manufacturer ASC, p.name ASC'
+  sql += ` ORDER BY ${sortCol} ${sortDir}${secondary} LIMIT 5000`
 
   const stmt = db.prepare(sql)
   const res = params.length ? await stmt.bind(...params).all<Record<string,unknown>>() : await stmt.all<Record<string,unknown>>()
@@ -214,24 +233,75 @@ app.get('/products', async (c) => {
     `${esc(c2.item_category)}</a>`
   ).join('')
 
-  const rows = res.results.map(r => `<tr data-id="${r['id']}">
+  // club_type バッジ色マップ
+  const ctColorMap: Record<string,string> = {
+    DR: 'danger', FW: 'success', UT: 'warning text-dark',
+    IR: 'secondary', PT: 'dark', 'DR/FW': 'info text-dark'
+  }
+  // ソートリンク生成
+  const sortLink = (col: string, label: string, extraCls = '') => {
+    const active = sortCol === ALLOWED_COLS[col]
+    const nd = nextDir(col)
+    const sp = new URLSearchParams()
+    if (q)   sp.set('q',   q)
+    if (cat) sp.set('cat', cat)
+    sp.set('sort', col)
+    sp.set('dir',  nd)
+    const icon = active
+      ? (sortDir === 'ASC'
+          ? '<i class="fas fa-sort-up ms-1 text-warning small"></i>'
+          : '<i class="fas fa-sort-down ms-1 text-warning small"></i>')
+      : '<i class="fas fa-sort ms-1 text-white-50 small"></i>'
+    return `<a href="/products?${sp.toString()}" class="text-decoration-none text-white ${extraCls}">${label}${icon}</a>`
+  }
+
+  const rows = res.results.map(r => {
+    const ct = String(r['club_type'] || '')
+    const ctBadge = ct
+      ? `<span class="badge bg-${ctColorMap[ct] || 'secondary'}">${esc(ct)}</span>`
+      : '<span class="text-muted">—</span>'
+    return `<tr data-id="${r['id']}">
     <td class="text-muted small">${r['id']}</td>
     <td><span class="badge bg-secondary">${esc(r['item_category'])}</span></td>
-    <td>${esc(r['manufacturer'])}</td>
+    <td class="fw-semibold">${esc(r['manufacturer'])}</td>
     <td><strong>${esc(r['name'])}</strong></td>
     <td class="text-muted small">${esc(r['spec'])}</td>
-    <td class="text-muted small">${esc(r['club_type'])}</td>
-    <td class="text-end fw-semibold">${yen(r['list_price'])}</td>
+    <td>${ctBadge}</td>
+    <td class="text-end fw-semibold text-primary">${yen(r['list_price'])}</td>
     <td class="text-center">${r['default_rate'] != null ? (Number(r['default_rate'])*100).toFixed(1)+'%' : ''}</td>
     <td class="small">${esc(r['supplier_name'])}</td>
     <td class="text-muted small">${esc(r['barcode'])}</td>
-    <td>
+    <td style="white-space:nowrap">
       <button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-row='${JSON.stringify(r)}'><i class="fas fa-edit"></i></button>
       <button class="btn btn-xs btn-outline-danger btn-del-product py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}"><i class="fas fa-trash"></i></button>
     </td>
-  </tr>`).join('')
+  </tr>`
+  }).join('')
 
   const scripts = `<script>
+// ── ライブ絞り込み（クライアント側）────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  var liveQ = document.getElementById('live-q');
+  if (!liveQ) return;
+  liveQ.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    var count = 0;
+    document.querySelectorAll('#product-tbody tr').forEach(function(tr) {
+      var show = !q || tr.textContent.toLowerCase().indexOf(q) >= 0;
+      tr.style.display = show ? '' : 'none';
+      if (show) count++;
+    });
+    var lbl = document.getElementById('row-count-label');
+    if (lbl) lbl.textContent = count + ' 件表示';
+  });
+  document.getElementById('live-q-clear').addEventListener('click', function() {
+    liveQ.value = '';
+    document.querySelectorAll('#product-tbody tr').forEach(function(tr){ tr.style.display = ''; });
+    var lbl = document.getElementById('row-count-label');
+    if (lbl) lbl.textContent = '${res.results.length} 件表示';
+  });
+});
+
 // ── 商品 モーダル制御 ─────────────────────────────────
 var productModal = new bootstrap.Modal(document.getElementById('productModal'));
 var editingId = null;
@@ -286,10 +356,17 @@ document.getElementById('productForm').addEventListener('submit', async function
 });
 </script>`
 
+  const currentSortLabel = (sortKey === 'manufacturer' ? 'メーカー'
+    : sortKey === 'name'         ? '商品名'
+    : sortKey === 'list_price'   ? '定価'
+    : sortKey === 'club_type'    ? '種類'
+    : '品目')
   const content = `
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <div><h1 class="h3 mb-1"><i class="fas fa-box me-2 text-primary"></i>商品マスタ</h1>
-  <p class="text-muted mb-0">${res.results.length} 件表示</p></div>
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-box me-2 text-primary"></i>商品マスタ</h1>
+    <p class="text-muted mb-0" id="row-count-label">${res.results.length} 件表示</p>
+  </div>
   <button class="btn btn-success" onclick="openAddProduct()"><i class="fas fa-plus me-1"></i>商品を追加</button>
 </div>
 
@@ -300,28 +377,62 @@ document.getElementById('productForm').addEventListener('submit', async function
 </div>
 
 <!-- 検索バー -->
-<form class="row g-2 mb-3" method="GET" action="/products">
-  ${cat ? `<input type="hidden" name="cat" value="${esc(cat)}">` : ''}
-  <div class="col">
-    <input class="form-control" type="text" name="q" value="${esc(q)}"
-      placeholder="メーカー・商品名・仕様・バーコードで絞り込み" autofocus>
+<div class="row g-2 mb-3">
+  <div class="col-md-6">
+    <form class="d-flex gap-2" method="GET" action="/products">
+      ${cat ? `<input type="hidden" name="cat" value="${esc(cat)}">` : ''}
+      ${sortKey !== 'item_category' ? `<input type="hidden" name="sort" value="${esc(sortKey)}">` : ''}
+      ${sortDir === 'DESC' ? `<input type="hidden" name="dir" value="desc">` : ''}
+      <input class="form-control" type="text" name="q" value="${esc(q)}"
+        placeholder="サーバー検索（メーカー・商品名・仕様…）">
+      <button class="btn btn-primary flex-shrink-0"><i class="fas fa-search"></i></button>
+      ${(q||cat) ? `<a href="/products" class="btn btn-outline-secondary flex-shrink-0"><i class="fas fa-times"></i></a>` : ''}
+    </form>
   </div>
-  <div class="col-auto d-flex gap-2">
-    <button class="btn btn-primary"><i class="fas fa-search me-1"></i>検索</button>
-    ${(q||cat) ? '<a href="/products" class="btn btn-outline-secondary">クリア</a>' : ''}
+  <div class="col-md-6">
+    <div class="input-group">
+      <span class="input-group-text bg-success text-white border-success">
+        <i class="fas fa-bolt"></i>
+      </span>
+      <input id="live-q" type="text" class="form-control border-success"
+        placeholder="ページ内瞬時絞り込み（入力するだけ・サーバー通信なし）" autocomplete="off">
+      <button id="live-q-clear" class="btn btn-outline-secondary" type="button">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
   </div>
-</form>
+</div>
 
 <div class="card shadow-sm">
   <div class="table-responsive">
-    <table class="table table-sm table-hover align-middle mb-0">
-      <thead class="table-dark"><tr>
-        <th>ID</th><th>品目</th><th>メーカー</th><th>商品名</th><th>仕様</th>
-        <th>種類</th><th class="text-end">定価</th><th class="text-center">掛率</th>
-        <th>標準仕入先</th><th>バーコード</th><th>操作</th>
-      </tr></thead>
-      <tbody>${rows || '<tr><td colspan="11" class="text-center py-4 text-muted">対象データがありません。</td></tr>'}</tbody>
+    <table class="table table-sm table-hover align-middle mb-0" id="product-table">
+      <thead class="table-dark">
+        <tr>
+          <th class="text-white-50 small" style="width:46px">ID</th>
+          <th>${sortLink('item_category', '品目')}</th>
+          <th>${sortLink('manufacturer', 'メーカー')}</th>
+          <th>${sortLink('name', '商品名')}</th>
+          <th class="text-white-50">仕様</th>
+          <th>${sortLink('club_type', '種類')}</th>
+          <th class="text-end">${sortLink('list_price', '定価', 'text-end d-block')}</th>
+          <th class="text-center text-white-50">掛率</th>
+          <th class="text-white-50">標準仕入先</th>
+          <th class="text-white-50">バーコード</th>
+          <th class="text-white-50">操作</th>
+        </tr>
+      </thead>
+      <tbody id="product-tbody">
+        ${rows || '<tr><td colspan="11" class="text-center py-4 text-muted">対象データがありません。</td></tr>'}
+      </tbody>
     </table>
+  </div>
+  <div class="card-footer text-muted small d-flex justify-content-between align-items-center">
+    <span>
+      <i class="fas fa-sort me-1"></i>
+      ソート: <strong>${currentSortLabel}</strong>
+      ${sortDir === 'ASC' ? '<i class="fas fa-arrow-up ms-1 text-success"></i> 昇順' : '<i class="fas fa-arrow-down ms-1 text-danger"></i> 降順'}
+    </span>
+    <span class="text-muted">ヘッダーをクリックしてソート切り替え</span>
   </div>
 </div>
 
