@@ -445,9 +445,9 @@ function renderModalStep(step) {
       ul2.appendChild(btnAllMf);
     }
 
-    renderMfList('');
     body.innerHTML = '';
     body.appendChild(wrap2);
+    renderMfList('');
 
     // ソートボタン
     document.getElementById('mf-sort-name').addEventListener('click', function() {
@@ -578,9 +578,9 @@ function renderModalStep(step) {
       });
     }
 
-    renderProdList(searchQ);
     body.innerHTML = '';
     body.appendChild(wrap3);
+    renderProdList(searchQ);
 
     // ソートボタンのイベント
     document.getElementById('ps-name').addEventListener('click', function() {
@@ -699,6 +699,6 @@ document.addEventListener('DOMContentLoaded', function() {
   var form = document.getElementById('order-form');
   if (form) form.addEventListener('submit', submitOrderForm);
 
-  var addBtn = document.getElementById('btn-add-row');
+  var addBtn = document.getElementById('add-row');
   if (addBtn) addBtn.addEventListener('click', function() { addRow(); });
 });

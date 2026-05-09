@@ -1119,9 +1119,12 @@ ${modalHtml}
       </button>
     </div>
   </div>
-</form>
-<script src="/static/new-order.js"></script>`
-  return layout('新規発注', content)
+</form>`
+
+  // Bootstrap JS より後に読み込む必要があるため extraScripts として渡す
+  const newOrderScripts = `<script src="/static/new-order.js"></script>`
+
+  return layout('新規発注', content, newOrderScripts)
 })
 
 // ============================================================
