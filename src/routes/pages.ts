@@ -278,8 +278,11 @@ app.get('/products', async (c) => {
   </tr>`
   }).join('')
 
-  const scripts = `<script>
-// ── ライブ絞り込み（クライアント側）────────────────────
+  const scripts = `<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════
+// ライブ絞り込み
+// ════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', function() {
   var liveQ = document.getElementById('live-q');
   if (!liveQ) return;
@@ -302,7 +305,9 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
-// ── 商品 モーダル制御 ─────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// 商品 追加・編集モーダル
+// ════════════════════════════════════════════════════════════
 var productModal = new bootstrap.Modal(document.getElementById('productModal'));
 var editingId = null;
 
@@ -354,6 +359,238 @@ document.getElementById('productForm').addEventListener('submit', async function
     showFlash(err.error||'保存に失敗しました','danger');
   }
 });
+
+// ════════════════════════════════════════════════════════════
+// テンプレート CSV ダウンロード
+// ════════════════════════════════════════════════════════════
+document.getElementById('btn-dl-template').addEventListener('click', function() {
+  var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典'];
+  var examples = [
+    ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','',''],
+    ['グリップ','Golf Pride','CP2 Pro','M60','',' ',1800,0.60,'個','','',''],
+    ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','',''],
+  ];
+  var rows = [headers].concat(examples);
+  var csv = rows.map(function(row){
+    return row.map(function(cell){
+      var s = String(cell === null || cell === undefined ? '' : cell);
+      if(s.indexOf(',')>=0 || s.indexOf('"')>=0 || s.indexOf('\\n')>=0){
+        s = '"' + s.replace(/"/g,'""') + '"';
+      }
+      return s;
+    }).join(',');
+  }).join('\\r\\n');
+  var bom = '\\uFEFF';
+  var blob = new Blob([bom + csv], {type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '商品マスタ_インポートテンプレート.csv';
+  a.click();
+});
+
+// ════════════════════════════════════════════════════════════
+// Excel / CSV 一括インポート
+// ════════════════════════════════════════════════════════════
+var importModal  = new bootstrap.Modal(document.getElementById('importModal'));
+var _importRows  = [];   // パース済み行データ
+
+// ヘッダー列マッピング（日本語 / 英語どちらでも受け付ける）
+var COL_MAP = {
+  '品目':         'item_category',
+  'item_category':'item_category',
+  'メーカー':     'manufacturer',
+  'manufacturer': 'manufacturer',
+  '商品名':       'name',
+  'name':         'name',
+  '仕様':         'spec',
+  'spec':         'spec',
+  '色':           'color',
+  'color':        'color',
+  '種類':         'club_type',
+  'club_type':    'club_type',
+  '定価':         'list_price',
+  'list_price':   'list_price',
+  '掛率':         'default_rate',
+  'default_rate': 'default_rate',
+  '単位':         'unit',
+  'unit':         'unit',
+  'バーコード':   'barcode',
+  'barcode':      'barcode',
+  '品番':         'product_code',
+  'product_code': 'product_code',
+  '出典':         'source',
+  'source':       'source',
+};
+
+document.getElementById('btn-import').addEventListener('click', function() {
+  // 毎回リセット
+  document.getElementById('import-file').value = '';
+  document.getElementById('import-preview-wrap').style.display = 'none';
+  document.getElementById('import-result').style.display = 'none';
+  document.getElementById('btn-do-import').style.display = 'none';
+  document.getElementById('import-step-file').classList.add('active');
+  document.getElementById('import-step-preview').classList.remove('active');
+  document.getElementById('import-step-done').classList.remove('active');
+  _importRows = [];
+  importModal.show();
+});
+
+document.getElementById('import-file').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  var reader = new FileReader();
+
+  reader.onload = function(ev) {
+    try {
+      var wb;
+      if (ext === 'csv') {
+        wb = XLSX.read(ev.target.result, {type:'string', codepage:65001});
+      } else {
+        wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      }
+      var ws   = wb.Sheets[wb.SheetNames[0]];
+      var raw  = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+
+      if (raw.length === 0) {
+        showImportError('データが見つかりませんでした。ヘッダー行 + データ行が必要です。');
+        return;
+      }
+
+      // ヘッダーを正規化してマッピング
+      _importRows = raw.map(function(row) {
+        var mapped = {};
+        Object.keys(row).forEach(function(k) {
+          var canonical = COL_MAP[k.trim()] || COL_MAP[k.trim().toLowerCase()];
+          if (canonical) mapped[canonical] = row[k];
+        });
+        return mapped;
+      }).filter(function(row) {
+        // 品目・商品名どちらかでも空なら除外（後でエラー表示）
+        return true;  // APIサーバー側でバリデーション
+      });
+
+      renderImportPreview(_importRows);
+    } catch(err) {
+      showImportError('ファイルの読み込みに失敗しました: ' + err.message);
+    }
+  };
+
+  if (ext === 'csv') {
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    reader.readAsArrayBuffer(file);
+  }
+});
+
+function showImportError(msg) {
+  var el = document.getElementById('import-file-error');
+  el.textContent = msg;
+  el.style.display = '';
+}
+
+function renderImportPreview(rows) {
+  document.getElementById('import-file-error').style.display = 'none';
+
+  var cols = ['item_category','manufacturer','name','spec','color','club_type',
+              'list_price','default_rate','unit','barcode','product_code','source'];
+  var labels = {'item_category':'品目','manufacturer':'メーカー','name':'商品名',
+                'spec':'仕様','color':'色','club_type':'種類',
+                'list_price':'定価','default_rate':'掛率','unit':'単位',
+                'barcode':'バーコード','product_code':'品番','source':'出典'};
+
+  var thead = '<tr>' + cols.map(function(c){
+    var req = (c==='item_category'||c==='name') ? ' <span class="text-danger">*</span>' : '';
+    return '<th class="small text-nowrap">' + labels[c] + req + '</th>';
+  }).join('') + '</tr>';
+
+  var MAX_PREVIEW = 200;
+  var previewRows = rows.slice(0, MAX_PREVIEW);
+  var tbody = previewRows.map(function(row, i) {
+    var hasError = !row['item_category'] || !row['name'];
+    var trCls = hasError ? 'table-danger' : (i%2===0?'':'table-light');
+    return '<tr class="' + trCls + '">' + cols.map(function(c) {
+      var val = row[c] !== undefined ? String(row[c]) : '';
+      var isEmpty = val === '' && (c==='item_category'||c==='name');
+      return '<td class="small text-nowrap' + (isEmpty?' text-danger fw-bold':'') + '">'
+        + (isEmpty ? '⚠ 空' : escapeHtml(val.length>30 ? val.slice(0,30)+'…' : val))
+        + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+
+  var errCount = rows.filter(function(r){ return !r['item_category']||!r['name']; }).length;
+
+  document.getElementById('import-preview-thead').innerHTML = thead;
+  document.getElementById('import-preview-tbody').innerHTML = tbody;
+  document.getElementById('import-row-count').textContent = rows.length;
+  document.getElementById('import-err-count').textContent  = errCount;
+  document.getElementById('import-preview-more').style.display = rows.length > MAX_PREVIEW ? '' : 'none';
+  document.getElementById('import-preview-more-count').textContent = rows.length - MAX_PREVIEW;
+  document.getElementById('import-preview-wrap').style.display = '';
+  document.getElementById('btn-do-import').style.display = '';
+  document.getElementById('import-step-preview').classList.add('active');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// インポート実行
+document.getElementById('btn-do-import').addEventListener('click', async function() {
+  if (_importRows.length === 0) return;
+  var mode = document.getElementById('import-mode').value;
+  var btn  = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>インポート中…';
+
+  try {
+    var resp = await fetch('/api/products/bulk-import', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ rows: _importRows, mode: mode })
+    });
+    var result = await resp.json();
+
+    if (!resp.ok) {
+      showFlash(result.error || 'インポートに失敗しました', 'danger');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-file-import me-1"></i>インポート実行';
+      return;
+    }
+
+    // 結果表示
+    var resEl = document.getElementById('import-result');
+    var summary = '<div class="alert alert-success mb-2"><i class="fas fa-check-circle me-1"></i>'
+      + '<strong>インポート完了！</strong> '
+      + '追加: <strong>' + result.inserted + '件</strong>　'
+      + (mode==='upsert' ? '更新: <strong>' + result.updated + '件</strong>　' : '')
+      + (result.skipped > 0 ? 'スキップ: <strong class="text-warning">' + result.skipped + '件</strong>' : '')
+      + '</div>';
+
+    var errHtml = '';
+    if (result.errors && result.errors.length > 0) {
+      errHtml = '<div class="alert alert-warning py-2"><strong>エラー詳細:</strong><ul class="mb-0 mt-1 small">'
+        + result.errors.slice(0,20).map(function(e){
+            return '<li>行' + e.row + ': ' + escapeHtml(e.msg) + '</li>';
+          }).join('')
+        + (result.errors.length > 20 ? '<li>… 他 ' + (result.errors.length-20) + '件</li>' : '')
+        + '</ul></div>';
+    }
+
+    resEl.innerHTML = summary + errHtml
+      + '<button class="btn btn-primary" onclick="location.reload()">'
+      + '<i class="fas fa-sync me-1"></i>ページを再読み込み</button>';
+    resEl.style.display = '';
+    document.getElementById('import-step-done').classList.add('active');
+    document.getElementById('import-preview-wrap').style.display = 'none';
+    document.getElementById('btn-do-import').style.display = 'none';
+
+  } catch(err) {
+    showFlash('通信エラー: ' + err.message, 'danger');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-file-import me-1"></i>インポート実行';
+  }
+});
 </script>`
 
   const currentSortLabel = (sortKey === 'manufacturer' ? 'メーカー'
@@ -367,7 +604,17 @@ document.getElementById('productForm').addEventListener('submit', async function
     <h1 class="h3 mb-1"><i class="fas fa-box me-2 text-primary"></i>商品マスタ</h1>
     <p class="text-muted mb-0" id="row-count-label">${res.results.length} 件表示</p>
   </div>
-  <button class="btn btn-success" onclick="openAddProduct()"><i class="fas fa-plus me-1"></i>商品を追加</button>
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-outline-secondary" id="btn-dl-template" title="CSVテンプレートをダウンロード">
+      <i class="fas fa-download me-1"></i>テンプレート
+    </button>
+    <button class="btn btn-outline-primary" id="btn-import">
+      <i class="fas fa-file-import me-1"></i>Excel/CSV一括追加
+    </button>
+    <button class="btn btn-success" onclick="openAddProduct()">
+      <i class="fas fa-plus me-1"></i>1件追加
+    </button>
+  </div>
 </div>
 
 <!-- カテゴリフィルタ -->
@@ -433,6 +680,135 @@ document.getElementById('productForm').addEventListener('submit', async function
       ${sortDir === 'ASC' ? '<i class="fas fa-arrow-up ms-1 text-success"></i> 昇順' : '<i class="fas fa-arrow-down ms-1 text-danger"></i> 降順'}
     </span>
     <span class="text-muted">ヘッダーをクリックしてソート切り替え</span>
+  </div>
+</div>
+
+<!-- ════ Excel/CSV 一括インポートモーダル ════ -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white py-2">
+        <h5 class="modal-title mb-0">
+          <i class="fas fa-file-import me-2"></i>Excel / CSV 一括インポート
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-3">
+
+        <!-- ステップインジケーター -->
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <span id="import-step-file" class="badge rounded-pill bg-primary active px-3 py-2">
+            <i class="fas fa-upload me-1"></i>① ファイル選択
+          </span>
+          <i class="fas fa-chevron-right text-muted small"></i>
+          <span id="import-step-preview" class="badge rounded-pill bg-secondary px-3 py-2">
+            <i class="fas fa-table me-1"></i>② プレビュー確認
+          </span>
+          <i class="fas fa-chevron-right text-muted small"></i>
+          <span id="import-step-done" class="badge rounded-pill bg-secondary px-3 py-2">
+            <i class="fas fa-check me-1"></i>③ 完了
+          </span>
+        </div>
+
+        <!-- ① ファイル選択エリア -->
+        <div class="card border-primary mb-3">
+          <div class="card-body py-3">
+            <div class="row g-3 align-items-start">
+              <div class="col-md-8">
+                <label class="form-label fw-semibold">
+                  <i class="fas fa-file-excel me-1 text-success"></i>
+                  ファイルを選択 <span class="text-muted small fw-normal">（.xlsx / .xls / .csv 対応）</span>
+                </label>
+                <input type="file" class="form-control" id="import-file"
+                  accept=".xlsx,.xls,.csv">
+                <div class="text-danger small mt-1" id="import-file-error" style="display:none"></div>
+                <div class="text-muted small mt-2">
+                  <i class="fas fa-info-circle me-1"></i>
+                  ヘッダー行（1行目）に列名が必要です。
+                  日本語列名（品目・メーカー・商品名…）と英語列名（item_category・manufacturer・name…）どちらも使えます。
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label fw-semibold">
+                  <i class="fas fa-cog me-1"></i>インポートモード
+                </label>
+                <select class="form-select" id="import-mode">
+                  <option value="insert">新規追加のみ（既存は変更しない）</option>
+                  <option value="upsert">追加 ＋ 更新（品番が一致したら上書き）</option>
+                </select>
+                <div class="text-muted small mt-1">
+                  「更新」モードは品番(product_code)で既存レコードを照合します
+                </div>
+              </div>
+            </div>
+
+            <!-- 列マッピング早見表 -->
+            <div class="mt-3">
+              <button class="btn btn-sm btn-outline-secondary" type="button"
+                data-bs-toggle="collapse" data-bs-target="#col-mapping-help">
+                <i class="fas fa-question-circle me-1"></i>列名の対応表を表示
+              </button>
+              <div class="collapse mt-2" id="col-mapping-help">
+                <table class="table table-sm table-bordered small mb-0" style="max-width:700px">
+                  <thead class="table-light"><tr>
+                    <th>日本語列名</th><th>英語列名</th><th>必須</th><th>説明</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr><td class="fw-semibold">品目</td><td><code>item_category</code></td><td><span class="text-danger">必須</span></td><td>シャフト / グリップ / ボール など</td></tr>
+                    <tr><td class="fw-semibold">メーカー</td><td><code>manufacturer</code></td><td></td><td>フジクラ / グラファイトデザイン など</td></tr>
+                    <tr><td class="fw-semibold">商品名</td><td><code>name</code></td><td><span class="text-danger">必須</span></td><td>例: SPEEDER NX 50</td></tr>
+                    <tr><td class="fw-semibold">仕様</td><td><code>spec</code></td><td></td><td>例: 5S, 6X, R</td></tr>
+                    <tr><td class="fw-semibold">色</td><td><code>color</code></td><td></td><td>例: 白, 黒</td></tr>
+                    <tr><td class="fw-semibold">種類</td><td><code>club_type</code></td><td></td><td>DR / FW / UT / IR / PT</td></tr>
+                    <tr><td class="fw-semibold">定価</td><td><code>list_price</code></td><td></td><td>数値（円）</td></tr>
+                    <tr><td class="fw-semibold">掛率</td><td><code>default_rate</code></td><td></td><td>0〜1の小数（例: 0.55）</td></tr>
+                    <tr><td class="fw-semibold">単位</td><td><code>unit</code></td><td></td><td>省略時は「本」</td></tr>
+                    <tr><td class="fw-semibold">バーコード</td><td><code>barcode</code></td><td></td><td>JANコードなど</td></tr>
+                    <tr><td class="fw-semibold">品番</td><td><code>product_code</code></td><td></td><td>更新モードの照合キー</td></tr>
+                    <tr><td class="fw-semibold">出典</td><td><code>source</code></td><td></td><td>メモ・出典など</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ② プレビューテーブル -->
+        <div id="import-preview-wrap" style="display:none">
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <div>
+              <strong><i class="fas fa-table me-1 text-primary"></i>プレビュー</strong>
+              <span class="text-muted small ms-2">
+                全 <strong id="import-row-count">0</strong> 行
+                <span id="import-err-badge" class="ms-1"></span>
+              </span>
+              <span class="text-danger small ms-2" id="import-err-count-wrap">
+                （<span id="import-err-count">0</span>行にエラーあり — スキップされます）
+              </span>
+            </div>
+          </div>
+          <div class="table-responsive border rounded" style="max-height:320px;overflow-y:auto">
+            <table class="table table-sm table-hover mb-0" style="font-size:0.8rem">
+              <thead class="table-dark sticky-top" id="import-preview-thead"></thead>
+              <tbody id="import-preview-tbody"></tbody>
+            </table>
+          </div>
+          <div class="text-muted small mt-1" id="import-preview-more" style="display:none">
+            <i class="fas fa-ellipsis-h me-1"></i>先頭200行のみ表示（残り <span id="import-preview-more-count"></span> 行は非表示）
+          </div>
+        </div>
+
+        <!-- ③ 結果表示 -->
+        <div id="import-result" style="display:none"></div>
+
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">閉じる</button>
+        <button type="button" class="btn btn-primary" id="btn-do-import" style="display:none">
+          <i class="fas fa-file-import me-1"></i>インポート実行
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 

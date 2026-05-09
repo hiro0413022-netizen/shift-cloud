@@ -944,6 +944,116 @@ app.delete('/products/:id', async (c) => {
 })
 
 // ============================================================
+// API: 商品 一括インポート
+// POST /api/products/bulk-import
+// Body: { rows: Array<{...}>, mode: 'insert'|'upsert' }
+//   mode=insert : 新規追加のみ
+//   mode=upsert : product_code が同じなら UPDATE、なければ INSERT
+// ============================================================
+app.post('/products/bulk-import', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{ rows: Record<string,unknown>[]; mode?: string }>()
+  const rows = body.rows
+  const mode = body.mode === 'upsert' ? 'upsert' : 'insert'
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return c.json({ error: 'rows が空です' }, 400)
+  }
+  if (rows.length > 1000) {
+    return c.json({ error: '一度に登録できるのは1,000件までです' }, 400)
+  }
+
+  // 必須チェック用ヘルパー
+  const n = (v: unknown) => normalize(v as string)
+  const num = (v: unknown) => {
+    const x = Number(String(v ?? '').replace(/,/g, '').trim())
+    return isNaN(x) ? null : x
+  }
+
+  let inserted = 0
+  let updated  = 0
+  let skipped  = 0
+  const errors: { row: number; msg: string }[] = []
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+    const rowNum = i + 2  // Excel行番号（ヘッダー=1行目）
+
+    const item_category  = n(r['item_category']  ?? r['品目'])
+    const name           = n(r['name']            ?? r['商品名'])
+    const manufacturer   = n(r['manufacturer']    ?? r['メーカー'])
+    const spec           = n(r['spec']            ?? r['仕様'])
+    const color          = n(r['color']           ?? r['色'])
+    const club_type      = n(r['club_type']       ?? r['種類'])
+    const list_price     = num(r['list_price']    ?? r['定価'])
+    const default_rate   = num(r['default_rate']  ?? r['掛率'])
+    const unit           = n(r['unit']            ?? r['単位']) || '本'
+    const barcode        = n(r['barcode']         ?? r['バーコード'])
+    const product_code   = n(r['product_code']    ?? r['品番'])
+    const source         = n(r['source']          ?? r['出典'])
+
+    // 必須フィールド検証
+    if (!item_category) {
+      errors.push({ row: rowNum, msg: '品目が空です' }); skipped++; continue
+    }
+    if (!name) {
+      errors.push({ row: rowNum, msg: '商品名が空です' }); skipped++; continue
+    }
+    // 掛率範囲チェック
+    if (default_rate !== null && (default_rate < 0 || default_rate > 1)) {
+      errors.push({ row: rowNum, msg: `掛率は0〜1の範囲で入力してください (値: ${default_rate})` })
+      skipped++; continue
+    }
+
+    try {
+      if (mode === 'upsert' && product_code) {
+        // product_code が一致する既存レコードを検索
+        const existing = await db.prepare(
+          'SELECT id FROM products WHERE product_code=? AND is_active=1 LIMIT 1'
+        ).bind(product_code).first<{ id: number }>()
+
+        if (existing) {
+          await db.prepare(`
+            UPDATE products SET
+              item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
+              list_price=?, default_rate=?, unit=?, barcode=?, source=?
+            WHERE id=?
+          `).bind(
+            item_category, manufacturer || null, name, spec || null,
+            color || null, club_type || null,
+            list_price, default_rate, unit, barcode || null, source || null,
+            existing.id
+          ).run()
+          updated++
+          continue
+        }
+      }
+
+      // INSERT
+      await db.prepare(`
+        INSERT INTO products
+          (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
+           list_price, default_rate, unit, source, is_active)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)
+      `).bind(
+        product_code || null, barcode || null,
+        item_category, manufacturer || null, name,
+        spec || null, color || null, club_type || null,
+        list_price, default_rate, unit, source || null
+      ).run()
+      inserted++
+
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      errors.push({ row: rowNum, msg })
+      skipped++
+    }
+  }
+
+  return c.json({ ok: true, inserted, updated, skipped, errors })
+})
+
+// ============================================================
 // API: 判定ルール CRUD
 // ============================================================
 app.post('/rules', async (c) => {
