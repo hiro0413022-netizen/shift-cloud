@@ -661,7 +661,8 @@ function submitOrderForm(e) {
   .then(function(res) {
     if (res.ok) {
       showFlash('発注を作成しました！', 'success');
-      setTimeout(function() { location.href = '/orders/' + res.d.id; }, 800);
+      var firstId = res.d.order_ids ? res.d.order_ids[0] : res.d.id;
+      setTimeout(function() { location.href = '/orders/' + firstId; }, 800);
     } else {
       showFlash(res.d.error || '発注作成に失敗しました', 'danger');
       btn.disabled = false;
