@@ -1847,7 +1847,7 @@ app.get('/orders/:id', async (c) => {
     var spinner = document.getElementById('receipt-updating');
     if(spinner) spinner.style.display = '';
 
-    fetch('/api/orders/' + ORDER_ID, {cache:'no-store'})
+    fetch('/api/orders/' + ORDER_ID, {cache:'no-store', credentials:'include'})
       .then(function(r){ return r.json(); })
       .then(function(data){
         // ── 発注明細の入荷済・残数を更新 ──
@@ -1898,9 +1898,11 @@ app.get('/orders/:id', async (c) => {
   // ページロード直後に1回更新（URLに ?_r= が付いている場合＝納品登録直後）
   var isAfterReceipt = location.search.indexOf('_r=') >= 0;
   if(isAfterReceipt){
-    // URLから ?_r= を除去（ブラウザ履歴を汚さない）
-    var cleanUrl = location.pathname + location.search.replace(/[?&]_r=\d+/,'').replace(/^&/,'?');
-    if(cleanUrl.endsWith('?')) cleanUrl = cleanUrl.slice(0,-1);
+    // URLから ?_r= を除去（URLSearchParamsを使って正規表現のエスケープ問題を回避）
+    var params = new URLSearchParams(location.search);
+    params.delete('_r');
+    var qs = params.toString();
+    var cleanUrl = location.pathname + (qs ? '?' + qs : '');
     history.replaceState(null,'',cleanUrl);
     // 納品登録直後は確実に最新データを取得
     refreshReceipts();
