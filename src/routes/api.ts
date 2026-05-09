@@ -226,17 +226,22 @@ app.get('/dashboard', async (c) => {
 app.get('/products', async (c) => {
   const db = c.env.DB
   const q = normalize(c.req.query('q'))
+  const cat = c.req.query('category') || ''
   let sql = `SELECT p.*, s.name AS supplier_name
              FROM products p
              LEFT JOIN suppliers s ON p.default_supplier_id = s.id
              WHERE p.is_active = 1`
   const params: unknown[] = []
+  if (cat) {
+    sql += ' AND p.item_category = ?'
+    params.push(cat)
+  }
   if (q) {
     sql += ' AND (p.name LIKE ? OR p.manufacturer LIKE ? OR p.barcode LIKE ? OR p.item_category LIKE ? OR p.club_type LIKE ?)'
     const like = `%${q}%`
     params.push(like, like, like, like, like)
   }
-  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 1500'
+  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000'
 
   const stmt = db.prepare(sql)
   const rows = params.length > 0
@@ -675,7 +680,7 @@ app.get('/products-for-order', async (c) => {
        LEFT JOIN suppliers s ON p.default_supplier_id = s.id
        WHERE p.is_active = 1
        ORDER BY p.item_category, p.manufacturer, p.name
-       LIMIT 1500`
+       LIMIT 5000`
     )
     .all<Record<string, unknown>>()
   return c.json({ products: rows.results })
