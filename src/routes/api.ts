@@ -236,7 +236,7 @@ app.get('/products', async (c) => {
     const like = `%${q}%`
     params.push(like, like, like, like, like)
   }
-  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 300'
+  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 1500'
 
   const stmt = db.prepare(sql)
   const rows = params.length > 0
@@ -675,7 +675,7 @@ app.get('/products-for-order', async (c) => {
        LEFT JOIN suppliers s ON p.default_supplier_id = s.id
        WHERE p.is_active = 1
        ORDER BY p.item_category, p.manufacturer, p.name
-       LIMIT 600`
+       LIMIT 1500`
     )
     .all<Record<string, unknown>>()
   return c.json({ products: rows.results })

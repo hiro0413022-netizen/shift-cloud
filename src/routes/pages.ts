@@ -198,7 +198,7 @@ app.get('/products', async (c) => {
     const like = `%${q}%`
     params.push(like, like, like, like, like, like)
   }
-  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 500'
+  sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 1500'
 
   const stmt = db.prepare(sql)
   const res = params.length ? await stmt.bind(...params).all<Record<string,unknown>>() : await stmt.all<Record<string,unknown>>()
@@ -894,7 +894,7 @@ app.get('/orders/new', async (c) => {
     SELECT p.id, p.item_category, p.manufacturer, p.name, p.spec, p.club_type,
            p.list_price, p.default_rate, s.name AS supplier_name
     FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
-    WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 600
+    WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 1500
   `).all<Record<string,unknown>>()
 
   // 外部JSに商品データを渡すインライン変数のみ定義
