@@ -17,6 +17,7 @@ function statusLabel(v: string): string {
   const m: Record<string, string> = {
     draft: '下書き', draft_created: '下書き作成済', ordered: '発注済',
     partial: '一部入荷', completed: '完納', cancelled: 'キャンセル',
+    pool: 'プール中',
   }
   return m[v] ?? v
 }
@@ -25,6 +26,7 @@ function statusBadge(status: string): string {
   const colors: Record<string, string> = {
     draft: 'secondary', draft_created: 'info', ordered: 'primary',
     partial: 'warning', completed: 'success', cancelled: 'dark',
+    pool: 'warning',
   }
   return `<span class="badge text-bg-${colors[status] ?? 'secondary'}">${statusLabel(status)}</span>`
 }
@@ -63,6 +65,7 @@ function layout(title: string, content: string, extraScripts = '', username = ''
       <div class="navbar-nav gap-1 ms-auto align-items-lg-center">
         <a class="nav-link" href="/"><i class="fas fa-chart-line me-1"></i>ダッシュボード</a>
         <a class="nav-link" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注</a>
+        <a class="nav-link" href="/purchase-pool"><i class="fas fa-layer-group me-1"></i>発注プール</a>
         <a class="nav-link" href="/orders"><i class="fas fa-list me-1"></i>発注一覧</a>
         <a class="nav-link" href="/backorders"><i class="fas fa-exclamation-triangle me-1"></i>残注一覧</a>
         <a class="nav-link" href="/receipts"><i class="fas fa-truck me-1"></i>納品履歴</a>
@@ -777,7 +780,7 @@ document.querySelectorAll('.btn-edit-sup').forEach(function(btn){
     var f = document.getElementById('supForm');
     ['name','alias_names','contact_name','honorific','order_method','order_method_detail',
      'phone','fax','fax_number','email','line_id','line_group_id',
-     'payment_method','shipping_rule','website','postal_code','address','notes'
+     'payment_method','shipping_rule','free_shipping_threshold','website','postal_code','address','notes'
     ].forEach(function(k){ if(f[k]) f[k].value = r[k]??''; });
     updateMethodFields();
     supModal.show();
@@ -907,9 +910,16 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
               <label class="form-label fw-semibold">支払い方法</label>
               <input class="form-control" name="payment_method" placeholder="売掛 / 現金 / 振込">
             </div>
-            <div class="col-12">
+            <div class="col-md-8">
               <label class="form-label fw-semibold">送料条件</label>
               <input class="form-control" name="shipping_rule" placeholder="例: 3万円以上送料無料">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">送料無料ライン <small class="text-muted fw-normal">（プール機能用・円）</small></label>
+              <div class="input-group">
+                <span class="input-group-text">¥</span>
+                <input class="form-control" name="free_shipping_threshold" type="number" min="0" step="1000" placeholder="25000">
+              </div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold">Webサイト</label>
@@ -1105,6 +1115,246 @@ document.getElementById('ruleForm').addEventListener('submit',async function(e){
   </div>
 </div>`
   return layout('判定ルール', content, scripts)
+})
+
+// ============================================================
+// 発注プール
+// ============================================================
+app.get('/purchase-pool', async (c) => {
+  const db = c.env.DB
+
+  const orders = await db.prepare(`
+    SELECT po.id, po.order_no, po.order_date, po.ordered_by,
+           po.customer_name, po.usage_type, po.order_note,
+           s.id AS supplier_id, s.name AS supplier_name,
+           s.free_shipping_threshold,
+           COALESCE(SUM(poi.amount),0) AS total_amount,
+           COALESCE(SUM(poi.quantity),0) AS total_qty,
+           COUNT(DISTINCT poi.id) AS line_count
+    FROM purchase_orders po
+    JOIN suppliers s ON po.supplier_id = s.id
+    LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+    WHERE po.status = 'pool'
+    GROUP BY po.id
+    ORDER BY s.name, po.id
+  `).all<Record<string, unknown>>()
+
+  // 仕入先ごとにグループ化
+  type SupplierGroup = {
+    supplier_id: number
+    supplier_name: string
+    free_shipping_threshold: number | null
+    orders: Record<string, unknown>[]
+    pool_total: number
+  }
+  const supplierMap = new Map<number, SupplierGroup>()
+  for (const o of orders.results) {
+    const sid = o['supplier_id'] as number
+    if (!supplierMap.has(sid)) {
+      supplierMap.set(sid, {
+        supplier_id: sid,
+        supplier_name: o['supplier_name'] as string,
+        free_shipping_threshold: o['free_shipping_threshold'] as number | null,
+        orders: [],
+        pool_total: 0,
+      })
+    }
+    const g = supplierMap.get(sid)!
+    g.orders.push(o)
+    g.pool_total += (o['total_amount'] as number) || 0
+  }
+  const groups = Array.from(supplierMap.values())
+
+  // 各発注の明細を取得
+  const allOrderIds = orders.results.map(o => o['id'] as number)
+  const itemsByOrder = new Map<number, Record<string, unknown>[]>()
+  for (const oid of allOrderIds) {
+    const items = await db.prepare(
+      'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
+    ).bind(oid).all<Record<string, unknown>>()
+    itemsByOrder.set(oid, items.results)
+  }
+
+  const totalPoolOrders = orders.results.length
+
+  // グループHTMLを生成
+  const groupsHtml = groups.length === 0 ? `
+    <div class="text-center py-5 text-muted">
+      <i class="fas fa-layer-group fa-3x mb-3 d-block opacity-50"></i>
+      <p class="mb-0">プールに追加された発注はありません</p>
+      <a href="/orders/new" class="btn btn-primary mt-3">
+        <i class="fas fa-plus me-1"></i>新規発注を作成
+      </a>
+    </div>` : groups.map(g => {
+    const threshold = g.free_shipping_threshold
+    const pct = threshold ? Math.min(100, Math.round(g.pool_total / threshold * 100)) : null
+    const remaining = threshold ? Math.max(0, threshold - g.pool_total) : null
+    const achieved = threshold ? g.pool_total >= threshold : false
+
+    const progressHtml = threshold ? `
+      <div class="mb-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <small class="text-muted">送料無料まで</small>
+          ${achieved
+            ? `<span class="badge bg-success"><i class="fas fa-check me-1"></i>送料無料達成！</span>`
+            : `<span class="text-danger fw-bold small">あと ¥${remaining!.toLocaleString()}</span>`
+          }
+        </div>
+        <div class="progress" style="height:10px">
+          <div class="progress-bar ${achieved ? 'bg-success' : 'bg-warning'}"
+               style="width:${pct}%" role="progressbar"></div>
+        </div>
+        <div class="d-flex justify-content-between mt-1">
+          <small class="text-muted">¥${g.pool_total.toLocaleString()}</small>
+          <small class="text-muted">¥${threshold.toLocaleString()}</small>
+        </div>
+      </div>` : `
+      <div class="mb-2">
+        <small class="text-muted">合計金額: <strong>¥${g.pool_total.toLocaleString()}</strong>　（送料無料ライン未設定）</small>
+      </div>`
+
+    const ordersHtml = g.orders.map(o => {
+      const items = itemsByOrder.get(o['id'] as number) || []
+      const itemsHtml = items.map(item => `
+        <tr class="small">
+          <td class="ps-3 text-muted">${esc(item['item_category'] as string)}</td>
+          <td>${esc(item['manufacturer'] as string)}</td>
+          <td>${esc(item['product_name'] as string)}</td>
+          <td>${esc(item['spec'] as string)}</td>
+          <td>${esc(item['color'] as string)}</td>
+          <td class="text-end">${item['quantity']}</td>
+          <td class="text-end">¥${((item['unit_price'] as number) || 0).toLocaleString()}</td>
+          <td class="text-end">¥${((item['amount'] as number) || 0).toLocaleString()}</td>
+          <td>${esc(item['line_note'] as string)}</td>
+        </tr>`).join('')
+
+      return `
+      <div class="border rounded mb-2 p-2 bg-light" data-order-id="${o['id']}">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <span class="small text-muted me-2">${esc(o['order_date'] as string)}</span>
+            ${o['customer_name'] ? `<span class="small fw-bold me-2">${esc(o['customer_name'] as string)}</span>` : ''}
+            ${o['usage_type'] ? `<span class="badge bg-light text-dark border me-1">${esc(o['usage_type'] as string)}</span>` : ''}
+            <span class="small text-muted">${o['line_count']}明細</span>
+            <strong class="ms-2">¥${((o['total_amount'] as number) || 0).toLocaleString()}</strong>
+            ${o['order_note'] ? `<span class="small text-muted ms-2"><i class="fas fa-sticky-note me-1"></i>${esc(o['order_note'] as string)}</span>` : ''}
+          </div>
+          <div class="d-flex gap-1">
+            <button class="btn btn-xs btn-outline-secondary btn-toggle-items py-0 px-2"
+                    data-order-id="${o['id']}" title="明細を表示">
+              <i class="fas fa-list"></i>
+            </button>
+            <button class="btn btn-xs btn-outline-danger btn-remove-pool py-0 px-2"
+                    data-order-id="${o['id']}" title="プールから削除">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+        <div class="items-area mt-2" id="items-${o['id']}" style="display:none">
+          <table class="table table-sm table-bordered mb-0 bg-white small">
+            <thead class="table-light">
+              <tr>
+                <th>品目</th><th>メーカー</th><th>商品名</th>
+                <th>仕様</th><th>色</th><th class="text-end">数量</th>
+                <th class="text-end">単価</th><th class="text-end">金額</th><th>備考</th>
+              </tr>
+            </thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+        </div>
+      </div>`
+    }).join('')
+
+    const orderIdsJson = JSON.stringify(g.orders.map(o => o['id']))
+    return `
+    <div class="card mb-4 ${achieved ? 'border-success' : ''}" data-supplier-id="${g.supplier_id}">
+      <div class="card-header d-flex justify-content-between align-items-center ${achieved ? 'bg-success bg-opacity-10' : 'bg-white'}">
+        <div>
+          <h5 class="mb-0"><i class="fas fa-truck me-2 text-primary"></i>${esc(g.supplier_name)}</h5>
+          <small class="text-muted">${g.orders.length}件の発注</small>
+        </div>
+        <button class="btn btn-primary btn-execute-pool"
+                data-order-ids='${orderIdsJson}'
+                data-supplier="${esc(g.supplier_name)}">
+          <i class="fas fa-paper-plane me-1"></i>まとめて発注する
+        </button>
+      </div>
+      <div class="card-body">
+        ${progressHtml}
+        <hr class="my-2">
+        ${ordersHtml}
+      </div>
+    </div>`
+  }).join('')
+
+  const content = `
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-layer-group me-2 text-warning"></i>発注プール</h1>
+    <p class="text-muted mb-0">送料無料ラインを超えたらまとめて発注 — 現在 <strong>${totalPoolOrders}</strong> 件プール中</p>
+  </div>
+  <a href="/orders/new" class="btn btn-outline-primary">
+    <i class="fas fa-plus me-1"></i>新規発注
+  </a>
+</div>
+${groupsHtml}
+<div id="pool-toast" class="toast align-items-center text-white bg-success border-0 position-fixed bottom-0 end-0 m-3" role="alert" style="z-index:9999">
+  <div class="d-flex">
+    <div class="toast-body" id="pool-toast-msg"></div>
+    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+  </div>
+</div>`
+
+  const scripts = `<script>
+(function(){
+  // 明細トグル
+  document.querySelectorAll('.btn-toggle-items').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var id = this.dataset.orderId;
+      var area = document.getElementById('items-' + id);
+      if (!area) return;
+      area.style.display = area.style.display === 'none' ? '' : 'none';
+    });
+  });
+
+  // プールから削除
+  document.querySelectorAll('.btn-remove-pool').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      if (!confirm('この発注をプールから削除しますか？')) return;
+      var id = this.dataset.orderId;
+      var resp = await fetch('/api/pool/' + id, {method:'DELETE'});
+      if (resp.ok) { location.reload(); }
+      else { alert('削除に失敗しました'); }
+    });
+  });
+
+  // まとめて発注
+  document.querySelectorAll('.btn-execute-pool').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var supplier = this.dataset.supplier;
+      var ids = JSON.parse(this.dataset.orderIds);
+      if (!confirm(supplier + ' の ' + ids.length + ' 件をまとめて発注しますか？\\nメール下書きが作成されます。')) return;
+      this.disabled = true;
+      this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
+      var resp = await fetch('/api/pool/execute', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({order_ids: ids})
+      });
+      if (resp.ok) {
+        var data = await resp.json();
+        window.location.href = '/mail-batch/' + data.batch_code;
+      } else {
+        alert('発注処理に失敗しました');
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-paper-plane me-1"></i>まとめて発注する';
+      }
+    });
+  });
+})();
+</script>`
+
+  return layout('発注プール', content, scripts)
 })
 
 // ============================================================
@@ -1309,9 +1559,14 @@ ${modalHtml}
           <i class="fas fa-lightbulb me-1 text-warning"></i>
           定価・掛率を入力すると単価が自動計算されます
         </p>
-        <button type="submit" class="btn btn-primary btn-lg px-4">
-          <i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成
-        </button>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-lg px-4">
+            <i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成
+          </button>
+          <button type="button" class="btn btn-outline-warning btn-lg px-4" id="btn-add-to-pool">
+            <i class="fas fa-layer-group me-1"></i>プールに追加
+          </button>
+        </div>
       </div>
     </div>
   </div>

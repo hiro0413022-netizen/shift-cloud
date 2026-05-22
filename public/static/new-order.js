@@ -672,9 +672,9 @@ function renderModalStep(step) {
 }
 
 // ─── 発注フォーム送信 ──────────────────────────────────────
-function submitOrderForm(e) {
-  e.preventDefault();
-  var form = e.target;
+function submitOrderForm(e, isPool) {
+  if (e) e.preventDefault();
+  var form = document.getElementById('order-form');
   var indexes = Array.from(form.querySelectorAll('input[name="row_index"]')).map(function(el) { return el.value; });
   var lines = indexes.map(function(idx) {
     function val(name) {
@@ -711,10 +711,13 @@ function submitOrderForm(e) {
   };
 
   if (!payload.ordered_by) { showFlash('発注者を入力してください。', 'danger'); return; }
+  if (isPool) payload.pool = true;
 
-  var btn = form.querySelector('button[type=submit]');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
+  var submitBtn = form.querySelector('button[type=submit]');
+  var poolBtn   = document.getElementById('btn-add-to-pool');
+  var activeBtn = isPool ? poolBtn : submitBtn;
+  activeBtn.disabled = true;
+  activeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>処理中...';
 
   fetch('/api/orders', {
     method: 'POST',
@@ -724,19 +727,28 @@ function submitOrderForm(e) {
   .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
   .then(function(res) {
     if (res.ok) {
-      showFlash('発注を作成しました！', 'success');
-      var firstId = res.d.order_ids ? res.d.order_ids[0] : res.d.id;
-      setTimeout(function() { location.href = '/orders/' + firstId; }, 800);
+      if (isPool) {
+        showFlash('発注プールに追加しました！', 'success');
+        setTimeout(function() { location.href = '/purchase-pool'; }, 800);
+      } else {
+        showFlash('発注を作成しました！', 'success');
+        var firstId = res.d.order_ids ? res.d.order_ids[0] : res.d.id;
+        setTimeout(function() { location.href = '/orders/' + firstId; }, 800);
+      }
     } else {
       showFlash(res.d.error || '発注作成に失敗しました', 'danger');
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>発注を確定する';
+      activeBtn.disabled = false;
+      activeBtn.innerHTML = isPool
+        ? '<i class="fas fa-layer-group me-1"></i>プールに追加'
+        : '<i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成';
     }
   })
   .catch(function() {
     showFlash('通信エラーが発生しました', 'danger');
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>発注を確定する';
+    activeBtn.disabled = false;
+    activeBtn.innerHTML = isPool
+      ? '<i class="fas fa-layer-group me-1"></i>プールに追加'
+      : '<i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成';
   });
 }
 
@@ -823,5 +835,13 @@ document.addEventListener('DOMContentLoaded', function() {
   if (lineTable) {
     var observer = new MutationObserver(function() { updateSupplierNotesArea(); });
     observer.observe(lineTable, { childList: true, subtree: true, attributes: true });
+  }
+
+  // プールに追加ボタン
+  var poolBtn = document.getElementById('btn-add-to-pool');
+  if (poolBtn) {
+    poolBtn.addEventListener('click', function() {
+      submitOrderForm(null, true);
+    });
   }
 });

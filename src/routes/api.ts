@@ -22,6 +22,7 @@ function statusLabel(v: string): string {
     partial: '一部入荷',
     completed: '完納',
     cancelled: 'キャンセル',
+    pool: 'プール中',
   }
   return m[v] ?? v
 }
@@ -490,7 +491,7 @@ app.post('/orders', async (c) => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(batchCode, orderNo, orderDate, orderedBy, supplierId, customerName,
-            usageType, requestedDeliveryDate, 'draft_created', orderNote)
+            usageType, requestedDeliveryDate, isPool ? 'pool' : 'draft_created', orderNote)
       .run()
     const orderId = inserted.meta.last_row_id as number
 
@@ -523,7 +524,7 @@ app.post('/orders', async (c) => {
       .bind(orderId)
       .all<Record<string, unknown>>()
 
-    if (supplier && order) {
+    if (supplier && order && !isPool) {
       const { subject, body } = composeMail(order, items.results, supplier)
       await db
         .prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
@@ -533,7 +534,7 @@ app.post('/orders', async (c) => {
     orderIds.push(orderId)
   }
 
-  return c.json({ order_ids: orderIds, batch_code: batchCode, count: orderIds.length })
+  return c.json({ order_ids: orderIds, batch_code: batchCode, count: orderIds.length, pool: isPool })
 })
 
 // ============================================================
@@ -543,6 +544,118 @@ app.post('/orders/:id/mark-ordered', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
   await db.prepare('UPDATE purchase_orders SET status=? WHERE id=?').bind('ordered', id).run()
+  return c.json({ ok: true })
+})
+
+// ============================================================
+// API: 発注プール
+// ============================================================
+
+// プール一覧（仕入先別に集計）
+app.get('/pool', async (c) => {
+  const db = c.env.DB
+
+  // プール中の発注を仕入先別に集計
+  const orders = await db.prepare(`
+    SELECT po.id, po.order_no, po.order_date, po.ordered_by,
+           po.customer_name, po.usage_type, po.order_note,
+           s.id AS supplier_id, s.name AS supplier_name,
+           s.free_shipping_threshold,
+           COALESCE(SUM(poi.amount),0) AS total_amount,
+           COALESCE(SUM(poi.quantity),0) AS total_qty,
+           COUNT(DISTINCT poi.id) AS line_count
+    FROM purchase_orders po
+    JOIN suppliers s ON po.supplier_id = s.id
+    LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
+    WHERE po.status = 'pool'
+    GROUP BY po.id
+    ORDER BY s.name, po.id
+  `).all<Record<string, unknown>>()
+
+  // 仕入先ごとにグループ化
+  const supplierMap = new Map<number, {
+    supplier_id: number
+    supplier_name: string
+    free_shipping_threshold: number | null
+    orders: Record<string, unknown>[]
+    pool_total: number
+  }>()
+
+  for (const o of orders.results) {
+    const sid = o['supplier_id'] as number
+    if (!supplierMap.has(sid)) {
+      supplierMap.set(sid, {
+        supplier_id: sid,
+        supplier_name: o['supplier_name'] as string,
+        free_shipping_threshold: o['free_shipping_threshold'] as number | null,
+        orders: [],
+        pool_total: 0,
+      })
+    }
+    const g = supplierMap.get(sid)!
+    g.orders.push(o)
+    g.pool_total += o['total_amount'] as number
+  }
+
+  return c.json({ groups: Array.from(supplierMap.values()) })
+})
+
+// プール内の発注の明細取得
+app.get('/pool/items/:order_id', async (c) => {
+  const db = c.env.DB
+  const orderId = parseInt(c.req.param('order_id'))
+  const items = await db.prepare(`
+    SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id
+  `).bind(orderId).all<Record<string, unknown>>()
+  return c.json({ items: items.results })
+})
+
+// プールから発注実行（仕入先単位でまとめて draft_created に昇格）
+app.post('/pool/execute', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{ order_ids: number[] }>()
+  const ids = body.order_ids || []
+  if (ids.length === 0) return c.json({ error: '発注IDが必要です' }, 400)
+
+  for (const id of ids) {
+    // メール下書き生成
+    const order = await db.prepare(
+      `SELECT po.*, s.name AS supplier_name, s.email, s.contact_name, s.order_method
+       FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?`
+    ).bind(id).first<Record<string, unknown>>()
+    const items = await db.prepare(
+      'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
+    ).bind(id).all<Record<string, unknown>>()
+    const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+      .bind(order?.['supplier_id']).first<Record<string, unknown>>()
+
+    if (order && supplier) {
+      const { subject, body: emailBody } = composeMail(order, items.results, supplier)
+      await db.prepare(
+        'UPDATE purchase_orders SET status=?, email_subject=?, email_body=? WHERE id=?'
+      ).bind('draft_created', subject, emailBody, id).run()
+    } else {
+      await db.prepare('UPDATE purchase_orders SET status=? WHERE id=?')
+        .bind('draft_created', id).run()
+    }
+  }
+
+  // batch_codeを統一して一括メール送信画面へ誘導
+  const batchCode = nowCode() + '-pool-' + Math.random().toString(36).substring(2, 6)
+  for (const id of ids) {
+    await db.prepare('UPDATE purchase_orders SET batch_code=? WHERE id=?').bind(batchCode, id).run()
+  }
+
+  return c.json({ ok: true, batch_code: batchCode, count: ids.length })
+})
+
+// プールから除外（削除）
+app.delete('/pool/:order_id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('order_id'))
+  // 明細も削除
+  await db.prepare('DELETE FROM purchase_order_items WHERE purchase_order_id=?').bind(id).run()
+  await db.prepare('DELETE FROM purchase_orders WHERE id=? AND status=?').bind(id, 'pool').run()
   return c.json({ ok: true })
 })
 
@@ -846,14 +959,15 @@ app.post('/suppliers', async (c) => {
     INSERT INTO suppliers
       (name, alias_names, contact_name, honorific, order_method, order_method_detail,
        phone, fax, fax_number, email, line_id, line_group_id,
-       payment_method, shipping_rule, website, postal_code, address, notes, is_active, updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP)
+       payment_method, shipping_rule, free_shipping_threshold, website, postal_code, address, notes, is_active, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP)
   `).bind(
     normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
     normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
     normalize(b['phone']), normalize(b['fax']), normalize(b['fax_number']),
     normalize(b['email']), normalize(b['line_id']), normalize(b['line_group_id']),
     normalize(b['payment_method']), normalize(b['shipping_rule']),
+    b['free_shipping_threshold'] ? parseInt(b['free_shipping_threshold']) : null,
     normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
     normalize(b['notes'])
   ).run()
@@ -868,7 +982,7 @@ app.put('/suppliers/:id', async (c) => {
     UPDATE suppliers SET
       name=?, alias_names=?, contact_name=?, honorific=?, order_method=?, order_method_detail=?,
       phone=?, fax=?, fax_number=?, email=?, line_id=?, line_group_id=?,
-      payment_method=?, shipping_rule=?, website=?, postal_code=?, address=?, notes=?,
+      payment_method=?, shipping_rule=?, free_shipping_threshold=?, website=?, postal_code=?, address=?, notes=?,
       updated_at=CURRENT_TIMESTAMP
     WHERE id=?
   `).bind(
@@ -877,6 +991,7 @@ app.put('/suppliers/:id', async (c) => {
     normalize(b['phone']), normalize(b['fax']), normalize(b['fax_number']),
     normalize(b['email']), normalize(b['line_id']), normalize(b['line_group_id']),
     normalize(b['payment_method']), normalize(b['shipping_rule']),
+    b['free_shipping_threshold'] ? parseInt(b['free_shipping_threshold']) : null,
     normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
     normalize(b['notes']), id
   ).run()
