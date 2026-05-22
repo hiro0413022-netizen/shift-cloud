@@ -356,7 +356,7 @@ app.get('/products', async (c) => {
     <td class="small">${esc(r['supplier_name'])}</td>
     <td class="text-muted small">${esc(r['barcode'])}</td>
     <td style="white-space:nowrap">
-      <button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-row='${JSON.stringify(r)}'><i class="fas fa-edit"></i></button>
+      <button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-row='${JSON.stringify(r).replace(/'/g,"&#39;")}'><i class="fas fa-edit"></i></button>
       <button class="btn btn-xs btn-outline-danger btn-del-product py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}"><i class="fas fa-trash"></i></button>
     </td>
   </tr>`
@@ -405,11 +405,18 @@ function openAddProduct(){
 }
 
 function initProductPage() {
+try {
 
 // モーダル初期化（DOM確定後）
-productModal  = new bootstrap.Modal(document.getElementById('productModal'));
-importModal   = new bootstrap.Modal(document.getElementById('importModal'));
-varHelpModal  = new bootstrap.Modal(document.getElementById('varHelpModal'));
+var pmEl = document.getElementById('productModal');
+var imEl = document.getElementById('importModal');
+var vmEl = document.getElementById('varHelpModal');
+if (!pmEl) { console.error('productModal not found'); return; }
+if (!imEl) { console.error('importModal not found'); return; }
+if (!vmEl) { console.error('varHelpModal not found'); return; }
+productModal  = new bootstrap.Modal(pmEl);
+importModal   = new bootstrap.Modal(imEl);
+varHelpModal  = new bootstrap.Modal(vmEl);
 
 document.querySelectorAll('.btn-edit-product').forEach(function(btn){
   btn.addEventListener('click', function(){
@@ -725,9 +732,11 @@ document.getElementById('btn-do-import').addEventListener('click', async functio
   }
 });
 
+} catch(e) { console.error('initProductPage error:', e); }
 } // initProductPage end
 
 // スクリプトはbody末尾に挿入されるため、DOM構築完了後に直接呼び出す
+console.log('[products] readyState=', document.readyState);
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initProductPage);
 } else {
