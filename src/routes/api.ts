@@ -979,21 +979,36 @@ app.post('/products/bulk-import', async (c) => {
     const key = nameRaw.trim()
     if (!key) return null
     if (supplierCache.has(key)) return supplierCache.get(key)!
-    // 前方一致（例: "ワークス" → "ワークスゴルフ" にも対応）、完全一致優先
     const exact = await db.prepare(
       'SELECT id FROM suppliers WHERE name=? AND is_active=1 LIMIT 1'
     ).bind(key).first<{ id: number }>()
-    if (exact) {
-      supplierCache.set(key, exact.id)
-      return exact.id
-    }
-    // 部分一致フォールバック
+    if (exact) { supplierCache.set(key, exact.id); return exact.id }
     const like = await db.prepare(
       "SELECT id FROM suppliers WHERE name LIKE ? AND is_active=1 ORDER BY length(name) LIMIT 1"
     ).bind(`%${key}%`).first<{ id: number }>()
     const id = like?.id ?? null
     supplierCache.set(key, id)
     return id
+  }
+
+  // ----------------------------------------------------------------
+  // バリエーション列パーサー
+  // 書式: "BL無:色名=品番/BL有:色名=品番/..."
+  // 戻り値: [{ backline: 'BL無'|'BL有', color: string, product_code: string }, ...]
+  // ----------------------------------------------------------------
+  type VarItem = { backline: string; color: string; product_code: string }
+  const parseVariations = (raw: string): VarItem[] => {
+    return raw.split('/').map(s => s.trim()).filter(Boolean).map(seg => {
+      // 区切り: "BL無:色名=品番"
+      const colonIdx = seg.indexOf(':')
+      const eqIdx    = seg.indexOf('=')
+      if (colonIdx < 0 || eqIdx < 0 || eqIdx < colonIdx) return null
+      const backline     = seg.slice(0, colonIdx).trim()          // "BL無" / "BL有"
+      const color        = seg.slice(colonIdx + 1, eqIdx).trim()  // 色名
+      const product_code = seg.slice(eqIdx + 1).trim()            // 品番
+      if (!color || !product_code) return null
+      return { backline, color, product_code }
+    }).filter((x): x is VarItem => x !== null)
   }
 
   let inserted = 0
@@ -1017,10 +1032,10 @@ app.post('/products/bulk-import', async (c) => {
     const barcode        = n(r['barcode']         ?? r['バーコード'])
     const product_code   = n(r['product_code']    ?? r['品番'])
     const source         = n(r['source']          ?? r['出典'])
-    // 仕入先名（複数の列名に対応）
     const supplier_name_raw = n(
       r['supplier_name'] ?? r['仕入先名'] ?? r['仕入先'] ?? r['発注先'] ?? r['発注先名']
     )
+    const variations_raw = n(r['variations'] ?? r['バリエーション'] ?? r['バリエ'])
 
     // 必須フィールド検証
     if (!item_category) {
@@ -1029,7 +1044,6 @@ app.post('/products/bulk-import', async (c) => {
     if (!name) {
       errors.push({ row: rowNum, msg: '商品名が空です' }); skipped++; continue
     }
-    // 掛率範囲チェック
     if (default_rate !== null && (default_rate < 0 || default_rate > 1)) {
       errors.push({ row: rowNum, msg: `掛率は0〜1の範囲で入力してください (値: ${default_rate})` })
       skipped++; continue
@@ -1040,18 +1054,72 @@ app.post('/products/bulk-import', async (c) => {
     if (supplier_name_raw) {
       default_supplier_id = await resolveSupplierName(supplier_name_raw)
       if (default_supplier_id === null) {
-        errors.push({ row: rowNum, msg: `仕入先名 "${supplier_name_raw}" が見つかりませんでした（スキップせず登録します）` })
-        // スキップしない：仕入先未設定のまま登録を続行
+        errors.push({ row: rowNum, msg: `仕入先名 "${supplier_name_raw}" が見つかりませんでした（仕入先未設定で登録します）` })
       }
     }
 
+    // ----------------------------------------------------------------
+    // バリエーション展開
+    // ----------------------------------------------------------------
+    const varItems = variations_raw ? parseVariations(variations_raw) : []
+
+    if (varItems.length > 0) {
+      // バリエーションあり → バリエーションの数だけ INSERT/UPSERT
+      for (const v of varItems) {
+        // spec に バックライン情報を付加（既存specがあれば " / BL有" 等を追記）
+        const varSpec = [spec, v.backline].filter(Boolean).join(' / ')
+        try {
+          if (mode === 'upsert' && v.product_code) {
+            const existing = await db.prepare(
+              'SELECT id FROM products WHERE product_code=? AND is_active=1 LIMIT 1'
+            ).bind(v.product_code).first<{ id: number }>()
+            if (existing) {
+              await db.prepare(`
+                UPDATE products SET
+                  item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
+                  list_price=?, default_rate=?, unit=?, source=?,
+                  default_supplier_id=COALESCE(?, default_supplier_id)
+                WHERE id=?
+              `).bind(
+                item_category, manufacturer || null, name,
+                varSpec || null, v.color || null, club_type || null,
+                list_price, default_rate, unit, source || null,
+                default_supplier_id, existing.id
+              ).run()
+              updated++
+              continue
+            }
+          }
+          await db.prepare(`
+            INSERT INTO products
+              (product_code, item_category, manufacturer, name, spec, color, club_type,
+               list_price, default_rate, unit, source, default_supplier_id, is_active)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)
+          `).bind(
+            v.product_code,
+            item_category, manufacturer || null, name,
+            varSpec || null, v.color || null, club_type || null,
+            list_price, default_rate, unit, source || null,
+            default_supplier_id
+          ).run()
+          inserted++
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err)
+          errors.push({ row: rowNum, msg: `バリエーション "${v.backline}:${v.color}=${v.product_code}": ${msg}` })
+          skipped++
+        }
+      }
+      continue  // 次の行へ（バリエーションなしのINSERT処理をスキップ）
+    }
+
+    // ----------------------------------------------------------------
+    // バリエーションなし → 従来通りの処理
+    // ----------------------------------------------------------------
     try {
       if (mode === 'upsert' && product_code) {
-        // product_code が一致する既存レコードを検索
         const existing = await db.prepare(
           'SELECT id FROM products WHERE product_code=? AND is_active=1 LIMIT 1'
         ).bind(product_code).first<{ id: number }>()
-
         if (existing) {
           await db.prepare(`
             UPDATE products SET
@@ -1063,15 +1131,12 @@ app.post('/products/bulk-import', async (c) => {
             item_category, manufacturer || null, name, spec || null,
             color || null, club_type || null,
             list_price, default_rate, unit, barcode || null, source || null,
-            default_supplier_id,   // NULL の場合は既存値を保持（COALESCE）
-            existing.id
+            default_supplier_id, existing.id
           ).run()
           updated++
           continue
         }
       }
-
-      // INSERT
       await db.prepare(`
         INSERT INTO products
           (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
@@ -1085,7 +1150,6 @@ app.post('/products/bulk-import', async (c) => {
         default_supplier_id
       ).run()
       inserted++
-
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push({ row: rowNum, msg })

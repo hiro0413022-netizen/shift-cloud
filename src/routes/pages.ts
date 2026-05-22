@@ -448,12 +448,19 @@ document.getElementById('productForm').addEventListener('submit', async function
 // テンプレート CSV ダウンロード
 // ════════════════════════════════════════════════════════════
 document.getElementById('btn-dl-template').addEventListener('click', function() {
-  var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典','仕入先名'];
+  var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典','仕入先名','バリエーション'];
   var examples = [
-    ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','','','ワークス'],
-    ['グリップ','Golf Pride','CP2 Pro','M60','',' ',1800,0.60,'個','','','','アクシネット'],
-    ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','','','アクシネット'],
+    ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','SNXDR50S','','ワークス',''],
+    ['グリップ','Golf Pride','CP2 Pro','M60','','',1800,0.60,'個','','','','アクシネット','BL無:ブラック=GCP2BK60BL/BL無:レッド=GCP2RD60BL/BL無:ホワイト=GCP2WH60BL/BL有:ブラック=GCP2BK60/BL有:レッド=GCP2RD60/BL有:ホワイト=GCP2WH60'],
+    ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','','','アクシネット',''],
   ];
+  var varHelp = '【バリエーション列の書き方】\n'
+    + '色・バックライン有無ごとに品番が異なる場合に使います。\n'
+    + '書式: BL無:色名=品番/BL有:色名=品番  （スラッシュ区切りで複数指定）\n'
+    + '例: BL無:ブラック=GCP2BK60BL/BL無:レッド=GCP2RD60BL/BL有:ブラック=GCP2BK60\n\n'
+    + '※ バリエーションがない商品はこの列を空欄にしてください。\n'
+    + '※ バリエーションがある場合、「色」「品番」列は無視されます（バリエーション列から自動展開）。';
+  if (!confirm('テンプレートをダウンロードします。\n\n' + varHelp + '\n\nOKをクリックするとダウンロードが始まります。')) { return; }
   var rows = [headers].concat(examples);
   var csv = rows.map(function(row){
     return row.map(function(cell){
@@ -509,6 +516,9 @@ var COL_MAP = {
   '仕入先':       'supplier_name',
   '発注先':       'supplier_name',
   '発注先名':     'supplier_name',
+  'バリエーション': 'variations',
+  'variations':   'variations',
+  'バリエ':       'variations',
 };
 
 document.getElementById('btn-import').addEventListener('click', function() {
@@ -582,12 +592,12 @@ function renderImportPreview(rows) {
   document.getElementById('import-file-error').style.display = 'none';
 
   var cols = ['item_category','manufacturer','name','spec','color','club_type',
-              'list_price','default_rate','unit','barcode','product_code','source','supplier_name'];
+              'list_price','default_rate','unit','barcode','product_code','source','supplier_name','variations'];
   var labels = {'item_category':'品目','manufacturer':'メーカー','name':'商品名',
                 'spec':'仕様','color':'色','club_type':'種類',
                 'list_price':'定価','default_rate':'掛率','unit':'単位',
                 'barcode':'バーコード','product_code':'品番','source':'出典',
-                'supplier_name':'仕入先名'};
+                'supplier_name':'仕入先名','variations':'バリエーション'};
 
   var thead = '<tr>' + cols.map(function(c){
     var req = (c==='item_category'||c==='name') ? ' <span class="text-danger">*</span>' : '';
@@ -602,17 +612,36 @@ function renderImportPreview(rows) {
     return '<tr class="' + trCls + '">' + cols.map(function(c) {
       var val = row[c] !== undefined ? String(row[c]) : '';
       var isEmpty = val === '' && (c==='item_category'||c==='name');
-      return '<td class="small text-nowrap' + (isEmpty?' text-danger fw-bold':'') + '">'
-        + (isEmpty ? '⚠ 空' : escapeHtml(val.length>30 ? val.slice(0,30)+'…' : val))
+      if (isEmpty) {
+        return '<td class="small text-nowrap text-danger fw-bold">⚠ 空</td>';
+      }
+      // バリエーション列は件数バッジ＋ツールチップで表示
+      if (c === 'variations' && val) {
+        var varCount = val.split('/').filter(function(v){ return v.trim(); }).length;
+        return '<td class="small text-nowrap">'
+          + '<span class="badge bg-primary" title="' + escapeHtml(val.replace(/\//g,'\n')) + '" '
+          + 'data-bs-toggle="tooltip" data-bs-placement="left" style="cursor:pointer">'
+          + varCount + '件展開'
+          + '</span></td>';
+      }
+      return '<td class="small text-nowrap">'
+        + escapeHtml(val.length>30 ? val.slice(0,30)+'…' : val)
         + '</td>';
     }).join('') + '</tr>';
   }).join('');
 
   var errCount = rows.filter(function(r){ return !r['item_category']||!r['name']; }).length;
+  // バリエーション展開後の総登録件数を計算
+  var expandedCount = rows.reduce(function(sum, r) {
+    var v = r['variations'] ? String(r['variations']).trim() : '';
+    if (!v) return sum + 1;
+    var varCount = v.split('/').filter(function(x){ return x.trim(); }).length;
+    return sum + (varCount > 0 ? varCount : 1);
+  }, 0);
 
   document.getElementById('import-preview-thead').innerHTML = thead;
   document.getElementById('import-preview-tbody').innerHTML = tbody;
-  document.getElementById('import-row-count').textContent = rows.length;
+  document.getElementById('import-row-count').textContent = rows.length + '行（展開後 ' + expandedCount + '件）';
   document.getElementById('import-err-count').textContent  = errCount;
   document.getElementById('import-preview-more').style.display = rows.length > MAX_PREVIEW ? '' : 'none';
   document.getElementById('import-preview-more-count').textContent = rows.length - MAX_PREVIEW;
