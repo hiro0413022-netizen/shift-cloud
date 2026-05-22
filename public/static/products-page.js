@@ -1,0 +1,332 @@
+// ============================================================
+// 商品マスタページ JS
+// ============================================================
+
+// ライブ絞り込み
+document.addEventListener('DOMContentLoaded', function() {
+  var liveQ = document.getElementById('live-q');
+  if (!liveQ) return;
+  liveQ.addEventListener('input', function() {
+    var q = this.value.toLowerCase();
+    var count = 0;
+    document.querySelectorAll('#product-tbody tr').forEach(function(tr) {
+      var show = !q || tr.textContent.toLowerCase().indexOf(q) >= 0;
+      tr.style.display = show ? '' : 'none';
+      if (show) count++;
+    });
+    var lbl = document.getElementById('row-count-label');
+    if (lbl) lbl.textContent = count + ' 件表示';
+  });
+  document.getElementById('live-q-clear').addEventListener('click', function() {
+    liveQ.value = '';
+    document.querySelectorAll('#product-tbody tr').forEach(function(tr){ tr.style.display = ''; });
+    var lbl = document.getElementById('row-count-label');
+    if (lbl) lbl.textContent = window._PRODUCTS_PAGE_COUNT || '' ;
+  });
+});
+
+// ============================================================
+// 商品 追加・編集・インポート
+// ============================================================
+var productModal, importModal, varHelpModal;
+var editingId = null;
+var _importRows = [];
+
+function openAddProduct(){
+  editingId = null;
+  document.getElementById('pmTitle').textContent = '商品を追加';
+  document.getElementById('productForm').reset();
+  productModal.show();
+}
+
+function initProductPage() {
+try {
+
+var pmEl = document.getElementById('productModal');
+var imEl = document.getElementById('importModal');
+var vmEl = document.getElementById('varHelpModal');
+if (!pmEl) { console.error('productModal not found'); return; }
+if (!imEl) { console.error('importModal not found'); return; }
+if (!vmEl) { console.error('varHelpModal not found'); return; }
+productModal = new bootstrap.Modal(pmEl);
+importModal  = new bootstrap.Modal(imEl);
+varHelpModal = new bootstrap.Modal(vmEl);
+
+document.querySelectorAll('.btn-edit-product').forEach(function(btn){
+  btn.addEventListener('click', async function(){
+    var id = this.dataset.id;
+    var resp = await fetch('/api/products/' + id);
+    if (!resp.ok) { showFlash('商品データの取得に失敗しました', 'danger'); return; }
+    var r = await resp.json();
+    editingId = r.id;
+    document.getElementById('pmTitle').textContent = '商品を編集';
+    var f = document.getElementById('productForm');
+    ['product_code','barcode','item_category','manufacturer','name','spec','color','club_type',
+     'list_price','default_rate','unit','source'].forEach(function(k){ if(f[k]) f[k].value = r[k]!=null?r[k]:''; });
+    f['default_supplier_id'].value = r['default_supplier_id'] != null ? r['default_supplier_id'] : '';
+    productModal.show();
+  });
+});
+
+document.querySelectorAll('.btn-del-product').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    if(!confirm(this.dataset.name + ' を無効化しますか？')) return;
+    var id = this.dataset.id;
+    fetch('/api/products/'+id, {method:'DELETE'}).then(function(r){
+      if(r.ok){ showFlash('削除しました','success'); setTimeout(function(){ location.reload(); },800); }
+      else showFlash('削除に失敗しました','danger');
+    });
+  });
+});
+
+document.getElementById('productForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  var fd = new FormData(this);
+  var body = {};
+  fd.forEach(function(v,k){ body[k]=v; });
+  var url = editingId ? '/api/products/'+editingId : '/api/products';
+  var method = editingId ? 'PUT' : 'POST';
+  var resp = await fetch(url, {method:method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  if(resp.ok){
+    showFlash(editingId?'更新しました':'追加しました','success');
+    productModal.hide();
+    setTimeout(function(){ location.reload(); },800);
+  } else {
+    var err = await resp.json().catch(function(){ return {}; });
+    showFlash(err.error||'保存に失敗しました','danger');
+  }
+});
+
+// ============================================================
+// テンプレート CSV ダウンロード
+// ============================================================
+function doDownloadTemplate() {
+  var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典','仕入先名','バリエーション'];
+  var examples = [
+    ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','SNXDR50S','','ワークス',''],
+    ['グリップ','Golf Pride','CP2 Pro','M60','','',1800,0.60,'個','','','','アクシネット','BL無:ブラック/レッド/ホワイト|BL有:ブラック/レッド/ホワイト'],
+    ['グリップ','Golf Pride','Tour Velvet','M60','','',1200,0.60,'個','','','','アクシネット','ブラック/レッド/ホワイト/ブルー'],
+    ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','','','アクシネット',''],
+  ];
+  var rows = [headers].concat(examples);
+  var csv = rows.map(function(row){
+    return row.map(function(cell){
+      var s = String(cell === null || cell === undefined ? '' : cell);
+      if(s.indexOf(',')>=0 || s.indexOf('"')>=0 || s.indexOf('\n')>=0){
+        s = '"' + s.replace(/"/g,'""') + '"';
+      }
+      return s;
+    }).join(',');
+  }).join('\r\n');
+  var bom = '\uFEFF';
+  var blob = new Blob([bom + csv], {type:'text/csv;charset=utf-8'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '商品マスタ_インポートテンプレート.csv';
+  a.click();
+}
+document.getElementById('btn-dl-template').addEventListener('click', doDownloadTemplate);
+
+document.getElementById('btn-template-help').addEventListener('click', function() {
+  varHelpModal.show();
+});
+document.getElementById('btn-dl-template-from-help').addEventListener('click', function() {
+  varHelpModal.hide();
+  doDownloadTemplate();
+});
+
+// ============================================================
+// Excel / CSV 一括インポート
+// ============================================================
+var COL_MAP = {
+  '品目':'item_category','item_category':'item_category',
+  'メーカー':'manufacturer','manufacturer':'manufacturer',
+  '商品名':'name','name':'name',
+  '仕様':'spec','spec':'spec',
+  '色':'color','color':'color',
+  '種類':'club_type','club_type':'club_type',
+  '定価':'list_price','list_price':'list_price',
+  '掛率':'default_rate','default_rate':'default_rate',
+  '単位':'unit','unit':'unit',
+  'バーコード':'barcode','barcode':'barcode',
+  '品番':'product_code','product_code':'product_code',
+  '出典':'source','source':'source',
+  '仕入先名':'supplier_name','supplier_name':'supplier_name',
+  '仕入先':'supplier_name','発注先':'supplier_name','発注先名':'supplier_name',
+  'バリエーション':'variations','variations':'variations','バリエ':'variations',
+};
+
+document.getElementById('btn-import').addEventListener('click', function() {
+  document.getElementById('import-file').value = '';
+  document.getElementById('import-preview-wrap').style.display = 'none';
+  document.getElementById('import-result').style.display = 'none';
+  document.getElementById('btn-do-import').style.display = 'none';
+  document.getElementById('import-step-file').classList.add('active');
+  document.getElementById('import-step-preview').classList.remove('active');
+  document.getElementById('import-step-done').classList.remove('active');
+  _importRows = [];
+  importModal.show();
+});
+
+document.getElementById('import-file').addEventListener('change', function(e) {
+  var file = e.target.files[0];
+  if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      var wb;
+      if (ext === 'csv') {
+        wb = XLSX.read(ev.target.result, {type:'string', codepage:65001});
+      } else {
+        wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      }
+      var ws  = wb.Sheets[wb.SheetNames[0]];
+      var raw = XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+      if (raw.length === 0) {
+        showImportError('データが見つかりませんでした。ヘッダー行 + データ行が必要です。');
+        return;
+      }
+      _importRows = raw.map(function(row) {
+        var mapped = {};
+        Object.keys(row).forEach(function(k) {
+          var canonical = COL_MAP[k.trim()] || COL_MAP[k.trim().toLowerCase()];
+          if (canonical) mapped[canonical] = row[k];
+        });
+        return mapped;
+      });
+      renderImportPreview(_importRows);
+    } catch(err) {
+      showImportError('ファイルの読み込みに失敗しました: ' + err.message);
+    }
+  };
+  if (ext === 'csv') {
+    reader.readAsText(file, 'UTF-8');
+  } else {
+    reader.readAsArrayBuffer(file);
+  }
+});
+
+function showImportError(msg) {
+  var el = document.getElementById('import-file-error');
+  el.textContent = msg;
+  el.style.display = '';
+}
+
+function renderImportPreview(rows) {
+  document.getElementById('import-file-error').style.display = 'none';
+  var cols = ['item_category','manufacturer','name','spec','color','club_type',
+              'list_price','default_rate','unit','barcode','product_code','source','supplier_name','variations'];
+  var labels = {
+    'item_category':'品目','manufacturer':'メーカー','name':'商品名',
+    'spec':'仕様','color':'色','club_type':'種類',
+    'list_price':'定価','default_rate':'掛率','unit':'単位',
+    'barcode':'バーコード','product_code':'品番','source':'出典',
+    'supplier_name':'仕入先名','variations':'バリエーション'
+  };
+  var thead = '<tr>' + cols.map(function(c){
+    var req = (c==='item_category'||c==='name') ? ' <span class="text-danger">*</span>' : '';
+    return '<th class="small text-nowrap">' + labels[c] + req + '</th>';
+  }).join('') + '</tr>';
+
+  var MAX_PREVIEW = 200;
+  var previewRows = rows.slice(0, MAX_PREVIEW);
+  var tbody = previewRows.map(function(row, i) {
+    var hasError = !row['item_category'] || !row['name'];
+    var trCls = hasError ? 'table-danger' : (i%2===0?'':'table-light');
+    return '<tr class="' + trCls + '">' + cols.map(function(c) {
+      var val = row[c] !== undefined ? String(row[c]) : '';
+      var isEmpty = val === '' && (c==='item_category'||c==='name');
+      if (isEmpty) return '<td class="small text-nowrap text-danger fw-bold">⚠ 空</td>';
+      if (c === 'variations' && val) {
+        var varCount = val.split('|').filter(function(s){ return s.trim(); }).length;
+        var tipText = val.replace(/\|/g, '\n').replace(/:/g, ': ');
+        return '<td class="small text-nowrap">'
+          + '<span class="badge bg-primary" title="' + escapeHtml(tipText) + '" '
+          + 'data-bs-toggle="tooltip" data-bs-placement="left" style="cursor:pointer">'
+          + varCount + 'レコード展開</span></td>';
+      }
+      return '<td class="small text-nowrap">' + escapeHtml(val.length>30 ? val.slice(0,30)+'…' : val) + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+
+  var errCount = rows.filter(function(r){ return !r['item_category']||!r['name']; }).length;
+  var expandedCount = rows.reduce(function(sum, r) {
+    var v = r['variations'] ? String(r['variations']).trim() : '';
+    if (!v) return sum + 1;
+    var varCount = v.split('|').filter(function(x){ return x.trim(); }).length;
+    return sum + (varCount > 0 ? varCount : 1);
+  }, 0);
+
+  document.getElementById('import-preview-thead').innerHTML = thead;
+  document.getElementById('import-preview-tbody').innerHTML = tbody;
+  document.getElementById('import-row-count').textContent = rows.length + '行（展開後 ' + expandedCount + '件）';
+  document.getElementById('import-err-count').textContent  = errCount;
+  document.getElementById('import-preview-more').style.display = rows.length > MAX_PREVIEW ? '' : 'none';
+  document.getElementById('import-preview-more-count').textContent = rows.length - MAX_PREVIEW;
+  document.getElementById('import-preview-wrap').style.display = '';
+  document.getElementById('btn-do-import').style.display = '';
+  document.getElementById('import-step-preview').classList.add('active');
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.getElementById('btn-do-import').addEventListener('click', async function() {
+  if (_importRows.length === 0) return;
+  var mode = document.getElementById('import-mode').value;
+  var btn  = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>インポート中…';
+  try {
+    var resp = await fetch('/api/products/bulk-import', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ rows: _importRows, mode: mode })
+    });
+    var result = await resp.json();
+    if (!resp.ok) {
+      showFlash(result.error || 'インポートに失敗しました', 'danger');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-file-import me-1"></i>インポート実行';
+      return;
+    }
+    var resEl = document.getElementById('import-result');
+    var summary = '<div class="alert alert-success mb-2"><i class="fas fa-check-circle me-1"></i>'
+      + '<strong>インポート完了！</strong> '
+      + '追加: <strong>' + result.inserted + '件</strong>　'
+      + (mode==='upsert' ? '更新: <strong>' + result.updated + '件</strong>　' : '')
+      + (result.skipped > 0 ? 'スキップ: <strong class="text-warning">' + result.skipped + '件</strong>' : '')
+      + '</div>';
+    var errHtml = '';
+    if (result.errors && result.errors.length > 0) {
+      errHtml = '<div class="alert alert-warning py-2"><strong>エラー詳細:</strong><ul class="mb-0 mt-1 small">'
+        + result.errors.slice(0,20).map(function(e){
+            return '<li>行' + e.row + ': ' + escapeHtml(e.msg) + '</li>';
+          }).join('')
+        + (result.errors.length > 20 ? '<li>… 他 ' + (result.errors.length-20) + '件</li>' : '')
+        + '</ul></div>';
+    }
+    resEl.innerHTML = summary + errHtml
+      + '<button class="btn btn-primary" onclick="location.reload()">'
+      + '<i class="fas fa-sync me-1"></i>ページを再読み込み</button>';
+    resEl.style.display = '';
+    document.getElementById('import-step-done').classList.add('active');
+    document.getElementById('import-preview-wrap').style.display = 'none';
+    document.getElementById('btn-do-import').style.display = 'none';
+  } catch(err) {
+    showFlash('通信エラー: ' + err.message, 'danger');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-file-import me-1"></i>インポート実行';
+  }
+});
+
+} catch(e) { console.error('initProductPage error:', e.message, e.stack); }
+} // initProductPage end
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initProductPage);
+} else {
+  initProductPage();
+}
