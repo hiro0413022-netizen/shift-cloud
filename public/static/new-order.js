@@ -724,27 +724,34 @@ function submitOrderForm(e, isPool) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   })
-  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
-  .then(function(res) {
-    if (res.ok) {
-      if (isPool) {
-        showFlash('発注プールに追加しました！', 'success');
-        setTimeout(function() { location.href = '/purchase-pool'; }, 800);
-      } else {
-        showFlash('発注を作成しました！', 'success');
-        var firstId = res.d.order_ids ? res.d.order_ids[0] : res.d.id;
-        setTimeout(function() { location.href = '/orders/' + firstId; }, 800);
-      }
-    } else {
-      showFlash(res.d.error || '発注作成に失敗しました', 'danger');
-      activeBtn.disabled = false;
-      activeBtn.innerHTML = isPool
-        ? '<i class="fas fa-layer-group me-1"></i>プールに追加'
-        : '<i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成';
+  .then(function(r) {
+    if (r.status === 302 || r.redirected) {
+      window.location.href = '/login';
+      return;
     }
+    return r.text().then(function(text) {
+      var d = {};
+      try { d = JSON.parse(text); } catch(e) { d = { error: 'サーバーエラー: ' + text.substring(0, 100) }; }
+      if (r.ok) {
+        if (isPool) {
+          showFlash('発注プールに追加しました！', 'success');
+          setTimeout(function() { location.href = '/purchase-pool'; }, 800);
+        } else {
+          showFlash('発注を作成しました！', 'success');
+          var firstId = d.order_ids ? d.order_ids[0] : d.id;
+          setTimeout(function() { location.href = '/orders/' + firstId; }, 800);
+        }
+      } else {
+        showFlash(d.error || '発注作成に失敗しました (HTTP ' + r.status + ')', 'danger');
+        activeBtn.disabled = false;
+        activeBtn.innerHTML = isPool
+          ? '<i class="fas fa-layer-group me-1"></i>プールに追加'
+          : '<i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成';
+      }
+    });
   })
-  .catch(function() {
-    showFlash('通信エラーが発生しました', 'danger');
+  .catch(function(err) {
+    showFlash('通信エラーが発生しました: ' + (err && err.message ? err.message : String(err)), 'danger');
     activeBtn.disabled = false;
     activeBtn.innerHTML = isPool
       ? '<i class="fas fa-layer-group me-1"></i>プールに追加'

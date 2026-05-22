@@ -403,6 +403,7 @@ app.post('/orders', async (c) => {
   const usageType = normalize(body.usage_type)
   const requestedDeliveryDate = body.requested_delivery_date || null
   const orderNote = normalize(body.order_note)
+  const isPool = (body as Record<string, unknown>)['pool'] === true
   const batchCode = nowCode() + '-' + Math.random().toString(36).substring(2, 8)
 
   const linesRaw = body.lines || []
