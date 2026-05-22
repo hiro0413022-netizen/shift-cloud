@@ -992,22 +992,35 @@ app.post('/products/bulk-import', async (c) => {
   }
 
   // ----------------------------------------------------------------
-  // バリエーション列パーサー
-  // 書式: "BL無:色名=品番/BL有:色名=品番/..."
-  // 戻り値: [{ backline: 'BL無'|'BL有', color: string, product_code: string }, ...]
+  // バリエーション列パーサー（v2）
+  //
+  // 書式: "BL無:ブラック/レッド/ホワイト|BL有:ブラック/レッド/ホワイト"
+  //   ・| (パイプ) でバックライン区切り
+  //   ・: (コロン) の前がバックライン名（BL無/BL有など）、後が色一覧
+  //   ・/ (スラッシュ) で色を区切り → color列に "/区切り" で保存
+  //
+  // バックラインがない商品（色だけ複数）の書式:
+  //   "ブラック/レッド/ホワイト"  ← コロンなし＝バックライン区別なし → 1レコード
+  //
+  // 戻り値: [{ backline: string, colors: string }, ...]
+  //   backline: "BL無" / "BL有" / "" （なし）
+  //   colors  : "ブラック/レッド/ホワイト" （/区切り、そのままDBのcolorカラムへ）
   // ----------------------------------------------------------------
-  type VarItem = { backline: string; color: string; product_code: string }
+  type VarItem = { backline: string; colors: string }
   const parseVariations = (raw: string): VarItem[] => {
-    return raw.split('/').map(s => s.trim()).filter(Boolean).map(seg => {
-      // 区切り: "BL無:色名=品番"
+    const segments = raw.split('|').map(s => s.trim()).filter(Boolean)
+    return segments.map(seg => {
       const colonIdx = seg.indexOf(':')
-      const eqIdx    = seg.indexOf('=')
-      if (colonIdx < 0 || eqIdx < 0 || eqIdx < colonIdx) return null
-      const backline     = seg.slice(0, colonIdx).trim()          // "BL無" / "BL有"
-      const color        = seg.slice(colonIdx + 1, eqIdx).trim()  // 色名
-      const product_code = seg.slice(eqIdx + 1).trim()            // 品番
-      if (!color || !product_code) return null
-      return { backline, color, product_code }
+      if (colonIdx >= 0) {
+        // "BL無:ブラック/レッド" 形式
+        const backline = seg.slice(0, colonIdx).trim()
+        const colors   = seg.slice(colonIdx + 1).trim()
+        if (!colors) return null
+        return { backline, colors }
+      } else {
+        // コロンなし = バックライン区別なし "ブラック/レッド/ホワイト"
+        return { backline: '', colors: seg }
+      }
     }).filter((x): x is VarItem => x !== null)
   }
 
@@ -1064,25 +1077,27 @@ app.post('/products/bulk-import', async (c) => {
     const varItems = variations_raw ? parseVariations(variations_raw) : []
 
     if (varItems.length > 0) {
-      // バリエーションあり → バリエーションの数だけ INSERT/UPSERT
+      // バリエーションあり → バックライン別に1レコードずつ INSERT/UPSERT
+      // color列に "/区切り" で複数色を保存、specにバックライン情報を付加
       for (const v of varItems) {
-        // spec に バックライン情報を付加（既存specがあれば " / BL有" 等を追記）
-        const varSpec = [spec, v.backline].filter(Boolean).join(' / ')
+        const varSpec  = [spec, v.backline].filter(Boolean).join(' / ')  // 例: "M60 / BL無"
+        const varColor = v.colors  // 例: "ブラック/レッド/ホワイト"
+        // upsert: spec+name+manufacturer で既存レコードを照合
         try {
-          if (mode === 'upsert' && v.product_code) {
+          if (mode === 'upsert') {
             const existing = await db.prepare(
-              'SELECT id FROM products WHERE product_code=? AND is_active=1 LIMIT 1'
-            ).bind(v.product_code).first<{ id: number }>()
+              `SELECT id FROM products
+               WHERE name=? AND manufacturer IS ? AND spec IS ? AND is_active=1 LIMIT 1`
+            ).bind(name, manufacturer || null, varSpec || null).first<{ id: number }>()
             if (existing) {
               await db.prepare(`
                 UPDATE products SET
-                  item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
+                  item_category=?, color=?, club_type=?,
                   list_price=?, default_rate=?, unit=?, source=?,
                   default_supplier_id=COALESCE(?, default_supplier_id)
                 WHERE id=?
               `).bind(
-                item_category, manufacturer || null, name,
-                varSpec || null, v.color || null, club_type || null,
+                item_category, varColor || null, club_type || null,
                 list_price, default_rate, unit, source || null,
                 default_supplier_id, existing.id
               ).run()
@@ -1092,24 +1107,23 @@ app.post('/products/bulk-import', async (c) => {
           }
           await db.prepare(`
             INSERT INTO products
-              (product_code, item_category, manufacturer, name, spec, color, club_type,
+              (item_category, manufacturer, name, spec, color, club_type,
                list_price, default_rate, unit, source, default_supplier_id, is_active)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
           `).bind(
-            v.product_code,
             item_category, manufacturer || null, name,
-            varSpec || null, v.color || null, club_type || null,
+            varSpec || null, varColor || null, club_type || null,
             list_price, default_rate, unit, source || null,
             default_supplier_id
           ).run()
           inserted++
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err)
-          errors.push({ row: rowNum, msg: `バリエーション "${v.backline}:${v.color}=${v.product_code}": ${msg}` })
+          errors.push({ row: rowNum, msg: `バリエーション "${v.backline || '色のみ'}": ${msg}` })
           skipped++
         }
       }
-      continue  // 次の行へ（バリエーションなしのINSERT処理をスキップ）
+      continue  // 次の行へ
     }
 
     // ----------------------------------------------------------------

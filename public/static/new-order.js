@@ -107,7 +107,9 @@ function addRow(prefill) {
   var fMF  = mkTd('manufacturer',  p.manufacturer,  'メーカー', '90px');
   var fNM  = mkTd('product_name',  p.name,          '商品名',  '150px');
   var fSP  = mkTd('spec',          p.spec,          '仕様',    '60px');
-  var fCL  = mkTd('color',         '',              '色',      '55px');
+  // 色セル（商品に複数色がある場合はfillRow()でドロップダウンに切り替わる）
+  var fCL  = mkTd('color',         '',              '色',      '80px');
+  fCL.td.classList.add('td-color');
   var fCT  = mkTd('club_type',     p.club_type,     '種類',    '65px');
 
   // 数値系セル
@@ -185,6 +187,41 @@ function fillRow(tr, p) {
     var el = tr.querySelector('[name="' + k + '_' + idx + '"]');
     if (el) el.value = fields[k];
   });
+
+  // 色フィールド: /区切りで複数色がある場合はドロップダウンに切り替え
+  var colorTd = tr.querySelector('.td-color');
+  if (colorTd) {
+    var colorVal = (p.color || '').trim();
+    var colorList = colorVal ? colorVal.split('/').map(function(c){ return c.trim(); }).filter(Boolean) : [];
+    // 既存要素を全クリア
+    colorTd.innerHTML = '';
+    if (colorList.length > 1) {
+      // 複数色 → <select>
+      var sel = document.createElement('select');
+      sel.className = 'form-select form-select-sm';
+      sel.name = 'color_' + idx;
+      sel.style.minWidth = '80px';
+      // 先頭に空選択肢
+      var optBlank = document.createElement('option');
+      optBlank.value = ''; optBlank.textContent = '色を選択';
+      sel.appendChild(optBlank);
+      colorList.forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        sel.appendChild(opt);
+      });
+      colorTd.appendChild(sel);
+    } else {
+      // 1色 or 色なし → テキスト入力（単色の場合は自動セット）
+      var inp = document.createElement('input');
+      inp.className = 'form-control form-control-sm';
+      inp.name = 'color_' + idx;
+      inp.placeholder = '色';
+      inp.style.minWidth = '80px';
+      inp.value = colorList.length === 1 ? colorList[0] : '';
+      colorTd.appendChild(inp);
+    }
+  }
 
   var lpEl = tr.querySelector('.inp-list-price');
   var rtEl = tr.querySelector('.inp-rate');

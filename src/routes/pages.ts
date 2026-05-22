@@ -451,15 +451,22 @@ document.getElementById('btn-dl-template').addEventListener('click', function() 
   var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典','仕入先名','バリエーション'];
   var examples = [
     ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','SNXDR50S','','ワークス',''],
-    ['グリップ','Golf Pride','CP2 Pro','M60','','',1800,0.60,'個','','','','アクシネット','BL無:ブラック=GCP2BK60BL/BL無:レッド=GCP2RD60BL/BL無:ホワイト=GCP2WH60BL/BL有:ブラック=GCP2BK60/BL有:レッド=GCP2RD60/BL有:ホワイト=GCP2WH60'],
+    ['グリップ','Golf Pride','CP2 Pro','M60','','',1800,0.60,'個','','','','アクシネット','BL無:ブラック/レッド/ホワイト|BL有:ブラック/レッド/ホワイト'],
+    ['グリップ','Golf Pride','Tour Velvet','M60','','',1200,0.60,'個','','','','アクシネット','ブラック/レッド/ホワイト/ブルー'],
     ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','','','アクシネット',''],
   ];
   var varHelp = '【バリエーション列の書き方】\n'
-    + '色・バックライン有無ごとに品番が異なる場合に使います。\n'
-    + '書式: BL無:色名=品番/BL有:色名=品番  （スラッシュ区切りで複数指定）\n'
-    + '例: BL無:ブラック=GCP2BK60BL/BL無:レッド=GCP2RD60BL/BL有:ブラック=GCP2BK60\n\n'
+    + 'バックライン有無・色が複数ある場合に使います（色は/区切り）。\n\n'
+    + '■ バックライン有無あり:\n'
+    + '  BL無:色1/色2/色3|BL有:色1/色2/色3\n'
+    + '  例: BL無:ブラック/レッド/ホワイト|BL有:ブラック/レッド/ホワイト\n'
+    + '  → BL無・BL有 それぞれ1レコード登録（発注時に色を選択）\n\n'
+    + '■ バックライン区別なし（色のみ複数）:\n'
+    + '  色1/色2/色3\n'
+    + '  例: ブラック/レッド/ホワイト/ブルー\n'
+    + '  → 1レコード登録（発注時に色を選択）\n\n'
     + '※ バリエーションがない商品はこの列を空欄にしてください。\n'
-    + '※ バリエーションがある場合、「色」「品番」列は無視されます（バリエーション列から自動展開）。';
+    + '※ バリエーションがある場合、「色」「品番」列は無視されます。';
   if (!confirm('テンプレートをダウンロードします。\n\n' + varHelp + '\n\nOKをクリックするとダウンロードが始まります。')) { return; }
   var rows = [headers].concat(examples);
   var csv = rows.map(function(row){
@@ -617,11 +624,13 @@ function renderImportPreview(rows) {
       }
       // バリエーション列は件数バッジ＋ツールチップで表示
       if (c === 'variations' && val) {
-        var varCount = val.split('/').filter(function(v){ return v.trim(); }).length;
+        // | でバックライン区切り → レコード数
+        var varCount = val.split('|').filter(function(s){ return s.trim(); }).length;
+        var tipText  = val.replace(/\|/g, '\n').replace(/:/g, ': ');
         return '<td class="small text-nowrap">'
-          + '<span class="badge bg-primary" title="' + escapeHtml(val.replace(/\//g,'\n')) + '" '
+          + '<span class="badge bg-primary" title="' + escapeHtml(tipText) + '" '
           + 'data-bs-toggle="tooltip" data-bs-placement="left" style="cursor:pointer">'
-          + varCount + '件展開'
+          + varCount + 'レコード展開'
           + '</span></td>';
       }
       return '<td class="small text-nowrap">'
@@ -635,7 +644,8 @@ function renderImportPreview(rows) {
   var expandedCount = rows.reduce(function(sum, r) {
     var v = r['variations'] ? String(r['variations']).trim() : '';
     if (!v) return sum + 1;
-    var varCount = v.split('/').filter(function(x){ return x.trim(); }).length;
+    // | でバックライン区切り → それぞれ1レコード
+    var varCount = v.split('|').filter(function(x){ return x.trim(); }).length;
     return sum + (varCount > 0 ? varCount : 1);
   }, 0);
 
