@@ -1009,8 +1009,8 @@ app.get('/suppliers', async (c) => {
     </td>
     <td class="small">${r['phone'] ? `<a href="tel:${esc(r['phone'])}" class="text-decoration-none">${esc(r['phone'])}</a>` : ''}</td>
     <td class="small">${esc(r['payment_method'])}</td>
-    <td class="small">${esc(r['shipping_rule'])}</td>
-    <td class="small text-muted">${esc(r['notes'])}</td>
+    <td class="small">${r['shipping_rule'] ? `<span class="badge bg-info text-dark"><i class="fas fa-truck me-1"></i>${esc(r['shipping_rule'])}</span>` : ''}</td>
+    <td class="small" style="max-width:220px">${r['notes'] ? `<span class="text-muted" data-bs-toggle="tooltip" data-bs-placement="left" title="${esc(r['notes'])}" style="cursor:help;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:200px">${esc(r['notes'])}</span>` : ''}</td>
     <td>
       <button class="btn btn-xs btn-outline-primary btn-edit-sup py-0 px-2" data-row='${JSON.stringify(r).replace(/'/g,'&#39;')}'><i class="fas fa-edit"></i></button>
       <button class="btn btn-xs btn-outline-danger btn-del-sup py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}"><i class="fas fa-trash"></i></button>
@@ -1018,6 +1018,11 @@ app.get('/suppliers', async (c) => {
   </tr>`).join('')
 
   const scripts = `<script>
+// Tooltipを有効化（備考の省略表示）
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function(el){
+  new bootstrap.Tooltip(el);
+});
+
 var supModal = new bootstrap.Modal(document.getElementById('supModal'));
 var editingSupId = null;
 
@@ -1570,14 +1575,18 @@ ${modalHtml}
         <tbody></tbody>
       </table>
     </div>
-    <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3">
-      <p class="text-muted small mb-0">
-        <i class="fas fa-lightbulb me-1 text-warning"></i>
-        定価・掛率を入力すると単価が自動計算されます
-      </p>
-      <button type="submit" class="btn btn-primary btn-lg px-4">
-        <i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成
-      </button>
+    <div class="card-footer bg-white py-3">
+      <!-- 仕入先備考プレビュー（商品選択後に自動表示） -->
+      <div id="supplier-notes-area"></div>
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <p class="text-muted small mb-0">
+          <i class="fas fa-lightbulb me-1 text-warning"></i>
+          定価・掛率を入力すると単価が自動計算されます
+        </p>
+        <button type="submit" class="btn btn-primary btn-lg px-4">
+          <i class="fas fa-paper-plane me-1"></i>発注データとメール下書きを作成
+        </button>
+      </div>
     </div>
   </div>
 </form>`
@@ -1696,7 +1705,8 @@ app.get('/orders/:id', async (c) => {
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
            s.contact_name, s.honorific, s.order_method, s.order_method_detail,
-           s.phone, s.line_id, s.fax, s.fax_number, s.website
+           s.phone, s.line_id, s.fax, s.fax_number, s.website,
+           s.notes AS supplier_notes, s.shipping_rule AS supplier_shipping_rule
     FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?
   `).bind(id).first<Record<string,unknown>>()
   if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>')
@@ -2003,6 +2013,8 @@ document.getElementById('btn-copy-order').addEventListener('click', async functi
           <dt class="col-5 text-muted">担当者</dt><dd class="col-7">${esc(order['contact_name'])||''} ${esc(order['honorific'])||''}</dd>
           <dt class="col-5 text-muted">発注方法</dt><dd class="col-7">${esc(order['order_method'])||'―'}</dd>
           <dt class="col-5 text-muted">備考</dt><dd class="col-7 text-muted">${esc(order['order_note'])||'―'}</dd>
+          ${order['supplier_shipping_rule'] ? `<dt class="col-5 text-muted">送料条件</dt><dd class="col-7"><span class="badge bg-info text-dark"><i class="fas fa-truck me-1"></i>${esc(order['supplier_shipping_rule'])}</span></dd>` : ''}
+          ${order['supplier_notes'] ? `<dt class="col-5 text-warning"><i class="fas fa-exclamation-triangle"></i> 仕入先備考</dt><dd class="col-7"><div class="alert alert-warning py-1 px-2 mb-0 small">${esc(order['supplier_notes']).replace(/\n/g,'<br>')}</div></dd>` : ''}
         </dl>
       </div>
     </div>

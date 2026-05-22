@@ -67,6 +67,11 @@ function addRow(prefill) {
   hidPid.type = 'hidden'; hidPid.className = 'inp-product-id';
   hidPid.name = 'product_id_' + idx; hidPid.value = p.id ? String(p.id) : '';
 
+  // 仕入先ID（備考表示用）
+  var hidSup = document.createElement('input');
+  hidSup.type = 'hidden'; hidSup.className = 'inp-supplier-id';
+  hidSup.name = 'supplier_id_' + idx; hidSup.value = '';
+
   var btnPick = document.createElement('button');
   btnPick.type = 'button';
   btnPick.className = 'btn btn-sm btn-outline-success btn-pick me-1';
@@ -81,6 +86,7 @@ function addRow(prefill) {
 
   tdPick.appendChild(hidIdx);
   tdPick.appendChild(hidPid);
+  tdPick.appendChild(hidSup);
   tdPick.appendChild(btnPick);
   tdPick.appendChild(lblPick);
 
@@ -146,7 +152,7 @@ function addRow(prefill) {
 
   // イベント
   btnPick.addEventListener('click', function() { openProductModal(tr); });
-  btnRem.addEventListener('click',  function() { tr.remove(); recalcTotal(); });
+  btnRem.addEventListener('click',  function() { tr.remove(); recalcTotal(); updateSupplierNotesArea(); });
 
   fLP.inp.addEventListener('input', function() { calcUnitPrice(tr); });
   fRT.inp.addEventListener('input', function() { calcUnitPrice(tr); });
@@ -187,6 +193,27 @@ function fillRow(tr, p) {
   if (rtEl) rtEl.value = p.default_rate  ? String(p.default_rate)  : '';
   if (upEl) { delete upEl.dataset.manual; upEl.value = ''; }
   calcUnitPrice(tr);
+
+  // 仕入先IDを suggest APIで取得してhidden inputに保存 → 備考エリアを更新
+  var supHid = tr.querySelector('.inp-supplier-id');
+  if (supHid) supHid.value = '';
+  if (p.item_category || p.manufacturer) {
+    var qs = new URLSearchParams({
+      item_category: p.item_category || '',
+      manufacturer:  p.manufacturer  || '',
+      club_type:     p.club_type     || ''
+    });
+    if (p.id) qs.set('product_id', String(p.id));
+    fetch('/api/suggest-supplier?' + qs.toString(), { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.supplier && d.supplier.id && supHid) {
+          supHid.value = String(d.supplier.id);
+          updateSupplierNotesArea();
+        }
+      })
+      .catch(function() {});
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -692,6 +719,57 @@ function showFlash(msg, type) {
     '</div>';
 }
 
+// ─── 仕入先備考プレビュー ────────────────────────────────
+// SUPPLIERS_MAP: id -> {notes, shipping_rule, name} をキャッシュ
+var _suppliersCache = null;
+function loadSuppliersCache(cb) {
+  if (_suppliersCache) { cb(_suppliersCache); return; }
+  fetch('/api/suppliers', { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var map = {};
+      (d.rows || []).forEach(function(s) { map[s.id] = s; });
+      _suppliersCache = map;
+      cb(map);
+    })
+    .catch(function() { cb({}); });
+}
+
+function updateSupplierNotesArea() {
+  var tbody = document.querySelector('#line-table tbody');
+  if (!tbody) return;
+
+  // 各行から supplier_id を収集（hidden inputがある行）
+  var supplierIds = {};
+  tbody.querySelectorAll('input[name^="supplier_id_"]').forEach(function(el) {
+    if (el.value) supplierIds[el.value] = 1;
+  });
+  var ids = Object.keys(supplierIds);
+  var area = document.getElementById('supplier-notes-area');
+  if (!area) return;
+
+  if (ids.length === 0) { area.innerHTML = ''; return; }
+
+  loadSuppliersCache(function(map) {
+    var html = '';
+    ids.forEach(function(id) {
+      var s = map[id];
+      if (!s) return;
+      var hasInfo = s.notes || s.shipping_rule;
+      if (!hasInfo) return;
+      html += '<div class="alert alert-warning py-2 px-3 mb-2 small d-flex align-items-start gap-2">' +
+        '<i class="fas fa-exclamation-triangle text-warning mt-1 flex-shrink-0"></i>' +
+        '<div>' +
+          '<strong>' + escH(s.name) + '</strong>' +
+          (s.shipping_rule ? '<span class="badge bg-info text-dark ms-2"><i class="fas fa-truck me-1"></i>' + escH(s.shipping_rule) + '</span>' : '') +
+          (s.notes ? '<div class="text-muted mt-1" style="white-space:pre-wrap">' + escH(s.notes) + '</div>' : '') +
+        '</div>' +
+      '</div>';
+    });
+    area.innerHTML = html;
+  });
+}
+
 // ─── 初期化 ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function() {
   buildCategories();
@@ -702,4 +780,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
   var addBtn = document.getElementById('add-row');
   if (addBtn) addBtn.addEventListener('click', function() { addRow(); });
+
+  // 明細テーブルの変化を監視して仕入先備考を更新
+  var lineTable = document.getElementById('line-table');
+  if (lineTable) {
+    var observer = new MutationObserver(function() { updateSupplierNotesArea(); });
+    observer.observe(lineTable, { childList: true, subtree: true, attributes: true });
+  }
 });
