@@ -447,7 +447,7 @@ document.getElementById('productForm').addEventListener('submit', async function
 // ════════════════════════════════════════════════════════════
 // テンプレート CSV ダウンロード
 // ════════════════════════════════════════════════════════════
-document.getElementById('btn-dl-template').addEventListener('click', function() {
+function doDownloadTemplate() {
   var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典','仕入先名','バリエーション'];
   var examples = [
     ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','SNXDR50S','','ワークス',''],
@@ -455,19 +455,6 @@ document.getElementById('btn-dl-template').addEventListener('click', function() 
     ['グリップ','Golf Pride','Tour Velvet','M60','','',1200,0.60,'個','','','','アクシネット','ブラック/レッド/ホワイト/ブルー'],
     ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','','','アクシネット',''],
   ];
-  var varHelp = '【バリエーション列の書き方】\n'
-    + 'バックライン有無・色が複数ある場合に使います（色は/区切り）。\n\n'
-    + '■ バックライン有無あり:\n'
-    + '  BL無:色1/色2/色3|BL有:色1/色2/色3\n'
-    + '  例: BL無:ブラック/レッド/ホワイト|BL有:ブラック/レッド/ホワイト\n'
-    + '  → BL無・BL有 それぞれ1レコード登録（発注時に色を選択）\n\n'
-    + '■ バックライン区別なし（色のみ複数）:\n'
-    + '  色1/色2/色3\n'
-    + '  例: ブラック/レッド/ホワイト/ブルー\n'
-    + '  → 1レコード登録（発注時に色を選択）\n\n'
-    + '※ バリエーションがない商品はこの列を空欄にしてください。\n'
-    + '※ バリエーションがある場合、「色」「品番」列は無視されます。';
-  if (!confirm('テンプレートをダウンロードします。\n\n' + varHelp + '\n\nOKをクリックするとダウンロードが始まります。')) { return; }
   var rows = [headers].concat(examples);
   var csv = rows.map(function(row){
     return row.map(function(cell){
@@ -484,6 +471,17 @@ document.getElementById('btn-dl-template').addEventListener('click', function() 
   a.href = URL.createObjectURL(blob);
   a.download = '商品マスタ_インポートテンプレート.csv';
   a.click();
+}
+document.getElementById('btn-dl-template').addEventListener('click', doDownloadTemplate);
+
+// ヘルプモーダル
+var varHelpModal = new bootstrap.Modal(document.getElementById('varHelpModal'));
+document.getElementById('btn-template-help').addEventListener('click', function() {
+  varHelpModal.show();
+});
+document.getElementById('btn-dl-template-from-help').addEventListener('click', function() {
+  varHelpModal.hide();
+  doDownloadTemplate();
 });
 
 // ════════════════════════════════════════════════════════════
@@ -734,15 +732,52 @@ document.getElementById('btn-do-import').addEventListener('click', async functio
     <p class="text-muted mb-0" id="row-count-label"><strong>${totalCount.toLocaleString()}</strong> 件中 ${res.results.length} 件表示（${currentPage}/${totalPages} ページ）</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    <button class="btn btn-outline-secondary" id="btn-dl-template" title="CSVテンプレートをダウンロード">
-      <i class="fas fa-download me-1"></i>テンプレート
-    </button>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary" id="btn-dl-template" title="CSVテンプレートをダウンロード">
+        <i class="fas fa-download me-1"></i>テンプレート
+      </button>
+      <button class="btn btn-outline-secondary" id="btn-template-help" title="バリエーション列の書き方">
+        <i class="fas fa-question-circle"></i>
+      </button>
+    </div>
     <button class="btn btn-outline-primary" id="btn-import">
       <i class="fas fa-file-import me-1"></i>Excel/CSV一括追加
     </button>
     <button class="btn btn-success" onclick="openAddProduct()">
       <i class="fas fa-plus me-1"></i>1件追加
     </button>
+  </div>
+</div>
+
+<!-- バリエーションヘルプモーダル -->
+<div class="modal fade" id="varHelpModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-question-circle me-2 text-primary"></i>バリエーション列の書き方</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">色・バックライン有無が複数ある商品（グリップ等）に使います。</p>
+        <h6 class="fw-bold mt-3">■ バックライン有無あり</h6>
+        <code class="d-block bg-light p-2 rounded small mb-1">BL無:色1/色2/色3|BL有:色1/色2/色3</code>
+        <p class="small text-muted mb-0">例: <code>BL無:ブラック/レッド/ホワイト|BL有:ブラック/レッド/ホワイト</code></p>
+        <p class="small text-success">→ BL無・BL有 それぞれ1レコード登録（発注時に色をドロップダウン選択）</p>
+        <h6 class="fw-bold mt-3">■ 色のみ複数（BL区別なし）</h6>
+        <code class="d-block bg-light p-2 rounded small mb-1">色1/色2/色3/色4</code>
+        <p class="small text-muted mb-0">例: <code>ブラック/レッド/ホワイト/ブルー</code></p>
+        <p class="small text-success">→ 1レコード登録（発注時に色をドロップダウン選択）</p>
+        <hr>
+        <p class="small text-muted mb-0">※ バリエーションがない商品はこの列を空欄にしてください。</p>
+        <p class="small text-muted mb-0">※ バリエーションがある場合、「色」「品番」列は無視されます。</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+        <button type="button" class="btn btn-primary" id="btn-dl-template-from-help">
+          <i class="fas fa-download me-1"></i>テンプレートをダウンロード
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 
