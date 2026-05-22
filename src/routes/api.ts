@@ -915,6 +915,18 @@ app.post('/products', async (c) => {
   return c.json({ ok: true, id: r.meta.last_row_id })
 })
 
+app.get('/products/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  const row = await db.prepare(
+    `SELECT p.*, s.name AS supplier_name FROM products p
+     LEFT JOIN suppliers s ON s.id = p.default_supplier_id
+     WHERE p.id=? AND p.is_active=1`
+  ).bind(id).first()
+  if (!row) return c.json({ error: 'not found' }, 404)
+  return c.json(row)
+})
+
 app.put('/products/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))

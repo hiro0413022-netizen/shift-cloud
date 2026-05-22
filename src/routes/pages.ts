@@ -356,7 +356,7 @@ app.get('/products', async (c) => {
     <td class="small">${esc(r['supplier_name'])}</td>
     <td class="text-muted small">${esc(r['barcode'])}</td>
     <td style="white-space:nowrap">
-      <button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-row='${JSON.stringify(r).replace(/'/g,"&#39;")}'><i class="fas fa-edit"></i></button>
+      <button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-id="${r['id']}"><i class="fas fa-edit"></i></button>
       <button class="btn btn-xs btn-outline-danger btn-del-product py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}"><i class="fas fa-trash"></i></button>
     </td>
   </tr>`
@@ -419,8 +419,11 @@ importModal   = new bootstrap.Modal(imEl);
 varHelpModal  = new bootstrap.Modal(vmEl);
 
 document.querySelectorAll('.btn-edit-product').forEach(function(btn){
-  btn.addEventListener('click', function(){
-    var r = JSON.parse(this.dataset.row);
+  btn.addEventListener('click', async function(){
+    var id = this.dataset.id;
+    var resp = await fetch('/api/products/' + id);
+    if (!resp.ok) { showFlash('商品データの取得に失敗しました', 'danger'); return; }
+    var r = await resp.json();
     editingId = r.id;
     document.getElementById('pmTitle').textContent = '商品を編集';
     var f = document.getElementById('productForm');
