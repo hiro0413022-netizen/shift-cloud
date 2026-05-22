@@ -973,6 +973,29 @@ app.post('/products/bulk-import', async (c) => {
     return isNaN(x) ? null : x
   }
 
+  // 仕入先名→IDキャッシュ（同一インポート内で重複ルックアップを避ける）
+  const supplierCache = new Map<string, number | null>()
+  const resolveSupplierName = async (nameRaw: string): Promise<number | null> => {
+    const key = nameRaw.trim()
+    if (!key) return null
+    if (supplierCache.has(key)) return supplierCache.get(key)!
+    // 前方一致（例: "ワークス" → "ワークスゴルフ" にも対応）、完全一致優先
+    const exact = await db.prepare(
+      'SELECT id FROM suppliers WHERE name=? AND is_active=1 LIMIT 1'
+    ).bind(key).first<{ id: number }>()
+    if (exact) {
+      supplierCache.set(key, exact.id)
+      return exact.id
+    }
+    // 部分一致フォールバック
+    const like = await db.prepare(
+      "SELECT id FROM suppliers WHERE name LIKE ? AND is_active=1 ORDER BY length(name) LIMIT 1"
+    ).bind(`%${key}%`).first<{ id: number }>()
+    const id = like?.id ?? null
+    supplierCache.set(key, id)
+    return id
+  }
+
   let inserted = 0
   let updated  = 0
   let skipped  = 0
@@ -994,6 +1017,10 @@ app.post('/products/bulk-import', async (c) => {
     const barcode        = n(r['barcode']         ?? r['バーコード'])
     const product_code   = n(r['product_code']    ?? r['品番'])
     const source         = n(r['source']          ?? r['出典'])
+    // 仕入先名（複数の列名に対応）
+    const supplier_name_raw = n(
+      r['supplier_name'] ?? r['仕入先名'] ?? r['仕入先'] ?? r['発注先'] ?? r['発注先名']
+    )
 
     // 必須フィールド検証
     if (!item_category) {
@@ -1008,6 +1035,16 @@ app.post('/products/bulk-import', async (c) => {
       skipped++; continue
     }
 
+    // 仕入先名→ID解決
+    let default_supplier_id: number | null = null
+    if (supplier_name_raw) {
+      default_supplier_id = await resolveSupplierName(supplier_name_raw)
+      if (default_supplier_id === null) {
+        errors.push({ row: rowNum, msg: `仕入先名 "${supplier_name_raw}" が見つかりませんでした（スキップせず登録します）` })
+        // スキップしない：仕入先未設定のまま登録を続行
+      }
+    }
+
     try {
       if (mode === 'upsert' && product_code) {
         // product_code が一致する既存レコードを検索
@@ -1019,12 +1056,14 @@ app.post('/products/bulk-import', async (c) => {
           await db.prepare(`
             UPDATE products SET
               item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
-              list_price=?, default_rate=?, unit=?, barcode=?, source=?
+              list_price=?, default_rate=?, unit=?, barcode=?, source=?,
+              default_supplier_id=COALESCE(?, default_supplier_id)
             WHERE id=?
           `).bind(
             item_category, manufacturer || null, name, spec || null,
             color || null, club_type || null,
             list_price, default_rate, unit, barcode || null, source || null,
+            default_supplier_id,   // NULL の場合は既存値を保持（COALESCE）
             existing.id
           ).run()
           updated++
@@ -1036,13 +1075,14 @@ app.post('/products/bulk-import', async (c) => {
       await db.prepare(`
         INSERT INTO products
           (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
-           list_price, default_rate, unit, source, is_active)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,1)
+           list_price, default_rate, unit, source, default_supplier_id, is_active)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
       `).bind(
         product_code || null, barcode || null,
         item_category, manufacturer || null, name,
         spec || null, color || null, club_type || null,
-        list_price, default_rate, unit, source || null
+        list_price, default_rate, unit, source || null,
+        default_supplier_id
       ).run()
       inserted++
 

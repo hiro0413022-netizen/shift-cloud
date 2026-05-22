@@ -448,11 +448,11 @@ document.getElementById('productForm').addEventListener('submit', async function
 // テンプレート CSV ダウンロード
 // ════════════════════════════════════════════════════════════
 document.getElementById('btn-dl-template').addEventListener('click', function() {
-  var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典'];
+  var headers = ['品目','メーカー','商品名','仕様','色','種類','定価','掛率','単位','バーコード','品番','出典','仕入先名'];
   var examples = [
-    ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','',''],
-    ['グリップ','Golf Pride','CP2 Pro','M60','',' ',1800,0.60,'個','','',''],
-    ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','',''],
+    ['シャフト','フジクラ','SPEEDER NX 50','5S','','DR',38000,0.55,'本','','','','ワークス'],
+    ['グリップ','Golf Pride','CP2 Pro','M60','',' ',1800,0.60,'個','','','','アクシネット'],
+    ['ボール','タイトリスト','Pro V1','','','',8800,0.65,'ダース','','','','アクシネット'],
   ];
   var rows = [headers].concat(examples);
   var csv = rows.map(function(row){
@@ -504,6 +504,11 @@ var COL_MAP = {
   'product_code': 'product_code',
   '出典':         'source',
   'source':       'source',
+  '仕入先名':     'supplier_name',
+  'supplier_name':'supplier_name',
+  '仕入先':       'supplier_name',
+  '発注先':       'supplier_name',
+  '発注先名':     'supplier_name',
 };
 
 document.getElementById('btn-import').addEventListener('click', function() {
@@ -577,11 +582,12 @@ function renderImportPreview(rows) {
   document.getElementById('import-file-error').style.display = 'none';
 
   var cols = ['item_category','manufacturer','name','spec','color','club_type',
-              'list_price','default_rate','unit','barcode','product_code','source'];
+              'list_price','default_rate','unit','barcode','product_code','source','supplier_name'];
   var labels = {'item_category':'品目','manufacturer':'メーカー','name':'商品名',
                 'spec':'仕様','color':'色','club_type':'種類',
                 'list_price':'定価','default_rate':'掛率','unit':'単位',
-                'barcode':'バーコード','product_code':'品番','source':'出典'};
+                'barcode':'バーコード','product_code':'品番','source':'出典',
+                'supplier_name':'仕入先名'};
 
   var thead = '<tr>' + cols.map(function(c){
     var req = (c==='item_category'||c==='name') ? ' <span class="text-danger">*</span>' : '';
