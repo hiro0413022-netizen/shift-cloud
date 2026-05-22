@@ -101,34 +101,37 @@ function composeMail(
   items: Record<string, unknown>[],
   supplier: Record<string, unknown>
 ): { subject: string; body: string } {
-  const subject = `【ゴルフウィング発注】${order['order_no']} ${supplier['name']}`
+  const subject = `発注のお願い`
   const lines = items.map((item) => {
-    const spec = item['spec'] ? ` / ${item['spec']}` : ''
-    const color = item['color'] ? ` / ${item['color']}` : ''
+    const spec     = item['spec']     ? ` / ${item['spec']}`     : ''
+    const color    = item['color']    ? ` / ${item['color']}`    : ''
     const clubType = item['club_type'] ? ` / ${item['club_type']}` : ''
-    const customer = item['customer_name'] ? ` / 顧客:${item['customer_name']}` : ''
-    const usage = item['usage_type'] ? ` / 用途:${item['usage_type']}` : ''
-    return `- ${item['item_category']} / ${item['manufacturer'] || ''} / ${item['product_name']}${spec}${color}${clubType} / 数量:${item['quantity']}${customer}${usage}`
+    return `・${item['item_category']} / ${item['manufacturer'] || ''} / ${item['product_name']}${spec}${color}${clubType} / ${item['quantity']}本`
   })
 
   const honorific = (supplier['honorific'] as string) || '様'
-  const contact = (supplier['contact_name'] as string) || 'ご担当者'
+  const contact   = (supplier['contact_name'] as string) || 'ご担当者'
+  const orderNote = (order['order_note'] as string || '').trim()
+
   const body = `${supplier['name']}
 ${contact}${honorific}
 
-いつもお世話になっております。ゴルフウィングです。
-下記商品の発注をお願いいたします。
+お世話になっております。
+ゴルフウィング宝塚店の古川でございます。
 
-発注番号: ${order['order_no']}
-発注日: ${order['order_date']}
-希望納期: ${order['requested_delivery_date'] || '未設定'}
+下記の通り、発注をお願いいたします。
 
 ${lines.join('\n')}
+${orderNote ? `\n備考:\n${orderNote}\n` : ''}
+ご確認のほど、よろしくお願いいたします。
 
-備考:
-${order['order_note'] || '特になし'}
-
-以上、よろしくお願いいたします。`
+---------------------------
+GOLF WING 宝塚店
+〒665-0882
+兵庫県宝塚市山本南1-26-25
+TEL：0797-82-0833
+mail：takarazuka@golfwing.jp
+---------------------------`
   return { subject, body }
 }
 
