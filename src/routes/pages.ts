@@ -390,17 +390,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ════════════════════════════════════════════════════════════
-// 商品 追加・編集モーダル
+// 商品 追加・編集・インポート（DOMContentLoaded内で初期化）
 // ════════════════════════════════════════════════════════════
-var productModal = new bootstrap.Modal(document.getElementById('productModal'));
+var productModal, importModal, varHelpModal;
 var editingId = null;
+var _importRows = [];
 
+// openAddProductはonclick属性から呼ばれるのでグローバルに定義
 function openAddProduct(){
   editingId = null;
   document.getElementById('pmTitle').textContent = '商品を追加';
   document.getElementById('productForm').reset();
   productModal.show();
 }
+
+function initProductPage() {
+
+// モーダル初期化（DOM確定後）
+productModal  = new bootstrap.Modal(document.getElementById('productModal'));
+importModal   = new bootstrap.Modal(document.getElementById('importModal'));
+varHelpModal  = new bootstrap.Modal(document.getElementById('varHelpModal'));
 
 document.querySelectorAll('.btn-edit-product').forEach(function(btn){
   btn.addEventListener('click', function(){
@@ -475,7 +484,6 @@ function doDownloadTemplate() {
 document.getElementById('btn-dl-template').addEventListener('click', doDownloadTemplate);
 
 // ヘルプモーダル
-var varHelpModal = new bootstrap.Modal(document.getElementById('varHelpModal'));
 document.getElementById('btn-template-help').addEventListener('click', function() {
   varHelpModal.show();
 });
@@ -487,8 +495,6 @@ document.getElementById('btn-dl-template-from-help').addEventListener('click', f
 // ════════════════════════════════════════════════════════════
 // Excel / CSV 一括インポート
 // ════════════════════════════════════════════════════════════
-var importModal  = new bootstrap.Modal(document.getElementById('importModal'));
-var _importRows  = [];   // パース済み行データ
 
 // ヘッダー列マッピング（日本語 / 英語どちらでも受け付ける）
 var COL_MAP = {
@@ -718,6 +724,15 @@ document.getElementById('btn-do-import').addEventListener('click', async functio
     btn.innerHTML = '<i class="fas fa-file-import me-1"></i>インポート実行';
   }
 });
+
+} // initProductPage end
+
+// スクリプトはbody末尾に挿入されるため、DOM構築完了後に直接呼び出す
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initProductPage);
+} else {
+  initProductPage();
+}
 </script>`
 
   const currentSortLabel = (sortKey === 'manufacturer' ? 'メーカー'
