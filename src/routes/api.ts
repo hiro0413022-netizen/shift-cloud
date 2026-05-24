@@ -549,6 +549,32 @@ app.post('/orders/:id/mark-ordered', async (c) => {
 })
 
 // ============================================================
+// API: メール下書き再生成（pool/draft など email_body が空の場合に使用）
+// ============================================================
+app.post('/orders/:id/regenerate-mail', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+
+  const order = await db.prepare('SELECT * FROM purchase_orders WHERE id=?')
+    .bind(id).first<Record<string, unknown>>()
+  if (!order) return c.json({ error: '発注が見つかりません' }, 404)
+
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+    .bind(order['supplier_id']).first<Record<string, unknown>>()
+  if (!supplier) return c.json({ error: '仕入先が見つかりません' }, 404)
+
+  const items = await db.prepare(
+    'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
+  ).bind(id).all<Record<string, unknown>>()
+
+  const { subject, body } = composeMail(order, items.results, supplier)
+  await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+    .bind(subject, body, id).run()
+
+  return c.json({ ok: true, subject, body })
+})
+
+// ============================================================
 // API: 発注プール
 // ============================================================
 
@@ -1411,6 +1437,42 @@ app.post('/orders/:id/status', async (c) => {
   const { status } = await c.req.json<{ status: string }>()
   const allowed = ['draft','draft_created','ordered','partial','completed','cancelled']
   if (!allowed.includes(status)) return c.json({ error: 'invalid status' }, 400)
+
+  // 「完納にする」ボタン押下時：未入荷分を自動で入荷登録する
+  if (status === 'completed') {
+    const today = new Date().toISOString().slice(0, 10)
+
+    // 各明細の未入荷数を取得
+    const items = await db.prepare(`
+      SELECT poi.id AS poi_id, poi.quantity,
+             COALESCE(SUM(ri.received_quantity), 0) AS received_qty
+      FROM purchase_order_items poi
+      LEFT JOIN receipt_items ri ON ri.purchase_order_item_id = poi.id
+      WHERE poi.purchase_order_id = ?
+      GROUP BY poi.id, poi.quantity
+    `).bind(id).all<{ poi_id: number; quantity: number; received_qty: number }>()
+
+    const pendingItems = items.results.filter(i => i.received_qty < i.quantity)
+
+    if (pendingItems.length > 0) {
+      // 入荷ヘッダーを作成
+      const ins = await db.prepare(
+        `INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note)
+         VALUES (?, ?, NULL, '', '完納処理により自動登録')`
+      ).bind(id, today).run()
+      const receiptId = ins.meta.last_row_id as number
+
+      // 各明細の残量を入荷明細として登録
+      for (const item of pendingItems) {
+        const remaining = item.quantity - item.received_qty
+        await db.prepare(
+          `INSERT INTO receipt_items (receipt_id, purchase_order_item_id, received_quantity, note)
+           VALUES (?, ?, ?, '')`
+        ).bind(receiptId, item.poi_id, remaining).run()
+      }
+    }
+  }
+
   await db.prepare('UPDATE purchase_orders SET status=? WHERE id=?').bind(status, id).run()
   return c.json({ ok: true })
 })

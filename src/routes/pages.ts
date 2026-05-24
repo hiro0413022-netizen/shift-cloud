@@ -1748,26 +1748,38 @@ app.get('/orders/:id', async (c) => {
   const bodyEsc      = emailBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   const bodyJson     = JSON.stringify(emailBody)
 
+  // メール本文が空の場合の再生成ブロック（pool/draft で本文未生成の場合）
+  const noBodyBlock = `
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-2" id="no-body-alert">
+  <i class="fas fa-exclamation-triangle"></i>
+  <div class="flex-grow-1">テンプレートがまだ作成されていません。</div>
+  <button class="btn btn-warning btn-sm" id="btn-regen-mail">
+    <i class="fas fa-magic me-1"></i>テンプレートを生成する
+  </button>
+</div>`
+
   // メールパネル
   const emailPanel = `
+${emailBody ? '' : noBodyBlock}
 <div class="mb-2 d-flex gap-2 flex-wrap align-items-center">
   <span class="fw-semibold text-muted small">宛先:</span>
   <span>${supplierEmail ? `<a href="mailto:${esc(supplierEmail)}">${esc(supplierEmail)}</a>` : '<em class="text-muted">未設定</em>'}</span>
 </div>
 <div class="mb-2">
   <span class="fw-semibold text-muted small">件名:</span>
-  <span class="ms-1">${esc(emailSubject)}</span>
+  <span class="ms-1" id="email-subject-span">${esc(emailSubject)}</span>
 </div>
 <div class="mb-2 position-relative">
   <textarea id="email-body-ta" class="form-control font-monospace" rows="10" readonly>${bodyEsc}</textarea>
 </div>
 <div class="d-flex gap-2 flex-wrap">
-  ${supplierEmail ? `<a class="btn btn-primary btn-sm" href="mailto:${esc(supplierEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>` : ''}
+  ${supplierEmail ? `<a class="btn btn-primary btn-sm" id="btn-mailto" href="mailto:${esc(supplierEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>` : ''}
   <button class="btn btn-outline-success btn-sm" id="btn-copy-body"><i class="fas fa-copy me-1"></i>本文をコピー</button>
 </div>`
 
   // LINEパネル
   const linePanel = `
+${emailBody ? '' : noBodyBlock}
 <div class="alert alert-success py-2 mb-2">
   <i class="fab fa-line me-1"></i>
   LINE ID: <strong>${lineId || '未設定'}</strong>
@@ -1783,6 +1795,7 @@ app.get('/orders/:id', async (c) => {
 
   // FAXパネル
   const faxPanel = `
+${emailBody ? '' : noBodyBlock}
 <div class="alert alert-secondary py-2 mb-2">
   <i class="fas fa-fax me-1"></i>
   FAX番号: <strong>${faxNum || '未設定'}</strong>
@@ -1944,6 +1957,45 @@ function bindStatus(btnId, status, label){
 bindStatus('btn-s-ordered','ordered','発注済');
 bindStatus('btn-s-completed','completed','完納');
 bindStatus('btn-s-cancelled','cancelled','キャンセル');
+
+// テンプレート再生成ボタン
+(function(){
+  var regenBtn = document.getElementById('btn-regen-mail');
+  if (!regenBtn) return;
+  regenBtn.addEventListener('click', async function(){
+    regenBtn.disabled = true;
+    regenBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>生成中...';
+    try {
+      var r = await fetch('/api/orders/${id}/regenerate-mail', {method:'POST'});
+      var d = await r.json();
+      if (r.ok) {
+        // テキストエリア・件名スパンを更新
+        var ta = document.getElementById('email-body-ta') || document.getElementById('line-body-ta') || document.getElementById('fax-body-ta');
+        if (ta) ta.value = d.body || '';
+        var subj = document.getElementById('email-subject-span');
+        if (subj) subj.textContent = d.subject || '';
+        // mailtoリンクを更新
+        var mailto = document.getElementById('btn-mailto');
+        if (mailto && '${supplierEmail}') {
+          var q = new URLSearchParams({subject: d.subject||'', body: d.body||''});
+          mailto.href = 'mailto:${esc(supplierEmail)}?' + q.toString();
+        }
+        // アラートを非表示
+        var alert = document.getElementById('no-body-alert');
+        if (alert) alert.style.display = 'none';
+        showFlash('テンプレートを生成しました', 'success');
+      } else {
+        showFlash(d.error || 'テンプレートの生成に失敗しました', 'danger');
+        regenBtn.disabled = false;
+        regenBtn.innerHTML = '<i class="fas fa-magic me-1"></i>テンプレートを生成する';
+      }
+    } catch(e) {
+      showFlash('通信エラーが発生しました', 'danger');
+      regenBtn.disabled = false;
+      regenBtn.innerHTML = '<i class="fas fa-magic me-1"></i>テンプレートを生成する';
+    }
+  });
+})();
 
 // 発注コピー
 document.getElementById('btn-copy-order').addEventListener('click', async function(){
