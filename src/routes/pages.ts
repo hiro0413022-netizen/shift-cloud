@@ -1402,7 +1402,38 @@ app.get('/orders', async (c) => {
     <td class="text-center">${r['total_qty']}</td>
     <td class="text-end">${yen(r['total_amount'])}</td>
     <td>${statusBadge(String(r['status']))}</td>
+    <td class="text-center">
+      <button class="btn btn-xs btn-outline-danger py-0 px-2 btn-delete-order"
+              data-order-id="${r['id']}" data-order-no="${esc(r['order_no'])}"
+              title="削除">
+        <i class="fas fa-trash-alt"></i>
+      </button>
+    </td>
   </tr>`).join('')
+
+  const listScript = `<script>
+document.querySelectorAll('.btn-delete-order').forEach(function(btn){
+  btn.addEventListener('click', async function(){
+    var orderNo = this.dataset.orderNo;
+    var id = this.dataset.orderId;
+    if (!confirm('発注「' + orderNo + '」を削除しますか？\\n\\n入荷履歴も含めて完全に削除されます。\\nこの操作は取り消せません。')) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    var r = await fetch('/api/orders/' + id, {method:'DELETE'});
+    if (r.ok) {
+      var row = btn.closest('tr');
+      row.style.transition = 'opacity 0.3s';
+      row.style.opacity = '0';
+      setTimeout(function(){ row.remove(); }, 300);
+    } else {
+      var d = await r.json().catch(function(){ return {}; });
+      alert(d.error || '削除に失敗しました');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+    }
+  });
+});
+</script>`
 
   const content = `
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -1428,14 +1459,14 @@ app.get('/orders', async (c) => {
       <thead class="table-light"><tr>
         <th>発注番号</th><th>発注日</th><th>仕入先</th><th>顧客名</th><th>用途</th>
         <th class="text-center">明細</th><th class="text-center">数量</th>
-        <th class="text-end">金額</th><th>状態</th>
+        <th class="text-end">金額</th><th>状態</th><th></th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" class="text-center text-muted py-4">対象データがありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="10" class="text-center text-muted py-4">対象データがありません。</td></tr>'}</tbody>
     </table>
   </div>
   <div class="card-footer text-muted small">${res.results.length}件</div>
 </div>`
-  return layout('発注一覧', content)
+  return layout('発注一覧', content, listScript)
 })
 
 // ============================================================
@@ -2008,6 +2039,24 @@ document.getElementById('btn-copy-order').addEventListener('click', async functi
     setTimeout(function(){ location.href='/orders/'+res.order_id; },1200);
   } else { showFlash(res.error||'コピーに失敗しました','danger'); this.disabled=false; }
 });
+
+// 発注削除
+document.getElementById('btn-delete-order').addEventListener('click', async function(){
+  var orderNo = '${esc(String(order['order_no']))}';
+  if(!confirm('発注「' + orderNo + '」を削除しますか？\\n\\n入荷履歴も含めて完全に削除されます。\\nこの操作は取り消せません。')) return;
+  this.disabled=true;
+  this.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>削除中...';
+  var r = await fetch('/api/orders/${id}',{method:'DELETE'});
+  if(r.ok){
+    showFlash('発注を削除しました','success');
+    setTimeout(function(){ location.href='/orders'; },900);
+  } else {
+    var d = await r.json().catch(function(){ return {}; });
+    showFlash(d.error||'削除に失敗しました','danger');
+    this.disabled=false;
+    this.innerHTML='<i class="fas fa-trash-alt me-1"></i>削除';
+  }
+});
 </script>`
 
   const content = `
@@ -2026,6 +2075,7 @@ document.getElementById('btn-copy-order').addEventListener('click', async functi
     ${showButtons.join('')}
     <a class="btn btn-sm btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-truck me-1"></i>納品登録</a>
     <button class="btn btn-sm btn-outline-secondary" id="btn-copy-order"><i class="fas fa-copy me-1"></i>再発注</button>
+    <button class="btn btn-sm btn-outline-danger" id="btn-delete-order"><i class="fas fa-trash-alt me-1"></i>削除</button>
     <a class="btn btn-sm btn-outline-secondary" href="/orders"><i class="fas fa-arrow-left me-1"></i>一覧へ</a>
   </div>
 </div>

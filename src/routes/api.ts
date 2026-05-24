@@ -1478,6 +1478,34 @@ app.post('/orders/:id/status', async (c) => {
 })
 
 // ============================================================
+// API: 発注削除
+// ============================================================
+app.delete('/orders/:id', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.json({ error: '不正なIDです' }, 400)
+
+  // 存在確認
+  const order = await db.prepare('SELECT id, order_no FROM purchase_orders WHERE id=?')
+    .bind(id).first<{ id: number; order_no: string }>()
+  if (!order) return c.json({ error: '発注が見つかりません' }, 404)
+
+  // 関連レコードを依存順に削除（receipt_items → receipts → purchase_order_items → purchase_orders）
+  const receiptIds = await db.prepare(
+    'SELECT id FROM receipts WHERE purchase_order_id=?'
+  ).bind(id).all<{ id: number }>()
+
+  for (const r of receiptIds.results) {
+    await db.prepare('DELETE FROM receipt_items WHERE receipt_id=?').bind(r.id).run()
+  }
+  await db.prepare('DELETE FROM receipts WHERE purchase_order_id=?').bind(id).run()
+  await db.prepare('DELETE FROM purchase_order_items WHERE purchase_order_id=?').bind(id).run()
+  await db.prepare('DELETE FROM purchase_orders WHERE id=?').bind(id).run()
+
+  return c.json({ ok: true, order_no: order.order_no })
+})
+
+// ============================================================
 // API: バックアップ / リストア
 // ============================================================
 
