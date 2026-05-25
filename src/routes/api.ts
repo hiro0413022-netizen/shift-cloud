@@ -512,25 +512,25 @@ app.post('/orders', async (c) => {
         .run()
     }
 
-    const supplier = await db
-      .prepare('SELECT * FROM suppliers WHERE id=?')
-      .bind(supplierId)
-      .first<Record<string, unknown>>()
-    const order = await db
-      .prepare('SELECT * FROM purchase_orders WHERE id=?')
-      .bind(orderId)
-      .first<Record<string, unknown>>()
-    const items = await db
-      .prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id')
-      .bind(orderId)
-      .all<Record<string, unknown>>()
+    if (!isPool) {
+      const supplier = await db
+        .prepare('SELECT * FROM suppliers WHERE id=?')
+        .bind(supplierId)
+        .first<Record<string, unknown>>()
+      const order = await db
+        .prepare('SELECT * FROM purchase_orders WHERE id=?')
+        .bind(orderId)
+        .first<Record<string, unknown>>()
 
-    if (supplier && order && !isPool) {
-      const { subject, body } = composeMail(order, items.results, supplier)
-      await db
-        .prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
-        .bind(subject, body, orderId)
-        .run()
+      if (supplier && order) {
+        // DBへの再SELECTを避け、メモリ上の supplierLines を直接使用
+        // （D1のread-after-write問題を回避しつつ全明細を確実に渡す）
+        const { subject, body } = composeMail(order, supplierLines as unknown as Record<string, unknown>[], supplier)
+        await db
+          .prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+          .bind(subject, body, orderId)
+          .run()
+      }
     }
     orderIds.push(orderId)
   }
