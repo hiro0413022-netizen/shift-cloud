@@ -134,6 +134,96 @@ app.get('/', async (c) => {
     )`).first<{c:number}>(),
   ])
 
+  // 検品待ち明細（ordered/partial かつ inspected=0）
+  const pendingInspect = await db.prepare(`
+    SELECT
+      poi.id            AS poi_id,
+      poi.purchase_order_id AS order_id,
+      po.order_no,
+      po.status,
+      po.order_date,
+      po.customer_name,
+      s.name            AS supplier_name,
+      poi.item_category,
+      poi.manufacturer,
+      poi.product_name,
+      poi.spec,
+      poi.color,
+      poi.club_type,
+      poi.quantity,
+      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+    FROM purchase_order_items poi
+    JOIN purchase_orders po ON po.id = poi.purchase_order_id
+    JOIN suppliers s ON s.id = po.supplier_id
+    WHERE po.status IN ('ordered','partial')
+      AND poi.inspected = 0
+    ORDER BY po.order_date ASC, po.id ASC, poi.id ASC
+    LIMIT 200
+  `).all<Record<string,unknown>>()
+
+  const inspectCount = pendingInspect.results.length
+
+  // 発注番号ごとにグループ化
+  const inspectByOrder = new Map<string, { orderId: number; orderNo: string; status: string; orderDate: string; supplierName: string; customerName: string; items: Record<string,unknown>[] }>()
+  for (const item of pendingInspect.results) {
+    const key = String(item['order_id'])
+    if (!inspectByOrder.has(key)) {
+      inspectByOrder.set(key, {
+        orderId:      Number(item['order_id']),
+        orderNo:      String(item['order_no'] ?? ''),
+        status:       String(item['status'] ?? ''),
+        orderDate:    String(item['order_date'] ?? ''),
+        supplierName: String(item['supplier_name'] ?? ''),
+        customerName: String(item['customer_name'] ?? ''),
+        items: []
+      })
+    }
+    inspectByOrder.get(key)!.items.push(item)
+  }
+
+  const inspectOrderBlocks = Array.from(inspectByOrder.values()).map(grp => {
+    const itemRows = grp.items.map(item => `
+      <tr data-poi-id="${item['poi_id']}" class="inspect-row">
+        <td class="small ps-3">
+          <span class="badge bg-secondary me-1">${esc(item['item_category'])}</span>
+          ${esc(item['manufacturer'])} <strong>${esc(item['product_name'])}</strong>
+          ${item['spec'] ? `<span class="text-muted ms-1">${esc(item['spec'])}</span>` : ''}
+          ${item['color'] ? `<span class="text-muted ms-1">${esc(item['color'])}</span>` : ''}
+        </td>
+        <td class="text-center small">${item['quantity']}</td>
+        <td class="text-center small text-success">${item['received_qty']}</td>
+        <td class="text-center">
+          <button class="btn btn-sm btn-outline-secondary btn-dash-inspect"
+            data-poi-id="${item['poi_id']}" data-order-id="${grp.orderId}"
+            style="min-width:80px;font-size:0.75rem;padding:3px 8px">
+            <i class="far fa-circle me-1"></i>未検品
+          </button>
+        </td>
+      </tr>`).join('')
+    return `
+    <div class="border rounded mb-2 overflow-hidden inspect-order-block" data-order-id="${grp.orderId}">
+      <div class="d-flex align-items-center gap-2 px-3 py-2 bg-light border-bottom">
+        <a href="/orders/${grp.orderId}" class="fw-bold text-decoration-none">${esc(grp.orderNo)}</a>
+        ${statusBadge(grp.status)}
+        <span class="text-muted small">${esc(grp.orderDate)}</span>
+        <span class="ms-1 small"><i class="fas fa-building me-1 text-muted"></i>${esc(grp.supplierName)}</span>
+        ${grp.customerName ? `<span class="ms-1 small text-muted"><i class="fas fa-user me-1"></i>${esc(grp.customerName)}</span>` : ''}
+        <span class="ms-auto badge bg-warning text-dark" id="remain-badge-${grp.orderId}">${grp.items.length}件</span>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">商品</th>
+            <th class="text-center" style="width:60px">発注数</th>
+            <th class="text-center" style="width:60px">入荷数</th>
+            <th class="text-center" style="width:100px">検品</th>
+          </tr>
+        </thead>
+        <tbody class="inspect-tbody-${grp.orderId}">${itemRows}</tbody>
+      </table>
+    </div>`
+  }).join('')
+
   const recent = await db.prepare(`
     SELECT po.id, po.order_no, po.order_date, po.status, po.customer_name,
            s.name AS supplier_name,
@@ -157,7 +247,79 @@ app.get('/', async (c) => {
     <td>${statusBadge(String(r['status']))}</td>
   </tr>`).join('')
 
+  const dashScript = `
+<script>
+(function(){
+  // ダッシュボード検品ボタン
+  document.querySelectorAll('.btn-dash-inspect').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var poiId   = this.dataset.poiId;
+      var orderId = this.dataset.orderId;
+      var tr      = this.closest('tr');
+      this.disabled = true;
+      this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+      try {
+        var r = await fetch('/api/orders/'+orderId+'/items/'+poiId+'/inspect',{
+          method:'PATCH', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({inspected:1})
+        });
+        var d = await r.json();
+        if(r.ok){
+          // 行をフェードアウトして削除
+          tr.style.transition = 'opacity 0.4s';
+          tr.style.opacity = '0';
+          setTimeout(function(){
+            tr.remove();
+            // バッジ件数を更新
+            var tbody = document.querySelector('.inspect-tbody-'+orderId);
+            var remainCount = tbody ? tbody.querySelectorAll('tr').length : 0;
+            var badge = document.getElementById('remain-badge-'+orderId);
+            if(badge) badge.textContent = remainCount + '件';
+            // 発注全件完了なら発注ブロックも消す
+            if(remainCount === 0){
+              var block = document.querySelector('.inspect-order-block[data-order-id="'+orderId+'"]');
+              if(block){ block.style.transition='opacity 0.4s'; block.style.opacity='0'; setTimeout(function(){ block.remove(); updateTotalBadge(); },400); }
+            }
+            updateTotalBadge();
+            if(d.all_inspected){
+              showFlashDash('✓ 発注 '+orderId+' がすべて検品済みになりました！','success');
+            }
+          }, 400);
+        } else {
+          this.disabled = false;
+          this.innerHTML = '<i class=\\"far fa-circle me-1\\"></i>未検品';
+          showFlashDash('更新に失敗しました','danger');
+        }
+      } catch(e){
+        this.disabled = false;
+        this.innerHTML = '<i class=\\"far fa-circle me-1\\"></i>未検品';
+      }
+    });
+  });
+
+  function updateTotalBadge(){
+    var total = document.querySelectorAll('.btn-dash-inspect').length;
+    var badge = document.getElementById('inspect-total-badge');
+    if(badge) badge.textContent = total + '件';
+    var widget = document.getElementById('inspect-widget-body');
+    if(total === 0 && widget){
+      widget.innerHTML = '<div class="text-center py-4 text-success"><i class="fas fa-check-circle fa-2x mb-2"></i><br>検品待ちの商品はありません</div>';
+    }
+  }
+
+  function showFlashDash(msg, type){
+    var el = document.getElementById('dash-flash');
+    if(!el) return;
+    el.className = 'alert alert-'+type+' alert-dismissible fade show';
+    el.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+    el.style.display='';
+    setTimeout(function(){ el.style.display='none'; }, 4000);
+  }
+})();
+</script>`
+
   const content = `
+<div id="dash-flash" class="alert alert-dismissible fade show" style="display:none" role="alert"></div>
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h1 class="h3 mb-1"><i class="fas fa-chart-line me-2 text-primary"></i>ダッシュボード</h1>
@@ -183,6 +345,23 @@ app.get('/', async (c) => {
     <div class="metric-value">${b?.c ?? 0}</div>
   </div></div></div>
 </div>
+
+<!-- ════ 検品待ちウィジェット ════ -->
+<div class="card shadow-sm mb-4 ${inspectCount === 0 ? 'border-success' : 'border-warning border-2'}">
+  <div class="card-header d-flex align-items-center gap-2 ${inspectCount === 0 ? 'bg-success text-white' : 'bg-warning text-dark'}">
+    <i class="fas fa-clipboard-check fa-lg"></i>
+    <strong class="me-1">検品待ち商品</strong>
+    <span class="badge ${inspectCount === 0 ? 'bg-white text-success' : 'bg-dark'}" id="inspect-total-badge">${inspectCount}件</span>
+    <span class="ms-auto small opacity-75">発注済・一部入荷の未検品明細</span>
+  </div>
+  <div class="card-body p-3" id="inspect-widget-body">
+    ${inspectCount === 0
+      ? `<div class="text-center py-3 text-success"><i class="fas fa-check-circle fa-2x mb-2"></i><br>検品待ちの商品はありません</div>`
+      : inspectOrderBlocks
+    }
+  </div>
+</div>
+
 <div class="card shadow-sm">
   <div class="card-header bg-white d-flex justify-content-between align-items-center">
     <strong><i class="fas fa-clock me-1"></i>最近の発注</strong>
@@ -198,7 +377,7 @@ app.get('/', async (c) => {
       <tbody>${rows || '<tr><td colspan="8" class="text-center text-muted py-4">まだ発注データがありません。</td></tr>'}</tbody>
     </table>
   </div>
-</div>`
+</div>${dashScript}`
   return layout('ダッシュボード', content)
 })
 

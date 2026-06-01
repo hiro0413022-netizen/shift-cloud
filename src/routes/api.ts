@@ -1623,6 +1623,43 @@ function parseCsv(text: string): Record<string, string>[] {
 }
 
 // ── GET /api/backup/all ────────────────────────────────────
+// ============================================================
+// API: ダッシュボード用 検品待ち明細一覧
+// GET /api/dashboard/pending-inspection
+// → ordered / partial 状態の発注の未検品明細を返す
+// ============================================================
+app.get('/dashboard/pending-inspection', async (c) => {
+  const db = c.env.DB
+  const res = await db.prepare(`
+    SELECT
+      poi.id            AS poi_id,
+      poi.purchase_order_id AS order_id,
+      po.order_no,
+      po.status,
+      po.order_date,
+      s.name            AS supplier_name,
+      po.customer_name,
+      poi.item_category,
+      poi.manufacturer,
+      poi.product_name,
+      poi.spec,
+      poi.color,
+      poi.club_type,
+      poi.quantity,
+      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty,
+      poi.is_free
+    FROM purchase_order_items poi
+    JOIN purchase_orders po ON po.id = poi.purchase_order_id
+    JOIN suppliers s ON s.id = po.supplier_id
+    WHERE po.status IN ('ordered','partial')
+      AND poi.inspected = 0
+    ORDER BY po.order_date ASC, po.id ASC, poi.id ASC
+    LIMIT 200
+  `).all<Record<string, unknown>>()
+
+  return c.json({ items: res.results })
+})
+
 app.get('/backup/all', async (c) => {
   const db = c.env.DB
   const data: Record<string, unknown[]> = {}
