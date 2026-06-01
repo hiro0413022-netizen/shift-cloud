@@ -347,7 +347,15 @@ app.get('/products', async (c) => {
     const ctBadge = ct
       ? `<span class="badge bg-${ctColorMap[ct] || 'secondary'}">${esc(ct)}</span>`
       : '<span class="text-muted">—</span>'
-    return `<tr data-id="${r['id']}">
+    const actionBtns = isDiscontinued
+      ? `<button class="btn btn-xs btn-outline-success btn-restore-product py-0 px-2" data-id="${r['id']}" data-name="${esc(r['name'])}" title="有効に戻す"><i class="fas fa-undo me-1"></i>復活</button>
+         <button class="btn btn-xs btn-outline-danger btn-perm-del-product py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}" title="完全削除（発注履歴なしのみ）"><i class="fas fa-times"></i></button>`
+      : `<button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-id="${r['id']}" title="編集"><i class="fas fa-edit"></i></button>
+         <button class="btn btn-xs btn-outline-warning btn-disc-product py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}" title="廃盤にする"><i class="fas fa-ban"></i></button>`
+    return `<tr data-id="${r['id']}" class="${isDiscontinued ? 'table-secondary' : ''}">
+    <td class="text-center" style="width:36px">
+      <input type="checkbox" class="form-check-input chk-product" value="${r['id']}" style="width:1.1em;height:1.1em;cursor:pointer">
+    </td>
     <td class="text-muted small">${r['id']}</td>
     <td><span class="badge bg-secondary">${esc(r['item_category'])}</span></td>
     <td class="fw-semibold">${esc(r['manufacturer'])}</td>
@@ -358,15 +366,12 @@ app.get('/products', async (c) => {
     <td class="text-center">${r['default_rate'] != null ? (Number(r['default_rate'])*100).toFixed(1)+'%' : ''}</td>
     <td class="small">${esc(r['supplier_name'])}</td>
     <td class="text-muted small">${esc(r['barcode'])}</td>
-    <td style="white-space:nowrap">
-      <button class="btn btn-xs btn-outline-primary btn-edit-product py-0 px-2" data-id="${r['id']}"><i class="fas fa-edit"></i></button>
-      <button class="btn btn-xs btn-outline-danger btn-del-product py-0 px-2 ms-1" data-id="${r['id']}" data-name="${esc(r['name'])}"><i class="fas fa-trash"></i></button>
-    </td>
+    <td style="white-space:nowrap">${actionBtns}</td>
   </tr>`
   }).join('')
 
   const scripts = `<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script>window._PRODUCTS_PAGE_COUNT = '${res.results.length} 件表示（このページ）';</script>
+<script>window._PRODUCTS_PAGE_COUNT = '${res.results.length} 件表示（このページ）'; window._PRODUCTS_TAB = '${tab}';</script>
 <script src="/static/products-page.js"></script>`
 
   const currentSortLabel = (sortKey === 'manufacturer' ? 'メーカー'
@@ -463,11 +468,32 @@ app.get('/products', async (c) => {
   </div>
 </div>
 
+<!-- 選択時に浮き上がるアクションバー -->
+<div id="bulk-action-bar" class="d-none mb-2">
+  <div class="alert alert-primary d-flex align-items-center gap-3 py-2 mb-0 shadow-sm">
+    <span class="fw-bold"><i class="fas fa-check-square me-1"></i><span id="bulk-count">0</span> 件選択中</span>
+    <button class="btn btn-sm btn-warning" id="btn-bulk-edit">
+      <i class="fas fa-edit me-1"></i>一括編集
+    </button>
+    ${!isDiscontinued ? `<button class="btn btn-sm btn-outline-danger" id="btn-bulk-disc">
+      <i class="fas fa-ban me-1"></i>一括廃盤
+    </button>` : `<button class="btn btn-sm btn-outline-success" id="btn-bulk-restore">
+      <i class="fas fa-undo me-1"></i>一括復活
+    </button>`}
+    <button class="btn btn-sm btn-outline-secondary ms-auto" id="btn-bulk-clear">
+      <i class="fas fa-times me-1"></i>選択解除
+    </button>
+  </div>
+</div>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" id="product-table">
       <thead class="table-dark">
         <tr>
+          <th style="width:36px" class="text-center">
+            <input type="checkbox" class="form-check-input" id="chk-all" style="width:1.1em;height:1.1em;cursor:pointer" title="全選択">
+          </th>
           <th class="text-white-50 small" style="width:46px">ID</th>
           <th>${sortLink('item_category', '品目')}</th>
           <th>${sortLink('manufacturer', 'メーカー')}</th>
@@ -482,7 +508,7 @@ app.get('/products', async (c) => {
         </tr>
       </thead>
       <tbody id="product-tbody">
-        ${rows || '<tr><td colspan="11" class="text-center py-4 text-muted">対象データがありません。</td></tr>'}
+        ${rows || '<tr><td colspan="12" class="text-center py-4 text-muted">対象データがありません。</td></tr>'}
       </tbody>
     </table>
   </div>
@@ -496,6 +522,92 @@ app.get('/products', async (c) => {
   </div>
 </div>
 ${buildPager()}
+
+<!-- ════ 一括編集モーダル ════ -->
+<div class="modal fade" id="bulkEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark py-2">
+        <h5 class="modal-title mb-0">
+          <i class="fas fa-edit me-2"></i>選択商品を一括編集
+          <span class="badge bg-dark ms-2" id="bulk-edit-count-badge">0件</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info py-2 small mb-3">
+          <i class="fas fa-info-circle me-1"></i>
+          <strong>入力した項目のみ</strong>上書きされます。空欄のままにした項目は変更されません。
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">品目</label>
+            <input class="form-control" id="be-item-category" placeholder="変更しない場合は空欄">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">メーカー</label>
+            <input class="form-control" id="be-manufacturer" placeholder="変更しない場合は空欄">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">種類</label>
+            <select class="form-select" id="be-club-type">
+              <option value="">— 変更しない —</option>
+              <option value="DR">DR</option>
+              <option value="FW">FW</option>
+              <option value="UT">UT</option>
+              <option value="IR">IR</option>
+              <option value="PT">PT</option>
+              <option value="DR/FW">DR/FW</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">掛率</label>
+            <div class="input-group">
+              <input class="form-control" id="be-rate" type="number" step="0.01" min="0" max="1" placeholder="例: 0.45">
+              <span class="input-group-text">（0〜1）</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">定価</label>
+            <div class="input-group">
+              <span class="input-group-text">¥</span>
+              <input class="form-control" id="be-list-price" type="number" step="1" min="0" placeholder="変更しない場合は空欄">
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">標準仕入先</label>
+            <select class="form-select" id="be-supplier">
+              <option value="">— 変更しない —</option>
+              ${supplierOpts}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold">単位</label>
+            <select class="form-select" id="be-unit">
+              <option value="">— 変更しない —</option>
+              <option value="本">本</option>
+              <option value="個">個</option>
+              <option value="ダース">ダース</option>
+              <option value="セット">セット</option>
+              <option value="足">足</option>
+            </select>
+          </div>
+        </div>
+        <!-- プレビューリスト -->
+        <div class="mt-3">
+          <div class="fw-semibold small text-muted mb-1"><i class="fas fa-list me-1"></i>編集対象の商品</div>
+          <div id="bulk-edit-preview" class="border rounded p-2 bg-light" style="max-height:180px;overflow-y:auto;font-size:0.8rem"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+        <button type="button" class="btn btn-warning fw-bold" id="btn-do-bulk-edit">
+          <i class="fas fa-save me-1"></i>一括更新を実行
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ════ Excel/CSV 一括インポートモーダル ════ -->
 <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">

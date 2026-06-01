@@ -1101,6 +1101,63 @@ app.delete('/products/:id', async (c) => {
 })
 
 // ============================================================
+// API: 商品 選択一括編集
+// POST /api/products/bulk-update
+// Body: { ids: number[], fields: { manufacturer?, item_category?, club_type?,
+//          default_rate?, list_price?, default_supplier_id?, unit?, spec? } }
+// ============================================================
+app.post('/products/bulk-update', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{
+    ids: number[]
+    fields: Record<string, unknown>
+  }>()
+  const { ids, fields } = body
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return c.json({ error: '対象IDが指定されていません' }, 400)
+  }
+  if (ids.length > 500) {
+    return c.json({ error: '一度に編集できるのは500件までです' }, 400)
+  }
+
+  // 更新可能なフィールドのホワイトリスト
+  const ALLOWED: Record<string, (v: unknown) => unknown> = {
+    manufacturer:       v => String(v ?? '').trim() || null,
+    item_category:      v => String(v ?? '').trim() || null,
+    club_type:          v => String(v ?? '').trim() || null,
+    default_rate:       v => { const n = parseFloat(String(v)); return isNaN(n) ? null : Math.min(1, Math.max(0, n)) },
+    list_price:         v => { const n = parseFloat(String(v).replace(/,/g,'')); return isNaN(n) ? null : n },
+    default_supplier_id:v => { const n = parseInt(String(v)); return isNaN(n) ? null : n },
+    unit:               v => String(v ?? '').trim() || null,
+  }
+
+  // 空でない（変更対象）フィールドのみ抽出
+  const setClauses: string[] = []
+  const setValues: unknown[] = []
+  for (const [key, converter] of Object.entries(ALLOWED)) {
+    if (key in fields && fields[key] !== '' && fields[key] !== null && fields[key] !== undefined) {
+      const val = converter(fields[key])
+      if (val !== null) {
+        setClauses.push(`${key}=?`)
+        setValues.push(val)
+      }
+    }
+  }
+
+  if (setClauses.length === 0) {
+    return c.json({ error: '更新する項目が選択されていません' }, 400)
+  }
+
+  // IN句用プレースホルダ
+  const placeholders = ids.map(() => '?').join(',')
+  const sql = `UPDATE products SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`
+  await db.prepare(sql).bind(...setValues, ...ids).run()
+
+  return c.json({ ok: true, updated: ids.length })
+})
+
+// ============================================================
 // API: 商品 一括インポート
 // POST /api/products/bulk-import
 // Body: { rows: Array<{...}>, mode: 'insert'|'upsert' }

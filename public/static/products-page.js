@@ -322,6 +322,216 @@ document.getElementById('btn-do-import').addEventListener('click', async functio
   }
 });
 
+// ============================================================
+// 選択チェックボックス & 一括編集
+// ============================================================
+
+var bulkEditModal;
+var _selectedIds = new Set();
+
+function updateBulkBar() {
+  var bar   = document.getElementById('bulk-action-bar');
+  var countEl = document.getElementById('bulk-count');
+  if (!bar) return;
+  if (_selectedIds.size > 0) {
+    bar.classList.remove('d-none');
+    if (countEl) countEl.textContent = _selectedIds.size;
+  } else {
+    bar.classList.add('d-none');
+  }
+  // 全選択チェックボックスの状態を同期
+  var chkAll = document.getElementById('chk-all');
+  if (!chkAll) return;
+  var allChks = document.querySelectorAll('.chk-product');
+  var checkedCount = document.querySelectorAll('.chk-product:checked').length;
+  chkAll.checked       = allChks.length > 0 && checkedCount === allChks.length;
+  chkAll.indeterminate = checkedCount > 0 && checkedCount < allChks.length;
+}
+
+// 全選択チェックボックス
+var chkAllEl = document.getElementById('chk-all');
+if (chkAllEl) {
+  chkAllEl.addEventListener('change', function() {
+    document.querySelectorAll('.chk-product').forEach(function(chk) {
+      chk.checked = chkAllEl.checked;
+      var id = parseInt(chk.value);
+      if (chkAllEl.checked) {
+        _selectedIds.add(id);
+        chk.closest('tr').classList.add('table-active');
+      } else {
+        _selectedIds.delete(id);
+        chk.closest('tr').classList.remove('table-active');
+      }
+    });
+    updateBulkBar();
+  });
+}
+
+// 行チェックボックス（イベント委譲）
+document.getElementById('product-tbody').addEventListener('change', function(e) {
+  if (!e.target.classList.contains('chk-product')) return;
+  var id = parseInt(e.target.value);
+  var tr = e.target.closest('tr');
+  if (e.target.checked) {
+    _selectedIds.add(id);
+    tr.classList.add('table-active');
+  } else {
+    _selectedIds.delete(id);
+    tr.classList.remove('table-active');
+  }
+  updateBulkBar();
+});
+
+// 選択解除ボタン
+var clearBtn = document.getElementById('btn-bulk-clear');
+if (clearBtn) {
+  clearBtn.addEventListener('click', function() {
+    _selectedIds.clear();
+    document.querySelectorAll('.chk-product').forEach(function(chk) {
+      chk.checked = false;
+      chk.closest('tr').classList.remove('table-active');
+    });
+    updateBulkBar();
+  });
+}
+
+// 一括廃盤ボタン
+var bulkDiscBtn = document.getElementById('btn-bulk-disc');
+if (bulkDiscBtn) {
+  bulkDiscBtn.addEventListener('click', async function() {
+    var ids = Array.from(_selectedIds);
+    if (!confirm(ids.length + ' 件の商品を廃盤にしますか？')) return;
+    this.disabled = true;
+    var ok = 0;
+    for (var id of ids) {
+      var r = await fetch('/api/products/' + id, {method:'DELETE'});
+      if (r.ok) ok++;
+    }
+    showFlash(ok + ' 件を廃盤にしました', 'success');
+    setTimeout(function(){ location.reload(); }, 900);
+  });
+}
+
+// 一括復活ボタン（廃盤タブ用）
+var bulkRestoreBtn = document.getElementById('btn-bulk-restore');
+if (bulkRestoreBtn) {
+  bulkRestoreBtn.addEventListener('click', async function() {
+    var ids = Array.from(_selectedIds);
+    if (!confirm(ids.length + ' 件の商品を有効に戻しますか？')) return;
+    this.disabled = true;
+    var ok = 0;
+    for (var id of ids) {
+      var r = await fetch('/api/products/' + id + '/restore', {method:'PATCH'});
+      if (r.ok) ok++;
+    }
+    showFlash(ok + ' 件を復活させました', 'success');
+    setTimeout(function(){ location.reload(); }, 900);
+  });
+}
+
+// 一括編集モーダルを開く
+var beModalEl = document.getElementById('bulkEditModal');
+if (beModalEl) {
+  bulkEditModal = new bootstrap.Modal(beModalEl);
+}
+
+var bulkEditBtn = document.getElementById('btn-bulk-edit');
+if (bulkEditBtn) {
+  bulkEditBtn.addEventListener('click', function() {
+    var ids = Array.from(_selectedIds);
+    if (ids.length === 0) return;
+    // フォームリセット
+    ['be-item-category','be-manufacturer','be-list-price','be-rate'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.value = '';
+    });
+    ['be-club-type','be-supplier','be-unit'].forEach(function(id){
+      var el = document.getElementById(id);
+      if(el) el.value = '';
+    });
+    // バッジ件数
+    var badge = document.getElementById('bulk-edit-count-badge');
+    if (badge) badge.textContent = ids.length + '件';
+    // プレビューリスト生成（選択行のテキストを収集）
+    var preview = document.getElementById('bulk-edit-preview');
+    if (preview) {
+      var items = [];
+      ids.forEach(function(id) {
+        var tr = document.querySelector('#product-tbody tr[data-id="' + id + '"]');
+        if (tr) {
+          var cells = tr.querySelectorAll('td');
+          // [0]=chk [1]=ID [2]=品目 [3]=メーカー [4]=商品名 [5]=仕様 [6]=種類
+          var cat  = cells[2] ? cells[2].textContent.trim() : '';
+          var mfr  = cells[3] ? cells[3].textContent.trim() : '';
+          var name = cells[4] ? cells[4].textContent.trim() : '';
+          var spec = cells[5] ? cells[5].textContent.trim() : '';
+          items.push('<span class="badge bg-secondary me-1">' + escapeHtml(cat) + '</span>'
+            + escapeHtml(mfr) + ' ' + escapeHtml(name)
+            + (spec ? ' <span class="text-muted">' + escapeHtml(spec) + '</span>' : ''));
+        }
+      });
+      preview.innerHTML = items.map(function(s){ return '<div class="py-1 border-bottom">' + s + '</div>'; }).join('');
+    }
+    if (bulkEditModal) bulkEditModal.show();
+  });
+}
+
+// 一括更新実行
+var doBulkEditBtn = document.getElementById('btn-do-bulk-edit');
+if (doBulkEditBtn) {
+  doBulkEditBtn.addEventListener('click', async function() {
+    var ids = Array.from(_selectedIds);
+    if (ids.length === 0) return;
+
+    var fields = {};
+    var itemCat  = document.getElementById('be-item-category').value.trim();
+    var mfr      = document.getElementById('be-manufacturer').value.trim();
+    var clubType = document.getElementById('be-club-type').value;
+    var rateStr  = document.getElementById('be-rate').value.trim();
+    var priceStr = document.getElementById('be-list-price').value.trim();
+    var suppId   = document.getElementById('be-supplier').value;
+    var unit     = document.getElementById('be-unit').value;
+
+    if (itemCat)  fields['item_category']       = itemCat;
+    if (mfr)      fields['manufacturer']         = mfr;
+    if (clubType) fields['club_type']            = clubType;
+    if (rateStr)  fields['default_rate']         = parseFloat(rateStr);
+    if (priceStr) fields['list_price']           = parseFloat(priceStr);
+    if (suppId)   fields['default_supplier_id']  = parseInt(suppId);
+    if (unit)     fields['unit']                 = unit;
+
+    if (Object.keys(fields).length === 0) {
+      showFlash('変更する項目を1つ以上入力してください', 'warning');
+      return;
+    }
+
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>更新中…';
+
+    try {
+      var resp = await fetch('/api/products/bulk-update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ ids: ids, fields: fields })
+      });
+      var result = await resp.json();
+      if (resp.ok) {
+        if (bulkEditModal) bulkEditModal.hide();
+        showFlash(result.updated + ' 件を更新しました', 'success');
+        setTimeout(function(){ location.reload(); }, 900);
+      } else {
+        showFlash(result.error || '更新に失敗しました', 'danger');
+        this.disabled = false;
+        this.innerHTML = '<i class="fas fa-save me-1"></i>一括更新を実行';
+      }
+    } catch(err) {
+      showFlash('通信エラー: ' + err.message, 'danger');
+      this.disabled = false;
+      this.innerHTML = '<i class="fas fa-save me-1"></i>一括更新を実行';
+    }
+  });
+}
+
 } catch(e) { console.error('initProductPage error:', e.message, e.stack); }
 } // initProductPage end
 
