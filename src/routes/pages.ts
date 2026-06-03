@@ -2040,15 +2040,28 @@ app.get('/orders/:id', async (c) => {
   `).bind(id).first<Record<string,unknown>>()
   if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>')
 
-  const items = await db.prepare(`
-    SELECT poi.*,
-      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
-    FROM purchase_order_items poi WHERE poi.purchase_order_id=? ORDER BY poi.id
-  `).bind(id).all<Record<string,unknown>>()
+  const curStatus = String(order['status'] ?? '')
+  const isEditable = curStatus === 'draft_created' || curStatus === 'pool'
 
-  const receipts = await db.prepare(
-    'SELECT * FROM receipts WHERE purchase_order_id=? ORDER BY id DESC'
-  ).bind(id).all<Record<string,unknown>>()
+  const [items, receipts, productRes, supplierRes] = await Promise.all([
+    db.prepare(`
+      SELECT poi.*,
+        COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+      FROM purchase_order_items poi WHERE poi.purchase_order_id=? ORDER BY poi.id
+    `).bind(id).all<Record<string,unknown>>(),
+    db.prepare('SELECT * FROM receipts WHERE purchase_order_id=? ORDER BY id DESC').bind(id).all<Record<string,unknown>>(),
+    // 下書き/プールのときだけ商品マスタを取得（それ以外は空）
+    isEditable
+      ? db.prepare(`SELECT p.id, p.item_category, p.manufacturer, p.name, p.spec, p.club_type,
+                           p.list_price, p.default_rate, s.name AS supplier_name
+                    FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
+                    WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000`
+        ).all<Record<string,unknown>>()
+      : Promise.resolve({ results: [] }),
+    isEditable
+      ? db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<{id:number,name:string}>()
+      : Promise.resolve({ results: [] }),
+  ])
 
   // 合計金額
   const totalAmount = items.results.reduce((s, i) => s + (Number(i['amount'])||0), 0)
@@ -2182,11 +2195,85 @@ ${emailBody ? '' : noBodyBlock}
     completed: '<button class="btn btn-sm btn-success" id="btn-s-completed"><i class="fas fa-check-double me-1"></i>完納にする</button>',
     cancelled: '<button class="btn btn-sm btn-outline-danger" id="btn-s-cancelled"><i class="fas fa-ban me-1"></i>キャンセル</button>',
   }
-  const curStatus = String(order['status'])
   const showButtons = curStatus === 'draft_created' ? [statusButtons.ordered, statusButtons.cancelled]
     : curStatus === 'ordered'  ? [statusButtons.completed, statusButtons.cancelled]
     : curStatus === 'partial'  ? [statusButtons.completed, statusButtons.cancelled]
     : []
+
+  // 商品追加モーダル（下書き/プールのときのみ）
+  const addItemModalHtml = isEditable ? `
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <div class="d-flex align-items-center gap-2 flex-grow-1">
+          <button type="button" id="aim-back" class="btn btn-sm btn-outline-secondary" style="display:none">
+            <i class="fas fa-chevron-left me-1"></i>戻る
+          </button>
+          <h6 class="modal-title mb-0 fw-bold" id="aim-title">カテゴリーを選択</h6>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="px-3 pt-2 pb-1" id="aim-search-wrap" style="display:none">
+        <input type="text" id="aim-search" class="form-control form-control-sm" placeholder="商品名・仕様・種類で絞り込み…">
+      </div>
+      <div class="modal-body p-0" id="aim-body" style="max-height:400px;overflow-y:auto"></div>
+      <!-- 確認フォーム -->
+      <div class="modal-footer flex-column align-items-stretch d-none" id="aim-form-area">
+        <div class="row g-2 w-100">
+          <div class="col-12">
+            <label class="form-label form-label-sm mb-1 fw-semibold">商品名</label>
+            <input id="aim-pname" class="form-control form-control-sm" readonly>
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">色</label>
+            <div id="aim-color-wrap">
+              <input id="aim-color" class="form-control form-control-sm" placeholder="色">
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">数量 <span class="text-danger">*</span></label>
+            <input id="aim-qty" type="number" min="1" value="1" class="form-control form-control-sm text-center">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">定価</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">¥</span>
+              <input id="aim-list-price" type="number" min="0" class="form-control text-end">
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">掛率</label>
+            <input id="aim-rate" type="number" min="0" max="1" step="0.001" class="form-control form-control-sm text-end" placeholder="0.55">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">単価</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">¥</span>
+              <input id="aim-unit-price" type="number" min="0" class="form-control text-end" placeholder="自動計算">
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">備考</label>
+            <input id="aim-note" class="form-control form-control-sm" placeholder="任意">
+          </div>
+        </div>
+        <div class="d-flex gap-2 w-100 mt-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="aim-back-form">
+            <i class="fas fa-chevron-left me-1"></i>商品選択に戻る
+          </button>
+          <button type="button" class="btn btn-primary btn-sm flex-grow-1" id="aim-submit">
+            <i class="fas fa-plus me-1"></i>この商品を追加する
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>` : ''
+
+  const dataScript = isEditable
+    ? `<script>var AIM_PRODUCTS=${JSON.stringify(productRes.results)};var AIM_SUPPLIERS=${JSON.stringify(supplierRes.results)};</script>`
+    : ''
 
   const scripts = `<script>
 // ============================================================
@@ -2406,6 +2493,306 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
     this.innerHTML='<i class="fas fa-trash-alt me-1"></i>削除';
   }
 });
+
+// ============================================================
+// 商品追加モーダル（下書き/プール状態のみ）
+// ============================================================
+(function(){
+  if (typeof AIM_PRODUCTS === 'undefined') return; // 編集不可ステータスでは何もしない
+
+  var ORDER_ID   = ${id};
+  var products   = AIM_PRODUCTS;   // [{id, item_category, maker_name, product_name, spec, color, list_price, default_rate}, ...]
+  var suppliers  = AIM_SUPPLIERS;  // [{id, name}, ...]
+
+  // --- DOM refs ---
+  var modal      = document.getElementById('addItemModal');
+  var bsModal    = new bootstrap.Modal(modal);
+  var titleEl    = document.getElementById('aim-title');
+  var bodyEl     = document.getElementById('aim-body');
+  var backBtn    = document.getElementById('aim-back');
+  var searchWrap = document.getElementById('aim-search-wrap');
+  var searchInp  = document.getElementById('aim-search');
+  var formArea   = document.getElementById('aim-form-area');
+  var pnameInp   = document.getElementById('aim-pname');
+  var colorInp   = document.getElementById('aim-color');
+  var qtyInp     = document.getElementById('aim-qty');
+  var listPriceInp = document.getElementById('aim-list-price');
+  var rateInp    = document.getElementById('aim-rate');
+  var unitPriceInp = document.getElementById('aim-unit-price');
+  var noteInp    = document.getElementById('aim-note');
+  var submitBtn  = document.getElementById('aim-submit');
+  var backFormBtn = document.getElementById('aim-back-form');
+
+  // --- 状態 ---
+  var step = 'category'; // 'category' | 'maker' | 'product' | 'form'
+  var selCategory = null;
+  var selMaker    = null;
+  var selProduct  = null; // nullのとき=マスタ外
+  var isFreeMode  = false;
+  var freeSupplierId = null;
+
+  // --- ユーティリティ ---
+  function uniqueSorted(arr){ return arr.filter(function(v,i,a){ return v && a.indexOf(v)===i; }).sort(); }
+  function filtered(keyword){
+    var kw = keyword.trim().toLowerCase();
+    return products.filter(function(p){
+      if(selCategory && p.item_category !== selCategory) return false;
+      if(selMaker    && p.maker_name    !== selMaker)    return false;
+      if(!kw) return true;
+      return (p.product_name||'').toLowerCase().indexOf(kw)>=0
+          || (p.spec||'').toLowerCase().indexOf(kw)>=0
+          || (p.color||'').toLowerCase().indexOf(kw)>=0;
+    });
+  }
+
+  function listItem(label, onClick, badge){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+    btn.innerHTML = label + (badge ? ' <span class="badge bg-secondary rounded-pill">'+badge+'</span>' : '');
+    btn.addEventListener('click', onClick);
+    return btn;
+  }
+
+  // --- ステップ描画 ---
+  function showCategory(){
+    step = 'category'; selCategory = null; selMaker = null; selProduct = null; isFreeMode = false;
+    titleEl.textContent = 'カテゴリーを選択';
+    backBtn.style.display = 'none';
+    searchWrap.style.display = 'none';
+    formArea.classList.add('d-none');
+    bodyEl.innerHTML = '';
+    var lg = document.createElement('div');
+    lg.className = 'list-group list-group-flush';
+
+    // マスタ外商品ボタン
+    var freeBtn = document.createElement('button');
+    freeBtn.type = 'button';
+    freeBtn.className = 'list-group-item list-group-item-action text-success fw-semibold';
+    freeBtn.innerHTML = '<i class="fas fa-pen me-2"></i>マスタ外商品を直接入力する';
+    freeBtn.addEventListener('click', function(){ showFreeForm(); });
+    lg.appendChild(freeBtn);
+
+    var cats = uniqueSorted(products.map(function(p){ return p.item_category; }));
+    cats.forEach(function(cat){
+      var cnt = products.filter(function(p){ return p.item_category===cat; }).length;
+      lg.appendChild(listItem(cat, function(){ selCategory=cat; showMaker(); }, cnt));
+    });
+    bodyEl.appendChild(lg);
+  }
+
+  function showMaker(){
+    step = 'maker'; selMaker = null; selProduct = null;
+    titleEl.textContent = selCategory + ' › メーカー';
+    backBtn.style.display = '';
+    searchWrap.style.display = 'none';
+    formArea.classList.add('d-none');
+    bodyEl.innerHTML = '';
+    var lg = document.createElement('div');
+    lg.className = 'list-group list-group-flush';
+    var makers = uniqueSorted(products.filter(function(p){ return p.item_category===selCategory; }).map(function(p){ return p.maker_name; }));
+    makers.forEach(function(mk){
+      var cnt = products.filter(function(p){ return p.item_category===selCategory && p.maker_name===mk; }).length;
+      lg.appendChild(listItem(mk, function(){ selMaker=mk; showProduct(); }, cnt));
+    });
+    bodyEl.appendChild(lg);
+  }
+
+  function showProduct(){
+    step = 'product'; selProduct = null;
+    titleEl.textContent = selMaker + ' › 商品';
+    backBtn.style.display = '';
+    searchWrap.style.display = '';
+    searchInp.value = '';
+    formArea.classList.add('d-none');
+    renderProductList('');
+    searchInp.oninput = function(){ renderProductList(searchInp.value); };
+  }
+
+  function renderProductList(kw){
+    bodyEl.innerHTML = '';
+    var lg = document.createElement('div');
+    lg.className = 'list-group list-group-flush';
+    var list = filtered(kw);
+    if(list.length === 0){
+      lg.innerHTML = '<div class="text-center text-muted py-3 small">該当商品がありません</div>';
+    } else {
+      list.forEach(function(p){
+        var label = p.product_name + (p.spec ? ' / '+p.spec : '') + (p.color ? ' <span class="text-muted small">['+p.color+']</span>' : '');
+        lg.appendChild(listItem(label, function(){ selProduct=p; showForm(false); }));
+      });
+    }
+    bodyEl.appendChild(lg);
+  }
+
+  function showFreeForm(){
+    isFreeMode = true; selProduct = null;
+    step = 'form';
+    titleEl.textContent = 'マスタ外商品を入力';
+    backBtn.style.display = '';
+    searchWrap.style.display = 'none';
+    bodyEl.innerHTML = '';
+
+    // 仕入先セレクトを動的に挿入
+    var supplierWrap = document.getElementById('aim-supplier-wrap');
+    if(!supplierWrap){
+      var col = document.createElement('div');
+      col.className = 'col-12';
+      col.id = 'aim-supplier-wrap';
+      col.innerHTML = '<label class="form-label form-label-sm mb-1 fw-semibold">仕入先 <span class="text-danger">*</span></label>'
+        + '<select id="aim-supplier-sel" class="form-select form-select-sm">'
+        + '<option value="">-- 仕入先を選択 --</option>'
+        + suppliers.map(function(s){ return '<option value="'+s.id+'">'+s.name+'</option>'; }).join('')
+        + '</select>';
+      var rowDiv = formArea.querySelector('.row.g-2.w-100');
+      if(rowDiv) rowDiv.insertBefore(col, rowDiv.firstChild);
+    }
+
+    pnameInp.readOnly = false;
+    pnameInp.value = '';
+    pnameInp.placeholder = '商品名を入力';
+    colorInp.value = '';
+    qtyInp.value = '1';
+    listPriceInp.value = '';
+    rateInp.value = '';
+    unitPriceInp.value = '';
+    noteInp.value = '';
+    formArea.classList.remove('d-none');
+  }
+
+  function showForm(fromSearch){
+    isFreeMode = false;
+    step = 'form';
+    var p = selProduct;
+    titleEl.textContent = p.product_name;
+    backBtn.style.display = '';
+    searchWrap.style.display = 'none';
+    bodyEl.innerHTML = '';
+
+    // 仕入先セレクトを削除（マスタ内商品では不要）
+    var supplierWrap = document.getElementById('aim-supplier-wrap');
+    if(supplierWrap) supplierWrap.remove();
+
+    pnameInp.readOnly = true;
+    pnameInp.value = p.product_name + (p.spec ? ' / '+p.spec : '');
+    colorInp.value = p.color || '';
+    qtyInp.value = '1';
+    listPriceInp.value = p.list_price != null ? p.list_price : '';
+    rateInp.value = p.default_rate != null ? p.default_rate : '';
+    // 単価を自動計算
+    if(p.list_price && p.default_rate){
+      unitPriceInp.value = Math.round(p.list_price * p.default_rate);
+    } else {
+      unitPriceInp.value = '';
+    }
+    noteInp.value = '';
+    formArea.classList.remove('d-none');
+  }
+
+  // 定価×掛率 → 単価 自動計算
+  function calcUnitPrice(){
+    var lp = parseFloat(listPriceInp.value);
+    var rt = parseFloat(rateInp.value);
+    if(!isNaN(lp) && !isNaN(rt)){
+      unitPriceInp.value = Math.round(lp * rt);
+    }
+  }
+  listPriceInp.addEventListener('input', calcUnitPrice);
+  rateInp.addEventListener('input', calcUnitPrice);
+
+  // --- 戻るボタン ---
+  backBtn.addEventListener('click', function(){
+    if(step === 'maker')   { showCategory(); }
+    else if(step === 'product') { showMaker(); }
+    else if(step === 'form'){
+      if(isFreeMode){ showCategory(); }
+      else          { showProduct(); }
+    }
+  });
+  backFormBtn.addEventListener('click', function(){
+    if(isFreeMode){ showCategory(); }
+    else          { showProduct(); }
+  });
+
+  // --- 商品追加ボタン ---
+  submitBtn.addEventListener('click', async function(){
+    var qty = parseInt(qtyInp.value, 10);
+    if(isNaN(qty) || qty < 1){ showFlash('数量を正しく入力してください', 'warning'); return; }
+
+    var unitPrice = parseFloat(unitPriceInp.value);
+    if(isNaN(unitPrice) || unitPrice < 0){ showFlash('単価を入力してください', 'warning'); return; }
+
+    var payload = {
+      quantity:   qty,
+      unit_price: unitPrice,
+      list_price: parseFloat(listPriceInp.value) || null,
+      rate:       parseFloat(rateInp.value)       || null,
+      note:       noteInp.value.trim() || null,
+      color:      colorInp.value.trim() || null,
+    };
+
+    if(isFreeMode){
+      // マスタ外
+      var pname = pnameInp.value.trim();
+      if(!pname){ showFlash('商品名を入力してください', 'warning'); return; }
+      var sel = document.getElementById('aim-supplier-sel');
+      var suppId = sel ? parseInt(sel.value, 10) : NaN;
+      if(isNaN(suppId) || !suppId){ showFlash('仕入先を選択してください', 'warning'); return; }
+      payload.product_name = pname;
+      payload.supplier_id  = suppId;
+    } else {
+      // マスタ内
+      var p = selProduct;
+      payload.product_id   = p.id;
+      payload.product_name = p.product_name + (p.spec ? ' / '+p.spec : '');
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>追加中...';
+
+    try {
+      var r = await fetch('/api/orders/' + ORDER_ID + '/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      var d = await r.json();
+      if(r.ok){
+        bsModal.hide();
+        showFlash('商品を追加しました', 'success');
+        // 明細テーブルと合計金額を更新するためページリロード
+        setTimeout(function(){ location.reload(); }, 800);
+      } else {
+        showFlash(d.error || '追加に失敗しました', 'danger');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-plus me-1"></i>この商品を追加する';
+      }
+    } catch(e){
+      showFlash('通信エラーが発生しました', 'danger');
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fas fa-plus me-1"></i>この商品を追加する';
+    }
+  });
+
+  // モーダルを開くたびに初期化
+  modal.addEventListener('show.bs.modal', function(){
+    // 仕入先セレクト残骸を削除
+    var sw = document.getElementById('aim-supplier-wrap');
+    if(sw) sw.remove();
+    pnameInp.readOnly = true;
+    pnameInp.placeholder = '';
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="fas fa-plus me-1"></i>この商品を追加する';
+    showCategory();
+  });
+
+  // 「商品を追加」ボタンからモーダルを開く
+  var openBtn = document.getElementById('btn-add-item');
+  if(openBtn){
+    openBtn.addEventListener('click', function(){ bsModal.show(); });
+  }
+})();
 </script>`
 
   const content = `
@@ -2466,7 +2853,10 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
 <div class="card shadow-sm mb-3">
   <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
     <strong><i class="fas fa-table me-1 text-primary"></i>発注明細</strong>
-    <span class="badge bg-primary">${items.results.length} 品目 / 合計 ${yen(totalAmount)}</span>
+    <div class="d-flex align-items-center gap-2">
+      ${isEditable ? `<button class="btn btn-sm btn-outline-success" id="btn-add-item"><i class="fas fa-plus me-1"></i>商品を追加</button>` : ''}
+      <span class="badge bg-primary">${items.results.length} 品目 / 合計 ${yen(totalAmount)}</span>
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" id="order-items-table">
@@ -2498,7 +2888,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
     </table>
   </div>
 </div>`
-  return layout(`発注詳細 ${esc(order['order_no'])}`, content, scripts)
+  return layout(`発注詳細 ${esc(order['order_no'])}`, dataScript + addItemModalHtml + content, scripts)
 })
 
 // ============================================================

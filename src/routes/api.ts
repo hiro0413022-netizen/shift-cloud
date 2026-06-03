@@ -591,6 +591,102 @@ app.post('/orders/:id/regenerate-mail', async (c) => {
 })
 
 // ============================================================
+// API: 既存発注への明細追加 POST /orders/:id/items
+// draft_created / pool ステータスのときのみ許可
+// ============================================================
+app.post('/orders/:id/items', async (c) => {
+  const db = c.env.DB
+  const orderId = parseInt(c.req.param('id'))
+  if (isNaN(orderId)) return c.json({ error: '不正なIDです。' }, 400)
+
+  const order = await db.prepare(
+    `SELECT po.*, s.* FROM purchase_orders po
+     JOIN suppliers s ON po.supplier_id = s.id
+     WHERE po.id = ?`
+  ).bind(orderId).first<Record<string, unknown>>()
+  if (!order) return c.json({ error: '発注が見つかりません。' }, 404)
+
+  const status = String(order['status'] ?? '')
+  if (status !== 'draft_created' && status !== 'pool') {
+    return c.json({ error: '下書きまたはプール状態の発注にのみ明細を追加できます。' }, 400)
+  }
+
+  const body = await c.req.json<{
+    product_id?: number | null
+    supplier_id?: number | null   // マスタ外商品の場合に直接指定
+    item_category: string
+    manufacturer: string
+    product_name: string
+    spec?: string
+    color?: string
+    club_type?: string
+    quantity: number
+    list_price?: number | null
+    rate?: number | null
+    unit_price?: number | null
+    line_note?: string
+  }>()
+
+  if (!body.product_name && !body.item_category) {
+    return c.json({ error: '商品名または品目を入力してください。' }, 400)
+  }
+  if (!body.quantity || body.quantity <= 0) {
+    return c.json({ error: '数量は1以上を指定してください。' }, 400)
+  }
+
+  // 単価計算
+  const rate = body.rate ?? null
+  let unitPrice = body.unit_price ?? null
+  if (unitPrice === null && body.list_price != null && rate != null) {
+    unitPrice = Math.round(body.list_price * rate)
+  }
+  const amount = unitPrice != null ? unitPrice * body.quantity : null
+
+  // INSERT
+  await db.prepare(`
+    INSERT INTO purchase_order_items
+      (purchase_order_id, product_id, item_category, manufacturer, product_name,
+       spec, color, club_type, quantity, list_price, rate, unit_price, amount,
+       customer_name, usage_type, requested_delivery_date, line_note)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    orderId,
+    body.product_id ?? null,
+    body.item_category ?? '',
+    body.manufacturer  ?? '',
+    body.product_name,
+    body.spec      ?? '',
+    body.color     ?? '',
+    body.club_type ?? '',
+    body.quantity,
+    body.list_price ?? null,
+    rate,
+    unitPrice,
+    amount,
+    order['customer_name']            ?? null,
+    order['usage_type']               ?? null,
+    order['requested_delivery_date']  ?? null,
+    normalize(body.line_note)
+  ).run()
+
+  // メール下書きを再生成（追加した商品を含める）
+  const allItems = await db.prepare(
+    'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
+  ).bind(orderId).all<Record<string, unknown>>()
+
+  // supplier オブジェクトを purchase_orders JOIN から再取得
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+    .bind(order['supplier_id']).first<Record<string, unknown>>()
+  if (supplier) {
+    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier)
+    await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+      .bind(subject, mailBody, orderId).run()
+  }
+
+  return c.json({ ok: true })
+})
+
+// ============================================================
 // API: 発注プール
 // ============================================================
 
