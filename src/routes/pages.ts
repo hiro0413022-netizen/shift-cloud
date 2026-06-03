@@ -2453,6 +2453,7 @@ app.get('/receipts', async (c) => {
   const from       = c.req.query('from')        || ''
   const to         = c.req.query('to')          || ''
   const supplierId = c.req.query('supplier_id') || ''
+  const flash      = c.req.query('flash')        || ''
 
   // 仕入先一覧（フィルタ用）
   const supplierRes = await db.prepare(
@@ -2462,17 +2463,17 @@ app.get('/receipts', async (c) => {
     `<option value="${esc(s['id'])}" ${supplierId === String(s['id']) ? 'selected' : ''}>${esc(s['name'])}</option>`
   ).join('')
 
-  // 絞り込み付きクエリ
+  // 絞り込み付きクエリ（フリー納品はpurchase_order_id=NULLのためLEFT JOIN）
   let sql = `
     SELECT r.id, r.received_date, r.slip_date, r.inspected_by, r.note,
            po.order_no, po.id AS purchase_order_id, po.customer_name,
            s.name AS supplier_name, s.id AS supplier_id,
            COUNT(ri.id) AS item_count,
            SUM(ri.received_quantity) AS total_qty,
-           SUM(ri.received_quantity * poi.unit_price) AS total_amount
+           SUM(ri.received_quantity * COALESCE(poi.unit_price, 0)) AS total_amount
     FROM receipts r
-    JOIN purchase_orders po ON r.purchase_order_id=po.id
-    JOIN suppliers s ON po.supplier_id=s.id
+    LEFT JOIN purchase_orders po ON r.purchase_order_id=po.id
+    LEFT JOIN suppliers s ON po.supplier_id=s.id
     LEFT JOIN receipt_items ri ON ri.receipt_id=r.id
     LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id=poi.id
     WHERE 1=1`
@@ -2493,14 +2494,24 @@ app.get('/receipts', async (c) => {
   const rows = res.results.map(r => `<tr>
     <td class="fw-semibold">${esc(r['received_date'])}</td>
     <td class="text-muted">${esc(r['slip_date']) || '―'}</td>
-    <td><a href="/orders/${r['purchase_order_id']}" class="text-decoration-none fw-semibold">${esc(r['order_no'])}</a></td>
-    <td>${esc(r['supplier_name'])}</td>
+    <td>
+      ${r['purchase_order_id']
+        ? `<a href="/orders/${r['purchase_order_id']}" class="text-decoration-none fw-semibold">${esc(r['order_no'])}</a>`
+        : `<span class="badge bg-secondary">システム外</span>`
+      }
+    </td>
+    <td>${r['supplier_name'] ? esc(r['supplier_name']) : '<span class="text-muted">―</span>'}</td>
     <td>${esc(r['customer_name']) || '―'}</td>
     <td class="text-center">${esc(r['item_count'])}</td>
     <td class="text-end">${Number(r['total_qty'])||0} 個</td>
     <td class="text-end fw-semibold">${yen(r['total_amount'])}</td>
     <td>${esc(r['inspected_by']) || '―'}</td>
     <td class="text-muted small">${esc(r['note']) || ''}</td>
+    <td style="white-space:nowrap">
+      <a href="/receipts/${r['id']}/edit" class="btn btn-xs btn-outline-primary py-0 px-2">
+        <i class="fas fa-edit"></i>
+      </a>
+    </td>
   </tr>`).join('')
 
   // ダウンロードURL組み立て
@@ -2511,14 +2522,23 @@ app.get('/receipts', async (c) => {
   const dlUrl = `/api/receipts/download${dlParams.toString() ? '?' + dlParams.toString() : ''}`
 
   const content = `
+${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" role="alert">
+  <i class="fas fa-check-circle me-1"></i>${esc(flash)}
+  <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
+</div>` : ''}
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
   <div>
     <h1 class="h3 mb-1"><i class="fas fa-truck me-2 text-primary"></i>納品履歴</h1>
     <p class="text-muted mb-0">登録済みの納品データ一覧です。</p>
   </div>
-  <a href="${dlUrl}" class="btn btn-success btn-sm px-3">
-    <i class="fas fa-file-excel me-1"></i>Excel ダウンロード
-  </a>
+  <div class="d-flex gap-2">
+    <a href="/receipts/free" class="btn btn-primary btn-sm px-3">
+      <i class="fas fa-plus me-1"></i>システム外発注を納品登録
+    </a>
+    <a href="${dlUrl}" class="btn btn-success btn-sm px-3">
+      <i class="fas fa-file-excel me-1"></i>Excel ダウンロード
+    </a>
+  </div>
 </div>
 
 <!-- フィルタカード -->
@@ -2569,10 +2589,10 @@ app.get('/receipts', async (c) => {
           <th>入荷日</th><th>納品書日付</th><th>発注番号</th><th>仕入先</th>
           <th>顧客名</th><th class="text-center">品目数</th>
           <th class="text-end">入荷数</th><th class="text-end">金額</th>
-          <th>検品者</th><th>備考</th>
+          <th>検品者</th><th>備考</th><th>操作</th>
         </tr>
       </thead>
-      <tbody>${rows || '<tr><td colspan="10" class="text-center text-muted py-4">納品履歴がありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="11" class="text-center text-muted py-4">納品履歴がありません。</td></tr>'}</tbody>
     </table>
   </div>
 </div>`
@@ -2682,6 +2702,514 @@ document.getElementById('receipt-form').addEventListener('submit', async functio
   </div>
 </form>`
   return layout('納品登録', content, scripts)
+})
+
+// ============================================================
+// システム外発注の納品登録ページ (/receipts/free)
+// ★ /receipts/new/:order_id の後・/receipts/:id/edit の前に定義（静的パス優先）
+// ============================================================
+app.get('/receipts/free', async (c) => {
+  const db = c.env.DB
+  const suppliers = await db.prepare(
+    'SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name'
+  ).all<Record<string,unknown>>()
+  const supplierOpts = suppliers.results.map(s =>
+    `<option value="${s['id']}">${esc(s['name'])}</option>`
+  ).join('')
+
+  const scripts = `<script>
+var rowCount = 1;
+
+function addRow(){
+  rowCount++;
+  var tbody = document.getElementById('free-items-tbody');
+  var tr = document.createElement('tr');
+  tr.dataset.row = rowCount;
+  tr.innerHTML = \`
+    <td><input class="form-control form-control-sm" name="pname_\${rowCount}" placeholder="商品名" required></td>
+    <td><input class="form-control form-control-sm" name="spec_\${rowCount}" placeholder="仕様・色など"></td>
+    <td><input class="form-control form-control-sm text-center" type="number" min="1" name="qty_\${rowCount}" value="1" required></td>
+    <td>
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">¥</span>
+        <input class="form-control text-end" type="number" min="0" step="1" name="up_\${rowCount}" placeholder="任意">
+      </div>
+    </td>
+    <td><input class="form-control form-control-sm" name="note_\${rowCount}" placeholder="備考"></td>
+    <td class="text-center">
+      <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 btn-del-row"><i class="fas fa-trash"></i></button>
+    </td>
+  \`;
+  tr.querySelector('.btn-del-row').addEventListener('click', function(){
+    tr.remove();
+  });
+  tbody.appendChild(tr);
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.btn-del-row').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var tr = btn.closest('tr');
+      if(document.querySelectorAll('#free-items-tbody tr').length > 1){
+        tr.remove();
+      } else {
+        showFlash('明細は1行以上必要です','warning');
+      }
+    });
+  });
+
+  document.getElementById('btn-add-row').addEventListener('click', addRow);
+
+  document.getElementById('free-receipt-form').addEventListener('submit', async function(e){
+    e.preventDefault();
+    var f = e.target;
+    var rows = document.querySelectorAll('#free-items-tbody tr');
+    var items = [];
+    rows.forEach(function(tr){
+      var n = tr.dataset.row;
+      var pname = (f.querySelector('[name="pname_'+n+'"]')?.value||'').trim();
+      var qty   = parseInt(f.querySelector('[name="qty_'+n+'"]')?.value||'0');
+      if(!pname || qty <= 0) return;
+      var item = {
+        product_name: pname,
+        spec:         (f.querySelector('[name="spec_'+n+'"]')?.value||'').trim(),
+        quantity:     qty,
+        note:         (f.querySelector('[name="note_'+n+'"]')?.value||'').trim()
+      };
+      var upEl = f.querySelector('[name="up_'+n+'"]');
+      if(upEl && upEl.value !== '') item.unit_price = parseFloat(upEl.value);
+      items.push(item);
+    });
+    if(items.length === 0){ showFlash('明細を1行以上入力してください','danger'); return; }
+    var payload = {
+      supplier_id:   parseInt(f.querySelector('[name="supplier_id"]').value),
+      received_date: f.querySelector('[name="received_date"]').value,
+      slip_date:     (f.querySelector('[name="slip_date"]')?.value||''),
+      inspected_by:  f.querySelector('[name="inspected_by"]').value,
+      note:          f.querySelector('[name="note"]').value,
+      items: items
+    };
+    if(!payload.supplier_id){ showFlash('仕入先を選択してください','danger'); return; }
+    var btn = f.querySelector('button[type=submit]');
+    btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+    try {
+      var resp = await fetch('/api/receipts/free',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      });
+      var res = await resp.json();
+      if(!resp.ok){ showFlash(res.error||'保存に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>納品登録を保存'; return; }
+      window.location.href = '/receipts?flash=' + encodeURIComponent('システム外発注の納品を登録しました');
+    } catch(err){
+      showFlash('通信エラー: '+err.message,'danger');
+      btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>納品登録を保存';
+    }
+  });
+});
+</script>`
+
+  const content = `
+<div class="mb-3 d-flex align-items-center gap-3">
+  <a href="/receipts" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>納品履歴に戻る</a>
+  <div>
+    <h1 class="h3 mb-0"><i class="fas fa-plus-circle me-2 text-success"></i>システム外発注の納品登録</h1>
+    <small class="text-muted">このシステムで発注していない商品の納品を記録します。</small>
+  </div>
+</div>
+<form id="free-receipt-form">
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
+    <div class="card-body row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">仕入先 <span class="text-danger">*</span></label>
+        <select class="form-select" name="supplier_id" required>
+          <option value="">― 選択してください ―</option>
+          ${supplierOpts}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">入荷日 <span class="text-danger">*</span></label>
+        <input class="form-control" type="date" name="received_date" value="${todayStr()}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">納品書記載日</label>
+        <input class="form-control" type="date" name="slip_date">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">検品者</label>
+        <input class="form-control" name="inspected_by" placeholder="古川">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">備考</label>
+        <textarea class="form-control" name="note" rows="2" placeholder="納品書番号など"></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between">
+      <span class="fw-semibold"><i class="fas fa-table me-1"></i>入荷明細</span>
+      <button type="button" id="btn-add-row" class="btn btn-outline-success btn-sm">
+        <i class="fas fa-plus me-1"></i>行を追加
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th style="min-width:200px">商品名 <span class="text-danger">*</span></th>
+            <th style="min-width:130px">仕様・色など</th>
+            <th class="text-center" style="min-width:80px">数量 <span class="text-danger">*</span></th>
+            <th style="min-width:130px">単価</th>
+            <th style="min-width:130px">備考</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="free-items-tbody">
+          <tr data-row="1">
+            <td><input class="form-control form-control-sm" name="pname_1" placeholder="商品名" required></td>
+            <td><input class="form-control form-control-sm" name="spec_1" placeholder="仕様・色など"></td>
+            <td><input class="form-control form-control-sm text-center" type="number" min="1" name="qty_1" value="1" required></td>
+            <td>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">¥</span>
+                <input class="form-control text-end" type="number" min="0" step="1" name="up_1" placeholder="任意">
+              </div>
+            </td>
+            <td><input class="form-control form-control-sm" name="note_1" placeholder="備考"></td>
+            <td class="text-center">
+              <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 btn-del-row"><i class="fas fa-trash"></i></button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="d-flex justify-content-end gap-2">
+    <a href="/receipts" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>キャンセル</a>
+    <button type="submit" class="btn btn-success btn-lg px-4"><i class="fas fa-save me-1"></i>納品登録を保存</button>
+  </div>
+</form>`
+  return layout('システム外発注の納品登録', content, scripts)
+})
+
+// ============================================================
+// 商品マスタ 新規登録フォーム（/products/new）
+// 発注詳細のマスタ外バナーからクエリパラメータで初期値を受け取れる
+// ============================================================
+app.get('/products/new', async (c) => {
+  const db = c.env.DB
+  const q = c.req.query
+  const prefill = {
+    item_category: q('item_category') || '',
+    manufacturer:  q('manufacturer')  || '',
+    name:          q('name')          || '',
+    spec:          q('spec')          || '',
+    color:         q('color')         || '',
+    club_type:     q('club_type')     || '',
+    list_price:    q('list_price')    || '',
+    default_rate:  q('default_rate')  || '0.65',
+    supplier_id:   q('supplier_id')   || '',
+  }
+
+  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  const supplierOpts = suppliers.results.map(s =>
+    `<option value="${s['id']}" ${prefill.supplier_id === String(s['id']) ? 'selected' : ''}>${esc(s['name'])}</option>`
+  ).join('')
+
+  const scripts = `<script>
+document.getElementById('new-product-form').addEventListener('submit', async function(e){
+  e.preventDefault();
+  var f = this;
+  var body = {
+    item_category:       f.item_category.value.trim(),
+    manufacturer:        f.manufacturer.value.trim(),
+    name:                f.name.value.trim(),
+    spec:                f.spec.value.trim(),
+    color:               f.color.value.trim(),
+    club_type:           f.club_type.value,
+    list_price:          f.list_price.value ? parseFloat(f.list_price.value) : null,
+    default_rate:        f.default_rate.value ? parseFloat(f.default_rate.value) : null,
+    default_supplier_id: f.default_supplier_id.value ? parseInt(f.default_supplier_id.value) : null,
+    unit:                f.unit.value || '本',
+    barcode:             f.barcode.value.trim(),
+    product_code:        f.product_code.value.trim(),
+    source:              f.source.value.trim(),
+  };
+  if(!body.item_category || !body.name){
+    showFlash('品目と商品名は必須です','danger'); return;
+  }
+  var btn = f.querySelector('button[type=submit]');
+  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+  try {
+    var r = await fetch('/api/products',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    var res = await r.json();
+    if(r.ok){
+      location.href = '/products?flash=' + encodeURIComponent('「'+body.name+'」を登録しました');
+    } else {
+      showFlash(res.error||'登録に失敗しました','danger');
+      btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>登録する';
+    }
+  } catch(err){
+    showFlash('通信エラー: '+err.message,'danger');
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>登録する';
+  }
+});
+</script>`
+
+  const content = `
+<div class="mb-3 d-flex align-items-center gap-3">
+  <a href="/products" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>一覧に戻る</a>
+  <h1 class="h3 mb-0"><i class="fas fa-plus-circle me-2 text-success"></i>商品を新規登録</h1>
+</div>
+<form id="new-product-form">
+  <div class="card shadow-sm">
+    <div class="card-body row g-3">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">品目 <span class="text-danger">*</span></label>
+        <input class="form-control" name="item_category" value="${esc(prefill.item_category)}" placeholder="シャフト / グリップ …" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">メーカー</label>
+        <input class="form-control" name="manufacturer" value="${esc(prefill.manufacturer)}" placeholder="フジクラ / Golf Pride …">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">商品名 <span class="text-danger">*</span></label>
+        <input class="form-control" name="name" value="${esc(prefill.name)}" placeholder="例: SPEEDER NX 50" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">仕様</label>
+        <input class="form-control" name="spec" value="${esc(prefill.spec)}" placeholder="5S / R / 60S …">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">色</label>
+        <input class="form-control" name="color" value="${esc(prefill.color)}" placeholder="ブラック / ホワイト …">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">種類</label>
+        <select class="form-select" name="club_type">
+          <option value="">―</option>
+          ${['DR','FW','UT','IR','PT','DR/FW'].map(t =>
+            `<option value="${t}" ${prefill.club_type===t?'selected':''}>${t}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">定価</label>
+        <div class="input-group">
+          <span class="input-group-text">¥</span>
+          <input class="form-control" type="number" name="list_price" value="${esc(prefill.list_price)}" min="0" step="1" placeholder="0">
+        </div>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">掛率</label>
+        <input class="form-control" type="number" name="default_rate" value="${esc(prefill.default_rate)}" step="0.01" min="0" max="1" placeholder="0.65">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">標準仕入先</label>
+        <select class="form-select" name="default_supplier_id">
+          <option value="">― 未設定 ―</option>
+          ${supplierOpts}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold">単位</label>
+        <select class="form-select" name="unit">
+          <option value="本">本</option>
+          <option value="個">個</option>
+          <option value="ダース">ダース</option>
+          <option value="セット">セット</option>
+          <option value="足">足</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">バーコード</label>
+        <input class="form-control" name="barcode" placeholder="JANコードなど">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">品番</label>
+        <input class="form-control" name="product_code">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">出典 / メモ</label>
+        <input class="form-control" name="source">
+      </div>
+    </div>
+    <div class="card-footer text-end">
+      <a href="/products" class="btn btn-outline-secondary me-2"><i class="fas fa-times me-1"></i>キャンセル</a>
+      <button type="submit" class="btn btn-success btn-lg px-4"><i class="fas fa-save me-1"></i>登録する</button>
+    </div>
+  </div>
+</form>`
+  return layout('商品新規登録', content, scripts)
+})
+
+// ============================================================
+// 納品履歴編集ページ (/receipts/:id/edit)
+// ★ /receipts/new/:order_id・/receipts/free より後・/backorders の前に定義
+// ============================================================
+app.get('/receipts/:id/edit', async (c) => {
+  const db  = c.env.DB
+  const rid = parseInt(c.req.param('id'))
+  if (isNaN(rid)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>')
+
+  // 納品ヘッダ取得
+  const receipt = await db.prepare(`
+    SELECT r.*,
+           po.order_no, po.id AS purchase_order_id,
+           s.name AS supplier_name, s.id AS supplier_id
+    FROM receipts r
+    LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
+    LEFT JOIN suppliers s ON po.supplier_id = s.id
+    WHERE r.id=?
+  `).bind(rid).first<Record<string,unknown>>()
+  if (!receipt) return layout('エラー', '<div class="alert alert-danger">納品データが見つかりません。</div>')
+
+  // 明細取得
+  const itemsRes = await db.prepare(`
+    SELECT ri.id AS receipt_item_id, ri.received_quantity, ri.note AS item_note,
+           poi.id AS poi_id, poi.product_name, poi.spec, poi.color, poi.item_category,
+           poi.manufacturer, poi.quantity AS ordered_qty, poi.unit_price,
+           poi.list_price, poi.default_rate
+    FROM receipt_items ri
+    LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
+    WHERE ri.receipt_id=?
+    ORDER BY ri.id
+  `).bind(rid).all<Record<string,unknown>>()
+
+  const isFreeReceipt = !receipt['purchase_order_id']
+
+  const itemRows = itemsRes.results.map(item => {
+    if (isFreeReceipt) {
+      // フリー納品の場合：商品名はnoteに格納されている
+      return `<tr data-ri-id="${item['receipt_item_id']}">
+        <td><input class="form-control form-control-sm" name="item_note_${item['receipt_item_id']}" value="${esc(item['item_note'])}"></td>
+        <td><input class="form-control form-control-sm text-center" type="number" min="1" name="rq_${item['receipt_item_id']}" value="${item['received_quantity']}"></td>
+        <td class="text-center">
+          <button type="button" class="btn btn-outline-danger btn-sm btn-del-ri py-0 px-2" data-ri-id="${item['receipt_item_id']}">
+            <i class="fas fa-trash"></i>
+          </button>
+        </td>
+      </tr>`
+    }
+    return `<tr data-ri-id="${item['receipt_item_id']}">
+      <td class="small">
+        <span class="text-muted">${esc(item['item_category'])} / ${esc(item['manufacturer'])}</span><br>
+        <strong>${esc(item['product_name'])}</strong>${item['spec'] ? ' <span class="text-muted">'+esc(item['spec'])+'</span>' : ''}
+      </td>
+      <td class="text-center">${item['ordered_qty']}</td>
+      <td>
+        <div class="input-group input-group-sm" style="min-width:110px">
+          <span class="input-group-text">¥</span>
+          <input class="form-control text-end" type="number" min="0" step="1"
+            name="up_${item['receipt_item_id']}" value="${item['unit_price']}"
+            placeholder="${item['list_price'] ? Math.round(Number(item['list_price']) * Number(item['default_rate'] || 0.65)) : ''}">
+        </div>
+      </td>
+      <td>
+        <input class="form-control form-control-sm text-center" type="number" min="0"
+          name="rq_${item['receipt_item_id']}" value="${item['received_quantity']}">
+      </td>
+      <td><input class="form-control form-control-sm" name="rn_${item['receipt_item_id']}" value="${esc(item['item_note'])}"></td>
+    </tr>`
+  }).join('')
+
+  const riIds = itemsRes.results.map(i => i['receipt_item_id'])
+
+  const theadHtml = isFreeReceipt
+    ? `<tr><th>商品名 / 備考</th><th class="text-center" style="min-width:90px">入荷数</th><th></th></tr>`
+    : `<tr><th>商品</th><th class="text-center">発注数</th><th>単価</th><th class="text-center" style="min-width:90px">入荷数</th><th>行備考</th></tr>`
+
+  const backUrl = receipt['purchase_order_id'] ? `/orders/${receipt['purchase_order_id']}` : '/receipts'
+
+  const scripts = `<script>
+var riIds = ${JSON.stringify(riIds)};
+document.getElementById('edit-receipt-form').addEventListener('submit', async function(e){
+  e.preventDefault();
+  var f = e.target;
+  var items = riIds.map(function(id){
+    var obj = {
+      receipt_item_id: id,
+      received_quantity: parseInt(f.querySelector('[name="rq_'+id+'"]')?.value||'0'),
+      note: f.querySelector('[name="rn_'+id+'"]')?.value || f.querySelector('[name="item_note_'+id+'"]')?.value || ''
+    };
+    var upEl = f.querySelector('[name="up_'+id+'"]');
+    if(upEl && upEl.value !== '') obj.unit_price = parseFloat(upEl.value);
+    return obj;
+  });
+  var payload = {
+    received_date:  f.querySelector('[name="received_date"]').value,
+    slip_date:      f.querySelector('[name="slip_date"]')?.value || '',
+    inspected_by:   f.querySelector('[name="inspected_by"]').value,
+    note:           f.querySelector('[name="note"]').value,
+    items: items
+  };
+  var btn = f.querySelector('button[type=submit]');
+  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+  try {
+    var resp = await fetch('/api/receipts/${rid}', {
+      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+    });
+    var res = await resp.json();
+    if(!resp.ok){ showFlash(res.error||'保存に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存'; return; }
+    showFlash('保存しました','success');
+    setTimeout(function(){ window.location.href = '${backUrl}'; }, 800);
+  } catch(err){
+    showFlash('通信エラー: '+err.message,'danger');
+    btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存';
+  }
+});
+</script>`
+
+  const content = `
+<div class="mb-3 d-flex align-items-center gap-3">
+  <a href="${backUrl}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>戻る</a>
+  <div>
+    <h1 class="h3 mb-0"><i class="fas fa-edit me-2 text-primary"></i>納品履歴を編集</h1>
+    <small class="text-muted">
+      ${receipt['purchase_order_id']
+        ? `発注番号: ${esc(receipt['order_no'])} / ${esc(receipt['supplier_name'])}`
+        : '<span class="badge bg-secondary">システム外発注</span>'
+      }
+      &nbsp;納品ID: ${rid}
+    </small>
+  </div>
+</div>
+<form id="edit-receipt-form">
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
+    <div class="card-body row g-3">
+      <div class="col-md-3">
+        <label class="form-label">入荷日 <span class="text-danger">*</span></label>
+        <input class="form-control" type="date" name="received_date" value="${esc(receipt['received_date'])}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">納品書記載日</label>
+        <input class="form-control" type="date" name="slip_date" value="${esc(receipt['slip_date']) || ''}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">検品者</label>
+        <input class="form-control" name="inspected_by" value="${esc(receipt['inspected_by']) || ''}" placeholder="古川">
+      </div>
+      <div class="col-12">
+        <label class="form-label">備考</label>
+        <textarea class="form-control" name="note" rows="2">${esc(receipt['note']) || ''}</textarea>
+      </div>
+    </div>
+  </div>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold"><i class="fas fa-table me-1"></i>入荷明細</div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0 small">
+        <thead class="table-light">${theadHtml}</thead>
+        <tbody id="ri-tbody">${itemRows}</tbody>
+      </table>
+    </div>
+  </div>
+  <div class="d-flex justify-content-end gap-2">
+    <a href="${backUrl}" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>キャンセル</a>
+    <button type="submit" class="btn btn-primary btn-lg px-4"><i class="fas fa-save me-1"></i>変更を保存</button>
+  </div>
+</form>`
+  return layout('納品履歴編集', content, scripts)
 })
 
 // ============================================================

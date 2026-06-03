@@ -730,8 +730,8 @@ app.get('/receipts', async (c) => {
     .prepare(
       `SELECT r.*, po.order_no, s.name AS supplier_name
        FROM receipts r
-       JOIN purchase_orders po ON r.purchase_order_id = po.id
-       JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
+       LEFT JOIN suppliers s ON po.supplier_id = s.id
        ORDER BY r.id DESC
        LIMIT 200`
     )
@@ -781,6 +781,126 @@ app.post('/receipts', async (c) => {
 
   await updateOrderStatus(db, orderId)
   return c.json({ ok: true, receipt_id: receiptId, added_quantity: added })
+})
+
+// ============================================================
+// API: 納品履歴編集 (PUT /api/receipts/:id)
+// ============================================================
+app.put('/receipts/:id', async (c) => {
+  const db = c.env.DB
+  const receiptId = parseInt(c.req.param('id'))
+  if (isNaN(receiptId)) return c.json({ error: '不正なIDです。' }, 400)
+
+  const receipt = await db.prepare('SELECT * FROM receipts WHERE id=?').bind(receiptId).first<Record<string,unknown>>()
+  if (!receipt) return c.json({ error: '納品データが見つかりません。' }, 404)
+
+  const body = await c.req.json<{
+    received_date?: string
+    slip_date?: string
+    inspected_by?: string
+    note?: string
+    items?: Array<{
+      receipt_item_id: number
+      received_quantity: number
+      note?: string
+      unit_price?: number  // purchase_order_items.unit_price も更新可能
+    }>
+  }>()
+
+  // ヘッダー更新
+  const sets: string[] = []
+  const binds: unknown[] = []
+  if (body.received_date !== undefined) { sets.push('received_date=?'); binds.push(body.received_date) }
+  if (body.slip_date     !== undefined) { sets.push('slip_date=?');     binds.push(body.slip_date || null) }
+  if (body.inspected_by  !== undefined) { sets.push('inspected_by=?');  binds.push(normalize(body.inspected_by)) }
+  if (body.note          !== undefined) { sets.push('note=?');          binds.push(normalize(body.note)) }
+  if (sets.length) {
+    binds.push(receiptId)
+    await db.prepare(`UPDATE receipts SET ${sets.join(',')} WHERE id=?`).bind(...binds).run()
+  }
+
+  // 明細更新
+  for (const item of (body.items || [])) {
+    if (!item.receipt_item_id) continue
+    // received_quantity と行備考を更新
+    await db.prepare(
+      'UPDATE receipt_items SET received_quantity=?, note=? WHERE id=? AND receipt_id=?'
+    ).bind(item.received_quantity, normalize(item.note), item.receipt_item_id, receiptId).run()
+
+    // unit_price が指定されていれば purchase_order_items も更新
+    if (item.unit_price !== undefined && item.unit_price !== null) {
+      // receipt_item から purchase_order_item_id を取得して unit_price を更新
+      const ri = await db.prepare(
+        'SELECT purchase_order_item_id FROM receipt_items WHERE id=? AND receipt_id=?'
+      ).bind(item.receipt_item_id, receiptId).first<{ purchase_order_item_id: number }>()
+      if (ri?.purchase_order_item_id) {
+        const unitPrice = Number(item.unit_price)
+        const poi = await db.prepare(
+          'SELECT quantity, default_rate FROM purchase_order_items WHERE id=?'
+        ).bind(ri.purchase_order_item_id).first<{ quantity: number; default_rate: number }>()
+        if (poi) {
+          const amount = Math.round(unitPrice * poi.quantity)
+          await db.prepare(
+            'UPDATE purchase_order_items SET unit_price=?, amount=? WHERE id=?'
+          ).bind(unitPrice, amount, ri.purchase_order_item_id).run()
+        }
+      }
+    }
+  }
+
+  // 発注ステータス再計算（purchase_order_id が存在する場合）
+  const orderId = receipt['purchase_order_id'] as number | null
+  if (orderId) await updateOrderStatus(db, orderId)
+
+  return c.json({ ok: true })
+})
+
+// ============================================================
+// API: システム外発注の自由納品登録 (POST /api/receipts/free)
+// ============================================================
+app.post('/receipts/free', async (c) => {
+  const db = c.env.DB
+  const body = await c.req.json<{
+    supplier_id: number
+    received_date?: string
+    slip_date?: string
+    inspected_by?: string
+    note?: string
+    items: Array<{
+      product_name: string
+      spec?: string
+      quantity: number
+      unit_price?: number
+      note?: string
+    }>
+  }>()
+
+  if (!body.supplier_id) return c.json({ error: '仕入先は必須です。' }, 400)
+  if (!body.items || body.items.length === 0) return c.json({ error: '明細が空です。' }, 400)
+
+  const receivedDate = body.received_date || today()
+  const slipDate     = body.slip_date || null
+  const inspectedBy  = normalize(body.inspected_by)
+  const note         = normalize(body.note)
+
+  // receipts に purchase_order_id=NULL で登録
+  const ins = await db.prepare(
+    'INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note) VALUES (NULL, ?, ?, ?, ?)'
+  ).bind(receivedDate, slipDate, inspectedBy, note).run()
+  const receiptId = ins.meta.last_row_id as number
+
+  // receipt_items に purchase_order_item_id=NULL で登録
+  // フリー納品の場合は商品名をnoteに格納し、purchase_order_item_idはNULL
+  for (const item of body.items) {
+    if (!item.product_name?.trim() || !(item.quantity > 0)) continue
+    const itemNote = [item.product_name.trim(), item.spec?.trim(), item.note?.trim()]
+      .filter(Boolean).join(' / ')
+    await db.prepare(
+      'INSERT INTO receipt_items (receipt_id, purchase_order_item_id, received_quantity, note) VALUES (?, NULL, ?, ?)'
+    ).bind(receiptId, item.quantity, itemNote).run()
+  }
+
+  return c.json({ ok: true, receipt_id: receiptId })
 })
 
 // ============================================================
