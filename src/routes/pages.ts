@@ -2113,6 +2113,12 @@ ${emailBody ? '' : noBodyBlock}
   <span class="fw-semibold text-muted small">宛先:</span>
   <span>${supplierEmail ? `<a href="mailto:${esc(supplierEmail)}">${esc(supplierEmail)}</a>` : '<em class="text-muted">未設定</em>'}</span>
 </div>
+<div class="mb-2 d-flex gap-2 flex-wrap align-items-center">
+  <label class="fw-semibold text-muted small mb-0" for="email-cc-input">CC:</label>
+  <input type="email" id="email-cc-input" class="form-control form-control-sm"
+    style="max-width:320px" placeholder="cc@example.com（任意・複数はカンマ区切り）"
+    autocomplete="email">
+</div>
 <div class="mb-2">
   <span class="fw-semibold text-muted small">件名:</span>
   <span class="ms-1" id="email-subject-span">${esc(emailSubject)}</span>
@@ -2287,6 +2293,29 @@ makeCopyBtn('btn-copy-body','email-body-ta');
 makeCopyBtn('btn-copy-line','line-body-ta');
 makeCopyBtn('btn-copy-fax','fax-body-ta');
 
+// CC入力 → mailtoリンクをリアルタイム更新
+(function(){
+  var ccInput  = document.getElementById('email-cc-input');
+  var mailto   = document.getElementById('btn-mailto');
+  var bodyTa   = document.getElementById('email-body-ta');
+  var subjSpan = document.getElementById('email-subject-span');
+  var SUPPLIER_EMAIL = '${esc(supplierEmail)}';
+  if (!ccInput || !mailto || !SUPPLIER_EMAIL) return;
+
+  function rebuildMailto() {
+    var cc      = ccInput.value.trim();
+    var subject = subjSpan ? subjSpan.textContent : '';
+    var body    = bodyTa   ? bodyTa.value         : '';
+    var params  = new URLSearchParams({ subject: subject, body: body });
+    if (cc) params.set('cc', cc);
+    mailto.href = 'mailto:' + SUPPLIER_EMAIL + '?' + params.toString();
+  }
+
+  ccInput.addEventListener('input', rebuildMailto);
+  // 初期化（bodyTaの値が入ってから実行）
+  rebuildMailto();
+})();
+
 // ステータス変更
 function bindStatus(btnId, status, label){
   var btn = document.getElementById(btnId);
@@ -2322,10 +2351,13 @@ bindStatus('btn-s-cancelled','cancelled','キャンセル');
         if (ta) ta.value = d.body || '';
         var subj = document.getElementById('email-subject-span');
         if (subj) subj.textContent = d.subject || '';
-        // mailtoリンクを更新
+        // mailtoリンクを更新（CC値も保持）
         var mailto = document.getElementById('btn-mailto');
         if (mailto && '${supplierEmail}') {
+          var ccInp = document.getElementById('email-cc-input');
+          var cc = ccInp ? ccInp.value.trim() : '';
           var q = new URLSearchParams({subject: d.subject||'', body: d.body||''});
+          if (cc) q.set('cc', cc);
           mailto.href = 'mailto:${esc(supplierEmail)}?' + q.toString();
         }
         // アラートを非表示
