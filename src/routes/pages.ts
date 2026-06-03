@@ -389,6 +389,10 @@ app.get('/products', async (c) => {
   const q   = (c.req.query('q')   || '').replace(/　/g, ' ').trim()
   const cat = (c.req.query('cat') || '').trim()
 
+  // 廃盤タブ判定
+  const tab = c.req.query('tab') === 'discontinued' ? 'discontinued' : 'active'
+  const isDiscontinued = tab === 'discontinued'
+
   // ソートパラメータ
   const ALLOWED_COLS: Record<string, string> = {
     manufacturer:  'p.manufacturer',
@@ -409,8 +413,8 @@ app.get('/products', async (c) => {
   const PAGE_SIZE = 100
   const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1)
 
-  // WHERE句を共通化
-  let whereSql = 'WHERE p.is_active=1'
+  // WHERE句を共通化（廃盤タブで切り替え）
+  let whereSql = isDiscontinued ? 'WHERE p.is_active=0' : 'WHERE p.is_active=1'
   const whereParams: unknown[] = []
   if (cat) { whereSql += ' AND p.item_category=?'; whereParams.push(cat) }
   if (q) {
@@ -441,10 +445,11 @@ app.get('/products', async (c) => {
   const stmt = db.prepare(sql)
   const res = await stmt.bind(...params).all<Record<string,unknown>>()
 
-  // カテゴリ一覧
-  const cats = await db.prepare('SELECT DISTINCT item_category FROM products WHERE is_active=1 ORDER BY item_category').all<{item_category:string}>()
-  // 仕入先一覧（モーダル用）
-  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  // カテゴリ一覧（現在のタブに合わせて取得）・仕入先一覧を並列取得
+  const [cats, suppliers] = await Promise.all([
+    db.prepare(`SELECT DISTINCT item_category FROM products WHERE is_active=${isDiscontinued ? 0 : 1} ORDER BY item_category`).all<{item_category:string}>(),
+    db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  ])
   const supplierOpts = suppliers.results.map(s => `<option value="${s['id']}">${esc(s['name'])}</option>`).join('')
   const catOpts = cats.results.map(c2 => `<option value="${esc(c2.item_category)}">${esc(c2.item_category)}</option>`).join('')
   const catFilter = cats.results.map(c2 => {
@@ -453,6 +458,7 @@ app.get('/products', async (c) => {
     if (q) sp2.set('q', q)
     if (sortKey !== 'item_category') sp2.set('sort', sortKey)
     if (sortDir === 'DESC') sp2.set('dir', 'desc')
+    if (isDiscontinued) sp2.set('tab', 'discontinued')
     return `<a class="btn btn-sm ${cat===c2.item_category?'btn-primary':'btn-outline-secondary'}" href="/products?${sp2.toString()}">${esc(c2.item_category)}</a>`
   }).join('')
 
@@ -461,7 +467,7 @@ app.get('/products', async (c) => {
     DR: 'danger', FW: 'success', UT: 'warning text-dark',
     IR: 'secondary', PT: 'dark', 'DR/FW': 'info text-dark'
   }
-  // ページネーションリンク生成ヘルパー
+  // ページネーションリンク生成ヘルパー（tabパラメータ引き継ぎ）
   const pageUrl = (p: number) => {
     const sp = new URLSearchParams()
     if (q)   sp.set('q',   q)
@@ -469,6 +475,7 @@ app.get('/products', async (c) => {
     if (sortKey !== 'item_category') sp.set('sort', sortKey)
     if (sortDir === 'DESC') sp.set('dir', 'desc')
     if (p > 1) sp.set('page', String(p))
+    if (isDiscontinued) sp.set('tab', 'discontinued')
     return '/products?' + sp.toString()
   }
 
@@ -504,7 +511,7 @@ app.get('/products', async (c) => {
 </nav>`
   }
 
-  // ソートリンク生成
+  // ソートリンク生成（tabパラメータ引き継ぎ）
   const sortLink = (col: string, label: string, extraCls = '') => {
     const active = sortCol === ALLOWED_COLS[col]
     const nd = nextDir(col)
@@ -513,6 +520,7 @@ app.get('/products', async (c) => {
     if (cat) sp.set('cat', cat)
     sp.set('sort', col)
     sp.set('dir',  nd)
+    if (isDiscontinued) sp.set('tab', 'discontinued')
     const icon = active
       ? (sortDir === 'ASC'
           ? '<i class="fas fa-sort-up ms-1 text-warning small"></i>'
@@ -614,9 +622,23 @@ app.get('/products', async (c) => {
   </div>
 </div>
 
+<!-- 有効 / 廃盤タブ -->
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item">
+    <a class="nav-link ${!isDiscontinued ? 'active fw-semibold' : ''}" href="/products">
+      <i class="fas fa-box me-1"></i>有効商品
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link ${isDiscontinued ? 'active fw-semibold text-danger' : 'text-muted'}" href="/products?tab=discontinued">
+      <i class="fas fa-ban me-1"></i>廃盤商品
+    </a>
+  </li>
+</ul>
+
 <!-- カテゴリフィルタ -->
 <div class="d-flex gap-2 flex-wrap mb-2">
-  <a class="btn btn-sm ${!cat?'btn-dark':'btn-outline-secondary'}" href="/products${q?'?q='+encodeURIComponent(q):''}">すべて</a>
+  <a class="btn btn-sm ${!cat?'btn-dark':'btn-outline-secondary'}" href="/products${isDiscontinued?'?tab=discontinued':(q?'?q='+encodeURIComponent(q):'')}">すべて</a>
   ${catFilter}
 </div>
 
@@ -627,6 +649,7 @@ app.get('/products', async (c) => {
       ${cat ? `<input type="hidden" name="cat" value="${esc(cat)}">` : ''}
       ${sortKey !== 'item_category' ? `<input type="hidden" name="sort" value="${esc(sortKey)}">` : ''}
       ${sortDir === 'DESC' ? `<input type="hidden" name="dir" value="desc">` : ''}
+      ${isDiscontinued ? `<input type="hidden" name="tab" value="discontinued">` : ''}
       <input class="form-control" type="text" name="q" value="${esc(q)}"
         placeholder="サーバー検索（メーカー・商品名・仕様…）">
       <button class="btn btn-primary flex-shrink-0"><i class="fas fa-search"></i></button>
