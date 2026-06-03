@@ -2052,8 +2052,12 @@ app.get('/orders/:id', async (c) => {
     db.prepare('SELECT * FROM receipts WHERE purchase_order_id=? ORDER BY id DESC').bind(id).all<Record<string,unknown>>(),
     // 下書き/プールのときだけ商品マスタを取得（それ以外は空）
     isEditable
-      ? db.prepare(`SELECT p.id, p.item_category, p.manufacturer, p.name, p.spec, p.club_type,
-                           p.list_price, p.default_rate, s.name AS supplier_name
+      ? db.prepare(`SELECT p.id, p.item_category,
+                           p.manufacturer AS maker_name,
+                           p.name         AS product_name,
+                           p.spec, p.color, p.club_type,
+                           p.list_price, p.default_rate,
+                           s.name AS supplier_name
                     FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
                     WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000`
         ).all<Record<string,unknown>>()
