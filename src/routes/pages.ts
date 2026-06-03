@@ -3092,7 +3092,7 @@ app.get('/receipts/:id/edit', async (c) => {
       SELECT ri.id AS receipt_item_id, ri.received_quantity, ri.note AS item_note,
              poi.id AS poi_id, poi.product_name, poi.spec, poi.color, poi.item_category,
              poi.manufacturer, poi.quantity AS ordered_qty, poi.unit_price,
-             poi.list_price, poi.default_rate
+             poi.list_price, poi.rate AS default_rate
       FROM receipt_items ri
       LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
       WHERE ri.receipt_id=?
