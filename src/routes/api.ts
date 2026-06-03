@@ -383,6 +383,7 @@ app.post('/orders', async (c) => {
     order_note?: string
     lines: Array<{
       product_id?: number | null
+      supplier_id?: number | null   // マスタ外商品で直接指定する場合
       item_category: string
       manufacturer: string
       product_name: string
@@ -431,15 +432,30 @@ app.post('/orders', async (c) => {
     if (!raw.product_name && !raw.item_category) continue
     if (!raw.quantity || raw.quantity <= 0) continue
 
-    const { supplier, rate: autoRate } = await resolveSupplier(
-      db,
-      raw.item_category,
-      raw.manufacturer,
-      raw.club_type || '',
-      raw.product_id
-    )
+    let supplier: Record<string, unknown> | null = null
+    let autoRate: number | null = null
+
+    // マスタ外商品で supplier_id を直接指定している場合はそちらを優先
+    if (raw.supplier_id) {
+      const s = await db
+        .prepare('SELECT * FROM suppliers WHERE id=? AND is_active=1')
+        .bind(raw.supplier_id)
+        .first<Record<string, unknown>>()
+      supplier = s ?? null
+    } else {
+      const resolved = await resolveSupplier(
+        db,
+        raw.item_category,
+        raw.manufacturer,
+        raw.club_type || '',
+        raw.product_id
+      )
+      supplier = resolved.supplier
+      autoRate = resolved.rate
+    }
+
     if (!supplier) {
-      return c.json({ error: `発注先が特定できない明細があります: ${raw.product_name || raw.manufacturer}` }, 400)
+      return c.json({ error: `発注先が特定できない明細があります: ${raw.product_name || raw.manufacturer || '未入力'}` }, 400)
     }
 
     const rate = raw.rate != null ? raw.rate : autoRate

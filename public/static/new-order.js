@@ -1,5 +1,5 @@
 // ゴルフウィング 発注管理 - 新規発注フォーム JS
-// PRODUCTS は pages.ts 側でインラインで注入される
+// PRODUCTS, SUPPLIERS は pages.ts 側でインラインで注入される
 
 // ─── カテゴリーリスト ─────────────────────────────────────
 var CATEGORIES = [];
@@ -49,14 +49,16 @@ function escH(s) {
 var rowIndex = 0;
 
 // ─── 行を追加 ─────────────────────────────────────────────
-function addRow(prefill) {
+// freeMode=true のとき「マスタ外商品」行として生成（仕入先セレクト付き）
+function addRow(prefill, freeMode) {
   var tbody = document.querySelector('#line-table tbody');
   var idx   = rowIndex++;
   var p     = prefill || {};
   var tr    = document.createElement('tr');
   tr.dataset.idx = String(idx);
+  if (freeMode) tr.dataset.free = '1';
 
-  // [0] 商品選択セル
+  // ─── [0] 商品選択セル ──────────────────────────────────
   var tdPick = document.createElement('td');
   tdPick.style.whiteSpace = 'nowrap';
 
@@ -67,31 +69,69 @@ function addRow(prefill) {
   hidPid.type = 'hidden'; hidPid.className = 'inp-product-id';
   hidPid.name = 'product_id_' + idx; hidPid.value = p.id ? String(p.id) : '';
 
-  // 仕入先ID（備考表示用）
+  // 仕入先ID hidden（マスタ外行では仕入先セレクトの値がここに同期される）
   var hidSup = document.createElement('input');
   hidSup.type = 'hidden'; hidSup.className = 'inp-supplier-id';
   hidSup.name = 'supplier_id_' + idx; hidSup.value = '';
 
-  var btnPick = document.createElement('button');
-  btnPick.type = 'button';
-  btnPick.className = 'btn btn-sm btn-outline-success btn-pick me-1';
-  btnPick.title = '商品を選択';
-  btnPick.innerHTML = '<i class="fas fa-search"></i>';
+  if (!freeMode) {
+    // ── 通常行: 商品選択ボタン + 選択ラベル
+    var btnPick = document.createElement('button');
+    btnPick.type = 'button';
+    btnPick.className = 'btn btn-sm btn-outline-success btn-pick me-1';
+    btnPick.title = '商品を選択';
+    btnPick.innerHTML = '<i class="fas fa-search"></i>';
 
-  var lblPick = document.createElement('span');
-  lblPick.className = 'picked-label text-primary small fw-bold';
-  if (p.id) {
-    lblPick.textContent = [p.item_category, p.manufacturer, p.name].filter(Boolean).join(' / ');
+    var lblPick = document.createElement('span');
+    lblPick.className = 'picked-label text-primary small fw-bold';
+    if (p.id) {
+      lblPick.textContent = [p.item_category, p.manufacturer, p.name].filter(Boolean).join(' / ');
+    }
+
+    tdPick.appendChild(hidIdx);
+    tdPick.appendChild(hidPid);
+    tdPick.appendChild(hidSup);
+    tdPick.appendChild(btnPick);
+    tdPick.appendChild(lblPick);
+
+    btnPick.addEventListener('click', function() { openProductModal(tr); });
+  } else {
+    // ── マスタ外行: バッジ + 仕入先セレクト
+    var badge = document.createElement('span');
+    badge.className = 'badge bg-warning text-dark me-1';
+    badge.innerHTML = '<i class="fas fa-edit me-1"></i>マスタ外';
+    badge.title = '商品マスタに登録されていない商品です';
+
+    // 仕入先セレクト（必須）
+    var selSup = document.createElement('select');
+    selSup.className = 'form-select form-select-sm mt-1 inp-supplier-select';
+    selSup.style.minWidth = '130px';
+    // 空選択肢
+    var optBlank = document.createElement('option');
+    optBlank.value = ''; optBlank.textContent = '仕入先を選択 *';
+    selSup.appendChild(optBlank);
+    // 仕入先リスト
+    (SUPPLIERS || []).forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = String(s.id); opt.textContent = s.name;
+      selSup.appendChild(opt);
+    });
+    // 選択時に hidden に同期
+    selSup.addEventListener('change', function() {
+      hidSup.value = this.value;
+      updateSupplierNotesArea();
+    });
+
+    tdPick.appendChild(hidIdx);
+    tdPick.appendChild(hidPid);
+    tdPick.appendChild(hidSup);
+    tdPick.appendChild(badge);
+    tdPick.appendChild(document.createElement('br'));
+    tdPick.appendChild(selSup);
   }
 
-  tdPick.appendChild(hidIdx);
-  tdPick.appendChild(hidPid);
-  tdPick.appendChild(hidSup);
-  tdPick.appendChild(btnPick);
-  tdPick.appendChild(lblPick);
-
-  // テキスト系セルを一括生成
-  function mkTd(name, val, placeholder, minW) {
+  // ─── テキスト系セルを一括生成 ─────────────────────────
+  function mkTd(name, val, placeholder, minW, readonly) {
     var td = document.createElement('td');
     var inp = document.createElement('input');
     inp.className = 'form-control form-control-sm';
@@ -99,20 +139,21 @@ function addRow(prefill) {
     inp.value = val || '';
     inp.placeholder = placeholder || '';
     inp.style.minWidth = minW || '80px';
+    if (readonly) { inp.readOnly = true; inp.classList.add('bg-light'); }
     td.appendChild(inp);
     return { td: td, inp: inp };
   }
 
-  var fIC  = mkTd('item_category', p.item_category, '品目',    '72px');
-  var fMF  = mkTd('manufacturer',  p.manufacturer,  'メーカー', '90px');
-  var fNM  = mkTd('product_name',  p.name,          '商品名',  '150px');
-  var fSP  = mkTd('spec',          p.spec,          '仕様',    '60px');
+  var fIC  = mkTd('item_category', p.item_category, '品目',    '72px',  !freeMode && !!p.id);
+  var fMF  = mkTd('manufacturer',  p.manufacturer,  'メーカー', '90px',  !freeMode && !!p.id);
+  var fNM  = mkTd('product_name',  p.name,          '商品名',  '150px', false);
+  var fSP  = mkTd('spec',          p.spec,          '仕様',    '60px',  false);
   // 色セル（商品に複数色がある場合はfillRow()でドロップダウンに切り替わる）
-  var fCL  = mkTd('color',         '',              '色',      '80px');
+  var fCL  = mkTd('color',         '',              '色',      '80px',  false);
   fCL.td.classList.add('td-color');
-  var fCT  = mkTd('club_type',     p.club_type,     '種類',    '65px');
+  var fCT  = mkTd('club_type',     p.club_type,     '種類',    '65px',  false);
 
-  // 数値系セル
+  // ─── 数値系セル ──────────────────────────────────────
   function mkNumTd(name, extraClass, step, min, max, val, minW, placeholder) {
     var td  = document.createElement('td');
     var inp = document.createElement('input');
@@ -135,7 +176,7 @@ function addRow(prefill) {
   var fUP  = mkNumTd('unit_price', 'inp-unit-price text-end',  '1',     '0',  null, null,           '80px');
   var fLN  = mkTd('line_note', '', '備考', '90px');
 
-  // 削除ボタンセル
+  // ─── 削除ボタンセル ───────────────────────────────────
   var tdRem = document.createElement('td');
   tdRem.style.whiteSpace = 'nowrap';
   var btnRem = document.createElement('button');
@@ -145,16 +186,15 @@ function addRow(prefill) {
   btnRem.innerHTML = '<i class="fas fa-trash"></i>';
   tdRem.appendChild(btnRem);
 
-  // 行に追加
+  // ─── 行に追加 ────────────────────────────────────────
   [tdPick, fIC.td, fMF.td, fNM.td, fSP.td, fCL.td, fCT.td,
    fQty.td, fLP.td, fRT.td, fUP.td, fLN.td, tdRem].forEach(function(td) {
     tr.appendChild(td);
   });
   tbody.appendChild(tr);
 
-  // イベント
-  btnPick.addEventListener('click', function() { openProductModal(tr); });
-  btnRem.addEventListener('click',  function() { tr.remove(); recalcTotal(); updateSupplierNotesArea(); });
+  // ─── イベント ─────────────────────────────────────────
+  btnRem.addEventListener('click', function() { tr.remove(); recalcTotal(); updateSupplierNotesArea(); });
 
   fLP.inp.addEventListener('input', function() { calcUnitPrice(tr); });
   fRT.inp.addEventListener('input', function() { calcUnitPrice(tr); });
@@ -174,7 +214,7 @@ function fillRow(tr, p) {
   var idx = tr.dataset.idx;
   tr.querySelector('.inp-product-id').value = p.id ? String(p.id) : '';
   var lbl = tr.querySelector('.picked-label');
-  lbl.textContent = [p.item_category, p.manufacturer, p.name].filter(Boolean).join(' / ');
+  if (lbl) lbl.textContent = [p.item_category, p.manufacturer, p.name].filter(Boolean).join(' / ');
 
   var fields = {
     item_category: p.item_category || '',
@@ -193,15 +233,12 @@ function fillRow(tr, p) {
   if (colorTd) {
     var colorVal = (p.color || '').trim();
     var colorList = colorVal ? colorVal.split('/').map(function(c){ return c.trim(); }).filter(Boolean) : [];
-    // 既存要素を全クリア
     colorTd.innerHTML = '';
     if (colorList.length > 1) {
-      // 複数色 → <select>
       var sel = document.createElement('select');
       sel.className = 'form-select form-select-sm';
       sel.name = 'color_' + idx;
       sel.style.minWidth = '80px';
-      // 先頭に空選択肢
       var optBlank = document.createElement('option');
       optBlank.value = ''; optBlank.textContent = '色を選択';
       sel.appendChild(optBlank);
@@ -212,7 +249,6 @@ function fillRow(tr, p) {
       });
       colorTd.appendChild(sel);
     } else {
-      // 1色 or 色なし → テキスト入力（単色の場合は自動セット）
       var inp = document.createElement('input');
       inp.className = 'form-control form-control-sm';
       inp.name = 'color_' + idx;
@@ -296,7 +332,6 @@ function getFilteredProducts(category, manufacturer, searchQ) {
     return catOk && mfOk && qOk;
   });
 
-  // ソート
   result.sort(function(a, b) {
     var va, vb;
     if (_prodSort === 'price') {
@@ -305,7 +340,6 @@ function getFilteredProducts(category, manufacturer, searchQ) {
       if (va !== vb) return (va - vb) * _prodSortDir;
       return (a.name || '').localeCompare(b.name || '', 'ja');
     } else {
-      // name ソート: メーカー→商品名
       var mfCmp = (a.manufacturer || '').localeCompare(b.manufacturer || '', 'ja') * _prodSortDir;
       if (mfCmp !== 0) return mfCmp;
       return (a.name || '').localeCompare(b.name || '', 'ja') * _prodSortDir;
@@ -326,7 +360,6 @@ function openProductModal(tr) {
   var el    = document.getElementById('productModal');
   var modal = bootstrap.Modal.getOrCreateInstance(el);
   modal.show();
-  // モーダルが開いてからカテゴリ検索欄にフォーカス
   el.addEventListener('shown.bs.modal', function onShown() {
     var cs = document.getElementById('cat-search');
     if (cs) cs.focus();
@@ -351,7 +384,6 @@ function renderModalStep(step) {
   var backBtn   = document.getElementById('modal-back');
   var searchWrap = document.getElementById('modal-search-wrap');
 
-  // 商品ステップのみ右上検索欄を表示
   searchWrap.style.display = (step === 'product') ? '' : 'none';
 
   // ────────────────────────────────────────────────────────
@@ -374,10 +406,26 @@ function renderModalStep(step) {
       '</div>';
     wrap.appendChild(searchDiv);
 
+    // ── マスタ外商品ボタン（カテゴリーリストの最上部に固定表示）
+    var freeBtn = document.createElement('button');
+    freeBtn.type = 'button';
+    freeBtn.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 px-3 border-bottom border-warning bg-warning bg-opacity-10';
+    freeBtn.innerHTML =
+      '<span class="badge bg-warning text-dark"><i class="fas fa-edit me-1"></i>マスタ外</span>' +
+      '<span class="fw-semibold text-warning-emphasis">商品マスタにない商品を直接入力する</span>' +
+      '<i class="fas fa-chevron-right ms-auto text-muted small"></i>';
+    freeBtn.addEventListener('click', function() {
+      // モーダルを閉じて「マスタ外行」を追加
+      bootstrap.Modal.getInstance(document.getElementById('productModal')).hide();
+      // _modalTr が空行なら free モードに切り替え、既存行なら置き換えしない（新規行追加）
+      if (_modalTr) {
+        convertRowToFreeMode(_modalTr);
+      }
+    });
+
     var ul = document.createElement('div');
     ul.id = 'cat-list';
     ul.className = 'list-group list-group-flush';
-    wrap.appendChild(ul);
 
     function renderCatList(filter) {
       ul.innerHTML = '';
@@ -402,7 +450,6 @@ function renderModalStep(step) {
         ul.appendChild(btn);
       });
 
-      // 全商品
       var btnAll = document.createElement('button');
       btnAll.type = 'button';
       btnAll.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center text-muted';
@@ -416,11 +463,12 @@ function renderModalStep(step) {
       ul.appendChild(btnAll);
     }
 
+    wrap.appendChild(freeBtn);
+    wrap.appendChild(ul);
     renderCatList('');
     body.innerHTML = '';
     body.appendChild(wrap);
 
-    // カテゴリ検索イベント
     var catSearchEl = document.getElementById('cat-search');
     catSearchEl.addEventListener('input', function() {
       renderCatList(this.value);
@@ -436,7 +484,6 @@ function renderModalStep(step) {
 
     var wrap2 = document.createElement('div');
 
-    // ── ツールバー（件数表示 + ソート切り替え）
     var toolbar2 = document.createElement('div');
     toolbar2.className = 'px-3 py-2 border-bottom d-flex align-items-center justify-content-between bg-light';
     toolbar2.innerHTML =
@@ -451,7 +498,6 @@ function renderModalStep(step) {
       '</div>';
     wrap2.appendChild(toolbar2);
 
-    // ── メーカー検索ボックス
     var mfSearchDiv = document.createElement('div');
     mfSearchDiv.className = 'px-3 pt-2 pb-1 border-bottom';
     mfSearchDiv.innerHTML =
@@ -492,7 +538,6 @@ function renderModalStep(step) {
         ul2.appendChild(btn);
       });
 
-      // 全メーカー
       var total = PRODUCTS.filter(function(p) {
         return !_selCategory || (p.item_category || '未分類') === _selCategory;
       }).length;
@@ -513,7 +558,6 @@ function renderModalStep(step) {
     body.appendChild(wrap2);
     renderMfList('');
 
-    // ソートボタン
     document.getElementById('mf-sort-name').addEventListener('click', function() {
       _mfSort = 'name';
       renderModalStep('manufacturer');
@@ -522,8 +566,6 @@ function renderModalStep(step) {
       _mfSort = 'count';
       renderModalStep('manufacturer');
     });
-
-    // メーカー検索
     document.getElementById('mf-search').addEventListener('input', function() {
       renderMfList(this.value);
     });
@@ -538,18 +580,15 @@ function renderModalStep(step) {
     backBtn.style.display = '';
     backBtn.onclick = function() { renderModalStep('manufacturer'); };
 
-    // 右上の検索欄
     var searchQ = (document.getElementById('modal-search').value || '').trim();
 
     var wrap3 = document.createElement('div');
 
-    // ── ツールバー（件数 + ソート切り替え）
     var toolbar3 = document.createElement('div');
     toolbar3.className = 'px-3 py-2 border-bottom d-flex align-items-center justify-content-between bg-light flex-wrap gap-1';
     toolbar3.innerHTML =
       '<small class="text-muted" id="prod-count-label"></small>' +
       '<div class="d-flex gap-1 align-items-center">' +
-        // ソート列選択
         '<div class="btn-group btn-group-sm" role="group">' +
           '<button type="button" id="ps-name"  class="btn ' + (_prodSort === 'name'  ? 'btn-primary' : 'btn-outline-secondary') + '">' +
             '<i class="fas fa-sort-alpha-down me-1"></i>名前順' +
@@ -558,7 +597,6 @@ function renderModalStep(step) {
             '<i class="fas fa-yen-sign me-1"></i>定価順' +
           '</button>' +
         '</div>' +
-        // 昇順/降順
         '<button type="button" id="ps-dir" class="btn btn-sm btn-outline-secondary" title="昇順/降順切り替え">' +
           (_prodSortDir === 1 ? '<i class="fas fa-arrow-up"></i>' : '<i class="fas fa-arrow-down"></i>') +
         '</button>' +
@@ -584,12 +622,10 @@ function renderModalStep(step) {
         return;
       }
 
-      // メーカーが混在する場合（全メーカー表示時）はメーカー別グループヘッダーを出す
       var showMfHeader = !_selManufacturer && _prodSort === 'name';
       var lastMf = null;
 
       prods.forEach(function(p) {
-        // メーカーグループヘッダー
         if (showMfHeader) {
           var mf = p.manufacturer || '(メーカー不明)';
           if (mf !== lastMf) {
@@ -646,7 +682,6 @@ function renderModalStep(step) {
     body.appendChild(wrap3);
     renderProdList(searchQ);
 
-    // ソートボタンのイベント
     document.getElementById('ps-name').addEventListener('click', function() {
       if (_prodSort === 'name') { _prodSortDir *= -1; }
       else { _prodSort = 'name'; _prodSortDir = 1; }
@@ -662,7 +697,6 @@ function renderModalStep(step) {
       renderModalStep('product');
     });
 
-    // 右上検索欄のリアルタイム絞り込み
     var modalSearch = document.getElementById('modal-search');
     modalSearch.oninput = function() {
       renderProdList(this.value.trim());
@@ -671,19 +705,100 @@ function renderModalStep(step) {
   }
 }
 
+// ─── 通常行 → マスタ外行に変換 ───────────────────────────
+// （モーダルで「マスタ外」を選んだとき、その行をマスタ外モードに切り替える）
+function convertRowToFreeMode(tr) {
+  if (tr.dataset.free === '1') return; // すでにマスタ外行なら無視
+
+  var idx = tr.dataset.idx;
+  tr.dataset.free = '1';
+
+  // [0] 選択セルを差し替え
+  var tdPick = tr.cells[0];
+  // hidden inputs はそのまま流用（product_id は空にする）
+  var hidPid = tdPick.querySelector('.inp-product-id');
+  var hidSup = tdPick.querySelector('.inp-supplier-id');
+  if (hidPid) hidPid.value = '';
+  if (hidSup) hidSup.value = '';
+
+  // 既存の選択ボタン・ラベルを削除
+  var btnPick = tdPick.querySelector('.btn-pick');
+  var lblPick = tdPick.querySelector('.picked-label');
+  if (btnPick) btnPick.remove();
+  if (lblPick) lblPick.remove();
+
+  // マスタ外バッジ追加
+  var badge = document.createElement('span');
+  badge.className = 'badge bg-warning text-dark me-1';
+  badge.innerHTML = '<i class="fas fa-edit me-1"></i>マスタ外';
+  badge.title = '商品マスタに登録されていない商品です';
+
+  // 仕入先セレクト追加
+  var selSup = document.createElement('select');
+  selSup.className = 'form-select form-select-sm mt-1 inp-supplier-select';
+  selSup.style.minWidth = '130px';
+  var optBlank = document.createElement('option');
+  optBlank.value = ''; optBlank.textContent = '仕入先を選択 *';
+  selSup.appendChild(optBlank);
+  (SUPPLIERS || []).forEach(function(s) {
+    var opt = document.createElement('option');
+    opt.value = String(s.id); opt.textContent = s.name;
+    selSup.appendChild(opt);
+  });
+  selSup.addEventListener('change', function() {
+    if (hidSup) hidSup.value = this.value;
+    updateSupplierNotesArea();
+  });
+
+  // hidden の後ろに挿入
+  var br = document.createElement('br');
+  tdPick.appendChild(badge);
+  tdPick.appendChild(br);
+  tdPick.appendChild(selSup);
+
+  // 入力フィールドを編集可能に（readonly を解除）
+  [1, 2, 3, 4, 5, 6].forEach(function(cellIdx) {
+    var cell = tr.cells[cellIdx];
+    if (cell) {
+      var inp = cell.querySelector('input');
+      if (inp) { inp.readOnly = false; inp.classList.remove('bg-light'); }
+    }
+  });
+
+  // 商品名フィールドにフォーカス
+  var nmInp = tr.querySelector('[name="product_name_' + idx + '"]');
+  if (nmInp) { nmInp.value = ''; setTimeout(function() { nmInp.focus(); }, 100); }
+}
+
 // ─── 発注フォーム送信 ──────────────────────────────────────
 function submitOrderForm(e, isPool) {
   if (e) e.preventDefault();
   var form = document.getElementById('order-form');
   var indexes = Array.from(form.querySelectorAll('input[name="row_index"]')).map(function(el) { return el.value; });
+
+  // マスタ外行の仕入先未選択チェック
+  var hasFreeMissing = false;
+  document.querySelectorAll('#line-table tbody tr[data-free="1"]').forEach(function(tr) {
+    var sel = tr.querySelector('.inp-supplier-select');
+    var qtyEl = tr.querySelector('.inp-qty');
+    var qty = qtyEl ? parseInt(qtyEl.value, 10) : 0;
+    if (qty > 0 && sel && !sel.value) hasFreeMissing = true;
+  });
+  if (hasFreeMissing) {
+    showFlash('マスタ外商品の仕入先を選択してください。', 'danger');
+    return;
+  }
+
   var lines = indexes.map(function(idx) {
     function val(name) {
       var el = form.querySelector('[name="' + name + '_' + idx + '"]');
       return el ? el.value : '';
     }
+    var pidEl  = form.querySelector('[name="product_id_' + idx + '"]');
+    var supEl  = form.querySelector('[name="supplier_id_' + idx + '"]');
     return {
-      product_id:    form.querySelector('[name="product_id_' + idx + '"]')
-                       ? (form.querySelector('[name="product_id_' + idx + '"]').value || null) : null,
+      product_id:    pidEl ? (pidEl.value || null) : null,
+      supplier_id:   supEl ? (supEl.value ? parseInt(supEl.value, 10) : null) : null,
       item_category: val('item_category'),
       manufacturer:  val('manufacturer'),
       product_name:  val('product_name'),
@@ -776,7 +891,6 @@ function showFlash(msg, type) {
 }
 
 // ─── 仕入先備考プレビュー ────────────────────────────────
-// SUPPLIERS_MAP: id -> {notes, shipping_rule, name} をキャッシュ
 var _suppliersCache = null;
 function loadSuppliersCache(cb) {
   if (_suppliersCache) { cb(_suppliersCache); return; }
@@ -795,7 +909,6 @@ function updateSupplierNotesArea() {
   var tbody = document.querySelector('#line-table tbody');
   if (!tbody) return;
 
-  // 各行から supplier_id を収集（hidden inputがある行）
   var supplierIds = {};
   tbody.querySelectorAll('input[name^="supplier_id_"]').forEach(function(el) {
     if (el.value) supplierIds[el.value] = 1;

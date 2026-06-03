@@ -1788,15 +1788,18 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
 // ============================================================
 app.get('/orders/new', async (c) => {
   const db = c.env.DB
-  const products = await db.prepare(`
-    SELECT p.id, p.item_category, p.manufacturer, p.name, p.spec, p.club_type,
-           p.list_price, p.default_rate, s.name AS supplier_name
-    FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
-    WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000
-  `).all<Record<string,unknown>>()
+  const [productRes, supplierRes] = await Promise.all([
+    db.prepare(`
+      SELECT p.id, p.item_category, p.manufacturer, p.name, p.spec, p.club_type,
+             p.list_price, p.default_rate, s.name AS supplier_name
+      FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
+      WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000
+    `).all<Record<string,unknown>>(),
+    db.prepare(`SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name`).all<{id:number,name:string}>()
+  ])
 
-  // 外部JSに商品データを渡すインライン変数のみ定義
-  const dataScript = `<script>var PRODUCTS = ${JSON.stringify(products.results)};</script>`
+  // 外部JSに商品データ・仕入先データを渡すインライン変数のみ定義
+  const dataScript = `<script>var PRODUCTS = ${JSON.stringify(productRes.results)};var SUPPLIERS = ${JSON.stringify(supplierRes.results)};</script>`
 
   // モーダル HTML
   const modalHtml = `
