@@ -791,9 +791,6 @@ app.put('/receipts/:id', async (c) => {
   const receiptId = parseInt(c.req.param('id'))
   if (isNaN(receiptId)) return c.json({ error: '不正なIDです。' }, 400)
 
-  const receipt = await db.prepare('SELECT * FROM receipts WHERE id=?').bind(receiptId).first<Record<string,unknown>>()
-  if (!receipt) return c.json({ error: '納品データが見つかりません。' }, 404)
-
   const body = await c.req.json<{
     received_date?: string
     slip_date?: string
@@ -803,9 +800,44 @@ app.put('/receipts/:id', async (c) => {
       receipt_item_id: number
       received_quantity: number
       note?: string
-      unit_price?: number  // purchase_order_items.unit_price も更新可能
+      unit_price?: number
     }>
   }>()
+
+  // ヘッダー確認 + 既存明細の poi_id マップを並列取得
+  const [receipt, existingItems] = await Promise.all([
+    db.prepare('SELECT id, purchase_order_id FROM receipts WHERE id=?')
+      .bind(receiptId).first<{ id: number; purchase_order_id: number | null }>(),
+    db.prepare('SELECT id, purchase_order_item_id FROM receipt_items WHERE receipt_id=?')
+      .bind(receiptId).all<{ id: number; purchase_order_item_id: number | null }>()
+  ])
+  if (!receipt) return c.json({ error: '納品データが見つかりません。' }, 404)
+
+  // receipt_item_id → purchase_order_item_id のマップ
+  const poiMap = new Map<number, number | null>()
+  for (const ri of existingItems.results) poiMap.set(ri.id, ri.purchase_order_item_id)
+
+  // unit_price 更新が必要な poi を洗い出す
+  const priceUpdates: Array<{ poiId: number; unitPrice: number }> = []
+  for (const item of (body.items || [])) {
+    if (!item.receipt_item_id || item.unit_price == null) continue
+    const poiId = poiMap.get(item.receipt_item_id)
+    if (poiId) priceUpdates.push({ poiId, unitPrice: Number(item.unit_price) })
+  }
+
+  // 単価更新に必要な poi.quantity を1回のクエリで一括取得
+  const poiQuantities = new Map<number, number>()
+  if (priceUpdates.length > 0) {
+    const ids = priceUpdates.map(p => p.poiId)
+    const inClause = ids.map(() => '?').join(',')
+    const poiRows = await db.prepare(
+      `SELECT id, quantity FROM purchase_order_items WHERE id IN (${inClause})`
+    ).bind(...ids).all<{ id: number; quantity: number }>()
+    for (const p of poiRows.results) poiQuantities.set(p.id, p.quantity)
+  }
+
+  // すべての更新を並列実行
+  const updatePromises: Promise<unknown>[] = []
 
   // ヘッダー更新
   const sets: string[] = []
@@ -816,41 +848,33 @@ app.put('/receipts/:id', async (c) => {
   if (body.note          !== undefined) { sets.push('note=?');          binds.push(normalize(body.note)) }
   if (sets.length) {
     binds.push(receiptId)
-    await db.prepare(`UPDATE receipts SET ${sets.join(',')} WHERE id=?`).bind(...binds).run()
+    updatePromises.push(
+      db.prepare(`UPDATE receipts SET ${sets.join(',')} WHERE id=?`).bind(...binds).run()
+    )
   }
 
-  // 明細更新
+  // 明細更新（receipt_items）を並列
   for (const item of (body.items || [])) {
     if (!item.receipt_item_id) continue
-    // received_quantity と行備考を更新
-    await db.prepare(
-      'UPDATE receipt_items SET received_quantity=?, note=? WHERE id=? AND receipt_id=?'
-    ).bind(item.received_quantity, normalize(item.note), item.receipt_item_id, receiptId).run()
-
-    // unit_price が指定されていれば purchase_order_items も更新
-    if (item.unit_price !== undefined && item.unit_price !== null) {
-      // receipt_item から purchase_order_item_id を取得して unit_price を更新
-      const ri = await db.prepare(
-        'SELECT purchase_order_item_id FROM receipt_items WHERE id=? AND receipt_id=?'
-      ).bind(item.receipt_item_id, receiptId).first<{ purchase_order_item_id: number }>()
-      if (ri?.purchase_order_item_id) {
-        const unitPrice = Number(item.unit_price)
-        const poi = await db.prepare(
-          'SELECT quantity, default_rate FROM purchase_order_items WHERE id=?'
-        ).bind(ri.purchase_order_item_id).first<{ quantity: number; default_rate: number }>()
-        if (poi) {
-          const amount = Math.round(unitPrice * poi.quantity)
-          await db.prepare(
-            'UPDATE purchase_order_items SET unit_price=?, amount=? WHERE id=?'
-          ).bind(unitPrice, amount, ri.purchase_order_item_id).run()
-        }
-      }
-    }
+    updatePromises.push(
+      db.prepare('UPDATE receipt_items SET received_quantity=?, note=? WHERE id=? AND receipt_id=?')
+        .bind(item.received_quantity, normalize(item.note), item.receipt_item_id, receiptId).run()
+    )
   }
 
-  // 発注ステータス再計算（purchase_order_id が存在する場合）
-  const orderId = receipt['purchase_order_id'] as number | null
-  if (orderId) await updateOrderStatus(db, orderId)
+  // 単価更新（purchase_order_items）を並列
+  for (const { poiId, unitPrice } of priceUpdates) {
+    const qty = poiQuantities.get(poiId) ?? 1
+    updatePromises.push(
+      db.prepare('UPDATE purchase_order_items SET unit_price=?, amount=? WHERE id=?')
+        .bind(unitPrice, Math.round(unitPrice * qty), poiId).run()
+    )
+  }
+
+  await Promise.all(updatePromises)
+
+  // 発注ステータス再計算
+  if (receipt.purchase_order_id) await updateOrderStatus(db, receipt.purchase_order_id)
 
   return c.json({ ok: true })
 })

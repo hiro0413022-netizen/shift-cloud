@@ -2455,14 +2455,6 @@ app.get('/receipts', async (c) => {
   const supplierId = c.req.query('supplier_id') || ''
   const flash      = c.req.query('flash')        || ''
 
-  // 仕入先一覧（フィルタ用）
-  const supplierRes = await db.prepare(
-    'SELECT id, name FROM suppliers ORDER BY name'
-  ).all<Record<string,unknown>>()
-  const supplierOptions = supplierRes.results.map(s =>
-    `<option value="${esc(s['id'])}" ${supplierId === String(s['id']) ? 'selected' : ''}>${esc(s['name'])}</option>`
-  ).join('')
-
   // 絞り込み付きクエリ（フリー納品はpurchase_order_id=NULLのためLEFT JOIN）
   let sql = `
     SELECT r.id, r.received_date, r.slip_date, r.inspected_by, r.note,
@@ -2485,7 +2477,15 @@ app.get('/receipts', async (c) => {
 
   let stmt = db.prepare(sql)
   if (binds.length) stmt = (stmt.bind as (...a: unknown[]) => typeof stmt)(...binds)
-  const res = await stmt.all<Record<string,unknown>>()
+
+  // 仕入先一覧と本体クエリを並列取得
+  const [supplierRes, res] = await Promise.all([
+    db.prepare('SELECT id, name FROM suppliers ORDER BY name').all<Record<string,unknown>>(),
+    stmt.all<Record<string,unknown>>()
+  ])
+  const supplierOptions = supplierRes.results.map(s =>
+    `<option value="${esc(s['id'])}" ${supplierId === String(s['id']) ? 'selected' : ''}>${esc(s['name'])}</option>`
+  ).join('')
 
   // サマリー計算
   const totalQty    = res.results.reduce((s, r) => s + (Number(r['total_qty'])    || 0), 0)
@@ -3051,29 +3051,29 @@ app.get('/receipts/:id/edit', async (c) => {
   const rid = parseInt(c.req.param('id'))
   if (isNaN(rid)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>')
 
-  // 納品ヘッダ取得
-  const receipt = await db.prepare(`
-    SELECT r.*,
-           po.order_no, po.id AS purchase_order_id,
-           s.name AS supplier_name, s.id AS supplier_id
-    FROM receipts r
-    LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
-    LEFT JOIN suppliers s ON po.supplier_id = s.id
-    WHERE r.id=?
-  `).bind(rid).first<Record<string,unknown>>()
+  // ヘッダーと明細を並列取得
+  const [receipt, itemsRes] = await Promise.all([
+    db.prepare(`
+      SELECT r.*,
+             po.order_no, po.id AS purchase_order_id,
+             s.name AS supplier_name, s.id AS supplier_id
+      FROM receipts r
+      LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
+      LEFT JOIN suppliers s ON po.supplier_id = s.id
+      WHERE r.id=?
+    `).bind(rid).first<Record<string,unknown>>(),
+    db.prepare(`
+      SELECT ri.id AS receipt_item_id, ri.received_quantity, ri.note AS item_note,
+             poi.id AS poi_id, poi.product_name, poi.spec, poi.color, poi.item_category,
+             poi.manufacturer, poi.quantity AS ordered_qty, poi.unit_price,
+             poi.list_price, poi.default_rate
+      FROM receipt_items ri
+      LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
+      WHERE ri.receipt_id=?
+      ORDER BY ri.id
+    `).bind(rid).all<Record<string,unknown>>()
+  ])
   if (!receipt) return layout('エラー', '<div class="alert alert-danger">納品データが見つかりません。</div>')
-
-  // 明細取得
-  const itemsRes = await db.prepare(`
-    SELECT ri.id AS receipt_item_id, ri.received_quantity, ri.note AS item_note,
-           poi.id AS poi_id, poi.product_name, poi.spec, poi.color, poi.item_category,
-           poi.manufacturer, poi.quantity AS ordered_qty, poi.unit_price,
-           poi.list_price, poi.default_rate
-    FROM receipt_items ri
-    LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
-    WHERE ri.receipt_id=?
-    ORDER BY ri.id
-  `).bind(rid).all<Record<string,unknown>>()
 
   const isFreeReceipt = !receipt['purchase_order_id']
 
