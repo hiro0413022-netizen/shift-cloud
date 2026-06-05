@@ -2284,6 +2284,27 @@ app.get('/orders/:id', async (c) => {
     const remaining = Number(item['quantity']||0) - Number(item['received_qty']||0)
     const pct = Number(item['quantity']||0) > 0
       ? Math.round(Number(item['received_qty']||0) / Number(item['quantity']||0) * 100) : 0
+    const editBtns = isEditable ? `
+      <td class="text-center" style="white-space:nowrap">
+        <button class="btn btn-xs btn-outline-primary py-0 px-1 btn-edit-item"
+          data-poi-id="${item['id']}"
+          data-item-category="${esc(item['item_category'])}"
+          data-manufacturer="${esc(item['manufacturer'])}"
+          data-product-name="${esc(item['product_name'])}"
+          data-spec="${esc(item['spec'])}"
+          data-color="${esc(item['color'])}"
+          data-club-type="${esc(item['club_type'])}"
+          data-quantity="${item['quantity']}"
+          data-list-price="${item['list_price'] ?? ''}"
+          data-rate="${item['rate'] ?? ''}"
+          data-unit-price="${item['unit_price'] ?? ''}"
+          data-line-note="${esc(item['line_note'])}"
+          title="編集"><i class="fas fa-edit"></i></button>
+        <button class="btn btn-xs btn-outline-danger py-0 px-1 ms-1 btn-delete-item"
+          data-poi-id="${item['id']}"
+          data-product-name="${esc(item['product_name'])}"
+          title="削除"><i class="fas fa-trash"></i></button>
+      </td>` : ''
     // data-poi-id を付与 → JS側でAjax更新対象を特定
     return `<tr data-poi-id="${item['id']}">
       <td><span class="badge bg-secondary">${esc(item['item_category'])}</span></td>
@@ -2302,6 +2323,7 @@ app.get('/orders/:id', async (c) => {
       <td class="text-end">${yen(item['unit_price'])}</td>
       <td class="text-end fw-semibold">${yen(item['amount'])}</td>
       <td class="small text-muted">${esc(item['line_note'])}</td>
+      ${editBtns}
     </tr>`
   }).join('')
 
@@ -2494,6 +2516,80 @@ ${emailBody ? '' : noBodyBlock}
   const dataScript = isEditable
     ? `<script>var AIM_PRODUCTS=${JSON.stringify(productRes.results)};var AIM_SUPPLIERS=${JSON.stringify(supplierRes.results)};</script>`
     : ''
+
+  // 明細編集モーダル（isEditableのときのみ）
+  const editItemModalHtml = isEditable ? `
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-bold" id="eim-title">明細を編集</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="eim-poi-id">
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1 fw-semibold">品目</label>
+            <input id="eim-item-category" class="form-control form-control-sm">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1 fw-semibold">メーカー</label>
+            <input id="eim-manufacturer" class="form-control form-control-sm">
+          </div>
+          <div class="col-12">
+            <label class="form-label form-label-sm mb-1 fw-semibold">商品名 <span class="text-danger">*</span></label>
+            <input id="eim-product-name" class="form-control form-control-sm">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">仕様</label>
+            <input id="eim-spec" class="form-control form-control-sm" placeholder="例: 20cm">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">色</label>
+            <input id="eim-color" class="form-control form-control-sm" placeholder="例: ホワイト">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">種類</label>
+            <input id="eim-club-type" class="form-control form-control-sm">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">数量 <span class="text-danger">*</span></label>
+            <input id="eim-quantity" type="number" min="1" class="form-control form-control-sm text-center">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">定価</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">¥</span>
+              <input id="eim-list-price" type="number" min="0" class="form-control text-end">
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">掛率</label>
+            <input id="eim-rate" type="number" min="0" max="1" step="0.001" class="form-control form-control-sm text-end" placeholder="例: 0.55">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">単価</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">¥</span>
+              <input id="eim-unit-price" type="number" min="0" class="form-control text-end" placeholder="自動計算">
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">備考</label>
+            <input id="eim-line-note" class="form-control form-control-sm">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+        <button type="button" class="btn btn-primary btn-sm px-4" id="eim-submit">
+          <i class="fas fa-save me-1"></i>保存
+        </button>
+      </div>
+    </div>
+  </div>
+</div>` : ''
 
   const scripts = `<script>
 // ============================================================
@@ -3013,6 +3109,140 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
     openBtn.addEventListener('click', function(){ bsModal.show(); });
   }
 })();
+
+// ============================================================
+// 明細編集・削除（isEditableのときのみ動作）
+// ============================================================
+(function(){
+  var editModal = document.getElementById('editItemModal');
+  if (!editModal) return;
+  var bsEdit = new bootstrap.Modal(editModal);
+
+  // --- 編集フォームDOM ---
+  var ePoiId    = document.getElementById('eim-poi-id');
+  var eTitle    = document.getElementById('eim-title');
+  var eIC       = document.getElementById('eim-item-category');
+  var eMF       = document.getElementById('eim-manufacturer');
+  var ePN       = document.getElementById('eim-product-name');
+  var eSpec     = document.getElementById('eim-spec');
+  var eColor    = document.getElementById('eim-color');
+  var eCT       = document.getElementById('eim-club-type');
+  var eQty      = document.getElementById('eim-quantity');
+  var eLP       = document.getElementById('eim-list-price');
+  var eRate     = document.getElementById('eim-rate');
+  var eUP       = document.getElementById('eim-unit-price');
+  var eNote     = document.getElementById('eim-line-note');
+  var eSubmit   = document.getElementById('eim-submit');
+
+  // 定価×掛率 → 単価 自動計算
+  function calcUP(){
+    var lp = parseFloat(eLP.value);
+    var rt = parseFloat(eRate.value);
+    if (!isNaN(lp) && !isNaN(rt)) eUP.value = Math.round(lp * rt);
+  }
+  eLP.addEventListener('input', calcUP);
+  eRate.addEventListener('input', calcUP);
+
+  // 「編集」ボタン → モーダルを開いてデータをセット
+  document.querySelectorAll('.btn-edit-item').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var d = btn.dataset;
+      ePoiId.value  = d.poiId;
+      eTitle.textContent = '明細を編集: ' + d.productName;
+      eIC.value     = d.itemCategory  || '';
+      eMF.value     = d.manufacturer  || '';
+      ePN.value     = d.productName   || '';
+      eSpec.value   = d.spec          || '';
+      eColor.value  = d.color         || '';
+      eCT.value     = d.clubType      || '';
+      eQty.value    = d.quantity      || '1';
+      eLP.value     = d.listPrice     || '';
+      eRate.value   = d.rate          || '';
+      eUP.value     = d.unitPrice     || '';
+      eNote.value   = d.lineNote      || '';
+      eSubmit.disabled = false;
+      eSubmit.innerHTML = '<i class="fas fa-save me-1"></i>保存';
+      bsEdit.show();
+    });
+  });
+
+  // 「保存」ボタン
+  eSubmit.addEventListener('click', async function(){
+    var poiId = ePoiId.value;
+    if (!poiId) return;
+    if (!ePN.value.trim()) { showFlash('商品名は必須です', 'warning'); return; }
+    var qty = parseInt(eQty.value, 10);
+    if (isNaN(qty) || qty < 1) { showFlash('数量は1以上を入力してください', 'warning'); return; }
+
+    eSubmit.disabled = true;
+    eSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+    var payload = {
+      item_category: eIC.value.trim()   || null,
+      manufacturer:  eMF.value.trim()   || null,
+      product_name:  ePN.value.trim(),
+      spec:          eSpec.value.trim()  || null,
+      color:         eColor.value.trim() || null,
+      club_type:     eCT.value.trim()    || null,
+      quantity:      qty,
+      list_price:    parseFloat(eLP.value)   || null,
+      rate:          parseFloat(eRate.value) || null,
+      unit_price:    parseFloat(eUP.value)   || null,
+      line_note:     eNote.value.trim()  || null,
+    };
+
+    try {
+      var r = await fetch('/api/items/' + poiId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      var d = await r.json();
+      if (r.ok) {
+        bsEdit.hide();
+        showFlash('明細を保存しました', 'success');
+        setTimeout(function(){ location.reload(); }, 700);
+      } else {
+        showFlash(d.error || '保存に失敗しました', 'danger');
+        eSubmit.disabled = false;
+        eSubmit.innerHTML = '<i class="fas fa-save me-1"></i>保存';
+      }
+    } catch(e) {
+      showFlash('通信エラーが発生しました', 'danger');
+      eSubmit.disabled = false;
+      eSubmit.innerHTML = '<i class="fas fa-save me-1"></i>保存';
+    }
+  });
+
+  // 「削除」ボタン
+  document.querySelectorAll('.btn-delete-item').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      var poiId = btn.dataset.poiId;
+      var name  = btn.dataset.productName || '（不明）';
+      if (!confirm('「' + name + '」を削除しますか？\\nこの操作は取り消せません。')) return;
+      btn.disabled = true;
+
+      try {
+        var r = await fetch('/api/items/' + poiId, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        var d = await r.json();
+        if (r.ok) {
+          showFlash('明細を削除しました', 'success');
+          setTimeout(function(){ location.reload(); }, 700);
+        } else {
+          showFlash(d.error || '削除に失敗しました', 'danger');
+          btn.disabled = false;
+        }
+      } catch(e) {
+        showFlash('通信エラーが発生しました', 'danger');
+        btn.disabled = false;
+      }
+    });
+  });
+})();
 </script>`
 
   const content = `
@@ -3087,6 +3317,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
         <th class="text-center">入荷済</th>
         <th class="text-center">残数</th>
         <th class="text-end">単価</th><th class="text-end">金額</th><th>備考</th>
+        ${isEditable ? '<th class="text-center" style="width:70px">操作</th>' : ''}
       </tr></thead>
       <tbody id="order-items-tbody">${itemRows || '<tr><td colspan="11" class="text-center text-muted py-3">明細がありません。</td></tr>'}</tbody>
     </table>
@@ -3109,7 +3340,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
     </table>
   </div>
 </div>`
-  return layout(`発注詳細 ${esc(order['order_no'])}`, dataScript + addItemModalHtml + content, scripts)
+  return layout(`発注詳細 ${esc(order['order_no'])}`, dataScript + addItemModalHtml + editItemModalHtml + content, scripts)
 })
 
 // ============================================================

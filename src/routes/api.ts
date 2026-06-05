@@ -688,6 +688,129 @@ app.post('/orders/:id/items', async (c) => {
 })
 
 // ============================================================
+// API: 明細編集  PUT /items/:poi_id
+// ============================================================
+app.put('/items/:poi_id', async (c) => {
+  const db    = c.env.DB
+  const poiId = parseInt(c.req.param('poi_id'))
+  if (isNaN(poiId)) return c.json({ error: '不正なIDです。' }, 400)
+
+  // 明細と親発注を取得
+  const poi = await db.prepare(
+    'SELECT poi.*, po.status, po.supplier_id FROM purchase_order_items poi JOIN purchase_orders po ON po.id=poi.purchase_order_id WHERE poi.id=?'
+  ).bind(poiId).first<Record<string, unknown>>()
+  if (!poi) return c.json({ error: '明細が見つかりません。' }, 404)
+
+  const status = String(poi['status'] ?? '')
+  if (status !== 'draft_created' && status !== 'pool') {
+    return c.json({ error: '下書きまたはプール状態の発注のみ編集できます。' }, 400)
+  }
+
+  const body = await c.req.json<{
+    item_category?: string
+    manufacturer?: string
+    product_name?: string
+    spec?: string
+    color?: string
+    club_type?: string
+    quantity?: number
+    list_price?: number | null
+    rate?: number | null
+    unit_price?: number | null
+    line_note?: string
+  }>()
+
+  const quantity   = body.quantity   != null ? Number(body.quantity)   : Number(poi['quantity'])
+  const listPrice  = body.list_price != null ? Number(body.list_price) : (poi['list_price']  != null ? Number(poi['list_price'])  : null)
+  const rate       = body.rate       != null ? Number(body.rate)       : (poi['rate']        != null ? Number(poi['rate'])        : null)
+  let   unitPrice  = body.unit_price != null ? Number(body.unit_price) : (poi['unit_price']  != null ? Number(poi['unit_price'])  : null)
+
+  // 定価×掛率で単価を自動計算（unit_price が明示指定されていない場合）
+  if (body.unit_price == null && listPrice != null && rate != null) {
+    unitPrice = Math.round(listPrice * rate)
+  }
+  const amount = unitPrice != null ? Math.round(unitPrice * quantity) : null
+
+  await db.prepare(`
+    UPDATE purchase_order_items
+    SET item_category=?, manufacturer=?, product_name=?,
+        spec=?, color=?, club_type=?,
+        quantity=?, list_price=?, rate=?, unit_price=?, amount=?,
+        line_note=?
+    WHERE id=?
+  `).bind(
+    normalize(body.item_category) ?? poi['item_category'],
+    normalize(body.manufacturer)  ?? poi['manufacturer'],
+    normalize(body.product_name)  ?? poi['product_name'],
+    normalize(body.spec)          ?? poi['spec']       ?? '',
+    normalize(body.color)         ?? poi['color']      ?? '',
+    normalize(body.club_type)     ?? poi['club_type']  ?? '',
+    quantity, listPrice, rate, unitPrice, amount,
+    normalize(body.line_note)     ?? poi['line_note']  ?? '',
+    poiId
+  ).run()
+
+  // 発注ヘッダーのメール本文を再生成
+  const orderId = Number(poi['purchase_order_id'])
+  const [order, supplier, allItems] = await Promise.all([
+    db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(orderId).first<Record<string,unknown>>(),
+    db.prepare('SELECT * FROM suppliers WHERE id=?').bind(poi['supplier_id']).first<Record<string,unknown>>(),
+    db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(orderId).all<Record<string,unknown>>(),
+  ])
+  if (order && supplier) {
+    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier)
+    await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+      .bind(subject, mailBody, orderId).run()
+  }
+
+  return c.json({ ok: true, amount })
+})
+
+// ============================================================
+// API: 明細削除  DELETE /items/:poi_id
+// ============================================================
+app.delete('/items/:poi_id', async (c) => {
+  const db    = c.env.DB
+  const poiId = parseInt(c.req.param('poi_id'))
+  if (isNaN(poiId)) return c.json({ error: '不正なIDです。' }, 400)
+
+  const poi = await db.prepare(
+    'SELECT poi.*, po.status FROM purchase_order_items poi JOIN purchase_orders po ON po.id=poi.purchase_order_id WHERE poi.id=?'
+  ).bind(poiId).first<Record<string, unknown>>()
+  if (!poi) return c.json({ error: '明細が見つかりません。' }, 404)
+
+  const status = String(poi['status'] ?? '')
+  if (status !== 'draft_created' && status !== 'pool') {
+    return c.json({ error: '下書きまたはプール状態の発注のみ削除できます。' }, 400)
+  }
+
+  // receipt_items が存在する（入荷済み）明細は削除不可
+  const received = await db.prepare(
+    'SELECT COALESCE(SUM(received_quantity),0) AS total FROM receipt_items WHERE purchase_order_item_id=?'
+  ).bind(poiId).first<{ total: number }>()
+  if ((received?.total ?? 0) > 0) {
+    return c.json({ error: '入荷済み明細は削除できません。' }, 400)
+  }
+
+  await db.prepare('DELETE FROM purchase_order_items WHERE id=?').bind(poiId).run()
+
+  // メール再生成
+  const orderId = Number(poi['purchase_order_id'])
+  const [order, supplier, allItems] = await Promise.all([
+    db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(orderId).first<Record<string,unknown>>(),
+    db.prepare('SELECT * FROM suppliers WHERE id=?').bind(poi['supplier_id']).first<Record<string,unknown>>(),
+    db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(orderId).all<Record<string,unknown>>(),
+  ])
+  if (order && supplier && allItems.results.length > 0) {
+    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier)
+    await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+      .bind(subject, mailBody, orderId).run()
+  }
+
+  return c.json({ ok: true })
+})
+
+// ============================================================
 // API: 発注プール
 // ============================================================
 
