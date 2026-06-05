@@ -1932,6 +1932,7 @@ ${modalHtml}
 app.get('/mail-batch/:batch_code', async (c) => {
   const db = c.env.DB
   const batchCode = c.req.param('batch_code')
+  const BATCH_DEFAULT_CC = 'h_furukawa@golfwing.jp,s_furukawa@golfwing.jp,y_idono@golfwing.jp,u_ogawa@golfwing.jp,a_tanigawa@golfwing.jp'
 
   const orders = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
@@ -1940,13 +1941,39 @@ app.get('/mail-batch/:batch_code', async (c) => {
     WHERE po.batch_code=? ORDER BY po.id
   `).bind(batchCode).all<Record<string,unknown>>()
 
-  const cards: string[] = []
+  // ── 同一 supplier_email でグループ化（まとめメール対応） ──
+  type OrderGroup = {
+    supplierName: string
+    supplierEmail: string
+    orderMethod: string
+    orders: Array<{ order: Record<string,unknown>; items: Record<string,unknown>[] }>
+  }
+  const groupMap = new Map<string, OrderGroup>()
+
   for (const order of orders.results) {
     const items = await db.prepare(
       'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
     ).bind(order['id']).all<Record<string,unknown>>()
 
-    const itemRows = items.results.map(item => `<tr>
+    const email = String(order['supplier_email'] ?? '') || `__no_email_${order['id']}`
+    if (!groupMap.has(email)) {
+      groupMap.set(email, {
+        supplierName:  String(order['supplier_name']  ?? ''),
+        supplierEmail: String(order['supplier_email'] ?? ''),
+        orderMethod:   String(order['order_method']   ?? ''),
+        orders: [],
+      })
+    }
+    groupMap.get(email)!.orders.push({ order, items: items.results })
+  }
+
+  const cards: string[] = []
+
+  for (const [, group] of groupMap) {
+    // グループ内の全アイテムをまとめて明細テーブルを作成
+    const allItems: Record<string,unknown>[] = group.orders.flatMap(g => g.items)
+
+    const itemRows = allItems.map(item => `<tr>
       <td>${esc(item['item_category'])}</td><td>${esc(item['manufacturer'])}</td>
       <td>${esc(item['product_name'])}</td><td>${esc(item['spec'])}</td>
       <td>${esc(item['club_type'])}</td>
@@ -1955,33 +1982,68 @@ app.get('/mail-batch/:batch_code', async (c) => {
       <td class="text-end">${yen(item['amount'])}</td>
     </tr>`).join('')
 
-    const emailBody = String(order['email_body'] ?? '')
-    const emailSubject = String(order['email_subject'] ?? '')
-    const supplierEmail = String(order['supplier_email'] ?? '')
+    // メール本文・件名は先頭発注のものを使用（まとめ時は最初の発注のテンプレートが代表）
+    const firstOrder  = group.orders[0].order
+    const emailBody    = String(firstOrder['email_body']    ?? '')
+    const emailSubject = String(firstOrder['email_subject'] ?? '')
+    const supplierEmail = group.supplierEmail
 
-    const mailtoLink = supplierEmail
-      ? `<a class="btn btn-outline-secondary" href="mailto:${esc(supplierEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>`
-      : ''
+    // 発注番号一覧（複数ある場合は全部表示）
+    const orderNos = group.orders.map(g => String(g.order['order_no'])).join('、')
+    const orderLinks = group.orders.map(g =>
+      `<a class="btn btn-sm btn-outline-primary" href="/orders/${g.order['id']}">
+        <i class="fas fa-edit me-1"></i>${esc(String(g.order['order_no']))}
+      </a>`
+    ).join('')
 
     const bodyEscaped = emailBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     const bodyJson = JSON.stringify(emailBody)
 
+    const mailtoHref = supplierEmail
+      ? `mailto:${esc(supplierEmail)}?cc=${encodeURIComponent(BATCH_DEFAULT_CC)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
+      : ''
+
+    const isMerged = group.orders.length > 1
+
     cards.push(`
     <div class="card shadow-sm mb-4">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <div><strong><i class="fas fa-building me-1"></i>${esc(order['supplier_name'])}</strong>
-          <span class="text-muted ms-2">${esc(order['order_no'])}</span></div>
-        <div class="small text-muted">発注方法: ${esc(order['order_method']) || '未設定'}</div>
+      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+          <strong><i class="fas fa-building me-1"></i>${esc(group.supplierName)}</strong>
+          ${isMerged
+            ? `<span class="badge bg-warning text-dark ms-2"><i class="fas fa-compress-arrows-alt me-1"></i>${group.orders.length}件まとめ</span>`
+            : `<span class="text-muted ms-2 small">${esc(orderNos)}</span>`
+          }
+        </div>
+        <div class="small text-muted">発注方法: ${esc(group.orderMethod) || '未設定'}</div>
       </div>
       <div class="card-body">
-        <div class="row g-3 mb-3">
-          <div class="col-md-5"><label class="form-label fw-bold">宛先</label>
-            <input class="form-control" readonly value="${esc(order['supplier_email'])}"></div>
-          <div class="col-md-7"><label class="form-label fw-bold">件名</label>
-            <input class="form-control" readonly value="${esc(emailSubject)}"></div>
+        <!-- 宛先・CC・件名 -->
+        <div class="row g-2 mb-3">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold small text-muted mb-1">宛先 (To)</label>
+            <input class="form-control form-control-sm" readonly value="${esc(supplierEmail)}">
+          </div>
+          <div class="col-md-8">
+            <label class="form-label fw-semibold small text-muted mb-1">CC <span class="text-muted fw-normal">(編集可)</span></label>
+            <input type="text" class="form-control form-control-sm batch-cc-input"
+              data-email="${esc(supplierEmail)}"
+              data-subject="${esc(emailSubject)}"
+              data-body="${esc(emailBody)}"
+              value="${esc(BATCH_DEFAULT_CC)}"
+              autocomplete="off">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold small text-muted mb-1">件名</label>
+            <input class="form-control form-control-sm" readonly value="${esc(emailSubject)}">
+          </div>
         </div>
-        <div class="mb-3"><label class="form-label fw-bold">本文</label>
-          <textarea class="form-control font-monospace" rows="12" readonly>${bodyEscaped}</textarea></div>
+        <!-- 本文 -->
+        <div class="mb-3">
+          <label class="form-label fw-semibold small text-muted mb-1">本文</label>
+          <textarea class="form-control font-monospace batch-body-ta" rows="12" readonly>${bodyEscaped}</textarea>
+        </div>
+        <!-- 明細テーブル -->
         <div class="table-responsive mb-3">
           <table class="table table-sm mb-0">
             <thead class="table-light"><tr>
@@ -1991,12 +2053,16 @@ app.get('/mail-batch/:batch_code', async (c) => {
             <tbody>${itemRows}</tbody>
           </table>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <a class="btn btn-primary" href="/orders/${order['id']}"><i class="fas fa-file-alt me-1"></i>発注詳細を見る</a>
-          ${mailtoLink}
-          <button class="btn btn-outline-success" onclick="copyBody(this,${bodyJson})">
+        <!-- ボタン群 -->
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          ${mailtoHref ? `<a class="btn btn-primary btn-sm batch-mailto-btn" href="${mailtoHref}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>` : ''}
+          <button class="btn btn-outline-success btn-sm" onclick="copyBody(this,${bodyJson})">
             <i class="fas fa-copy me-1"></i>本文をコピー
           </button>
+          <div class="ms-auto d-flex gap-1 flex-wrap">
+            <span class="small text-muted align-self-center me-1">商品追加・編集:</span>
+            ${orderLinks}
+          </div>
         </div>
       </div>
     </div>`)
@@ -2011,12 +2077,31 @@ function copyBody(btn, text){
     setTimeout(function(){ btn.innerHTML=orig; btn.classList.replace('btn-success','btn-outline-success'); },2000);
   });
 }
+
+// CC入力 → mailtoリンクをリアルタイム更新
+document.querySelectorAll('.batch-cc-input').forEach(function(ccInp){
+  var card = ccInp.closest('.card');
+  var mailtoBtn = card ? card.querySelector('.batch-mailto-btn') : null;
+  if(!mailtoBtn) return;
+  function rebuild(){
+    var email   = ccInp.dataset.email;
+    var subject = ccInp.dataset.subject;
+    var body    = ccInp.dataset.body;
+    var cc      = ccInp.value.trim();
+    var params  = new URLSearchParams({subject: subject, body: body});
+    if(cc) params.set('cc', cc);
+    mailtoBtn.href = 'mailto:' + email + '?' + params.toString();
+  }
+  ccInp.addEventListener('input', rebuild);
+});
 </script>`
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div><h1 class="h3 mb-1"><i class="fas fa-envelope-open-text me-2 text-primary"></i>メール下書き一覧</h1>
-  <p class="text-muted mb-0">仕入先ごとに作成した発注メールの件名・本文です。Outlookへ転記して利用できます。</p></div>
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-envelope-open-text me-2 text-primary"></i>メール下書き一覧</h1>
+    <p class="text-muted mb-0">仕入先ごとの発注メール下書きです。CCは編集可能です。「メールソフトで開く」でOutlookに転記できます。</p>
+  </div>
   <a class="btn btn-outline-secondary" href="/orders"><i class="fas fa-list me-1"></i>発注一覧へ</a>
 </div>
 ${cards.length ? cards.join('') : '<div class="alert alert-warning">該当するメール下書きがありません。</div>'}`
@@ -2124,6 +2209,11 @@ app.get('/orders/:id', async (c) => {
 </div>`
 
   // メールパネル
+  const DEFAULT_CC = 'h_furukawa@golfwing.jp,s_furukawa@golfwing.jp,y_idono@golfwing.jp,u_ogawa@golfwing.jp,a_tanigawa@golfwing.jp'
+  const mailtoWithCC = supplierEmail
+    ? `mailto:${esc(supplierEmail)}?cc=${encodeURIComponent(DEFAULT_CC)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
+    : ''
+
   const emailPanel = `
 ${emailBody ? '' : noBodyBlock}
 <div class="mb-2 d-flex gap-2 flex-wrap align-items-center">
@@ -2132,9 +2222,10 @@ ${emailBody ? '' : noBodyBlock}
 </div>
 <div class="mb-2 d-flex gap-2 flex-wrap align-items-center">
   <label class="fw-semibold text-muted small mb-0" for="email-cc-input">CC:</label>
-  <input type="email" id="email-cc-input" class="form-control form-control-sm"
-    style="max-width:320px" placeholder="cc@example.com（任意・複数はカンマ区切り）"
-    autocomplete="email">
+  <input type="text" id="email-cc-input" class="form-control form-control-sm"
+    style="max-width:480px"
+    value="${esc(DEFAULT_CC)}"
+    autocomplete="off">
 </div>
 <div class="mb-2">
   <span class="fw-semibold text-muted small">件名:</span>
@@ -2144,7 +2235,7 @@ ${emailBody ? '' : noBodyBlock}
   <textarea id="email-body-ta" class="form-control font-monospace" rows="10" readonly>${bodyEsc}</textarea>
 </div>
 <div class="d-flex gap-2 flex-wrap">
-  ${supplierEmail ? `<a class="btn btn-primary btn-sm" id="btn-mailto" href="mailto:${esc(supplierEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>` : ''}
+  ${mailtoWithCC ? `<a class="btn btn-primary btn-sm" id="btn-mailto" href="${mailtoWithCC}"><i class="fas fa-envelope me-1"></i>メールソフトで開く</a>` : ''}
   <button class="btn btn-outline-success btn-sm" id="btn-copy-body"><i class="fas fa-copy me-1"></i>本文をコピー</button>
 </div>`
 
