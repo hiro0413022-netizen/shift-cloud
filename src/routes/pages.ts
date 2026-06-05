@@ -2109,6 +2109,131 @@ ${cards.length ? cards.join('') : '<div class="alert alert-warning">該当する
 })
 
 // ============================================================
+// 発注ヘッダー編集ページ  ★ /orders/:id より前に定義
+// ============================================================
+app.get('/orders/:id/edit', async (c) => {
+  const db  = c.env.DB
+  const id  = parseInt(c.req.param('id'))
+  if (isNaN(id)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>')
+
+  const order = await db.prepare(`
+    SELECT po.*, s.name AS supplier_name
+    FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id
+    WHERE po.id=?
+  `).bind(id).first<Record<string,unknown>>()
+  if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>')
+
+  const scripts = `<script>
+(function(){
+  var form    = document.getElementById('edit-header-form');
+  var saveBtn = document.getElementById('btn-save-header');
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+
+    var payload = {
+      order_date:                form.order_date.value.trim()                || null,
+      ordered_by:                form.ordered_by.value.trim()                || null,
+      customer_name:             form.customer_name.value.trim()             || null,
+      usage_type:                form.usage_type.value.trim()                || null,
+      requested_delivery_date:   form.requested_delivery_date.value.trim()   || null,
+      order_note:                form.order_note.value.trim()                || null,
+    };
+
+    try {
+      var r = await fetch('/api/orders/${id}/header', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      var d = await r.json();
+      if (r.ok) {
+        location.href = '/orders/${id}';
+      } else {
+        alert(d.error || '保存に失敗しました');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>保存して発注詳細に戻る';
+      }
+    } catch(err) {
+      alert('通信エラーが発生しました');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<i class="fas fa-save me-1"></i>保存して発注詳細に戻る';
+    }
+  });
+})();
+</script>`
+
+  const content = `
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h1 class="h3 mb-1"><i class="fas fa-edit me-2 text-primary"></i>発注情報を編集</h1>
+    <div class="text-muted small">${esc(order['order_no'])} / <strong>${esc(order['supplier_name'])}</strong></div>
+  </div>
+  <a class="btn btn-sm btn-outline-secondary" href="/orders/${id}">
+    <i class="fas fa-arrow-left me-1"></i>キャンセルして戻る
+  </a>
+</div>
+
+<form id="edit-header-form">
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white"><strong><i class="fas fa-info-circle me-1"></i>発注ヘッダー</strong></div>
+    <div class="card-body row g-3">
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">発注日</label>
+        <input class="form-control" type="date" name="order_date"
+          value="${esc(order['order_date'])}">
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">発注者 <span class="text-danger">*</span></label>
+        <input class="form-control" name="ordered_by"
+          placeholder="古川" value="${esc(order['ordered_by'])}" required>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">顧客名</label>
+        <input class="form-control" name="customer_name"
+          placeholder="上田様" value="${esc(order['customer_name'])}">
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">用途</label>
+        <input class="form-control" name="usage_type"
+          placeholder="取り寄せ / 在庫用" value="${esc(order['usage_type'])}">
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="form-label">希望納期</label>
+        <input class="form-control" type="date" name="requested_delivery_date"
+          value="${esc(order['requested_delivery_date'])}">
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">発注備考 <span class="text-muted small">（メール本文の末尾に追記されます）</span></label>
+        <textarea class="form-control" name="order_note" rows="3"
+          placeholder="メール本文へ差し込む全体備考">${esc(order['order_note'])}</textarea>
+      </div>
+
+    </div>
+    <div class="card-footer bg-white d-flex justify-content-end gap-2">
+      <a class="btn btn-outline-secondary" href="/orders/${id}">
+        <i class="fas fa-times me-1"></i>キャンセル
+      </a>
+      <button type="submit" class="btn btn-primary px-4" id="btn-save-header">
+        <i class="fas fa-save me-1"></i>保存して発注詳細に戻る
+      </button>
+    </div>
+  </div>
+</form>`
+
+  return layout(`発注情報編集 ${esc(order['order_no'])}`, content, scripts)
+})
+
+// ============================================================
 // 発注詳細
 // ============================================================
 app.get('/orders/:id', async (c) => {
@@ -2904,6 +3029,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
   </div>
   <div class="d-flex gap-2 flex-wrap">
     ${showButtons.join('')}
+    <a class="btn btn-sm btn-outline-warning" href="/orders/${id}/edit"><i class="fas fa-edit me-1"></i>発注情報を編集</a>
     <a class="btn btn-sm btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-truck me-1"></i>納品登録</a>
     <button class="btn btn-sm btn-outline-secondary" id="btn-copy-order"><i class="fas fa-copy me-1"></i>再発注</button>
     <button class="btn btn-sm btn-outline-danger" id="btn-delete-order"><i class="fas fa-trash-alt me-1"></i>削除</button>

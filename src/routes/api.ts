@@ -1745,6 +1745,62 @@ app.post('/orders/:id/copy', async (c) => {
 // ============================================================
 // API: 発注ステータス変更
 // ============================================================
+// ============================================================
+// API: 発注ヘッダー編集（発注者・顧客名・用途・希望納期・備考）
+// ============================================================
+app.put('/orders/:id/header', async (c) => {
+  const db = c.env.DB
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.json({ error: '不正なIDです。' }, 400)
+
+  const order = await db.prepare(
+    `SELECT po.*, s.* FROM purchase_orders po
+     JOIN suppliers s ON po.supplier_id = s.id WHERE po.id = ?`
+  ).bind(id).first<Record<string, unknown>>()
+  if (!order) return c.json({ error: '発注が見つかりません。' }, 404)
+
+  const body = await c.req.json<{
+    order_date?: string
+    ordered_by?: string
+    customer_name?: string
+    usage_type?: string
+    requested_delivery_date?: string
+    order_note?: string
+  }>()
+
+  await db.prepare(`
+    UPDATE purchase_orders
+    SET order_date=?, ordered_by=?, customer_name=?,
+        usage_type=?, requested_delivery_date=?, order_note=?
+    WHERE id=?
+  `).bind(
+    normalize(body.order_date)                || order['order_date'],
+    normalize(body.ordered_by)                || order['ordered_by'],
+    normalize(body.customer_name)             ?? null,
+    normalize(body.usage_type)                ?? null,
+    normalize(body.requested_delivery_date)   ?? null,
+    normalize(body.order_note)                ?? null,
+    id
+  ).run()
+
+  // メール本文を再生成（発注者名・備考が本文に影響するため）
+  const updatedOrder = await db.prepare('SELECT * FROM purchase_orders WHERE id=?')
+    .bind(id).first<Record<string, unknown>>()
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+    .bind(order['supplier_id']).first<Record<string, unknown>>()
+  const items = await db.prepare(
+    'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
+  ).bind(id).all<Record<string, unknown>>()
+
+  if (updatedOrder && supplier && items.results.length > 0) {
+    const { subject, body: mailBody } = composeMail(updatedOrder, items.results, supplier)
+    await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+      .bind(subject, mailBody, id).run()
+  }
+
+  return c.json({ ok: true })
+})
+
 app.post('/orders/:id/status', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
