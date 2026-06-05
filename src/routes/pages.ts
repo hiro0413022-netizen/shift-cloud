@@ -1932,7 +1932,7 @@ ${modalHtml}
 app.get('/mail-batch/:batch_code', async (c) => {
   const db = c.env.DB
   const batchCode = c.req.param('batch_code')
-  const BATCH_DEFAULT_CC = 'h_furukawa@golfwing.jp,s_furukawa@golfwing.jp,y_idono@golfwing.jp,u_ogawa@golfwing.jp,a_tanigawa@golfwing.jp'
+  const BATCH_DEFAULT_CC = 'h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idono@golfwing.jp;u_ogawa@golfwing.jp;a_tanigawa@golfwing.jp'
 
   const orders = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
@@ -2209,7 +2209,7 @@ app.get('/orders/:id', async (c) => {
 </div>`
 
   // メールパネル
-  const DEFAULT_CC = 'h_furukawa@golfwing.jp,s_furukawa@golfwing.jp,y_idono@golfwing.jp,u_ogawa@golfwing.jp,a_tanigawa@golfwing.jp'
+  const DEFAULT_CC = 'h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idono@golfwing.jp;u_ogawa@golfwing.jp;a_tanigawa@golfwing.jp'
   const mailtoWithCC = supplierEmail
     ? `mailto:${esc(supplierEmail)}?cc=${encodeURIComponent(DEFAULT_CC)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
     : ''

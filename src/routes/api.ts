@@ -107,7 +107,8 @@ function composeMail(
     const spec     = item['spec']     ? ` / ${item['spec']}`     : ''
     const color    = item['color']    ? ` / ${item['color']}`    : ''
     const clubType = item['club_type'] ? ` / ${item['club_type']}` : ''
-    return `・${item['item_category']} / ${item['manufacturer'] || ''} / ${item['product_name']}${spec}${color}${clubType} / ${item['quantity']}本`
+    const unit = (item['unit'] as string || '本')
+    return `・${item['item_category']} / ${item['manufacturer'] || ''} / ${item['product_name']}${spec}${color}${clubType} / ${item['quantity']}${unit}`
   })
 
   const honorific = (supplier['honorific'] as string) || '様'
