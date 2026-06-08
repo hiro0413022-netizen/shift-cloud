@@ -2109,6 +2109,10 @@ mail：takarazuka@golfwing.jp
           <button class="btn btn-outline-success btn-sm" onclick="copyBody(this,${bodyJson})">
             <i class="fas fa-copy me-1"></i>本文をコピー
           </button>
+          <button class="btn btn-success btn-sm btn-mark-ordered"
+            data-order-ids="${group.orders.map(g => g.order['id']).join(',')}">
+            <i class="fas fa-paper-plane me-1"></i>発注済みにする
+          </button>
           <div class="ms-auto d-flex gap-1 flex-wrap">
             <span class="small text-muted align-self-center me-1">商品追加・編集:</span>
             ${orderLinks}
@@ -2143,6 +2147,54 @@ document.querySelectorAll('.batch-cc-input').forEach(function(ccInp){
     mailtoBtn.href = 'mailto:' + email + '?' + params.toString();
   }
   ccInp.addEventListener('input', rebuild);
+});
+
+// 発注済みにする
+document.querySelectorAll('.btn-mark-ordered').forEach(function(btn){
+  btn.addEventListener('click', async function(){
+    var ids = btn.dataset.orderIds.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+    var label = ids.length > 1 ? ids.length + '件の発注' : '1件の発注';
+    if(!confirm(label + 'を「発注済み」に更新しますか？')) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>更新中...';
+
+    try {
+      // 各発注を順番に発注済みへ更新
+      var failed = [];
+      for(var i = 0; i < ids.length; i++){
+        var r = await fetch('/api/orders/' + ids[i] + '/status', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          credentials: 'include',
+          body: JSON.stringify({status: 'ordered'}),
+        });
+        if(!r.ok) failed.push(ids[i]);
+      }
+
+      if(failed.length === 0){
+        // 成功：ボタンを完了表示にしてカードをグレーアウト
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>発注済みにしました';
+        btn.classList.replace('btn-success', 'btn-secondary');
+        var card = btn.closest('.card');
+        if(card){
+          card.style.opacity = '0.6';
+          card.querySelector('.card-header').style.background = '#f8f9fa';
+        }
+        // メールソフトで開くボタンなど他ボタンも無効化
+        var mailtoBtn = card ? card.querySelector('.batch-mailto-btn') : null;
+        if(mailtoBtn) mailtoBtn.classList.replace('btn-primary','btn-secondary');
+      } else {
+        alert('一部の更新に失敗しました（ID: ' + failed.join(', ') + '）');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>発注済みにする';
+      }
+    } catch(e){
+      alert('通信エラーが発生しました');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-paper-plane me-1"></i>発注済みにする';
+    }
+  });
 });
 </script>`
 
