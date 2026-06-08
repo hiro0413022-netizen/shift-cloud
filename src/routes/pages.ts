@@ -1967,6 +1967,43 @@ app.get('/mail-batch/:batch_code', async (c) => {
     groupMap.get(email)!.orders.push({ order, items: items.results })
   }
 
+  // pages.ts 内でメール本文を組み立てるユーティリティ（api.ts の composeMail と同等）
+  function buildMailBody(
+    supplierName: string,
+    contactName: string,
+    honorific: string,
+    orderNote: string,
+    items: Record<string,unknown>[]
+  ): string {
+    const lines = items.map(item => {
+      const spec     = item['spec']      ? ` / ${item['spec']}`      : ''
+      const color    = item['color']     ? ` / ${item['color']}`     : ''
+      const clubType = item['club_type'] ? ` / ${item['club_type']}` : ''
+      const unit     = String(item['unit'] || '本')
+      return `・${item['item_category']} / ${item['manufacturer'] || ''} / ${item['product_name']}${spec}${color}${clubType} / ${item['quantity']}${unit}`
+    })
+    const noteBlock = orderNote.trim() ? `\n備考:\n${orderNote.trim()}\n` : ''
+    return `${supplierName}
+${contactName}${honorific}
+
+お世話になっております。
+ゴルフウィング宝塚店の古川でございます。
+
+下記の通り、発注をお願いいたします。
+
+${lines.join('\n')}
+${noteBlock}
+ご確認のほど、よろしくお願いいたします。
+
+---------------------------
+GOLF WING 宝塚店
+〒665-0882
+兵庫県宝塚市山本南1-26-25
+TEL：0797-82-0833
+mail：takarazuka@golfwing.jp
+---------------------------`
+  }
+
   const cards: string[] = []
 
   for (const [, group] of groupMap) {
@@ -1982,10 +2019,23 @@ app.get('/mail-batch/:batch_code', async (c) => {
       <td class="text-end">${yen(item['amount'])}</td>
     </tr>`).join('')
 
-    // メール本文・件名は先頭発注のものを使用（まとめ時は最初の発注のテンプレートが代表）
+    // 先頭発注からサプライヤー情報・備考を取得
     const firstOrder  = group.orders[0].order
-    const emailBody    = String(firstOrder['email_body']    ?? '')
-    const emailSubject = String(firstOrder['email_subject'] ?? '')
+    const emailSubject = String(firstOrder['email_subject'] ?? '発注のお願い')
+
+    // 複数発注がまとまっている場合は全商品で本文を再構築
+    // 備考は各発注のものを改行で結合（重複除去）
+    const orderNotesCombined = [...new Set(
+      group.orders.map(g => String(g.order['order_note'] ?? '').trim()).filter(Boolean)
+    )].join('\n')
+
+    const emailBody = buildMailBody(
+      group.supplierName,
+      String(firstOrder['contact_name'] ?? 'ご担当者'),
+      String(firstOrder['honorific']    ?? '様'),
+      orderNotesCombined,
+      allItems
+    )
     const supplierEmail = group.supplierEmail
 
     // 発注番号一覧（複数ある場合は全部表示）
