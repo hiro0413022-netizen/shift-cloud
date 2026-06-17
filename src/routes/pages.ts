@@ -55,30 +55,36 @@ function layout(title: string, content: string, extraScripts = '', username = ''
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
-  <div class="container-fluid px-4">
-    <a class="navbar-brand fw-bold" href="/"><i class="fas fa-golf-ball me-2"></i>ゴルフウィング 発注管理</a>
+<nav class="navbar navbar-expand-lg sticky-top">
+  <div class="container-fluid px-3">
+    <a class="navbar-brand" href="/">
+      <span class="brand-icon"><i class="fas fa-golf-ball"></i></span>
+      ゴルフウィング 発注管理
+    </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
       <div class="navbar-nav gap-1 ms-auto align-items-lg-center">
         <a class="nav-link" href="/"><i class="fas fa-chart-line me-1"></i>ダッシュボード</a>
+        <div class="nav-divider d-none d-lg-block"></div>
         <a class="nav-link" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注</a>
         <a class="nav-link" href="/purchase-pool"><i class="fas fa-layer-group me-1"></i>発注プール</a>
         <a class="nav-link" href="/orders"><i class="fas fa-list me-1"></i>発注一覧</a>
         <a class="nav-link" href="/backorders"><i class="fas fa-exclamation-triangle me-1"></i>残注一覧</a>
         <a class="nav-link" href="/receipts"><i class="fas fa-truck me-1"></i>納品履歴</a>
+        <div class="nav-divider d-none d-lg-block"></div>
         <a class="nav-link" href="/products"><i class="fas fa-box me-1"></i>商品マスタ</a>
         <a class="nav-link" href="/suppliers"><i class="fas fa-building me-1"></i>仕入先</a>
         <a class="nav-link" href="/rules"><i class="fas fa-cog me-1"></i>判定ルール</a>
-        <div class="nav-item dropdown ms-lg-2">
-          <a class="nav-link dropdown-toggle d-flex align-items-center gap-1 border border-secondary rounded px-2"
+        <div class="nav-divider d-none d-lg-block"></div>
+        <div class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle d-flex align-items-center gap-1"
              href="#" data-bs-toggle="dropdown">
             <i class="fas fa-user-circle"></i>
-            <span class="small">${username || 'admin'}</span>
+            <span>${username || 'admin'}</span>
           </a>
-          <ul class="dropdown-menu dropdown-menu-end shadow">
+          <ul class="dropdown-menu dropdown-menu-end">
             <li><h6 class="dropdown-header"><i class="fas fa-user me-1"></i>${username || 'admin'}</h6></li>
             <li><a class="dropdown-item" href="/admin/backup"><i class="fas fa-database me-2 text-primary"></i>バックアップ管理</a></li>
             <li><hr class="dropdown-divider"></li>
@@ -89,8 +95,8 @@ function layout(title: string, content: string, extraScripts = '', username = ''
     </div>
   </div>
 </nav>
-<div class="container-fluid px-4 py-4">
-  <div id="flash-container"></div>
+<div id="flash-container"></div>
+<div class="page-container">
   ${content}
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -211,7 +217,7 @@ app.get('/', async (c) => {
         <span class="ms-auto badge bg-warning text-dark" id="remain-badge-${grp.orderId}">${grp.items.length}件</span>
       </div>
       <table class="table table-sm mb-0">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th class="ps-3">商品</th>
             <th class="text-center" style="width:60px">発注数</th>
@@ -320,61 +326,72 @@ app.get('/', async (c) => {
 
   const content = `
 <div id="dash-flash" class="alert alert-dismissible fade show" style="display:none" role="alert"></div>
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="action-bar mb-4">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-chart-line me-2 text-primary"></i>ダッシュボード</h1>
-    <p class="text-muted mb-0">発注・納品・残注の状況を横断的に確認できます。</p>
+    <h1 class="page-title"><i class="fas fa-chart-line me-2" style="color:var(--gw-green)"></i>ダッシュボード</h1>
+    <p class="page-subtitle">発注・納品・残注の状況を横断的に確認できます。</p>
   </div>
-  <a class="btn btn-primary" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注を作成</a>
-</div>
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3"><div class="card metric-card h-100"><div class="card-body text-center">
-    <div class="metric-label"><i class="fas fa-box me-1"></i>商品マスタ</div>
-    <div class="metric-value">${p?.c ?? 0}</div>
-  </div></div></div>
-  <div class="col-6 col-md-3"><div class="card metric-card h-100"><div class="card-body text-center">
-    <div class="metric-label"><i class="fas fa-building me-1"></i>仕入先</div>
-    <div class="metric-value">${s?.c ?? 0}</div>
-  </div></div></div>
-  <div class="col-6 col-md-3"><div class="card metric-card h-100"><div class="card-body text-center">
-    <div class="metric-label"><i class="fas fa-file-alt me-1"></i>発注件数</div>
-    <div class="metric-value">${o?.c ?? 0}</div>
-  </div></div></div>
-  <div class="col-6 col-md-3"><div class="card metric-card danger h-100"><div class="card-body text-center">
-    <div class="metric-label"><i class="fas fa-exclamation-triangle me-1"></i>残注明細</div>
-    <div class="metric-value">${b?.c ?? 0}</div>
-  </div></div></div>
+  <div class="actions">
+    <a class="btn btn-primary" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注を作成</a>
+  </div>
 </div>
 
-<!-- ════ 検品待ちウィジェット ════ -->
-<div class="card shadow-sm mb-4 ${inspectCount === 0 ? 'border-success' : 'border-warning border-2'}">
-  <div class="card-header d-flex align-items-center gap-2 ${inspectCount === 0 ? 'bg-success text-white' : 'bg-warning text-dark'}">
-    <i class="fas fa-clipboard-check fa-lg"></i>
-    <strong class="me-1">検品待ち商品</strong>
-    <span class="badge ${inspectCount === 0 ? 'bg-white text-success' : 'bg-dark'}" id="inspect-total-badge">${inspectCount}件</span>
-    <span class="ms-auto small opacity-75">発注済・一部入荷の未検品明細</span>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="metric-card h-100">
+      <div class="metric-label"><i class="fas fa-box me-1"></i>商品マスタ</div>
+      <div class="metric-value">${p?.c ?? 0}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="metric-card h-100">
+      <div class="metric-label"><i class="fas fa-building me-1"></i>仕入先</div>
+      <div class="metric-value">${s?.c ?? 0}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="metric-card h-100 success">
+      <div class="metric-label"><i class="fas fa-file-alt me-1"></i>発注件数</div>
+      <div class="metric-value">${o?.c ?? 0}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="metric-card h-100 ${(b?.c ?? 0) > 0 ? 'danger' : 'success'}">
+      <div class="metric-label"><i class="fas fa-exclamation-triangle me-1"></i>残注明細</div>
+      <div class="metric-value">${b?.c ?? 0}</div>
+    </div>
+  </div>
+</div>
+
+<!-- 検品待ちウィジェット -->
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="fas fa-clipboard-check" style="color:${inspectCount === 0 ? 'var(--gw-green)' : '#d97706'}"></i>
+    <span class="card-title">検品待ち商品</span>
+    <span class="badge ${inspectCount === 0 ? 'text-bg-success' : 'text-bg-warning'}" id="inspect-total-badge">${inspectCount}件</span>
+    <span class="ms-auto" style="font-size:0.75rem;color:var(--gw-muted)">発注済・一部入荷の未検品明細</span>
   </div>
   <div class="card-body p-3" id="inspect-widget-body">
     ${inspectCount === 0
-      ? `<div class="text-center py-3 text-success"><i class="fas fa-check-circle fa-2x mb-2"></i><br>検品待ちの商品はありません</div>`
+      ? `<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--gw-green);opacity:1"></i><p class="mt-2" style="color:var(--gw-green)">検品待ちの商品はありません</p></div>`
       : inspectOrderBlocks
     }
   </div>
 </div>
 
-<div class="card shadow-sm">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center">
-    <strong><i class="fas fa-clock me-1"></i>最近の発注</strong>
-    <a href="/orders" class="btn btn-sm btn-outline-secondary">すべて見る</a>
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="card-title"><i class="fas fa-clock me-1"></i>最近の発注</span>
+    <a href="/orders" class="btn btn-sm btn-outline-secondary">すべて見る <i class="fas fa-arrow-right ms-1"></i></a>
   </div>
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
+      <thead><tr>
         <th>発注番号</th><th>発注日</th><th>仕入先</th><th>顧客名</th>
         <th class="text-center">明細数</th><th class="text-center">数量</th>
         <th class="text-end">金額</th><th>状態</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" class="text-center text-muted py-4">まだ発注データがありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="8" class="text-center text-muted py-4"><i class="fas fa-inbox me-2 opacity-25"></i>まだ発注データがありません。</td></tr>'}</tbody>
     </table>
   </div>
 </div>${dashScript}`
@@ -567,12 +584,12 @@ app.get('/products', async (c) => {
     : sortKey === 'club_type'    ? '種類'
     : '品目')
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-box me-2 text-primary"></i>商品マスタ</h1>
-    <p class="text-muted mb-0" id="row-count-label"><strong>${totalCount.toLocaleString()}</strong> 件中 ${res.results.length} 件表示（${currentPage}/${totalPages} ページ）</p>
+    <h1 class="page-title"><i class="fas fa-box me-2" style="color:var(--gw-green)"></i>商品マスタ</h1>
+    <p class="page-subtitle" id="row-count-label"><strong>${totalCount.toLocaleString()}</strong> 件中 ${res.results.length} 件表示（${currentPage}/${totalPages} ページ）</p>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="actions">
     <div class="btn-group">
       <button class="btn btn-outline-secondary" id="btn-dl-template" title="CSVテンプレートをダウンロード">
         <i class="fas fa-download me-1"></i>テンプレート
@@ -584,8 +601,8 @@ app.get('/products', async (c) => {
     <button class="btn btn-outline-primary" id="btn-import">
       <i class="fas fa-file-import me-1"></i>Excel/CSV一括追加
     </button>
-    <button class="btn btn-success" onclick="openAddProduct()">
-      <i class="fas fa-plus me-1"></i>1件追加
+    <button class="btn btn-primary" onclick="openAddProduct()">
+      <i class="fas fa-plus me-1"></i>商品を追加
     </button>
   </div>
 </div>
@@ -688,10 +705,10 @@ app.get('/products', async (c) => {
   </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card">
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" id="product-table">
-      <thead class="table-dark">
+      <thead>
         <tr>
           <th style="width:36px" class="text-center">
             <input type="checkbox" class="form-check-input" id="chk-all" style="width:1.1em;height:1.1em;cursor:pointer" title="全選択">
@@ -878,7 +895,7 @@ ${buildPager()}
               </button>
               <div class="collapse mt-2" id="col-mapping-help">
                 <table class="table table-sm table-bordered small mb-0" style="max-width:700px">
-                  <thead class="table-light"><tr>
+                  <thead><tr>
                     <th>日本語列名</th><th>英語列名</th><th>必須</th><th>説明</th>
                   </tr></thead>
                   <tbody>
@@ -1129,15 +1146,19 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
 </script>`
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div><h1 class="h3 mb-1"><i class="fas fa-building me-2 text-primary"></i>仕入先マスタ</h1>
-  <p class="text-muted mb-0">${res.results.length} 件登録</p></div>
-  <button class="btn btn-success" onclick="openAddSup()"><i class="fas fa-plus me-1"></i>仕入先を追加</button>
+<div class="action-bar">
+  <div>
+    <h1 class="page-title"><i class="fas fa-building me-2" style="color:var(--gw-green)"></i>仕入先マスタ</h1>
+    <p class="page-subtitle">${res.results.length} 件登録</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" onclick="openAddSup()"><i class="fas fa-plus me-1"></i>仕入先を追加</button>
+  </div>
 </div>
-<div class="card shadow-sm">
+<div class="card">
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0">
-      <thead class="table-dark"><tr>
+      <thead><tr>
         <th>仕入先名</th><th>担当者</th><th>発注方法</th><th>連絡先</th>
         <th>電話</th><th>支払い</th><th>送料条件</th><th>備考</th><th>操作</th>
       </tr></thead>
@@ -1349,12 +1370,14 @@ document.getElementById('ruleForm').addEventListener('submit',async function(e){
 </script>`
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-sitemap me-2 text-primary"></i>仕入先判定ルール</h1>
-    <p class="text-muted mb-0">品目・メーカー・種類から発注先を自動判定するルールです。優先順位の小さい方が優先されます。</p>
+    <h1 class="page-title"><i class="fas fa-sitemap me-2" style="color:var(--gw-green)"></i>仕入先判定ルール</h1>
+    <p class="page-subtitle">品目・メーカー・種類から発注先を自動判定するルールです。優先順位の小さい方が優先されます。</p>
   </div>
-  <button class="btn btn-success" onclick="openAddRule()"><i class="fas fa-plus me-1"></i>ルールを追加</button>
+  <div class="actions">
+    <button class="btn btn-primary" onclick="openAddRule()"><i class="fas fa-plus me-1"></i>ルールを追加</button>
+  </div>
 </div>
 
 <div class="alert alert-info py-2 small mb-3">
@@ -1362,10 +1385,10 @@ document.getElementById('ruleForm').addEventListener('submit',async function(e){
   <strong>判定ロジック:</strong> 商品を発注する際、品目 → メーカー → 種類の順に絞り込み、最も優先度の高いルールの仕入先に自動振り分けされます。空欄は「すべて」にマッチします。
 </div>
 
-<div class="card shadow-sm">
+<div class="card">
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0">
-      <thead class="table-dark"><tr>
+      <thead><tr>
         <th>品目</th><th>メーカー</th><th>種類</th><th>仕入先</th>
         <th class="text-center">掛率</th><th class="text-center">優先順位</th><th>備考</th><th>操作</th>
       </tr></thead>
@@ -1566,7 +1589,7 @@ app.get('/purchase-pool', async (c) => {
         </div>
         <div class="items-area mt-2" id="items-${o['id']}" style="display:none">
           <table class="table table-sm table-bordered mb-0 bg-white small">
-            <thead class="table-light">
+            <thead>
               <tr>
                 <th>品目</th><th>メーカー</th><th>商品名</th>
                 <th>仕様</th><th>色</th><th class="text-end">数量</th>
@@ -1602,14 +1625,16 @@ app.get('/purchase-pool', async (c) => {
   }).join('')
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-layer-group me-2 text-warning"></i>発注プール</h1>
-    <p class="text-muted mb-0">送料無料ラインを超えたらまとめて発注 — 現在 <strong>${totalPoolOrders}</strong> 件プール中</p>
+    <h1 class="page-title"><i class="fas fa-layer-group me-2" style="color:#d97706"></i>発注プール</h1>
+    <p class="page-subtitle">送料無料ラインを超えたらまとめて発注 — 現在 <strong>${totalPoolOrders}</strong> 件プール中</p>
   </div>
-  <a href="/orders/new" class="btn btn-outline-primary">
-    <i class="fas fa-plus me-1"></i>新規発注
-  </a>
+  <div class="actions">
+    <a href="/orders/new" class="btn btn-primary">
+      <i class="fas fa-plus me-1"></i>新規発注
+    </a>
+  </div>
 </div>
 ${groupsHtml}
 <div id="pool-toast" class="toast align-items-center text-white bg-success border-0 position-fixed bottom-0 end-0 m-3" role="alert" style="z-index:9999">
@@ -1750,27 +1775,35 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
 </script>`
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div><h1 class="h3 mb-1"><i class="fas fa-list me-2 text-primary"></i>発注一覧</h1>
-  <p class="text-muted mb-0">発注履歴とステータスを一覧で確認できます。</p></div>
-  <a class="btn btn-primary" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注</a>
-</div>
-<form class="row g-2 mb-3">
-  <div class="col-md-2">
-    <select name="status" class="form-select">
-      <option value="">全ステータス</option>
-      ${statusOpts.map(s => `<option value="${s}" ${status===s?'selected':''}>${statusNames[s]}</option>`).join('')}
-    </select>
+<div class="action-bar">
+  <div>
+    <h1 class="page-title"><i class="fas fa-list me-2" style="color:var(--gw-green)"></i>発注一覧</h1>
+    <p class="page-subtitle">発注履歴とステータスを一覧で確認できます。</p>
   </div>
-  <div class="col-md-2"><input class="form-control" name="supplier" value="${esc(supplier)}" placeholder="仕入先"></div>
-  <div class="col-md-3"><input class="form-control" name="q" value="${esc(q)}" placeholder="発注番号・顧客名・発注者"></div>
-  <div class="col-auto"><button class="btn btn-outline-primary"><i class="fas fa-search me-1"></i>検索</button></div>
-  ${(status||supplier||q) ? '<div class="col-auto"><a href="/orders" class="btn btn-outline-secondary">クリア</a></div>' : ''}
-</form>
-<div class="card shadow-sm">
+  <div class="actions">
+    <a class="btn btn-primary" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注</a>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form class="row g-2 align-items-center">
+      <div class="col-md-2">
+        <select name="status" class="form-select form-select-sm">
+          <option value="">全ステータス</option>
+          ${statusOpts.map(s => `<option value="${s}" ${status===s?'selected':''}>${statusNames[s]}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-md-2"><input class="form-control form-control-sm" name="supplier" value="${esc(supplier)}" placeholder="仕入先で絞り込み"></div>
+      <div class="col-md-3"><input class="form-control form-control-sm" name="q" value="${esc(q)}" placeholder="発注番号・顧客名・発注者"></div>
+      <div class="col-auto"><button class="btn btn-sm btn-primary"><i class="fas fa-search me-1"></i>検索</button></div>
+      ${(status||supplier||q) ? '<div class="col-auto"><a href="/orders" class="btn btn-sm btn-outline-secondary"><i class="fas fa-times me-1"></i>クリア</a></div>' : ''}
+    </form>
+  </div>
+</div>
+<div class="card">
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
+      <thead><tr>
         <th>発注番号</th><th>発注日</th><th>仕入先</th><th>顧客名</th><th>用途</th>
         <th class="text-center">明細</th><th class="text-center">数量</th>
         <th class="text-end">金額</th><th>状態</th><th></th>
@@ -1827,15 +1860,19 @@ app.get('/orders/new', async (c) => {
   const content = `
 ${dataScript}
 ${modalHtml}
-<div class="mb-3">
-  <h1 class="h3 mb-1"><i class="fas fa-plus-circle me-2 text-primary"></i>新規発注</h1>
-  <p class="text-muted mb-0">
-    <i class="fas fa-search me-1 text-success"></i>ボタンでカテゴリーから商品を選択し、発注明細を作成してください。
-  </p>
+<div class="action-bar">
+  <div>
+    <h1 class="page-title"><i class="fas fa-plus-circle me-2" style="color:var(--gw-green)"></i>新規発注</h1>
+    <p class="page-subtitle">カテゴリーから商品を選択して発注明細を作成してください。</p>
+  </div>
+  <div class="actions">
+    <a href="/purchase-pool" class="btn btn-outline-secondary btn-sm"><i class="fas fa-layer-group me-1"></i>発注プール</a>
+    <a href="/orders" class="btn btn-outline-secondary btn-sm"><i class="fas fa-list me-1"></i>発注一覧</a>
+  </div>
 </div>
 <form id="order-form">
-  <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white"><strong><i class="fas fa-info-circle me-1"></i>発注ヘッダ</strong></div>
+  <div class="card mb-3">
+    <div class="card-header"><span class="card-title"><i class="fas fa-info-circle me-1"></i>発注ヘッダ</span></div>
     <div class="card-body row g-3">
       <div class="col-6 col-md-2">
         <label class="form-label">発注日</label>
@@ -1865,8 +1902,8 @@ ${modalHtml}
     </div>
   </div>
 
-  <div class="card shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
       <div class="d-flex align-items-center gap-3">
         <strong><i class="fas fa-table me-1"></i>発注明細</strong>
         <span class="text-muted small">
@@ -1879,7 +1916,7 @@ ${modalHtml}
     </div>
     <div class="table-responsive">
       <table class="table table-sm align-middle mb-0" id="line-table">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th style="min-width:160px">選択商品</th>
             <th style="min-width:72px">品目</th>
@@ -2056,8 +2093,8 @@ mail：takarazuka@golfwing.jp
     const isMerged = group.orders.length > 1
 
     cards.push(`
-    <div class="card shadow-sm mb-4">
-      <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <strong><i class="fas fa-building me-1"></i>${esc(group.supplierName)}</strong>
           ${isMerged
@@ -2096,7 +2133,7 @@ mail：takarazuka@golfwing.jp
         <!-- 明細テーブル -->
         <div class="table-responsive mb-3">
           <table class="table table-sm mb-0">
-            <thead class="table-light"><tr>
+            <thead><tr>
               <th>品目</th><th>メーカー</th><th>商品名</th><th>仕様</th><th>種類</th>
               <th class="text-center">数量</th><th class="text-end">単価</th><th class="text-end">金額</th>
             </tr></thead>
@@ -2199,12 +2236,14 @@ document.querySelectorAll('.btn-mark-ordered').forEach(function(btn){
 </script>`
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-envelope-open-text me-2 text-primary"></i>メール下書き一覧</h1>
-    <p class="text-muted mb-0">仕入先ごとの発注メール下書きです。CCは編集可能です。「メールソフトで開く」でOutlookに転記できます。</p>
+    <h1 class="page-title"><i class="fas fa-envelope-open-text me-2" style="color:var(--gw-green)"></i>メール下書き一覧</h1>
+    <p class="page-subtitle">仕入先ごとの発注メール下書きです。CCは編集可能です。「メールソフトで開く」でOutlookに転記できます。</p>
   </div>
-  <a class="btn btn-outline-secondary" href="/orders"><i class="fas fa-list me-1"></i>発注一覧へ</a>
+  <div class="actions">
+    <a class="btn btn-outline-secondary" href="/orders"><i class="fas fa-list me-1"></i>発注一覧へ</a>
+  </div>
 </div>
 ${cards.length ? cards.join('') : '<div class="alert alert-warning">該当するメール下書きがありません。</div>'}`
   return layout('メール下書き', content, scripts)
@@ -2269,19 +2308,21 @@ app.get('/orders/:id/edit', async (c) => {
 </script>`
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-edit me-2 text-primary"></i>発注情報を編集</h1>
-    <div class="text-muted small">${esc(order['order_no'])} / <strong>${esc(order['supplier_name'])}</strong></div>
+    <h1 class="page-title"><i class="fas fa-edit me-2" style="color:var(--gw-green)"></i>発注情報を編集</h1>
+    <p class="page-subtitle">${esc(order['order_no'])} / <strong>${esc(order['supplier_name'])}</strong></p>
   </div>
-  <a class="btn btn-sm btn-outline-secondary" href="/orders/${id}">
-    <i class="fas fa-arrow-left me-1"></i>キャンセルして戻る
-  </a>
+  <div class="actions">
+    <a class="btn btn-outline-secondary" href="/orders/${id}">
+      <i class="fas fa-arrow-left me-1"></i>キャンセルして戻る
+    </a>
+  </div>
 </div>
 
 <form id="edit-header-form">
-  <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white"><strong><i class="fas fa-info-circle me-1"></i>発注ヘッダー</strong></div>
+  <div class="card mb-3">
+    <div class="card-header"><strong><i class="fas fa-info-circle me-1"></i>発注ヘッダー</strong></div>
     <div class="card-body row g-3">
 
       <div class="col-6 col-md-3">
@@ -3349,20 +3390,20 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
 
   const content = `
 <!-- ページヘッダ -->
-<div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-file-alt me-2 text-primary"></i>発注詳細</h1>
+    <h1 class="page-title"><i class="fas fa-file-alt me-2" style="color:var(--gw-green)"></i>発注詳細</h1>
     <div class="d-flex align-items-center gap-2 flex-wrap">
-      <span class="text-muted">${esc(order['order_no'])}</span>
-      <span class="mx-1 text-muted">|</span>
-      <strong>${esc(order['supplier_name'])}</strong>
+      <span class="page-subtitle mb-0">${esc(order['order_no'])}</span>
+      <span style="color:var(--gw-border)">|</span>
+      <strong style="font-size:0.85rem">${esc(order['supplier_name'])}</strong>
       ${statusBadge(curStatus)}
     </div>
   </div>
-  <div class="d-flex gap-2 flex-wrap">
+  <div class="actions">
     ${showButtons.join('')}
-    <a class="btn btn-sm btn-outline-warning" href="/orders/${id}/edit"><i class="fas fa-edit me-1"></i>発注情報を編集</a>
-    <a class="btn btn-sm btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-truck me-1"></i>納品登録</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/orders/${id}/edit"><i class="fas fa-edit me-1"></i>発注編集</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/receipts/new/${id}"><i class="fas fa-truck me-1"></i>納品登録</a>
     <button class="btn btn-sm btn-outline-secondary" id="btn-copy-order"><i class="fas fa-copy me-1"></i>再発注</button>
     <button class="btn btn-sm btn-outline-danger" id="btn-delete-order"><i class="fas fa-trash-alt me-1"></i>削除</button>
     <a class="btn btn-sm btn-outline-secondary" href="/orders"><i class="fas fa-arrow-left me-1"></i>一覧へ</a>
@@ -3372,8 +3413,8 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
 <!-- 上段: ヘッダ情報 + 発注方法別パネル -->
 <div class="row g-3 mb-3">
   <div class="col-lg-4">
-    <div class="card shadow-sm h-100">
-      <div class="card-header bg-white py-2"><strong><i class="fas fa-info-circle me-1 text-primary"></i>発注情報</strong></div>
+    <div class="card h-100">
+      <div class="card-header"><span class="card-title"><i class="fas fa-info-circle"></i>発注情報</span></div>
       <div class="card-body py-2">
         <dl class="row mb-0 small">
           <dt class="col-5 text-muted">発注日</dt><dd class="col-7 fw-semibold">${esc(order['order_date'])}</dd>
@@ -3381,7 +3422,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
           <dt class="col-5 text-muted">顧客名</dt><dd class="col-7">${esc(order['customer_name'])||'―'}</dd>
           <dt class="col-5 text-muted">用途</dt><dd class="col-7">${esc(order['usage_type'])||'―'}</dd>
           <dt class="col-5 text-muted">希望納期</dt><dd class="col-7">${esc(order['requested_delivery_date'])||'―'}</dd>
-          <dt class="col-5 text-muted">合計金額</dt><dd class="col-7 fw-bold text-primary fs-6">${yen(totalAmount)}</dd>
+          <dt class="col-5">合計金額</dt><dd class="col-7 fw-bold" style="font-size:1rem;color:var(--gw-green)">${yen(totalAmount)}</dd>
           <dt class="col-5 text-muted">担当者</dt><dd class="col-7">${esc(order['contact_name'])||''} ${esc(order['honorific'])||''}</dd>
           <dt class="col-5 text-muted">発注方法</dt><dd class="col-7">${esc(order['order_method'])||'―'}</dd>
           <dt class="col-5 text-muted">備考</dt><dd class="col-7 text-muted">${esc(order['order_note'])||'―'}</dd>
@@ -3392,9 +3433,9 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
     </div>
   </div>
   <div class="col-lg-8">
-    <div class="card shadow-sm h-100">
-      <div class="card-header bg-white py-2">
-        <strong><i class="${orderPanelIcon} me-1"></i>${orderPanelTitle}</strong>
+    <div class="card h-100">
+      <div class="card-header">
+        <span class="card-title"><i class="${orderPanelIcon} me-1"></i>${orderPanelTitle}</span>
         <span class="ms-2 badge bg-light text-dark border small">${esc(order['order_method'])||'方法未設定'}</span>
       </div>
       <div class="card-body">${orderPanel}</div>
@@ -3403,17 +3444,17 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
 </div>
 
 <!-- 発注明細 -->
-<div class="card shadow-sm mb-3">
-  <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-    <strong><i class="fas fa-table me-1 text-primary"></i>発注明細</strong>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span class="card-title"><i class="fas fa-table me-1"></i>発注明細</span>
     <div class="d-flex align-items-center gap-2">
-      ${isEditable ? `<button class="btn btn-sm btn-outline-success" id="btn-add-item"><i class="fas fa-plus me-1"></i>商品を追加</button>` : ''}
-      <span class="badge bg-primary">${items.results.length} 品目 / 合計 ${yen(totalAmount)}</span>
+      ${isEditable ? `<button class="btn btn-sm btn-primary" id="btn-add-item"><i class="fas fa-plus me-1"></i>商品を追加</button>` : ''}
+      <span class="badge text-bg-secondary">${items.results.length} 品目 / 合計 ${yen(totalAmount)}</span>
     </div>
   </div>
   <div class="table-responsive">
     <table class="table table-sm table-hover align-middle mb-0" id="order-items-table">
-      <thead class="table-dark"><tr>
+      <thead><tr>
         <th>品目</th><th>メーカー</th><th>商品名</th><th>仕様・色</th><th>種類</th>
         <th class="text-center">発注数</th>
         <th class="text-center">入荷済</th>
@@ -3427,17 +3468,17 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
 </div>
 
 <!-- 納品履歴 -->
-<div class="card shadow-sm">
-  <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center gap-2">
-      <strong><i class="fas fa-truck me-1 text-success"></i>納品履歴</strong>
-      <span id="receipt-updating" class="spinner-border spinner-border-sm text-success" style="display:none" title="更新中"></span>
+      <span class="card-title"><i class="fas fa-truck me-1"></i>納品履歴</span>
+      <span id="receipt-updating" class="spinner-border spinner-border-sm" style="display:none;color:var(--gw-green)" title="更新中"></span>
     </div>
-    <a class="btn btn-sm btn-outline-primary" href="/receipts/new/${id}"><i class="fas fa-plus me-1"></i>納品登録</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/receipts/new/${id}"><i class="fas fa-plus me-1"></i>納品登録</a>
   </div>
   <div class="table-responsive">
     <table class="table table-sm mb-0">
-      <thead class="table-light"><tr><th>入荷日</th><th>納品書日付</th><th>検品者</th><th>備考</th></tr></thead>
+      <thead><tr><th>入荷日</th><th>納品書日付</th><th>検品者</th><th>備考</th></tr></thead>
       <tbody id="receipt-tbody">${receiptRows}</tbody>
     </table>
   </div>
@@ -3528,23 +3569,23 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
   <i class="fas fa-check-circle me-1"></i>${esc(flash)}
   <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
 </div>` : ''}
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-truck me-2 text-primary"></i>納品履歴</h1>
-    <p class="text-muted mb-0">登録済みの納品データ一覧です。</p>
+    <h1 class="page-title"><i class="fas fa-truck me-2" style="color:var(--gw-green)"></i>納品履歴</h1>
+    <p class="page-subtitle">登録済みの納品データ一覧です。</p>
   </div>
-  <div class="d-flex gap-2">
-    <a href="/receipts/free" class="btn btn-primary btn-sm px-3">
-      <i class="fas fa-plus me-1"></i>システム外発注を納品登録
+  <div class="actions">
+    <a href="/receipts/free" class="btn btn-outline-secondary">
+      <i class="fas fa-plus me-1"></i>システム外発注納品
     </a>
-    <a href="${dlUrl}" class="btn btn-success btn-sm px-3">
-      <i class="fas fa-file-excel me-1"></i>Excel ダウンロード
+    <a href="${dlUrl}" class="btn btn-primary">
+      <i class="fas fa-file-excel me-1"></i>Excel DL
     </a>
   </div>
 </div>
 
 <!-- フィルタカード -->
-<div class="card shadow-sm mb-3">
+<div class="card mb-3">
   <div class="card-body py-2">
     <form method="GET" action="/receipts" class="row g-2 align-items-end">
       <div class="col-auto">
@@ -3583,10 +3624,10 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
   </span>
 </div>
 
-<div class="card shadow-sm">
+<div class="card">
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0 small">
-      <thead class="table-dark">
+      <thead>
         <tr>
           <th>入荷日</th><th>納品書日付</th><th>発注番号</th><th>仕入先</th>
           <th>顧客名</th><th class="text-center">品目数</th>
@@ -3672,13 +3713,18 @@ document.getElementById('receipt-form').addEventListener('submit', async functio
 </script>`
 
   const content = `
-<div class="mb-3">
-  <h1 class="h3 mb-1"><i class="fas fa-truck me-2 text-primary"></i>納品登録</h1>
-  <p class="text-muted mb-0">${esc(order['order_no'])} / ${esc(order['supplier_name'])}</p>
+<div class="action-bar">
+  <div>
+    <h1 class="page-title"><i class="fas fa-truck me-2" style="color:var(--gw-green)"></i>納品登録</h1>
+    <p class="page-subtitle">${esc(order['order_no'])} / ${esc(order['supplier_name'])}</p>
+  </div>
+  <div class="actions">
+    <a href="/orders/${orderId}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>発注詳細へ戻る</a>
+  </div>
 </div>
 <form id="receipt-form">
-  <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white"><strong><i class="fas fa-info-circle me-1"></i>納品ヘッダ</strong></div>
+  <div class="card mb-3">
+    <div class="card-header"><strong><i class="fas fa-info-circle me-1"></i>納品ヘッダ</strong></div>
     <div class="card-body row g-3">
       <div class="col-md-3"><label class="form-label">入荷日</label><input class="form-control" type="date" name="received_date" value="${todayStr()}"></div>
       <div class="col-md-3"><label class="form-label">納品書記載日</label><input class="form-control" type="date" name="slip_date"></div>
@@ -3686,11 +3732,11 @@ document.getElementById('receipt-form').addEventListener('submit', async functio
       <div class="col-12"><label class="form-label">備考</label><textarea class="form-control" name="note" rows="2"></textarea></div>
     </div>
   </div>
-  <div class="card shadow-sm">
-    <div class="card-header bg-white"><strong><i class="fas fa-table me-1"></i>入荷明細</strong></div>
+  <div class="card">
+    <div class="card-header"><strong><i class="fas fa-table me-1"></i>入荷明細</strong></div>
     <div class="table-responsive">
       <table class="table align-middle mb-0">
-        <thead class="table-light"><tr>
+        <thead><tr>
           <th>商品</th><th class="text-center">発注数</th><th class="text-center">入荷済</th>
           <th class="text-center">残数</th><th class="text-center" style="min-width:100px">今回入荷数</th><th>行備考</th>
         </tr></thead>
@@ -3810,16 +3856,18 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>`
 
   const content = `
-<div class="mb-3 d-flex align-items-center gap-3">
-  <a href="/receipts" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>納品履歴に戻る</a>
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-0"><i class="fas fa-plus-circle me-2 text-success"></i>システム外発注の納品登録</h1>
-    <small class="text-muted">このシステムで発注していない商品の納品を記録します。</small>
+    <h1 class="page-title"><i class="fas fa-plus-circle me-2" style="color:var(--gw-green)"></i>システム外発注の納品登録</h1>
+    <p class="page-subtitle">このシステムで発注していない商品の納品を記録します。</p>
+  </div>
+  <div class="actions">
+    <a href="/receipts" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>納品履歴に戻る</a>
   </div>
 </div>
 <form id="free-receipt-form">
-  <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white fw-semibold"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
+  <div class="card mb-3">
+    <div class="card-header"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
     <div class="card-body row g-3">
       <div class="col-md-4">
         <label class="form-label fw-semibold">仕入先 <span class="text-danger">*</span></label>
@@ -3846,8 +3894,8 @@ document.addEventListener('DOMContentLoaded', function(){
       </div>
     </div>
   </div>
-  <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white d-flex align-items-center justify-content-between">
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
       <span class="fw-semibold"><i class="fas fa-table me-1"></i>入荷明細</span>
       <button type="button" id="btn-add-row" class="btn btn-outline-success btn-sm">
         <i class="fas fa-plus me-1"></i>行を追加
@@ -3855,7 +3903,7 @@ document.addEventListener('DOMContentLoaded', function(){
     </div>
     <div class="table-responsive">
       <table class="table align-middle mb-0 small">
-        <thead class="table-light">
+        <thead>
           <tr>
             <th style="min-width:200px">商品名 <span class="text-danger">*</span></th>
             <th style="min-width:130px">仕様・色など</th>
@@ -3958,12 +4006,16 @@ document.getElementById('new-product-form').addEventListener('submit', async fun
 </script>`
 
   const content = `
-<div class="mb-3 d-flex align-items-center gap-3">
-  <a href="/products" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>一覧に戻る</a>
-  <h1 class="h3 mb-0"><i class="fas fa-plus-circle me-2 text-success"></i>商品を新規登録</h1>
+<div class="action-bar">
+  <div>
+    <h1 class="page-title"><i class="fas fa-plus-circle me-2" style="color:var(--gw-green)"></i>商品を新規登録</h1>
+  </div>
+  <div class="actions">
+    <a href="/products" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>一覧に戻る</a>
+  </div>
 </div>
 <form id="new-product-form">
-  <div class="card shadow-sm">
+  <div class="card">
     <div class="card-body row g-3">
       <div class="col-md-3">
         <label class="form-label fw-semibold">品目 <span class="text-danger">*</span></label>
@@ -4162,22 +4214,24 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
 </script>`
 
   const content = `
-<div class="mb-3 d-flex align-items-center gap-3">
-  <a href="${backUrl}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>戻る</a>
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-0"><i class="fas fa-edit me-2 text-primary"></i>納品履歴を編集</h1>
-    <small class="text-muted">
+    <h1 class="page-title"><i class="fas fa-edit me-2" style="color:var(--gw-green)"></i>納品履歴を編集</h1>
+    <p class="page-subtitle">
       ${receipt['purchase_order_id']
         ? `発注番号: ${esc(receipt['order_no'])} / ${esc(receipt['supplier_name'])}`
-        : '<span class="badge bg-secondary">システム外発注</span>'
+        : '<span class="badge text-bg-secondary">システム外発注</span>'
       }
-      &nbsp;納品ID: ${rid}
-    </small>
+      &nbsp;・納品ID: ${rid}
+    </p>
+  </div>
+  <div class="actions">
+    <a href="${backUrl}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>戻る</a>
   </div>
 </div>
 <form id="edit-receipt-form">
-  <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white fw-semibold"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
+  <div class="card mb-3">
+    <div class="card-header"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
     <div class="card-body row g-3">
       <div class="col-md-3">
         <label class="form-label">入荷日 <span class="text-danger">*</span></label>
@@ -4197,11 +4251,11 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
       </div>
     </div>
   </div>
-  <div class="card shadow-sm mb-3">
-    <div class="card-header bg-white fw-semibold"><i class="fas fa-table me-1"></i>入荷明細</div>
+  <div class="card mb-3">
+    <div class="card-header"><i class="fas fa-table me-1"></i>入荷明細</div>
     <div class="table-responsive">
       <table class="table align-middle mb-0 small">
-        <thead class="table-light">${theadHtml}</thead>
+        <thead>${theadHtml}</thead>
         <tbody id="ri-tbody">${itemRows}</tbody>
       </table>
     </div>
@@ -4256,15 +4310,19 @@ app.get('/backorders', async (c) => {
   </tr>`).join('')
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div><h1 class="h3 mb-1"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>残注一覧</h1>
-  <p class="text-muted mb-0">未入荷・一部入荷の明細を一覧表示します。</p></div>
-  <a class="btn btn-outline-primary" href="/orders"><i class="fas fa-list me-1"></i>発注一覧へ</a>
+<div class="action-bar">
+  <div>
+    <h1 class="page-title"><i class="fas fa-exclamation-triangle me-2" style="color:#d97706"></i>残注一覧</h1>
+    <p class="page-subtitle">未入荷・一部入荷の明細を一覧表示します。</p>
+  </div>
+  <div class="actions">
+    <a class="btn btn-outline-secondary" href="/orders"><i class="fas fa-list me-1"></i>発注一覧へ</a>
+  </div>
 </div>
-<div class="card shadow-sm">
+<div class="card">
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light"><tr>
+      <thead><tr>
         <th>発注日</th><th>発注番号</th><th>仕入先</th><th>顧客名</th><th>用途</th>
         <th>品目</th><th>メーカー</th><th>商品名</th><th>仕様</th>
         <th class="text-center">発注</th><th class="text-center">入荷済</th><th class="text-center">残数</th>
@@ -4317,17 +4375,17 @@ app.get('/admin/backup', async (c) => {
     </tr>`).join('')
 
   const content = `
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="action-bar">
   <div>
-    <h1 class="h3 mb-1"><i class="fas fa-database me-2 text-primary"></i>バックアップ管理</h1>
-    <p class="text-muted mb-0">データのエクスポート・インポートを行います。定期的なバックアップを推奨します。</p>
+    <h1 class="page-title"><i class="fas fa-database me-2" style="color:var(--gw-green)"></i>バックアップ管理</h1>
+    <p class="page-subtitle">データのエクスポート・インポートを行います。定期的なバックアップを推奨します。</p>
   </div>
 </div>
 
 <div class="row g-4">
   <!-- エクスポート -->
   <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
+    <div class="card h-100">
       <div class="card-header bg-primary text-white">
         <h5 class="mb-0"><i class="fas fa-download me-2"></i>エクスポート（バックアップ）</h5>
       </div>
@@ -4344,7 +4402,7 @@ app.get('/admin/backup', async (c) => {
           <div class="card-body p-2">
             <p class="small fw-semibold mb-2 text-muted">テーブル別CSVダウンロード</p>
             <table class="table table-sm mb-0">
-              <thead class="table-light"><tr>
+              <thead><tr>
                 <th>テーブル</th><th class="text-center">件数</th><th>DL</th>
               </tr></thead>
               <tbody>${tableRows}</tbody>
@@ -4357,7 +4415,7 @@ app.get('/admin/backup', async (c) => {
 
   <!-- インポート（リストア） -->
   <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
+    <div class="card h-100">
       <div class="card-header bg-warning text-dark">
         <h5 class="mb-0"><i class="fas fa-upload me-2"></i>インポート（リストア）</h5>
       </div>
