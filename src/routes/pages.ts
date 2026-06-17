@@ -259,11 +259,11 @@ app.get('/', async (c) => {
   // ダッシュボード検品ボタン
   document.querySelectorAll('.btn-dash-inspect').forEach(function(btn){
     btn.addEventListener('click', async function(){
-      var poiId   = this.dataset.poiId;
-      var orderId = this.dataset.orderId;
-      var tr      = this.closest('tr');
-      this.disabled = true;
-      this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+      var poiId   = btn.dataset.poiId;
+      var orderId = btn.dataset.orderId;
+      var tr      = btn.closest('tr');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
       try {
         var r = await fetch('/api/orders/'+orderId+'/items/'+poiId+'/inspect',{
           method:'PATCH', headers:{'Content-Type':'application/json'},
@@ -288,17 +288,20 @@ app.get('/', async (c) => {
             }
             updateTotalBadge();
             if(d.all_inspected){
-              showFlashDash('✓ 発注 '+orderId+' がすべて検品済みになりました！','success');
+              showFlash('✓ 発注 '+orderId+' がすべて検品済みになりました！','success');
+            } else {
+              showFlash('検品済みにしました','success');
             }
           }, 400);
         } else {
-          this.disabled = false;
-          this.innerHTML = '<i class=\\"far fa-circle me-1\\"></i>未検品';
-          showFlashDash('更新に失敗しました','danger');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="far fa-circle me-1"></i>未検品';
+          showFlash((d && d.error) ? d.error : '更新に失敗しました','danger');
         }
       } catch(e){
-        this.disabled = false;
-        this.innerHTML = '<i class=\\"far fa-circle me-1\\"></i>未検品';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="far fa-circle me-1"></i>未検品';
+        showFlash('通信エラーが発生しました','danger');
       }
     });
   });
@@ -313,19 +316,11 @@ app.get('/', async (c) => {
     }
   }
 
-  function showFlashDash(msg, type){
-    var el = document.getElementById('dash-flash');
-    if(!el) return;
-    el.className = 'alert alert-'+type+' alert-dismissible fade show';
-    el.innerHTML = msg + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
-    el.style.display='';
-    setTimeout(function(){ el.style.display='none'; }, 4000);
-  }
+  // showFlash は layout() 共通関数を使用
 })();
 </script>`
 
   const content = `
-<div id="dash-flash" class="alert alert-dismissible fade show" style="display:none" role="alert"></div>
 <div class="action-bar mb-4">
   <div>
     <h1 class="page-title"><i class="fas fa-chart-line me-2" style="color:var(--gw-green)"></i>ダッシュボード</h1>

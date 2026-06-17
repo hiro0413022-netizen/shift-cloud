@@ -2096,6 +2096,43 @@ app.get('/dashboard/pending-inspection', async (c) => {
   return c.json({ items: res.results })
 })
 
+// ============================================================
+// PATCH /api/orders/:id/items/:poi_id/inspect
+// ダッシュボードの検品ボタン → inspected フラグを 1 に更新
+// ============================================================
+app.patch('/orders/:id/items/:poi_id/inspect', async (c) => {
+  const db     = c.env.DB
+  const orderId  = Number(c.req.param('id'))
+  const poiId    = Number(c.req.param('poi_id'))
+
+  if (isNaN(orderId) || isNaN(poiId)) {
+    return c.json({ error: 'Invalid id' }, 400)
+  }
+
+  // 明細が該当発注に属することを確認
+  const poi = await db.prepare(
+    'SELECT id, inspected FROM purchase_order_items WHERE id=? AND purchase_order_id=?'
+  ).bind(poiId, orderId).first<{ id: number; inspected: number }>()
+
+  if (!poi) {
+    return c.json({ error: '明細が見つかりません' }, 404)
+  }
+
+  // inspected = 1 に更新
+  await db.prepare(
+    'UPDATE purchase_order_items SET inspected=1 WHERE id=?'
+  ).bind(poiId).run()
+
+  // 同一発注の未検品明細が残っているか確認
+  const remain = await db.prepare(
+    'SELECT COUNT(*) AS c FROM purchase_order_items WHERE purchase_order_id=? AND inspected=0'
+  ).bind(orderId).first<{ c: number }>()
+
+  const allInspected = (remain?.c ?? 0) === 0
+
+  return c.json({ ok: true, all_inspected: allInspected })
+})
+
 app.get('/backup/all', async (c) => {
   const db = c.env.DB
   const data: Record<string, unknown[]> = {}
