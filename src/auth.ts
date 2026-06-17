@@ -139,58 +139,179 @@ export function loginPage(error = false, next = '/'): Response {
   <title>ログイン | ゴルフウィング 発注管理</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; display:flex; align-items:center; justify-content:center; }
-    .login-card { width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
-    .login-header { background: linear-gradient(135deg, #0f3460, #16213e); border-radius: 16px 16px 0 0; padding: 2rem; text-align:center; }
-    .login-body { background: #fff; border-radius: 0 0 16px 16px; padding: 2rem; }
-    .form-control:focus { border-color: #0f3460; box-shadow: 0 0 0 .2rem rgba(15,52,96,.25); }
-    .btn-login { background: linear-gradient(135deg, #0f3460, #16213e); border: none; font-size: 1rem; padding: .75rem; }
-    .btn-login:hover { background: linear-gradient(135deg, #16213e, #0f3460); }
-    .input-group-text { background: #f8f9fa; }
+    *,*::before,*::after{box-sizing:border-box}
+    body {
+      font-family: 'Inter','Hiragino Sans','Yu Gothic UI',sans-serif;
+      background: #0f2417;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+    /* 背景装飾 */
+    body::before {
+      content: '';
+      position: fixed;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(26,122,74,.25) 0%, transparent 70%);
+      top: -200px; right: -200px;
+      pointer-events: none;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(46,204,113,.15) 0%, transparent 70%);
+      bottom: -150px; left: -150px;
+      pointer-events: none;
+    }
+    .login-wrap {
+      width: 100%;
+      max-width: 400px;
+      position: relative;
+      z-index: 1;
+    }
+    /* ロゴエリア */
+    .login-logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .logo-icon {
+      width: 56px; height: 56px;
+      background: #1a7a4a;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      color: #fff;
+      margin-bottom: 0.75rem;
+      box-shadow: 0 8px 24px rgba(26,122,74,.4);
+    }
+    .login-logo h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    .login-logo p {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,.45);
+      margin: 4px 0 0;
+    }
+    /* カード */
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 24px 64px rgba(0,0,0,.4);
+    }
+    .login-card .form-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.3rem;
+      letter-spacing: 0.01em;
+    }
+    .login-card .form-control {
+      font-family: 'Inter',sans-serif;
+      font-size: 0.875rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 0.55rem 0.85rem;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .login-card .form-control:focus {
+      border-color: #1a7a4a;
+      box-shadow: 0 0 0 3px rgba(26,122,74,.15);
+      outline: none;
+    }
+    .input-group-text {
+      background: #f9fafb;
+      border-color: #d1d5db;
+      border-radius: 8px 0 0 8px;
+      color: #9ca3af;
+    }
+    .input-group .form-control { border-radius: 0 8px 8px 0; }
+    .btn-login {
+      background: #1a7a4a;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Inter',sans-serif;
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.65rem;
+      color: #fff;
+      width: 100%;
+      transition: background .15s, box-shadow .15s;
+      cursor: pointer;
+    }
+    .btn-login:hover {
+      background: #145e38;
+      box-shadow: 0 4px 12px rgba(26,122,74,.35);
+    }
+    .alert-danger {
+      background: #fef2f2;
+      border: none;
+      border-left: 3px solid #ef4444;
+      border-radius: 8px;
+      color: #b91c1c;
+      font-size: 0.82rem;
+      padding: 0.65rem 0.85rem;
+    }
+    .login-footer {
+      text-align: center;
+      margin-top: 1.25rem;
+      font-size: 0.72rem;
+      color: rgba(255,255,255,.3);
+    }
   </style>
 </head>
 <body>
-<div class="login-card">
-  <div class="login-header text-white">
-    <div class="mb-3" style="font-size:3rem; opacity:.9">
-      <i class="fas fa-golf-ball"></i>
-    </div>
-    <h1 class="h4 fw-bold mb-1">ゴルフウィング</h1>
-    <p class="mb-0 opacity-75 small">発注管理システム</p>
+<div class="login-wrap">
+  <div class="login-logo">
+    <div class="logo-icon"><i class="fas fa-golf-ball"></i></div>
+    <h1>ゴルフウィング 発注管理</h1>
+    <p>Golf Wing Order Management</p>
   </div>
-  <div class="login-body">
+  <div class="login-card">
     ${error ? `
-    <div class="alert alert-danger py-2 small">
+    <div class="alert-danger mb-3">
       <i class="fas fa-exclamation-circle me-1"></i>
       ユーザー名またはパスワードが正しくありません
     </div>` : ''}
     <form method="POST" action="/login">
       <input type="hidden" name="next" value="${next}">
       <div class="mb-3">
-        <label class="form-label fw-semibold small text-muted">ユーザー名</label>
+        <label class="form-label">ユーザー名</label>
         <div class="input-group">
-          <span class="input-group-text"><i class="fas fa-user text-muted"></i></span>
+          <span class="input-group-text"><i class="fas fa-user"></i></span>
           <input type="text" class="form-control" name="username" autofocus autocomplete="username"
             placeholder="username" required>
         </div>
       </div>
       <div class="mb-4">
-        <label class="form-label fw-semibold small text-muted">パスワード</label>
+        <label class="form-label">パスワード</label>
         <div class="input-group">
-          <span class="input-group-text"><i class="fas fa-lock text-muted"></i></span>
+          <span class="input-group-text"><i class="fas fa-lock"></i></span>
           <input type="password" class="form-control" name="password" autocomplete="current-password"
             placeholder="••••••••" required>
         </div>
       </div>
-      <button type="submit" class="btn btn-login btn-primary w-100 text-white fw-semibold">
+      <button type="submit" class="btn-login">
         <i class="fas fa-sign-in-alt me-2"></i>ログイン
       </button>
     </form>
-    <p class="text-center text-muted small mt-3 mb-0">
-      <i class="fas fa-shield-alt me-1"></i>社内専用システム
-    </p>
   </div>
+  <p class="login-footer"><i class="fas fa-shield-alt me-1"></i>社内専用システム</p>
 </div>
 </body>
 </html>`
