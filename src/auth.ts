@@ -130,13 +130,14 @@ export function unauthorizedRedirect(path: string): Response {
 }
 
 // ── ログインページHTML ────────────────────────────────
-export function loginPage(error = false, next = '/'): Response {
+export function loginPage(error = false, next = '/', appName?: string): Response {
+  const sysName = appName || '発注管理システム'
   const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ログイン | ゴルフウィング 発注管理</title>
+  <title>ログイン | ${sysName}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -279,8 +280,8 @@ export function loginPage(error = false, next = '/'): Response {
 <div class="login-wrap">
   <div class="login-logo">
     <div class="logo-icon"><i class="fas fa-golf-ball"></i></div>
-    <h1>ゴルフウィング 発注管理</h1>
-    <p>Golf Wing Order Management</p>
+    <h1>${sysName}</h1>
+    <p>Order Management System</p>
   </div>
   <div class="login-card">
     ${error ? `

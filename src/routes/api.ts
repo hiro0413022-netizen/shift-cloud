@@ -1,12 +1,31 @@
 import { Hono } from 'hono'
 import { buildXlsx } from '../xlsxHelper'
 
-type Bindings = { DB: D1Database }
+type Bindings = {
+  DB: D1Database
+  APP_SENDER_NAME?: string
+  APP_SENDER_SHOP?: string
+  APP_SENDER_ADDR?: string
+  APP_SENDER_TEL?: string
+  APP_SENDER_MAIL?: string
+  APP_DEFAULT_CC?: string
+  DEMO_MODE?: string
+}
 const app = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================
 // ユーティリティ
 // ============================================================
+function senderInfoFromEnv(env: Bindings) {
+  return {
+    name: env.APP_SENDER_NAME,
+    shop: env.APP_SENDER_SHOP,
+    addr: env.APP_SENDER_ADDR,
+    tel:  env.APP_SENDER_TEL,
+    mail: env.APP_SENDER_MAIL,
+  }
+}
+
 function yen(v: unknown): string {
   if (v === null || v === undefined || v === '') return ''
   const n = parseFloat(String(v))
@@ -100,7 +119,10 @@ async function resolveSupplier(
 function composeMail(
   order: Record<string, unknown>,
   items: Record<string, unknown>[],
-  supplier: Record<string, unknown>
+  supplier: Record<string, unknown>,
+  senderInfo?: {
+    name?: string; shop?: string; addr?: string; tel?: string; mail?: string
+  }
 ): { subject: string; body: string } {
   const subject = `発注のお願い`
   const lines = items.map((item) => {
@@ -115,25 +137,29 @@ function composeMail(
   const contact   = (supplier['contact_name'] as string) || 'ご担当者'
   const orderNote = (order['order_note'] as string || '').trim()
 
+  const sn = senderInfo?.name || ''
+  const greeting = sn ? `お世話になっております。\n${sn}でございます。` : 'お世話になっております。'
+
+  const sigLines: string[] = []
+  if (senderInfo?.shop) sigLines.push(senderInfo.shop)
+  if (senderInfo?.addr) sigLines.push(senderInfo.addr)
+  if (senderInfo?.tel)  sigLines.push(`TEL：${senderInfo.tel}`)
+  if (senderInfo?.mail) sigLines.push(`mail：${senderInfo.mail}`)
+  const sig = sigLines.length
+    ? `---------------------------\n${sigLines.join('\n')}\n---------------------------`
+    : ''
+
   const body = `${supplier['name']}
 ${contact}${honorific}
 
-お世話になっております。
-ゴルフウィング宝塚店の古川でございます。
+${greeting}
 
 下記の通り、発注をお願いいたします。
 
 ${lines.join('\n')}
 ${orderNote ? `\n備考:\n${orderNote}\n` : ''}
 ご確認のほど、よろしくお願いいたします。
-
----------------------------
-GOLF WING 宝塚店
-〒665-0882
-兵庫県宝塚市山本南1-26-25
-TEL：0797-82-0833
-mail：takarazuka@golfwing.jp
----------------------------`
+${sig ? '\n' + sig : ''}`
   return { subject, body }
 }
 
@@ -542,7 +568,7 @@ app.post('/orders', async (c) => {
       if (supplier && order) {
         // DBへの再SELECTを避け、メモリ上の supplierLines を直接使用
         // （D1のread-after-write問題を回避しつつ全明細を確実に渡す）
-        const { subject, body } = composeMail(order, supplierLines as unknown as Record<string, unknown>[], supplier)
+        const { subject, body } = composeMail(order, supplierLines as unknown as Record<string, unknown>[], supplier, senderInfoFromEnv(c.env))
         await db
           .prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
           .bind(subject, body, orderId)
@@ -584,7 +610,7 @@ app.post('/orders/:id/regenerate-mail', async (c) => {
     'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
   ).bind(id).all<Record<string, unknown>>()
 
-  const { subject, body } = composeMail(order, items.results, supplier)
+  const { subject, body } = composeMail(order, items.results, supplier, senderInfoFromEnv(c.env))
   await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
     .bind(subject, body, id).run()
 
@@ -679,7 +705,7 @@ app.post('/orders/:id/items', async (c) => {
   const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
     .bind(order['supplier_id']).first<Record<string, unknown>>()
   if (supplier) {
-    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier)
+    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
     await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
       .bind(subject, mailBody, orderId).run()
   }
@@ -758,7 +784,7 @@ app.put('/items/:poi_id', async (c) => {
     db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(orderId).all<Record<string,unknown>>(),
   ])
   if (order && supplier) {
-    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier)
+    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
     await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
       .bind(subject, mailBody, orderId).run()
   }
@@ -802,7 +828,7 @@ app.delete('/items/:poi_id', async (c) => {
     db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(orderId).all<Record<string,unknown>>(),
   ])
   if (order && supplier && allItems.results.length > 0) {
-    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier)
+    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
     await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
       .bind(subject, mailBody, orderId).run()
   }
@@ -893,7 +919,7 @@ app.post('/pool/execute', async (c) => {
       .bind(order?.['supplier_id']).first<Record<string, unknown>>()
 
     if (order && supplier) {
-      const { subject, body: emailBody } = composeMail(order, items.results, supplier)
+      const { subject, body: emailBody } = composeMail(order, items.results, supplier, senderInfoFromEnv(c.env))
       await db.prepare(
         'UPDATE purchase_orders SET status=?, email_subject=?, email_body=? WHERE id=?'
       ).bind('draft_created', subject, emailBody, id).run()
@@ -1858,7 +1884,7 @@ app.post('/orders/:id/copy', async (c) => {
   const newOrder = await db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(newOrderId).first<Record<string,unknown>>()
   const newItems = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(newOrderId).all<Record<string,unknown>>()
   if (supplier && newOrder) {
-    const { subject, body } = composeMail(newOrder, newItems.results, supplier)
+    const { subject, body } = composeMail(newOrder, newItems.results, supplier, senderInfoFromEnv(c.env))
     await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?').bind(subject, body, newOrderId).run()
   }
 
@@ -1916,7 +1942,7 @@ app.put('/orders/:id/header', async (c) => {
   ).bind(id).all<Record<string, unknown>>()
 
   if (updatedOrder && supplier && items.results.length > 0) {
-    const { subject, body: mailBody } = composeMail(updatedOrder, items.results, supplier)
+    const { subject, body: mailBody } = composeMail(updatedOrder, items.results, supplier, senderInfoFromEnv(c.env))
     await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
       .bind(subject, mailBody, id).run()
   }

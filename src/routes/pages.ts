@@ -1,6 +1,16 @@
 import { Hono } from 'hono'
 
-type Bindings = { DB: D1Database }
+type Bindings = {
+  DB: D1Database
+  APP_NAME?: string
+  APP_SENDER_NAME?: string
+  APP_SENDER_SHOP?: string
+  APP_SENDER_ADDR?: string
+  APP_SENDER_TEL?: string
+  APP_SENDER_MAIL?: string
+  APP_DEFAULT_CC?: string
+  DEMO_MODE?: string
+}
 const app = new Hono<{ Bindings: Bindings }>()
 
 // ============================================================
@@ -40,26 +50,65 @@ function esc(s: unknown): string {
 }
 
 // ============================================================
+// 環境変数ヘルパー（各ルートで使い回す）
+// ============================================================
+function getLayoutOpts(c: { env: Bindings; get: (k: string) => unknown }): {
+  appName: string
+  isDemo: boolean
+  username: string
+} {
+  return {
+    appName:  c.env.APP_NAME  || '発注管理システム',
+    isDemo:   c.env.DEMO_MODE === '1',
+    username: (c.get('username' as never) as string) || '',
+  }
+}
+
+// ============================================================
 // 共通レイアウト
 // ============================================================
-function layout(title: string, content: string, extraScripts = '', username = ''): Response {
+function layout(
+  title: string,
+  content: string,
+  extraScripts = '',
+  username = '',
+  opts: { appName?: string; isDemo?: boolean } = {}
+): Response {
+  const appName = opts.appName || '発注管理システム'
+  const isDemo  = opts.isDemo  ?? false
+
+  const demoBanner = isDemo ? `
+<div id="demo-banner" style="
+  background: linear-gradient(90deg,#7c3aed,#4f46e5);
+  color:#fff;padding:8px 16px;font-size:0.8rem;font-weight:600;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:8px;position:sticky;top:0;z-index:2000;
+">
+  <span><i class="fas fa-flask me-2"></i>デモモード — データは定期的にリセットされます。書き込み操作は無効です。</span>
+  <a href="https://golfwing-order.pages.dev" target="_blank"
+     style="color:#fff;background:rgba(255,255,255,.2);padding:3px 10px;border-radius:6px;font-size:0.75rem;white-space:nowrap">
+    <i class="fas fa-shopping-cart me-1"></i>導入のお問い合わせ
+  </a>
+</div>` : ''
+
   const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title} | ゴルフウィング 発注管理</title>
+  <title>${title} | ${appName}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <link href="/static/style.css" rel="stylesheet">
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
 </head>
-<body>
+<body${isDemo ? ' class="is-demo"' : ''}>
+${demoBanner}
 <nav class="navbar navbar-expand-lg sticky-top">
   <div class="container-fluid px-3">
     <a class="navbar-brand" href="/">
       <span class="brand-icon"><i class="fas fa-golf-ball"></i></span>
-      ゴルフウィング 発注管理
+      ${appName}
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
       <span class="navbar-toggler-icon"></span>
@@ -390,7 +439,8 @@ app.get('/', async (c) => {
     </table>
   </div>
 </div>${dashScript}`
-  return layout('ダッシュボード', content)
+  const o0 = getLayoutOpts(c)
+  return layout('ダッシュボード', content, '', o0.username, o0)
 })
 
 // ============================================================
@@ -1029,7 +1079,8 @@ ${buildPager()}
     </div>
   </div>
 </div>`
-  return layout('商品マスタ', content, scripts)
+  const o1 = getLayoutOpts(c)
+  return layout('商品マスタ', content, scripts, o1.username, o1)
 })
 
 // ============================================================
@@ -1277,7 +1328,8 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
     </div>
   </div>
 </div>`
-  return layout('仕入先マスタ', content, scripts)
+  const o2 = getLayoutOpts(c)
+  return layout('仕入先マスタ', content, scripts, o2.username, o2)
 })
 
 // ============================================================
@@ -1446,7 +1498,8 @@ document.getElementById('ruleForm').addEventListener('submit',async function(e){
     </div>
   </div>
 </div>`
-  return layout('判定ルール', content, scripts)
+  const o3 = getLayoutOpts(c)
+  return layout('判定ルール', content, scripts, o3.username, o3)
 })
 
 // ============================================================
@@ -1688,7 +1741,8 @@ ${groupsHtml}
 })();
 </script>`
 
-  return layout('発注プール', content, scripts)
+  const o4 = getLayoutOpts(c)
+  return layout('発注プール', content, scripts, o4.username, o4)
 })
 
 // ============================================================
@@ -1808,7 +1862,8 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
   </div>
   <div class="card-footer text-muted small">${res.results.length}件</div>
 </div>`
-  return layout('発注一覧', content, listScript)
+  const o5 = getLayoutOpts(c)
+  return layout('発注一覧', content, listScript, o5.username, o5)
 })
 
 // ============================================================
@@ -1955,7 +2010,8 @@ ${modalHtml}
   // Bootstrap JS より後に読み込む必要があるため extraScripts として渡す
   const newOrderScripts = `<script src="/static/new-order.js"></script>`
 
-  return layout('新規発注', content, newOrderScripts)
+  const o6 = getLayoutOpts(c)
+  return layout('新規発注', content, newOrderScripts, o6.username, o6)
 })
 
 // ============================================================
@@ -1964,7 +2020,7 @@ ${modalHtml}
 app.get('/mail-batch/:batch_code', async (c) => {
   const db = c.env.DB
   const batchCode = c.req.param('batch_code')
-  const BATCH_DEFAULT_CC = 'h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idono@golfwing.jp;u_ogawa@golfwing.jp;a_tanigawa@golfwing.jp'
+  const BATCH_DEFAULT_CC = c.env.APP_DEFAULT_CC || ''
 
   const orders = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
@@ -1999,6 +2055,13 @@ app.get('/mail-batch/:batch_code', async (c) => {
     groupMap.get(email)!.orders.push({ order, items: items.results })
   }
 
+  // メール署名情報（環境変数 → フォールバック）
+  const senderName = c.env.APP_SENDER_NAME || ''
+  const senderShop = c.env.APP_SENDER_SHOP || ''
+  const senderAddr = c.env.APP_SENDER_ADDR || ''
+  const senderTel  = c.env.APP_SENDER_TEL  || ''
+  const senderMail = c.env.APP_SENDER_MAIL || ''
+
   // pages.ts 内でメール本文を組み立てるユーティリティ（api.ts の composeMail と同等）
   function buildMailBody(
     supplierName: string,
@@ -2015,25 +2078,26 @@ app.get('/mail-batch/:batch_code', async (c) => {
       return `・${item['item_category']} / ${item['manufacturer'] || ''} / ${item['product_name']}${spec}${color}${clubType} / ${item['quantity']}${unit}`
     })
     const noteBlock = orderNote.trim() ? `\n備考:\n${orderNote.trim()}\n` : ''
+    const greeting = senderName ? `お世話になっております。\n${senderName}でございます。` : 'お世話になっております。'
+    const sigLines: string[] = []
+    if (senderShop) sigLines.push(senderShop)
+    if (senderAddr) sigLines.push(senderAddr)
+    if (senderTel)  sigLines.push(`TEL：${senderTel}`)
+    if (senderMail) sigLines.push(`mail：${senderMail}`)
+    const sig = sigLines.length
+      ? `---------------------------\n${sigLines.join('\n')}\n---------------------------`
+      : ''
     return `${supplierName}
 ${contactName}${honorific}
 
-お世話になっております。
-ゴルフウィング宝塚店の古川でございます。
+${greeting}
 
 下記の通り、発注をお願いいたします。
 
 ${lines.join('\n')}
 ${noteBlock}
 ご確認のほど、よろしくお願いいたします。
-
----------------------------
-GOLF WING 宝塚店
-〒665-0882
-兵庫県宝塚市山本南1-26-25
-TEL：0797-82-0833
-mail：takarazuka@golfwing.jp
----------------------------`
+${sig ? '\n' + sig : ''}`
   }
 
   const cards: string[] = []
@@ -2241,7 +2305,8 @@ document.querySelectorAll('.btn-mark-ordered').forEach(function(btn){
   </div>
 </div>
 ${cards.length ? cards.join('') : '<div class="alert alert-warning">該当するメール下書きがありません。</div>'}`
-  return layout('メール下書き', content, scripts)
+  const o7 = getLayoutOpts(c)
+  return layout('メール下書き', content, scripts, o7.username, o7)
 })
 
 // ============================================================
@@ -2250,14 +2315,14 @@ ${cards.length ? cards.join('') : '<div class="alert alert-warning">該当する
 app.get('/orders/:id/edit', async (c) => {
   const db  = c.env.DB
   const id  = parseInt(c.req.param('id'))
-  if (isNaN(id)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>')
+  if (isNaN(id)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name
     FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id
     WHERE po.id=?
   `).bind(id).first<Record<string,unknown>>()
-  if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>')
+  if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const scripts = `<script>
 (function(){
@@ -2368,7 +2433,8 @@ app.get('/orders/:id/edit', async (c) => {
   </div>
 </form>`
 
-  return layout(`発注情報編集 ${esc(order['order_no'])}`, content, scripts)
+  const o8 = getLayoutOpts(c)
+  return layout(`発注情報編集 ${esc(order['order_no'])}`, content, scripts, o8.username, o8)
 })
 
 // ============================================================
@@ -2377,7 +2443,7 @@ app.get('/orders/:id/edit', async (c) => {
 app.get('/orders/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  if (isNaN(id)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>')
+  if (isNaN(id)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
@@ -2386,7 +2452,7 @@ app.get('/orders/:id', async (c) => {
            s.notes AS supplier_notes, s.shipping_rule AS supplier_shipping_rule
     FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?
   `).bind(id).first<Record<string,unknown>>()
-  if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>')
+  if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const curStatus = String(order['status'] ?? '')
   const isEditable = curStatus === 'draft_created' || curStatus === 'pool'
@@ -2494,7 +2560,7 @@ app.get('/orders/:id', async (c) => {
 </div>`
 
   // メールパネル
-  const DEFAULT_CC = 'h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idono@golfwing.jp;u_ogawa@golfwing.jp;a_tanigawa@golfwing.jp'
+  const DEFAULT_CC = c.env.APP_DEFAULT_CC || ''
   const mailtoWithCC = supplierEmail
     ? `mailto:${esc(supplierEmail)}?cc=${encodeURIComponent(DEFAULT_CC)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
     : ''
@@ -3478,7 +3544,8 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
     </table>
   </div>
 </div>`
-  return layout(`発注詳細 ${esc(order['order_no'])}`, dataScript + addItemModalHtml + editItemModalHtml + content, scripts)
+  const o9 = getLayoutOpts(c)
+  return layout(`発注詳細 ${esc(order['order_no'])}`, dataScript + addItemModalHtml + editItemModalHtml + content, scripts, o9.username, o9)
 })
 
 // ============================================================
@@ -3634,7 +3701,8 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
     </table>
   </div>
 </div>`
-  return layout('納品履歴', content)
+  const o10 = getLayoutOpts(c)
+  return layout('納品履歴', content, '', o10.username, o10)
 })
 
 // ============================================================
@@ -3643,13 +3711,13 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
 app.get('/receipts/new/:order_id', async (c) => {
   const db = c.env.DB
   const orderId = parseInt(c.req.param('order_id'))
-  if (isNaN(orderId)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>')
+  if (isNaN(orderId)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?
   `).bind(orderId).first<Record<string,unknown>>()
-  if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>')
+  if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const items = await db.prepare(`
     SELECT poi.*,
@@ -3744,7 +3812,8 @@ document.getElementById('receipt-form').addEventListener('submit', async functio
     </div>
   </div>
 </form>`
-  return layout('納品登録', content, scripts)
+  const o11 = getLayoutOpts(c)
+  return layout('納品登録', content, scripts, o11.username, o11)
 })
 
 // ============================================================
@@ -3933,7 +4002,8 @@ document.addEventListener('DOMContentLoaded', function(){
     <button type="submit" class="btn btn-success btn-lg px-4"><i class="fas fa-save me-1"></i>納品登録を保存</button>
   </div>
 </form>`
-  return layout('システム外発注の納品登録', content, scripts)
+  const o12 = getLayoutOpts(c)
+  return layout('システム外発注の納品登録', content, scripts, o12.username, o12)
 })
 
 // ============================================================
@@ -4088,7 +4158,8 @@ document.getElementById('new-product-form').addEventListener('submit', async fun
     </div>
   </div>
 </form>`
-  return layout('商品新規登録', content, scripts)
+  const o13 = getLayoutOpts(c)
+  return layout('商品新規登録', content, scripts, o13.username, o13)
 })
 
 // ============================================================
@@ -4098,7 +4169,7 @@ document.getElementById('new-product-form').addEventListener('submit', async fun
 app.get('/receipts/:id/edit', async (c) => {
   const db  = c.env.DB
   const rid = parseInt(c.req.param('id'))
-  if (isNaN(rid)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>')
+  if (isNaN(rid)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
   // ヘッダーと明細を並列取得
   const [receipt, itemsRes] = await Promise.all([
@@ -4122,7 +4193,7 @@ app.get('/receipts/:id/edit', async (c) => {
       ORDER BY ri.id
     `).bind(rid).all<Record<string,unknown>>()
   ])
-  if (!receipt) return layout('エラー', '<div class="alert alert-danger">納品データが見つかりません。</div>')
+  if (!receipt) return layout('エラー', '<div class="alert alert-danger">納品データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const isFreeReceipt = !receipt['purchase_order_id']
 
@@ -4260,7 +4331,8 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
     <button type="submit" class="btn btn-primary btn-lg px-4"><i class="fas fa-save me-1"></i>変更を保存</button>
   </div>
 </form>`
-  return layout('納品履歴編集', content, scripts)
+  const o14 = getLayoutOpts(c)
+  return layout('納品履歴編集', content, scripts, o14.username, o14)
 })
 
 // ============================================================
@@ -4328,7 +4400,8 @@ app.get('/backorders', async (c) => {
   </div>
   <div class="card-footer text-muted small">${res.results.length}件の残注明細</div>
 </div>`
-  return layout('残注一覧', content)
+  const o15 = getLayoutOpts(c)
+  return layout('残注一覧', content, '', o15.username, o15)
 })
 
 // ============================================================
@@ -4569,7 +4642,8 @@ function showRestoreResult(ok, result) {
 }
 </script>`
 
-  return layout('バックアップ管理', content, scripts)
+  const o16 = getLayoutOpts(c)
+  return layout('バックアップ管理', content, scripts, o16.username, o16)
 })
 
 export { app as pageRoutes }
