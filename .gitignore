@@ -31,3 +31,7 @@ lerna-debug.log*
 
 # misc
 .DS_Store
+
+# local dev files
+seed_suppliers_local.sql
+*.bak

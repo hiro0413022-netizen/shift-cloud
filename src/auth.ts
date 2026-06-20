@@ -1,22 +1,32 @@
 // ============================================================
-// 認証モジュール
+// 認証モジュール（マルチテナント対応版）
 // Cookie に HMAC-SHA256 署名付きトークンを保存する方式
 // Workers の Web Crypto API を使用（Node.js crypto不要）
+//
+// テナント管理:
+//   tenant_id=0 → デモテナント（DEMO_MODE的な扱い、書き込み禁止）
+//   tenant_id=1 → ゴルフウィング（既存）
+//   tenant_id=N → 販売先テナント
 // ============================================================
 
 export type AuthBindings = {
   DB: D1Database
-  AUTH_SECRET?: string      // wrangler secret / .dev.vars で設定
-  AUTH_USERNAME?: string    // 省略時: admin
-  AUTH_PASSWORD?: string    // 省略時: golfwing2024
+  AUTH_SECRET?: string
+  AUTH_USERNAME?: string   // 後方互換（未設定時はDBを使用）
+  AUTH_PASSWORD?: string   // 後方互換（未設定時はDBを使用）
+  APP_NAME?: string
 }
 
-const COOKIE_NAME = 'gw_session'
-const SESSION_TTL = 60 * 60 * 24 * 7  // 7日（秒）
+export type SessionUser = {
+  username:    string
+  tenantId:    number
+  displayName: string
+  isDemo:      boolean   // tenant_id===0
+  isAdmin:     boolean
+}
 
-// デフォルト認証情報（本番では必ず環境変数で上書き）
-const DEFAULT_USER = 'admin'
-const DEFAULT_PASS = 'golfwing2024'
+const COOKIE_NAME  = 'gw_session'
+const SESSION_TTL  = 60 * 60 * 24 * 7  // 7日（秒）
 const DEFAULT_SECRET = 'golfwing-secret-key-change-in-production'
 
 // ── HMAC 署名 ────────────────────────────────────────────
@@ -32,7 +42,6 @@ async function sign(payload: string, secret: string): Promise<string> {
 
 async function verify(payload: string, signature: string, secret: string): Promise<boolean> {
   const expected = await sign(payload, secret)
-  // タイミング攻撃対策の定数時間比較
   if (expected.length !== signature.length) return false
   let diff = 0
   for (let i = 0; i < expected.length; i++) {
@@ -42,24 +51,35 @@ async function verify(payload: string, signature: string, secret: string): Promi
 }
 
 // ── トークン生成・検証 ─────────────────────────────────
-export async function createToken(username: string, secret: string): Promise<string> {
+// payload: "username:tenantId:expires"
+export async function createToken(
+  username: string,
+  tenantId: number,
+  secret: string
+): Promise<string> {
   const expires = Math.floor(Date.now() / 1000) + SESSION_TTL
-  const payload = `${username}:${expires}`
+  const payload = `${username}:${tenantId}:${expires}`
   const sig = await sign(payload, secret)
   return `${payload}:${sig}`
 }
 
-export async function verifyToken(token: string, secret: string): Promise<string | null> {
+export async function verifyToken(
+  token: string,
+  secret: string
+): Promise<{ username: string; tenantId: number } | null> {
   if (!token) return null
   const parts = token.split(':')
-  if (parts.length < 3) return null
+  // 形式: username:tenantId:expires:sig  (sigはbase64urlで':'を含まない)
+  if (parts.length < 4) return null
   const username = parts[0]
-  const expires = parseInt(parts[1])
-  const sig = parts.slice(2).join(':')
-  if (isNaN(expires) || Date.now() / 1000 > expires) return null
-  const payload = `${username}:${expires}`
+  const tenantId = parseInt(parts[1])
+  const expires  = parseInt(parts[2])
+  const sig      = parts.slice(3).join(':')
+  if (isNaN(tenantId) || isNaN(expires)) return null
+  if (Date.now() / 1000 > expires) return null
+  const payload = `${username}:${tenantId}:${expires}`
   const ok = await verify(payload, sig, secret)
-  return ok ? username : null
+  return ok ? { username, tenantId } : null
 }
 
 // ── Cookie パース ──────────────────────────────────────
@@ -71,45 +91,102 @@ export function parseCookie(header: string | null): Record<string, string> {
   )
 }
 
-// ── 現在ユーザー取得（認証済みなら username を返す）──
+// ── 現在ユーザー取得（DBからセッション情報を復元）──────
 export async function getCurrentUser(
   req: Request,
+  db: D1Database,
   secret: string
-): Promise<string | null> {
+): Promise<SessionUser | null> {
   const cookies = parseCookie(req.headers.get('Cookie'))
   const token = cookies[COOKIE_NAME]
   if (!token) return null
-  return verifyToken(token, secret)
+
+  const result = await verifyToken(token, secret)
+  if (!result) return null
+
+  const { username, tenantId } = result
+
+  // デモセッション（tenant_id=0）は DB 照会不要で復元
+  if (tenantId === 0) {
+    return {
+      username,
+      tenantId:    0,
+      displayName: 'デモユーザー',
+      isDemo:      true,
+      isAdmin:     false,
+    }
+  }
+
+  // テナント情報をDBから取得
+  const user = await db.prepare(
+    'SELECT u.*, t.is_demo FROM users u JOIN tenants t ON t.id=u.tenant_id WHERE u.username=? AND u.tenant_id=?'
+  ).bind(username, tenantId).first<{
+    id: number; tenant_id: number; username: string;
+    display_name: string; is_admin: number; is_demo: number
+  }>()
+
+  if (!user) return null
+
+  return {
+    username:    user.username,
+    tenantId:    user.tenant_id,
+    displayName: user.display_name || user.username,
+    isDemo:      user.is_demo === 1,
+    isAdmin:     user.is_admin === 1,
+  }
 }
 
-// ── ログイン処理 ──────────────────────────────────────
+// ── ログイン処理（DBベース + 後方互換）─────────────────
 export async function attemptLogin(
   username: string,
   password: string,
   env: AuthBindings
 ): Promise<Response | null> {
-  const validUser = env.AUTH_USERNAME || DEFAULT_USER
-  const validPass = env.AUTH_PASSWORD || DEFAULT_PASS
-  const secret    = env.AUTH_SECRET   || DEFAULT_SECRET
+  const secret = env.AUTH_SECRET || DEFAULT_SECRET
 
-  // 定数時間比較（タイミング攻撃対策）
-  const userMatch = username === validUser
-  const passMatch = password === validPass
-  if (!userMatch || !passMatch) return null
+  // ① DB の users テーブルで認証（マルチテナント対応）
+  if (env.DB) {
+    const userRow = await env.DB.prepare(
+      'SELECT u.*, t.is_demo FROM users u JOIN tenants t ON t.id=u.tenant_id WHERE u.username=? AND u.password=?'
+    ).bind(username, password).first<{
+      id: number; tenant_id: number; username: string;
+      display_name: string; is_admin: number; is_demo: number
+    }>()
 
-  const token = await createToken(username, secret)
-  const cookie = [
+    if (userRow) {
+      const token  = await createToken(userRow.username, userRow.tenant_id, secret)
+      const cookie = makeCookie(token)
+      return new Response(null, {
+        status: 302,
+        headers: { 'Location': '/', 'Set-Cookie': cookie }
+      })
+    }
+  }
+
+  // ② 後方互換: 環境変数での認証（DBにユーザーが見つからない場合）
+  const validUser = env.AUTH_USERNAME || 'admin'
+  const validPass = env.AUTH_PASSWORD || 'golfwing2024'
+  if (username === validUser && password === validPass) {
+    // 環境変数ユーザーは tenant_id=1 として扱う
+    const token  = await createToken(username, 1, secret)
+    const cookie = makeCookie(token)
+    return new Response(null, {
+      status: 302,
+      headers: { 'Location': '/', 'Set-Cookie': cookie }
+    })
+  }
+
+  return null
+}
+
+function makeCookie(token: string): string {
+  return [
     `${COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     `Max-Age=${SESSION_TTL}`,
     'HttpOnly',
     'SameSite=Strict',
   ].join('; ')
-
-  return new Response(null, {
-    status: 302,
-    headers: { 'Location': '/', 'Set-Cookie': cookie }
-  })
 }
 
 // ── ログアウト（Cookie削除）──────────────────────────
@@ -154,7 +231,6 @@ export function loginPage(error = false, next = '/', appName?: string): Response
       position: relative;
       overflow: hidden;
     }
-    /* 背景装飾 */
     body::before {
       content: '';
       position: fixed;
@@ -179,7 +255,6 @@ export function loginPage(error = false, next = '/', appName?: string): Response
       position: relative;
       z-index: 1;
     }
-    /* ロゴエリア */
     .login-logo {
       text-align: center;
       margin-bottom: 2rem;
@@ -208,7 +283,6 @@ export function loginPage(error = false, next = '/', appName?: string): Response
       color: rgba(255,255,255,.45);
       margin: 4px 0 0;
     }
-    /* カード */
     .login-card {
       background: #fff;
       border-radius: 16px;
@@ -258,6 +332,41 @@ export function loginPage(error = false, next = '/', appName?: string): Response
     .btn-login:hover {
       background: #145e38;
       box-shadow: 0 4px 12px rgba(26,122,74,.35);
+    }
+    .btn-demo {
+      display: block;
+      width: 100%;
+      padding: 0.6rem;
+      border-radius: 8px;
+      border: 2px solid #7c3aed;
+      background: transparent;
+      color: #7c3aed;
+      font-family: 'Inter',sans-serif;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-align: center;
+      text-decoration: none;
+      transition: background .15s, color .15s;
+      cursor: pointer;
+    }
+    .btn-demo:hover {
+      background: #7c3aed;
+      color: #fff;
+    }
+    .demo-divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 1.25rem 0;
+      color: #9ca3af;
+      font-size: 0.75rem;
+    }
+    .demo-divider::before,
+    .demo-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e5e7eb;
     }
     .alert-danger {
       background: #fef2f2;
@@ -311,6 +420,12 @@ export function loginPage(error = false, next = '/', appName?: string): Response
         <i class="fas fa-sign-in-alt me-2"></i>ログイン
       </button>
     </form>
+
+    <div class="demo-divider">または</div>
+
+    <a href="/demo-login" class="btn-demo">
+      <i class="fas fa-flask me-2"></i>デモを試す（登録不要）
+    </a>
   </div>
   <p class="login-footer"><i class="fas fa-shield-alt me-1"></i>社内専用システム</p>
 </div>

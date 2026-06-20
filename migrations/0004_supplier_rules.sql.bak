@@ -3,8 +3,6 @@
 -- 既存データを全削除してから再投入
 -- 実行日: 2026-05-09
 
-PRAGMA foreign_keys = OFF;
-
 DELETE FROM supplier_rules;
 
 -- ============================================================
@@ -312,5 +310,3 @@ INSERT INTO supplier_rules (item_category, manufacturer, club_type, supplier_id,
 
 -- 結果確認
 SELECT COUNT(*) AS total_rules FROM supplier_rules;
-
-PRAGMA foreign_keys = ON;

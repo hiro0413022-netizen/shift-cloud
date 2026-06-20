@@ -5,6 +5,8 @@
 -- ワークス supplier_id = 7
 -- ============================================================
 
+PRAGMA foreign_keys = OFF;
+
 -- ① フジクラ → ワークス に変更（全種類）
 DELETE FROM supplier_rules WHERE manufacturer = 'フジクラ';
 INSERT INTO supplier_rules (item_category, manufacturer, club_type, supplier_id, rate, priority, notes) VALUES
@@ -114,3 +116,5 @@ INSERT INTO supplier_rules (item_category, manufacturer, club_type, supplier_id,
 ('シャフト', 'グラビティー（Waccine Compo）', 'FW',   7, NULL, 10, 'グラビティー FW → ワークス'),
 ('シャフト', 'グラビティー（Waccine Compo）', 'UT',   7, NULL, 10, 'グラビティー UT → ワークス'),
 ('シャフト', 'グラビティー（Waccine Compo）', 'IRON', 7, NULL, 10, 'グラビティー IR → ワークス');
+
+PRAGMA foreign_keys = ON;

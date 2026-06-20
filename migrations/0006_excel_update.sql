@@ -3,6 +3,8 @@
 -- 2026-05-22
 -- ============================================================
 
+PRAGMA foreign_keys = OFF;
+
 -- ① suppliers の notes / shipping_rule を更新（備考欄）
 UPDATE suppliers SET
   notes = '2万5千円以内は送料別途',
@@ -140,3 +142,4 @@ SELECT 'グリップ', 'エリート', NULL,
   NULL, 10, 'エリート → エリートグリップ'
 WHERE NOT EXISTS (SELECT 1 FROM supplier_rules WHERE manufacturer='エリート');
 
+PRAGMA foreign_keys = ON;

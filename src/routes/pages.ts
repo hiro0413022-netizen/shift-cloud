@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import type { SessionUser } from '../auth'
 
 type Bindings = {
   DB: D1Database
@@ -11,7 +12,8 @@ type Bindings = {
   APP_DEFAULT_CC?: string
   DEMO_MODE?: string
 }
-const app = new Hono<{ Bindings: Bindings }>()
+type Variables = { sessionUser: SessionUser }
+const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
 // ============================================================
 // ユーティリティ
@@ -50,17 +52,31 @@ function esc(s: unknown): string {
 }
 
 // ============================================================
-// 環境変数ヘルパー（各ルートで使い回す）
+// セッション・レイアウトヘルパー（各ルートで使い回す）
 // ============================================================
-function getLayoutOpts(c: { env: Bindings; get: (k: string) => unknown }): {
+type LayoutCtx = { env: Bindings; get: (k: 'sessionUser') => SessionUser | undefined }
+
+function getSession(c: LayoutCtx): SessionUser {
+  return c.get('sessionUser') ?? {
+    username: 'unknown', tenantId: 1,
+    displayName: '', isDemo: false, isAdmin: false
+  }
+}
+
+function getLayoutOpts(c: LayoutCtx): {
   appName: string
   isDemo: boolean
   username: string
+  tenantId: number
 } {
+  const su = getSession(c)
+  // デモテナント(0) または 強制DEMOモード
+  const isDemo = su.isDemo || c.env.DEMO_MODE === '1'
   return {
-    appName:  c.env.APP_NAME  || '発注管理システム',
-    isDemo:   c.env.DEMO_MODE === '1',
-    username: (c.get('username' as never) as string) || '',
+    appName:  c.env.APP_NAME || '発注管理システム',
+    isDemo,
+    username: su.displayName || su.username,
+    tenantId: su.tenantId,
   }
 }
 
@@ -177,16 +193,19 @@ ${extraScripts}
 // ============================================================
 app.get('/', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const [p, s, o, b] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders WHERE tenant_id=?').bind(tenantId).first<{c:number}>(),
     db.prepare(`SELECT COUNT(*) AS c FROM (
       SELECT poi.id FROM purchase_order_items poi
+      JOIN purchase_orders po ON po.id=poi.purchase_order_id
       LEFT JOIN receipt_items ri ON ri.purchase_order_item_id=poi.id
+      WHERE po.tenant_id=?
       GROUP BY poi.id, poi.quantity
       HAVING COALESCE(SUM(ri.received_quantity),0) < poi.quantity
-    )`).first<{c:number}>(),
+    )`).bind(tenantId).first<{c:number}>(),
   ])
 
   // 検品待ち明細（ordered/partial かつ inspected=0）
@@ -210,11 +229,12 @@ app.get('/', async (c) => {
     FROM purchase_order_items poi
     JOIN purchase_orders po ON po.id = poi.purchase_order_id
     JOIN suppliers s ON s.id = po.supplier_id
-    WHERE po.status IN ('ordered','partial')
+    WHERE po.tenant_id=?
+      AND po.status IN ('ordered','partial')
       AND poi.inspected = 0
     ORDER BY po.order_date ASC, po.id ASC, poi.id ASC
     LIMIT 200
-  `).all<Record<string,unknown>>()
+  `).bind(tenantId).all<Record<string,unknown>>()
 
   const inspectCount = pendingInspect.results.length
 
@@ -288,8 +308,9 @@ app.get('/', async (c) => {
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id=s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
+    WHERE po.tenant_id=?
     GROUP BY po.id ORDER BY po.id DESC LIMIT 10
-  `).all<Record<string,unknown>>()
+  `).bind(tenantId).all<Record<string,unknown>>()
 
   const rows = recent.results.map(r => `<tr>
     <td><a href="/orders/${r['id']}">${esc(r['order_no'])}</a></td>
@@ -475,9 +496,11 @@ app.get('/products', async (c) => {
   const PAGE_SIZE = 100
   const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1)
 
+  const { tenantId } = getLayoutOpts(c)
+
   // WHERE句を共通化（廃盤タブで切り替え）
-  let whereSql = isDiscontinued ? 'WHERE p.is_active=0' : 'WHERE p.is_active=1'
-  const whereParams: unknown[] = []
+  let whereSql = isDiscontinued ? 'WHERE p.is_active=0 AND p.tenant_id=?' : 'WHERE p.is_active=1 AND p.tenant_id=?'
+  const whereParams: unknown[] = [tenantId]
   if (cat) { whereSql += ' AND p.item_category=?'; whereParams.push(cat) }
   if (q) {
     whereSql += ' AND (p.name LIKE ? OR p.manufacturer LIKE ? OR p.barcode LIKE ? OR p.item_category LIKE ? OR p.club_type LIKE ? OR p.spec LIKE ?)'
@@ -487,9 +510,7 @@ app.get('/products', async (c) => {
 
   // 総件数取得
   const countSql = `SELECT COUNT(*) AS c FROM products p ${whereSql}`
-  const countRes = whereParams.length
-    ? await db.prepare(countSql).bind(...whereParams).first<{ c: number }>()
-    : await db.prepare(countSql).first<{ c: number }>()
+  const countRes = await db.prepare(countSql).bind(...whereParams).first<{ c: number }>()
   const totalCount = countRes?.c ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
@@ -509,8 +530,8 @@ app.get('/products', async (c) => {
 
   // カテゴリ一覧（現在のタブに合わせて取得）・仕入先一覧を並列取得
   const [cats, suppliers] = await Promise.all([
-    db.prepare(`SELECT DISTINCT item_category FROM products WHERE is_active=${isDiscontinued ? 0 : 1} ORDER BY item_category`).all<{item_category:string}>(),
-    db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+    db.prepare(`SELECT DISTINCT item_category FROM products WHERE is_active=${isDiscontinued ? 0 : 1} AND tenant_id=? ORDER BY item_category`).bind(tenantId).all<{item_category:string}>(),
+    db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name').bind(tenantId).all<Record<string,unknown>>()
   ])
   const supplierOpts = suppliers.results.map(s => `<option value="${s['id']}">${esc(s['name'])}</option>`).join('')
   const catOpts = cats.results.map(c2 => `<option value="${esc(c2.item_category)}">${esc(c2.item_category)}</option>`).join('')
@@ -1088,7 +1109,8 @@ ${buildPager()}
 // ============================================================
 app.get('/suppliers', async (c) => {
   const db = c.env.DB
-  const res = await db.prepare('SELECT * FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  const { tenantId } = getLayoutOpts(c)
+  const res = await db.prepare('SELECT * FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name').bind(tenantId).all<Record<string,unknown>>()
 
   // 発注方法バッジ
   function omBadge(m: unknown, detail: unknown): string {
@@ -1337,16 +1359,18 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
 // ============================================================
 app.get('/rules', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const res = await db.prepare(`
     SELECT sr.*, s.name AS supplier_name FROM supplier_rules sr
     JOIN suppliers s ON sr.supplier_id=s.id
+    WHERE sr.tenant_id=?
     ORDER BY sr.item_category, sr.manufacturer, sr.club_type, sr.priority
-  `).all<Record<string,unknown>>()
+  `).bind(tenantId).all<Record<string,unknown>>()
 
-  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name').bind(tenantId).all<Record<string,unknown>>()
   const supplierOpts = suppliers.results.map(s => `<option value="${s['id']}">${esc(s['name'])}</option>`).join('')
 
-  const cats = await db.prepare('SELECT DISTINCT item_category FROM products WHERE is_active=1 ORDER BY item_category').all<{item_category:string}>()
+  const cats = await db.prepare('SELECT DISTINCT item_category FROM products WHERE is_active=1 AND tenant_id=? ORDER BY item_category').bind(tenantId).all<{item_category:string}>()
   const catOpts = cats.results.map(c2 => `<option value="${esc(c2.item_category)}">${esc(c2.item_category)}</option>`).join('')
 
   const rows = res.results.map(r => `<tr data-id="${r['id']}">
@@ -1507,6 +1531,7 @@ document.getElementById('ruleForm').addEventListener('submit',async function(e){
 // ============================================================
 app.get('/purchase-pool', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
 
   const orders = await db.prepare(`
     SELECT po.id, po.order_no, po.order_date, po.ordered_by,
@@ -1519,10 +1544,10 @@ app.get('/purchase-pool', async (c) => {
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
-    WHERE po.status = 'pool'
+    WHERE po.status = 'pool' AND po.tenant_id=?
     GROUP BY po.id
     ORDER BY s.name, po.id
-  `).all<Record<string, unknown>>()
+  `).bind(tenantId).all<Record<string, unknown>>()
 
   // 仕入先ごとにグループ化
   type SupplierGroup = {
@@ -1750,6 +1775,7 @@ ${groupsHtml}
 // ============================================================
 app.get('/orders', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const status = (c.req.query('status') || '').trim()
   const supplier = (c.req.query('supplier') || '').trim()
   const q = (c.req.query('q') || '').trim()
@@ -1762,8 +1788,8 @@ app.get('/orders', async (c) => {
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id=s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
-    WHERE 1=1`
-  const params: unknown[] = []
+    WHERE po.tenant_id=?`
+  const params: unknown[] = [tenantId]
   if (status) { sql += ' AND po.status=?'; params.push(status) }
   if (supplier) { sql += ' AND s.name LIKE ?'; params.push(`%${supplier}%`) }
   if (q) {
@@ -1871,14 +1897,15 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
 // ============================================================
 app.get('/orders/new', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const [productRes, supplierRes] = await Promise.all([
     db.prepare(`
       SELECT p.id, p.item_category, p.manufacturer, p.name, p.spec, p.club_type,
              p.list_price, p.default_rate, s.name AS supplier_name
       FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
-      WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000
-    `).all<Record<string,unknown>>(),
-    db.prepare(`SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name`).all<{id:number,name:string}>()
+      WHERE p.is_active=1 AND p.tenant_id=? ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000
+    `).bind(tenantId).all<Record<string,unknown>>(),
+    db.prepare(`SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name`).bind(tenantId).all<{id:number,name:string}>()
   ])
 
   // 外部JSに商品データ・仕入先データを渡すインライン変数のみ定義
@@ -2019,6 +2046,7 @@ ${modalHtml}
 // ============================================================
 app.get('/mail-batch/:batch_code', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const batchCode = c.req.param('batch_code')
   const BATCH_DEFAULT_CC = c.env.APP_DEFAULT_CC || ''
 
@@ -2026,8 +2054,8 @@ app.get('/mail-batch/:batch_code', async (c) => {
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
            s.contact_name, s.order_method
     FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id
-    WHERE po.batch_code=? ORDER BY po.id
-  `).bind(batchCode).all<Record<string,unknown>>()
+    WHERE po.batch_code=? AND po.tenant_id=? ORDER BY po.id
+  `).bind(batchCode, tenantId).all<Record<string,unknown>>()
 
   // ── 同一 supplier_email でグループ化（まとめメール対応） ──
   type OrderGroup = {
@@ -2314,14 +2342,15 @@ ${cards.length ? cards.join('') : '<div class="alert alert-warning">該当する
 // ============================================================
 app.get('/orders/:id/edit', async (c) => {
   const db  = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const id  = parseInt(c.req.param('id'))
   if (isNaN(id)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name
     FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id
-    WHERE po.id=?
-  `).bind(id).first<Record<string,unknown>>()
+    WHERE po.id=? AND po.tenant_id=?
+  `).bind(id, tenantId).first<Record<string,unknown>>()
   if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const scripts = `<script>
@@ -2442,6 +2471,7 @@ app.get('/orders/:id/edit', async (c) => {
 // ============================================================
 app.get('/orders/:id', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
@@ -2450,8 +2480,8 @@ app.get('/orders/:id', async (c) => {
            s.contact_name, s.honorific, s.order_method, s.order_method_detail,
            s.phone, s.line_id, s.fax, s.fax_number, s.website,
            s.notes AS supplier_notes, s.shipping_rule AS supplier_shipping_rule
-    FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?
-  `).bind(id).first<Record<string,unknown>>()
+    FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=? AND po.tenant_id=?
+  `).bind(id, tenantId).first<Record<string,unknown>>()
   if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const curStatus = String(order['status'] ?? '')
@@ -2473,11 +2503,11 @@ app.get('/orders/:id', async (c) => {
                            p.list_price, p.default_rate,
                            s.name AS supplier_name
                     FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
-                    WHERE p.is_active=1 ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000`
-        ).all<Record<string,unknown>>()
+                    WHERE p.is_active=1 AND p.tenant_id=? ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000`
+        ).bind(tenantId).all<Record<string,unknown>>()
       : Promise.resolve({ results: [] }),
     isEditable
-      ? db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<{id:number,name:string}>()
+      ? db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name').bind(tenantId).all<{id:number,name:string}>()
       : Promise.resolve({ results: [] }),
   ])
 
@@ -3553,6 +3583,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
 // ============================================================
 app.get('/receipts', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
 
   // 絞り込みパラメータ
   const from       = c.req.query('from')        || ''
@@ -3573,20 +3604,16 @@ app.get('/receipts', async (c) => {
     LEFT JOIN suppliers s ON po.supplier_id=s.id
     LEFT JOIN receipt_items ri ON ri.receipt_id=r.id
     LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id=poi.id
-    WHERE 1=1`
-  const binds: unknown[] = []
+    WHERE r.tenant_id=?`
+  const binds: unknown[] = [tenantId]
   if (from) { sql += ` AND r.received_date >= ?`; binds.push(from) }
   if (to)   { sql += ` AND r.received_date <= ?`; binds.push(to) }
   if (supplierId) { sql += ` AND po.supplier_id = ?`; binds.push(Number(supplierId)) }
   sql += ` GROUP BY r.id ORDER BY r.received_date DESC, r.id DESC LIMIT 300`
 
-  let stmt = db.prepare(sql)
-  if (binds.length) stmt = (stmt.bind as (...a: unknown[]) => typeof stmt)(...binds)
-
-  // 仕入先一覧と本体クエリを並列取得
   const [supplierRes, res] = await Promise.all([
-    db.prepare('SELECT id, name FROM suppliers ORDER BY name').all<Record<string,unknown>>(),
-    stmt.all<Record<string,unknown>>()
+    db.prepare('SELECT id, name FROM suppliers WHERE tenant_id=? ORDER BY name').bind(tenantId).all<Record<string,unknown>>(),
+    db.prepare(sql).bind(...binds).all<Record<string,unknown>>()
   ])
   const supplierOptions = supplierRes.results.map(s =>
     `<option value="${esc(s['id'])}" ${supplierId === String(s['id']) ? 'selected' : ''}>${esc(s['name'])}</option>`
@@ -3710,13 +3737,14 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
 // ============================================================
 app.get('/receipts/new/:order_id', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const orderId = parseInt(c.req.param('order_id'))
   if (isNaN(orderId)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name FROM purchase_orders po
-    JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?
-  `).bind(orderId).first<Record<string,unknown>>()
+    JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=? AND po.tenant_id=?
+  `).bind(orderId, tenantId).first<Record<string,unknown>>()
   if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const items = await db.prepare(`
@@ -3822,9 +3850,10 @@ document.getElementById('receipt-form').addEventListener('submit', async functio
 // ============================================================
 app.get('/receipts/free', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const suppliers = await db.prepare(
-    'SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name'
-  ).all<Record<string,unknown>>()
+    'SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name'
+  ).bind(tenantId).all<Record<string,unknown>>()
   const supplierOpts = suppliers.results.map(s =>
     `<option value="${s['id']}">${esc(s['name'])}</option>`
   ).join('')
@@ -4025,7 +4054,8 @@ app.get('/products/new', async (c) => {
     supplier_id:   q('supplier_id')   || '',
   }
 
-  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 ORDER BY name').all<Record<string,unknown>>()
+  const { tenantId } = getLayoutOpts(c)
+  const suppliers = await db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name').bind(tenantId).all<Record<string,unknown>>()
   const supplierOpts = suppliers.results.map(s =>
     `<option value="${s['id']}" ${prefill.supplier_id === String(s['id']) ? 'selected' : ''}>${esc(s['name'])}</option>`
   ).join('')
@@ -4168,6 +4198,7 @@ document.getElementById('new-product-form').addEventListener('submit', async fun
 // ============================================================
 app.get('/receipts/:id/edit', async (c) => {
   const db  = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const rid = parseInt(c.req.param('id'))
   if (isNaN(rid)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
@@ -4180,8 +4211,8 @@ app.get('/receipts/:id/edit', async (c) => {
       FROM receipts r
       LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
       LEFT JOIN suppliers s ON po.supplier_id = s.id
-      WHERE r.id=?
-    `).bind(rid).first<Record<string,unknown>>(),
+      WHERE r.id=? AND r.tenant_id=?
+    `).bind(rid, tenantId).first<Record<string,unknown>>(),
     db.prepare(`
       SELECT ri.id AS receipt_item_id, ri.received_quantity, ri.note AS item_note,
              poi.id AS poi_id, poi.product_name, poi.spec, poi.color, poi.item_category,
@@ -4340,6 +4371,7 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
 // ============================================================
 app.get('/backorders', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
   const res = await db.prepare(`
     SELECT po.order_no, po.order_date, po.customer_name, po.usage_type,
            po.requested_delivery_date, po.id AS purchase_order_id,
@@ -4354,10 +4386,11 @@ app.get('/backorders', async (c) => {
     JOIN suppliers s ON po.supplier_id=s.id
     LEFT JOIN receipt_items ri ON ri.purchase_order_item_id=poi.id
     LEFT JOIN receipts r ON ri.receipt_id=r.id
+    WHERE po.tenant_id=?
     GROUP BY poi.id
     HAVING COALESCE(SUM(ri.received_quantity),0) < poi.quantity
     ORDER BY po.order_date DESC, po.order_no DESC
-  `).all<Record<string,unknown>>()
+  `).bind(tenantId).all<Record<string,unknown>>()
 
   const rows = res.results.map(r => `<tr>
     <td>${esc(r['order_date'])}</td>
@@ -4409,16 +4442,17 @@ app.get('/backorders', async (c) => {
 // ============================================================
 app.get('/admin/backup', async (c) => {
   const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
 
-  // 各テーブルの件数を取得
+  // 各テーブルの件数を取得（テナント分離）
   const [p, s, po, poi, sr, r, ri] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM purchase_order_items').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM supplier_rules').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM receipts').first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM receipt_items').first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders WHERE tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM purchase_order_items poi JOIN purchase_orders po ON po.id=poi.purchase_order_id WHERE po.tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM supplier_rules WHERE tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM receipts WHERE tenant_id=?').bind(tenantId).first<{c:number}>(),
+    db.prepare('SELECT COUNT(*) AS c FROM receipt_items ri JOIN receipts r ON r.id=ri.receipt_id WHERE r.tenant_id=?').bind(tenantId).first<{c:number}>(),
   ])
 
   const tables = [

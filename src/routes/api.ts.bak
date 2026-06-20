@@ -22,11 +22,10 @@ function getTenantId(c: { get: (k: 'sessionUser') => SessionUser | undefined }):
 
 // ============================================================
 // デモモード書き込みブロック middleware
-// isDemo=true のとき GET/HEAD 以外は 403 を返す
+// DEMO_MODE=1 のとき GET/HEAD 以外は 403 を返す
 // ============================================================
 app.use('/*', async (c, next) => {
-  const sessionUser = c.get('sessionUser')
-  if (sessionUser?.isDemo && !['GET', 'HEAD'].includes(c.req.method)) {
+  if (c.env.DEMO_MODE === '1' && !['GET', 'HEAD'].includes(c.req.method)) {
     return c.json({
       error: 'デモモードでは書き込み操作はできません。',
       demo: true
@@ -90,20 +89,19 @@ async function resolveSupplier(
   itemCategory: string,
   manufacturer: string,
   clubType: string,
-  productId?: number | null,
-  tenantId: number = 1
+  productId?: number | null
 ): Promise<{ supplier: Record<string, unknown> | null; rate: number | null }> {
   if (productId) {
     const p = await db
       .prepare(
-        'SELECT p.*, s.name AS supplier_name FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id WHERE p.id=? AND p.tenant_id=?'
+        'SELECT p.*, s.name AS supplier_name FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id WHERE p.id=?'
       )
-      .bind(productId, tenantId)
+      .bind(productId)
       .first<Record<string, unknown>>()
     if (p && p['default_supplier_id']) {
       const s = await db
-        .prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?')
-        .bind(p['default_supplier_id'], tenantId)
+        .prepare('SELECT * FROM suppliers WHERE id=?')
+        .bind(p['default_supplier_id'])
         .first<Record<string, unknown>>()
       return { supplier: s ?? null, rate: (p['default_rate'] as number) ?? null }
     }
@@ -118,7 +116,6 @@ async function resolveSupplier(
          AND COALESCE(sr.manufacturer, '') IN ('', ?)
          AND COALESCE(sr.club_type, '') IN ('', ?)
          AND s.is_active = 1
-         AND sr.tenant_id = ?
        ORDER BY
          CASE WHEN sr.item_category = ? THEN 0 ELSE 1 END,
          CASE WHEN sr.manufacturer = ? THEN 0 ELSE 1 END,
@@ -127,13 +124,13 @@ async function resolveSupplier(
          sr.id ASC
        LIMIT 1`
     )
-    .bind(itemCategory, manufacturer, clubType, tenantId, itemCategory, manufacturer, clubType)
+    .bind(itemCategory, manufacturer, clubType, itemCategory, manufacturer, clubType)
     .first<Record<string, unknown>>()
 
   if (rows) {
     const supplier = await db
-      .prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?')
-      .bind(rows['supplier_id'], tenantId)
+      .prepare('SELECT * FROM suppliers WHERE id=?')
+      .bind(rows['supplier_id'])
       .first<Record<string, unknown>>()
     return { supplier: supplier ?? null, rate: (rows['rate'] as number) ?? null }
   }
@@ -229,24 +226,20 @@ async function updateOrderStatus(db: D1Database, orderId: number): Promise<void>
 // ============================================================
 app.get('/dashboard', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const [products, suppliers, orders, backorders] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{ c: number }>(),
-    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{ c: number }>(),
-    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders WHERE tenant_id=?').bind(tenantId).first<{ c: number }>(),
+    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1').first<{ c: number }>(),
+    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1').first<{ c: number }>(),
+    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders').first<{ c: number }>(),
     db
       .prepare(
         `SELECT COUNT(*) AS c FROM (
           SELECT poi.id
           FROM purchase_order_items poi
-          JOIN purchase_orders po ON po.id = poi.purchase_order_id
           LEFT JOIN receipt_items ri ON ri.purchase_order_item_id = poi.id
-          WHERE po.tenant_id = ?
           GROUP BY poi.id, poi.quantity
           HAVING COALESCE(SUM(ri.received_quantity),0) < poi.quantity
         )`
       )
-      .bind(tenantId)
       .first<{ c: number }>(),
   ])
   const recentOrders = await db
@@ -258,12 +251,10 @@ app.get('/dashboard', async (c) => {
        FROM purchase_orders po
        JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
-       WHERE po.tenant_id = ?
        GROUP BY po.id
        ORDER BY po.id DESC
        LIMIT 10`
     )
-    .bind(tenantId)
     .all<Record<string, unknown>>()
 
   return c.json({
@@ -286,14 +277,13 @@ app.get('/dashboard', async (c) => {
 // ============================================================
 app.get('/products', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const q = normalize(c.req.query('q'))
   const cat = c.req.query('category') || ''
   let sql = `SELECT p.*, s.name AS supplier_name
              FROM products p
              LEFT JOIN suppliers s ON p.default_supplier_id = s.id
-             WHERE p.is_active = 1 AND p.tenant_id = ?`
-  const params: unknown[] = [tenantId]
+             WHERE p.is_active = 1`
+  const params: unknown[] = []
   if (cat) {
     sql += ' AND p.item_category = ?'
     params.push(cat)
@@ -306,7 +296,9 @@ app.get('/products', async (c) => {
   sql += ' ORDER BY p.item_category, p.manufacturer, p.name LIMIT 5000'
 
   const stmt = db.prepare(sql)
-  const rows = await stmt.bind(...params).all<Record<string, unknown>>()
+  const rows = params.length > 0
+    ? await stmt.bind(...params).all<Record<string, unknown>>()
+    : await stmt.all<Record<string, unknown>>()
 
   return c.json({
     rows: rows.results.map((r) => ({ ...r, list_price_yen: yen(r['list_price']) })),
@@ -318,10 +310,8 @@ app.get('/products', async (c) => {
 // ============================================================
 app.get('/suppliers', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const rows = await db
-    .prepare('SELECT * FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name')
-    .bind(tenantId)
+    .prepare('SELECT * FROM suppliers WHERE is_active=1 ORDER BY name')
     .all<Record<string, unknown>>()
   return c.json({ rows: rows.results })
 })
@@ -331,16 +321,13 @@ app.get('/suppliers', async (c) => {
 // ============================================================
 app.get('/rules', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const rows = await db
     .prepare(
       `SELECT sr.*, s.name AS supplier_name
        FROM supplier_rules sr
        JOIN suppliers s ON sr.supplier_id=s.id
-       WHERE sr.tenant_id = ?
        ORDER BY sr.item_category, sr.manufacturer, sr.club_type, sr.priority`
     )
-    .bind(tenantId)
     .all<Record<string, unknown>>()
   return c.json({ rows: rows.results })
 })
@@ -350,7 +337,6 @@ app.get('/rules', async (c) => {
 // ============================================================
 app.get('/orders', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const status = (c.req.query('status') || '').trim()
   const supplier = (c.req.query('supplier') || '').trim()
   const q = (c.req.query('q') || '').trim()
@@ -362,8 +348,8 @@ app.get('/orders', async (c) => {
              FROM purchase_orders po
              JOIN suppliers s ON po.supplier_id = s.id
              LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
-             WHERE po.tenant_id = ?`
-  const params: unknown[] = [tenantId]
+             WHERE 1=1`
+  const params: unknown[] = []
   if (status) { sql += ' AND po.status=?'; params.push(status) }
   if (supplier) { sql += ' AND s.name LIKE ?'; params.push(`%${supplier}%`) }
   if (q) {
@@ -373,7 +359,10 @@ app.get('/orders', async (c) => {
   }
   sql += ' GROUP BY po.id ORDER BY po.id DESC'
 
-  const rows = await db.prepare(sql).bind(...params).all<Record<string, unknown>>()
+  const stmt = db.prepare(sql)
+  const rows = params.length > 0
+    ? await stmt.bind(...params).all<Record<string, unknown>>()
+    : await stmt.all<Record<string, unknown>>()
 
   return c.json({
     rows: rows.results.map((r) => ({
@@ -390,15 +379,14 @@ app.get('/orders', async (c) => {
 app.get('/orders/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
   const order = await db
     .prepare(
       `SELECT po.*, s.name AS supplier_name, s.email, s.contact_name, s.order_method, s.phone
        FROM purchase_orders po
        JOIN suppliers s ON po.supplier_id=s.id
-       WHERE po.id=? AND po.tenant_id=?`
+       WHERE po.id=?`
     )
-    .bind(id, tenantId)
+    .bind(id)
     .first<Record<string, unknown>>()
   if (!order) return c.json({ error: 'Not found' }, 404)
 
@@ -434,7 +422,6 @@ app.get('/orders/:id', async (c) => {
 // ============================================================
 app.post('/orders', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const body = await c.req.json<{
     ordered_by?: string
     order_date?: string
@@ -499,8 +486,8 @@ app.post('/orders', async (c) => {
     // マスタ外商品で supplier_id を直接指定している場合はそちらを優先
     if (raw.supplier_id) {
       const s = await db
-        .prepare('SELECT * FROM suppliers WHERE id=? AND is_active=1 AND tenant_id=?')
-        .bind(raw.supplier_id, tenantId)
+        .prepare('SELECT * FROM suppliers WHERE id=? AND is_active=1')
+        .bind(raw.supplier_id)
         .first<Record<string, unknown>>()
       supplier = s ?? null
     } else {
@@ -509,8 +496,7 @@ app.post('/orders', async (c) => {
         raw.item_category,
         raw.manufacturer,
         raw.club_type || '',
-        raw.product_id,
-        tenantId
+        raw.product_id
       )
       supplier = resolved.supplier
       autoRate = resolved.rate
@@ -566,11 +552,11 @@ app.post('/orders', async (c) => {
       .prepare(
         `INSERT INTO purchase_orders
           (batch_code, order_no, order_date, ordered_by, supplier_id, customer_name,
-           usage_type, requested_delivery_date, status, order_note, tenant_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           usage_type, requested_delivery_date, status, order_note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(batchCode, orderNo, orderDate, orderedBy, supplierId, customerName,
-            usageType, requestedDeliveryDate, isPool ? 'pool' : 'draft_created', orderNote, tenantId)
+            usageType, requestedDeliveryDate, isPool ? 'pool' : 'draft_created', orderNote)
       .run()
     const orderId = inserted.meta.last_row_id as number
 
@@ -592,12 +578,12 @@ app.post('/orders', async (c) => {
 
     if (!isPool) {
       const supplier = await db
-        .prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?')
-        .bind(supplierId, tenantId)
+        .prepare('SELECT * FROM suppliers WHERE id=?')
+        .bind(supplierId)
         .first<Record<string, unknown>>()
       const order = await db
-        .prepare('SELECT * FROM purchase_orders WHERE id=? AND tenant_id=?')
-        .bind(orderId, tenantId)
+        .prepare('SELECT * FROM purchase_orders WHERE id=?')
+        .bind(orderId)
         .first<Record<string, unknown>>()
 
       if (supplier && order) {
@@ -622,8 +608,7 @@ app.post('/orders', async (c) => {
 app.post('/orders/:id/mark-ordered', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
-  await db.prepare('UPDATE purchase_orders SET status=? WHERE id=? AND tenant_id=?').bind('ordered', id, tenantId).run()
+  await db.prepare('UPDATE purchase_orders SET status=? WHERE id=?').bind('ordered', id).run()
   return c.json({ ok: true })
 })
 
@@ -633,14 +618,13 @@ app.post('/orders/:id/mark-ordered', async (c) => {
 app.post('/orders/:id/regenerate-mail', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
 
-  const order = await db.prepare('SELECT * FROM purchase_orders WHERE id=? AND tenant_id=?')
-    .bind(id, tenantId).first<Record<string, unknown>>()
+  const order = await db.prepare('SELECT * FROM purchase_orders WHERE id=?')
+    .bind(id).first<Record<string, unknown>>()
   if (!order) return c.json({ error: '発注が見つかりません' }, 404)
 
-  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?')
-    .bind(order['supplier_id'], tenantId).first<Record<string, unknown>>()
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+    .bind(order['supplier_id']).first<Record<string, unknown>>()
   if (!supplier) return c.json({ error: '仕入先が見つかりません' }, 404)
 
   const items = await db.prepare(
@@ -662,13 +646,12 @@ app.post('/orders/:id/items', async (c) => {
   const db = c.env.DB
   const orderId = parseInt(c.req.param('id'))
   if (isNaN(orderId)) return c.json({ error: '不正なIDです。' }, 400)
-  const tenantId = getTenantId(c)
 
   const order = await db.prepare(
     `SELECT po.*, s.* FROM purchase_orders po
      JOIN suppliers s ON po.supplier_id = s.id
-     WHERE po.id = ? AND po.tenant_id = ?`
-  ).bind(orderId, tenantId).first<Record<string, unknown>>()
+     WHERE po.id = ?`
+  ).bind(orderId).first<Record<string, unknown>>()
   if (!order) return c.json({ error: '発注が見つかりません。' }, 404)
 
   const status = String(order['status'] ?? '')
@@ -740,8 +723,8 @@ app.post('/orders/:id/items', async (c) => {
   ).bind(orderId).all<Record<string, unknown>>()
 
   // supplier オブジェクトを purchase_orders JOIN から再取得
-  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?')
-    .bind(order['supplier_id'], tenantId).first<Record<string, unknown>>()
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+    .bind(order['supplier_id']).first<Record<string, unknown>>()
   if (supplier) {
     const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
     await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
@@ -881,7 +864,6 @@ app.delete('/items/:poi_id', async (c) => {
 // プール一覧（仕入先別に集計）
 app.get('/pool', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
 
   // プール中の発注を仕入先別に集計
   const orders = await db.prepare(`
@@ -895,10 +877,10 @@ app.get('/pool', async (c) => {
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id = s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
-    WHERE po.status = 'pool' AND po.tenant_id = ?
+    WHERE po.status = 'pool'
     GROUP BY po.id
     ORDER BY s.name, po.id
-  `).bind(tenantId).all<Record<string, unknown>>()
+  `).all<Record<string, unknown>>()
 
   // 仕入先ごとにグループ化
   const supplierMap = new Map<number, {
@@ -941,7 +923,6 @@ app.get('/pool/items/:order_id', async (c) => {
 // プールから発注実行（仕入先単位でまとめて draft_created に昇格）
 app.post('/pool/execute', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const body = await c.req.json<{ order_ids: number[] }>()
   const ids = body.order_ids || []
   if (ids.length === 0) return c.json({ error: '発注IDが必要です' }, 400)
@@ -950,13 +931,13 @@ app.post('/pool/execute', async (c) => {
     // メール下書き生成
     const order = await db.prepare(
       `SELECT po.*, s.name AS supplier_name, s.email, s.contact_name, s.order_method
-       FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=? AND po.tenant_id=?`
-    ).bind(id, tenantId).first<Record<string, unknown>>()
+       FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=?`
+    ).bind(id).first<Record<string, unknown>>()
     const items = await db.prepare(
       'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
     ).bind(id).all<Record<string, unknown>>()
-    const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?')
-      .bind(order?.['supplier_id'], tenantId).first<Record<string, unknown>>()
+    const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+      .bind(order?.['supplier_id']).first<Record<string, unknown>>()
 
     if (order && supplier) {
       const { subject, body: emailBody } = composeMail(order, items.results, supplier, senderInfoFromEnv(c.env))
@@ -982,10 +963,9 @@ app.post('/pool/execute', async (c) => {
 app.delete('/pool/:order_id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('order_id'))
-  const tenantId = getTenantId(c)
   // 明細も削除
   await db.prepare('DELETE FROM purchase_order_items WHERE purchase_order_id=?').bind(id).run()
-  await db.prepare('DELETE FROM purchase_orders WHERE id=? AND status=? AND tenant_id=?').bind(id, 'pool', tenantId).run()
+  await db.prepare('DELETE FROM purchase_orders WHERE id=? AND status=?').bind(id, 'pool').run()
   return c.json({ ok: true })
 })
 
@@ -995,16 +975,15 @@ app.delete('/pool/:order_id', async (c) => {
 app.get('/mail-batch/:batch_code', async (c) => {
   const db = c.env.DB
   const batchCode = c.req.param('batch_code')
-  const tenantId = getTenantId(c)
   const orders = await db
     .prepare(
       `SELECT po.*, s.name AS supplier_name, s.email, s.contact_name, s.order_method
        FROM purchase_orders po
        JOIN suppliers s ON po.supplier_id = s.id
-       WHERE po.batch_code = ? AND po.tenant_id = ?
+       WHERE po.batch_code = ?
        ORDER BY po.id`
     )
-    .bind(batchCode, tenantId)
+    .bind(batchCode)
     .all<Record<string, unknown>>()
 
   const result: Array<{ order: Record<string, unknown>; items: Record<string, unknown>[] }> = []
@@ -1030,18 +1009,15 @@ app.get('/mail-batch/:batch_code', async (c) => {
 // ============================================================
 app.get('/receipts', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const rows = await db
     .prepare(
       `SELECT r.*, po.order_no, s.name AS supplier_name
        FROM receipts r
        LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
        LEFT JOIN suppliers s ON po.supplier_id = s.id
-       WHERE r.tenant_id = ?
        ORDER BY r.id DESC
        LIMIT 200`
     )
-    .bind(tenantId)
     .all<Record<string, unknown>>()
   return c.json({ rows: rows.results })
 })
@@ -1066,12 +1042,11 @@ app.post('/receipts', async (c) => {
   const inspectedBy = normalize(body.inspected_by)
   const note = normalize(body.note)
 
-  const tenantId = getTenantId(c)
   const ins = await db
     .prepare(
-      'INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note) VALUES (?, ?, ?, ?, ?)'
     )
-    .bind(orderId, receivedDate, slipDate, inspectedBy, note, tenantId)
+    .bind(orderId, receivedDate, slipDate, inspectedBy, note)
     .run()
   const receiptId = ins.meta.last_row_id as number
 
@@ -1112,11 +1087,10 @@ app.put('/receipts/:id', async (c) => {
     }>
   }>()
 
-  const tenantId = getTenantId(c)
   // ヘッダー確認 + 既存明細の poi_id マップを並列取得
   const [receipt, existingItems] = await Promise.all([
-    db.prepare('SELECT id, purchase_order_id FROM receipts WHERE id=? AND tenant_id=?')
-      .bind(receiptId, tenantId).first<{ id: number; purchase_order_id: number | null }>(),
+    db.prepare('SELECT id, purchase_order_id FROM receipts WHERE id=?')
+      .bind(receiptId).first<{ id: number; purchase_order_id: number | null }>(),
     db.prepare('SELECT id, purchase_order_item_id FROM receipt_items WHERE receipt_id=?')
       .bind(receiptId).all<{ id: number; purchase_order_item_id: number | null }>()
   ])
@@ -1216,11 +1190,10 @@ app.post('/receipts/free', async (c) => {
   const inspectedBy  = normalize(body.inspected_by)
   const note         = normalize(body.note)
 
-  const tenantId = getTenantId(c)
   // receipts に purchase_order_id=NULL で登録
   const ins = await db.prepare(
-    'INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note, tenant_id) VALUES (NULL, ?, ?, ?, ?, ?)'
-  ).bind(receivedDate, slipDate, inspectedBy, note, tenantId).run()
+    'INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note) VALUES (NULL, ?, ?, ?, ?)'
+  ).bind(receivedDate, slipDate, inspectedBy, note).run()
   const receiptId = ins.meta.last_row_id as number
 
   // receipt_items に purchase_order_item_id=NULL で登録
@@ -1242,7 +1215,6 @@ app.post('/receipts/free', async (c) => {
 // ============================================================
 app.get('/backorders', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const rows = await db
     .prepare(
       `SELECT po.order_no, po.order_date, po.customer_name, po.usage_type, po.requested_delivery_date,
@@ -1257,12 +1229,10 @@ app.get('/backorders', async (c) => {
        JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN receipt_items ri ON ri.purchase_order_item_id = poi.id
        LEFT JOIN receipts r ON ri.receipt_id = r.id
-       WHERE po.tenant_id = ?
        GROUP BY poi.id
        HAVING COALESCE(SUM(ri.received_quantity), 0) < poi.quantity
        ORDER BY po.order_date DESC, po.order_no DESC`
     )
-    .bind(tenantId)
     .all<Record<string, unknown>>()
   return c.json({ rows: rows.results })
 })
@@ -1272,18 +1242,16 @@ app.get('/backorders', async (c) => {
 // ============================================================
 app.get('/products-for-order', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const rows = await db
     .prepare(
       `SELECT p.id, p.item_category, p.manufacturer, p.name, p.spec, p.club_type,
               p.list_price, p.default_rate, s.name AS supplier_name
        FROM products p
        LEFT JOIN suppliers s ON p.default_supplier_id = s.id
-       WHERE p.is_active = 1 AND p.tenant_id = ?
+       WHERE p.is_active = 1
        ORDER BY p.item_category, p.manufacturer, p.name
        LIMIT 5000`
     )
-    .bind(tenantId)
     .all<Record<string, unknown>>()
   return c.json({ products: rows.results })
 })
@@ -1299,7 +1267,6 @@ app.get('/receipts/download', async (c) => {
   const to   = c.req.query('to')   || ''
   const supplierId = c.req.query('supplier_id') || ''
 
-  const tenantId = getTenantId(c)
   let sql = `
     SELECT
       po.order_date,
@@ -1328,15 +1295,20 @@ app.get('/receipts/download', async (c) => {
     JOIN purchase_orders po     ON r.purchase_order_id = po.id
     JOIN suppliers s            ON po.supplier_id = s.id
     JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
-    WHERE r.tenant_id = ?`
+    WHERE 1=1`
 
-  const binds: unknown[] = [tenantId]
+  const binds: unknown[] = []
   if (from) { sql += ` AND r.received_date >= ?`; binds.push(from) }
   if (to)   { sql += ` AND r.received_date <= ?`; binds.push(to)   }
   if (supplierId) { sql += ` AND po.supplier_id = ?`; binds.push(Number(supplierId)) }
   sql += ` ORDER BY r.received_date DESC, r.id DESC, poi.id ASC`
 
-  const res = await db.prepare(sql).bind(...binds).all<Record<string, unknown>>()
+  let stmt = db.prepare(sql)
+  if (binds.length) {
+    // D1 の bind は引数を展開する
+    stmt = (stmt.bind as (...args: unknown[]) => typeof stmt)(...binds)
+  }
+  const res = await stmt.all<Record<string, unknown>>()
   const data = res.results
 
   // ── ヘッダ行 ──────────────────────────────────────────────
@@ -1436,14 +1408,13 @@ app.get('/receipts/download', async (c) => {
 // ============================================================
 app.post('/suppliers', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const b = await c.req.json<Record<string, string>>()
   const r = await db.prepare(`
     INSERT INTO suppliers
       (name, alias_names, contact_name, honorific, order_method, order_method_detail,
        phone, fax, fax_number, email, line_id, line_group_id,
-       payment_method, shipping_rule, free_shipping_threshold, website, postal_code, address, notes, is_active, updated_at, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP,?)
+       payment_method, shipping_rule, free_shipping_threshold, website, postal_code, address, notes, is_active, updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP)
   `).bind(
     normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
     normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
@@ -1452,7 +1423,7 @@ app.post('/suppliers', async (c) => {
     normalize(b['payment_method']), normalize(b['shipping_rule']),
     b['free_shipping_threshold'] ? parseInt(b['free_shipping_threshold']) : null,
     normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
-    normalize(b['notes']), tenantId
+    normalize(b['notes'])
   ).run()
   return c.json({ ok: true, id: r.meta.last_row_id })
 })
@@ -1460,7 +1431,6 @@ app.post('/suppliers', async (c) => {
 app.put('/suppliers/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
   const b = await c.req.json<Record<string, string>>()
   await db.prepare(`
     UPDATE suppliers SET
@@ -1468,7 +1438,7 @@ app.put('/suppliers/:id', async (c) => {
       phone=?, fax=?, fax_number=?, email=?, line_id=?, line_group_id=?,
       payment_method=?, shipping_rule=?, free_shipping_threshold=?, website=?, postal_code=?, address=?, notes=?,
       updated_at=CURRENT_TIMESTAMP
-    WHERE id=? AND tenant_id=?
+    WHERE id=?
   `).bind(
     normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
     normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
@@ -1477,7 +1447,7 @@ app.put('/suppliers/:id', async (c) => {
     normalize(b['payment_method']), normalize(b['shipping_rule']),
     b['free_shipping_threshold'] ? parseInt(b['free_shipping_threshold']) : null,
     normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
-    normalize(b['notes']), id, tenantId
+    normalize(b['notes']), id
   ).run()
   return c.json({ ok: true })
 })
@@ -1485,8 +1455,7 @@ app.put('/suppliers/:id', async (c) => {
 app.delete('/suppliers/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
-  await db.prepare('UPDATE suppliers SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?').bind(id, tenantId).run()
+  await db.prepare('UPDATE suppliers SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(id).run()
   return c.json({ ok: true })
 })
 
@@ -1495,13 +1464,12 @@ app.delete('/suppliers/:id', async (c) => {
 // ============================================================
 app.post('/products', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const b = await c.req.json<Record<string, unknown>>()
   const r = await db.prepare(`
     INSERT INTO products
       (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
-       list_price, default_rate, default_supplier_id, unit, source, is_active, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+       list_price, default_rate, default_supplier_id, unit, source, is_active)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
   `).bind(
     normalize(b['product_code'] as string), normalize(b['barcode'] as string),
     normalize(b['item_category'] as string), normalize(b['manufacturer'] as string),
@@ -1511,7 +1479,7 @@ app.post('/products', async (c) => {
     b['default_rate'] ? Number(b['default_rate']) : null,
     b['default_supplier_id'] ? Number(b['default_supplier_id']) : null,
     normalize(b['unit'] as string) || '本',
-    normalize(b['source'] as string), tenantId
+    normalize(b['source'] as string)
   ).run()
   return c.json({ ok: true, id: r.meta.last_row_id })
 })
@@ -1519,12 +1487,11 @@ app.post('/products', async (c) => {
 app.get('/products/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
   const row = await db.prepare(
     `SELECT p.*, s.name AS supplier_name FROM products p
      LEFT JOIN suppliers s ON s.id = p.default_supplier_id
-     WHERE p.id=? AND p.is_active=1 AND p.tenant_id=?`
-  ).bind(id, tenantId).first()
+     WHERE p.id=? AND p.is_active=1`
+  ).bind(id).first()
   if (!row) return c.json({ error: 'not found' }, 404)
   return c.json(row)
 })
@@ -1532,13 +1499,12 @@ app.get('/products/:id', async (c) => {
 app.put('/products/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
   const b = await c.req.json<Record<string, unknown>>()
   await db.prepare(`
     UPDATE products SET
       product_code=?, barcode=?, item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
       list_price=?, default_rate=?, default_supplier_id=?, unit=?, source=?
-    WHERE id=? AND tenant_id=?
+    WHERE id=?
   `).bind(
     normalize(b['product_code'] as string), normalize(b['barcode'] as string),
     normalize(b['item_category'] as string), normalize(b['manufacturer'] as string),
@@ -1549,7 +1515,7 @@ app.put('/products/:id', async (c) => {
     b['default_supplier_id'] ? Number(b['default_supplier_id']) : null,
     normalize(b['unit'] as string) || '本',
     normalize(b['source'] as string),
-    id, tenantId
+    id
   ).run()
   return c.json({ ok: true })
 })
@@ -1557,8 +1523,7 @@ app.put('/products/:id', async (c) => {
 app.delete('/products/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
-  await db.prepare('UPDATE products SET is_active=0 WHERE id=? AND tenant_id=?').bind(id, tenantId).run()
+  await db.prepare('UPDATE products SET is_active=0 WHERE id=?').bind(id).run()
   return c.json({ ok: true })
 })
 
@@ -1612,10 +1577,9 @@ app.post('/products/bulk-update', async (c) => {
   }
 
   // IN句用プレースホルダ
-  const tenantId = getTenantId(c)
   const placeholders = ids.map(() => '?').join(',')
-  const sql = `UPDATE products SET ${setClauses.join(', ')} WHERE id IN (${placeholders}) AND tenant_id=?`
-  await db.prepare(sql).bind(...setValues, ...ids, tenantId).run()
+  const sql = `UPDATE products SET ${setClauses.join(', ')} WHERE id IN (${placeholders})`
+  await db.prepare(sql).bind(...setValues, ...ids).run()
 
   return c.json({ ok: true, updated: ids.length })
 })
@@ -1649,18 +1613,17 @@ app.post('/products/bulk-import', async (c) => {
 
   // 仕入先名→IDキャッシュ（同一インポート内で重複ルックアップを避ける）
   const supplierCache = new Map<string, number | null>()
-  const tenantId = getTenantId(c)
   const resolveSupplierName = async (nameRaw: string): Promise<number | null> => {
     const key = nameRaw.trim()
     if (!key) return null
     if (supplierCache.has(key)) return supplierCache.get(key)!
     const exact = await db.prepare(
-      'SELECT id FROM suppliers WHERE name=? AND is_active=1 AND tenant_id=? LIMIT 1'
-    ).bind(key, tenantId).first<{ id: number }>()
+      'SELECT id FROM suppliers WHERE name=? AND is_active=1 LIMIT 1'
+    ).bind(key).first<{ id: number }>()
     if (exact) { supplierCache.set(key, exact.id); return exact.id }
     const like = await db.prepare(
-      "SELECT id FROM suppliers WHERE name LIKE ? AND is_active=1 AND tenant_id=? ORDER BY length(name) LIMIT 1"
-    ).bind(`%${key}%`, tenantId).first<{ id: number }>()
+      "SELECT id FROM suppliers WHERE name LIKE ? AND is_active=1 ORDER BY length(name) LIMIT 1"
+    ).bind(`%${key}%`).first<{ id: number }>()
     const id = like?.id ?? null
     supplierCache.set(key, id)
     return id
@@ -1762,8 +1725,8 @@ app.post('/products/bulk-import', async (c) => {
           if (mode === 'upsert') {
             const existing = await db.prepare(
               `SELECT id FROM products
-               WHERE name=? AND manufacturer IS ? AND spec IS ? AND is_active=1 AND tenant_id=? LIMIT 1`
-            ).bind(name, manufacturer || null, varSpec || null, tenantId).first<{ id: number }>()
+               WHERE name=? AND manufacturer IS ? AND spec IS ? AND is_active=1 LIMIT 1`
+            ).bind(name, manufacturer || null, varSpec || null).first<{ id: number }>()
             if (existing) {
               await db.prepare(`
                 UPDATE products SET
@@ -1783,13 +1746,13 @@ app.post('/products/bulk-import', async (c) => {
           await db.prepare(`
             INSERT INTO products
               (item_category, manufacturer, name, spec, color, club_type,
-               list_price, default_rate, unit, source, default_supplier_id, is_active, tenant_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)
+               list_price, default_rate, unit, source, default_supplier_id, is_active)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
           `).bind(
             item_category, manufacturer || null, name,
             varSpec || null, varColor || null, club_type || null,
             list_price, default_rate, unit, source || null,
-            default_supplier_id, tenantId
+            default_supplier_id
           ).run()
           inserted++
         } catch (err: unknown) {
@@ -1807,8 +1770,8 @@ app.post('/products/bulk-import', async (c) => {
     try {
       if (mode === 'upsert' && product_code) {
         const existing = await db.prepare(
-          'SELECT id FROM products WHERE product_code=? AND is_active=1 AND tenant_id=? LIMIT 1'
-        ).bind(product_code, tenantId).first<{ id: number }>()
+          'SELECT id FROM products WHERE product_code=? AND is_active=1 LIMIT 1'
+        ).bind(product_code).first<{ id: number }>()
         if (existing) {
           await db.prepare(`
             UPDATE products SET
@@ -1829,14 +1792,14 @@ app.post('/products/bulk-import', async (c) => {
       await db.prepare(`
         INSERT INTO products
           (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
-           list_price, default_rate, unit, source, default_supplier_id, is_active, tenant_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+           list_price, default_rate, unit, source, default_supplier_id, is_active)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)
       `).bind(
         product_code || null, barcode || null,
         item_category, manufacturer || null, name,
         spec || null, color || null, club_type || null,
         list_price, default_rate, unit, source || null,
-        default_supplier_id, tenantId
+        default_supplier_id
       ).run()
       inserted++
     } catch (err: unknown) {
@@ -1854,11 +1817,10 @@ app.post('/products/bulk-import', async (c) => {
 // ============================================================
 app.post('/rules', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const b = await c.req.json<Record<string, unknown>>()
   const r = await db.prepare(`
-    INSERT INTO supplier_rules (item_category, manufacturer, club_type, supplier_id, rate, priority, notes, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?)
+    INSERT INTO supplier_rules (item_category, manufacturer, club_type, supplier_id, rate, priority, notes)
+    VALUES (?,?,?,?,?,?,?)
   `).bind(
     normalize(b['item_category'] as string) || null,
     normalize(b['manufacturer'] as string) || null,
@@ -1866,8 +1828,7 @@ app.post('/rules', async (c) => {
     Number(b['supplier_id']),
     b['rate'] ? Number(b['rate']) : null,
     Number(b['priority']) || 100,
-    normalize(b['notes'] as string),
-    tenantId
+    normalize(b['notes'] as string)
   ).run()
   return c.json({ ok: true, id: r.meta.last_row_id })
 })
@@ -1875,12 +1836,11 @@ app.post('/rules', async (c) => {
 app.put('/rules/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
   const b = await c.req.json<Record<string, unknown>>()
   await db.prepare(`
     UPDATE supplier_rules SET
       item_category=?, manufacturer=?, club_type=?, supplier_id=?, rate=?, priority=?, notes=?
-    WHERE id=? AND tenant_id=?
+    WHERE id=?
   `).bind(
     normalize(b['item_category'] as string) || null,
     normalize(b['manufacturer'] as string) || null,
@@ -1889,7 +1849,7 @@ app.put('/rules/:id', async (c) => {
     b['rate'] ? Number(b['rate']) : null,
     Number(b['priority']) || 100,
     normalize(b['notes'] as string),
-    id, tenantId
+    id
   ).run()
   return c.json({ ok: true })
 })
@@ -1897,8 +1857,7 @@ app.put('/rules/:id', async (c) => {
 app.delete('/rules/:id', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
-  await db.prepare('DELETE FROM supplier_rules WHERE id=? AND tenant_id=?').bind(id, tenantId).run()
+  await db.prepare('DELETE FROM supplier_rules WHERE id=?').bind(id).run()
   return c.json({ ok: true })
 })
 
@@ -1908,8 +1867,7 @@ app.delete('/rules/:id', async (c) => {
 app.post('/orders/:id/copy', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
-  const src = await db.prepare('SELECT * FROM purchase_orders WHERE id=? AND tenant_id=?').bind(id, tenantId).first<Record<string,unknown>>()
+  const src = await db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(id).first<Record<string,unknown>>()
   if (!src) return c.json({ error: 'Not found' }, 404)
   const items = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(id).all<Record<string,unknown>>()
 
@@ -1918,12 +1876,12 @@ app.post('/orders/:id/copy', async (c) => {
   const ins = await db.prepare(`
     INSERT INTO purchase_orders
       (batch_code, order_no, order_date, ordered_by, supplier_id, customer_name,
-       usage_type, requested_delivery_date, status, order_note, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+       usage_type, requested_delivery_date, status, order_note)
+    VALUES (?,?,?,?,?,?,?,?,?,?)
   `).bind(
     batchCode, orderNo, today(),
     src['ordered_by'], src['supplier_id'], src['customer_name'],
-    src['usage_type'], src['requested_delivery_date'], 'draft_created', src['order_note'], tenantId
+    src['usage_type'], src['requested_delivery_date'], 'draft_created', src['order_note']
   ).run()
   const newOrderId = ins.meta.last_row_id as number
 
@@ -1943,8 +1901,8 @@ app.post('/orders/:id/copy', async (c) => {
   }
 
   // メール文生成
-  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?').bind(src['supplier_id'], tenantId).first<Record<string,unknown>>()
-  const newOrder = await db.prepare('SELECT * FROM purchase_orders WHERE id=? AND tenant_id=?').bind(newOrderId, tenantId).first<Record<string,unknown>>()
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?').bind(src['supplier_id']).first<Record<string,unknown>>()
+  const newOrder = await db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(newOrderId).first<Record<string,unknown>>()
   const newItems = await db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(newOrderId).all<Record<string,unknown>>()
   if (supplier && newOrder) {
     const { subject, body } = composeMail(newOrder, newItems.results, supplier, senderInfoFromEnv(c.env))
@@ -1964,12 +1922,11 @@ app.put('/orders/:id/header', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return c.json({ error: '不正なIDです。' }, 400)
-  const tenantId = getTenantId(c)
 
   const order = await db.prepare(
     `SELECT po.*, s.* FROM purchase_orders po
-     JOIN suppliers s ON po.supplier_id = s.id WHERE po.id = ? AND po.tenant_id = ?`
-  ).bind(id, tenantId).first<Record<string, unknown>>()
+     JOIN suppliers s ON po.supplier_id = s.id WHERE po.id = ?`
+  ).bind(id).first<Record<string, unknown>>()
   if (!order) return c.json({ error: '発注が見つかりません。' }, 404)
 
   const body = await c.req.json<{
@@ -1985,7 +1942,7 @@ app.put('/orders/:id/header', async (c) => {
     UPDATE purchase_orders
     SET order_date=?, ordered_by=?, customer_name=?,
         usage_type=?, requested_delivery_date=?, order_note=?
-    WHERE id=? AND tenant_id=?
+    WHERE id=?
   `).bind(
     normalize(body.order_date)                || order['order_date'],
     normalize(body.ordered_by)                || order['ordered_by'],
@@ -1993,14 +1950,14 @@ app.put('/orders/:id/header', async (c) => {
     normalize(body.usage_type)                ?? null,
     normalize(body.requested_delivery_date)   ?? null,
     normalize(body.order_note)                ?? null,
-    id, tenantId
+    id
   ).run()
 
   // メール本文を再生成（発注者名・備考が本文に影響するため）
-  const updatedOrder = await db.prepare('SELECT * FROM purchase_orders WHERE id=? AND tenant_id=?')
-    .bind(id, tenantId).first<Record<string, unknown>>()
-  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=? AND tenant_id=?')
-    .bind(order['supplier_id'], tenantId).first<Record<string, unknown>>()
+  const updatedOrder = await db.prepare('SELECT * FROM purchase_orders WHERE id=?')
+    .bind(id).first<Record<string, unknown>>()
+  const supplier = await db.prepare('SELECT * FROM suppliers WHERE id=?')
+    .bind(order['supplier_id']).first<Record<string, unknown>>()
   const items = await db.prepare(
     'SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id'
   ).bind(id).all<Record<string, unknown>>()
@@ -2017,7 +1974,6 @@ app.put('/orders/:id/header', async (c) => {
 app.post('/orders/:id/status', async (c) => {
   const db = c.env.DB
   const id = parseInt(c.req.param('id'))
-  const tenantId = getTenantId(c)
   const { status } = await c.req.json<{ status: string }>()
   const allowed = ['draft','draft_created','ordered','partial','completed','cancelled']
   if (!allowed.includes(status)) return c.json({ error: 'invalid status' }, 400)
@@ -2057,7 +2013,7 @@ app.post('/orders/:id/status', async (c) => {
     }
   }
 
-  await db.prepare('UPDATE purchase_orders SET status=? WHERE id=? AND tenant_id=?').bind(status, id, tenantId).run()
+  await db.prepare('UPDATE purchase_orders SET status=? WHERE id=?').bind(status, id).run()
   return c.json({ ok: true })
 })
 
@@ -2069,10 +2025,9 @@ app.delete('/orders/:id', async (c) => {
   const id = parseInt(c.req.param('id'))
   if (isNaN(id)) return c.json({ error: '不正なIDです' }, 400)
 
-  const tenantId = getTenantId(c)
   // 存在確認
-  const order = await db.prepare('SELECT id, order_no FROM purchase_orders WHERE id=? AND tenant_id=?')
-    .bind(id, tenantId).first<{ id: number; order_no: string }>()
+  const order = await db.prepare('SELECT id, order_no FROM purchase_orders WHERE id=?')
+    .bind(id).first<{ id: number; order_no: string }>()
   if (!order) return c.json({ error: '発注が見つかりません' }, 404)
 
   // 関連レコードを依存順に削除（receipt_items → receipts → purchase_order_items → purchase_orders）
@@ -2158,7 +2113,6 @@ function parseCsv(text: string): Record<string, string>[] {
 // ============================================================
 app.get('/dashboard/pending-inspection', async (c) => {
   const db = c.env.DB
-  const tenantId = getTenantId(c)
   const res = await db.prepare(`
     SELECT
       poi.id            AS poi_id,
@@ -2182,10 +2136,9 @@ app.get('/dashboard/pending-inspection', async (c) => {
     JOIN suppliers s ON s.id = po.supplier_id
     WHERE po.status IN ('ordered','partial')
       AND poi.inspected = 0
-      AND po.tenant_id = ?
     ORDER BY po.order_date ASC, po.id ASC, poi.id ASC
     LIMIT 200
-  `).bind(tenantId).all<Record<string, unknown>>()
+  `).all<Record<string, unknown>>()
 
   return c.json({ items: res.results })
 })
@@ -2198,18 +2151,15 @@ app.patch('/orders/:id/items/:poi_id/inspect', async (c) => {
   const db     = c.env.DB
   const orderId  = Number(c.req.param('id'))
   const poiId    = Number(c.req.param('poi_id'))
-  const tenantId = getTenantId(c)
 
   if (isNaN(orderId) || isNaN(poiId)) {
     return c.json({ error: 'Invalid id' }, 400)
   }
 
-  // 明細が該当発注に属することを確認（tenant_idも検証）
+  // 明細が該当発注に属することを確認
   const poi = await db.prepare(
-    `SELECT poi.id, poi.inspected FROM purchase_order_items poi
-     JOIN purchase_orders po ON po.id = poi.purchase_order_id
-     WHERE poi.id=? AND poi.purchase_order_id=? AND po.tenant_id=?`
-  ).bind(poiId, orderId, tenantId).first<{ id: number; inspected: number }>()
+    'SELECT id, inspected FROM purchase_order_items WHERE id=? AND purchase_order_id=?'
+  ).bind(poiId, orderId).first<{ id: number; inspected: number }>()
 
   if (!poi) {
     return c.json({ error: '明細が見つかりません' }, 404)
