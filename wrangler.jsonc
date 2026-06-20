@@ -10,9 +10,5 @@
       "database_name": "golfwing-production",
       "database_id": "eb6484c8-67de-48c0-83ee-b250d95f89ef"
     }
-  ],
-  // Cron Trigger: 毎日 UTC 15:00 (= JST 00:00) にデモデータをリセット
-  "triggers": {
-    "crons": ["0 15 * * *"]
-  }
+  ]
 }
