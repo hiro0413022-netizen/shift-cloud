@@ -91,11 +91,15 @@ app.get('/logout', (c) => {
 // sessionUser を c.get('sessionUser') でどこからでも参照できるようにする
 app.use('/*', async (c, next) => {
   const path = new URL(c.req.url).pathname
-  // 静的ファイル・demo-login はスキップ
+  // 静的ファイル・パブリックページはスキップ（認証不要）
   if (path.startsWith('/static/') || path === '/favicon.ico' || path === '/demo-login') {
     return next()
   }
   if (path === '/login') return next()
+  // ランディングページ（/）は未ログインでも表示
+  if (path === '/') return next()
+  // デモリセットは独自認証（secretパラメータ）で保護
+  if (path === '/api/demo-reset') return next()
 
   const secret = c.env.AUTH_SECRET || 'golfwing-secret-key-change-in-production'
 
@@ -118,30 +122,132 @@ app.use('/*', async (c, next) => {
   return next()
 })
 
+import { landingPage } from './routes/landing'
+
 app.use('/api/*', cors())
 app.route('/api', apiRoutes)
+
+// ── デモデータ手動リセット（管理用） ──────────────────────
+// /api/demo-reset?secret=XXXX で手動実行可能
+app.get('/api/demo-reset', async (c) => {
+  const secret = c.req.query('secret') || ''
+  const expected = c.env.AUTH_SECRET || 'golfwing-secret-key-change-in-production'
+  if (secret !== expected) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+  await resetDemoData(c.env.DB)
+  return c.json({ ok: true, message: 'Demo data reset completed.' })
+})
+
+// ── ランディングページ（/ は認証不要） ─────────────────────
+app.get('/', async (c) => {
+  // ログイン済みならダッシュボードへ
+  const sessionUser = c.get('sessionUser')
+  if (sessionUser) return c.redirect('/dashboard')
+  const appName = c.env.APP_NAME || 'GolfOrder'
+  return c.html(landingPage(appName))
+})
+
 app.route('/', pageRoutes)
 
 // ============================================================
 // Cron Trigger: 毎日 JST 00:00 にデモテナント（tenant_id=0）をリセット
-// wrangler.jsonc: "0 15 * * *" (UTC 15:00 = JST 00:00)
+// scheduled ハンドラ経由、または /api/demo-reset エンドポイントで手動実行可
 // ============================================================
 const DEMO_TENANT_ID = 0
 
-// デモ初期データ
+// ── デモ仕入先（5社・発注方法バリエーション込み） ──────────────
 const DEMO_SUPPLIERS = [
-  { name: 'デモ仕入先A', contact_name: '山田 太郎', honorific: '様', order_method: 'email', email: 'demo-a@example.com', is_active: 1 },
-  { name: 'デモ仕入先B', contact_name: '鈴木 花子', honorific: '様', order_method: 'fax',   email: '',                   is_active: 1 },
+  {
+    name: 'ワークスシャフト株式会社',
+    contact_name: '小森 健太', honorific: '様',
+    order_method: 'メール', email: 'order@works-shaft.example.com',
+    notes: '大口割引あり。¥25,000未満は送料別途',
+    shipping_rule: '¥25,000以上送料無料',
+  },
+  {
+    name: 'プレミアムシャフト工業',
+    contact_name: '田中 浩二', honorific: '様',
+    order_method: 'メール', email: 'sales@premium-shaft.example.com',
+    notes: '在庫確認は電話でも可',
+    shipping_rule: '¥30,000以上送料無料',
+  },
+  {
+    name: '山田グリップ商事',
+    contact_name: '山田 みき', honorific: '様',
+    order_method: 'LINE', email: '',
+    notes: 'LINEで発注。紙の注文票あり。¥10,000未満送料別途',
+    shipping_rule: '¥10,000以上送料無料',
+  },
+  {
+    name: 'スポーツアパレルジャパン',
+    contact_name: '渡辺 恵', honorific: '様',
+    order_method: 'メール', email: 'order@sports-apparel.example.com',
+    notes: 'シーズン前に一括発注が多い',
+    shipping_rule: '一律送料¥500',
+  },
+  {
+    name: '工房備品センター',
+    contact_name: '佐藤 誠', honorific: '様',
+    order_method: 'FAX', email: '',
+    notes: '工房用消耗品専門。FAX注文のみ',
+    shipping_rule: '¥5,000以上送料無料',
+  },
 ]
 
+// ── デモ商品（12品目） ──────────────────────────────────────
 const DEMO_PRODUCTS = [
-  { item_category: 'ドライバー', manufacturer: 'デモメーカー', name: 'デモドライバー 460cc', list_price: 50000, default_rate: 0.7, unit: '本' },
-  { item_category: 'アイアン',   manufacturer: 'デモメーカー', name: 'デモアイアン 7本セット', list_price: 80000, default_rate: 0.65, unit: 'セット' },
-  { item_category: 'パター',     manufacturer: 'デモメーカー', name: 'デモパター 33インチ',   list_price: 30000, default_rate: 0.7, unit: '本' },
+  // シャフト 3種
+  { item_category: 'シャフト', manufacturer: 'ワークスシャフト',  name: 'WS-DR α 45S',       spec: '45g S',  club_type: 'DR',   list_price: 58000, default_rate: 0.45, unit: '本',  supplier_idx: 0 },
+  { item_category: 'シャフト', manufacturer: 'ワークスシャフト',  name: 'WS-IRON β 95S',     spec: '95g S',  club_type: 'IRON', list_price: 48000, default_rate: 0.45, unit: '本',  supplier_idx: 0 },
+  { item_category: 'シャフト', manufacturer: 'プレミアムシャフト', name: 'PS-FW Xtra 65R',    spec: '65g R',  club_type: 'FW',   list_price: 42000, default_rate: 0.48, unit: '本',  supplier_idx: 1 },
+  // グリップ 4種
+  { item_category: 'グリップ', manufacturer: '山田グリップ',      name: 'YG-PRO コードレス M60', spec: 'M60',  club_type: null,   list_price: 1800,  default_rate: 0.55, unit: '個',  supplier_idx: 2 },
+  { item_category: 'グリップ', manufacturer: '山田グリップ',      name: 'YG-TOUR コード M60',   spec: 'M60',  club_type: null,   list_price: 2200,  default_rate: 0.55, unit: '個',  supplier_idx: 2 },
+  { item_category: 'グリップ', manufacturer: '山田グリップ',      name: 'YG-パター ミッドサイズ', spec: 'M62',  club_type: 'PT',   list_price: 3500,  default_rate: 0.55, unit: '個',  supplier_idx: 2 },
+  { item_category: 'グリップ', manufacturer: '山田グリップ',      name: 'YG-ジュニア S52',       spec: 'S52',  club_type: null,   list_price: 1200,  default_rate: 0.55, unit: '個',  supplier_idx: 2 },
+  // アパレル 2種
+  { item_category: 'アパレル', manufacturer: 'スポーツアパレル', name: 'ポロシャツ 吸水速乾 M',  spec: 'M',    club_type: null,   list_price: 8800,  default_rate: 0.60, unit: '枚',  supplier_idx: 3 },
+  { item_category: 'アパレル', manufacturer: 'スポーツアパレル', name: 'ストレッチパンツ L',      spec: 'L',    club_type: null,   list_price: 12000, default_rate: 0.60, unit: '本',  supplier_idx: 3 },
+  // 工房用品 3種
+  { item_category: '工房用品', manufacturer: '工房備品センター', name: 'エポキシ接着剤 2液型',   spec: '100ml', club_type: null,   list_price: 2400,  default_rate: 0.65, unit: '本',  supplier_idx: 4 },
+  { item_category: '工房用品', manufacturer: '工房備品センター', name: 'グリップテープ (10本入)', spec: '10本',  club_type: null,   list_price: 1500,  default_rate: 0.65, unit: '袋',  supplier_idx: 4 },
+  { item_category: '工房用品', manufacturer: '工房備品センター', name: 'リムーバー溶剤 500ml',   spec: '500ml', club_type: null,   list_price: 3200,  default_rate: 0.65, unit: '本',  supplier_idx: 4 },
+]
+
+// ── 発注サンプルデータ ──────────────────────────────────────
+interface DemoOrderDef {
+  supplierIdx: number
+  customerName: string
+  status: string
+  daysAgo: number
+  items: { productIdx: number; quantity: number }[]
+}
+const DEMO_ORDERS: DemoOrderDef[] = [
+  {
+    supplierIdx: 0, customerName: '鈴木 一郎 様', status: 'ordered', daysAgo: 3,
+    items: [{ productIdx: 0, quantity: 1 }, { productIdx: 1, quantity: 2 }],
+  },
+  {
+    supplierIdx: 1, customerName: '田中 花子 様', status: 'ordered', daysAgo: 5,
+    items: [{ productIdx: 2, quantity: 1 }],
+  },
+  {
+    supplierIdx: 2, customerName: '佐藤 健 様', status: 'received', daysAgo: 10,
+    items: [{ productIdx: 3, quantity: 13 }, { productIdx: 4, quantity: 6 }],
+  },
+  {
+    supplierIdx: 3, customerName: '（店舗在庫補充）', status: 'ordered', daysAgo: 1,
+    items: [{ productIdx: 7, quantity: 5 }, { productIdx: 8, quantity: 3 }],
+  },
+  {
+    supplierIdx: 4, customerName: '（工房消耗品）', status: 'draft', daysAgo: 0,
+    items: [{ productIdx: 9, quantity: 3 }, { productIdx: 10, quantity: 10 }, { productIdx: 11, quantity: 2 }],
+  },
 ]
 
 async function resetDemoData(db: D1Database): Promise<void> {
-  // 1. デモテナントの全データを削除（依存順）
+  // 1. デモテナントの全データを依存順で削除
   const receiptRows = await db.prepare(
     'SELECT id FROM receipts WHERE tenant_id=?'
   ).bind(DEMO_TENANT_ID).all<{ id: number }>()
@@ -161,53 +267,106 @@ async function resetDemoData(db: D1Database): Promise<void> {
   await db.prepare('DELETE FROM products WHERE tenant_id=?').bind(DEMO_TENANT_ID).run()
   await db.prepare('DELETE FROM suppliers WHERE tenant_id=?').bind(DEMO_TENANT_ID).run()
 
-  // 2. デモ仕入先を再登録
+  // 2. 仕入先を再登録
   const supplierIds: number[] = []
   for (const s of DEMO_SUPPLIERS) {
     const r = await db.prepare(`
       INSERT INTO suppliers
-        (name, contact_name, honorific, order_method, email, is_active, tenant_id, updated_at)
-      VALUES (?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-    `).bind(s.name, s.contact_name, s.honorific, s.order_method, s.email, s.is_active, DEMO_TENANT_ID).run()
+        (name, contact_name, honorific, order_method, email, notes, shipping_rule,
+         is_active, tenant_id)
+      VALUES (?,?,?,?,?,?,?,1,?)
+    `).bind(s.name, s.contact_name, s.honorific, s.order_method, s.email,
+            s.notes, s.shipping_rule, DEMO_TENANT_ID).run()
     supplierIds.push(r.meta.last_row_id as number)
   }
 
-  // 3. デモ商品を再登録（デモ仕入先Aに紐付け）
+  // 3. 商品を再登録
+  const productIds: number[] = []
   for (const p of DEMO_PRODUCTS) {
-    await db.prepare(`
+    const sid = supplierIds[p.supplier_idx]
+    const r = await db.prepare(`
       INSERT INTO products
-        (item_category, manufacturer, name, list_price, default_rate, unit,
-         is_active, tenant_id, default_supplier_id)
-      VALUES (?,?,?,?,?,?,1,?,?)
-    `).bind(p.item_category, p.manufacturer, p.name, p.list_price, p.default_rate,
-            p.unit, DEMO_TENANT_ID, supplierIds[0]).run()
+        (item_category, manufacturer, name, spec, club_type,
+         list_price, default_rate, unit, default_supplier_id,
+         is_active, tenant_id)
+      VALUES (?,?,?,?,?,?,?,?,?,1,?)
+    `).bind(p.item_category, p.manufacturer, p.name, p.spec ?? null,
+            p.club_type ?? null, p.list_price, p.default_rate,
+            p.unit, sid, DEMO_TENANT_ID).run()
+    productIds.push(r.meta.last_row_id as number)
   }
 
-  // 4. デモ判定ルール（ドライバー → 仕入先A）
-  await db.prepare(`
-    INSERT INTO supplier_rules (item_category, supplier_id, priority, tenant_id)
-    VALUES (?,?,?,?)
-  `).bind('ドライバー', supplierIds[0], 1, DEMO_TENANT_ID).run()
+  // 4. 判定ルール（カテゴリ→仕入先の代表的なマッピング）
+  const rules = [
+    { item_category: 'シャフト', manufacturer: 'ワークスシャフト',  supplier_idx: 0, rate: 0.45 },
+    { item_category: 'シャフト', manufacturer: 'プレミアムシャフト', supplier_idx: 1, rate: 0.48 },
+    { item_category: 'グリップ', manufacturer: '山田グリップ',       supplier_idx: 2, rate: 0.55 },
+    { item_category: 'アパレル', manufacturer: null,                  supplier_idx: 3, rate: 0.60 },
+    { item_category: '工房用品', manufacturer: null,                  supplier_idx: 4, rate: 0.65 },
+  ]
+  for (const rule of rules) {
+    await db.prepare(`
+      INSERT INTO supplier_rules
+        (item_category, manufacturer, supplier_id, rate, priority, tenant_id)
+      VALUES (?,?,?,?,10,?)
+    `).bind(rule.item_category, rule.manufacturer ?? null,
+            supplierIds[rule.supplier_idx], rule.rate, DEMO_TENANT_ID).run()
+  }
 
-  // 5. デモ発注データ（ordered ステータス 2件）
-  const today = new Date().toISOString().slice(0, 10)
-  for (let i = 0; i < 2; i++) {
-    const orderNo = `DEMO-${today.replace(/-/g,'')}-${String(i + 1).padStart(3,'0')}`
+  // 5. 発注データを再登録
+  for (let oi = 0; oi < DEMO_ORDERS.length; oi++) {
+    const od = DEMO_ORDERS[oi]
+    const orderDate = new Date(Date.now() - od.daysAgo * 86400000)
+    const dateStr = orderDate.toISOString().slice(0, 10)
+    const batchCode = `DEMO-${dateStr.replace(/-/g, '')}`
+    const orderNo   = `DEMO-${dateStr.replace(/-/g, '')}-${String(oi + 1).padStart(3, '0')}`
+    const sid = supplierIds[od.supplierIdx]
+
     const ins = await db.prepare(`
       INSERT INTO purchase_orders
-        (batch_code, order_no, order_date, ordered_by, supplier_id,
-         customer_name, status, tenant_id)
+        (batch_code, order_no, order_date, ordered_by,
+         supplier_id, customer_name, status, tenant_id)
       VALUES (?,?,?,?,?,?,?,?)
-    `).bind(`DEMO-${today}`, orderNo, today, 'デモユーザー',
-            supplierIds[i % supplierIds.length],
-            `デモ顧客${i + 1}`, 'ordered', DEMO_TENANT_ID).run()
+    `).bind(batchCode, orderNo, dateStr, 'デモスタッフ',
+            sid, od.customerName, od.status, DEMO_TENANT_ID).run()
     const orderId = ins.meta.last_row_id as number
-    await db.prepare(`
-      INSERT INTO purchase_order_items
-        (purchase_order_id, item_category, manufacturer, product_name, quantity, unit_price, amount)
-      VALUES (?,?,?,?,?,?,?)
-    `).bind(orderId, 'ドライバー', 'デモメーカー', 'デモドライバー 460cc',
-            1, 35000, 35000).run()
+
+    for (const item of od.items) {
+      const p = DEMO_PRODUCTS[item.productIdx]
+      const unitPrice = Math.floor((p.list_price ?? 0) * p.default_rate)
+      await db.prepare(`
+        INSERT INTO purchase_order_items
+          (purchase_order_id, item_category, manufacturer, product_name,
+           spec, club_type, quantity, list_price, rate, unit_price, amount,
+           customer_name)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      `).bind(orderId, p.item_category, p.manufacturer, p.name,
+              p.spec ?? null, p.club_type ?? null, item.quantity,
+              p.list_price ?? null, p.default_rate,
+              unitPrice, unitPrice * item.quantity,
+              od.customerName).run()
+    }
+
+    // 入荷済みステータスには入荷レコードも追加
+    if (od.status === 'received') {
+      const recIns = await db.prepare(`
+        INSERT INTO receipts
+          (purchase_order_id, received_date, inspected_by, tenant_id)
+        VALUES (?,?,?,?)
+      `).bind(orderId, dateStr, 'デモスタッフ', DEMO_TENANT_ID).run()
+      const recId = recIns.meta.last_row_id as number
+      // 発注明細IDを取得して入荷明細を作成
+      const poItems = await db.prepare(
+        'SELECT id, quantity FROM purchase_order_items WHERE purchase_order_id=?'
+      ).bind(orderId).all<{ id: number; quantity: number }>()
+      for (const poi of poItems.results) {
+        await db.prepare(`
+          INSERT INTO receipt_items
+            (receipt_id, purchase_order_item_id, received_quantity)
+          VALUES (?,?,?)
+        `).bind(recId, poi.id, poi.quantity).run()
+      }
+    }
   }
 }
 
