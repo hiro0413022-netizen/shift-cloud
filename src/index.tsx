@@ -227,23 +227,28 @@ interface DemoOrderDef {
 }
 const DEMO_ORDERS: DemoOrderDef[] = [
   {
-    supplierIdx: 0, customerName: '鈴木 一郎 様', status: 'ordered', daysAgo: 3,
+    // 対応が必要：14日前発注・未入荷（赤アラート）
+    supplierIdx: 0, customerName: '鈴木 一郎 様', status: 'ordered', daysAgo: 14,
     items: [{ productIdx: 0, quantity: 1 }, { productIdx: 1, quantity: 2 }],
   },
   {
-    supplierIdx: 1, customerName: '田中 花子 様', status: 'ordered', daysAgo: 5,
+    // 対応が必要：8日前発注・未入荷（要確認）
+    supplierIdx: 1, customerName: '田中 花子 様', status: 'ordered', daysAgo: 8,
     items: [{ productIdx: 2, quantity: 1 }],
   },
   {
-    supplierIdx: 2, customerName: '佐藤 健 様', status: 'received', daysAgo: 10,
+    // 検品待ち：一部入荷・入荷レコードあり → 検品待ちセクションに表示
+    supplierIdx: 2, customerName: '佐藤 健 様', status: 'partial', daysAgo: 11,
     items: [{ productIdx: 3, quantity: 13 }, { productIdx: 4, quantity: 6 }],
   },
   {
-    supplierIdx: 3, customerName: '（店舗在庫補充）', status: 'ordered', daysAgo: 1,
+    // お客様対応中（最近の発注）
+    supplierIdx: 3, customerName: '（店舗在庫補充）', status: 'ordered', daysAgo: 2,
     items: [{ productIdx: 7, quantity: 5 }, { productIdx: 8, quantity: 3 }],
   },
   {
-    supplierIdx: 4, customerName: '（工房消耗品）', status: 'draft', daysAgo: 0,
+    // 発注し忘れ確認：下書き
+    supplierIdx: 4, customerName: '（工房消耗品）', status: 'draft', daysAgo: 1,
     items: [{ productIdx: 9, quantity: 3 }, { productIdx: 10, quantity: 10 }, { productIdx: 11, quantity: 2 }],
   },
 ]
@@ -349,24 +354,27 @@ async function resetDemoData(db: D1Database): Promise<void> {
               od.customerName).run()
     }
 
-    // 入荷済みステータスには入荷レコードも追加
-    if (od.status === 'received') {
+    // 入荷済み・一部入荷には入荷レコードも追加
+    if (od.status === 'received' || od.status === 'partial') {
       const recIns = await db.prepare(`
         INSERT INTO receipts
           (purchase_order_id, received_date, inspected_by, tenant_id)
         VALUES (?,?,?,?)
       `).bind(orderId, dateStr, 'デモスタッフ', DEMO_TENANT_ID).run()
       const recId = recIns.meta.last_row_id as number
-      // 発注明細IDを取得して入荷明細を作成
       const poItems = await db.prepare(
         'SELECT id, quantity FROM purchase_order_items WHERE purchase_order_id=?'
       ).bind(orderId).all<{ id: number; quantity: number }>()
       for (const poi of poItems.results) {
+        // partial の場合は数量の一部のみ入荷（半分）
+        const recvQty = od.status === 'partial'
+          ? Math.max(1, Math.floor(poi.quantity / 2))
+          : poi.quantity
         await db.prepare(`
           INSERT INTO receipt_items
             (receipt_id, purchase_order_item_id, received_quantity)
           VALUES (?,?,?)
-        `).bind(recId, poi.id, poi.quantity).run()
+        `).bind(recId, poi.id, recvQty).run()
       }
     }
   }
