@@ -49,7 +49,7 @@ app.get('/demo-login', async (c) => {
   ].join('; ')
   return new Response(null, {
     status: 302,
-    headers: { 'Location': '/', 'Set-Cookie': cookie }
+    headers: { 'Location': '/orders', 'Set-Cookie': cookie }  // ダッシュボード（発注一覧）へ直接
   })
 })
 
@@ -57,8 +57,8 @@ app.get('/demo-login', async (c) => {
 app.get('/login', async (c) => {
   const secret = c.env.AUTH_SECRET || 'golfwing-secret-key-change-in-production'
   const user = await getCurrentUser(c.req.raw, c.env.DB, secret)
-  if (user) return c.redirect('/')
-  const next = c.req.query('next') || '/'
+  if (user) return c.redirect('/orders')  // ログイン済みならダッシュボードへ
+  const next = c.req.query('next') || '/orders'
   return loginPage(false, next, c.env.APP_NAME)
 })
 
@@ -67,10 +67,12 @@ app.post('/login', async (c) => {
   const form     = await c.req.formData()
   const username = String(form.get('username') || '')
   const password = String(form.get('password') || '')
-  const next     = String(form.get('next') || '/')
+  const next     = String(form.get('next') || '/orders')
   const result   = await attemptLogin(username, password, c.env)
   if (result) {
-    const dest = next.startsWith('/') && !next.startsWith('//') ? next : '/'
+    // next が / の場合は /orders（ダッシュボード）へ
+    const rawDest = next.startsWith('/') && !next.startsWith('//') ? next : '/orders'
+    const dest = rawDest === '/' ? '/orders' : rawDest
     return new Response(null, {
       status: 302,
       headers: {
@@ -141,9 +143,10 @@ app.get('/api/demo-reset', async (c) => {
 
 // ── ランディングページ（/ は認証不要） ─────────────────────
 app.get('/', async (c) => {
-  // ログイン済みならダッシュボードへ
-  const sessionUser = c.get('sessionUser')
-  if (sessionUser) return c.redirect('/dashboard')
+  // ログイン済みかどうかを自力で確認（ミドルウェアは / をスキップするため）
+  const secret = c.env.AUTH_SECRET || 'golfwing-secret-key-change-in-production'
+  const user = await getCurrentUser(c.req.raw, c.env.DB, secret)
+  if (user) return c.redirect('/orders')  // ログイン済みならダッシュボードへ
   const appName = c.env.APP_NAME || 'GolfOrder'
   return c.html(landingPage(appName))
 })
