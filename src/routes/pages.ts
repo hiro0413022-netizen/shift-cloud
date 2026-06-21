@@ -131,7 +131,7 @@ ${demoBanner}
     </button>
     <div class="collapse navbar-collapse" id="navMenu">
       <div class="navbar-nav gap-1 ms-auto align-items-lg-center">
-        <a class="nav-link" href="/"><i class="fas fa-chart-line me-1"></i>ダッシュボード</a>
+        <a class="nav-link" href="/dashboard"><i class="fas fa-home me-1"></i>今日やること</a>
         <div class="nav-divider d-none d-lg-block"></div>
         <a class="nav-link" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注</a>
         <a class="nav-link" href="/purchase-pool"><i class="fas fa-layer-group me-1"></i>発注プール</a>
@@ -191,277 +191,444 @@ ${extraScripts}
 // ============================================================
 // ダッシュボード
 // ============================================================
-app.get('/', async (c) => {
+// ダッシュボード（今日やること中心のUI）
+// ============================================================
+app.get('/dashboard', async (c) => {
   const db = c.env.DB
-  const { tenantId } = getLayoutOpts(c)
-  const [p, s, o, b] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS c FROM products WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM suppliers WHERE is_active=1 AND tenant_id=?').bind(tenantId).first<{c:number}>(),
-    db.prepare('SELECT COUNT(*) AS c FROM purchase_orders WHERE tenant_id=?').bind(tenantId).first<{c:number}>(),
-    db.prepare(`SELECT COUNT(*) AS c FROM (
-      SELECT poi.id FROM purchase_order_items poi
+  const opts = getLayoutOpts(c)
+  const { tenantId } = opts
+  const today = todayStr()
+
+  // ── 並列クエリ ────────────────────────────────────────
+  const [statusCounts, overdueRows, pendingRows, activeRows, draftRows] = await Promise.all([
+
+    // ① 状態別カウント
+    db.prepare(`
+      SELECT status, COUNT(*) AS c FROM purchase_orders
+      WHERE tenant_id=? AND status NOT IN ('cancelled')
+      GROUP BY status
+    `).bind(tenantId).all<{status:string; c:number}>(),
+
+    // ② 対応が必要：発注済で7日以上経過かつ未入荷
+    db.prepare(`
+      SELECT po.id, po.order_date, po.customer_name, po.status,
+             s.name AS supplier_name, s.order_method,
+             GROUP_CONCAT(poi.product_name, ' / ') AS products,
+             COUNT(poi.id) AS item_count,
+             CAST(julianday('now') - julianday(po.order_date) AS INTEGER) AS days_elapsed
+      FROM purchase_orders po
+      JOIN suppliers s ON s.id=po.supplier_id
+      JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
+      WHERE po.tenant_id=? AND po.status='ordered'
+        AND julianday('now') - julianday(po.order_date) >= 7
+      GROUP BY po.id
+      ORDER BY days_elapsed DESC
+      LIMIT 20
+    `).bind(tenantId).all<Record<string,unknown>>(),
+
+    // ③ 検品待ち：入荷済（partial/received）で未処理の明細
+    db.prepare(`
+      SELECT po.id AS order_id, po.order_date, po.status,
+             po.customer_name,
+             s.name AS supplier_name,
+             poi.id AS poi_id,
+             poi.item_category, poi.manufacturer, poi.product_name, poi.spec, poi.color,
+             poi.quantity,
+             COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri
+                       WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+      FROM purchase_order_items poi
       JOIN purchase_orders po ON po.id=poi.purchase_order_id
-      LEFT JOIN receipt_items ri ON ri.purchase_order_item_id=poi.id
+      JOIN suppliers s ON s.id=po.supplier_id
+      LEFT JOIN receipt_items ri2 ON ri2.purchase_order_item_id=poi.id
       WHERE po.tenant_id=?
-      GROUP BY poi.id, poi.quantity
-      HAVING COALESCE(SUM(ri.received_quantity),0) < poi.quantity
-    )`).bind(tenantId).first<{c:number}>(),
+        AND po.status IN ('partial','received')
+        AND ri2.id IS NOT NULL
+      GROUP BY poi.id
+      ORDER BY po.order_date ASC, po.id ASC
+      LIMIT 100
+    `).bind(tenantId).all<Record<string,unknown>>(),
+
+    // ④ お客様対応中：発注済・一部入荷で顧客名あり
+    db.prepare(`
+      SELECT po.id, po.order_date, po.status,
+             po.customer_name,
+             s.name AS supplier_name, s.order_method,
+             COUNT(poi.id) AS item_count,
+             COALESCE(SUM(poi.quantity),0) AS total_qty,
+             COALESCE(SUM(COALESCE(
+               (SELECT SUM(ri.received_quantity) FROM receipt_items ri
+                WHERE ri.purchase_order_item_id=poi.id),0
+             )),0) AS received_qty,
+             CAST(julianday('now') - julianday(po.order_date) AS INTEGER) AS days_elapsed
+      FROM purchase_orders po
+      JOIN suppliers s ON s.id=po.supplier_id
+      JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
+      WHERE po.tenant_id=?
+        AND po.status IN ('ordered','partial')
+        AND po.customer_name IS NOT NULL
+        AND po.customer_name NOT LIKE '（%）'
+        AND po.customer_name != ''
+      GROUP BY po.id
+      ORDER BY po.order_date ASC
+      LIMIT 30
+    `).bind(tenantId).all<Record<string,unknown>>(),
+
+    // ⑤ 下書き：まだ発注していない
+    db.prepare(`
+      SELECT po.id, po.order_date, po.customer_name,
+             s.name AS supplier_name,
+             COUNT(poi.id) AS item_count
+      FROM purchase_orders po
+      JOIN suppliers s ON s.id=po.supplier_id
+      LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
+      WHERE po.tenant_id=? AND po.status IN ('draft','draft_created')
+      GROUP BY po.id
+      ORDER BY po.id DESC
+      LIMIT 10
+    `).bind(tenantId).all<Record<string,unknown>>(),
   ])
 
-  // 検品待ち明細（ordered/partial かつ inspected=0）
-  const pendingInspect = await db.prepare(`
-    SELECT
-      poi.id            AS poi_id,
-      poi.purchase_order_id AS order_id,
-      po.order_no,
-      po.status,
-      po.order_date,
-      po.customer_name,
-      s.name            AS supplier_name,
-      poi.item_category,
-      poi.manufacturer,
-      poi.product_name,
-      poi.spec,
-      poi.color,
-      poi.club_type,
-      poi.quantity,
-      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
-    FROM purchase_order_items poi
-    JOIN purchase_orders po ON po.id = poi.purchase_order_id
-    JOIN suppliers s ON s.id = po.supplier_id
-    WHERE po.tenant_id=?
-      AND po.status IN ('ordered','partial')
-      AND poi.inspected = 0
-    ORDER BY po.order_date ASC, po.id ASC, poi.id ASC
-    LIMIT 200
-  `).bind(tenantId).all<Record<string,unknown>>()
+  // 状態別カウントをマップに
+  const sc: Record<string, number> = {}
+  for (const r of statusCounts.results) sc[r.status] = r.c
+  const orderedCount  = sc['ordered']  ?? 0
+  const partialCount  = sc['partial']  ?? 0
+  const draftCount    = (sc['draft'] ?? 0) + (sc['draft_created'] ?? 0)
+  const completedCount = sc['completed'] ?? 0
+  const activeCount   = orderedCount + partialCount
 
-  const inspectCount = pendingInspect.results.length
-
-  // 発注番号ごとにグループ化
-  const inspectByOrder = new Map<string, { orderId: number; orderNo: string; status: string; orderDate: string; supplierName: string; customerName: string; items: Record<string,unknown>[] }>()
-  for (const item of pendingInspect.results) {
-    const key = String(item['order_id'])
-    if (!inspectByOrder.has(key)) {
-      inspectByOrder.set(key, {
-        orderId:      Number(item['order_id']),
-        orderNo:      String(item['order_no'] ?? ''),
-        status:       String(item['status'] ?? ''),
-        orderDate:    String(item['order_date'] ?? ''),
-        supplierName: String(item['supplier_name'] ?? ''),
-        customerName: String(item['customer_name'] ?? ''),
-        items: []
-      })
-    }
-    inspectByOrder.get(key)!.items.push(item)
-  }
-
-  const inspectOrderBlocks = Array.from(inspectByOrder.values()).map(grp => {
-    const itemRows = grp.items.map(item => `
-      <tr data-poi-id="${item['poi_id']}" class="inspect-row">
-        <td class="small ps-3">
-          <span class="badge bg-secondary me-1">${esc(item['item_category'])}</span>
-          ${esc(item['manufacturer'])} <strong>${esc(item['product_name'])}</strong>
-          ${item['spec'] ? `<span class="text-muted ms-1">${esc(item['spec'])}</span>` : ''}
-          ${item['color'] ? `<span class="text-muted ms-1">${esc(item['color'])}</span>` : ''}
-        </td>
-        <td class="text-center small">${item['quantity']}</td>
-        <td class="text-center small text-success">${item['received_qty']}</td>
-        <td class="text-center">
-          <button class="btn btn-sm btn-outline-secondary btn-dash-inspect"
-            data-poi-id="${item['poi_id']}" data-order-id="${grp.orderId}"
-            style="min-width:80px;font-size:0.75rem;padding:3px 8px">
-            <i class="far fa-circle me-1"></i>未検品
-          </button>
-        </td>
-      </tr>`).join('')
+  // 遅延アラート
+  const overdueCount = overdueRows.results.length
+  const overdueAlerts = overdueRows.results.map(r => {
+    const days = Number(r['days_elapsed'])
+    const urgColor = days >= 14 ? '#dc2626' : '#d97706'
+    const urgLabel = days >= 14 ? '至急確認' : '要確認'
     return `
-    <div class="border rounded mb-2 overflow-hidden inspect-order-block" data-order-id="${grp.orderId}">
-      <div class="d-flex align-items-center gap-2 px-3 py-2 bg-light border-bottom">
-        <a href="/orders/${grp.orderId}" class="fw-bold text-decoration-none">${esc(grp.orderNo)}</a>
-        ${statusBadge(grp.status)}
-        <span class="text-muted small">${esc(grp.orderDate)}</span>
-        <span class="ms-1 small"><i class="fas fa-building me-1 text-muted"></i>${esc(grp.supplierName)}</span>
-        ${grp.customerName ? `<span class="ms-1 small text-muted"><i class="fas fa-user me-1"></i>${esc(grp.customerName)}</span>` : ''}
-        <span class="ms-auto badge bg-warning text-dark" id="remain-badge-${grp.orderId}">${grp.items.length}件</span>
+    <div class="dash-alert-item" data-order-id="${r['id']}">
+      <div class="dash-alert-left">
+        <span class="dash-alert-days" style="color:${urgColor}">${days}日経過</span>
+        <span class="dash-alert-urgency" style="background:${urgColor}20;color:${urgColor}">${urgLabel}</span>
       </div>
-      <table class="table table-sm mb-0">
-        <thead>
-          <tr>
-            <th class="ps-3">商品</th>
-            <th class="text-center" style="width:60px">発注数</th>
-            <th class="text-center" style="width:60px">入荷数</th>
-            <th class="text-center" style="width:100px">検品</th>
-          </tr>
-        </thead>
-        <tbody class="inspect-tbody-${grp.orderId}">${itemRows}</tbody>
-      </table>
+      <div class="dash-alert-center">
+        <div class="dash-alert-customer">${esc(r['customer_name'] || '（仕入・在庫）')}</div>
+        <div class="dash-alert-products">${esc(String(r['products'] ?? '').split(' / ').slice(0,2).join(' / '))}</div>
+        <div class="dash-alert-supplier"><i class="fas fa-building me-1 opacity-50"></i>${esc(r['supplier_name'])}<span class="ms-2 badge bg-secondary" style="font-size:0.65rem">${esc(r['order_method'])}</span></div>
+      </div>
+      <div class="dash-alert-right">
+        <a href="/orders/${r['id']}" class="btn btn-sm btn-outline-danger">詳細 <i class="fas fa-arrow-right ms-1"></i></a>
+      </div>
     </div>`
   }).join('')
 
-  const recent = await db.prepare(`
-    SELECT po.id, po.order_no, po.order_date, po.status, po.customer_name,
-           s.name AS supplier_name,
-           COUNT(poi.id) AS line_count,
-           COALESCE(SUM(poi.amount),0) AS total_amount,
-           COALESCE(SUM(poi.quantity),0) AS total_qty
-    FROM purchase_orders po
-    JOIN suppliers s ON po.supplier_id=s.id
-    LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
-    WHERE po.tenant_id=?
-    GROUP BY po.id ORDER BY po.id DESC LIMIT 10
-  `).bind(tenantId).all<Record<string,unknown>>()
+  // 検品待ち：発注IDでグループ化
+  type InspectGroup = { orderId:number; orderDate:string; status:string; customerName:string; supplierName:string; items: Record<string,unknown>[] }
+  const inspectMap = new Map<number, InspectGroup>()
+  for (const item of pendingRows.results) {
+    const oid = Number(item['order_id'])
+    if (!inspectMap.has(oid)) {
+      inspectMap.set(oid, {
+        orderId: oid,
+        orderDate: String(item['order_date'] ?? ''),
+        status: String(item['status'] ?? ''),
+        customerName: String(item['customer_name'] ?? ''),
+        supplierName: String(item['supplier_name'] ?? ''),
+        items: []
+      })
+    }
+    inspectMap.get(oid)!.items.push(item)
+  }
+  const inspectCount = pendingRows.results.length
+  const inspectBlocks = Array.from(inspectMap.values()).map(grp => {
+    const itemCards = grp.items.map(item => `
+      <div class="inspect-item-card" data-poi-id="${item['poi_id']}">
+        <div class="inspect-item-info">
+          <span class="inspect-item-cat">${esc(item['item_category'])}</span>
+          <span class="inspect-item-name">${esc(item['manufacturer'] ? item['manufacturer']+' ' : '')}${esc(item['product_name'])}</span>
+          ${item['spec'] ? `<span class="inspect-item-spec">${esc(item['spec'])}</span>` : ''}
+          ${item['color'] ? `<span class="inspect-item-spec">${esc(item['color'])}</span>` : ''}
+        </div>
+        <div class="inspect-item-qty">
+          <span class="qty-received">${item['received_qty']}</span>
+          <span class="qty-sep">/</span>
+          <span class="qty-total">${item['quantity']}</span>
+          <span class="qty-unit">本</span>
+        </div>
+        <button class="btn-inspect-done btn-dash-inspect"
+          data-poi-id="${item['poi_id']}" data-order-id="${grp.orderId}">
+          <i class="fas fa-check me-1"></i>検品済
+        </button>
+      </div>`).join('')
+    return `
+    <div class="inspect-order-block" data-order-id="${grp.orderId}" id="inspect-block-${grp.orderId}">
+      <div class="inspect-order-header">
+        <span class="inspect-order-customer"><i class="fas fa-user me-1 opacity-50"></i>${esc(grp.customerName || '仕入・在庫')}</span>
+        <span class="inspect-order-supplier text-muted">${esc(grp.supplierName)}</span>
+        <span class="ms-auto badge ${grp.status === 'partial' ? 'text-bg-warning' : 'text-bg-success'}" id="remain-badge-${grp.orderId}">${grp.items.length}点</span>
+        <a href="/orders/${grp.orderId}" class="inspect-order-link">詳細</a>
+      </div>
+      <div class="inspect-items-wrap" id="inspect-items-${grp.orderId}">${itemCards}</div>
+    </div>`
+  }).join('')
 
-  const rows = recent.results.map(r => `<tr>
-    <td><a href="/orders/${r['id']}">${esc(r['order_no'])}</a></td>
-    <td>${esc(r['order_date'])}</td>
-    <td>${esc(r['supplier_name'])}</td>
-    <td>${esc(r['customer_name'])}</td>
-    <td class="text-center">${r['line_count']}</td>
-    <td class="text-center">${r['total_qty']}</td>
-    <td class="text-end">${yen(r['total_amount'])}</td>
-    <td>${statusBadge(String(r['status']))}</td>
-  </tr>`).join('')
+  // お客様対応中カード
+  const activeCards = activeRows.results.map(r => {
+    const days = Number(r['days_elapsed'])
+    const totalQty = Number(r['total_qty'])
+    const recvQty  = Number(r['received_qty'])
+    const pct = totalQty > 0 ? Math.round(recvQty / totalQty * 100) : 0
+    const isPartial = String(r['status']) === 'partial'
+    const statusColor = isPartial ? '#d97706' : '#3b82f6'
+    const progressBar = isPartial ? `
+      <div class="progress-wrap">
+        <div class="progress" style="height:4px;border-radius:2px;background:#e5e7eb">
+          <div class="progress-bar" style="width:${pct}%;background:#d97706"></div>
+        </div>
+        <span class="progress-label">${recvQty}/${totalQty} 入荷済</span>
+      </div>` : ''
+    return `
+    <a href="/orders/${r['id']}" class="active-order-card">
+      <div class="active-order-top">
+        <span class="active-order-customer">${esc(r['customer_name'])}</span>
+        <span class="active-order-badge" style="background:${statusColor}20;color:${statusColor}">${statusLabel(String(r['status']))}</span>
+      </div>
+      <div class="active-order-supplier"><i class="fas fa-building me-1 opacity-40"></i>${esc(r['supplier_name'])}</div>
+      ${progressBar}
+      <div class="active-order-meta">
+        <span><i class="fas fa-calendar me-1 opacity-40"></i>${esc(r['order_date'])}</span>
+        <span class="ms-auto" style="color:${days >= 10 ? '#d97706' : 'var(--gw-muted)'}">${days}日前</span>
+      </div>
+    </a>`
+  }).join('')
 
-  const dashScript = `
-<script>
+  // 下書きリスト
+  const draftItems = draftRows.results.map(r => `
+    <a href="/orders/${r['id']}" class="draft-item">
+      <i class="fas fa-file-alt me-2 opacity-40"></i>
+      <span class="draft-customer">${esc(r['customer_name'] || '（顧客未設定）')}</span>
+      <span class="draft-supplier text-muted ms-2">${esc(r['supplier_name'])}</span>
+      <span class="ms-auto draft-date text-muted">${esc(r['order_date'])}</span>
+    </a>`).join('')
+
+  // ── CSS ──────────────────────────────────────────────────
+  const dashCss = `<style>
+/* ── 今日やること ヘッダー ── */
+.dash-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem; flex-wrap:wrap; gap:.75rem; }
+.dash-title { font-size:1.1rem; font-weight:700; color:var(--gw-text); }
+.dash-date { font-size:.8rem; color:var(--gw-muted); }
+
+/* ── 状態サマリバー ── */
+.status-bar { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+.status-pill { display:flex; align-items:center; gap:.4rem; padding:.35rem .75rem; border-radius:99px; font-size:.78rem; font-weight:600; border:1px solid transparent; text-decoration:none; transition:opacity .15s; }
+.status-pill:hover { opacity:.8; }
+.status-pill .pill-count { font-size:1rem; font-weight:700; }
+
+/* ── セクション共通 ── */
+.dash-section { margin-bottom:1.5rem; }
+.dash-section-header { display:flex; align-items:center; gap:.5rem; margin-bottom:.75rem; }
+.dash-section-title { font-size:.875rem; font-weight:700; color:var(--gw-text); }
+.dash-section-badge { font-size:.7rem; padding:.2rem .5rem; border-radius:99px; font-weight:700; }
+.dash-empty { text-align:center; padding:1.25rem; color:var(--gw-muted); font-size:.83rem; background:var(--gw-surface); border-radius:10px; }
+
+/* ── 対応が必要アラート ── */
+.dash-alert-list { display:flex; flex-direction:column; gap:.5rem; }
+.dash-alert-item { display:flex; align-items:center; gap:.75rem; padding:.75rem 1rem; background:#fff9f0; border:1px solid #fed7aa; border-radius:10px; }
+.dash-alert-left { display:flex; flex-direction:column; align-items:center; gap:.25rem; min-width:60px; }
+.dash-alert-days { font-size:1rem; font-weight:800; line-height:1; }
+.dash-alert-urgency { font-size:.65rem; font-weight:700; padding:.15rem .4rem; border-radius:4px; }
+.dash-alert-center { flex:1; min-width:0; }
+.dash-alert-customer { font-weight:700; font-size:.88rem; color:var(--gw-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dash-alert-products { font-size:.78rem; color:var(--gw-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dash-alert-supplier { font-size:.75rem; color:var(--gw-muted); margin-top:.15rem; }
+.dash-alert-right { flex-shrink:0; }
+
+/* ── 検品待ち ── */
+.inspect-order-block { background:var(--gw-surface); border-radius:10px; border:1px solid var(--gw-border); margin-bottom:.75rem; overflow:hidden; }
+.inspect-order-header { display:flex; align-items:center; gap:.5rem; padding:.6rem .875rem; background:#f0fdf4; border-bottom:1px solid var(--gw-border); flex-wrap:wrap; }
+.inspect-order-customer { font-weight:700; font-size:.85rem; }
+.inspect-order-supplier { font-size:.78rem; }
+.inspect-order-link { font-size:.75rem; color:var(--gw-green); text-decoration:none; white-space:nowrap; }
+.inspect-items-wrap { padding:.5rem .875rem .75rem; display:flex; flex-direction:column; gap:.5rem; }
+.inspect-item-card { display:flex; align-items:center; gap:.625rem; padding:.5rem .625rem; background:#fff; border:1px solid var(--gw-border); border-radius:8px; }
+.inspect-item-info { flex:1; min-width:0; }
+.inspect-item-cat { display:inline-block; font-size:.65rem; background:#e5e7eb; color:#6b7280; border-radius:4px; padding:.1rem .35rem; margin-right:.25rem; }
+.inspect-item-name { font-size:.83rem; font-weight:600; }
+.inspect-item-spec { font-size:.75rem; color:var(--gw-muted); margin-left:.25rem; }
+.inspect-item-qty { font-size:.83rem; color:var(--gw-muted); white-space:nowrap; flex-shrink:0; }
+.qty-received { color:var(--gw-green); font-weight:700; }
+.qty-sep { margin:0 .15rem; }
+.qty-total, .qty-unit { color:var(--gw-muted); }
+.btn-inspect-done { flex-shrink:0; padding:.3rem .7rem; font-size:.75rem; font-weight:600; background:#f0fdf4; color:var(--gw-green); border:1px solid #86efac; border-radius:6px; cursor:pointer; transition:background .15s; white-space:nowrap; }
+.btn-inspect-done:hover { background:#dcfce7; }
+.btn-inspect-done:disabled { opacity:.5; cursor:default; }
+
+/* ── お客様対応中 ── */
+.active-orders-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.625rem; }
+.active-order-card { display:block; padding:.75rem 1rem; background:var(--gw-surface); border:1px solid var(--gw-border); border-radius:10px; text-decoration:none; color:var(--gw-text); transition:box-shadow .15s, transform .1s; }
+.active-order-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.08); transform:translateY(-1px); color:var(--gw-text); }
+.active-order-top { display:flex; align-items:flex-start; justify-content:space-between; gap:.5rem; margin-bottom:.3rem; }
+.active-order-customer { font-weight:700; font-size:.9rem; line-height:1.3; }
+.active-order-badge { font-size:.68rem; font-weight:700; padding:.2rem .5rem; border-radius:99px; white-space:nowrap; flex-shrink:0; }
+.active-order-supplier { font-size:.75rem; color:var(--gw-muted); margin-bottom:.4rem; }
+.progress-wrap { margin:.4rem 0; }
+.progress-label { font-size:.7rem; color:var(--gw-muted); display:block; margin-top:.2rem; }
+.active-order-meta { display:flex; font-size:.72rem; color:var(--gw-muted); margin-top:.35rem; }
+
+/* ── 下書き ── */
+.draft-list { display:flex; flex-direction:column; gap:.375rem; }
+.draft-item { display:flex; align-items:center; padding:.55rem .875rem; background:var(--gw-surface); border:1px solid var(--gw-border); border-radius:8px; font-size:.82rem; text-decoration:none; color:var(--gw-text); transition:background .1s; }
+.draft-item:hover { background:#f8fafc; color:var(--gw-text); }
+.draft-customer { font-weight:600; }
+.draft-date { font-size:.75rem; }
+</style>`
+
+  // ── JavaScript ───────────────────────────────────────────
+  const dashScript = `<script>
 (function(){
-  // ダッシュボード検品ボタン
+  // 検品済みボタン
   document.querySelectorAll('.btn-dash-inspect').forEach(function(btn){
     btn.addEventListener('click', async function(){
-      var poiId   = btn.dataset.poiId;
-      var orderId = btn.dataset.orderId;
-      var tr      = btn.closest('tr');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+      var poiId   = btn.dataset.poiId
+      var orderId = btn.dataset.orderId
+      var card    = btn.closest('.inspect-item-card')
+      btn.disabled = true
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem"></span>'
       try {
         var r = await fetch('/api/orders/'+orderId+'/items/'+poiId+'/inspect',{
           method:'PATCH', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({inspected:1})
-        });
-        var d = await r.json();
+        })
+        var d = await r.json()
         if(r.ok){
-          // 行をフェードアウトして削除
-          tr.style.transition = 'opacity 0.4s';
-          tr.style.opacity = '0';
+          card.style.transition = 'opacity 0.35s'
+          card.style.opacity = '0'
           setTimeout(function(){
-            tr.remove();
-            // バッジ件数を更新
-            var tbody = document.querySelector('.inspect-tbody-'+orderId);
-            var remainCount = tbody ? tbody.querySelectorAll('tr').length : 0;
-            var badge = document.getElementById('remain-badge-'+orderId);
-            if(badge) badge.textContent = remainCount + '件';
-            // 発注全件完了なら発注ブロックも消す
-            if(remainCount === 0){
-              var block = document.querySelector('.inspect-order-block[data-order-id="'+orderId+'"]');
-              if(block){ block.style.transition='opacity 0.4s'; block.style.opacity='0'; setTimeout(function(){ block.remove(); updateTotalBadge(); },400); }
+            card.remove()
+            var wrap = document.getElementById('inspect-items-'+orderId)
+            var remain = wrap ? wrap.querySelectorAll('.inspect-item-card').length : 0
+            var badge = document.getElementById('remain-badge-'+orderId)
+            if(badge) badge.textContent = remain+'点'
+            if(remain === 0){
+              var block = document.getElementById('inspect-block-'+orderId)
+              if(block){ block.style.transition='opacity 0.35s'; block.style.opacity='0'; setTimeout(function(){ block.remove(); updateInspectBadge() },350) }
             }
-            updateTotalBadge();
-            if(d.all_inspected){
-              showFlash('✓ 発注 '+orderId+' がすべて検品済みになりました！','success');
-            } else {
-              showFlash('検品済みにしました','success');
-            }
-          }, 400);
+            updateInspectBadge()
+            showFlash('検品済みにしました','success')
+          }, 350)
         } else {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="far fa-circle me-1"></i>未検品';
-          showFlash((d && d.error) ? d.error : '更新に失敗しました','danger');
+          btn.disabled = false
+          btn.innerHTML = '<i class="fas fa-check me-1"></i>検品済'
+          showFlash((d&&d.error)||'更新に失敗しました','danger')
         }
       } catch(e){
-        btn.disabled = false;
-        btn.innerHTML = '<i class="far fa-circle me-1"></i>未検品';
-        showFlash('通信エラーが発生しました','danger');
+        btn.disabled = false
+        btn.innerHTML = '<i class="fas fa-check me-1"></i>検品済'
+        showFlash('通信エラーが発生しました','danger')
       }
-    });
-  });
+    })
+  })
 
-  function updateTotalBadge(){
-    var total = document.querySelectorAll('.btn-dash-inspect').length;
-    var badge = document.getElementById('inspect-total-badge');
-    if(badge) badge.textContent = total + '件';
-    var widget = document.getElementById('inspect-widget-body');
-    if(total === 0 && widget){
-      widget.innerHTML = '<div class="text-center py-4 text-success"><i class="fas fa-check-circle fa-2x mb-2"></i><br>検品待ちの商品はありません</div>';
+  function updateInspectBadge(){
+    var total = document.querySelectorAll('.btn-dash-inspect').length
+    var badge = document.getElementById('inspect-section-badge')
+    if(badge) badge.textContent = total+'件'
+    if(total === 0){
+      var sec = document.getElementById('inspect-section-body')
+      if(sec) sec.innerHTML = '<div class="dash-empty"><i class="fas fa-check-circle text-success me-2"></i>検品待ちの商品はありません</div>'
     }
   }
-
-  // showFlash は layout() 共通関数を使用
-})();
+})()
 </script>`
 
-  const content = `
-<div class="action-bar mb-4">
+  // ── 今日の日付（日本語）─────────────────────────────
+  const todayJP = (() => {
+    const d = new Date()
+    const wd = ['日','月','火','水','木','金','土'][d.getDay()]
+    return `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${wd}）`
+  })()
+
+  const content = dashCss + `
+<div class="dash-header">
   <div>
-    <h1 class="page-title"><i class="fas fa-chart-line me-2" style="color:var(--gw-green)"></i>ダッシュボード</h1>
-    <p class="page-subtitle">発注・納品・残注の状況を横断的に確認できます。</p>
+    <div class="dash-title"><i class="fas fa-home me-2" style="color:var(--gw-green)"></i>今日やること</div>
+    <div class="dash-date">${todayJP}</div>
   </div>
-  <div class="actions">
-    <a class="btn btn-primary" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注を作成</a>
+  <a class="btn btn-primary btn-sm" href="/orders/new"><i class="fas fa-plus me-1"></i>新規発注</a>
+</div>
+
+<!-- ── 状態サマリバー ── -->
+<div class="status-bar">
+  <a href="/orders?status=draft" class="status-pill" style="background:#f1f5f9;color:#64748b;border-color:#e2e8f0">
+    <i class="fas fa-file-alt"></i><span class="pill-count">${draftCount}</span>下書き
+  </a>
+  <a href="/orders?status=ordered" class="status-pill" style="background:#eff6ff;color:#3b82f6;border-color:#bfdbfe">
+    <i class="fas fa-paper-plane"></i><span class="pill-count">${orderedCount}</span>発注済
+  </a>
+  <a href="/orders?status=partial" class="status-pill" style="background:#fffbeb;color:#d97706;border-color:#fde68a">
+    <i class="fas fa-box-open"></i><span class="pill-count">${partialCount}</span>一部入荷
+  </a>
+  <a href="/orders?status=completed" class="status-pill" style="background:#f0fdf4;color:#16a34a;border-color:#bbf7d0">
+    <i class="fas fa-check-circle"></i><span class="pill-count">${completedCount}</span>完納
+  </a>
+</div>
+
+<!-- ── ① 対応が必要 ── -->
+<div class="dash-section">
+  <div class="dash-section-header">
+    <i class="fas fa-exclamation-circle" style="color:#dc2626"></i>
+    <span class="dash-section-title">対応が必要</span>
+    <span class="dash-section-badge" style="background:${overdueCount>0?'#fef2f2':'#f0fdf4'};color:${overdueCount>0?'#dc2626':'#16a34a'}">${overdueCount}件</span>
+    <span style="font-size:.72rem;color:var(--gw-muted);margin-left:auto">発注から7日以上・未入荷</span>
+  </div>
+  <div class="dash-alert-list">
+    ${overdueCount === 0
+      ? '<div class="dash-empty"><i class="fas fa-check-circle text-success me-2"></i>対応が必要な案件はありません</div>'
+      : overdueAlerts}
   </div>
 </div>
 
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="metric-card h-100">
-      <div class="metric-label"><i class="fas fa-box me-1"></i>商品マスタ</div>
-      <div class="metric-value">${p?.c ?? 0}</div>
-    </div>
+<!-- ── ② 検品待ち ── -->
+<div class="dash-section">
+  <div class="dash-section-header">
+    <i class="fas fa-clipboard-check" style="color:${inspectCount>0?'#d97706':'#16a34a'}"></i>
+    <span class="dash-section-title">検品待ち</span>
+    <span class="dash-section-badge" id="inspect-section-badge" style="background:${inspectCount>0?'#fffbeb':'#f0fdf4'};color:${inspectCount>0?'#d97706':'#16a34a'}">${inspectCount}件</span>
+    <span style="font-size:.72rem;color:var(--gw-muted);margin-left:auto">入荷済・未検品</span>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="metric-card h-100">
-      <div class="metric-label"><i class="fas fa-building me-1"></i>仕入先</div>
-      <div class="metric-value">${s?.c ?? 0}</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="metric-card h-100 success">
-      <div class="metric-label"><i class="fas fa-file-alt me-1"></i>発注件数</div>
-      <div class="metric-value">${o?.c ?? 0}</div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="metric-card h-100 ${(b?.c ?? 0) > 0 ? 'danger' : 'success'}">
-      <div class="metric-label"><i class="fas fa-exclamation-triangle me-1"></i>残注明細</div>
-      <div class="metric-value">${b?.c ?? 0}</div>
-    </div>
-  </div>
-</div>
-
-<!-- 検品待ちウィジェット -->
-<div class="card mb-4">
-  <div class="card-header d-flex align-items-center gap-2">
-    <i class="fas fa-clipboard-check" style="color:${inspectCount === 0 ? 'var(--gw-green)' : '#d97706'}"></i>
-    <span class="card-title">検品待ち商品</span>
-    <span class="badge ${inspectCount === 0 ? 'text-bg-success' : 'text-bg-warning'}" id="inspect-total-badge">${inspectCount}件</span>
-    <span class="ms-auto" style="font-size:0.75rem;color:var(--gw-muted)">発注済・一部入荷の未検品明細</span>
-  </div>
-  <div class="card-body p-3" id="inspect-widget-body">
+  <div id="inspect-section-body">
     ${inspectCount === 0
-      ? `<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--gw-green);opacity:1"></i><p class="mt-2" style="color:var(--gw-green)">検品待ちの商品はありません</p></div>`
-      : inspectOrderBlocks
-    }
+      ? '<div class="dash-empty"><i class="fas fa-check-circle text-success me-2"></i>検品待ちの商品はありません</div>'
+      : inspectBlocks}
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <span class="card-title"><i class="fas fa-clock me-1"></i>最近の発注</span>
-    <a href="/orders" class="btn btn-sm btn-outline-secondary">すべて見る <i class="fas fa-arrow-right ms-1"></i></a>
+<!-- ── ③ お客様対応中 ── -->
+<div class="dash-section">
+  <div class="dash-section-header">
+    <i class="fas fa-user-clock" style="color:#3b82f6"></i>
+    <span class="dash-section-title">お客様対応中</span>
+    <span class="dash-section-badge" style="background:#eff6ff;color:#3b82f6">${activeRows.results.length}件</span>
+    <span style="font-size:.72rem;color:var(--gw-muted);margin-left:auto">発注済・一部入荷（顧客名あり）</span>
   </div>
-  <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
-      <thead><tr>
-        <th>発注番号</th><th>発注日</th><th>仕入先</th><th>顧客名</th>
-        <th class="text-center">明細数</th><th class="text-center">数量</th>
-        <th class="text-end">金額</th><th>状態</th>
-      </tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" class="text-center text-muted py-4"><i class="fas fa-inbox me-2 opacity-25"></i>まだ発注データがありません。</td></tr>'}</tbody>
-    </table>
+  ${activeRows.results.length === 0
+    ? '<div class="dash-empty">対応中のお客様案件はありません</div>'
+    : `<div class="active-orders-grid">${activeCards}</div>`}
+</div>
+
+<!-- ── ④ 下書き ── -->
+${draftCount > 0 ? `
+<div class="dash-section">
+  <div class="dash-section-header">
+    <i class="fas fa-file-edit" style="color:#64748b"></i>
+    <span class="dash-section-title">発注し忘れ確認</span>
+    <span class="dash-section-badge" style="background:#f1f5f9;color:#64748b">${draftCount}件</span>
+    <span style="font-size:.72rem;color:var(--gw-muted);margin-left:auto">下書き・未発注</span>
   </div>
-</div>${dashScript}`
-  const o0 = getLayoutOpts(c)
-  return layout('ダッシュボード', content, '', o0.username, o0)
+  <div class="draft-list">${draftItems}</div>
+</div>` : ''}
+
+${dashScript}`
+
+  return layout('今日やること', content, '', opts.username, opts)
 })
 
 // ============================================================

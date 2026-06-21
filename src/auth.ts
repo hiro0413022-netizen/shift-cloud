@@ -158,7 +158,7 @@ export async function attemptLogin(
       const cookie = makeCookie(token)
       return new Response(null, {
         status: 302,
-        headers: { 'Location': '/orders', 'Set-Cookie': cookie }
+        headers: { 'Location': '/dashboard', 'Set-Cookie': cookie }
       })
     }
   }
@@ -172,7 +172,7 @@ export async function attemptLogin(
     const cookie = makeCookie(token)
     return new Response(null, {
       status: 302,
-      headers: { 'Location': '/orders', 'Set-Cookie': cookie }
+      headers: { 'Location': '/dashboard', 'Set-Cookie': cookie }
     })
   }
 

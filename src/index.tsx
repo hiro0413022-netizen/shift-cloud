@@ -49,7 +49,7 @@ app.get('/demo-login', async (c) => {
   ].join('; ')
   return new Response(null, {
     status: 302,
-    headers: { 'Location': '/orders', 'Set-Cookie': cookie }  // ダッシュボード（発注一覧）へ直接
+    headers: { 'Location': '/dashboard', 'Set-Cookie': cookie }
   })
 })
 
@@ -57,8 +57,8 @@ app.get('/demo-login', async (c) => {
 app.get('/login', async (c) => {
   const secret = c.env.AUTH_SECRET || 'golfwing-secret-key-change-in-production'
   const user = await getCurrentUser(c.req.raw, c.env.DB, secret)
-  if (user) return c.redirect('/orders')  // ログイン済みならダッシュボードへ
-  const next = c.req.query('next') || '/orders'
+  if (user) return c.redirect('/dashboard')
+  const next = c.req.query('next') || '/dashboard'
   return loginPage(false, next, c.env.APP_NAME)
 })
 
@@ -67,12 +67,11 @@ app.post('/login', async (c) => {
   const form     = await c.req.formData()
   const username = String(form.get('username') || '')
   const password = String(form.get('password') || '')
-  const next     = String(form.get('next') || '/orders')
+  const next     = String(form.get('next') || '/dashboard')
   const result   = await attemptLogin(username, password, c.env)
   if (result) {
-    // next が / の場合は /orders（ダッシュボード）へ
-    const rawDest = next.startsWith('/') && !next.startsWith('//') ? next : '/orders'
-    const dest = rawDest === '/' ? '/orders' : rawDest
+    const rawDest = next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard'
+    const dest = rawDest === '/' ? '/dashboard' : rawDest
     return new Response(null, {
       status: 302,
       headers: {
@@ -146,7 +145,7 @@ app.get('/', async (c) => {
   // ログイン済みかどうかを自力で確認（ミドルウェアは / をスキップするため）
   const secret = c.env.AUTH_SECRET || 'golfwing-secret-key-change-in-production'
   const user = await getCurrentUser(c.req.raw, c.env.DB, secret)
-  if (user) return c.redirect('/orders')  // ログイン済みならダッシュボードへ
+  if (user) return c.redirect('/dashboard')  // ログイン済みならダッシュボードへ
   const appName = c.env.APP_NAME || 'GolfOrder'
   return c.html(landingPage(appName))
 })
