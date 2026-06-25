@@ -1553,17 +1553,25 @@ app.put('/product-suppliers/:id', async (c) => {
         .bind(ps.product_id, tenantId).run()
     }
   }
-  await db.prepare(`
-    UPDATE product_suppliers SET supplier_id=?, rate=?, is_default=?, notes=?, sort_order=?
-    WHERE id=? AND tenant_id=?
-  `).bind(
-    parseInt(String(b['supplier_id'])),
-    b['rate'] ? parseFloat(String(b['rate'])) : null,
-    b['is_default'] ? 1 : 0,
-    b['notes'] ? String(b['notes']) : null,
-    b['sort_order'] ? parseInt(String(b['sort_order'])) : 0,
-    id, tenantId
-  ).run()
+  // is_defaultのみ変更する「デフォルト設定」モード（supplier_idが0または未指定の場合）
+  const supplierId = b['supplier_id'] ? parseInt(String(b['supplier_id'])) : null
+  if (!supplierId || supplierId === 0) {
+    // is_defaultだけ更新
+    await db.prepare('UPDATE product_suppliers SET is_default=? WHERE id=? AND tenant_id=?')
+      .bind(b['is_default'] ? 1 : 0, id, tenantId).run()
+  } else {
+    await db.prepare(`
+      UPDATE product_suppliers SET supplier_id=?, rate=?, is_default=?, notes=?, sort_order=?
+      WHERE id=? AND tenant_id=?
+    `).bind(
+      supplierId,
+      b['rate'] != null ? parseFloat(String(b['rate'])) : null,
+      b['is_default'] ? 1 : 0,
+      b['notes'] ? String(b['notes']) : null,
+      b['sort_order'] ? parseInt(String(b['sort_order'])) : 0,
+      id, tenantId
+    ).run()
+  }
   return c.json({ ok: true })
 })
 

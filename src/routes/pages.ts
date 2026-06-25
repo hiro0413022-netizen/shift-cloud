@@ -801,14 +801,26 @@ app.get('/products', async (c) => {
     <td>${ctBadge}</td>
     <td class="text-end fw-semibold text-primary">${yen(r['list_price'])}</td>
     <td class="text-center">${r['default_rate'] != null ? (Number(r['default_rate'])*100).toFixed(1)+'%' : ''}</td>
-    <td class="small">${esc(r['supplier_name'])}</td>
+    <td class="small">
+      <span class="me-1">${esc(r['supplier_name']) || '<span class="text-muted">&#x2015;</span>'}</span>
+      ${!isDiscontinued ? `<button class="btn btn-xs btn-outline-secondary py-0 px-1 btn-manage-suppliers"
+        data-product-id="${r['id']}"
+        data-product-name="${esc(r['name'])}"
+        title="仕入先を追加・管理"
+        style="font-size:0.7rem">
+        <i class="fas fa-truck me-1"></i>仕入先
+      </button>` : ''}
+    </td>
     <td class="text-muted small">${esc(r['barcode'])}</td>
     <td style="white-space:nowrap">${actionBtns}</td>
   </tr>`
   }).join('')
 
+  // 複数仕入先管理モーダル用の仕入先Optionsを埋め込む（JS側でそのまま使用）
+  const supplierOptsJson = JSON.stringify(suppliers.results.map(s => ({ id: s['id'], name: s['name'] })))
+
   const scripts = `<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script>window._PRODUCTS_PAGE_COUNT = '${res.results.length} 件表示（このページ）'; window._PRODUCTS_TAB = '${tab}';</script>
+<script>window._PRODUCTS_PAGE_COUNT = '${res.results.length} 件表示（このページ）'; window._PRODUCTS_TAB = '${tab}'; window._SUPPLIERS = ${supplierOptsJson};</script>
 <script src="/static/products-page.js"></script>`
 
   const currentSortLabel = (sortKey === 'manufacturer' ? 'メーカー'
@@ -1264,6 +1276,67 @@ ${buildPager()}
           <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i>保存</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ════ 複数仕入先管理モーダル ════ -->
+<div class="modal fade" id="suppliersModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-truck me-2"></i>仕入先設定: <span id="sup-modal-product-name"></span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">
+          <i class="fas fa-info-circle me-1"></i>
+          同じ商品でも仕入先ごとに掛け率が異なる場合、ここで設定できます。発注作成時に仕入先を選択すると掛け率が自動反映されます。
+        </p>
+        <!-- 現在の仕入先リスト -->
+        <div id="sup-modal-list" class="mb-3"></div>
+        <!-- 追加フォーム -->
+        <div class="card border-primary">
+          <div class="card-header bg-primary text-white py-2 small fw-semibold">
+            <i class="fas fa-plus me-1"></i>仕入先を追加
+          </div>
+          <div class="card-body py-3">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-5">
+                <label class="form-label small fw-semibold mb-1">仕入先 <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm" id="sup-add-supplier">
+                  <option value="">― 選択 ―</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small fw-semibold mb-1">掛率 <span class="text-muted fw-normal">(例: 0.65)</span></label>
+                <input type="number" class="form-control form-control-sm text-end" id="sup-add-rate"
+                  min="0" max="1" step="0.01" placeholder="0.65">
+              </div>
+              <div class="col-md-2 d-flex align-items-center pt-4">
+                <div class="form-check mb-0">
+                  <input class="form-check-input" type="checkbox" id="sup-add-default">
+                  <label class="form-check-label small" for="sup-add-default">デフォルト</label>
+                </div>
+              </div>
+              <div class="col-md-2">
+                <button class="btn btn-primary btn-sm w-100" id="btn-sup-add">
+                  <i class="fas fa-plus me-1"></i>追加
+                </button>
+              </div>
+              <div class="col-12">
+                <label class="form-label small fw-semibold mb-1">備考 <span class="text-muted fw-normal small">(急ぎ用・送料無料条件など)</span></label>
+                <input type="text" class="form-control form-control-sm" id="sup-add-notes" placeholder="例: 急ぎの場合のみ、ワークス経由">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+      </div>
     </div>
   </div>
 </div>`

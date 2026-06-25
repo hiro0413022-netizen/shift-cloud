@@ -532,6 +532,154 @@ if (doBulkEditBtn) {
   });
 }
 
+// ============================================================
+// 複数仕入先管理モーダル
+// ============================================================
+(function(){
+  var suppliersModal = document.getElementById('suppliersModal')
+    ? new bootstrap.Modal(document.getElementById('suppliersModal')) : null;
+  if (!suppliersModal) return;
+
+  var currentProductId = null;
+
+  // 仕入先セレクトを初期化
+  var supAddSel = document.getElementById('sup-add-supplier');
+  if (supAddSel && window._SUPPLIERS) {
+    window._SUPPLIERS.forEach(function(s) {
+      var opt = document.createElement('option');
+      opt.value = s.id;
+      opt.textContent = s.name;
+      supAddSel.appendChild(opt);
+    });
+  }
+
+  // 「仕入先」ボタンクリック → モーダルを開いてリストをロード
+  document.querySelectorAll('.btn-manage-suppliers').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      currentProductId = btn.dataset.productId;
+      var pName = btn.dataset.productName || '';
+      var nameEl = document.getElementById('sup-modal-product-name');
+      if (nameEl) nameEl.textContent = pName;
+      loadSupplierList(currentProductId);
+      suppliersModal.show();
+    });
+  });
+
+  // 仕入先リストを取得してモーダル内に描画
+  function loadSupplierList(productId) {
+    var listDiv = document.getElementById('sup-modal-list');
+    if (!listDiv) return;
+    listDiv.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm me-1"></span>読み込み中...</div>';
+    fetch('/api/product-suppliers/' + productId, { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(rows) {
+        if (!rows || rows.length === 0) {
+          listDiv.innerHTML = '<div class="text-muted small py-2"><i class="fas fa-info-circle me-1"></i>仕入先が設定されていません。下のフォームから追加してください。</div>';
+          return;
+        }
+        var html = '<table class="table table-sm mb-0 align-middle"><thead><tr>'
+          + '<th>仕入先</th><th class="text-center">掛率</th><th class="text-center">デフォルト</th><th>備考</th><th></th>'
+          + '</tr></thead><tbody>';
+        rows.forEach(function(row) {
+          var rateStr = row.rate != null ? (row.rate * 100).toFixed(1) + '%' : '<span class="text-muted">&#x2015;</span>';
+          var defaultBadge = row.is_default
+            ? '<span class="badge bg-success">デフォルト</span>'
+            : '<button class="btn btn-xs btn-outline-secondary py-0 px-1 btn-set-default" data-ps-id="' + row.id + '" style="font-size:0.7rem">デフォルトに設定</button>';
+          html += '<tr>'
+            + '<td class="fw-semibold">' + escHtml(row.supplier_name) + '</td>'
+            + '<td class="text-center">' + rateStr + '</td>'
+            + '<td class="text-center">' + defaultBadge + '</td>'
+            + '<td class="small text-muted">' + escHtml(row.notes || '') + '</td>'
+            + '<td><button class="btn btn-xs btn-outline-danger py-0 px-1 btn-del-ps" data-ps-id="' + row.id + '" title="削除"><i class="fas fa-trash"></i></button></td>'
+            + '</tr>';
+        });
+        html += '</tbody></table>';
+        listDiv.innerHTML = html;
+
+        // 削除ボタン
+        listDiv.querySelectorAll('.btn-del-ps').forEach(function(b) {
+          b.addEventListener('click', function() {
+            if (!confirm('この仕入先設定を削除しますか？')) return;
+            fetch('/api/product-suppliers/' + b.dataset.psId, { method: 'DELETE', credentials: 'include' })
+              .then(function(r) {
+                if (r.ok) { loadSupplierList(currentProductId); showFlash('削除しました', 'success'); }
+                else showFlash('削除に失敗しました', 'danger');
+              });
+          });
+        });
+
+        // デフォルト設定ボタン
+        listDiv.querySelectorAll('.btn-set-default').forEach(function(b) {
+          b.addEventListener('click', function() {
+            fetch('/api/product-suppliers/' + b.dataset.psId, {
+              method: 'PUT', credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ is_default: 1,
+                // 他フィールドを保持するため再取得ではなく、is_defaultだけ変更
+                supplier_id: 0 // API側でsupplier_idが必須のため暫定値（後で改善）
+              })
+            })
+            .then(function(r) {
+              if (r.ok) { loadSupplierList(currentProductId); showFlash('デフォルトを変更しました', 'success'); }
+              else showFlash('更新に失敗しました', 'danger');
+            });
+          });
+        });
+      })
+      .catch(function() {
+        listDiv.innerHTML = '<div class="text-danger small">読み込みに失敗しました</div>';
+      });
+  }
+
+  // 追加ボタン
+  var addBtn = document.getElementById('btn-sup-add');
+  if (addBtn) {
+    addBtn.addEventListener('click', async function() {
+      var supplierId = document.getElementById('sup-add-supplier').value;
+      var rate       = document.getElementById('sup-add-rate').value;
+      var notes      = document.getElementById('sup-add-notes').value.trim();
+      var isDefault  = document.getElementById('sup-add-default').checked;
+      if (!supplierId) { showFlash('仕入先を選択してください', 'danger'); return; }
+      addBtn.disabled = true;
+      addBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>追加中...';
+      try {
+        var r = await fetch('/api/product-suppliers', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product_id:  currentProductId,
+            supplier_id: supplierId,
+            rate:        rate ? parseFloat(rate) : null,
+            notes:       notes || null,
+            is_default:  isDefault ? 1 : 0,
+          })
+        });
+        if (r.ok) {
+          // フォームリセット
+          document.getElementById('sup-add-supplier').value = '';
+          document.getElementById('sup-add-rate').value = '';
+          document.getElementById('sup-add-notes').value = '';
+          document.getElementById('sup-add-default').checked = false;
+          loadSupplierList(currentProductId);
+          showFlash('仕入先を追加しました', 'success');
+        } else {
+          var err = await r.json().catch(function(){ return {}; });
+          showFlash(err.error || '追加に失敗しました', 'danger');
+        }
+      } catch(e) {
+        showFlash('通信エラーが発生しました', 'danger');
+      }
+      addBtn.disabled = false;
+      addBtn.innerHTML = '<i class="fas fa-plus me-1"></i>追加';
+    });
+  }
+
+  // HTMLエスケープヘルパー
+  function escHtml(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+})();
+
 } catch(e) { console.error('initProductPage error:', e.message, e.stack); }
 } // initProductPage end
 

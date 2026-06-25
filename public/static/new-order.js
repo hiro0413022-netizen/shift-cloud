@@ -267,17 +267,134 @@ function fillRow(tr, p) {
   if (upEl) { delete upEl.dataset.manual; upEl.value = ''; }
   calcUnitPrice(tr);
 
-  // 仕入先IDを suggest APIで取得してhidden inputに保存 → 備考エリアを更新
+  // 仕入先IDを設定: 複数仕入先がある場合はセレクトを表示、1件のみならhiddenに保存
   var supHid = tr.querySelector('.inp-supplier-id');
   if (supHid) supHid.value = '';
-  if (p.item_category || p.manufacturer) {
-    var qs = new URLSearchParams({
+
+  // 既存の仕入先セレクト(以前の選択時に作成済み)をクリア
+  var existSupSel = tr.querySelector('.inp-supplier-select-multi');
+  if (existSupSel) existSupSel.parentNode.removeChild(existSupSel);
+
+  // product_suppliersから仕入先候補を取得
+  if (p.id) {
+    fetch('/api/products/' + p.id + '/suppliers', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(suppliers) {
+        if (!Array.isArray(suppliers)) suppliers = [];
+
+        if (suppliers.length > 1) {
+          // 複数仕入先がある → セレクトボックスを表示
+          var tdPick = tr.querySelector('td:first-child');
+          var selSup = document.createElement('select');
+          selSup.className = 'form-select form-select-sm mt-1 inp-supplier-select inp-supplier-select-multi';
+          selSup.style.minWidth = '130px';
+          selSup.title = '仕入先を選択（掛け率が自動反映されます）';
+
+          suppliers.forEach(function(s) {
+            var opt = document.createElement('option');
+            opt.value = String(s.supplier_id);
+            var rateStr = s.rate != null ? ' (' + (s.rate * 100).toFixed(1) + '%)' : '';
+            var noteStr = s.notes ? ' ※' + s.notes : '';
+            opt.textContent = s.supplier_name + rateStr + noteStr;
+            opt.dataset.rate = s.rate != null ? String(s.rate) : '';
+            if (s.is_default) opt.selected = true;
+            selSup.appendChild(opt);
+          });
+
+          // 選択時: hidden同期 + 掛け率・単価自動更新 + 備考更新
+          selSup.addEventListener('change', function() {
+            supHid.value = this.value;
+            var selectedOpt = this.options[this.selectedIndex];
+            var newRate = selectedOpt ? selectedOpt.dataset.rate : '';
+            if (newRate) {
+              var rtEl = tr.querySelector('.inp-rate');
+              if (rtEl) {
+                rtEl.value = newRate;
+                calcUnitPrice(tr);
+              }
+            }
+            updateSupplierNotesArea();
+          });
+
+          // 初期値: デフォルト仕入先を選択してhiddenとrateに反映
+          var defaultOpt = selSup.options[selSup.selectedIndex];
+          if (defaultOpt) {
+            supHid.value = defaultOpt.value;
+            if (defaultOpt.dataset.rate) {
+              var rtEl2 = tr.querySelector('.inp-rate');
+              if (rtEl2) {
+                rtEl2.value = defaultOpt.dataset.rate;
+                calcUnitPrice(tr);
+              }
+            }
+          }
+
+          if (tdPick) {
+            tdPick.appendChild(selSup);
+          }
+          updateSupplierNotesArea();
+
+        } else {
+          // 1件以下 → 従来通りhiddenに保存
+          if (suppliers.length === 1) {
+            supHid.value = String(suppliers[0].supplier_id);
+            // 掛け率も反映
+            if (suppliers[0].rate != null) {
+              var rtEl3 = tr.querySelector('.inp-rate');
+              if (rtEl3 && !rtEl3.value) {
+                rtEl3.value = String(suppliers[0].rate);
+                calcUnitPrice(tr);
+              }
+            }
+            updateSupplierNotesArea();
+          } else if (p.item_category || p.manufacturer) {
+            // product_suppliersになければ従来のsuggest-supplier APIにフォールバック
+            var qs = new URLSearchParams({
+              item_category: p.item_category || '',
+              manufacturer:  p.manufacturer  || '',
+              club_type:     p.club_type     || ''
+            });
+            qs.set('product_id', String(p.id));
+            fetch('/api/suggest-supplier?' + qs.toString(), { credentials: 'include' })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.supplier && d.supplier.id && supHid) {
+                  supHid.value = String(d.supplier.id);
+                  updateSupplierNotesArea();
+                }
+              })
+              .catch(function() {});
+          }
+        }
+      })
+      .catch(function() {
+        // エラー時は従来のsuggest-supplier APIにフォールバック
+        if (p.item_category || p.manufacturer) {
+          var qs2 = new URLSearchParams({
+            item_category: p.item_category || '',
+            manufacturer:  p.manufacturer  || '',
+            club_type:     p.club_type     || ''
+          });
+          qs2.set('product_id', String(p.id));
+          fetch('/api/suggest-supplier?' + qs2.toString(), { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+              if (d.supplier && d.supplier.id && supHid) {
+                supHid.value = String(d.supplier.id);
+                updateSupplierNotesArea();
+              }
+            })
+            .catch(function() {});
+        }
+      });
+  } else if (p.item_category || p.manufacturer) {
+    // product_idがない場合は従来のsuggest-supplier API
+    var qs3 = new URLSearchParams({
       item_category: p.item_category || '',
       manufacturer:  p.manufacturer  || '',
       club_type:     p.club_type     || ''
     });
-    if (p.id) qs.set('product_id', String(p.id));
-    fetch('/api/suggest-supplier?' + qs.toString(), { credentials: 'include' })
+    fetch('/api/suggest-supplier?' + qs3.toString(), { credentials: 'include' })
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.supplier && d.supplier.id && supHid) {
