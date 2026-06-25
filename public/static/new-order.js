@@ -945,7 +945,25 @@ document.addEventListener('DOMContentLoaded', function() {
   addRow();  // 初期1行
 
   var form = document.getElementById('order-form');
-  if (form) form.addEventListener('submit', submitOrderForm);
+  if (form) {
+    // Enterキーによる誤フォーム送信を防止する
+    // （商品選択・数量入力中にEnterを押すと誤って下書き保存される問題対策）
+    form.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        var tag = e.target.tagName.toLowerCase();
+        var type = (e.target.type || '').toLowerCase();
+        // textarea・ボタン・セレクト以外でEnterが押されたら確認ダイアログ
+        if (tag !== 'textarea' && tag !== 'button' && tag !== 'select') {
+          e.preventDefault();
+          e.stopPropagation();
+          if (confirm('Enterキーが押されました。\n発注を下書き保存しますか？\n\n（続けて商品を入力する場合は「キャンセル」してください）')) {
+            submitOrderForm(null, false);
+          }
+        }
+      }
+    });
+    form.addEventListener('submit', submitOrderForm);
+  }
 
   var addBtn = document.getElementById('add-row');
   if (addBtn) addBtn.addEventListener('click', function() { addRow(); });

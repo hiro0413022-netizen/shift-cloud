@@ -1441,14 +1441,15 @@ app.post('/suppliers', async (c) => {
   const r = await db.prepare(`
     INSERT INTO suppliers
       (name, alias_names, contact_name, honorific, order_method, order_method_detail,
-       phone, fax, fax_number, email, line_id, line_group_id,
+       phone, fax, fax_number, email, cc_emails, line_id, line_group_id,
        payment_method, shipping_rule, free_shipping_threshold, website, postal_code, address, notes, is_active, updated_at, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP,?)
   `).bind(
     normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
     normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
     normalize(b['phone']), normalize(b['fax']), normalize(b['fax_number']),
-    normalize(b['email']), normalize(b['line_id']), normalize(b['line_group_id']),
+    normalize(b['email']), normalize(b['cc_emails']),
+    normalize(b['line_id']), normalize(b['line_group_id']),
     normalize(b['payment_method']), normalize(b['shipping_rule']),
     b['free_shipping_threshold'] ? parseInt(b['free_shipping_threshold']) : null,
     normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
@@ -1465,7 +1466,7 @@ app.put('/suppliers/:id', async (c) => {
   await db.prepare(`
     UPDATE suppliers SET
       name=?, alias_names=?, contact_name=?, honorific=?, order_method=?, order_method_detail=?,
-      phone=?, fax=?, fax_number=?, email=?, line_id=?, line_group_id=?,
+      phone=?, fax=?, fax_number=?, email=?, cc_emails=?, line_id=?, line_group_id=?,
       payment_method=?, shipping_rule=?, free_shipping_threshold=?, website=?, postal_code=?, address=?, notes=?,
       updated_at=CURRENT_TIMESTAMP
     WHERE id=? AND tenant_id=?
@@ -1473,7 +1474,8 @@ app.put('/suppliers/:id', async (c) => {
     normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
     normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
     normalize(b['phone']), normalize(b['fax']), normalize(b['fax_number']),
-    normalize(b['email']), normalize(b['line_id']), normalize(b['line_group_id']),
+    normalize(b['email']), normalize(b['cc_emails']),
+    normalize(b['line_id']), normalize(b['line_group_id']),
     normalize(b['payment_method']), normalize(b['shipping_rule']),
     b['free_shipping_threshold'] ? parseInt(b['free_shipping_threshold']) : null,
     normalize(b['website']), normalize(b['postal_code']), normalize(b['address']),
@@ -1488,6 +1490,117 @@ app.delete('/suppliers/:id', async (c) => {
   const tenantId = getTenantId(c)
   await db.prepare('UPDATE suppliers SET is_active=0, updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?').bind(id, tenantId).run()
   return c.json({ ok: true })
+})
+
+// ============================================================
+// API: 商品別複数仕入先 CRUD
+// ============================================================
+// GET /product-suppliers/:product_id → 商品の仕入先一覧取得
+app.get('/product-suppliers/:product_id', async (c) => {
+  const db = c.env.DB
+  const tenantId = getTenantId(c)
+  const productId = parseInt(c.req.param('product_id'))
+  if (isNaN(productId)) return c.json({ error: '不正なID' }, 400)
+  const rows = await db.prepare(`
+    SELECT ps.*, s.name AS supplier_name
+    FROM product_suppliers ps
+    JOIN suppliers s ON ps.supplier_id=s.id
+    WHERE ps.product_id=? AND ps.tenant_id=?
+    ORDER BY ps.is_default DESC, ps.sort_order ASC, ps.id ASC
+  `).bind(productId, tenantId).all<Record<string,unknown>>()
+  return c.json(rows.results)
+})
+
+// POST /product-suppliers → 商品仕入先を追加
+app.post('/product-suppliers', async (c) => {
+  const db = c.env.DB
+  const tenantId = getTenantId(c)
+  const b = await c.req.json<Record<string,unknown>>()
+  const productId  = parseInt(String(b['product_id']  || ''))
+  const supplierId = parseInt(String(b['supplier_id'] || ''))
+  if (isNaN(productId) || isNaN(supplierId)) return c.json({ error: '不正なID' }, 400)
+  // is_default=1 にする場合は他をリセット
+  if (b['is_default']) {
+    await db.prepare('UPDATE product_suppliers SET is_default=0 WHERE product_id=? AND tenant_id=?')
+      .bind(productId, tenantId).run()
+  }
+  const r = await db.prepare(`
+    INSERT INTO product_suppliers (product_id, supplier_id, rate, is_default, notes, sort_order, tenant_id)
+    VALUES (?,?,?,?,?,?,?)
+  `).bind(
+    productId, supplierId,
+    b['rate'] ? parseFloat(String(b['rate'])) : null,
+    b['is_default'] ? 1 : 0,
+    b['notes'] ? String(b['notes']) : null,
+    b['sort_order'] ? parseInt(String(b['sort_order'])) : 0,
+    tenantId
+  ).run()
+  return c.json({ ok: true, id: r.meta.last_row_id })
+})
+
+// PUT /product-suppliers/:id → 更新
+app.put('/product-suppliers/:id', async (c) => {
+  const db = c.env.DB
+  const tenantId = getTenantId(c)
+  const id = parseInt(c.req.param('id'))
+  const b = await c.req.json<Record<string,unknown>>()
+  if (b['is_default']) {
+    // 同商品の他をリセット
+    const ps = await db.prepare('SELECT product_id FROM product_suppliers WHERE id=? AND tenant_id=?')
+      .bind(id, tenantId).first<{product_id:number}>()
+    if (ps) {
+      await db.prepare('UPDATE product_suppliers SET is_default=0 WHERE product_id=? AND tenant_id=?')
+        .bind(ps.product_id, tenantId).run()
+    }
+  }
+  await db.prepare(`
+    UPDATE product_suppliers SET supplier_id=?, rate=?, is_default=?, notes=?, sort_order=?
+    WHERE id=? AND tenant_id=?
+  `).bind(
+    parseInt(String(b['supplier_id'])),
+    b['rate'] ? parseFloat(String(b['rate'])) : null,
+    b['is_default'] ? 1 : 0,
+    b['notes'] ? String(b['notes']) : null,
+    b['sort_order'] ? parseInt(String(b['sort_order'])) : 0,
+    id, tenantId
+  ).run()
+  return c.json({ ok: true })
+})
+
+// DELETE /product-suppliers/:id → 削除
+app.delete('/product-suppliers/:id', async (c) => {
+  const db = c.env.DB
+  const tenantId = getTenantId(c)
+  const id = parseInt(c.req.param('id'))
+  await db.prepare('DELETE FROM product_suppliers WHERE id=? AND tenant_id=?').bind(id, tenantId).run()
+  return c.json({ ok: true })
+})
+
+// GET /products/:id/suppliers → 商品選択時の仕入先候補（掛け率付き）
+app.get('/products/:id/suppliers', async (c) => {
+  const db = c.env.DB
+  const tenantId = getTenantId(c)
+  const productId = parseInt(c.req.param('id'))
+  if (isNaN(productId)) return c.json({ error: '不正なID' }, 400)
+  // product_suppliersに登録があればそちら優先、なければデフォルト仕入先
+  const rows = await db.prepare(`
+    SELECT ps.supplier_id, s.name AS supplier_name, ps.rate, ps.is_default, ps.notes
+    FROM product_suppliers ps
+    JOIN suppliers s ON ps.supplier_id=s.id
+    WHERE ps.product_id=? AND ps.tenant_id=?
+    ORDER BY ps.is_default DESC, ps.sort_order ASC
+  `).bind(productId, tenantId).all<Record<string,unknown>>()
+
+  if (rows.results.length > 0) {
+    return c.json(rows.results)
+  }
+  // フォールバック: productsテーブルのdefault_supplier_id + default_rate
+  const prod = await db.prepare(`
+    SELECT p.default_supplier_id AS supplier_id, s.name AS supplier_name, p.default_rate AS rate
+    FROM products p LEFT JOIN suppliers s ON p.default_supplier_id=s.id
+    WHERE p.id=? AND p.tenant_id=?
+  `).bind(productId, tenantId).first<Record<string,unknown>>()
+  return c.json(prod?.supplier_id ? [{ ...prod, is_default: 1, notes: null }] : [])
 })
 
 // ============================================================
@@ -2058,7 +2171,55 @@ app.post('/orders/:id/status', async (c) => {
   }
 
   await db.prepare('UPDATE purchase_orders SET status=? WHERE id=? AND tenant_id=?').bind(status, id, tenantId).run()
-  return c.json({ ok: true })
+
+  // 「発注済み」に変更した場合: 同一顧客の別仕入先でまだメールを送っていない発注を探す
+  // → batch_codeがある場合はそちらを優先、なければbatch_codeを探す
+  let nextMailBatch: string | null = null
+  let nextOrderId: number | null = null
+  if (status === 'ordered') {
+    // 現在の発注情報（顧客名）を取得
+    const cur = await db.prepare(
+      'SELECT customer_name, batch_code FROM purchase_orders WHERE id=? AND tenant_id=?'
+    ).bind(id, tenantId).first<{ customer_name: string | null; batch_code: string | null }>()
+
+    if (cur?.customer_name && cur.customer_name.trim() && !cur.customer_name.startsWith('（')) {
+      // 同一顧客名で status='draft_created' かつ発注書メールが作成済みのものを探す
+      // （batch_codeがある → メールバッチ画面へ誘導）
+      const next = await db.prepare(`
+        SELECT po.id, po.batch_code
+        FROM purchase_orders po
+        WHERE po.tenant_id=?
+          AND po.customer_name=?
+          AND po.status='draft_created'
+          AND po.id != ?
+          AND po.batch_code IS NOT NULL
+        ORDER BY po.id ASC
+        LIMIT 1
+      `).bind(tenantId, cur.customer_name, id).first<{ id: number; batch_code: string }>()
+
+      if (next) {
+        nextMailBatch = next.batch_code
+        nextOrderId   = next.id
+      } else {
+        // batch_codeなしの draft_created（発注番号が付いてるがメールバッチ未作成）も対象
+        const next2 = await db.prepare(`
+          SELECT po.id
+          FROM purchase_orders po
+          WHERE po.tenant_id=?
+            AND po.customer_name=?
+            AND po.status='draft_created'
+            AND po.id != ?
+          ORDER BY po.id ASC
+          LIMIT 1
+        `).bind(tenantId, cur.customer_name, id).first<{ id: number }>()
+        if (next2) {
+          nextOrderId = next2.id
+        }
+      }
+    }
+  }
+
+  return c.json({ ok: true, next_mail_batch: nextMailBatch, next_order_id: nextOrderId })
 })
 
 // ============================================================

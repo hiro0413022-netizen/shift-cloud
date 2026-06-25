@@ -1302,6 +1302,7 @@ app.get('/suppliers', async (c) => {
       ${r['line_id'] ? `<br><span class="badge" style="background:#06C755;font-size:0.7rem"><i class="fab fa-line me-1"></i>${esc(r['line_id'])}</span>` : ''}
       ${r['fax']||r['fax_number'] ? `<br><span class="text-muted"><i class="fas fa-fax me-1"></i>${esc(r['fax']||r['fax_number'])}</span>` : ''}
     </td>
+    <td class="small" style="max-width:200px">${r['cc_emails'] ? `<span class="text-muted" style="word-break:break-all;font-size:0.8rem">${esc(r['cc_emails'])}</span>` : '<span class="text-muted small">―</span>'}</td>
     <td class="small">${r['phone'] ? `<a href="tel:${esc(r['phone'])}" class="text-decoration-none">${esc(r['phone'])}</a>` : ''}</td>
     <td class="small">${esc(r['payment_method'])}</td>
     <td class="small">${r['shipping_rule'] ? `<span class="badge bg-info text-dark"><i class="fas fa-truck me-1"></i>${esc(r['shipping_rule'])}</span>` : ''}</td>
@@ -1345,7 +1346,7 @@ document.querySelectorAll('.btn-edit-sup').forEach(function(btn){
     document.getElementById('supTitle').textContent = '仕入先を編集';
     var f = document.getElementById('supForm');
     ['name','alias_names','contact_name','honorific','order_method','order_method_detail',
-     'phone','fax','fax_number','email','line_id','line_group_id',
+     'phone','fax','fax_number','email','cc_emails','line_id','line_group_id',
      'payment_method','shipping_rule','free_shipping_threshold','website','postal_code','address','notes'
     ].forEach(function(k){ if(f[k]) f[k].value = r[k]??''; });
     updateMethodFields();
@@ -1395,9 +1396,9 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
     <table class="table table-sm table-hover align-middle mb-0">
       <thead><tr>
         <th>仕入先名</th><th>担当者</th><th>発注方法</th><th>連絡先</th>
-        <th>電話</th><th>支払い</th><th>送料条件</th><th>備考</th><th>操作</th>
+        <th>CCアドレス</th><th>電話</th><th>支払い</th><th>送料条件</th><th>備考</th><th>操作</th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" class="text-center py-4 text-muted">仕入先データがありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="10" class="text-center py-4 text-muted">仕入先データがありません。</td></tr>'}</tbody>
     </table>
   </div>
 </div>
@@ -1452,6 +1453,11 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
             <div class="col-12" id="row-email">
               <label class="form-label fw-semibold"><i class="fas fa-envelope text-primary me-1"></i>メールアドレス</label>
               <input class="form-control" name="email" type="email" placeholder="order@example.com">
+            </div>
+            <div class="col-12" id="row-cc-emails">
+              <label class="form-label fw-semibold"><i class="fas fa-user-plus text-secondary me-1"></i>CCアドレス <span class="fw-normal text-muted small">(複数指定時はカンマ区切り)</span></label>
+              <input class="form-control" name="cc_emails" placeholder="cc1@example.com, cc2@example.com">
+              <div class="form-text"><i class="fas fa-info-circle me-1"></i>発注メール作成時にCC候補として表示されます</div>
             </div>
             <!-- LINE -->
             <div class="col-md-6" id="row-line" style="display:none">
@@ -2219,7 +2225,7 @@ app.get('/mail-batch/:batch_code', async (c) => {
 
   const orders = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
-           s.contact_name, s.order_method
+           s.cc_emails AS supplier_cc_emails, s.contact_name, s.order_method
     FROM purchase_orders po JOIN suppliers s ON po.supplier_id=s.id
     WHERE po.batch_code=? AND po.tenant_id=? ORDER BY po.id
   `).bind(batchCode, tenantId).all<Record<string,unknown>>()
@@ -2228,6 +2234,7 @@ app.get('/mail-batch/:batch_code', async (c) => {
   type OrderGroup = {
     supplierName: string
     supplierEmail: string
+    supplierCcEmails: string
     orderMethod: string
     orders: Array<{ order: Record<string,unknown>; items: Record<string,unknown>[] }>
   }
@@ -2241,9 +2248,10 @@ app.get('/mail-batch/:batch_code', async (c) => {
     const email = String(order['supplier_email'] ?? '') || `__no_email_${order['id']}`
     if (!groupMap.has(email)) {
       groupMap.set(email, {
-        supplierName:  String(order['supplier_name']  ?? ''),
-        supplierEmail: String(order['supplier_email'] ?? ''),
-        orderMethod:   String(order['order_method']   ?? ''),
+        supplierName:     String(order['supplier_name']      ?? ''),
+        supplierEmail:    String(order['supplier_email']     ?? ''),
+        supplierCcEmails: String(order['supplier_cc_emails'] ?? ''),
+        orderMethod:      String(order['order_method']       ?? ''),
         orders: [],
       })
     }
@@ -2328,6 +2336,31 @@ ${sig ? '\n' + sig : ''}`
       allItems
     )
     const supplierEmail = group.supplierEmail
+    // CC候補: 仕入先設定のcc_emailsをカンマ分割してリスト化
+    const ccCandidates: string[] = [
+      ...(BATCH_DEFAULT_CC ? [BATCH_DEFAULT_CC] : []),
+      ...(group.supplierCcEmails
+        ? group.supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean)
+        : []
+      ),
+    ]
+    // 重複除去
+    const ccUniq = [...new Set(ccCandidates)]
+    // 初期CC値: 仕入先固有CCがあればそれ、なければAPP_DEFAULT_CC
+    const initialCC = group.supplierCcEmails
+      ? group.supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean).join(', ')
+      : BATCH_DEFAULT_CC
+
+    // CC候補ボタン群HTML
+    const ccCandidateHtml = ccUniq.length > 0
+      ? `<div class="mt-1 d-flex flex-wrap gap-1">
+          <span class="small text-muted me-1">CC候補:</span>
+          ${ccUniq.map(addr =>
+            `<button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 batch-cc-candidate"
+              style="font-size:0.75rem" data-addr="${esc(addr)}">${esc(addr)}</button>`
+          ).join('')}
+        </div>`
+      : ''
 
     // 発注番号一覧（複数ある場合は全部表示）
     const orderNos = group.orders.map(g => String(g.order['order_no'])).join('、')
@@ -2341,7 +2374,9 @@ ${sig ? '\n' + sig : ''}`
     const bodyJson = JSON.stringify(emailBody)
 
     const mailtoHref = supplierEmail
-      ? `mailto:${esc(supplierEmail)}?cc=${encodeURIComponent(BATCH_DEFAULT_CC)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
+      ? 'mailto:' + supplierEmail + '?' +
+        (initialCC ? 'cc=' + encodeURIComponent(initialCC) + '&' : '') +
+        'subject=' + encodeURIComponent(emailSubject) + '&body=' + encodeURIComponent(emailBody)
       : ''
 
     const isMerged = group.orders.length > 1
@@ -2371,8 +2406,9 @@ ${sig ? '\n' + sig : ''}`
               data-email="${esc(supplierEmail)}"
               data-subject="${esc(emailSubject)}"
               data-body="${esc(emailBody)}"
-              value="${esc(BATCH_DEFAULT_CC)}"
-              autocomplete="off">
+              value="${esc(initialCC)}"
+              autocomplete="off" placeholder="cc@example.com, cc2@example.com">
+            ${ccCandidateHtml}
           </div>
           <div class="col-12">
             <label class="form-label fw-semibold small text-muted mb-1">件名</label>
@@ -2423,6 +2459,39 @@ function copyBody(btn, text){
   });
 }
 
+// CC候補ボタン → CC入力欄にアドレスを追加/削除
+document.querySelectorAll('.batch-cc-candidate').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var card = btn.closest('.card');
+    var ccInp = card ? card.querySelector('.batch-cc-input') : null;
+    if(!ccInp) return;
+    var addr = btn.dataset.addr || '';
+    var cur = ccInp.value.trim();
+    var addrs = cur ? cur.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+    var idx = addrs.indexOf(addr);
+    if(idx >= 0){
+      // すでに追加済み → 削除
+      addrs.splice(idx, 1);
+      btn.classList.remove('btn-secondary');
+      btn.classList.add('btn-outline-secondary');
+    } else {
+      // 未追加 → 追加
+      addrs.push(addr);
+      btn.classList.remove('btn-outline-secondary');
+      btn.classList.add('btn-secondary');
+    }
+    ccInp.value = addrs.join(', ');
+    ccInp.dispatchEvent(new Event('input'));
+  });
+  // 初期状態でCC欄に含まれていればアクティブ表示
+  var card = btn.closest('.card');
+  var ccInp = card ? card.querySelector('.batch-cc-input') : null;
+  if(ccInp && ccInp.value.includes(btn.dataset.addr)){
+    btn.classList.remove('btn-outline-secondary');
+    btn.classList.add('btn-secondary');
+  }
+});
+
 // CC入力 → mailtoリンクをリアルタイム更新
 document.querySelectorAll('.batch-cc-input').forEach(function(ccInp){
   var card = ccInp.closest('.card');
@@ -2433,11 +2502,12 @@ document.querySelectorAll('.batch-cc-input').forEach(function(ccInp){
     var subject = ccInp.dataset.subject;
     var body    = ccInp.dataset.body;
     var cc      = ccInp.value.trim();
-    var params  = new URLSearchParams({subject: subject, body: body});
-    if(cc) params.set('cc', cc);
-    mailtoBtn.href = 'mailto:' + email + '?' + params.toString();
+    var qs = 'subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    if(cc) qs += '&cc=' + encodeURIComponent(cc);
+    mailtoBtn.href = 'mailto:' + email + '?' + qs;
   }
   ccInp.addEventListener('input', rebuild);
+  rebuild(); // 初期化
 });
 
 // 発注済みにする
@@ -2475,6 +2545,36 @@ document.querySelectorAll('.btn-mark-ordered').forEach(function(btn){
         // メールソフトで開くボタンなど他ボタンも無効化
         var mailtoBtn = card ? card.querySelector('.batch-mailto-btn') : null;
         if(mailtoBtn) mailtoBtn.classList.replace('btn-primary','btn-secondary');
+
+        // 同一顧客の次の発注メールへ自動遷移（最後のAPIレスポンスを使用）
+        // ※複数IDある場合は最後のレスポンスを使用
+        var nextBatch = null, nextOrder = null;
+        for(var j = 0; j < ids.length; j++){
+          var rCheck = await fetch('/api/orders/' + ids[j] + '/status', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({status: 'ordered'}),
+          });
+          // 既に更新済みなので結果は無視、next情報だけ取得
+          try {
+            var dCheck = await rCheck.json();
+            if(dCheck.next_mail_batch) nextBatch = dCheck.next_mail_batch;
+            else if(dCheck.next_order_id) nextOrder = dCheck.next_order_id;
+          } catch(e2){}
+        }
+        if(nextBatch){
+          setTimeout(function(){
+            if(confirm('同じお客様の別仕入先への発注メールがあります。続けて処理しますか？')){
+              location.href = '/mail-batch/' + nextBatch;
+            }
+          }, 600);
+        } else if(nextOrder){
+          setTimeout(function(){
+            if(confirm('同じお客様の別仕入先への発注があります。続けて処理しますか？')){
+              location.href = '/orders/' + nextOrder;
+            }
+          }, 600);
+        }
       } else {
         alert('一部の更新に失敗しました（ID: ' + failed.join(', ') + '）');
         btn.disabled = false;
@@ -2644,6 +2744,7 @@ app.get('/orders/:id', async (c) => {
 
   const order = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
+           s.cc_emails AS supplier_cc_emails,
            s.contact_name, s.honorific, s.order_method, s.order_method_detail,
            s.phone, s.line_id, s.fax, s.fax_number, s.website,
            s.notes AS supplier_notes, s.shipping_rule AS supplier_shipping_rule
@@ -2758,8 +2859,34 @@ app.get('/orders/:id', async (c) => {
 
   // メールパネル
   const DEFAULT_CC = c.env.APP_DEFAULT_CC || ''
+  // CC候補: 仕入先のcc_emails + APP_DEFAULT_CC を合わせて重複除去
+  const supplierCcEmails = String(order['supplier_cc_emails'] ?? '')
+  const detailCcCandidates: string[] = [
+    ...(DEFAULT_CC ? [DEFAULT_CC] : []),
+    ...(supplierCcEmails
+      ? supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : []
+    ),
+  ]
+  const detailCcUniq = [...new Set(detailCcCandidates)]
+  // 初期CC値: 仕入先設定のCC優先 → なければAPP_DEFAULT_CC
+  const initialDetailCC = supplierCcEmails
+    ? supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean).join(', ')
+    : DEFAULT_CC
   const mailtoWithCC = supplierEmail
-    ? `mailto:${esc(supplierEmail)}?cc=${encodeURIComponent(DEFAULT_CC)}&subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`
+    ? 'mailto:' + supplierEmail + '?' +
+      (initialDetailCC ? 'cc=' + encodeURIComponent(initialDetailCC) + '&' : '') +
+      'subject=' + encodeURIComponent(emailSubject) + '&body=' + encodeURIComponent(emailBody)
+    : ''
+  // CC候補ボタン
+  const detailCcCandidateHtml = detailCcUniq.length > 0
+    ? `<div class="mt-1 d-flex flex-wrap gap-1">
+        <span class="small text-muted me-1">CC候補:</span>
+        ${detailCcUniq.map(addr =>
+          `<button type="button" class="btn btn-xs detail-cc-candidate py-0 px-1 ${initialDetailCC.includes(addr) ? 'btn-secondary' : 'btn-outline-secondary'}"
+            style="font-size:0.75rem" data-addr="${esc(addr)}">${esc(addr)}</button>`
+        ).join('')}
+      </div>`
     : ''
 
   const emailPanel = `
@@ -2768,12 +2895,14 @@ ${emailBody ? '' : noBodyBlock}
   <span class="fw-semibold text-muted small">宛先:</span>
   <span>${supplierEmail ? `<a href="mailto:${esc(supplierEmail)}">${esc(supplierEmail)}</a>` : '<em class="text-muted">未設定</em>'}</span>
 </div>
-<div class="mb-2 d-flex gap-2 flex-wrap align-items-center">
-  <label class="fw-semibold text-muted small mb-0" for="email-cc-input">CC:</label>
+<div class="mb-2">
+  <label class="fw-semibold text-muted small mb-1" for="email-cc-input">CC:</label>
   <input type="text" id="email-cc-input" class="form-control form-control-sm"
     style="max-width:480px"
-    value="${esc(DEFAULT_CC)}"
+    value="${esc(initialDetailCC)}"
+    placeholder="cc@example.com, cc2@example.com"
     autocomplete="off">
+  ${detailCcCandidateHtml}
 </div>
 <div class="mb-2">
   <span class="fw-semibold text-muted small">件名:</span>
@@ -3097,6 +3226,29 @@ makeCopyBtn('btn-copy-body','email-body-ta');
 makeCopyBtn('btn-copy-line','line-body-ta');
 makeCopyBtn('btn-copy-fax','fax-body-ta');
 
+// CC候補ボタン → CC入力欄にアドレスを追加/削除（発注詳細画面）
+document.querySelectorAll('.detail-cc-candidate').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var ccInp = document.getElementById('email-cc-input');
+    if(!ccInp) return;
+    var addr = btn.dataset.addr || '';
+    var cur = ccInp.value.trim();
+    var addrs = cur ? cur.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+    var idx = addrs.indexOf(addr);
+    if(idx >= 0){
+      addrs.splice(idx, 1);
+      btn.classList.remove('btn-secondary');
+      btn.classList.add('btn-outline-secondary');
+    } else {
+      addrs.push(addr);
+      btn.classList.remove('btn-outline-secondary');
+      btn.classList.add('btn-secondary');
+    }
+    ccInp.value = addrs.join(', ');
+    ccInp.dispatchEvent(new Event('input'));
+  });
+});
+
 // CC入力 → mailtoリンクをリアルタイム更新
 (function(){
   var ccInput  = document.getElementById('email-cc-input');
@@ -3110,9 +3262,9 @@ makeCopyBtn('btn-copy-fax','fax-body-ta');
     var cc      = ccInput.value.trim();
     var subject = subjSpan ? subjSpan.textContent : '';
     var body    = bodyTa   ? bodyTa.value         : '';
-    var params  = new URLSearchParams({ subject: subject, body: body });
-    if (cc) params.set('cc', cc);
-    mailto.href = 'mailto:' + SUPPLIER_EMAIL + '?' + params.toString();
+    var qs = 'subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    if (cc) qs += '&cc=' + encodeURIComponent(cc);
+    mailto.href = 'mailto:' + SUPPLIER_EMAIL + '?' + qs;
   }
 
   ccInput.addEventListener('input', rebuildMailto);
@@ -3131,7 +3283,38 @@ function bindStatus(btnId, status, label){
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({status: status})
     });
-    if(r.ok){ showFlash(label+'に更新しました','success'); setTimeout(function(){ location.reload(); },900); }
+    if(r.ok){
+      showFlash(label+'に更新しました','success');
+      // 「発注済」に変更した場合: 同一顧客の次の発注メールを確認
+      if(status === 'ordered'){
+        try {
+          var d = await r.json();
+          if(d.next_mail_batch){
+            setTimeout(function(){
+              if(confirm('同じお客様の別仕入先への発注メールがあります。続けて処理しますか？')){
+                location.href = '/mail-batch/' + d.next_mail_batch;
+              } else {
+                location.reload();
+              }
+            }, 600);
+          } else if(d.next_order_id){
+            setTimeout(function(){
+              if(confirm('同じお客様の別仕入先への発注があります。続けて処理しますか？')){
+                location.href = '/orders/' + d.next_order_id;
+              } else {
+                location.reload();
+              }
+            }, 600);
+          } else {
+            setTimeout(function(){ location.reload(); }, 900);
+          }
+        } catch(e2) {
+          setTimeout(function(){ location.reload(); }, 900);
+        }
+      } else {
+        setTimeout(function(){ location.reload(); }, 900);
+      }
+    }
     else { showFlash('更新に失敗しました','danger'); btn.disabled=false; }
   });
 }
@@ -3160,9 +3343,9 @@ bindStatus('btn-s-cancelled','cancelled','キャンセル');
         if (mailto && '${supplierEmail}') {
           var ccInp = document.getElementById('email-cc-input');
           var cc = ccInp ? ccInp.value.trim() : '';
-          var q = new URLSearchParams({subject: d.subject||'', body: d.body||''});
-          if (cc) q.set('cc', cc);
-          mailto.href = 'mailto:${esc(supplierEmail)}?' + q.toString();
+          var qs2 = 'subject=' + encodeURIComponent(d.subject||'') + '&body=' + encodeURIComponent(d.body||'');
+          if (cc) qs2 += '&cc=' + encodeURIComponent(cc);
+          mailto.href = 'mailto:${esc(supplierEmail)}?' + qs2;
         }
         // アラートを非表示
         var alert = document.getElementById('no-body-alert');
