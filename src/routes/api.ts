@@ -1104,6 +1104,14 @@ app.put('/receipts/:id', async (c) => {
     slip_date?: string
     inspected_by?: string
     note?: string
+    // 納品書照合フィールド
+    slip_verified?: boolean      // 納品書確認済みフラグ
+    no_slip?: boolean            // 納品書なしフラグ
+    slip_checked_by?: string     // 確認担当者
+    slip_note?: string           // 照合メモ（差異内容など）
+    // 仕入先変更
+    actual_supplier_id?: number | null  // 実際の仕入先（発注と異なる場合）
+    // 明細
     items?: Array<{
       receipt_item_id: number
       received_quantity: number
@@ -1121,6 +1129,13 @@ app.put('/receipts/:id', async (c) => {
       .bind(receiptId).all<{ id: number; purchase_order_item_id: number | null }>()
   ])
   if (!receipt) return c.json({ error: '納品データが見つかりません。' }, 404)
+
+  // actual_supplier_id の仕入先存在チェック
+  if (body.actual_supplier_id != null) {
+    const sup = await db.prepare('SELECT id FROM suppliers WHERE id=? AND tenant_id=?')
+      .bind(body.actual_supplier_id, tenantId).first()
+    if (!sup) return c.json({ error: '指定した仕入先が見つかりません。' }, 400)
+  }
 
   // receipt_item_id → purchase_order_item_id のマップ
   const poiMap = new Map<number, number | null>()
@@ -1148,13 +1163,39 @@ app.put('/receipts/:id', async (c) => {
   // すべての更新を並列実行
   const updatePromises: Promise<unknown>[] = []
 
-  // ヘッダー更新
+  // ヘッダー更新（納品書照合・仕入先変更含む）
   const sets: string[] = []
   const binds: unknown[] = []
-  if (body.received_date !== undefined) { sets.push('received_date=?'); binds.push(body.received_date) }
-  if (body.slip_date     !== undefined) { sets.push('slip_date=?');     binds.push(body.slip_date || null) }
-  if (body.inspected_by  !== undefined) { sets.push('inspected_by=?');  binds.push(normalize(body.inspected_by)) }
-  if (body.note          !== undefined) { sets.push('note=?');          binds.push(normalize(body.note)) }
+  if (body.received_date !== undefined)      { sets.push('received_date=?');      binds.push(body.received_date) }
+  if (body.slip_date     !== undefined)      { sets.push('slip_date=?');           binds.push(body.slip_date || null) }
+  if (body.inspected_by  !== undefined)      { sets.push('inspected_by=?');        binds.push(normalize(body.inspected_by)) }
+  if (body.note          !== undefined)      { sets.push('note=?');                binds.push(normalize(body.note)) }
+  if (body.slip_note     !== undefined)      { sets.push('slip_note=?');           binds.push(normalize(body.slip_note)) }
+  // 納品書なしフラグ: trueにしたらslip_verifiedも1にする（照合済み扱い）
+  if (body.no_slip !== undefined) {
+    const noSlipVal = body.no_slip ? 1 : 0
+    sets.push('no_slip=?'); binds.push(noSlipVal)
+    if (body.no_slip) {
+      sets.push('slip_verified=?'); binds.push(1)
+    }
+  }
+  // 納品書確認済みフラグ（no_slipと独立して更新可能）
+  if (body.slip_verified !== undefined && body.no_slip === undefined) {
+    sets.push('slip_verified=?'); binds.push(body.slip_verified ? 1 : 0)
+  }
+  // 確認担当者・確認日時（slip_verified=true or no_slip=true になったときに自動セット）
+  if (body.slip_verified || body.no_slip) {
+    if (body.slip_checked_by !== undefined) { sets.push('slip_checked_by=?'); binds.push(normalize(body.slip_checked_by)) }
+    sets.push('slip_checked_at=?'); binds.push(new Date().toISOString())
+  } else if (body.slip_verified === false && !body.no_slip) {
+    // 未確認に戻す場合は確認情報をクリア
+    sets.push('slip_checked_by=?'); binds.push(null)
+    sets.push('slip_checked_at=?'); binds.push(null)
+  }
+  // 実際の仕入先（NULL許容）
+  if (body.actual_supplier_id !== undefined) {
+    sets.push('actual_supplier_id=?'); binds.push(body.actual_supplier_id ?? null)
+  }
   if (sets.length) {
     binds.push(receiptId)
     updatePromises.push(
@@ -1186,6 +1227,23 @@ app.put('/receipts/:id', async (c) => {
   if (receipt.purchase_order_id) await updateOrderStatus(db, receipt.purchase_order_id)
 
   return c.json({ ok: true })
+})
+
+// ============================================================
+// API: 納品書チェック一括ステータス取得 (GET /api/receipts/slip-status)
+// ============================================================
+app.get('/receipts/slip-status', async (c) => {
+  const db = c.env.DB
+  const tenantId = getTenantId(c)
+  const rows = await db.prepare(`
+    SELECT
+      SUM(CASE WHEN slip_verified=1 OR no_slip=1 THEN 1 ELSE 0 END) AS checked,
+      SUM(CASE WHEN slip_verified=0 AND no_slip=0 THEN 1 ELSE 0 END) AS unchecked,
+      SUM(CASE WHEN no_slip=1 THEN 1 ELSE 0 END) AS no_slip_count,
+      COUNT(*) AS total
+    FROM receipts WHERE tenant_id=?
+  `).bind(tenantId).first<Record<string, number>>()
+  return c.json(rows)
 })
 
 // ============================================================

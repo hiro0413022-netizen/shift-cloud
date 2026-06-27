@@ -4012,26 +4012,34 @@ app.get('/receipts', async (c) => {
   const from       = c.req.query('from')        || ''
   const to         = c.req.query('to')          || ''
   const supplierId = c.req.query('supplier_id') || ''
+  const slipCheck  = c.req.query('slip_check')  || ''  // '' | 'unchecked' | 'no_slip' | 'verified'
   const flash      = c.req.query('flash')        || ''
 
-  // 絞り込み付きクエリ（フリー納品はpurchase_order_id=NULLのためLEFT JOIN）
+  // 絞り込み付きクエリ（actual_supplier_id優先で表示仕入先を決定）
   let sql = `
     SELECT r.id, r.received_date, r.slip_date, r.inspected_by, r.note,
+           r.slip_verified, r.no_slip, r.slip_checked_by, r.slip_note,
            po.order_no, po.id AS purchase_order_id, po.customer_name,
-           s.name AS supplier_name, s.id AS supplier_id,
+           COALESCE(sa.name, s.name) AS supplier_name,
+           COALESCE(sa.id,   s.id)   AS supplier_id,
+           CASE WHEN r.actual_supplier_id IS NOT NULL THEN 1 ELSE 0 END AS supplier_changed,
            COUNT(ri.id) AS item_count,
            SUM(ri.received_quantity) AS total_qty,
            SUM(ri.received_quantity * COALESCE(poi.unit_price, 0)) AS total_amount
     FROM receipts r
     LEFT JOIN purchase_orders po ON r.purchase_order_id=po.id
-    LEFT JOIN suppliers s ON po.supplier_id=s.id
+    LEFT JOIN suppliers s  ON po.supplier_id=s.id
+    LEFT JOIN suppliers sa ON r.actual_supplier_id=sa.id
     LEFT JOIN receipt_items ri ON ri.receipt_id=r.id
     LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id=poi.id
     WHERE r.tenant_id=?`
   const binds: unknown[] = [tenantId]
   if (from) { sql += ` AND r.received_date >= ?`; binds.push(from) }
   if (to)   { sql += ` AND r.received_date <= ?`; binds.push(to) }
-  if (supplierId) { sql += ` AND po.supplier_id = ?`; binds.push(Number(supplierId)) }
+  if (supplierId) { sql += ` AND (po.supplier_id = ? OR r.actual_supplier_id = ?)`; binds.push(Number(supplierId)); binds.push(Number(supplierId)) }
+  if (slipCheck === 'unchecked') { sql += ` AND r.slip_verified=0 AND r.no_slip=0` }
+  else if (slipCheck === 'no_slip')  { sql += ` AND r.no_slip=1` }
+  else if (slipCheck === 'verified') { sql += ` AND r.slip_verified=1` }
   sql += ` GROUP BY r.id ORDER BY r.received_date DESC, r.id DESC LIMIT 300`
 
   const [supplierRes, res] = await Promise.all([
@@ -4043,10 +4051,19 @@ app.get('/receipts', async (c) => {
   ).join('')
 
   // サマリー計算
-  const totalQty    = res.results.reduce((s, r) => s + (Number(r['total_qty'])    || 0), 0)
-  const totalAmount = res.results.reduce((s, r) => s + (Number(r['total_amount']) || 0), 0)
+  const totalQty      = res.results.reduce((s, r) => s + (Number(r['total_qty'])    || 0), 0)
+  const totalAmount   = res.results.reduce((s, r) => s + (Number(r['total_amount']) || 0), 0)
+  const uncheckedCount = res.results.filter(r => !r['slip_verified'] && !r['no_slip']).length
+  const noSlipCount    = res.results.filter(r =>  r['no_slip']).length
 
-  const rows = res.results.map(r => `<tr>
+  // 納品書チェックバッジ関数
+  const slipBadge = (r: Record<string,unknown>) => {
+    if (r['no_slip'])       return `<span class="badge bg-secondary" title="${esc(r['slip_note'])||''}"><i class="fas fa-file-slash me-1"></i>納品書なし</span>`
+    if (r['slip_verified']) return `<span class="badge bg-success"   title="確認者: ${esc(r['slip_checked_by'])||'―'}"><i class="fas fa-check me-1"></i>確認済</span>`
+    return `<span class="badge bg-warning text-dark"><i class="fas fa-exclamation me-1"></i>未確認</span>`
+  }
+
+  const rows = res.results.map(r => `<tr class="${(!r['slip_verified'] && !r['no_slip']) ? 'table-warning' : ''}">
     <td class="fw-semibold">${esc(r['received_date'])}</td>
     <td class="text-muted">${esc(r['slip_date']) || '―'}</td>
     <td>
@@ -4055,16 +4072,19 @@ app.get('/receipts', async (c) => {
         : `<span class="badge bg-secondary">システム外</span>`
       }
     </td>
-    <td>${r['supplier_name'] ? esc(r['supplier_name']) : '<span class="text-muted">―</span>'}</td>
+    <td>
+      ${r['supplier_name'] ? esc(r['supplier_name']) : '<span class="text-muted">―</span>'}
+      ${r['supplier_changed'] ? `<span class="badge bg-info text-dark ms-1" title="発注時と仕入先が異なります"><i class="fas fa-exchange-alt"></i></span>` : ''}
+    </td>
     <td>${esc(r['customer_name']) || '―'}</td>
     <td class="text-center">${esc(r['item_count'])}</td>
     <td class="text-end">${Number(r['total_qty'])||0} 個</td>
     <td class="text-end fw-semibold">${yen(r['total_amount'])}</td>
+    <td class="text-center">${slipBadge(r)}</td>
     <td>${esc(r['inspected_by']) || '―'}</td>
-    <td class="text-muted small">${esc(r['note']) || ''}</td>
     <td style="white-space:nowrap">
       <a href="/receipts/${r['id']}/edit" class="btn btn-xs btn-outline-primary py-0 px-2">
-        <i class="fas fa-edit"></i>
+        <i class="fas fa-edit"></i> 編集
       </a>
     </td>
   </tr>`).join('')
@@ -4076,15 +4096,28 @@ app.get('/receipts', async (c) => {
   if (supplierId) dlParams.set('supplier_id', supplierId)
   const dlUrl = `/api/receipts/download${dlParams.toString() ? '?' + dlParams.toString() : ''}`
 
+  const slipCheckOptions = [
+    { val: '',          label: '― すべて ―' },
+    { val: 'unchecked', label: '⚠ 未確認のみ' },
+    { val: 'verified',  label: '✓ 確認済のみ' },
+    { val: 'no_slip',   label: '□ 納品書なしのみ' },
+  ].map(o => `<option value="${o.val}" ${slipCheck === o.val ? 'selected' : ''}>${o.label}</option>`).join('')
+
   const content = `
 ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" role="alert">
   <i class="fas fa-check-circle me-1"></i>${esc(flash)}
   <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
 </div>` : ''}
+${uncheckedCount > 0 ? `<div class="alert alert-warning py-2 mb-3 d-flex align-items-center gap-2">
+  <i class="fas fa-exclamation-triangle fa-lg"></i>
+  <span>納品書未確認が <strong>${uncheckedCount}件</strong> あります。
+    <a href="/receipts?slip_check=unchecked" class="alert-link ms-2">未確認のみ表示</a>
+  </span>
+</div>` : ''}
 <div class="action-bar">
   <div>
     <h1 class="page-title"><i class="fas fa-truck me-2" style="color:var(--gw-green)"></i>納品履歴</h1>
-    <p class="page-subtitle">登録済みの納品データ一覧です。</p>
+    <p class="page-subtitle">登録済みの納品データ一覧です。黄色行は納品書未確認。</p>
   </div>
   <div class="actions">
     <a href="/receipts/free" class="btn btn-outline-secondary">
@@ -4115,6 +4148,12 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
           ${supplierOptions}
         </select>
       </div>
+      <div class="col-auto">
+        <label class="form-label form-label-sm mb-1">納品書チェック</label>
+        <select name="slip_check" class="form-select form-select-sm" style="min-width:150px">
+          ${slipCheckOptions}
+        </select>
+      </div>
       <div class="col-auto d-flex gap-2">
         <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search me-1"></i>絞り込み</button>
         <a href="/receipts" class="btn btn-outline-secondary btn-sm">リセット</a>
@@ -4134,6 +4173,12 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
   <span class="badge bg-success fs-6 fw-normal px-3 py-2">
     <i class="fas fa-yen-sign me-1"></i>合計金額: <strong>${yen(totalAmount)}</strong>
   </span>
+  ${uncheckedCount > 0 ? `<span class="badge bg-warning text-dark fs-6 fw-normal px-3 py-2">
+    <i class="fas fa-exclamation-triangle me-1"></i>納品書未確認: <strong>${uncheckedCount}</strong> 件
+  </span>` : ''}
+  ${noSlipCount > 0 ? `<span class="badge bg-secondary fs-6 fw-normal px-3 py-2">
+    <i class="fas fa-file-slash me-1"></i>納品書なし: <strong>${noSlipCount}</strong> 件
+  </span>` : ''}
 </div>
 
 <div class="card">
@@ -4144,7 +4189,7 @@ ${flash ? `<div class="alert alert-success alert-dismissible fade show py-2" rol
           <th>入荷日</th><th>納品書日付</th><th>発注番号</th><th>仕入先</th>
           <th>顧客名</th><th class="text-center">品目数</th>
           <th class="text-end">入荷数</th><th class="text-end">金額</th>
-          <th>検品者</th><th>備考</th><th>操作</th>
+          <th class="text-center">納品書</th><th>検品者</th><th>操作</th>
         </tr>
       </thead>
       <tbody>${rows || '<tr><td colspan="11" class="text-center text-muted py-4">納品履歴がありません。</td></tr>'}</tbody>
@@ -4625,15 +4670,17 @@ app.get('/receipts/:id/edit', async (c) => {
   const rid = parseInt(c.req.param('id'))
   if (isNaN(rid)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
-  // ヘッダーと明細を並列取得
-  const [receipt, itemsRes] = await Promise.all([
+  // ヘッダー・明細・仕入先一覧を並列取得
+  const [receipt, itemsRes, supplierRes] = await Promise.all([
     db.prepare(`
       SELECT r.*,
              po.order_no, po.id AS purchase_order_id,
-             s.name AS supplier_name, s.id AS supplier_id
+             s.name AS order_supplier_name, s.id AS order_supplier_id,
+             sa.name AS actual_supplier_name
       FROM receipts r
       LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
-      LEFT JOIN suppliers s ON po.supplier_id = s.id
+      LEFT JOIN suppliers s  ON po.supplier_id = s.id
+      LEFT JOIN suppliers sa ON r.actual_supplier_id = sa.id
       WHERE r.id=? AND r.tenant_id=?
     `).bind(rid, tenantId).first<Record<string,unknown>>(),
     db.prepare(`
@@ -4645,15 +4692,25 @@ app.get('/receipts/:id/edit', async (c) => {
       LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
       WHERE ri.receipt_id=?
       ORDER BY ri.id
-    `).bind(rid).all<Record<string,unknown>>()
+    `).bind(rid).all<Record<string,unknown>>(),
+    db.prepare('SELECT id, name FROM suppliers WHERE tenant_id=? AND is_active=1 ORDER BY name')
+      .bind(tenantId).all<Record<string,unknown>>()
   ])
   if (!receipt) return layout('エラー', '<div class="alert alert-danger">納品データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
   const isFreeReceipt = !receipt['purchase_order_id']
 
+  // 現在の表示仕入先（actual_supplier_id があればそちら優先）
+  const currentSupplierId = receipt['actual_supplier_id'] ?? receipt['order_supplier_id']
+  const supplierChanged   = !!receipt['actual_supplier_id']
+
+  // 仕入先セレクト選択肢
+  const supplierOpts = supplierRes.results.map(s =>
+    `<option value="${s['id']}" ${String(s['id']) === String(currentSupplierId) ? 'selected' : ''}>${esc(s['name'])}</option>`
+  ).join('')
+
   const itemRows = itemsRes.results.map(item => {
     if (isFreeReceipt) {
-      // フリー納品の場合：商品名はnoteに格納されている
       return `<tr data-ri-id="${item['receipt_item_id']}">
         <td><input class="form-control form-control-sm" name="item_note_${item['receipt_item_id']}" value="${esc(item['item_note'])}"></td>
         <td><input class="form-control form-control-sm text-center" type="number" min="1" name="rq_${item['receipt_item_id']}" value="${item['received_quantity']}"></td>
@@ -4664,19 +4721,22 @@ app.get('/receipts/:id/edit', async (c) => {
         </td>
       </tr>`
     }
+    const listPriceSugg = item['list_price'] ? Math.round(Number(item['list_price']) * Number(item['default_rate'] || 0.65)) : ''
     return `<tr data-ri-id="${item['receipt_item_id']}">
       <td class="small">
         <span class="text-muted">${esc(item['item_category'])} / ${esc(item['manufacturer'])}</span><br>
         <strong>${esc(item['product_name'])}</strong>${item['spec'] ? ' <span class="text-muted">'+esc(item['spec'])+'</span>' : ''}
+        ${item['color'] ? '<br><span class="text-muted small">'+esc(item['color'])+'</span>' : ''}
       </td>
       <td class="text-center">${item['ordered_qty']}</td>
       <td>
-        <div class="input-group input-group-sm" style="min-width:110px">
+        <div class="input-group input-group-sm" style="min-width:120px">
           <span class="input-group-text">¥</span>
-          <input class="form-control text-end" type="number" min="0" step="1"
-            name="up_${item['receipt_item_id']}" value="${item['unit_price']}"
-            placeholder="${item['list_price'] ? Math.round(Number(item['list_price']) * Number(item['default_rate'] || 0.65)) : ''}">
+          <input class="form-control text-end unit-price-input" type="number" min="0" step="1"
+            name="up_${item['receipt_item_id']}" value="${item['unit_price'] ?? ''}"
+            placeholder="${listPriceSugg}" data-list="${item['list_price']??''}" data-rate="${item['default_rate']??''}">
         </div>
+        ${listPriceSugg ? `<div class="text-muted" style="font-size:.7rem">定価¥${Number(item['list_price']).toLocaleString('ja-JP')} × ${item['default_rate']} = ¥${listPriceSugg.toLocaleString('ja-JP')}</div>` : ''}
       </td>
       <td>
         <input class="form-control form-control-sm text-center" type="number" min="0"
@@ -4690,12 +4750,43 @@ app.get('/receipts/:id/edit', async (c) => {
 
   const theadHtml = isFreeReceipt
     ? `<tr><th>商品名 / 備考</th><th class="text-center" style="min-width:90px">入荷数</th><th></th></tr>`
-    : `<tr><th>商品</th><th class="text-center">発注数</th><th>単価</th><th class="text-center" style="min-width:90px">入荷数</th><th>行備考</th></tr>`
+    : `<tr><th>商品</th><th class="text-center">発注数</th><th>単価（納品書に合わせて修正可）</th><th class="text-center" style="min-width:90px">入荷数</th><th>行備考</th></tr>`
 
   const backUrl = receipt['purchase_order_id'] ? `/orders/${receipt['purchase_order_id']}` : '/receipts'
 
+  // slip_verified / no_slip の現在状態
+  const isVerified = !!receipt['slip_verified']
+  const isNoSlip   = !!receipt['no_slip']
+
   const scripts = `<script>
 var riIds = ${JSON.stringify(riIds)};
+
+// 納品書なしチェックボックスのトグル制御
+(function(){
+  var noSlipCb   = document.getElementById('cb-no-slip');
+  var verifiedCb = document.getElementById('cb-slip-verified');
+  var slipDateEl = document.querySelector('[name="slip_date"]');
+  var slipNoteEl = document.querySelector('[name="slip_note"]');
+  var slipSection = document.getElementById('slip-verify-section');
+
+  function updateSlipUI(){
+    if(!noSlipCb || !verifiedCb) return;
+    if(noSlipCb.checked){
+      verifiedCb.checked = false;
+      verifiedCb.disabled = true;
+      if(slipDateEl) slipDateEl.value = '';
+    } else {
+      verifiedCb.disabled = false;
+    }
+    if(slipSection){
+      slipSection.style.opacity = noSlipCb.checked ? '0.4' : '1';
+      slipSection.style.pointerEvents = noSlipCb.checked ? 'none' : '';
+    }
+  }
+  if(noSlipCb) noSlipCb.addEventListener('change', updateSlipUI);
+  updateSlipUI();
+})();
+
 document.getElementById('edit-receipt-form').addEventListener('submit', async function(e){
   e.preventDefault();
   var f = e.target;
@@ -4709,13 +4800,31 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
     if(upEl && upEl.value !== '') obj.unit_price = parseFloat(upEl.value);
     return obj;
   });
+
+  var noSlipCb   = document.getElementById('cb-no-slip');
+  var verifiedCb = document.getElementById('cb-slip-verified');
+  var supEl      = f.querySelector('[name="actual_supplier_id"]');
+  var checkerEl  = f.querySelector('[name="slip_checked_by"]');
+  var slipNoteEl = f.querySelector('[name="slip_note"]');
+
   var payload = {
-    received_date:  f.querySelector('[name="received_date"]').value,
-    slip_date:      f.querySelector('[name="slip_date"]')?.value || '',
-    inspected_by:   f.querySelector('[name="inspected_by"]').value,
-    note:           f.querySelector('[name="note"]').value,
+    received_date:      f.querySelector('[name="received_date"]').value,
+    slip_date:          f.querySelector('[name="slip_date"]')?.value || '',
+    inspected_by:       f.querySelector('[name="inspected_by"]').value,
+    note:               f.querySelector('[name="note"]').value,
+    slip_verified:      verifiedCb ? verifiedCb.checked : false,
+    no_slip:            noSlipCb  ? noSlipCb.checked  : false,
+    slip_checked_by:    checkerEl ? checkerEl.value    : '',
+    slip_note:          slipNoteEl? slipNoteEl.value   : '',
+    actual_supplier_id: supEl && supEl.value ? parseInt(supEl.value) : null,
     items: items
   };
+
+  // 納品書確認済みまたは納品書なしの場合、確認者が未入力なら警告
+  if((payload.slip_verified || payload.no_slip) && !payload.slip_checked_by){
+    if(!confirm('納品書チェック者名が未入力です。このまま保存しますか？')) return;
+  }
+
   var btn = f.querySelector('button[type=submit]');
   btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
   try {
@@ -4725,7 +4834,7 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
     var res = await resp.json();
     if(!resp.ok){ showFlash(res.error||'保存に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存'; return; }
     showFlash('保存しました','success');
-    setTimeout(function(){ window.location.href = '${backUrl}'; }, 800);
+    setTimeout(function(){ window.location.href = '${backUrl}?flash='+encodeURIComponent('納品履歴を更新しました'); }, 800);
   } catch(err){
     showFlash('通信エラー: '+err.message,'danger');
     btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存';
@@ -4733,13 +4842,20 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
 });
 </script>`
 
+  // 現在のチェック状態バナー
+  const slipStatusBanner = isNoSlip
+    ? `<div class="alert alert-secondary py-2 mb-0 d-flex align-items-center gap-2"><i class="fas fa-file-slash"></i><span>納品書なし として登録済み ${receipt['slip_checked_by'] ? '（確認者: '+esc(receipt['slip_checked_by'])+'）' : ''}</span></div>`
+    : isVerified
+    ? `<div class="alert alert-success py-2 mb-0 d-flex align-items-center gap-2"><i class="fas fa-check-circle"></i><span>納品書確認済み ${receipt['slip_checked_by'] ? '（確認者: '+esc(receipt['slip_checked_by'])+'）' : ''}</span></div>`
+    : `<div class="alert alert-warning py-2 mb-0 d-flex align-items-center gap-2"><i class="fas fa-exclamation-triangle"></i><span><strong>納品書が未確認です。</strong>下の「納品書照合」セクションで確認してください。</span></div>`
+
   const content = `
 <div class="action-bar">
   <div>
     <h1 class="page-title"><i class="fas fa-edit me-2" style="color:var(--gw-green)"></i>納品履歴を編集</h1>
     <p class="page-subtitle">
       ${receipt['purchase_order_id']
-        ? `発注番号: ${esc(receipt['order_no'])} / ${esc(receipt['supplier_name'])}`
+        ? `発注番号: ${esc(receipt['order_no'])} / ${esc(receipt['order_supplier_name'])}`
         : '<span class="badge text-bg-secondary">システム外発注</span>'
       }
       &nbsp;・納品ID: ${rid}
@@ -4749,15 +4865,20 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
     <a href="${backUrl}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>戻る</a>
   </div>
 </div>
-<form id="edit-receipt-form">
+
+${slipStatusBanner}
+
+<form id="edit-receipt-form" class="mt-3">
+
+  <!-- ① 納品ヘッダ -->
   <div class="card mb-3">
-    <div class="card-header"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
+    <div class="card-header fw-semibold"><i class="fas fa-info-circle me-1"></i>① 納品ヘッダ</div>
     <div class="card-body row g-3">
       <div class="col-md-3">
         <label class="form-label">入荷日 <span class="text-danger">*</span></label>
         <input class="form-control" type="date" name="received_date" value="${esc(receipt['received_date'])}" required>
       </div>
-      <div class="col-md-3">
+      <div id="slip-verify-section" class="col-md-3">
         <label class="form-label">納品書記載日</label>
         <input class="form-control" type="date" name="slip_date" value="${esc(receipt['slip_date']) || ''}">
       </div>
@@ -4771,8 +4892,40 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
       </div>
     </div>
   </div>
+
+  <!-- ② 仕入先（納品履歴から変更） -->
+  <div class="card mb-3 ${supplierChanged ? 'border-info' : ''}">
+    <div class="card-header fw-semibold">
+      <i class="fas fa-building me-1"></i>② 仕入先
+      ${supplierChanged ? `<span class="badge bg-info text-dark ms-2"><i class="fas fa-exchange-alt me-1"></i>発注時と異なる仕入先が設定されています</span>` : ''}
+    </div>
+    <div class="card-body">
+      ${!isFreeReceipt ? `
+      <div class="mb-2 small text-muted">
+        <i class="fas fa-file-alt me-1"></i>発注時の仕入先:
+        <strong>${esc(receipt['order_supplier_name']) || '―'}</strong>
+        ${supplierChanged ? `<span class="ms-2 text-info">→ 実際の納品先が異なります</span>` : ''}
+      </div>` : ''}
+      <div class="row g-2 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label mb-1">実際の仕入先 <span class="text-muted small">（発注時と異なる場合のみ変更）</span></label>
+          <select class="form-select" name="actual_supplier_id">
+            <option value="">― 発注時の仕入先のまま ―</option>
+            ${supplierOpts}
+          </select>
+        </div>
+        <div class="col-md-7 small text-muted">
+          <i class="fas fa-info-circle me-1"></i>
+          実際に納品してきた仕入先が発注と異なる場合（例: 代替仕入先・直送など）に選択してください。<br>
+          選択すると納品履歴一覧に <span class="badge bg-info text-dark"><i class="fas fa-exchange-alt"></i></span> マークが表示されます。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 入荷明細（単価・数量を納品書に合わせて修正） -->
   <div class="card mb-3">
-    <div class="card-header"><i class="fas fa-table me-1"></i>入荷明細</div>
+    <div class="card-header fw-semibold"><i class="fas fa-table me-1"></i>③ 入荷明細（納品書と照合して単価・数量を修正）</div>
     <div class="table-responsive">
       <table class="table align-middle mb-0 small">
         <thead>${theadHtml}</thead>
@@ -4780,6 +4933,52 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
       </table>
     </div>
   </div>
+
+  <!-- ④ 納品書照合 -->
+  <div class="card mb-3 ${(!isVerified && !isNoSlip) ? 'border-warning' : isNoSlip ? 'border-secondary' : 'border-success'}">
+    <div class="card-header fw-semibold ${(!isVerified && !isNoSlip) ? 'bg-warning bg-opacity-25' : isNoSlip ? '' : 'bg-success bg-opacity-10'}">
+      <i class="fas fa-file-check me-1"></i>④ 納品書照合チェック
+      <span class="ms-2 small fw-normal text-muted">※ 保存前に必ず確認してください</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12">
+          <!-- 納品書なし -->
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="cb-no-slip" name="no_slip" value="1"
+              style="width:2.5em;height:1.3em" ${isNoSlip ? 'checked' : ''}>
+            <label class="form-check-label ms-2 fw-semibold" for="cb-no-slip">
+              <i class="fas fa-file-slash me-1 text-secondary"></i>納品書なし
+              <span class="text-muted fw-normal small ms-2">（郵送待ち・紛失・不要な場合など）</span>
+            </label>
+          </div>
+        </div>
+        <div class="col-12">
+          <!-- 納品書確認済み -->
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="cb-slip-verified" name="slip_verified" value="1"
+              style="width:2.5em;height:1.3em" ${isVerified ? 'checked' : ''} ${isNoSlip ? 'disabled' : ''}>
+            <label class="form-check-label ms-2 fw-semibold" for="cb-slip-verified">
+              <i class="fas fa-check-circle me-1 text-success"></i>納品書を確認した
+              <span class="text-muted fw-normal small ms-2">（金額・品目・数量が一致することを確認）</span>
+            </label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">確認者名</label>
+          <input class="form-control" name="slip_checked_by"
+            value="${esc(receipt['slip_checked_by']) || ''}"
+            placeholder="古川">
+        </div>
+        <div class="col-12">
+          <label class="form-label">照合メモ <span class="text-muted small">（差異・特記事項があれば記入）</span></label>
+          <textarea class="form-control" name="slip_note" rows="2"
+            placeholder="例: 金額が¥200異なったため単価を修正。仕入先から値引き連絡あり。">${esc(receipt['slip_note']) || ''}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="d-flex justify-content-end gap-2">
     <a href="${backUrl}" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>キャンセル</a>
     <button type="submit" class="btn btn-primary btn-lg px-4"><i class="fas fa-save me-1"></i>変更を保存</button>
