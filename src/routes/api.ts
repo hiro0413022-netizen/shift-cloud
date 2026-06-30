@@ -188,28 +188,32 @@ ${sig ? '\n' + sig : ''}`
 }
 
 async function computeStatus(db: D1Database, orderId: number): Promise<string> {
-  const rows = await db
-    .prepare(
-      `SELECT poi.id, poi.quantity,
-              COALESCE(SUM(ri.received_quantity), 0) AS received_qty
+  // 集計クエリとステータス取得を1本のSQLにまとめてRTT削減
+  const [summaryRow, curRow] = await Promise.all([
+    db.prepare(
+      `SELECT
+         COALESCE(SUM(poi.quantity), 0)          AS ordered_total,
+         COALESCE(SUM(ri_agg.received_qty), 0)   AS received_total,
+         COUNT(poi.id)                            AS item_count
        FROM purchase_order_items poi
-       LEFT JOIN receipt_items ri ON ri.purchase_order_item_id = poi.id
-       WHERE poi.purchase_order_id = ?
-       GROUP BY poi.id, poi.quantity`
-    )
-    .bind(orderId)
-    .all<{ id: number; quantity: number; received_qty: number }>()
+       LEFT JOIN (
+         SELECT purchase_order_item_id, SUM(received_quantity) AS received_qty
+         FROM receipt_items
+         GROUP BY purchase_order_item_id
+       ) ri_agg ON ri_agg.purchase_order_item_id = poi.id
+       WHERE poi.purchase_order_id = ?`
+    ).bind(orderId).first<{ ordered_total: number; received_total: number; item_count: number }>(),
+    db.prepare('SELECT status FROM purchase_orders WHERE id=?')
+      .bind(orderId).first<{ status: string }>()
+  ])
 
-  const data = rows.results
-  if (!data.length) return 'draft'
-  const orderedTotal = data.reduce((s, r) => s + (r.quantity || 0), 0)
-  const receivedTotal = data.reduce((s, r) => s + (r.received_qty || 0), 0)
+  const itemCount     = summaryRow?.item_count    ?? 0
+  const orderedTotal  = summaryRow?.ordered_total  ?? 0
+  const receivedTotal = summaryRow?.received_total ?? 0
+
+  if (!itemCount) return 'draft'
   if (receivedTotal <= 0) {
-    const cur = await db
-      .prepare('SELECT status FROM purchase_orders WHERE id=?')
-      .bind(orderId)
-      .first<{ status: string }>()
-    const s = cur?.status ?? 'draft'
+    const s = curRow?.status ?? 'draft'
     return ['draft', 'draft_created', 'ordered'].includes(s) ? s : 'ordered'
   }
   if (receivedTotal < orderedTotal) return 'partial'
@@ -1080,13 +1084,38 @@ app.post('/receipts', async (c) => {
 
   const tenantId = getTenantId(c)
 
-  // actual_supplier_id の存在チェック
+  const validItems = (body.items || []).filter(i => i.received_quantity > 0)
+
+  // actual_supplier_id チェック と poi一括取得 を並列実行
+  const allPoiIds = validItems.map(i => i.purchase_order_item_id)
+  const poiMap = new Map<number, { list_price: number | null; unit_price: number | null }>()
+
+  const parallelChecks: Promise<unknown>[] = []
+
   if (actualSupplierId) {
-    const sup = await db.prepare('SELECT id FROM suppliers WHERE id=? AND tenant_id=?')
-      .bind(actualSupplierId, tenantId).first()
-    if (!sup) return c.json({ error: '指定した仕入先が見つかりません。' }, 400)
+    parallelChecks.push(
+      db.prepare('SELECT id FROM suppliers WHERE id=? AND tenant_id=?')
+        .bind(actualSupplierId, tenantId).first()
+        .then(sup => { if (!sup) throw new Error('指定した仕入先が見つかりません。') })
+    )
+  }
+  if (allPoiIds.length > 0) {
+    const inClause = allPoiIds.map(() => '?').join(',')
+    parallelChecks.push(
+      db.prepare(`SELECT id, list_price, unit_price FROM purchase_order_items WHERE id IN (${inClause})`)
+        .bind(...allPoiIds)
+        .all<{ id: number; list_price: number | null; unit_price: number | null }>()
+        .then(rows => { for (const p of rows.results) poiMap.set(p.id, p) })
+    )
   }
 
+  try {
+    await Promise.all(parallelChecks)
+  } catch (e: unknown) {
+    return c.json({ error: e instanceof Error ? e.message : '入力エラー' }, 400)
+  }
+
+  // receipts INSERT
   const ins = await db
     .prepare(
       `INSERT INTO receipts
@@ -1098,58 +1127,50 @@ app.post('/receipts', async (c) => {
     .bind(
       orderId, receivedDate, slipDate, inspectedBy, note,
       slipVerified, noSlip, slipNote, actualSupplierId,
-      inspectedBy,  // 検品者 = 照合確認者として自動セット
+      inspectedBy,
       slipVerified ? new Date().toISOString() : null,
       tenantId
     )
     .run()
   const receiptId = ins.meta.last_row_id as number
 
-  // 発注明細の定価を一括取得（掛率自動計算用）
-  const allPoiIds = (body.items || [])
-    .filter(i => i.received_quantity > 0)
-    .map(i => i.purchase_order_item_id)
-  const poiMap = new Map<number, { list_price: number | null; unit_price: number | null }>()
-  if (allPoiIds.length > 0) {
-    const inClause = allPoiIds.map(() => '?').join(',')
-    const poiRows = await db.prepare(
-      `SELECT id, list_price, unit_price FROM purchase_order_items WHERE id IN (${inClause})`
-    ).bind(...allPoiIds).all<{ id: number; list_price: number | null; unit_price: number | null }>()
-    for (const p of poiRows.results) poiMap.set(p.id, p)
-  }
-
+  // 明細INSERT を db.batch() で1往復にまとめる
   let added = 0
-  for (const item of body.items || []) {
-    if (!item.received_quantity || item.received_quantity <= 0) continue
+  const itemStmts: D1PreparedStatement[] = []
+  for (const item of validItems) {
     const poi = poiMap.get(item.purchase_order_item_id)
     const listPrice = poi?.list_price ?? null
-    // 実際の単価：入力値 > 発注時単価 の優先順
     const actualUnitPrice = item.actual_unit_price != null
       ? Number(item.actual_unit_price)
       : (poi?.unit_price ?? null)
     const actualRate = (actualUnitPrice != null && listPrice != null && listPrice > 0)
-      ? Math.round((actualUnitPrice / listPrice) * 10000) / 10000  // 小数4桁
+      ? Math.round((actualUnitPrice / listPrice) * 10000) / 10000
       : null
     const actualAmount = actualUnitPrice != null
       ? Math.round(actualUnitPrice * item.received_quantity)
       : null
 
-    await db
-      .prepare(
+    itemStmts.push(
+      db.prepare(
         `INSERT INTO receipt_items
           (receipt_id, purchase_order_item_id, received_quantity, note,
            actual_unit_price, actual_rate, actual_amount)
          VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
+      ).bind(
         receiptId, item.purchase_order_item_id, item.received_quantity,
         normalize(item.note), actualUnitPrice, actualRate, actualAmount
       )
-      .run()
+    )
     added += item.received_quantity
   }
 
-  await updateOrderStatus(db, orderId)
+  // 明細INSERT + 発注ステータス更新 を並列実行
+  // batch() で明細を1RTT、updateOrderStatus は独立して並列
+  await Promise.all([
+    itemStmts.length > 0 ? db.batch(itemStmts) : Promise.resolve(),
+    updateOrderStatus(db, orderId)
+  ])
+
   return c.json({ ok: true, receipt_id: receiptId, added_quantity: added })
 })
 
@@ -1219,7 +1240,7 @@ app.put('/receipts/:id', async (c) => {
     for (const p of poiRows.results) poiPriceMap.set(p.id, p)
   }
 
-  // すべての更新を並列実行
+  // すべての更新をbatch/並列実行
   const updatePromises: Promise<unknown>[] = []
 
   // ヘッダー更新（納品書照合・仕入先変更含む）
@@ -1270,21 +1291,21 @@ app.put('/receipts/:id', async (c) => {
     )
   }
 
-  // 明細更新（receipt_items）: 数量・備考・実際の単価・掛率・金額
+  // 明細更新用ステートメントを収集して db.batch() で1往復にまとめる
+  const itemStmtsPut: D1PreparedStatement[] = []
   for (const item of (body.items || [])) {
     if (!item.receipt_item_id) continue
-    const poiId = poiMap.get(item.receipt_item_id)
-    const poiData = poiId ? poiPriceMap.get(poiId) : undefined
+    const poiId    = poiMap.get(item.receipt_item_id)
+    const poiData  = poiId ? poiPriceMap.get(poiId) : undefined
     const listPrice = poiData?.list_price ?? null
 
     if (item.actual_unit_price != null) {
-      // 実際の単価が指定された場合：掛率・金額を自動計算
       const actualUnitPrice = Number(item.actual_unit_price)
       const actualRate = (listPrice != null && listPrice > 0)
         ? Math.round((actualUnitPrice / listPrice) * 10000) / 10000
         : null
       const actualAmount = Math.round(actualUnitPrice * item.received_quantity)
-      updatePromises.push(
+      itemStmtsPut.push(
         db.prepare(
           `UPDATE receipt_items SET received_quantity=?, note=?,
            actual_unit_price=?, actual_rate=?, actual_amount=?
@@ -1293,21 +1314,24 @@ app.put('/receipts/:id', async (c) => {
           item.received_quantity, normalize(item.note),
           actualUnitPrice, actualRate, actualAmount,
           item.receipt_item_id, receiptId
-        ).run()
+        )
       )
     } else {
-      // 単価指定なし：数量・備考のみ更新
-      updatePromises.push(
+      itemStmtsPut.push(
         db.prepare('UPDATE receipt_items SET received_quantity=?, note=? WHERE id=? AND receipt_id=?')
-          .bind(item.received_quantity, normalize(item.note), item.receipt_item_id, receiptId).run()
+          .bind(item.received_quantity, normalize(item.note), item.receipt_item_id, receiptId)
       )
     }
   }
 
+  // ヘッダー更新・明細batch・ステータス更新 を並列実行
+  if (itemStmtsPut.length > 0) {
+    updatePromises.push(db.batch(itemStmtsPut))
+  }
+  if (receipt.purchase_order_id) {
+    updatePromises.push(updateOrderStatus(db, receipt.purchase_order_id))
+  }
   await Promise.all(updatePromises)
-
-  // 発注ステータス再計算
-  if (receipt.purchase_order_id) await updateOrderStatus(db, receipt.purchase_order_id)
 
   return c.json({ ok: true })
 })
@@ -1379,19 +1403,25 @@ app.post('/receipts/free', async (c) => {
   ).run()
   const receiptId = ins.meta.last_row_id as number
 
-  // receipt_items に purchase_order_item_id=NULL で登録
+  // receipt_items を db.batch() で一括INSERT
+  const freeItemStmts: D1PreparedStatement[] = []
   for (const item of body.items) {
     if (!item.product_name?.trim() || !(item.quantity > 0)) continue
     const itemNote = [item.product_name.trim(), item.spec?.trim(), item.note?.trim()]
       .filter(Boolean).join(' / ')
     const actualUnitPrice = item.unit_price != null ? Number(item.unit_price) : null
     const actualAmount    = actualUnitPrice != null ? Math.round(actualUnitPrice * item.quantity) : null
-    await db.prepare(
-      `INSERT INTO receipt_items
-        (receipt_id, purchase_order_item_id, received_quantity, note,
-         actual_unit_price, actual_rate, actual_amount)
-       VALUES (?, NULL, ?, ?, ?, NULL, ?)`
-    ).bind(receiptId, item.quantity, itemNote, actualUnitPrice, actualAmount).run()
+    freeItemStmts.push(
+      db.prepare(
+        `INSERT INTO receipt_items
+          (receipt_id, purchase_order_item_id, received_quantity, note,
+           actual_unit_price, actual_rate, actual_amount)
+         VALUES (?, NULL, ?, ?, ?, NULL, ?)`
+      ).bind(receiptId, item.quantity, itemNote, actualUnitPrice, actualAmount)
+    )
+  }
+  if (freeItemStmts.length > 0) {
+    await db.batch(freeItemStmts)
   }
 
   return c.json({ ok: true, receipt_id: receiptId })
