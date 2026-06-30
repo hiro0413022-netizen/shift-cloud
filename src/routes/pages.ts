@@ -4201,7 +4201,7 @@ ${uncheckedCount > 0 ? `<div class="alert alert-warning py-2 mb-3 d-flex align-i
 })
 
 // ============================================================
-// 納品登録フォーム  ★ /receipts より後・/receipts/:id の前に定義
+// 納品登録フォーム（＝検品フロー統合）  ★ /receipts より後・/receipts/:id の前に定義
 // ============================================================
 app.get('/receipts/new/:order_id', async (c) => {
   const db = c.env.DB
@@ -4209,52 +4209,153 @@ app.get('/receipts/new/:order_id', async (c) => {
   const orderId = parseInt(c.req.param('order_id'))
   if (isNaN(orderId)) return layout('エラー', '<div class="alert alert-danger">不正なIDです。</div>', '', '', getLayoutOpts(c))
 
-  const order = await db.prepare(`
-    SELECT po.*, s.name AS supplier_name FROM purchase_orders po
-    JOIN suppliers s ON po.supplier_id=s.id WHERE po.id=? AND po.tenant_id=?
-  `).bind(orderId, tenantId).first<Record<string,unknown>>()
+  const [order, itemsRes, supplierRes] = await Promise.all([
+    db.prepare(`
+      SELECT po.*, s.name AS supplier_name, s.payment_method
+      FROM purchase_orders po
+      JOIN suppliers s ON po.supplier_id=s.id
+      WHERE po.id=? AND po.tenant_id=?
+    `).bind(orderId, tenantId).first<Record<string,unknown>>(),
+    db.prepare(`
+      SELECT poi.*,
+        COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+      FROM purchase_order_items poi WHERE poi.purchase_order_id=? ORDER BY poi.id
+    `).bind(orderId).all<Record<string,unknown>>(),
+    db.prepare('SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name')
+      .bind(tenantId).all<Record<string,unknown>>()
+  ])
   if (!order) return layout('エラー', '<div class="alert alert-danger">発注データが見つかりません。</div>', '', '', getLayoutOpts(c))
 
-  const items = await db.prepare(`
-    SELECT poi.*,
-      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
-    FROM purchase_order_items poi WHERE poi.purchase_order_id=? ORDER BY poi.id
-  `).bind(orderId).all<Record<string,unknown>>()
+  const supplierOpts = supplierRes.results.map(s =>
+    `<option value="${s['id']}">${esc(s['name'])}</option>`
+  ).join('')
 
-  const itemRows = items.results.map(item => {
+  const itemIds = itemsRes.results.map(i => i['id'])
+
+  // 明細行HTML（単価入力欄付き）
+  const itemRows = itemsRes.results.map(item => {
     const remaining = Number(item['quantity']||0) - Number(item['received_qty']||0)
-    return `<tr>
-      <td>${esc(item['item_category'])} / ${esc(item['manufacturer'])} / <strong>${esc(item['product_name'])}</strong>${item['spec'] ? ' / '+esc(item['spec']) : ''}</td>
-      <td class="text-center">${item['quantity']}</td>
+    const listPrice  = item['list_price']  != null ? Number(item['list_price'])  : null
+    const rate       = item['rate']        != null ? Number(item['rate'])        : null
+    const unitPrice  = item['unit_price']  != null ? Number(item['unit_price'])  : null
+    // 定価×掛率のサジェスト（発注時計算値）
+    const suggested  = listPrice && rate ? Math.round(listPrice * rate) : unitPrice
+    const listFmt    = listPrice ? listPrice.toLocaleString('ja-JP') : ''
+    const rateFmt    = rate      ? (rate * 100).toFixed(1) + '%'     : ''
+    const suggestTip = (listPrice && rate)
+      ? `<div class="text-muted" style="font-size:.7rem">定価 ¥${listFmt} × ${rateFmt} = ¥${suggested?.toLocaleString('ja-JP')}</div>`
+      : ''
+    return `<tr data-poi-id="${item['id']}">
+      <td class="small">
+        <span class="text-muted">${esc(item['item_category'])} / ${esc(item['manufacturer'])}</span><br>
+        <strong>${esc(item['product_name'])}</strong>${item['spec'] ? ` <span class="text-muted">${esc(item['spec'])}</span>` : ''}
+        ${item['color'] ? `<br><span class="text-muted">${esc(item['color'])}</span>` : ''}
+      </td>
+      <td class="text-center fw-semibold">${item['quantity']}</td>
       <td class="text-center text-success">${item['received_qty']}</td>
       <td class="text-center ${remaining<=0?'text-muted':'text-danger fw-bold'}">${remaining}</td>
-      <td><input class="form-control form-control-sm text-center" type="number" min="0" max="${remaining}" name="rq_${item['id']}" value="${remaining<=0?0:remaining}"></td>
-      <td><input class="form-control form-control-sm" name="rn_${item['id']}" placeholder="備考"></td>
+      <td style="min-width:110px">
+        <input class="form-control form-control-sm text-center qty-input" type="number"
+          min="0" max="${remaining > 0 ? remaining : 0}"
+          name="rq_${item['id']}" value="${remaining>0 ? remaining : 0}"
+          data-poi="${item['id']}">
+      </td>
+      <td style="min-width:160px">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">¥</span>
+          <input class="form-control text-end price-input" type="number" min="0" step="1"
+            name="up_${item['id']}" value="${unitPrice ?? ''}"
+            placeholder="${suggested ?? ''}"
+            data-list="${listPrice ?? ''}" data-rate="${rate ?? ''}"
+            data-poi="${item['id']}">
+        </div>
+        ${suggestTip}
+      </td>
+      <td><input class="form-control form-control-sm" name="rn_${item['id']}" placeholder="行備考"></td>
     </tr>`
   }).join('')
 
-  const itemIds = items.results.map(i => i['id'])
-
   const scripts = `<script>
+// 合計金額リアルタイム計算
+function calcTotal(){
+  var total = 0;
+  document.querySelectorAll('.qty-input').forEach(function(qEl){
+    var poi = qEl.dataset.poi;
+    var pEl = document.querySelector('[name="up_'+poi+'"]');
+    var qty = parseInt(qEl.value)||0;
+    var price = parseFloat(pEl?.value||'0')||0;
+    total += qty * price;
+  });
+  var el = document.getElementById('preview-total');
+  if(el) el.textContent = '¥' + total.toLocaleString('ja-JP');
+}
+document.addEventListener('input', function(e){
+  if(e.target.classList.contains('qty-input') || e.target.classList.contains('price-input')) calcTotal();
+});
+
+// 納品書なしトグル
+(function(){
+  var noSlipCb = document.getElementById('cb-no-slip-new');
+  var slipDateEl = document.querySelector('[name="slip_date"]');
+  if(!noSlipCb) return;
+  noSlipCb.addEventListener('change', function(){
+    if(noSlipCb.checked){
+      slipDateEl.value = '';
+      slipDateEl.disabled = true;
+      slipDateEl.removeAttribute('required');
+    } else {
+      slipDateEl.disabled = false;
+      slipDateEl.setAttribute('required', '');
+    }
+  });
+})();
+
 document.getElementById('receipt-form').addEventListener('submit', async function(e){
   e.preventDefault();
   var form = e.target;
+  var noSlipCb = document.getElementById('cb-no-slip-new');
+  var isNoSlip = noSlipCb && noSlipCb.checked;
+
+  // バリデーション
+  var receivedDate = form.querySelector('[name="received_date"]').value;
+  var slipDate     = form.querySelector('[name="slip_date"]').value;
+  var inspectedBy  = form.querySelector('[name="inspected_by"]').value.trim();
+  if(!receivedDate){ showFlash('入荷日は必須です','danger'); return; }
+  if(!isNoSlip && !slipDate){ showFlash('納品書記載日を入力してください（納品書がない場合は「納品書なし」にチェック）','danger'); return; }
+  if(!inspectedBy){ showFlash('検品者は必須です','danger'); return; }
+
   var itemIds = ${JSON.stringify(itemIds)};
   var receiptItems = itemIds.map(function(id){
-    return {
+    var qEl = form.querySelector('[name="rq_'+id+'"]');
+    var pEl = form.querySelector('[name="up_'+id+'"]');
+    var nEl = form.querySelector('[name="rn_'+id+'"]');
+    var qty = parseInt(qEl?.value||'0');
+    var obj = {
       purchase_order_item_id: id,
-      received_quantity: parseInt(form.querySelector('[name="rq_'+id+'"]')?.value||'0'),
-      note: form.querySelector('[name="rn_'+id+'"]')?.value||''
+      received_quantity: qty,
+      note: nEl?.value||''
     };
+    if(pEl && pEl.value !== '') obj.actual_unit_price = parseFloat(pEl.value);
+    return obj;
   }).filter(function(i){ return i.received_quantity > 0; });
+
+  if(receiptItems.length === 0){
+    showFlash('入荷数を1以上入力してください','danger'); return;
+  }
+
+  var actualSupEl = form.querySelector('[name="actual_supplier_id"]');
   var payload = {
-    order_id: ${orderId},
-    received_date: form.querySelector('[name="received_date"]').value,
-    slip_date: form.querySelector('[name="slip_date"]').value,
-    inspected_by: form.querySelector('[name="inspected_by"]').value,
-    note: form.querySelector('[name="note"]').value,
+    order_id:           ${orderId},
+    received_date:      receivedDate,
+    slip_date:          isNoSlip ? '' : slipDate,
+    inspected_by:       inspectedBy,
+    note:               form.querySelector('[name="note"]').value,
+    no_slip:            isNoSlip,
+    slip_note:          form.querySelector('[name="slip_note"]')?.value||'',
+    actual_supplier_id: actualSupEl && actualSupEl.value ? parseInt(actualSupEl.value) : null,
     items: receiptItems
   };
+
   var btn = form.querySelector('button[type=submit]');
   btn.disabled=true;
   btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
@@ -4262,54 +4363,151 @@ document.getElementById('receipt-form').addEventListener('submit', async functio
     var resp = await fetch('/api/receipts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var result = await resp.json();
     if(!resp.ok){ showFlash(result.error||'登録に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>納品登録を保存'; return; }
-    // 保存完了 → 即リダイレクト（キャッシュバスト付き）
     window.location.replace('/orders/${orderId}?_r=' + Date.now());
   } catch(err){
     showFlash('通信エラー: '+err.message,'danger');
     btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>納品登録を保存';
   }
 });
+
+// 初期計算
+calcTotal();
 </script>`
 
   const content = `
 <div class="action-bar">
   <div>
-    <h1 class="page-title"><i class="fas fa-truck me-2" style="color:var(--gw-green)"></i>納品登録</h1>
-    <p class="page-subtitle">${esc(order['order_no'])} / ${esc(order['supplier_name'])}</p>
+    <h1 class="page-title"><i class="fas fa-truck me-2" style="color:var(--gw-green)"></i>納品登録・検品</h1>
+    <p class="page-subtitle">${esc(order['order_no'])} ／ ${esc(order['supplier_name'])}</p>
   </div>
   <div class="actions">
     <a href="/orders/${orderId}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i>発注詳細へ戻る</a>
   </div>
 </div>
+
+<!-- 運用ガイド -->
+<div class="alert alert-info d-flex gap-2 py-2 mb-3" style="font-size:.9rem">
+  <i class="fas fa-clipboard-check mt-1 flex-shrink-0"></i>
+  <div>
+    <strong>検品手順：</strong>
+    ①入荷日・検品者を入力　②納品書の日付を入力（納品書がない場合は「納品書なし」にチェック）
+    ③各商品の<strong>入荷数</strong>と<strong>納品書記載の単価</strong>を確認・入力　④仕入先が違う場合は変更　⑤保存
+  </div>
+</div>
+
 <form id="receipt-form">
+
+  <!-- ① 納品ヘッダ -->
   <div class="card mb-3">
-    <div class="card-header"><strong><i class="fas fa-info-circle me-1"></i>納品ヘッダ</strong></div>
-    <div class="card-body row g-3">
-      <div class="col-md-3"><label class="form-label">入荷日</label><input class="form-control" type="date" name="received_date" value="${todayStr()}"></div>
-      <div class="col-md-3"><label class="form-label">納品書記載日</label><input class="form-control" type="date" name="slip_date"></div>
-      <div class="col-md-3"><label class="form-label">検品者</label><input class="form-control" name="inspected_by" placeholder="古川"></div>
-      <div class="col-12"><label class="form-label">備考</label><textarea class="form-control" name="note" rows="2"></textarea></div>
+    <div class="card-header fw-semibold"><i class="fas fa-info-circle me-1"></i>① 入荷情報</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">入荷日 <span class="text-danger">*</span></label>
+          <input class="form-control" type="date" name="received_date" value="${todayStr()}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">
+            納品書記載日 <span class="text-danger" id="slip-date-required-mark">*</span>
+          </label>
+          <input class="form-control" type="date" name="slip_date" required
+            placeholder="納品書の日付">
+          <div class="form-text">納品書に記載されている日付</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">検品者 <span class="text-danger">*</span></label>
+          <input class="form-control" name="inspected_by" placeholder="例: 古川" required>
+        </div>
+        <div class="col-md-3 d-flex align-items-end pb-1">
+          <!-- 納品書なし -->
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="cb-no-slip-new" name="no_slip"
+              style="width:2.5em;height:1.3em">
+            <label class="form-check-label ms-2 fw-semibold" for="cb-no-slip-new">
+              <i class="fas fa-file-slash me-1 text-secondary"></i>納品書なし
+              <div class="text-muted fw-normal" style="font-size:.75rem">郵送待ち・紛失など</div>
+            </label>
+          </div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">備考</label>
+          <textarea class="form-control" name="note" rows="2" placeholder="特記事項があれば記入"></textarea>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="card">
-    <div class="card-header"><strong><i class="fas fa-table me-1"></i>入荷明細</strong></div>
+
+  <!-- ② 仕入先（実際の仕入先が違う場合） -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold"><i class="fas fa-building me-1"></i>② 仕入先確認</div>
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <div class="mb-2 small">
+            <span class="text-muted">発注時の仕入先:</span>
+            <strong class="ms-1">${esc(order['supplier_name'])}</strong>
+            ${order['payment_method'] ? `<span class="ms-2 badge text-bg-light border">${esc(order['payment_method'])}</span>` : ''}
+          </div>
+          <label class="form-label mb-1">実際の仕入先 <span class="text-muted small fw-normal">（発注と異なる場合のみ）</span></label>
+          <select class="form-select" name="actual_supplier_id">
+            <option value="">― 発注時の仕入先のまま ―</option>
+            ${supplierOpts}
+          </select>
+        </div>
+        <div class="col-md-7 small text-muted">
+          <i class="fas fa-info-circle me-1"></i>実際に納品してきた仕入先が発注と異なる場合（代替・直送など）に変更してください。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 入荷明細（単価を納品書に合わせて入力） -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-table me-1"></i>③ 入荷明細（納品書の金額を確認して入力）</span>
+      <span class="badge bg-secondary" id="preview-total">¥0</span>
+    </div>
     <div class="table-responsive">
-      <table class="table align-middle mb-0">
-        <thead><tr>
-          <th>商品</th><th class="text-center">発注数</th><th class="text-center">入荷済</th>
-          <th class="text-center">残数</th><th class="text-center" style="min-width:100px">今回入荷数</th><th>行備考</th>
-        </tr></thead>
+      <table class="table align-middle mb-0 small">
+        <thead class="table-light">
+          <tr>
+            <th>商品</th>
+            <th class="text-center">発注数</th>
+            <th class="text-center">入荷済</th>
+            <th class="text-center">残数</th>
+            <th class="text-center" style="min-width:110px">今回入荷数 <span class="text-danger">*</span></th>
+            <th style="min-width:170px">
+              納品書の単価 <span class="text-danger">*</span>
+              <div class="text-muted fw-normal" style="font-size:.7rem">発注単価と異なる場合は修正</div>
+            </th>
+            <th>行備考</th>
+          </tr>
+        </thead>
         <tbody>${itemRows}</tbody>
       </table>
     </div>
-    <div class="sticky-actions text-end">
-      <a href="/orders/${orderId}" class="btn btn-outline-secondary me-2"><i class="fas fa-arrow-left me-1"></i>キャンセル</a>
-      <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save me-1"></i>納品登録を保存</button>
+  </div>
+
+  <!-- ④ 照合メモ -->
+  <div class="card mb-3">
+    <div class="card-header fw-semibold"><i class="fas fa-sticky-note me-1"></i>④ 照合メモ（任意）</div>
+    <div class="card-body">
+      <textarea class="form-control" name="slip_note" rows="2"
+        placeholder="例: ○○の単価が納品書では¥1,800でシステムの¥2,000と異なったため修正。値引き連絡あり。"></textarea>
     </div>
   </div>
+
+  <div class="sticky-actions d-flex justify-content-between align-items-center">
+    <span class="text-muted small"><i class="fas fa-info-circle me-1"></i>納品書記載日・検品者は必須です</span>
+    <div>
+      <a href="/orders/${orderId}" class="btn btn-outline-secondary me-2"><i class="fas fa-times me-1"></i>キャンセル</a>
+      <button type="submit" class="btn btn-primary btn-lg px-4"><i class="fas fa-save me-1"></i>納品登録を保存</button>
+    </div>
+  </div>
+
 </form>`
   const o11 = getLayoutOpts(c)
-  return layout('納品登録', content, scripts, o11.username, o11)
+  return layout('納品登録・検品', content, scripts, o11.username, o11)
 })
 
 // ============================================================
@@ -4320,14 +4518,27 @@ app.get('/receipts/free', async (c) => {
   const db = c.env.DB
   const { tenantId } = getLayoutOpts(c)
   const suppliers = await db.prepare(
-    'SELECT id, name FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name'
+    'SELECT id, name, payment_method FROM suppliers WHERE is_active=1 AND tenant_id=? ORDER BY name'
   ).bind(tenantId).all<Record<string,unknown>>()
   const supplierOpts = suppliers.results.map(s =>
-    `<option value="${s['id']}">${esc(s['name'])}</option>`
+    `<option value="${s['id']}" data-pay="${esc(s['payment_method'])}">${esc(s['name'])}</option>`
   ).join('')
 
   const scripts = `<script>
 var rowCount = 1;
+
+// 合計金額リアルタイム計算
+function calcFreeTotal(){
+  var total = 0;
+  document.querySelectorAll('#free-items-tbody tr').forEach(function(tr){
+    var n = tr.dataset.row;
+    var qty = parseInt(document.querySelector('[name="qty_'+n+'"]')?.value||'0')||0;
+    var up  = parseFloat(document.querySelector('[name="up_'+n+'"]')?.value||'0')||0;
+    total += qty * up;
+  });
+  var el = document.getElementById('free-preview-total');
+  if(el) el.textContent = '¥' + total.toLocaleString('ja-JP');
+}
 
 function addRow(){
   rowCount++;
@@ -4337,12 +4548,13 @@ function addRow(){
   tr.innerHTML = \`
     <td><input class="form-control form-control-sm" name="pname_\${rowCount}" placeholder="商品名" required></td>
     <td><input class="form-control form-control-sm" name="spec_\${rowCount}" placeholder="仕様・色など"></td>
-    <td><input class="form-control form-control-sm text-center" type="number" min="1" name="qty_\${rowCount}" value="1" required></td>
+    <td><input class="form-control form-control-sm text-center qty-input" type="number" min="1" name="qty_\${rowCount}" value="1" required></td>
     <td>
       <div class="input-group input-group-sm">
         <span class="input-group-text">¥</span>
-        <input class="form-control text-end" type="number" min="0" step="1" name="up_\${rowCount}" placeholder="任意">
+        <input class="form-control text-end up-input" type="number" min="0" step="1" name="up_\${rowCount}" placeholder="納品書の単価">
       </div>
+      <div class="text-end text-muted row-subtotal" style="font-size:.72rem;margin-top:2px">小計: ¥0</div>
     </td>
     <td><input class="form-control form-control-sm" name="note_\${rowCount}" placeholder="備考"></td>
     <td class="text-center">
@@ -4350,35 +4562,116 @@ function addRow(){
     </td>
   \`;
   tr.querySelector('.btn-del-row').addEventListener('click', function(){
-    tr.remove();
+    if(document.querySelectorAll('#free-items-tbody tr').length > 1){
+      tr.remove(); calcFreeTotal();
+    } else {
+      showFlash('明細は1行以上必要です','warning');
+    }
+  });
+  tr.querySelectorAll('.qty-input,.up-input').forEach(function(inp){
+    inp.addEventListener('input', function(){
+      var n2 = tr.dataset.row;
+      var q = parseInt(document.querySelector('[name="qty_'+n2+'"]')?.value||'0')||0;
+      var p = parseFloat(document.querySelector('[name="up_'+n2+'"]')?.value||'0')||0;
+      var st = tr.querySelector('.row-subtotal');
+      if(st) st.textContent = '小計: ¥' + (q*p).toLocaleString('ja-JP');
+      calcFreeTotal();
+    });
   });
   tbody.appendChild(tr);
 }
 
+// 納品書なしトグル制御
+function updateNoSlipUI(){
+  var cb = document.getElementById('free-no-slip-cb');
+  var slipDateGroup = document.getElementById('free-slip-date-group');
+  var slipDateEl = document.querySelector('[name="slip_date"]');
+  if(!cb || !slipDateGroup) return;
+  if(cb.checked){
+    slipDateGroup.style.opacity = '0.4';
+    slipDateGroup.style.pointerEvents = 'none';
+    if(slipDateEl){ slipDateEl.value = ''; slipDateEl.removeAttribute('required'); }
+    var lbl = slipDateGroup.querySelector('label');
+    if(lbl) lbl.innerHTML = '納品書記載日 <span class="text-muted small">（納品書なしのため不要）</span>';
+  } else {
+    slipDateGroup.style.opacity = '1';
+    slipDateGroup.style.pointerEvents = '';
+    if(slipDateEl) slipDateEl.setAttribute('required','required');
+    var lbl2 = slipDateGroup.querySelector('label');
+    if(lbl2) lbl2.innerHTML = '納品書記載日 <span class="text-danger">*</span>';
+  }
+}
+
+// 仕入先変更時に支払い条件を表示
+function updatePayDisplay(){
+  var sel = document.querySelector('[name="supplier_id"]');
+  var el = document.getElementById('pay-method-display');
+  if(!sel || !el) return;
+  var opt = sel.options[sel.selectedIndex];
+  var pay = opt ? (opt.dataset.pay||'') : '';
+  el.textContent = pay ? ('支払い条件: ' + pay) : '';
+}
+
 document.addEventListener('DOMContentLoaded', function(){
-  document.querySelectorAll('.btn-del-row').forEach(function(btn){
+  // 行削除ボタン（初期行）
+  document.querySelectorAll('#free-items-tbody .btn-del-row').forEach(function(btn){
     btn.addEventListener('click', function(){
       var tr = btn.closest('tr');
       if(document.querySelectorAll('#free-items-tbody tr').length > 1){
-        tr.remove();
+        tr.remove(); calcFreeTotal();
       } else {
         showFlash('明細は1行以上必要です','warning');
       }
     });
   });
 
+  // 初期行の小計リアルタイム計算
+  document.querySelectorAll('#free-items-tbody tr').forEach(function(tr){
+    tr.querySelectorAll('.qty-input,.up-input').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        var n = tr.dataset.row;
+        var q = parseInt(document.querySelector('[name="qty_'+n+'"]')?.value||'0')||0;
+        var p = parseFloat(document.querySelector('[name="up_'+n+'"]')?.value||'0')||0;
+        var st = tr.querySelector('.row-subtotal');
+        if(st) st.textContent = '小計: ¥' + (q*p).toLocaleString('ja-JP');
+        calcFreeTotal();
+      });
+    });
+  });
+
   document.getElementById('btn-add-row').addEventListener('click', addRow);
+
+  var noSlipCb = document.getElementById('free-no-slip-cb');
+  if(noSlipCb) noSlipCb.addEventListener('change', updateNoSlipUI);
+  updateNoSlipUI();
+
+  var supSel = document.querySelector('[name="supplier_id"]');
+  if(supSel) supSel.addEventListener('change', updatePayDisplay);
 
   document.getElementById('free-receipt-form').addEventListener('submit', async function(e){
     e.preventDefault();
     var f = e.target;
+    var receivedDate = f.querySelector('[name="received_date"]').value;
+    var noSlip = document.getElementById('free-no-slip-cb')?.checked || false;
+    var slipDate = f.querySelector('[name="slip_date"]')?.value || '';
+    var inspectedBy = (f.querySelector('[name="inspected_by"]').value||'').trim();
+
+    // ── バリデーション ──
+    if(!receivedDate){ showFlash('入荷日は必須です','danger'); return; }
+    if(!noSlip && !slipDate){ showFlash('納品書記載日を入力してください。納品書がない場合は「納品書なし」をオンにしてください。','danger'); return; }
+    if(!inspectedBy){ showFlash('検品者は必須です','danger'); return; }
+    var supplierId = parseInt(f.querySelector('[name="supplier_id"]').value||'0');
+    if(!supplierId){ showFlash('仕入先を選択してください','danger'); return; }
+
     var rows = document.querySelectorAll('#free-items-tbody tr');
     var items = [];
+    var hasError = false;
     rows.forEach(function(tr){
       var n = tr.dataset.row;
       var pname = (f.querySelector('[name="pname_'+n+'"]')?.value||'').trim();
       var qty   = parseInt(f.querySelector('[name="qty_'+n+'"]')?.value||'0');
-      if(!pname || qty <= 0) return;
+      if(!pname){ return; } // 商品名空行はスキップ
+      if(qty <= 0){ showFlash('数量は1以上を入力してください（行: '+pname+'）','danger'); hasError=true; return; }
       var item = {
         product_name: pname,
         spec:         (f.querySelector('[name="spec_'+n+'"]')?.value||'').trim(),
@@ -4389,16 +4682,20 @@ document.addEventListener('DOMContentLoaded', function(){
       if(upEl && upEl.value !== '') item.unit_price = parseFloat(upEl.value);
       items.push(item);
     });
+    if(hasError) return;
     if(items.length === 0){ showFlash('明細を1行以上入力してください','danger'); return; }
+
     var payload = {
-      supplier_id:   parseInt(f.querySelector('[name="supplier_id"]').value),
-      received_date: f.querySelector('[name="received_date"]').value,
-      slip_date:     (f.querySelector('[name="slip_date"]')?.value||''),
-      inspected_by:  f.querySelector('[name="inspected_by"]').value,
-      note:          f.querySelector('[name="note"]').value,
+      supplier_id:   supplierId,
+      received_date: receivedDate,
+      slip_date:     noSlip ? '' : slipDate,
+      inspected_by:  inspectedBy,
+      note:          (f.querySelector('[name="note"]').value||'').trim(),
+      no_slip:       noSlip,
+      slip_note:     (f.querySelector('[name="slip_note"]')?.value||'').trim(),
       items: items
     };
-    if(!payload.supplier_id){ showFlash('仕入先を選択してください','danger'); return; }
+
     var btn = f.querySelector('button[type=submit]');
     btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
     try {
@@ -4427,37 +4724,72 @@ document.addEventListener('DOMContentLoaded', function(){
   </div>
 </div>
 <form id="free-receipt-form">
+
+  <!-- ① 入荷情報 -->
   <div class="card mb-3">
-    <div class="card-header"><i class="fas fa-info-circle me-1"></i>納品ヘッダ</div>
-    <div class="card-body row g-3">
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">仕入先 <span class="text-danger">*</span></label>
-        <select class="form-select" name="supplier_id" required>
-          <option value="">― 選択してください ―</option>
-          ${supplierOpts}
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold">入荷日 <span class="text-danger">*</span></label>
-        <input class="form-control" type="date" name="received_date" value="${todayStr()}" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold">納品書記載日</label>
-        <input class="form-control" type="date" name="slip_date">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold">検品者</label>
-        <input class="form-control" name="inspected_by" placeholder="古川">
-      </div>
-      <div class="col-12">
-        <label class="form-label fw-semibold">備考</label>
-        <textarea class="form-control" name="note" rows="2" placeholder="納品書番号など"></textarea>
+    <div class="card-header fw-semibold"><i class="fas fa-truck-loading me-1" style="color:var(--gw-green)"></i>① 入荷情報</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">仕入先 <span class="text-danger">*</span></label>
+          <select class="form-select" name="supplier_id" required>
+            <option value="">― 選択してください ―</option>
+            ${supplierOpts}
+          </select>
+          <div id="pay-method-display" class="text-muted small mt-1"></div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">入荷日 <span class="text-danger">*</span></label>
+          <input class="form-control" type="date" name="received_date" value="${todayStr()}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">検品者 <span class="text-danger">*</span></label>
+          <input class="form-control" name="inspected_by" placeholder="例: 古川" required>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">備考</label>
+          <textarea class="form-control" name="note" rows="2" placeholder="納品書番号・特記事項など"></textarea>
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- ② 納品書照合 -->
+  <div class="card mb-3 border-warning">
+    <div class="card-header fw-semibold bg-warning bg-opacity-10">
+      <i class="fas fa-file-invoice me-1"></i>② 納品書照合
+      <span class="ms-2 small fw-normal text-muted">※ 納品書の日付と金額を確認してください</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="free-no-slip-cb" name="no_slip" value="1"
+              style="width:2.5em;height:1.3em">
+            <label class="form-check-label ms-2 fw-semibold" for="free-no-slip-cb">
+              <i class="fas fa-file-slash me-1 text-secondary"></i>納品書なし
+              <span class="text-muted fw-normal small ms-2">（郵送待ち・紛失・不要な場合など）</span>
+            </label>
+          </div>
+        </div>
+        <div class="col-md-3" id="free-slip-date-group">
+          <label class="form-label fw-semibold">納品書記載日 <span class="text-danger">*</span></label>
+          <input class="form-control" type="date" name="slip_date" required>
+          <div class="text-muted small mt-1"><i class="fas fa-info-circle me-1"></i>納品書に記載されている日付を入力</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">照合メモ <span class="text-muted small fw-normal">（差異・特記事項があれば記入）</span></label>
+          <textarea class="form-control" name="slip_note" rows="2"
+            placeholder="例: 金額が¥200異なっていたため確認中。仕入先へ問い合わせ済み。"></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 入荷明細 -->
   <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
-      <span class="fw-semibold"><i class="fas fa-table me-1"></i>入荷明細</span>
+      <span class="fw-semibold"><i class="fas fa-table me-1"></i>③ 入荷明細（納品書の単価を確認して入力）</span>
       <button type="button" id="btn-add-row" class="btn btn-outline-success btn-sm">
         <i class="fas fa-plus me-1"></i>行を追加
       </button>
@@ -4469,8 +4801,10 @@ document.addEventListener('DOMContentLoaded', function(){
             <th style="min-width:200px">商品名 <span class="text-danger">*</span></th>
             <th style="min-width:130px">仕様・色など</th>
             <th class="text-center" style="min-width:80px">数量 <span class="text-danger">*</span></th>
-            <th style="min-width:130px">単価</th>
-            <th style="min-width:130px">備考</th>
+            <th style="min-width:150px">
+              単価 <span class="text-muted fw-normal">（納品書記載値）</span>
+            </th>
+            <th style="min-width:130px">行備考</th>
             <th></th>
           </tr>
         </thead>
@@ -4478,12 +4812,13 @@ document.addEventListener('DOMContentLoaded', function(){
           <tr data-row="1">
             <td><input class="form-control form-control-sm" name="pname_1" placeholder="商品名" required></td>
             <td><input class="form-control form-control-sm" name="spec_1" placeholder="仕様・色など"></td>
-            <td><input class="form-control form-control-sm text-center" type="number" min="1" name="qty_1" value="1" required></td>
+            <td><input class="form-control form-control-sm text-center qty-input" type="number" min="1" name="qty_1" value="1" required></td>
             <td>
               <div class="input-group input-group-sm">
                 <span class="input-group-text">¥</span>
-                <input class="form-control text-end" type="number" min="0" step="1" name="up_1" placeholder="任意">
+                <input class="form-control text-end up-input" type="number" min="0" step="1" name="up_1" placeholder="納品書の単価">
               </div>
+              <div class="text-end text-muted row-subtotal" style="font-size:.72rem;margin-top:2px">小計: ¥0</div>
             </td>
             <td><input class="form-control form-control-sm" name="note_1" placeholder="備考"></td>
             <td class="text-center">
@@ -4493,7 +4828,12 @@ document.addEventListener('DOMContentLoaded', function(){
         </tbody>
       </table>
     </div>
+    <div class="card-footer d-flex justify-content-end align-items-center gap-3 py-2">
+      <span class="text-muted small">合計金額（納品書と照合）:</span>
+      <span id="free-preview-total" class="fw-bold fs-5">¥0</span>
+    </div>
   </div>
+
   <div class="d-flex justify-content-end gap-2">
     <a href="/receipts" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>キャンセル</a>
     <button type="submit" class="btn btn-success btn-lg px-4"><i class="fas fa-save me-1"></i>納品登録を保存</button>
@@ -4676,6 +5016,7 @@ app.get('/receipts/:id/edit', async (c) => {
       SELECT r.*,
              po.order_no, po.id AS purchase_order_id,
              s.name AS order_supplier_name, s.id AS order_supplier_id,
+             s.payment_method AS order_supplier_payment,
              sa.name AS actual_supplier_name
       FROM receipts r
       LEFT JOIN purchase_orders po ON r.purchase_order_id = po.id
@@ -4685,15 +5026,17 @@ app.get('/receipts/:id/edit', async (c) => {
     `).bind(rid, tenantId).first<Record<string,unknown>>(),
     db.prepare(`
       SELECT ri.id AS receipt_item_id, ri.received_quantity, ri.note AS item_note,
+             ri.actual_unit_price, ri.actual_rate, ri.actual_amount,
              poi.id AS poi_id, poi.product_name, poi.spec, poi.color, poi.item_category,
-             poi.manufacturer, poi.quantity AS ordered_qty, poi.unit_price,
+             poi.manufacturer, poi.quantity AS ordered_qty,
+             poi.unit_price AS order_unit_price,
              poi.list_price, poi.rate AS default_rate
       FROM receipt_items ri
       LEFT JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
       WHERE ri.receipt_id=?
       ORDER BY ri.id
     `).bind(rid).all<Record<string,unknown>>(),
-    db.prepare('SELECT id, name FROM suppliers WHERE tenant_id=? AND is_active=1 ORDER BY name')
+    db.prepare('SELECT id, name, payment_method FROM suppliers WHERE tenant_id=? AND is_active=1 ORDER BY name')
       .bind(tenantId).all<Record<string,unknown>>()
   ])
   if (!receipt) return layout('エラー', '<div class="alert alert-danger">納品データが見つかりません。</div>', '', '', getLayoutOpts(c))
@@ -4711,36 +5054,62 @@ app.get('/receipts/:id/edit', async (c) => {
 
   const itemRows = itemsRes.results.map(item => {
     if (isFreeReceipt) {
+      // システム外発注: 商品名は note に格納、単価は actual_unit_price
+      const currentUp = item['actual_unit_price'] != null ? Number(item['actual_unit_price']) : ''
       return `<tr data-ri-id="${item['receipt_item_id']}">
         <td><input class="form-control form-control-sm" name="item_note_${item['receipt_item_id']}" value="${esc(item['item_note'])}"></td>
-        <td><input class="form-control form-control-sm text-center" type="number" min="1" name="rq_${item['receipt_item_id']}" value="${item['received_quantity']}"></td>
-        <td class="text-center">
-          <button type="button" class="btn btn-outline-danger btn-sm btn-del-ri py-0 px-2" data-ri-id="${item['receipt_item_id']}">
-            <i class="fas fa-trash"></i>
-          </button>
+        <td>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">¥</span>
+            <input class="form-control text-end up-input" type="number" min="0" step="1"
+              name="up_${item['receipt_item_id']}" value="${currentUp}" placeholder="納品書の単価"
+              data-ri-id="${item['receipt_item_id']}">
+          </div>
+        </td>
+        <td>
+          <input class="form-control form-control-sm text-center qty-input" type="number" min="1"
+            name="rq_${item['receipt_item_id']}" value="${item['received_quantity']}"
+            data-ri-id="${item['receipt_item_id']}">
+        </td>
+        <td class="text-end fw-semibold small subtotal-cell" data-ri-id="${item['receipt_item_id']}">
+          ${item['actual_amount'] != null ? '¥'+Number(item['actual_amount']).toLocaleString('ja-JP') : '―'}
         </td>
       </tr>`
     }
-    const listPriceSugg = item['list_price'] ? Math.round(Number(item['list_price']) * Number(item['default_rate'] || 0.65)) : ''
+    // 通常発注: actual_unit_price があればそれを表示、なければ発注時単価をデフォルト表示
+    const currentUp   = item['actual_unit_price'] != null ? Number(item['actual_unit_price']) : (item['order_unit_price'] ?? '')
+    const listPrice   = item['list_price'] ? Number(item['list_price']) : null
+    const defaultRate = item['default_rate'] ? Number(item['default_rate']) : null
+    const sugg        = (listPrice && defaultRate) ? Math.round(listPrice * defaultRate) : null
+    const currentAmt  = item['actual_amount']  != null ? Number(item['actual_amount'])
+                      : (item['order_unit_price'] != null ? Math.round(Number(item['order_unit_price']) * Number(item['received_quantity'])) : null)
     return `<tr data-ri-id="${item['receipt_item_id']}">
       <td class="small">
-        <span class="text-muted">${esc(item['item_category'])} / ${esc(item['manufacturer'])}</span><br>
+        <span class="text-muted" style="font-size:.75rem">${esc(item['item_category'])} / ${esc(item['manufacturer'])}</span><br>
         <strong>${esc(item['product_name'])}</strong>${item['spec'] ? ' <span class="text-muted">'+esc(item['spec'])+'</span>' : ''}
         ${item['color'] ? '<br><span class="text-muted small">'+esc(item['color'])+'</span>' : ''}
       </td>
       <td class="text-center">${item['ordered_qty']}</td>
       <td>
-        <div class="input-group input-group-sm" style="min-width:120px">
+        <div class="input-group input-group-sm" style="min-width:130px">
           <span class="input-group-text">¥</span>
-          <input class="form-control text-end unit-price-input" type="number" min="0" step="1"
-            name="up_${item['receipt_item_id']}" value="${item['unit_price'] ?? ''}"
-            placeholder="${listPriceSugg}" data-list="${item['list_price']??''}" data-rate="${item['default_rate']??''}">
+          <input class="form-control text-end up-input" type="number" min="0" step="1"
+            name="up_${item['receipt_item_id']}" value="${currentUp}"
+            data-ri-id="${item['receipt_item_id']}"
+            data-list="${listPrice??''}" data-rate="${defaultRate??''}">
         </div>
-        ${listPriceSugg ? `<div class="text-muted" style="font-size:.7rem">定価¥${Number(item['list_price']).toLocaleString('ja-JP')} × ${item['default_rate']} = ¥${listPriceSugg.toLocaleString('ja-JP')}</div>` : ''}
+        ${sugg ? `<div class="text-muted" style="font-size:.7rem">定価¥${listPrice!.toLocaleString('ja-JP')} × ${defaultRate} = ¥${sugg.toLocaleString('ja-JP')}</div>` : ''}
+        ${item['actual_unit_price'] != null
+          ? `<div class="text-success" style="font-size:.7rem"><i class="fas fa-check me-1"></i>実績単価あり</div>`
+          : `<div class="text-warning" style="font-size:.7rem"><i class="fas fa-exclamation-triangle me-1"></i>発注時単価（要確認）</div>`}
       </td>
       <td>
-        <input class="form-control form-control-sm text-center" type="number" min="0"
-          name="rq_${item['receipt_item_id']}" value="${item['received_quantity']}">
+        <input class="form-control form-control-sm text-center qty-input" type="number" min="0"
+          name="rq_${item['receipt_item_id']}" value="${item['received_quantity']}"
+          data-ri-id="${item['receipt_item_id']}">
+      </td>
+      <td class="text-end fw-semibold small subtotal-cell" data-ri-id="${item['receipt_item_id']}">
+        ${currentAmt != null ? '¥'+currentAmt.toLocaleString('ja-JP') : '―'}
       </td>
       <td><input class="form-control form-control-sm" name="rn_${item['receipt_item_id']}" value="${esc(item['item_note'])}"></td>
     </tr>`
@@ -4749,8 +5118,22 @@ app.get('/receipts/:id/edit', async (c) => {
   const riIds = itemsRes.results.map(i => i['receipt_item_id'])
 
   const theadHtml = isFreeReceipt
-    ? `<tr><th>商品名 / 備考</th><th class="text-center" style="min-width:90px">入荷数</th><th></th></tr>`
-    : `<tr><th>商品</th><th class="text-center">発注数</th><th>単価（納品書に合わせて修正可）</th><th class="text-center" style="min-width:90px">入荷数</th><th>行備考</th></tr>`
+    ? `<tr>
+        <th style="min-width:200px">商品名 / 備考</th>
+        <th style="min-width:140px">単価（納品書）</th>
+        <th class="text-center" style="min-width:90px">入荷数</th>
+        <th class="text-end" style="min-width:100px">小計</th>
+      </tr>`
+    : `<tr>
+        <th>商品</th>
+        <th class="text-center">発注数</th>
+        <th style="min-width:160px">
+          実際の単価 <span class="text-muted fw-normal small">（納品書記載値）</span>
+        </th>
+        <th class="text-center" style="min-width:90px">入荷数</th>
+        <th class="text-end" style="min-width:100px">小計</th>
+        <th style="min-width:120px">行備考</th>
+      </tr>`
 
   const backUrl = receipt['purchase_order_id'] ? `/orders/${receipt['purchase_order_id']}` : '/receipts'
 
@@ -4758,87 +5141,135 @@ app.get('/receipts/:id/edit', async (c) => {
   const isVerified = !!receipt['slip_verified']
   const isNoSlip   = !!receipt['no_slip']
 
-  const scripts = `<script>
-var riIds = ${JSON.stringify(riIds)};
+  // 明細JSON（クライアントサイドJS用）
+  const itemsJson = JSON.stringify(itemsRes.results.map(i => ({
+    riId:      i['receipt_item_id'],
+    listPrice: i['list_price'] ?? null,
+    defaultRate: i['default_rate'] ?? null
+  })))
 
-// 納品書なしチェックボックスのトグル制御
+  const scripts = `<script>
+var riIds   = ${JSON.stringify(riIds)};
+var itemMeta = ${itemsJson}; // [{riId, listPrice, defaultRate}]
+
+// 合計金額リアルタイム計算
+function calcEditTotal(){
+  var total = 0;
+  riIds.forEach(function(id){
+    var qEl = document.querySelector('[name="rq_'+id+'"]');
+    var pEl = document.querySelector('[name="up_'+id+'"]');
+    var qty = parseInt(qEl?.value||'0')||0;
+    var up  = parseFloat(pEl?.value||'0')||0;
+    var sub = qty * up;
+    total += sub;
+    var cell = document.querySelector('.subtotal-cell[data-ri-id="'+id+'"]');
+    if(cell) cell.textContent = up > 0 ? ('¥' + sub.toLocaleString('ja-JP')) : '―';
+  });
+  var el = document.getElementById('edit-preview-total');
+  if(el) el.textContent = '¥' + total.toLocaleString('ja-JP');
+}
+
+// 納品書なしトグル制御
 (function(){
   var noSlipCb   = document.getElementById('cb-no-slip');
-  var verifiedCb = document.getElementById('cb-slip-verified');
   var slipDateEl = document.querySelector('[name="slip_date"]');
-  var slipNoteEl = document.querySelector('[name="slip_note"]');
-  var slipSection = document.getElementById('slip-verify-section');
+  var slipDateGroup = document.getElementById('slip-date-group');
 
   function updateSlipUI(){
-    if(!noSlipCb || !verifiedCb) return;
+    if(!noSlipCb) return;
     if(noSlipCb.checked){
-      verifiedCb.checked = false;
-      verifiedCb.disabled = true;
+      if(slipDateGroup){
+        slipDateGroup.style.opacity = '0.4';
+        slipDateGroup.style.pointerEvents = 'none';
+      }
       if(slipDateEl) slipDateEl.value = '';
     } else {
-      verifiedCb.disabled = false;
-    }
-    if(slipSection){
-      slipSection.style.opacity = noSlipCb.checked ? '0.4' : '1';
-      slipSection.style.pointerEvents = noSlipCb.checked ? 'none' : '';
+      if(slipDateGroup){
+        slipDateGroup.style.opacity = '1';
+        slipDateGroup.style.pointerEvents = '';
+      }
     }
   }
   if(noSlipCb) noSlipCb.addEventListener('change', updateSlipUI);
   updateSlipUI();
 })();
 
-document.getElementById('edit-receipt-form').addEventListener('submit', async function(e){
-  e.preventDefault();
-  var f = e.target;
-  var items = riIds.map(function(id){
-    var obj = {
-      receipt_item_id: id,
-      received_quantity: parseInt(f.querySelector('[name="rq_'+id+'"]')?.value||'0'),
-      note: f.querySelector('[name="rn_'+id+'"]')?.value || f.querySelector('[name="item_note_'+id+'"]')?.value || ''
-    };
-    var upEl = f.querySelector('[name="up_'+id+'"]');
-    if(upEl && upEl.value !== '') obj.unit_price = parseFloat(upEl.value);
-    return obj;
+document.addEventListener('DOMContentLoaded', function(){
+  // リアルタイム計算イベント
+  riIds.forEach(function(id){
+    var qEl = document.querySelector('[name="rq_'+id+'"]');
+    var pEl = document.querySelector('[name="up_'+id+'"]');
+    if(qEl) qEl.addEventListener('input', calcEditTotal);
+    if(pEl) pEl.addEventListener('input', calcEditTotal);
   });
+  calcEditTotal();
 
-  var noSlipCb   = document.getElementById('cb-no-slip');
-  var verifiedCb = document.getElementById('cb-slip-verified');
-  var supEl      = f.querySelector('[name="actual_supplier_id"]');
-  var checkerEl  = f.querySelector('[name="slip_checked_by"]');
-  var slipNoteEl = f.querySelector('[name="slip_note"]');
+  document.getElementById('edit-receipt-form').addEventListener('submit', async function(e){
+    e.preventDefault();
+    var f = e.target;
 
-  var payload = {
-    received_date:      f.querySelector('[name="received_date"]').value,
-    slip_date:          f.querySelector('[name="slip_date"]')?.value || '',
-    inspected_by:       f.querySelector('[name="inspected_by"]').value,
-    note:               f.querySelector('[name="note"]').value,
-    slip_verified:      verifiedCb ? verifiedCb.checked : false,
-    no_slip:            noSlipCb  ? noSlipCb.checked  : false,
-    slip_checked_by:    checkerEl ? checkerEl.value    : '',
-    slip_note:          slipNoteEl? slipNoteEl.value   : '',
-    actual_supplier_id: supEl && supEl.value ? parseInt(supEl.value) : null,
-    items: items
-  };
+    var receivedDate = f.querySelector('[name="received_date"]').value;
+    var inspectedBy  = (f.querySelector('[name="inspected_by"]')?.value||'').trim();
+    var noSlipCb     = document.getElementById('cb-no-slip');
+    var noSlip       = noSlipCb ? noSlipCb.checked : false;
+    var slipDate     = f.querySelector('[name="slip_date"]')?.value || '';
 
-  // 納品書確認済みまたは納品書なしの場合、確認者が未入力なら警告
-  if((payload.slip_verified || payload.no_slip) && !payload.slip_checked_by){
-    if(!confirm('納品書チェック者名が未入力です。このまま保存しますか？')) return;
-  }
+    // バリデーション
+    if(!receivedDate){ showFlash('入荷日は必須です','danger'); return; }
+    if(!inspectedBy){ showFlash('検品者は必須です','danger'); return; }
+    if(!noSlip && !slipDate){ showFlash('納品書記載日を入力してください。納品書がない場合は「納品書なし」をオンにしてください。','danger'); return; }
 
-  var btn = f.querySelector('button[type=submit]');
-  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
-  try {
-    var resp = await fetch('/api/receipts/${rid}', {
-      method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+    var items = riIds.map(function(id){
+      var obj = {
+        receipt_item_id:   id,
+        received_quantity: parseInt(f.querySelector('[name="rq_'+id+'"]')?.value||'0'),
+        note: f.querySelector('[name="rn_'+id+'"]')?.value || f.querySelector('[name="item_note_'+id+'"]')?.value || ''
+      };
+      var upEl = f.querySelector('[name="up_'+id+'"]');
+      if(upEl && upEl.value !== '') obj.actual_unit_price = parseFloat(upEl.value);
+      return obj;
     });
-    var res = await resp.json();
-    if(!resp.ok){ showFlash(res.error||'保存に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存'; return; }
-    showFlash('保存しました','success');
-    setTimeout(function(){ window.location.href = '${backUrl}?flash='+encodeURIComponent('納品履歴を更新しました'); }, 800);
-  } catch(err){
-    showFlash('通信エラー: '+err.message,'danger');
-    btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存';
-  }
+
+    var verifiedCb = document.getElementById('cb-slip-verified');
+    var supEl      = f.querySelector('[name="actual_supplier_id"]');
+    var checkerEl  = f.querySelector('[name="slip_checked_by"]');
+    var slipNoteEl = f.querySelector('[name="slip_note"]');
+
+    // slip_date入力済みまたはno_slipの場合は自動で確認済み
+    var autoVerified = (!noSlip && !!slipDate) || noSlip;
+    var manualVerified = verifiedCb ? verifiedCb.checked : false;
+
+    var payload = {
+      received_date:      receivedDate,
+      slip_date:          noSlip ? '' : slipDate,
+      inspected_by:       inspectedBy,
+      note:               f.querySelector('[name="note"]')?.value || '',
+      slip_verified:      autoVerified || manualVerified,
+      no_slip:            noSlip,
+      slip_checked_by:    checkerEl ? (checkerEl.value||'').trim() : '',
+      slip_note:          slipNoteEl ? (slipNoteEl.value||'').trim() : '',
+      actual_supplier_id: supEl && supEl.value ? parseInt(supEl.value) : null,
+      items: items
+    };
+
+    // 確認者が未入力のとき（slip_checkerはinspected_byで補完される）
+    if(!payload.slip_checked_by) payload.slip_checked_by = inspectedBy;
+
+    var btn = f.querySelector('button[type=submit]');
+    btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>保存中...';
+    try {
+      var resp = await fetch('/api/receipts/${rid}', {
+        method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+      });
+      var res = await resp.json();
+      if(!resp.ok){ showFlash(res.error||'保存に失敗しました','danger'); btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存'; return; }
+      showFlash('保存しました','success');
+      setTimeout(function(){ window.location.href = '${backUrl}?flash='+encodeURIComponent('納品履歴を更新しました'); }, 800);
+    } catch(err){
+      showFlash('通信エラー: '+err.message,'danger');
+      btn.disabled=false; btn.innerHTML='<i class="fas fa-save me-1"></i>変更を保存';
+    }
+  });
 });
 </script>`
 
@@ -4847,7 +5278,7 @@ document.getElementById('edit-receipt-form').addEventListener('submit', async fu
     ? `<div class="alert alert-secondary py-2 mb-0 d-flex align-items-center gap-2"><i class="fas fa-file-slash"></i><span>納品書なし として登録済み ${receipt['slip_checked_by'] ? '（確認者: '+esc(receipt['slip_checked_by'])+'）' : ''}</span></div>`
     : isVerified
     ? `<div class="alert alert-success py-2 mb-0 d-flex align-items-center gap-2"><i class="fas fa-check-circle"></i><span>納品書確認済み ${receipt['slip_checked_by'] ? '（確認者: '+esc(receipt['slip_checked_by'])+'）' : ''}</span></div>`
-    : `<div class="alert alert-warning py-2 mb-0 d-flex align-items-center gap-2"><i class="fas fa-exclamation-triangle"></i><span><strong>納品書が未確認です。</strong>下の「納品書照合」セクションで確認してください。</span></div>`
+    : `<div class="alert alert-warning py-2 mb-0 d-flex align-items-center gap-2"><i class="fas fa-exclamation-triangle"></i><span><strong>納品書が未確認です。</strong>下の「② 納品書照合」セクションで日付と金額を確認してください。</span></div>`
 
   const content = `
 <div class="action-bar">
@@ -4870,33 +5301,68 @@ ${slipStatusBanner}
 
 <form id="edit-receipt-form" class="mt-3">
 
-  <!-- ① 納品ヘッダ -->
+  <!-- ① 入荷情報 -->
   <div class="card mb-3">
-    <div class="card-header fw-semibold"><i class="fas fa-info-circle me-1"></i>① 納品ヘッダ</div>
+    <div class="card-header fw-semibold"><i class="fas fa-truck-loading me-1" style="color:var(--gw-green)"></i>① 入荷情報</div>
     <div class="card-body row g-3">
       <div class="col-md-3">
-        <label class="form-label">入荷日 <span class="text-danger">*</span></label>
+        <label class="form-label fw-semibold">入荷日 <span class="text-danger">*</span></label>
         <input class="form-control" type="date" name="received_date" value="${esc(receipt['received_date'])}" required>
       </div>
-      <div id="slip-verify-section" class="col-md-3">
-        <label class="form-label">納品書記載日</label>
-        <input class="form-control" type="date" name="slip_date" value="${esc(receipt['slip_date']) || ''}">
-      </div>
       <div class="col-md-3">
-        <label class="form-label">検品者</label>
-        <input class="form-control" name="inspected_by" value="${esc(receipt['inspected_by']) || ''}" placeholder="古川">
+        <label class="form-label fw-semibold">検品者 <span class="text-danger">*</span></label>
+        <input class="form-control" name="inspected_by" value="${esc(receipt['inspected_by']) || ''}" placeholder="例: 古川" required>
       </div>
       <div class="col-12">
-        <label class="form-label">備考</label>
+        <label class="form-label fw-semibold">備考</label>
         <textarea class="form-control" name="note" rows="2">${esc(receipt['note']) || ''}</textarea>
       </div>
     </div>
   </div>
 
-  <!-- ② 仕入先（納品履歴から変更） -->
+  <!-- ② 納品書照合 -->
+  <div class="card mb-3 ${(!isVerified && !isNoSlip) ? 'border-warning' : isNoSlip ? 'border-secondary' : 'border-success'}">
+    <div class="card-header fw-semibold ${(!isVerified && !isNoSlip) ? 'bg-warning bg-opacity-25' : isNoSlip ? '' : 'bg-success bg-opacity-10'}">
+      <i class="fas fa-file-invoice me-1"></i>② 納品書照合
+      <span class="ms-2 small fw-normal text-muted">※ 納品書記載日・金額を確認してください</span>
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="form-check form-switch mb-2">
+            <input class="form-check-input" type="checkbox" id="cb-no-slip" name="no_slip" value="1"
+              style="width:2.5em;height:1.3em" ${isNoSlip ? 'checked' : ''}>
+            <label class="form-check-label ms-2 fw-semibold" for="cb-no-slip">
+              <i class="fas fa-file-slash me-1 text-secondary"></i>納品書なし
+              <span class="text-muted fw-normal small ms-2">（郵送待ち・紛失・不要な場合など）</span>
+            </label>
+          </div>
+        </div>
+        <div class="col-md-3" id="slip-date-group">
+          <label class="form-label fw-semibold">納品書記載日 <span class="text-danger">*</span></label>
+          <input class="form-control" type="date" name="slip_date" value="${esc(receipt['slip_date']) || ''}">
+          <div class="text-muted small mt-1"><i class="fas fa-info-circle me-1"></i>納品書に記載されている日付</div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label fw-semibold">確認者名</label>
+          <input class="form-control" name="slip_checked_by"
+            value="${esc(receipt['slip_checked_by']) || esc(receipt['inspected_by']) || ''}"
+            placeholder="例: 古川">
+          <div class="text-muted small mt-1">未入力の場合、検品者名で補完されます</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">照合メモ <span class="text-muted small fw-normal">（差異・特記事項があれば記入）</span></label>
+          <textarea class="form-control" name="slip_note" rows="2"
+            placeholder="例: 金額が¥200異なったため単価を修正。仕入先から値引き連絡あり。">${esc(receipt['slip_note']) || ''}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 仕入先 -->
   <div class="card mb-3 ${supplierChanged ? 'border-info' : ''}">
     <div class="card-header fw-semibold">
-      <i class="fas fa-building me-1"></i>② 仕入先
+      <i class="fas fa-building me-1"></i>③ 仕入先
       ${supplierChanged ? `<span class="badge bg-info text-dark ms-2"><i class="fas fa-exchange-alt me-1"></i>発注時と異なる仕入先が設定されています</span>` : ''}
     </div>
     <div class="card-body">
@@ -4904,6 +5370,7 @@ ${slipStatusBanner}
       <div class="mb-2 small text-muted">
         <i class="fas fa-file-alt me-1"></i>発注時の仕入先:
         <strong>${esc(receipt['order_supplier_name']) || '―'}</strong>
+        ${receipt['order_supplier_payment'] ? ` <span class="badge text-bg-light border ms-2">${esc(receipt['order_supplier_payment'])}</span>` : ''}
         ${supplierChanged ? `<span class="ms-2 text-info">→ 実際の納品先が異なります</span>` : ''}
       </div>` : ''}
       <div class="row g-2 align-items-end">
@@ -4916,70 +5383,28 @@ ${slipStatusBanner}
         </div>
         <div class="col-md-7 small text-muted">
           <i class="fas fa-info-circle me-1"></i>
-          実際に納品してきた仕入先が発注と異なる場合（例: 代替仕入先・直送など）に選択してください。<br>
-          選択すると納品履歴一覧に <span class="badge bg-info text-dark"><i class="fas fa-exchange-alt"></i></span> マークが表示されます。
+          実際に納品してきた仕入先が発注と異なる場合（例: 代替仕入先・直送など）に選択してください。
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ③ 入荷明細（単価・数量を納品書に合わせて修正） -->
+  <!-- ④ 入荷明細 -->
   <div class="card mb-3">
-    <div class="card-header fw-semibold"><i class="fas fa-table me-1"></i>③ 入荷明細（納品書と照合して単価・数量を修正）</div>
+    <div class="card-header fw-semibold"><i class="fas fa-table me-1"></i>④ 入荷明細（納品書と照合して実際の単価・数量を修正）</div>
     <div class="table-responsive">
       <table class="table align-middle mb-0 small">
         <thead>${theadHtml}</thead>
         <tbody id="ri-tbody">${itemRows}</tbody>
       </table>
     </div>
-  </div>
-
-  <!-- ④ 納品書照合 -->
-  <div class="card mb-3 ${(!isVerified && !isNoSlip) ? 'border-warning' : isNoSlip ? 'border-secondary' : 'border-success'}">
-    <div class="card-header fw-semibold ${(!isVerified && !isNoSlip) ? 'bg-warning bg-opacity-25' : isNoSlip ? '' : 'bg-success bg-opacity-10'}">
-      <i class="fas fa-file-check me-1"></i>④ 納品書照合チェック
-      <span class="ms-2 small fw-normal text-muted">※ 保存前に必ず確認してください</span>
-    </div>
-    <div class="card-body">
-      <div class="row g-3">
-        <div class="col-12">
-          <!-- 納品書なし -->
-          <div class="form-check form-switch mb-3">
-            <input class="form-check-input" type="checkbox" id="cb-no-slip" name="no_slip" value="1"
-              style="width:2.5em;height:1.3em" ${isNoSlip ? 'checked' : ''}>
-            <label class="form-check-label ms-2 fw-semibold" for="cb-no-slip">
-              <i class="fas fa-file-slash me-1 text-secondary"></i>納品書なし
-              <span class="text-muted fw-normal small ms-2">（郵送待ち・紛失・不要な場合など）</span>
-            </label>
-          </div>
-        </div>
-        <div class="col-12">
-          <!-- 納品書確認済み -->
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="cb-slip-verified" name="slip_verified" value="1"
-              style="width:2.5em;height:1.3em" ${isVerified ? 'checked' : ''} ${isNoSlip ? 'disabled' : ''}>
-            <label class="form-check-label ms-2 fw-semibold" for="cb-slip-verified">
-              <i class="fas fa-check-circle me-1 text-success"></i>納品書を確認した
-              <span class="text-muted fw-normal small ms-2">（金額・品目・数量が一致することを確認）</span>
-            </label>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label">確認者名</label>
-          <input class="form-control" name="slip_checked_by"
-            value="${esc(receipt['slip_checked_by']) || ''}"
-            placeholder="古川">
-        </div>
-        <div class="col-12">
-          <label class="form-label">照合メモ <span class="text-muted small">（差異・特記事項があれば記入）</span></label>
-          <textarea class="form-control" name="slip_note" rows="2"
-            placeholder="例: 金額が¥200異なったため単価を修正。仕入先から値引き連絡あり。">${esc(receipt['slip_note']) || ''}</textarea>
-        </div>
-      </div>
+    <div class="card-footer d-flex justify-content-end align-items-center gap-3 py-2">
+      <span class="text-muted small">合計金額（納品書と照合）:</span>
+      <span id="edit-preview-total" class="fw-bold fs-5">―</span>
     </div>
   </div>
 
-  <div class="d-flex justify-content-end gap-2">
+  <div class="d-flex justify-content-end gap-2 mb-4">
     <a href="${backUrl}" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i>キャンセル</a>
     <button type="submit" class="btn btn-primary btn-lg px-4"><i class="fas fa-save me-1"></i>変更を保存</button>
   </div>

@@ -1057,7 +1057,15 @@ app.post('/receipts', async (c) => {
     slip_date?: string
     inspected_by?: string
     note?: string
-    items: Array<{ purchase_order_item_id: number; received_quantity: number; note?: string }>
+    no_slip?: boolean           // 納品書なしフラグ
+    slip_note?: string          // 照合メモ
+    actual_supplier_id?: number | null  // 実際の仕入先
+    items: Array<{
+      purchase_order_item_id: number
+      received_quantity: number
+      note?: string
+      actual_unit_price?: number | null  // 納品書記載の実際の単価
+    }>
   }>()
 
   const orderId = body.order_id
@@ -1065,24 +1073,78 @@ app.post('/receipts', async (c) => {
   const slipDate = body.slip_date || null
   const inspectedBy = normalize(body.inspected_by)
   const note = normalize(body.note)
+  const noSlip = body.no_slip ? 1 : 0
+  const slipVerified = (slipDate || noSlip) ? 1 : 0  // 納品書日付入力済み or 納品書なし → 確認済み
+  const slipNote = normalize(body.slip_note)
+  const actualSupplierId = body.actual_supplier_id ?? null
 
   const tenantId = getTenantId(c)
+
+  // actual_supplier_id の存在チェック
+  if (actualSupplierId) {
+    const sup = await db.prepare('SELECT id FROM suppliers WHERE id=? AND tenant_id=?')
+      .bind(actualSupplierId, tenantId).first()
+    if (!sup) return c.json({ error: '指定した仕入先が見つかりません。' }, 400)
+  }
+
   const ins = await db
     .prepare(
-      'INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note, tenant_id) VALUES (?, ?, ?, ?, ?, ?)'
+      `INSERT INTO receipts
+        (purchase_order_id, received_date, slip_date, inspected_by, note,
+         slip_verified, no_slip, slip_note, actual_supplier_id,
+         slip_checked_by, slip_checked_at, tenant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(orderId, receivedDate, slipDate, inspectedBy, note, tenantId)
+    .bind(
+      orderId, receivedDate, slipDate, inspectedBy, note,
+      slipVerified, noSlip, slipNote, actualSupplierId,
+      inspectedBy,  // 検品者 = 照合確認者として自動セット
+      slipVerified ? new Date().toISOString() : null,
+      tenantId
+    )
     .run()
   const receiptId = ins.meta.last_row_id as number
+
+  // 発注明細の定価を一括取得（掛率自動計算用）
+  const allPoiIds = (body.items || [])
+    .filter(i => i.received_quantity > 0)
+    .map(i => i.purchase_order_item_id)
+  const poiMap = new Map<number, { list_price: number | null; unit_price: number | null }>()
+  if (allPoiIds.length > 0) {
+    const inClause = allPoiIds.map(() => '?').join(',')
+    const poiRows = await db.prepare(
+      `SELECT id, list_price, unit_price FROM purchase_order_items WHERE id IN (${inClause})`
+    ).bind(...allPoiIds).all<{ id: number; list_price: number | null; unit_price: number | null }>()
+    for (const p of poiRows.results) poiMap.set(p.id, p)
+  }
 
   let added = 0
   for (const item of body.items || []) {
     if (!item.received_quantity || item.received_quantity <= 0) continue
+    const poi = poiMap.get(item.purchase_order_item_id)
+    const listPrice = poi?.list_price ?? null
+    // 実際の単価：入力値 > 発注時単価 の優先順
+    const actualUnitPrice = item.actual_unit_price != null
+      ? Number(item.actual_unit_price)
+      : (poi?.unit_price ?? null)
+    const actualRate = (actualUnitPrice != null && listPrice != null && listPrice > 0)
+      ? Math.round((actualUnitPrice / listPrice) * 10000) / 10000  // 小数4桁
+      : null
+    const actualAmount = actualUnitPrice != null
+      ? Math.round(actualUnitPrice * item.received_quantity)
+      : null
+
     await db
       .prepare(
-        'INSERT INTO receipt_items (receipt_id, purchase_order_item_id, received_quantity, note) VALUES (?, ?, ?, ?)'
+        `INSERT INTO receipt_items
+          (receipt_id, purchase_order_item_id, received_quantity, note,
+           actual_unit_price, actual_rate, actual_amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
-      .bind(receiptId, item.purchase_order_item_id, item.received_quantity, normalize(item.note))
+      .bind(
+        receiptId, item.purchase_order_item_id, item.received_quantity,
+        normalize(item.note), actualUnitPrice, actualRate, actualAmount
+      )
       .run()
     added += item.received_quantity
   }
@@ -1116,7 +1178,7 @@ app.put('/receipts/:id', async (c) => {
       receipt_item_id: number
       received_quantity: number
       note?: string
-      unit_price?: number
+      actual_unit_price?: number | null  // 納品書記載の実際の単価（編集画面からの更新）
     }>
   }>()
 
@@ -1141,23 +1203,20 @@ app.put('/receipts/:id', async (c) => {
   const poiMap = new Map<number, number | null>()
   for (const ri of existingItems.results) poiMap.set(ri.id, ri.purchase_order_item_id)
 
-  // unit_price 更新が必要な poi を洗い出す
-  const priceUpdates: Array<{ poiId: number; unitPrice: number }> = []
+  // actual_unit_price が指定された明細の list_price を一括取得（掛率自動計算用）
+  const poiIdsForPrice: number[] = []
   for (const item of (body.items || [])) {
-    if (!item.receipt_item_id || item.unit_price == null) continue
+    if (item.actual_unit_price == null) continue
     const poiId = poiMap.get(item.receipt_item_id)
-    if (poiId) priceUpdates.push({ poiId, unitPrice: Number(item.unit_price) })
+    if (poiId) poiIdsForPrice.push(poiId)
   }
-
-  // 単価更新に必要な poi.quantity を1回のクエリで一括取得
-  const poiQuantities = new Map<number, number>()
-  if (priceUpdates.length > 0) {
-    const ids = priceUpdates.map(p => p.poiId)
-    const inClause = ids.map(() => '?').join(',')
+  const poiPriceMap = new Map<number, { list_price: number | null; quantity: number }>()
+  if (poiIdsForPrice.length > 0) {
+    const inClause = poiIdsForPrice.map(() => '?').join(',')
     const poiRows = await db.prepare(
-      `SELECT id, quantity FROM purchase_order_items WHERE id IN (${inClause})`
-    ).bind(...ids).all<{ id: number; quantity: number }>()
-    for (const p of poiRows.results) poiQuantities.set(p.id, p.quantity)
+      `SELECT id, list_price, quantity FROM purchase_order_items WHERE id IN (${inClause})`
+    ).bind(...poiIdsForPrice).all<{ id: number; list_price: number | null; quantity: number }>()
+    for (const p of poiRows.results) poiPriceMap.set(p.id, p)
   }
 
   // すべての更新を並列実行
@@ -1179,16 +1238,24 @@ app.put('/receipts/:id', async (c) => {
       sets.push('slip_verified=?'); binds.push(1)
     }
   }
-  // 納品書確認済みフラグ（no_slipと独立して更新可能）
-  if (body.slip_verified !== undefined && body.no_slip === undefined) {
-    sets.push('slip_verified=?'); binds.push(body.slip_verified ? 1 : 0)
+  // slip_verified 自動化ロジック:
+  //   ① no_slip=true → 強制的に slip_verified=1
+  //   ② slip_date が入力されている → 自動で slip_verified=1
+  //   ③ それ以外: body.slip_verified の値をそのまま使用
+  const autoVerify = (!!(body.no_slip) || !!(body.slip_date && body.slip_date.length > 0))
+  if (!body.no_slip) {
+    // no_slip は上のブロックで設定済み。here は no_slip=false or undefined の場合
+    if (body.slip_verified !== undefined || autoVerify) {
+      const verifiedVal = autoVerify ? 1 : (body.slip_verified ? 1 : 0)
+      sets.push('slip_verified=?'); binds.push(verifiedVal)
+    }
   }
-  // 確認担当者・確認日時（slip_verified=true or no_slip=true になったときに自動セット）
-  if (body.slip_verified || body.no_slip) {
+  // 確認担当者・確認日時（確認済みになる場合のみ設定）
+  const willBeVerified = autoVerify || body.slip_verified || body.no_slip
+  if (willBeVerified) {
     if (body.slip_checked_by !== undefined) { sets.push('slip_checked_by=?'); binds.push(normalize(body.slip_checked_by)) }
     sets.push('slip_checked_at=?'); binds.push(new Date().toISOString())
   } else if (body.slip_verified === false && !body.no_slip) {
-    // 未確認に戻す場合は確認情報をクリア
     sets.push('slip_checked_by=?'); binds.push(null)
     sets.push('slip_checked_at=?'); binds.push(null)
   }
@@ -1203,22 +1270,38 @@ app.put('/receipts/:id', async (c) => {
     )
   }
 
-  // 明細更新（receipt_items）を並列
+  // 明細更新（receipt_items）: 数量・備考・実際の単価・掛率・金額
   for (const item of (body.items || [])) {
     if (!item.receipt_item_id) continue
-    updatePromises.push(
-      db.prepare('UPDATE receipt_items SET received_quantity=?, note=? WHERE id=? AND receipt_id=?')
-        .bind(item.received_quantity, normalize(item.note), item.receipt_item_id, receiptId).run()
-    )
-  }
+    const poiId = poiMap.get(item.receipt_item_id)
+    const poiData = poiId ? poiPriceMap.get(poiId) : undefined
+    const listPrice = poiData?.list_price ?? null
 
-  // 単価更新（purchase_order_items）を並列
-  for (const { poiId, unitPrice } of priceUpdates) {
-    const qty = poiQuantities.get(poiId) ?? 1
-    updatePromises.push(
-      db.prepare('UPDATE purchase_order_items SET unit_price=?, amount=? WHERE id=?')
-        .bind(unitPrice, Math.round(unitPrice * qty), poiId).run()
-    )
+    if (item.actual_unit_price != null) {
+      // 実際の単価が指定された場合：掛率・金額を自動計算
+      const actualUnitPrice = Number(item.actual_unit_price)
+      const actualRate = (listPrice != null && listPrice > 0)
+        ? Math.round((actualUnitPrice / listPrice) * 10000) / 10000
+        : null
+      const actualAmount = Math.round(actualUnitPrice * item.received_quantity)
+      updatePromises.push(
+        db.prepare(
+          `UPDATE receipt_items SET received_quantity=?, note=?,
+           actual_unit_price=?, actual_rate=?, actual_amount=?
+           WHERE id=? AND receipt_id=?`
+        ).bind(
+          item.received_quantity, normalize(item.note),
+          actualUnitPrice, actualRate, actualAmount,
+          item.receipt_item_id, receiptId
+        ).run()
+      )
+    } else {
+      // 単価指定なし：数量・備考のみ更新
+      updatePromises.push(
+        db.prepare('UPDATE receipt_items SET received_quantity=?, note=? WHERE id=? AND receipt_id=?')
+          .bind(item.received_quantity, normalize(item.note), item.receipt_item_id, receiptId).run()
+      )
+    }
   }
 
   await Promise.all(updatePromises)
@@ -1257,11 +1340,13 @@ app.post('/receipts/free', async (c) => {
     slip_date?: string
     inspected_by?: string
     note?: string
+    no_slip?: boolean
+    slip_note?: string
     items: Array<{
       product_name: string
       spec?: string
       quantity: number
-      unit_price?: number
+      unit_price?: number | null
       note?: string
     }>
   }>()
@@ -1273,23 +1358,40 @@ app.post('/receipts/free', async (c) => {
   const slipDate     = body.slip_date || null
   const inspectedBy  = normalize(body.inspected_by)
   const note         = normalize(body.note)
+  const noSlip       = body.no_slip ? 1 : 0
+  const slipVerified = (slipDate || noSlip) ? 1 : 0
+  const slipNote     = normalize(body.slip_note)
 
   const tenantId = getTenantId(c)
   // receipts に purchase_order_id=NULL で登録
   const ins = await db.prepare(
-    'INSERT INTO receipts (purchase_order_id, received_date, slip_date, inspected_by, note, tenant_id) VALUES (NULL, ?, ?, ?, ?, ?)'
-  ).bind(receivedDate, slipDate, inspectedBy, note, tenantId).run()
+    `INSERT INTO receipts
+      (purchase_order_id, received_date, slip_date, inspected_by, note,
+       slip_verified, no_slip, slip_note,
+       slip_checked_by, slip_checked_at, tenant_id)
+     VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    receivedDate, slipDate, inspectedBy, note,
+    slipVerified, noSlip, slipNote,
+    inspectedBy,
+    slipVerified ? new Date().toISOString() : null,
+    tenantId
+  ).run()
   const receiptId = ins.meta.last_row_id as number
 
   // receipt_items に purchase_order_item_id=NULL で登録
-  // フリー納品の場合は商品名をnoteに格納し、purchase_order_item_idはNULL
   for (const item of body.items) {
     if (!item.product_name?.trim() || !(item.quantity > 0)) continue
     const itemNote = [item.product_name.trim(), item.spec?.trim(), item.note?.trim()]
       .filter(Boolean).join(' / ')
+    const actualUnitPrice = item.unit_price != null ? Number(item.unit_price) : null
+    const actualAmount    = actualUnitPrice != null ? Math.round(actualUnitPrice * item.quantity) : null
     await db.prepare(
-      'INSERT INTO receipt_items (receipt_id, purchase_order_item_id, received_quantity, note) VALUES (?, NULL, ?, ?)'
-    ).bind(receiptId, item.quantity, itemNote).run()
+      `INSERT INTO receipt_items
+        (receipt_id, purchase_order_item_id, received_quantity, note,
+         actual_unit_price, actual_rate, actual_amount)
+       VALUES (?, NULL, ?, ?, ?, NULL, ?)`
+    ).bind(receiptId, item.quantity, itemNote, actualUnitPrice, actualAmount).run()
   }
 
   return c.json({ ok: true, receipt_id: receiptId })
@@ -1364,6 +1466,7 @@ app.get('/receipts/download', async (c) => {
       po.ordered_by,
       po.order_no,
       COALESCE(sa.name, s.name) AS supplier_name,
+      s.payment_method,
       po.customer_name,
       po.usage_type,
       r.received_date,
@@ -1377,9 +1480,13 @@ app.get('/receipts/download', async (c) => {
       poi.club_type,
       ri.received_quantity,
       poi.list_price,
-      poi.rate,
-      poi.unit_price,
-      (ri.received_quantity * poi.unit_price) AS line_amount,
+      -- 実際の掛率: receipt_items.actual_rate > poi.rate の優先順
+      COALESCE(ri.actual_rate,  poi.rate)       AS used_rate,
+      -- 実際の単価: receipt_items.actual_unit_price > poi.unit_price の優先順
+      COALESCE(ri.actual_unit_price, poi.unit_price) AS used_unit_price,
+      -- 実際の金額: receipt_items.actual_amount > 計算値 の優先順
+      COALESCE(ri.actual_amount,
+               ri.received_quantity * poi.unit_price) AS used_amount,
       ri.note             AS item_note,
       r.note              AS receipt_note
     FROM receipt_items ri
@@ -1463,14 +1570,14 @@ app.get('/receipts/download', async (c) => {
       fmtDate(r['received_date']),    //  9 商品到着日
       r['inspected_by'],              // 10 検品者
       fmtDate(r['slip_date']),        // 11 納品書に記載されている日
-      r['list_price']  != null ? Number(r['list_price'])  : null, // 12 定価
-      r['rate']        != null ? Number(r['rate'])        : null, // 13 掛け率
-      r['unit_price']  != null ? Number(r['unit_price'])  : null, // 14 単価
+      r['list_price']     != null ? Number(r['list_price'])     : null, // 12 定価
+      r['used_rate']      != null ? Number(r['used_rate'])      : null, // 13 掛け率（実績優先）
+      r['used_unit_price']!= null ? Number(r['used_unit_price']): null, // 14 単価（実績優先）
       r['received_quantity'] != null ? Number(r['received_quantity']) : null, // 15 個数（再掲）
-      r['line_amount'] != null ? Number(r['line_amount']) : null, // 16 金額
-      null,                           // 17 支払い（空欄）
+      r['used_amount']    != null ? Number(r['used_amount'])    : null, // 16 金額（実績優先）
+      r['payment_method'] ?? null,    // 17 支払い（仕入先マスタから）
       r['receipt_note'],              // 18 備考（納品備考）
-      null,                           // 19 送料（空欄）
+      null,                           // 19 送料（未管理）
       r['order_no'],                  // 20 発注番号
       r['spec'],                      // 21 仕様
       r['color'],                     // 22 色
@@ -1483,7 +1590,7 @@ app.get('/receipts/download', async (c) => {
 
   // ── 合計行 ────────────────────────────────────────────────
   const totalQty    = data.reduce((s, r) => s + (Number(r['received_quantity']) || 0), 0)
-  const totalAmount = data.reduce((s, r) => s + (Number(r['line_amount'])       || 0), 0)
+  const totalAmount = data.reduce((s, r) => s + (Number(r['used_amount'])       || 0), 0)
   const TOTAL_COLS = HEADERS.length
   const totalCells: (string | number | null)[] = Array(TOTAL_COLS).fill(null)
   totalCells[0]  = '合計'
