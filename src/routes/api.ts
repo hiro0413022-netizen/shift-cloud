@@ -1361,8 +1361,9 @@ app.get('/receipts/download', async (c) => {
   let sql = `
     SELECT
       po.order_date,
+      po.ordered_by,
       po.order_no,
-      s.name              AS supplier_name,
+      COALESCE(sa.name, s.name) AS supplier_name,
       po.customer_name,
       po.usage_type,
       r.received_date,
@@ -1385,24 +1386,60 @@ app.get('/receipts/download', async (c) => {
     JOIN receipts r             ON ri.receipt_id = r.id
     JOIN purchase_orders po     ON r.purchase_order_id = po.id
     JOIN suppliers s            ON po.supplier_id = s.id
+    LEFT JOIN suppliers sa      ON r.actual_supplier_id = sa.id
     JOIN purchase_order_items poi ON ri.purchase_order_item_id = poi.id
     WHERE r.tenant_id = ?`
 
   const binds: unknown[] = [tenantId]
   if (from) { sql += ` AND r.received_date >= ?`; binds.push(from) }
   if (to)   { sql += ` AND r.received_date <= ?`; binds.push(to)   }
-  if (supplierId) { sql += ` AND po.supplier_id = ?`; binds.push(Number(supplierId)) }
+  if (supplierId) { sql += ` AND (po.supplier_id = ? OR r.actual_supplier_id = ?)`; binds.push(Number(supplierId)); binds.push(Number(supplierId)) }
   sql += ` ORDER BY r.received_date DESC, r.id DESC, poi.id ASC`
 
   const res = await db.prepare(sql).bind(...binds).all<Record<string, unknown>>()
   const data = res.results
 
+  // YYYY-MM-DD または YYYY/MM/DD → YYYY/MM/DD 形式に変換
+  function fmtDate(v: unknown): string {
+    if (!v) return ''
+    const s = String(v).trim()
+    // YYYY-MM-DD or YYYY/MM/DD
+    const m = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})/)
+    if (m) return `${m[1]}/${m[2]}/${m[3]}`
+    return s
+  }
+
   // ── ヘッダ行 ──────────────────────────────────────────────
+  // 列順: 注文日 注文者 品目 メーカー名 品名 個数 発注先 備考 顧客名 商品到着日
+  //       検品者 納品書に記載されている日 定価 掛け率 単価 個数 金額 支払い 備考 送料
+  //       ＋追加情報（発注番号 仕様 色 種類 用途）
   const HEADERS = [
-    '入荷日', '納品書日付', '発注番号', '発注日', '仕入先',
-    '顧客名', '用途', '品目', 'メーカー', '商品名',
-    '仕様', '色', '種類', '入荷数', '定価',
-    '掛率', '単価', '金額', '検品者', '商品備考', '納品備考',
+    '注文日',               //  0
+    '注文者',               //  1
+    '品目',                 //  2
+    'メーカー名',           //  3
+    '品名',                 //  4
+    '個数',                 //  5
+    '発注先',               //  6
+    '備考',                 //  7  ← 商品備考(item_note)
+    '顧客名',               //  8
+    '商品到着日',           //  9
+    '検品者',               // 10
+    '納品書に記載されている日', // 11
+    '定価',                 // 12
+    '掛け率',               // 13
+    '単価',                 // 14
+    '個数',                 // 15  ← 入荷数の再掲
+    '金額',                 // 16
+    '支払い',               // 17  ← DB未管理（空欄）
+    '備考',                 // 18  ← 納品備考(receipt_note)
+    '送料',                 // 19  ← DB未管理（空欄）
+    // ── 追加情報（指定列の後ろ）──
+    '発注番号',             // 20
+    '仕様',                 // 21
+    '色',                   // 22
+    '種類',                 // 23
+    '用途',                 // 24
   ]
 
   // styleId: 0=通常 1=ヘッダ 2=数値カンマ 3=パーセント 4=日付 5=合計行
@@ -1414,62 +1451,76 @@ app.get('/receipts/download', async (c) => {
   // ── データ行 ──────────────────────────────────────────────
   const dataRows = data.map(r => ({
     cells: [
-      r['received_date'],   // 入荷日
-      r['slip_date'],       // 納品書日付
-      r['order_no'],        // 発注番号
-      r['order_date'],      // 発注日
-      r['supplier_name'],   // 仕入先
-      r['customer_name'],   // 顧客名
-      r['usage_type'],      // 用途
-      r['item_category'],   // 品目
-      r['manufacturer'],    // メーカー
-      r['product_name'],    // 商品名
-      r['spec'],            // 仕様
-      r['color'],           // 色
-      r['club_type'],       // 種類
-      r['received_quantity'] != null ? Number(r['received_quantity']) : null,
-      r['list_price']  != null ? Number(r['list_price'])  : null,
-      r['rate']        != null ? Number(r['rate'])        : null,
-      r['unit_price']  != null ? Number(r['unit_price'])  : null,
-      r['line_amount'] != null ? Number(r['line_amount']) : null,
-      r['inspected_by'],
-      r['item_note'],
-      r['receipt_note'],
+      fmtDate(r['order_date']),       //  0 注文日
+      r['ordered_by'],                //  1 注文者
+      r['item_category'],             //  2 品目
+      r['manufacturer'],              //  3 メーカー名
+      r['product_name'],              //  4 品名
+      r['received_quantity'] != null ? Number(r['received_quantity']) : null, //  5 個数
+      r['supplier_name'],             //  6 発注先
+      r['item_note'],                 //  7 備考（商品備考）
+      r['customer_name'],             //  8 顧客名
+      fmtDate(r['received_date']),    //  9 商品到着日
+      r['inspected_by'],              // 10 検品者
+      fmtDate(r['slip_date']),        // 11 納品書に記載されている日
+      r['list_price']  != null ? Number(r['list_price'])  : null, // 12 定価
+      r['rate']        != null ? Number(r['rate'])        : null, // 13 掛け率
+      r['unit_price']  != null ? Number(r['unit_price'])  : null, // 14 単価
+      r['received_quantity'] != null ? Number(r['received_quantity']) : null, // 15 個数（再掲）
+      r['line_amount'] != null ? Number(r['line_amount']) : null, // 16 金額
+      null,                           // 17 支払い（空欄）
+      r['receipt_note'],              // 18 備考（納品備考）
+      null,                           // 19 送料（空欄）
+      r['order_no'],                  // 20 発注番号
+      r['spec'],                      // 21 仕様
+      r['color'],                     // 22 色
+      r['club_type'],                 // 23 種類
+      r['usage_type'],                // 24 用途
     ] as (string | number | null)[],
-    styles: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 2, 2, 0, 0, 0],
+    //         0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24
+    styles: [  0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 2, 3, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0],
   }))
 
   // ── 合計行 ────────────────────────────────────────────────
   const totalQty    = data.reduce((s, r) => s + (Number(r['received_quantity']) || 0), 0)
   const totalAmount = data.reduce((s, r) => s + (Number(r['line_amount'])       || 0), 0)
+  const TOTAL_COLS = HEADERS.length
+  const totalCells: (string | number | null)[] = Array(TOTAL_COLS).fill(null)
+  totalCells[0]  = '合計'
+  totalCells[5]  = totalQty    // 個数
+  totalCells[15] = totalQty    // 個数（再掲）
+  totalCells[16] = totalAmount // 金額
   const totalRow = {
-    cells: ['合計', null, null, null, null, null, null, null, null, null,
-            null, null, null, totalQty, null, null, null, totalAmount, null, null, null] as (string | number | null)[],
-    styles: [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5],
+    cells: totalCells,
+    styles: Array(TOTAL_COLS).fill(5) as number[],
   }
 
   const colWidths = [
-    { col: 0,  width: 12 }, // 入荷日
-    { col: 1,  width: 12 }, // 納品書日付
-    { col: 2,  width: 22 }, // 発注番号
-    { col: 3,  width: 12 }, // 発注日
-    { col: 4,  width: 22 }, // 仕入先
-    { col: 5,  width: 16 }, // 顧客名
-    { col: 6,  width: 10 }, // 用途
-    { col: 7,  width: 12 }, // 品目
-    { col: 8,  width: 20 }, // メーカー
-    { col: 9,  width: 30 }, // 商品名
-    { col: 10, width: 20 }, // 仕様
-    { col: 11, width: 10 }, // 色
-    { col: 12, width: 10 }, // 種類
-    { col: 13, width: 8  }, // 入荷数
-    { col: 14, width: 10 }, // 定価
-    { col: 15, width: 8  }, // 掛率
-    { col: 16, width: 10 }, // 単価
-    { col: 17, width: 12 }, // 金額
-    { col: 18, width: 10 }, // 検品者
-    { col: 19, width: 20 }, // 商品備考
-    { col: 20, width: 20 }, // 納品備考
+    { col: 0,  width: 12 }, // 注文日
+    { col: 1,  width: 14 }, // 注文者
+    { col: 2,  width: 12 }, // 品目
+    { col: 3,  width: 22 }, // メーカー名
+    { col: 4,  width: 30 }, // 品名
+    { col: 5,  width: 8  }, // 個数
+    { col: 6,  width: 22 }, // 発注先
+    { col: 7,  width: 20 }, // 備考（商品）
+    { col: 8,  width: 16 }, // 顧客名
+    { col: 9,  width: 12 }, // 商品到着日
+    { col: 10, width: 10 }, // 検品者
+    { col: 11, width: 18 }, // 納品書に記載されている日
+    { col: 12, width: 10 }, // 定価
+    { col: 13, width: 8  }, // 掛け率
+    { col: 14, width: 10 }, // 単価
+    { col: 15, width: 8  }, // 個数（再掲）
+    { col: 16, width: 12 }, // 金額
+    { col: 17, width: 10 }, // 支払い
+    { col: 18, width: 20 }, // 備考（納品）
+    { col: 19, width: 8  }, // 送料
+    { col: 20, width: 22 }, // 発注番号
+    { col: 21, width: 20 }, // 仕様
+    { col: 22, width: 10 }, // 色
+    { col: 23, width: 10 }, // 種類
+    { col: 24, width: 10 }, // 用途
   ]
 
   const xlsxBytes = buildXlsx([headerRow, ...dataRows, totalRow], colWidths)
