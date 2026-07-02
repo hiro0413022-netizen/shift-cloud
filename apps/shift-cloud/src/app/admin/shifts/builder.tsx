@@ -4,10 +4,17 @@ import { useState, useTransition } from "react";
 import { saveDraft, publishShifts, type CellShift } from "./actions";
 import { Button } from "@/components/ui";
 
-type Template = { id: string; name: string; is_day_off: boolean; color: string };
+type Template = { id: string; name: string; start_time: string | null; end_time: string | null; is_day_off: boolean; color: string };
 type StaffRow = { id: string; name: string };
 type Shift = { staff_id: string; date: string; template_id: string | null; status: string };
 type Request = { staff_id: string; date: string; template_id: string | null; memo: string | null };
+
+/** テンプレートの表示: 時間があれば "10:00-17:00"、なければ名前 */
+function tLabel(t: Template) {
+  if (t.is_day_off) return "休み";
+  if (t.start_time && t.end_time) return `${t.start_time.slice(0, 5)}-${t.end_time.slice(0, 5)}`;
+  return t.name;
+}
 
 export function ShiftBuilder({
   storeId, ym, days, staff, templates, shifts, requests,
@@ -104,15 +111,15 @@ export function ShiftBuilder({
                       >
                         <option value="">—</option>
                         {templates.map((tp) => (
-                          <option key={tp.id} value={tp.id}>{tp.name}</option>
+                          <option key={tp.id} value={tp.id}>{tLabel(tp)}</option>
                         ))}
                       </select>
                       {req && (
                         <p
                           className="truncate px-1 pb-0.5 text-[10px] text-zinc-400"
-                          title={`希望: ${req.template_id ? tmap.get(req.template_id)?.name ?? "" : ""}${req.memo ? ` / ${req.memo}` : ""}`}
+                          title={`希望: ${req.template_id ? (() => { const rt = tmap.get(req.template_id); return rt ? `${rt.name}（${tLabel(rt)}）` : ""; })() : ""}${req.memo ? ` / ${req.memo}` : ""}`}
                         >
-                          希望: {req.template_id ? tmap.get(req.template_id)?.name : "メモ"}
+                          希望: {req.template_id ? (() => { const rt = tmap.get(req.template_id); return rt ? tLabel(rt) : "—"; })() : "メモ"}
                           {req.memo ? " 📝" : ""}
                         </p>
                       )}

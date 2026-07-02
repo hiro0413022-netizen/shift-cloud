@@ -22,7 +22,7 @@ export default async function ShiftBuilderPage({ searchParams }: { searchParams:
     admin.from("staff").select("id, name, staff_store_assignments!inner(store_id)")
       .eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null)
       .eq("staff_store_assignments.store_id", storeId).order("name"),
-    admin.from("shift_templates").select("id, name, is_day_off, color")
+    admin.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color")
       .eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
     admin.from("shifts").select("staff_id, date, template_id, status")
       .eq("company_id", actor.companyId).eq("store_id", storeId).is("deleted_at", null)
