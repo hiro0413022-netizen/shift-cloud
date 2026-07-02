@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #0f6b4f;
+  --color-brand-light: #e6f2ee;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  @apply bg-zinc-50 text-zinc-900 antialiased;
+}

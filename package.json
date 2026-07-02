@@ -1,0 +1,10 @@
+{
+  "name": "yozan-genesis",
+  "private": true,
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "dev": "npm run dev -w apps/shift-cloud",
+    "build": "npm run build -w apps/shift-cloud",
+    "start": "npm run start -w apps/shift-cloud"
+  }
+}

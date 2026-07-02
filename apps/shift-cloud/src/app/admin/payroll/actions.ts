@@ -1,0 +1,117 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createClient as createBareClient } from "@supabase/supabase-js";
+import { requireActor, loginIdToEmail } from "@/lib/auth";
+import { createAdmin } from "@/lib/supabase/admin";
+import { grantPayrollAccess } from "@/lib/reauth";
+import { logAudit } from "@/lib/audit";
+
+/** 再認証: パスワードを確認して15分間の給与アクセスを付与 */
+export async function verifyPayrollAccess(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
+  const actor = await requireActor("view_payroll");
+  const password = String(formData.get("password") ?? "");
+
+  const admin = createAdmin();
+  const { data: staff } = await admin.from("staff").select("email, login_id").eq("id", actor.staffId).single();
+  const email = staff?.email || (staff?.login_id ? loginIdToEmail(staff.login_id) : null);
+  if (!email) return { error: "認証情報が見つかりません" };
+
+  // セッションに影響しない使い捨てクライアントで検証
+  const bare = createBareClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+  const { error } = await bare.auth.signInWithPassword({ email, password });
+  if (error) return { error: "パスワードが正しくありません" };
+
+  await grantPayrollAccess(actor.staffId);
+  await logAudit(actor, "payroll.reauth", "payroll_periods", null);
+  revalidatePath("/admin/payroll");
+  return {};
+}
+
+/** 給与集計を実行（attendance_days × staff_wages → payroll_items） */
+export async function buildPayroll(formData: FormData): Promise<{ error?: string }> {
+  const actor = await requireActor("manage_payroll");
+  const admin = createAdmin();
+  const ym = String(formData.get("ym"));
+  const from = `${ym}-01`, to = `${ym}-31`;
+
+  const { data: period } = await admin.from("payroll_periods")
+    .upsert({ company_id: actor.companyId, target_month: from }, { onConflict: "company_id,target_month" })
+    .select("*").single();
+  if (!period) return { error: "期間の作成に失敗しました" };
+  if (period.status === "locked") return { error: "この月は締め済みです" };
+
+  const [{ data: days }, { data: wages }, { data: company }] = await Promise.all([
+    admin.from("attendance_days").select("staff_id, date, work_minutes, overtime_minutes")
+      .eq("company_id", actor.companyId).gte("date", from).lte("date", to),
+    admin.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from")
+      .eq("company_id", actor.companyId).is("deleted_at", null).order("effective_from", { ascending: false }),
+    admin.from("companies").select("settings").eq("id", actor.companyId).single(),
+  ]);
+
+  const settings = (company?.settings ?? {}) as unknown as { rounding_minutes?: number; overtime_rate?: number };
+  const rounding = settings.rounding_minutes ?? 0;
+  const otRate = settings.overtime_rate ?? 1.25;
+
+  const byStaff = new Map<string, { work: number; overtime: number; daysWorked: number }>();
+  for (const d of days ?? []) {
+    const cur = byStaff.get(d.staff_id) ?? { work: 0, overtime: 0, daysWorked: 0 };
+    let w = d.work_minutes;
+    if (rounding > 0) w = Math.floor(w / rounding) * rounding;
+    cur.work += w;
+    cur.overtime += d.overtime_minutes;
+    if (d.work_minutes > 0) cur.daysWorked += 1;
+    byStaff.set(d.staff_id, cur);
+  }
+
+  function wageFor(staffId: string) {
+    return (wages ?? []).find((w) => w.staff_id === staffId && w.effective_from <= to) ?? null;
+  }
+
+  const items = [...byStaff.entries()].map(([staffId, agg]) => {
+    const w = wageFor(staffId);
+    const hourly = w?.hourly_wage ?? 0;
+    const normalMin = agg.work - agg.overtime;
+    const base = Math.floor((normalMin / 60) * hourly);
+    const ot = Math.floor((agg.overtime / 60) * hourly * otRate);
+    const commute = (w?.commute_allowance ?? 0) * agg.daysWorked;
+    return {
+      company_id: actor.companyId,
+      period_id: period.id,
+      staff_id: staffId,
+      work_minutes: agg.work,
+      overtime_minutes: agg.overtime,
+      base_amount: base,
+      overtime_amount: ot,
+      commute_amount: commute,
+      allowance_amount: 0,
+      deduction_amount: 0,
+      total_amount: base + ot + commute,
+      detail: { days_worked: agg.daysWorked, hourly_wage: hourly, overtime_rate: otRate, rounding_minutes: rounding },
+    };
+  });
+
+  if (items.length === 0) return { error: "対象月の勤怠データがありません" };
+
+  const { error } = await admin.from("payroll_items").upsert(items, { onConflict: "period_id,staff_id" });
+  if (error) return { error: error.message };
+
+  await logAudit(actor, "payroll.build", "payroll_items", period.id, null, { ym, staff: items.length });
+  revalidatePath("/admin/payroll");
+  return {};
+}
+
+export async function lockPayroll(formData: FormData) {
+  const actor = await requireActor("manage_payroll");
+  const admin = createAdmin();
+  const periodId = String(formData.get("period_id"));
+  await admin.from("payroll_periods")
+    .update({ status: "locked", locked_by: actor.staffId, locked_at: new Date().toISOString() })
+    .eq("id", periodId).eq("company_id", actor.companyId);
+  await logAudit(actor, "payroll.lock", "payroll_periods", periodId);
+  revalidatePath("/admin/payroll");
+}
