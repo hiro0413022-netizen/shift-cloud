@@ -94,7 +94,7 @@ export function RequestForm({
       <div className="fixed inset-x-0 bottom-14 z-10 mx-auto max-w-lg border-t border-zinc-200 bg-white/95 p-3 backdrop-blur">
         <div className="flex items-center gap-3">
           <p className="flex-1 text-xs text-zinc-500">{filled}日分 入力済み {msg && <span className="ml-2 font-medium text-brand">{msg}</span>}</p>
-          <Button onClick={submit} disabled={pending}>{pending ? "提出中…" : "希望を提出"}</Button>
+          <Button onClick={submit} disabled={pending}>{pending ? "提出中…" : "シフトを提出"}</Button>
         </div>
       </div>
     </div>

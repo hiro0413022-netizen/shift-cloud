@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-02 (2)
+- deploy: GitHub `shift-cloud` → Vercel（https://shift-cloud-shift-cloud.vercel.app、Function Region: 東京）
+- feat: シフト作成グリッドを時間表示（10:00-17:00形式）に変更
+- feat: スタッフ主導フローに転換 — シフト提出が自動でドラフト化（管理者は確認→確定のみ）。`0004_help_requests.sql`適用: 出勤募集（help_requests/help_applications）を追加。管理画面「出勤募集」で作成→店舗スタッフに通知→応募→採用で確定シフト化＋通知、人数充足で自動クローズ
+- 決定: DECISIONS #13
+
 ## 2026-07-02
 - docs: Phase 0完了。genesis共通ドキュメント9件、workforce-osドキュメント9件、PHASE0_PLAN.md作成
 - 決定: DECISIONS #1〜#9
