@@ -263,7 +263,7 @@ app.get('/dashboard', async (c) => {
        JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
        WHERE po.tenant_id = ?
-       GROUP BY po.id
+       GROUP BY po.id, s.id
        ORDER BY po.id DESC
        LIMIT 10`
     )
@@ -375,7 +375,7 @@ app.get('/orders', async (c) => {
     const like = `%${q}%`
     params.push(like, like, like)
   }
-  sql += ' GROUP BY po.id ORDER BY po.id DESC'
+  sql += ' GROUP BY po.id, s.id ORDER BY po.id DESC'
 
   const rows = await db.prepare(sql).bind(...params).all<Record<string, unknown>>()
 
@@ -900,7 +900,7 @@ app.get('/pool', async (c) => {
     JOIN suppliers s ON po.supplier_id = s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
     WHERE po.status = 'pool' AND po.tenant_id = ?
-    GROUP BY po.id
+    GROUP BY po.id, s.id
     ORDER BY s.name, po.id
   `).bind(tenantId).all<Record<string, unknown>>()
 
@@ -1448,7 +1448,7 @@ app.get('/backorders', async (c) => {
        LEFT JOIN receipt_items ri ON ri.purchase_order_item_id = poi.id
        LEFT JOIN receipts r ON ri.receipt_id = r.id
        WHERE po.tenant_id = ?
-       GROUP BY poi.id
+       GROUP BY poi.id, po.id, s.id
        HAVING COALESCE(SUM(ri.received_quantity), 0) < poi.quantity
        ORDER BY po.order_date DESC, po.order_no DESC`
     )

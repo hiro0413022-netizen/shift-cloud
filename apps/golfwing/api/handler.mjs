@@ -2870,7 +2870,7 @@ app.get("/dashboard", async (c) => {
        JOIN suppliers s ON po.supplier_id = s.id
        LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
        WHERE po.tenant_id = ?
-       GROUP BY po.id
+       GROUP BY po.id, s.id
        ORDER BY po.id DESC
        LIMIT 10`
   ).bind(tenantId).all();
@@ -2960,7 +2960,7 @@ app.get("/orders", async (c) => {
     const like = `%${q}%`;
     params.push(like, like, like);
   }
-  sql += " GROUP BY po.id ORDER BY po.id DESC";
+  sql += " GROUP BY po.id, s.id ORDER BY po.id DESC";
   const rows = await db2.prepare(sql).bind(...params).all();
   return c.json({
     rows: rows.results.map((r) => ({
@@ -3317,7 +3317,7 @@ app.get("/pool", async (c) => {
     JOIN suppliers s ON po.supplier_id = s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
     WHERE po.status = 'pool' AND po.tenant_id = ?
-    GROUP BY po.id
+    GROUP BY po.id, s.id
     ORDER BY s.name, po.id
   `).bind(tenantId).all();
   const supplierMap = /* @__PURE__ */ new Map();
@@ -3730,7 +3730,7 @@ app.get("/backorders", async (c) => {
        LEFT JOIN receipt_items ri ON ri.purchase_order_item_id = poi.id
        LEFT JOIN receipts r ON ri.receipt_id = r.id
        WHERE po.tenant_id = ?
-       GROUP BY poi.id
+       GROUP BY poi.id, po.id, s.id
        HAVING COALESCE(SUM(ri.received_quantity), 0) < poi.quantity
        ORDER BY po.order_date DESC, po.order_no DESC`
   ).bind(tenantId).all();
@@ -5182,7 +5182,7 @@ app2.get("/dashboard", async (c) => {
       JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
       WHERE po.tenant_id=? AND po.status='ordered'
         AND julianday('now') - julianday(po.order_date) >= 7
-      GROUP BY po.id
+      GROUP BY po.id, s.id
       ORDER BY days_elapsed DESC
       LIMIT 20
     `).bind(tenantId).all(),
@@ -5203,7 +5203,7 @@ app2.get("/dashboard", async (c) => {
       WHERE po.tenant_id=?
         AND po.status IN ('partial','received')
         AND ri2.id IS NOT NULL
-      GROUP BY poi.id
+      GROUP BY poi.id, po.id, s.id
       ORDER BY po.order_date ASC, po.id ASC
       LIMIT 100
     `).bind(tenantId).all(),
@@ -5227,7 +5227,7 @@ app2.get("/dashboard", async (c) => {
         AND po.customer_name IS NOT NULL
         AND po.customer_name NOT LIKE '\uFF08%\uFF09'
         AND po.customer_name != ''
-      GROUP BY po.id
+      GROUP BY po.id, s.id
       ORDER BY po.order_date ASC
       LIMIT 30
     `).bind(tenantId).all(),
@@ -5240,7 +5240,7 @@ app2.get("/dashboard", async (c) => {
       JOIN suppliers s ON s.id=po.supplier_id
       LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
       WHERE po.tenant_id=? AND po.status IN ('draft','draft_created')
-      GROUP BY po.id
+      GROUP BY po.id, s.id
       ORDER BY po.id DESC
       LIMIT 10
     `).bind(tenantId).all()
@@ -6657,7 +6657,7 @@ app2.get("/purchase-pool", async (c) => {
     JOIN suppliers s ON po.supplier_id = s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id = po.id
     WHERE po.status = 'pool' AND po.tenant_id=?
-    GROUP BY po.id
+    GROUP BY po.id, s.id
     ORDER BY s.name, po.id
   `).bind(tenantId).all();
   const supplierMap = /* @__PURE__ */ new Map();
@@ -6886,7 +6886,7 @@ app2.get("/orders", async (c) => {
     const like = `%${q}%`;
     params.push(like, like, like);
   }
-  sql += " GROUP BY po.id ORDER BY po.id DESC";
+  sql += " GROUP BY po.id, s.id ORDER BY po.id DESC";
   const stmt = db2.prepare(sql);
   const res = params.length ? await stmt.bind(...params).all() : await stmt.all();
   const statusOpts = ["draft_created", "ordered", "partial", "completed", "cancelled"];
@@ -8757,7 +8757,7 @@ app2.get("/receipts", async (c) => {
   } else if (slipCheck === "verified") {
     sql += ` AND r.slip_verified=1`;
   }
-  sql += ` GROUP BY r.id ORDER BY r.received_date DESC, r.id DESC LIMIT 300`;
+  sql += ` GROUP BY r.id, po.id, s.id, sa.id ORDER BY r.received_date DESC, r.id DESC LIMIT 300`;
   const [supplierRes, res] = await Promise.all([
     db2.prepare("SELECT id, name FROM suppliers WHERE tenant_id=? ORDER BY name").bind(tenantId).all(),
     db2.prepare(sql).bind(...binds).all()
@@ -10065,7 +10065,7 @@ app2.get("/backorders", async (c) => {
     LEFT JOIN receipt_items ri ON ri.purchase_order_item_id=poi.id
     LEFT JOIN receipts r ON ri.receipt_id=r.id
     WHERE po.tenant_id=?
-    GROUP BY poi.id
+    GROUP BY poi.id, po.id, s.id
     HAVING COALESCE(SUM(ri.received_quantity),0) < poi.quantity
     ORDER BY po.order_date DESC, po.order_no DESC
   `).bind(tenantId).all();
