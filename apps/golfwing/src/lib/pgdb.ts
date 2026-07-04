@@ -99,6 +99,10 @@ export function createPgD1(databaseUrl: string) {
     max: 1,
     idle_timeout: 20,
     connection: { search_path: 'golfwing,public' },
+    // D1(SQLite)互換: 日付系はDateオブジェクトにせず文字列のまま返す
+    types: {
+      rawDate: { to: 1184, from: [1082, 1114, 1184], serialize: (v: unknown) => v as never, parse: (v: string) => v },
+    },
   })
   return {
     prepare(sql: string): PgStatement {
