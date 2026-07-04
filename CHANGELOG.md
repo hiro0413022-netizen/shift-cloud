@@ -1,6 +1,8 @@
 # CHANGELOG
 
 ## 2026-07-04
+- feat: `apps/golfwing` 新規追加 — GolfOrder発注管理システムのソースをGensparkから回収（golfwing-srcブランチ経由、Hono+Cloudflare D1、migrations 0001〜0015、docs一式）。デプロイは当面Cloudflare Pages継続、将来Supabase/inventoryモジュールへ移行予定
+- feat(corporate): モーションデザイン強化 — スクロール進捗バー、data-reveal汎用リビール（方向/ディレイ対応）、ヒーローKen Burns＋ゴールドグラデ文字、マーキー帯、CountUp統計バンド、モザイク写真キャプション、CTA発光ボーダー、prefers-reduced-motion対応。新規: MotionFx.tsx / CountUp.tsx。トップページにCTAボタン・バッジ・統計セクション追加
 - fix: Gensparkによるmainへのforce push事故（336f880、SaaS履歴上書き）をローカルf245bf6からのforce pushで復旧。本番影響なし（該当デプロイはビルドERRORで旧版稼働継続）
 - feat: `apps/corporate` 新規追加 — Genspark製コーポレートサイト（Next.js 16 + Tailwind v4、/business /marketing /about /vision /recruit /contact）をモノレポに統合。package name: yozan-corporate
 - ops: 旧Vercelプロジェクト`shift-cloud`削除（稼働は`shift-cloud-shift-cloud`のみ）。リポジトリはPublic運用と決定（DECISIONS #14）

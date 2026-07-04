@@ -7,7 +7,10 @@
 
 ## 要対応
 
-0. **コーポレートサイト統合**: main復旧済み（2026-07-04）。Genspark製サイトを `apps/corporate` に統合済み → commit & push後、Vercel新プロジェクト（Root: apps/corporate）作成、yozan-inc.jpドメイン設定
+0. **コーポレートサイト統合**: main復旧済み。apps/corporate統合済み・Vercel `yozan-corporate` 本番公開済み・モーションアップグレード実装済み（push待ちの場合あり）
+0-a. **yozan-inc.jp DNS切替**: CloudflareアカウントトークンにZone>DNS>Edit権限がなくAPI編集不可。権限追加後に (1) `@` CNAME→`b86da20995ba7910.vercel-dns-017.com`(Proxyオフ) に変更 (2) その後Pages`yozan-group`からカスタムドメイン解除。MX(mail1026.onamae.ne.jp)は不変更
+0-b. **golfwing/kallinosソース回収**: Cloudflare Pages 3プロジェクトは全てdirect-uploadでソースなし。Gensparkに「shift-cloudリポの新ブランチ `golfwing-src` / `kallinos-src` へpush（mainへのforce push厳禁）」を依頼 → 回収後 apps/ へ統合
+0-c. **セキュリティ**: チャット共有されたCloudflare APIトークンは作業完了後に再発行。R2キーはR2未有効化のため失効推奨
 1. **ログイン動作確認**（ユーザー）: オーナー/本部アカウント（view_hq権限）で https://yozan-genesis.vercel.app にログイン → Cockpit表示確認
 2. **未コミットのdocs変更をcommit & push**（CHANGELOG / NEXT_TASKS / DECISIONS / package.json）
 3. **Webhook接続テスト**: Connectors画面でGitHubのトークン発行 → GitHubリポジトリのWebhooksに `https://yozan-genesis.vercel.app/api/webhooks/github?token=xxx` を登録

@@ -520,3 +520,115 @@ p  { margin: 0; }
   .biz-panel-grid { grid-template-columns: 1fr; }
   .grid-5 { grid-template-columns: 1fr; }
 }
+
+/* ═══════════════════════════════════════════════
+   MOTION UPGRADE (2026-07)
+═══════════════════════════════════════════════ */
+
+/* Scroll progress bar */
+#scroll-progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 200;
+  background: linear-gradient(90deg, var(--gold), var(--gold-2));
+  transform-origin: 0 50%; transform: scaleX(0);
+  pointer-events: none;
+}
+
+/* Reveal system */
+[data-reveal] {
+  opacity: 0; transform: translateY(30px);
+  transition: opacity .7s cubic-bezier(.22,.61,.36,1), transform .7s cubic-bezier(.22,.61,.36,1);
+  will-change: opacity, transform;
+}
+[data-reveal="left"]  { transform: translateX(-40px); }
+[data-reveal="right"] { transform: translateX(40px); }
+[data-reveal="scale"] { transform: scale(.92); }
+[data-reveal].is-visible { opacity: 1; transform: none; }
+[data-delay="1"] { transition-delay: .08s; }
+[data-delay="2"] { transition-delay: .16s; }
+[data-delay="3"] { transition-delay: .24s; }
+[data-delay="4"] { transition-delay: .32s; }
+[data-delay="5"] { transition-delay: .40s; }
+[data-delay="6"] { transition-delay: .48s; }
+
+/* Hero: Ken Burns + gradient word */
+.hero-bg { animation: kenburns 18s ease-out infinite alternate; }
+@keyframes kenburns {
+  0%   { transform: scale(1.06) translateY(0); }
+  100% { transform: scale(1.14) translateY(-14px); }
+}
+.grad-word {
+  background: linear-gradient(110deg, var(--gold-2) 20%, #fff 40%, var(--gold) 60%, var(--gold-2) 80%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shine 5s linear infinite;
+}
+@keyframes shine { to { background-position: 200% center; } }
+.hero-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 28px; }
+
+/* Marquee band */
+.marquee {
+  overflow: hidden; white-space: nowrap; position: relative;
+  background: var(--navy); border-top: 1px solid rgba(255,255,255,.06);
+  padding: 18px 0;
+}
+.marquee-track {
+  display: inline-block; animation: marquee 28s linear infinite;
+}
+.marquee:hover .marquee-track { animation-play-state: paused; }
+.marquee-track span {
+  font-size: 13px; font-weight: 800; letter-spacing: .34em; text-transform: uppercase;
+  color: rgba(255,255,255,.35); margin: 0 34px;
+}
+.marquee-track span b { color: var(--gold); font-weight: 800; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* Biz panel: icon float + entrance handled by data-reveal */
+.biz-panel-card:hover .biz-panel-icon { animation: floaty 1.6s ease-in-out infinite; }
+@keyframes floaty {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-6px); }
+}
+
+/* Photo mosaic captions */
+.photo-mosaic-item::after {
+  content: attr(data-cap);
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 26px 16px 12px;
+  background: linear-gradient(0deg, rgba(8,14,28,.85), transparent);
+  color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .06em;
+  opacity: 0; transform: translateY(8px);
+  transition: opacity .35s ease, transform .35s ease;
+  pointer-events: none;
+}
+.photo-mosaic-item:hover::after { opacity: 1; transform: translateY(0); }
+
+/* CTA band glow */
+.cta-band { position: relative; overflow: hidden; }
+.cta-band::before {
+  content: ""; position: absolute; inset: -2px; border-radius: inherit; padding: 2px;
+  background: linear-gradient(120deg, transparent 20%, rgba(200,169,107,.65), transparent 80%);
+  background-size: 220% 220%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: borderflow 6s linear infinite;
+  pointer-events: none;
+}
+@keyframes borderflow {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 220% 50%; }
+}
+
+/* Stat number pop */
+.stat-item .num { display: inline-block; }
+.stat-item:hover .num { animation: pop .5s ease; }
+@keyframes pop {
+  0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg, .marquee-track, .grad-word, .cta-band::before { animation: none !important; }
+  [data-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }
+  html { scroll-behavior: auto; }
+}

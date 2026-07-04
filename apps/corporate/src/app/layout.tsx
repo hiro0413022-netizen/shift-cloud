@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import MotionFx from '@/components/MotionFx'
 
 export const metadata: Metadata = {
   title: { default: '株式会社YOZAN | ゴルフ業界の成長を、仕組みで支える会社', template: '%s | 株式会社YOZAN' },
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ja">
       <body>
+        <MotionFx />
         <Header />
         <main>{children}</main>
         <Footer />
