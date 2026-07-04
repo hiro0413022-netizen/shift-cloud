@@ -7,23 +7,9 @@
 
 ## 要対応
 
-0. **コーポレートサイト統合**: main復旧済み。apps/corporate統合済み・Vercel `yozan-corporate` 本番公開済み・モーションアップグレード実装済み（push待ちの場合あり）
-0-a. **yozan-inc.jp DNS切替**: CloudflareアカウントトークンにZone>DNS>Edit権限がなくAPI編集不可。権限追加後に (1) `@` CNAME→`b86da20995ba7910.vercel-dns-017.com`(Proxyオフ) に変更 (2) その後Pages`yozan-group`からカスタムドメイン解除。MX(mail1026.onamae.ne.jp)は不変更
-0-b. **golfwing/kallinosソース回収**: Cloudflare Pages 3プロジェクトは全てdirect-uploadでソースなし。Gensparkに「shift-cloudリポの新ブランチ `golfwing-src` / `kallinos-src` へpush（mainへのforce push厳禁）」を依頼 → 回収後 apps/ へ統合
-0-c. **セキュリティ**: チャット共有されたCloudflare APIトークンは作業完了後に再発行。R2キーはR2未有効化のため失効推奨
+0. **Web移行完了（2026-07-04）**: yozan-inc.jp=Vercel`yozan-corporate`（モーション版・画像ローカル化済み）、www.kallinos.jp=Vercel`kallinos`（静的ミラー）、apps/golfwing=ソース回収済み（本番は当面Cloudflare Pages `golfwing`継続）
+0-a. **掃除（ユーザー作業）**: Cloudflareダッシュボードで旧Pagesのカスタムドメイン解除 — `yozan-group`から yozan-inc.jp/www.yozan-inc.jp、`kallinos`から www.kallinos.jp。※`golfwing`プロジェクトは本番稼働中なので触らない
+0-b. **セキュリティ**: チャット共有されたCloudflare APIトークンを再発行、R2キーは失効（R2未有効化）
+0-c. **GolfOrder移行 P2**: ユーザーPCで `cd apps/golfwing && npx wrangler d1 export golfwing-production --remote --output=dump.sql`（要wrangler login）→ dump.sqlをリポジトリ外に置き共有 → Cowork側で変換・投入・検証。P1(スキーマ0007)は適用済み。設計書: docs/genesis/GOLFWING_SUPABASE_MIGRATION.md
 1. **ログイン動作確認**（ユーザー）: オーナー/本部アカウント（view_hq権限）で https://yozan-genesis.vercel.app にログイン → Cockpit表示確認
-2. **未コミットのdocs変更をcommit & push**（CHANGELOG / NEXT_TASKS / DECISIONS / package.json）
-3. **Webhook接続テスト**: Connectors画面でGitHubのトークン発行 → GitHubリポジトリのWebhooksに `https://yozan-genesis.vercel.app/api/webhooks/github?token=xxx` を登録
-4. **運用開始**: CEO AI Command Centerで日次レポート生成・AI指示生成を使い始める
-5. （任意）Vercelの Function Region を東京(hnd1)に変更 — 現在iad1でSupabase東京との往復が遅め。Settings → Functions
-
-## バックログ
-- KPI実データ接続（payroll_items→人件費など）
-- AIエージェント実行の自動記録（n8n/Cowork→ai_execution_logs）
-- Shift Cloudの残項目: パスワードリセット / 有給・交通費申請 / LINE通知 / 給与丸め本番値（DECISIONS #9）
-- 次期モジュール選定（MODULE_TEMPLATE.md参照: inventory / reservation / crm / caddy-dispatch / kallinos-ec / golf-coach-ai）
-
-## メモ
-- Supabase: yozan-shift-cloud (qrgpblnnhdudigarrtuz, 東京) — genesisも同一DB（DECISIONS #16）
-- Shift Cloud本番: https://shift-cloud-shift-cloud.vercel.app
-- Genesis入口条件: staff + view_hq権限ロール（DECISIONS #18）
+2. **未コミットのdocs変更を

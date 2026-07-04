@@ -6,3 +6,7 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 .vercel
+
+# D1 export (顧客データ含む・公開リポジトリにコミット禁止)
+dump.sql
+*.d1export.sql
