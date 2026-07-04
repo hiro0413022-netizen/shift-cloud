@@ -31,27 +31,13 @@ type Variables = {
 }
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
+export { app }
 
-app.use('/static/*', serveStatic({ root: './public' }))
+app.use('/static/*', serveStatic({ root: './public' } as never))
 app.get('/favicon.ico', (c) => c.body(null, 204))
 
-// ── デモログイン ──────────────────────────────────────
-// ログイン不要でデモテナント（tenant_id=0）としてセッションを発行
-app.get('/demo-login', async (c) => {
-  const secret = c.env.AUTH_SECRET || 'golfwing-secret-key-change-in-production'
-  const token  = await createToken('demo', 0, secret)
-  const cookie = [
-    `gw_session=${encodeURIComponent(token)}`,
-    'Path=/',
-    `Max-Age=${60 * 60 * 24 * 7}`,
-    'HttpOnly',
-    'SameSite=Strict',
-  ].join('; ')
-  return new Response(null, {
-    status: 302,
-    headers: { 'Location': '/dashboard', 'Set-Cookie': cookie }
-  })
-})
+// ── デモログイン（廃止: DECISIONS #20）─────────────────
+app.get('/demo-login', (c) => c.redirect('/login'))
 
 // ── ログインページ GET ──────────────────────────────────
 app.get('/login', async (c) => {

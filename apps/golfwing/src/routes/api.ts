@@ -1668,7 +1668,7 @@ app.get('/receipts/download', async (c) => {
   }).replace(/\//g, '')
   const filename = encodeURIComponent(`納品履歴_${dateStr}.xlsx`)
 
-  return new Response(xlsxBytes, {
+  return new Response(xlsxBytes as unknown as BodyInit, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename*=UTF-8''${filename}`,

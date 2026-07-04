@@ -12,9 +12,11 @@
 export type AuthBindings = {
   DB: D1Database
   AUTH_SECRET?: string
-  AUTH_USERNAME?: string   // 後方互換（未設定時はDBを使用）
-  AUTH_PASSWORD?: string   // 後方互換（未設定時はDBを使用）
+  AUTH_USERNAME?: string   // 後方互換（未設定時はSupabase Authを使用）
+  AUTH_PASSWORD?: string   // 後方互換
   APP_NAME?: string
+  SUPABASE_URL?: string
+  SUPABASE_ANON_KEY?: string
 }
 
 export type SessionUser = {
@@ -106,33 +108,33 @@ export async function getCurrentUser(
 
   const { username, tenantId } = result
 
-  // デモセッション（tenant_id=0）は DB 照会不要で復元
-  if (tenantId === 0) {
+  // デモテナントは廃止（DECISIONS #20）
+  if (tenantId === 0) return null
+
+  // 環境変数ユーザー（後方互換）: username が env: プレフィックス
+  if (username.startsWith('env:')) {
     return {
-      username,
-      tenantId:    0,
-      displayName: 'デモユーザー',
-      isDemo:      true,
-      isAdmin:     false,
+      username:    username.slice(4),
+      tenantId:    1,
+      displayName: username.slice(4),
+      isDemo:      false,
+      isAdmin:     true,
     }
   }
 
-  // テナント情報をDBから取得
-  const user = await db.prepare(
-    'SELECT u.*, t.is_demo FROM users u JOIN tenants t ON t.id=u.tenant_id WHERE u.username=? AND u.tenant_id=?'
-  ).bind(username, tenantId).first<{
-    id: number; tenant_id: number; username: string;
-    display_name: string; is_admin: number; is_demo: number
-  }>()
+  // Supabase Auth ユーザー: username に auth uid を格納している
+  const staffRow = await db.prepare(
+    'SELECT name FROM public.staff WHERE auth_user_id = ? AND deleted_at IS NULL'
+  ).bind(username).first<{ name: string }>()
 
-  if (!user) return null
+  if (!staffRow) return null
 
   return {
-    username:    user.username,
-    tenantId:    user.tenant_id,
-    displayName: user.display_name || user.username,
-    isDemo:      user.is_demo === 1,
-    isAdmin:     user.is_admin === 1,
+    username,
+    tenantId:    1,
+    displayName: staffRow.name || 'スタッフ',
+    isDemo:      false,
+    isAdmin:     true,  // TODO: rolesテーブル連携（発注管理は現状全スタッフ管理者扱い）
   }
 }
 
@@ -144,31 +146,39 @@ export async function attemptLogin(
 ): Promise<Response | null> {
   const secret = env.AUTH_SECRET || DEFAULT_SECRET
 
-  // ① DB の users テーブルで認証（マルチテナント対応）
-  if (env.DB) {
-    const userRow = await env.DB.prepare(
-      'SELECT u.*, t.is_demo FROM users u JOIN tenants t ON t.id=u.tenant_id WHERE u.username=? AND u.password=?'
-    ).bind(username, password).first<{
-      id: number; tenant_id: number; username: string;
-      display_name: string; is_admin: number; is_demo: number
-    }>()
-
-    if (userRow) {
-      const token  = await createToken(userRow.username, userRow.tenant_id, secret)
-      const cookie = makeCookie(token)
-      return new Response(null, {
-        status: 302,
-        headers: { 'Location': '/dashboard', 'Set-Cookie': cookie }
+  // ① Supabase Auth（メールアドレス + パスワード。Shift Cloudと共通アカウント）
+  if (env.SUPABASE_URL && env.SUPABASE_ANON_KEY) {
+    try {
+      const res = await fetch(env.SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        headers: { apikey: env.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: username, password }),
       })
-    }
+      if (res.ok) {
+        const data = await res.json() as { user?: { id: string } }
+        const uid = data.user?.id
+        if (uid) {
+          // staffに存在するユーザーのみ許可
+          const staffRow = await env.DB.prepare(
+            'SELECT id FROM public.staff WHERE auth_user_id = ? AND deleted_at IS NULL'
+          ).bind(uid).first<{ id: string }>()
+          if (staffRow) {
+            const token  = await createToken(uid, 1, secret)
+            const cookie = makeCookie(token)
+            return new Response(null, {
+              status: 302,
+              headers: { 'Location': '/dashboard', 'Set-Cookie': cookie }
+            })
+          }
+        }
+      }
+    } catch (_e) { /* Supabase到達不可時はフォールバックへ */ }
   }
 
-  // ② 後方互換: 環境変数での認証（DBにユーザーが見つからない場合）
-  const validUser = env.AUTH_USERNAME || 'admin'
-  const validPass = env.AUTH_PASSWORD || 'golfwing2024'
-  if (username === validUser && password === validPass) {
-    // 環境変数ユーザーは tenant_id=1 として扱う
-    const token  = await createToken(username, 1, secret)
+  // ② 後方互換: 環境変数での認証（明示的に設定されている場合のみ）
+  if (env.AUTH_USERNAME && env.AUTH_PASSWORD &&
+      username === env.AUTH_USERNAME && password === env.AUTH_PASSWORD) {
+    const token  = await createToken('env:' + username, 1, secret)
     const cookie = makeCookie(token)
     return new Response(null, {
       status: 302,

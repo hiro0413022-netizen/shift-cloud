@@ -98,5 +98,6 @@ Genesis統合マッピング:
 - [x] P1: `supabase/migrations/0007_golfwing_schema.sql` 作成・本番適用（2026-07-04）— golfwingスキーマ8テーブル+RLS+updated_atトリガー+KPIビュー v_monthly_purchase_cost
 - [x] P2: データ移行完了（2026-07-04）— D1 API直読み→ブラウザ内変換→一時Edge Function `golfwing-import`（secretヘッダー認証）でgolfwingスキーマへ投入。件数検証一致: suppliers 27 / supplier_rules 135 / products 1748 / purchase_orders 31 / purchase_order_items 56 / receipts 29 / receipt_items 53。デモテナント(tenant_id=0)は除外、シーケンスはsetval済み、default_supplier_id等の孤児FKはnull化。KPIビュー動作確認済み
   - 注意: D1本番は稼働継続中 → P4切替直前に差分再同期（golfwing-import関数は残置、切替後に削除）
-- [ ] P3: DB層差し替え + auth置換
-- [ ] P4: 並行稼働 + 切替
+- [x] P3: 実装完了（2026-07-04）— `src/lib/pgdb.ts`（D1互換Postgresアダプタ: ?→$n変換、boolean/julianday/GROUP_CONCAT方言変換、INSERT自動RETURNING id、batch対応）、`api/index.ts`（Vercel Nodeエントリ）、`vercel.json`、auth.tsをSupabase Auth化（メール+パスワード、staffテーブル照合、env varフォールバック付き）、migration 0008でtenant_id互換列追加（既存SQL無修正）。デモログインは/loginへリダイレクト化。tsc --noEmit エラー0確認済み
+  - TODO: isAdminは暫定全員true（rolesテーブル連携は後続）。バックアップ復元機能のINSERT OR REPLACEはON CONFLICT非対応（既知の制限）
+- [ ] P4: Vercelプロジェクト`golfwing-order`作成（Root: apps/golfwing、Framework: Other、env 6つ）→ 動作検証 → D1差分再同期 → 切替。env: GW_DATABASE_URL / SUPABASE_URL / SUPABASE_ANON_KEY / AUTH_SECRET / AUTH_USERNAME / AUTH_PASSWORD
