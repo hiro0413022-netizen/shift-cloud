@@ -112,11 +112,11 @@ export async function getCurrentUser(
   if (tenantId === 0) return null
 
   // 環境変数ユーザー（後方互換）: username が env: プレフィックス
-  if (username.startsWith('env:')) {
+  if (username.startsWith('envuser-')) {
     return {
-      username:    username.slice(4),
+      username:    username.slice(8),
       tenantId:    1,
-      displayName: username.slice(4),
+      displayName: username.slice(8),
       isDemo:      false,
       isAdmin:     true,
     }
@@ -178,7 +178,7 @@ export async function attemptLogin(
   // ② 後方互換: 環境変数での認証（明示的に設定されている場合のみ）
   if (env.AUTH_USERNAME && env.AUTH_PASSWORD &&
       username === env.AUTH_USERNAME && password === env.AUTH_PASSWORD) {
-    const token  = await createToken('env:' + username, 1, secret)
+    const token  = await createToken('envuser-' + username, 1, secret)
     const cookie = makeCookie(token)
     return new Response(null, {
       status: 302,

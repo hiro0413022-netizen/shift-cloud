@@ -10404,11 +10404,11 @@ async function getCurrentUser(req, db2, secret) {
   if (!result) return null;
   const { username, tenantId } = result;
   if (tenantId === 0) return null;
-  if (username.startsWith("env:")) {
+  if (username.startsWith("envuser-")) {
     return {
-      username: username.slice(4),
+      username: username.slice(8),
       tenantId: 1,
-      displayName: username.slice(4),
+      displayName: username.slice(8),
       isDemo: false,
       isAdmin: true
     };
@@ -10456,7 +10456,7 @@ async function attemptLogin(username, password, env) {
     }
   }
   if (env.AUTH_USERNAME && env.AUTH_PASSWORD && username === env.AUTH_USERNAME && password === env.AUTH_PASSWORD) {
-    const token = await createToken("env:" + username, 1, secret);
+    const token = await createToken("envuser-" + username, 1, secret);
     const cookie = makeCookie(token);
     return new Response(null, {
       status: 302,
