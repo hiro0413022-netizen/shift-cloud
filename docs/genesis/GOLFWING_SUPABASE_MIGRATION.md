@@ -96,6 +96,7 @@ Genesis統合マッピング:
 ## 11. 進捗
 
 - [x] P1: `supabase/migrations/0007_golfwing_schema.sql` 作成・本番適用（2026-07-04）— golfwingスキーマ8テーブル+RLS+updated_atトリガー+KPIビュー v_monthly_purchase_cost
-- [ ] P2: D1エクスポート（ユーザーPCで `cd apps/golfwing && npx wrangler d1 export golfwing-production --remote --output=dump.sql` ※要wrangler login）→ 変換 → 投入 → 検証
+- [x] P2: データ移行完了（2026-07-04）— D1 API直読み→ブラウザ内変換→一時Edge Function `golfwing-import`（secretヘッダー認証）でgolfwingスキーマへ投入。件数検証一致: suppliers 27 / supplier_rules 135 / products 1748 / purchase_orders 31 / purchase_order_items 56 / receipts 29 / receipt_items 53。デモテナント(tenant_id=0)は除外、シーケンスはsetval済み、default_supplier_id等の孤児FKはnull化。KPIビュー動作確認済み
+  - 注意: D1本番は稼働継続中 → P4切替直前に差分再同期（golfwing-import関数は残置、切替後に削除）
 - [ ] P3: DB層差し替え + auth置換
 - [ ] P4: 並行稼働 + 切替
