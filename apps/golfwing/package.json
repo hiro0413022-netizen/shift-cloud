@@ -10,7 +10,8 @@
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "db:migrate:local": "wrangler d1 migrations apply golfwing-production --local",
     "db:seed": "wrangler d1 execute golfwing-production --local --file=./seed.sql",
-    "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed"
+    "db:reset": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:seed",
+    "bundle:vercel": "esbuild src/vercel-entry.ts --bundle --platform=node --target=node20 --format=esm --outfile=api/handler.mjs --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\""
   },
   "dependencies": {
     "hono": "^4.12.12",
@@ -23,6 +24,7 @@
     "vite": "^6.3.5",
     "wrangler": "^4.4.0",
     "@types/node": "^20",
-    "typescript": "^5"
+    "typescript": "^5",
+    "esbuild": "^0.24.0"
   }
 }

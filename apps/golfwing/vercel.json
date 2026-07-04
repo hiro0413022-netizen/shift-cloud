@@ -1,6 +1,6 @@
 {
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/((?!static/|api/).*)", "destination": "/api/index" }
+    { "source": "/((?!static/|api/).*)", "destination": "/api/handler" }
   ]
 }
