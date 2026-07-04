@@ -2,26 +2,26 @@
 import { app } from './index'
 import { createPgD1 } from './lib/pgdb'
 
-const PROJECT_REF = 'qrgpblnnhdudigarrtuz'
+const REF = 'qrgpblnnhdudigarrtuz'
+const POOLER = 'aws-0-ap-northeast-1.pooler.supabase.com:6543'
 
-// Supabaseプーラー接続はユーザー名に「postgres.<project_ref>」が必須。
-// 環境変数の入力ミス（Direct用のpostgresユーザー等）を自動補正する。
+// 入力値の揺れ（[ ]付きパスワード・未エンコードの?!・directホスト・ユーザー名のref欠落）を
+// すべて吸収してSupabaseプーラー向けの正しい接続文字列を再構築する
 function normalizeDbUrl(raw: string): string {
-  try {
-    const u = new URL(raw)
-    if (u.hostname.endsWith('.pooler.supabase.com') && !u.username.includes('.')) {
-      u.username = `postgres.${PROJECT_REF}`
-    }
-    if (u.hostname === `db.${PROJECT_REF}.supabase.co`) {
-      // Direct接続はVercelから不可(IPv6)のためプーラーへ差し替え
-      u.hostname = 'aws-0-ap-northeast-1.pooler.supabase.com'
-      u.port = '6543'
-      u.username = `postgres.${PROJECT_REF}`
-    }
-    return u.toString()
-  } catch {
-    return raw
+  const s = (raw || '').trim().replace(/^['"]|['"]$/g, '')
+  const m = s.match(/^postgres(?:ql)?:\/\/(.*)@([^@]+)$/)
+  if (m && (m[2].includes('pooler.supabase.com') || m[2].startsWith('db.'))) {
+    const cred = m[1]
+    const ci = cred.indexOf(':')
+    let user = ci < 0 ? cred : cred.slice(0, ci)
+    let pass = ci < 0 ? '' : cred.slice(ci + 1)
+    pass = pass.replace(/^\[|\]$/g, '')            // テンプレの[ ]除去
+    try { pass = decodeURIComponent(pass) } catch { /* 未エンコードのまま */ }
+    if (!user.includes('.')) user = 'postgres.' + REF
+    const dbPart = m[2].split('/')[1] || 'postgres'
+    return 'postgresql://' + user + ':' + encodeURIComponent(pass) + '@' + POOLER + '/' + dbPart.split('?')[0]
   }
+  return s
 }
 
 let db: ReturnType<typeof createPgD1> | null = null

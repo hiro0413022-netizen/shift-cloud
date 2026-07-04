@@ -13894,22 +13894,26 @@ function createPgD1(databaseUrl) {
 }
 
 // src/vercel-entry.ts
-var PROJECT_REF = "qrgpblnnhdudigarrtuz";
+var REF = "qrgpblnnhdudigarrtuz";
+var POOLER = "aws-0-ap-northeast-1.pooler.supabase.com:6543";
 function normalizeDbUrl(raw2) {
-  try {
-    const u = new URL(raw2);
-    if (u.hostname.endsWith(".pooler.supabase.com") && !u.username.includes(".")) {
-      u.username = `postgres.${PROJECT_REF}`;
+  const s = (raw2 || "").trim().replace(/^['"]|['"]$/g, "");
+  const m = s.match(/^postgres(?:ql)?:\/\/(.*)@([^@]+)$/);
+  if (m && (m[2].includes("pooler.supabase.com") || m[2].startsWith("db."))) {
+    const cred = m[1];
+    const ci = cred.indexOf(":");
+    let user = ci < 0 ? cred : cred.slice(0, ci);
+    let pass = ci < 0 ? "" : cred.slice(ci + 1);
+    pass = pass.replace(/^\[|\]$/g, "");
+    try {
+      pass = decodeURIComponent(pass);
+    } catch {
     }
-    if (u.hostname === `db.${PROJECT_REF}.supabase.co`) {
-      u.hostname = "aws-0-ap-northeast-1.pooler.supabase.com";
-      u.port = "6543";
-      u.username = `postgres.${PROJECT_REF}`;
-    }
-    return u.toString();
-  } catch {
-    return raw2;
+    if (!user.includes(".")) user = "postgres." + REF;
+    const dbPart = m[2].split("/")[1] || "postgres";
+    return "postgresql://" + user + ":" + encodeURIComponent(pass) + "@" + POOLER + "/" + dbPart.split("?")[0];
   }
+  return s;
 }
 var db = null;
 var handler = async (req) => {
