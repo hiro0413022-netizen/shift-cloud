@@ -1,22 +1,18 @@
 # NEXT_TASKS
 
-## Genesis Kernel MVP実装完了（2026-07-04）— 次は稼働準備
+## GENESIS本番稼働開始（2026-07-04）
 
-1. **commit & push**（ユーザーPCで）
-   ```
-   git add -A
-   git commit -m "feat: Genesis Kernel MVP（apps/genesis + migrations 0005/0006）"
-   git push
-   ```
-2. **ローカル起動確認**（ユーザー作業）
-   - `apps/genesis/.env.local` を作成（.env.example参照。shift-cloudと同じ3つのキー）
-   - ルートで `npm install` → `npm run dev:genesis` → http://localhost:3001
-   - Shift Cloudのオーナー/本部アカウント（view_hq権限）でログイン
-3. **Vercelデプロイ**（要承認・ユーザー判断）
-   - Vercelで新規プロジェクト作成 → 同じGitHubリポジトリをimport
-   - Root Directory: `apps/genesis`、環境変数3つ（shift-cloudと同値）
-4. **Webhook接続テスト**: Connectors画面でGitHubのトークン発行 → GitHubリポジトリのWebhooksに `https://（genesisのURL）/api/webhooks/github?token=xxx` を登録
-5. **運用開始**: CEO AI Command Centerで日次レポート生成・AI指示生成を使い始める
+- 本番: https://yozan-genesis.vercel.app（Vercel `yozan-genesis`、Root: apps/genesis、env 3つ設定済み）
+- push済み: commit f245bf6。Supabase migrations 0005/0006適用済み
+
+## 要対応
+
+0. **コーポレートサイト統合**: main復旧済み（2026-07-04）。Genspark製サイトを `apps/corporate` に統合済み → commit & push後、Vercel新プロジェクト（Root: apps/corporate）作成、yozan-inc.jpドメイン設定
+1. **ログイン動作確認**（ユーザー）: オーナー/本部アカウント（view_hq権限）で https://yozan-genesis.vercel.app にログイン → Cockpit表示確認
+2. **未コミットのdocs変更をcommit & push**（CHANGELOG / NEXT_TASKS / DECISIONS / package.json）
+3. **Webhook接続テスト**: Connectors画面でGitHubのトークン発行 → GitHubリポジトリのWebhooksに `https://yozan-genesis.vercel.app/api/webhooks/github?token=xxx` を登録
+4. **運用開始**: CEO AI Command Centerで日次レポート生成・AI指示生成を使い始める
+5. （任意）Vercelの Function Region を東京(hnd1)に変更 — 現在iad1でSupabase東京との往復が遅め。Settings → Functions
 
 ## バックログ
 - KPI実データ接続（payroll_items→人件費など）
