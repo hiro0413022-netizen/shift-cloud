@@ -1,25 +1,30 @@
 # NEXT_TASKS
 
-## 稼働開始済み（2026-07-04確認）
+## Genesis Kernel MVP実装完了（2026-07-04）— 次は稼働準備
 
-- 本番URL: https://shift-cloud-shift-cloud.vercel.app （Vercelプロジェクト `shift-cloud-shift-cloud`、最新commit 8cb17a0 がREADY）
-- GitHub: hiro0413022-netizen/shift-cloud（push済み・Vercel連携済み）
-- Supabase: bootstrap済み（auth 7ユーザー / staff 7 / stores 5）
+1. **commit & push**（ユーザーPCで）
+   ```
+   git add -A
+   git commit -m "feat: Genesis Kernel MVP（apps/genesis + migrations 0005/0006）"
+   git push
+   ```
+2. **ローカル起動確認**（ユーザー作業）
+   - `apps/genesis/.env.local` を作成（.env.example参照。shift-cloudと同じ3つのキー）
+   - ルートで `npm install` → `npm run dev:genesis` → http://localhost:3001
+   - Shift Cloudのオーナー/本部アカウント（view_hq権限）でログイン
+3. **Vercelデプロイ**（要承認・ユーザー判断）
+   - Vercelで新規プロジェクト作成 → 同じGitHubリポジトリをimport
+   - Root Directory: `apps/genesis`、環境変数3つ（shift-cloudと同値）
+4. **Webhook接続テスト**: Connectors画面でGitHubのトークン発行 → GitHubリポジトリのWebhooksに `https://（genesisのURL）/api/webhooks/github?token=xxx` を登録
+5. **運用開始**: CEO AI Command Centerで日次レポート生成・AI指示生成を使い始める
 
-## 要対応（優先順）
-
-1. **旧Vercelプロジェクト `shift-cloud` の削除** — 重複・ビルドERROR状態。稼働中は `shift-cloud-shift-cloud` のみ。Chrome拡張接続時にClaudeが代行可（2026-07-04時点は未接続で保留）
-2. **CHANGELOG.md の未コミット変更をcommit & push**（ユーザーPCで）
-3. **実運用フィードバック反映**: 実際に使って見つかったUI/挙動の修正
-
-※ リポジトリはPublicのまま運用と決定（2026-07-04、ユーザー判断）→ DECISIONS #14
-
-## MVP後のバックログ（ROADMAP.md参照）
-- パスワードリセット画面（現在リンクなし）
-- 有給・交通費申請フロー / LINE通知 / 打刻の位置情報検証
-- 給与丸めルール・割増率の本番値確認（DECISIONS #9）
-- GENESIS Kernel Phase 1（company_events等の基盤）着手判断
+## バックログ
+- KPI実データ接続（payroll_items→人件費など）
+- AIエージェント実行の自動記録（n8n/Cowork→ai_execution_logs）
+- Shift Cloudの残項目: パスワードリセット / 有給・交通費申請 / LINE通知 / 給与丸め本番値（DECISIONS #9）
+- 次期モジュール選定（MODULE_TEMPLATE.md参照: inventory / reservation / crm / caddy-dispatch / kallinos-ec / golf-coach-ai）
 
 ## メモ
-- Supabase: yozan-shift-cloud (qrgpblnnhdudigarrtuz, 東京)
-- Vercel team: hironobu-s-projects (team_fHq85i7oGBV5Al2v3WCefrmm)
+- Supabase: yozan-shift-cloud (qrgpblnnhdudigarrtuz, 東京) — genesisも同一DB（DECISIONS #16）
+- Shift Cloud本番: https://shift-cloud-shift-cloud.vercel.app
+- Genesis入口条件: staff + view_hq権限ロール（DECISIONS #18）

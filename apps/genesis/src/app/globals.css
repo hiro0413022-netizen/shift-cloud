@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  /* Genesis Cockpit palette（DESIGN_SYSTEM: 黒・濃紺・グレー基調＋ブルー/シアン/パープル/ゴールド） */
+  --color-bg: #07090f;
+  --color-panel: #0d1119;
+  --color-panel-2: #121826;
+  --color-line: #1e2637;
+  --color-txt: #e2e8f0;
+  --color-dim: #7c8aa5;
+  --color-accent: #38bdf8;
+  --color-accent-2: #818cf8;
+  --color-gold: #d4af37;
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  @apply bg-[--color-bg] text-[--color-txt] antialiased;
+}
+
+/* 状態モーション（意味のある動きのみ） */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 6px 0 rgba(56, 189, 248, 0.35); }
+  50% { box-shadow: 0 0 18px 2px rgba(56, 189, 248, 0.55); }
+}
+@keyframes pulse-danger {
+  0%, 100% { box-shadow: 0 0 6px 0 rgba(248, 113, 113, 0.4); }
+  50% { box-shadow: 0 0 20px 3px rgba(248, 113, 113, 0.65); }
+}
+@keyframes flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.node-processing { animation: pulse-glow 2.4s ease-in-out infinite; }
+.node-danger { animation: pulse-danger 1.6s ease-in-out infinite; }
+.ai-flow {
+  background: linear-gradient(90deg, #0d1119, #16324a, #0d1119);
+  background-size: 200% 100%;
+  animation: flow 3s linear infinite;
+}

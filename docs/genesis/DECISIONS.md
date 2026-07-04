@@ -16,3 +16,7 @@
 - #12 (2026-07-02) キオスクは端末トークン（sha256ハッシュ保存）認証。URLは発行時のみ表示
 - #13 (2026-07-02) シフトはスタッフ主導: 提出→自動ドラフト（主店舗）→管理者確認で確定。人員不足時は「出勤募集」（応募→採用で確定・人数充足で自動クローズ）— ユーザー要望による運用転換
 - #14 (2026-07-04) GitHubリポジトリ shift-cloud はPublicのまま運用 — ユーザー決定。シークレットは.env管理でリポジトリに含めないことを厳守
+- #15 (2026-07-04) Genesis Kernelは `apps/genesis`（モノレポ内2つ目のNext.jsアプリ）として実装。#10のpackages化は保留 — 稼働中shift-cloudのリファクタリスク回避とクレジット節約。共通化はGenesis安定後に実施
+- #16 (2026-07-04) Kernelテーブルは同一Supabaseプロジェクト(qrgpblnnhdudigarrtuz)に追加（migration 0004、追加のみ・既存テーブル変更なし）。audit_logs / approval_requests / notifications / ai_suggestions / integration_configs は既存を再利用
+- #17 (2026-07-04) Kernelテーブルも既存標準準拠: company_id + RLSテナント分離（app.current_company_id()）、書き込みはservice_role+requireActor、論理削除、updated_atトリガー
+- #18 (2026-07-04) Genesis UIのアクセスは `view_hq` 権限保持者のみ（本部/オーナー向けコックピット）。Webhook受信はconnectorごとのトークン（sha256ハッシュ保存、#12と同方式）
