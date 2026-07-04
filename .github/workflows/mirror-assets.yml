@@ -11,14 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Mirror KALLINOS site
+      - name: Mirror KALLINOS site (explicit pages)
         run: |
-          mkdir -p work/kallinos
+          mkdir -p work/kallinos/css work/kallinos/js
           cd work/kallinos
-          wget --recursive --level=3 --no-parent --page-requisites --adjust-extension \
-               --no-host-directories --restrict-file-names=nocontrol -e robots=off \
-               --timeout=20 --tries=2 https://www.kallinos.jp/ || true
-          echo "--- mirrored files:" && find . -type f | head -50
+          for p in index.html products.html brand.html size-guide.html faq.html contact.html auth.html cart.html legal.html; do
+            curl -sL --max-time 30 -o "$p" "https://www.kallinos.jp/$p" && echo "OK $p"
+          done
+          curl -sL -o css/style.css https://www.kallinos.jp/css/style.css
+          curl -sL -o js/components.js https://www.kallinos.jp/js/components.js
+          curl -sL -o js/main.js https://www.kallinos.jp/js/main.js
+          ls -la
       - name: Download corporate images
         run: |
           mkdir -p work/corporate-images

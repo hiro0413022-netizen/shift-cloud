@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collection | KALLINOS</title>
+  <meta name="description" content="KALLINOSの全コレクション。モックネック、ポロシャツ、パンツ、アウター、キャップなどラグジュアリーゴルフウェアを展開。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .products-page-header {
+      padding: calc(var(--header-height) + 2rem) 0 2rem;
+      background: var(--color-beige);
+    }
+
+    .products-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: var(--spacing-lg);
+      padding: var(--spacing-md) 0 var(--spacing-xl);
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .products-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: sticky;
+      top: calc(var(--header-height) + 1rem);
+    }
+
+    @media (max-width: 1024px) {
+      .sidebar {
+        position: static;
+        display: none;
+      }
+      .sidebar.sidebar-open {
+        display: block;
+        position: fixed;
+        inset: 0;
+        top: var(--header-height);
+        background: var(--color-white);
+        z-index: 800;
+        padding: 1.5rem;
+        overflow-y: auto;
+      }
+    }
+
+    .sidebar-section {
+      margin-bottom: 2rem;
+    }
+
+    .sidebar-title {
+      font-family: var(--font-secondary);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--color-grey-3);
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: var(--border-thin);
+    }
+
+    .filter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .filter-item {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      cursor: pointer;
+      padding: 0.3rem 0;
+    }
+
+    .filter-checkbox {
+      width: 16px;
+      height: 16px;
+      border: var(--border-thin);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: var(--transition-fast);
+    }
+
+    .filter-checkbox.checked {
+      background: var(--color-black);
+      border-color: var(--color-black);
+    }
+
+    .filter-checkbox.checked::after {
+      content: '\f00c';
+      font-family: 'Font Awesome 6 Free';
+      font-weight: 900;
+      color: white;
+      font-size: 0.6rem;
+    }
+
+    .filter-label {
+      font-size: 0.85rem;
+      color: var(--color-grey-2);
+      flex: 1;
+    }
+
+    .filter-count {
+      font-size: 0.72rem;
+      color: var(--color-grey-4);
+    }
+
+    .price-range {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .price-input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: var(--border-thin);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    .price-sep {
+      color: var(--color-grey-4);
+      font-size: 0.8rem;
+    }
+
+    /* Toolbar */
+    .products-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 1.5rem;
+      border-bottom: var(--border-thin);
+      margin-bottom: 1.5rem;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .products-count {
+      font-size: 0.82rem;
+      color: var(--color-grey-3);
+      letter-spacing: 0.05em;
+    }
+
+    .toolbar-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .sort-select {
+      padding: 0.5rem 1rem;
+      border: var(--border-thin);
+      font-family: var(--font-secondary);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: var(--color-grey-2);
+      cursor: pointer;
+      appearance: none;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b6b6b'/%3E%3C/svg%3E") no-repeat right 0.75rem center;
+      padding-right: 2rem;
+    }
+
+    .view-toggle {
+      display: flex;
+      gap: 0.25rem;
+    }
+
+    .view-btn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: var(--border-thin);
+      color: var(--color-grey-4);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      font-size: 0.85rem;
+    }
+
+    .view-btn.active {
+      background: var(--color-black);
+      border-color: var(--color-black);
+      color: var(--color-white);
+    }
+
+    .filter-toggle-btn {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border: var(--border-thin);
+      font-family: var(--font-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1024px) {
+      .filter-toggle-btn { display: flex; }
+    }
+
+    /* Grid modes */
+    .products-grid.grid-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .products-grid.grid-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    @media (max-width: 768px) {
+      .products-grid.grid-3 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    /* Active filters */
+    .active-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding-bottom: 1rem;
+    }
+
+    .active-filter-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.75rem;
+      background: var(--color-grey-6);
+      font-family: var(--font-secondary);
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .active-filter-tag:hover {
+      background: var(--color-grey-5);
+    }
+
+    .active-filter-tag i {
+      font-size: 0.6rem;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: var(--spacing-lg) 0;
+    }
+
+    .page-btn {
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: var(--border-thin);
+      font-family: var(--font-secondary);
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-fast);
+      color: var(--color-grey-3);
+    }
+
+    .page-btn:hover,
+    .page-btn.active {
+      background: var(--color-black);
+      border-color: var(--color-black);
+      color: var(--color-white);
+    }
+
+    .no-products {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 5rem 1rem;
+      color: var(--color-grey-4);
+    }
+
+    .no-products i {
+      font-size: 3rem;
+      display: block;
+      margin-bottom: 1rem;
+    }
+
+    .no-products p {
+      font-size: 0.9rem;
+      line-height: 1.8;
+    }
+
+    /* Mobile sidebar overlay bg */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 799;
+    }
+
+    .sidebar-backdrop.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="header-mount"></div>
+
+  <main>
+    <!-- Page Header -->
+    <section class="products-page-header">
+      <div class="container">
+        <nav class="breadcrumb" aria-label="パンくずリスト">
+          <span class="breadcrumb-item"><a href="index.html">Home</a></span>
+          <span class="breadcrumb-sep"><i class="fas fa-chevron-right"></i></span>
+          <span class="breadcrumb-item active" id="breadcrumbCurrent">Collection</span>
+        </nav>
+        <div style="padding:1rem 0 0.5rem">
+          <span class="page-header-label">KALLINOS</span>
+          <h1 class="page-header-title" id="pageTitle">Collection</h1>
+          <p class="page-header-desc">ゴルフ場でも、街でも。静かに品格を纏う一着を。</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="products-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar" aria-label="フィルター">
+          <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+          <!-- Category -->
+          <div class="sidebar-section">
+            <div class="sidebar-title">Category</div>
+            <div class="filter-list" id="categoryFilters">
+              <label class="filter-item" data-cat="">
+                <div class="filter-checkbox checked" id="cat-all"></div>
+                <span class="filter-label">すべて</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Price Range -->
+          <div class="sidebar-section">
+            <div class="sidebar-title">Price Range</div>
+            <div class="price-range">
+              <input type="number" class="price-input" id="priceMin" placeholder="¥0" min="0">
+              <span class="price-sep">〜</span>
+              <input type="number" class="price-input" id="priceMax" placeholder="上限なし" min="0">
+            </div>
+            <button class="btn btn-secondary btn-sm btn-full" style="margin-top:0.75rem" id="applyPrice">適用</button>
+          </div>
+
+          <!-- Sort (sidebar for desktop) -->
+          <div class="sidebar-section">
+            <div class="sidebar-title">Sort</div>
+            <div class="filter-list">
+              <label class="filter-item" data-sort="new">
+                <div class="filter-checkbox checked" id="sort-new"></div>
+                <span class="filter-label">新着順</span>
+              </label>
+              <label class="filter-item" data-sort="price_asc">
+                <div class="filter-checkbox" id="sort-price_asc"></div>
+                <span class="filter-label">価格：低い順</span>
+              </label>
+              <label class="filter-item" data-sort="price_desc">
+                <div class="filter-checkbox" id="sort-price_desc"></div>
+                <span class="filter-label">価格：高い順</span>
+              </label>
+              <label class="filter-item" data-sort="popular">
+                <div class="filter-checkbox" id="sort-popular"></div>
+                <span class="filter-label">人気順</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Stock -->
+          <div class="sidebar-section">
+            <div class="sidebar-title">Availability</div>
+            <label class="filter-item" style="cursor:pointer">
+              <input type="checkbox" id="inStockOnly" style="display:none">
+              <div class="filter-checkbox" id="stockCheck"></div>
+              <span class="filter-label">在庫あり</span>
+            </label>
+          </div>
+
+          <button class="btn btn-primary btn-full" id="resetFilter">フィルターをリセット</button>
+        </aside>
+
+        <!-- Products Area -->
+        <div>
+          <!-- Toolbar -->
+          <div class="products-toolbar">
+            <div style="display:flex; align-items:center; gap:1rem">
+              <button class="filter-toggle-btn" id="filterToggle">
+                <i class="fas fa-sliders-h"></i> フィルター
+              </button>
+              <span class="products-count" id="productsCount">読み込み中...</span>
+            </div>
+            <div class="toolbar-controls">
+              <select class="sort-select" id="sortSelect" aria-label="並び替え">
+                <option value="new">新着順</option>
+                <option value="price_asc">価格：低い順</option>
+                <option value="price_desc">価格：高い順</option>
+                <option value="popular">人気順</option>
+              </select>
+              <div class="view-toggle">
+                <button class="view-btn active" id="viewGrid" title="グリッド表示" aria-label="グリッド表示">
+                  <i class="fas fa-th-large"></i>
+                </button>
+                <button class="view-btn" id="viewList" title="リスト表示" aria-label="リスト表示">
+                  <i class="fas fa-th"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Filters -->
+          <div class="active-filters" id="activeFilters"></div>
+
+          <!-- Products Grid -->
+          <div class="products-grid" id="productsGrid">
+            <div class="skeleton" style="height:380px"></div>
+            <div class="skeleton" style="height:380px"></div>
+            <div class="skeleton" style="height:380px"></div>
+            <div class="skeleton" style="height:380px"></div>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination" id="pagination"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <section class="newsletter-section">
+    <div class="container">
+      <span class="newsletter-label">Newsletter</span>
+      <h2 class="newsletter-title">新作・セール情報をお届け</h2>
+      <p class="newsletter-desc">メールマガジンに登録して、KALLINOSの最新情報をいち早く受け取ってください。</p>
+      <form class="newsletter-form" novalidate>
+        <input type="email" class="newsletter-input" placeholder="メールアドレス" required>
+        <button type="submit" class="newsletter-btn">登録する</button>
+      </form>
+    </div>
+  </section>
+
+  <div id="footer-mount"></div>
+  <div class="sidebar-backdrop" id="sidebarBackdrop2"></div>
+
+  <script src="js/components.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      injectComponents('products.html');
+      initProductsPage();
+    });
+
+    const ITEMS_PER_PAGE = 12;
+    let allProducts  = [];
+    let filtered     = [];
+    let currentPage  = 1;
+    let currentCat   = '';
+    let currentSort  = 'new';
+    let priceMin     = 0;
+    let priceMax     = Infinity;
+    let inStockOnly  = false;
+
+    async function initProductsPage() {
+      // URLパラメータ
+      const params = new URLSearchParams(location.search);
+      currentCat = params.get('category') || '';
+
+      if (currentCat) {
+        document.getElementById('pageTitle').textContent = currentCat;
+        document.getElementById('breadcrumbCurrent').textContent = currentCat;
+      }
+
+      try {
+        const data = await API.getProducts({ limit: 100 });
+        allProducts = (data.data || []).filter(p => p.is_published !== false);
+        buildCategoryFilters();
+        applyFilters();
+      } catch(e) {
+        document.getElementById('productsGrid').innerHTML = `
+          <div class="no-products"><i class="fas fa-exclamation-circle"></i><p>商品の読み込みに失敗しました</p></div>
+        `;
+      }
+
+      initControls();
+    }
+
+    function buildCategoryFilters() {
+      const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))];
+      const container  = document.getElementById('categoryFilters');
+      const counts     = {};
+      allProducts.forEach(p => { counts[p.category] = (counts[p.category] || 0) + 1; });
+
+      container.innerHTML = `
+        <label class="filter-item" data-cat="">
+          <div class="filter-checkbox ${!currentCat ? 'checked' : ''}" data-cb="cat-all"></div>
+          <span class="filter-label">すべて</span>
+          <span class="filter-count">${allProducts.length}</span>
+        </label>
+        ${categories.map(cat => `
+          <label class="filter-item" data-cat="${cat}">
+            <div class="filter-checkbox ${currentCat === cat ? 'checked' : ''}" data-cb="cat-${cat}"></div>
+            <span class="filter-label">${cat}</span>
+            <span class="filter-count">${counts[cat] || 0}</span>
+          </label>
+        `).join('')}
+      `;
+
+      container.querySelectorAll('.filter-item').forEach(item => {
+        item.addEventListener('click', () => {
+          currentCat = item.dataset.cat;
+          currentPage = 1;
+          container.querySelectorAll('.filter-checkbox').forEach(cb => cb.classList.remove('checked'));
+          item.querySelector('.filter-checkbox').classList.add('checked');
+          applyFilters();
+          updateActiveFilters();
+          closeSidebar();
+        });
+      });
+    }
+
+    function applyFilters() {
+      filtered = allProducts.filter(p => {
+        if (currentCat && p.category !== currentCat) return false;
+        if (p.price < priceMin) return false;
+        if (priceMax !== Infinity && p.price > priceMax) return false;
+        if (inStockOnly && (!p.stock || p.stock <= 0)) return false;
+        return true;
+      });
+
+      // Sort
+      if (currentSort === 'price_asc')  filtered.sort((a,b) => a.price - b.price);
+      if (currentSort === 'price_desc') filtered.sort((a,b) => b.price - a.price);
+      if (currentSort === 'popular')    filtered.sort((a,b) => (b.is_popular ? 1:0) - (a.is_popular ? 1:0));
+      if (currentSort === 'new')        filtered.sort((a,b) => (b.created_at||0) - (a.created_at||0));
+
+      renderPage();
+    }
+
+    function renderPage() {
+      const start   = (currentPage - 1) * ITEMS_PER_PAGE;
+      const pageItems = filtered.slice(start, start + ITEMS_PER_PAGE);
+      const grid = document.getElementById('productsGrid');
+
+      document.getElementById('productsCount').textContent = `${filtered.length} 件`;
+
+      if (!pageItems.length) {
+        grid.innerHTML = `<div class="no-products">
+          <i class="fas fa-search"></i>
+          <p>条件に一致する商品が見つかりませんでした。<br>フィルターを変更してお試しください。</p>
+          <button class="btn btn-secondary" style="margin-top:1.5rem" onclick="resetFilters()">フィルターをリセット</button>
+        </div>`;
+        document.getElementById('pagination').innerHTML = '';
+        return;
+      }
+
+      grid.innerHTML = pageItems.map(buildProductCard).join('');
+
+      // Animate
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+      }, { threshold: 0.05 });
+      grid.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+      // Pagination
+      renderPagination(filtered.length);
+    }
+
+    function renderPagination(total) {
+      const pages = Math.ceil(total / ITEMS_PER_PAGE);
+      if (pages <= 1) { document.getElementById('pagination').innerHTML = ''; return; }
+
+      let html = '';
+      if (currentPage > 1) html += `<button class="page-btn" onclick="goPage(${currentPage-1})"><i class="fas fa-chevron-left"></i></button>`;
+      for (let i = 1; i <= pages; i++) {
+        html += `<button class="page-btn ${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+      }
+      if (currentPage < pages) html += `<button class="page-btn" onclick="goPage(${currentPage+1})"><i class="fas fa-chevron-right"></i></button>`;
+      document.getElementById('pagination').innerHTML = html;
+    }
+
+    function goPage(n) {
+      currentPage = n;
+      renderPage();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    window.goPage = goPage;
+
+    function updateActiveFilters() {
+      const container = document.getElementById('activeFilters');
+      const tags = [];
+      if (currentCat) tags.push(`<button class="active-filter-tag" onclick="removeCatFilter()"><i class="fas fa-times"></i>${currentCat}</button>`);
+      if (priceMin > 0 || priceMax !== Infinity) {
+        const label = `¥${priceMin.toLocaleString()}〜${priceMax === Infinity ? '' : '¥'+priceMax.toLocaleString()}`;
+        tags.push(`<button class="active-filter-tag" onclick="removePriceFilter()"><i class="fas fa-times"></i>${label}</button>`);
+      }
+      container.innerHTML = tags.join('');
+    }
+
+    function removeCatFilter() {
+      currentCat = ''; currentPage = 1;
+      document.querySelectorAll('#categoryFilters .filter-checkbox').forEach(cb => cb.classList.remove('checked'));
+      document.querySelector('#categoryFilters [data-cat=""] .filter-checkbox')?.classList.add('checked');
+      applyFilters(); updateActiveFilters();
+    }
+
+    function removePriceFilter() {
+      priceMin = 0; priceMax = Infinity;
+      document.getElementById('priceMin').value = '';
+      document.getElementById('priceMax').value = '';
+      applyFilters(); updateActiveFilters();
+    }
+
+    function resetFilters() {
+      currentCat = ''; currentSort = 'new'; priceMin = 0; priceMax = Infinity; inStockOnly = false; currentPage = 1;
+      document.getElementById('sortSelect').value = 'new';
+      document.getElementById('priceMin').value = '';
+      document.getElementById('priceMax').value = '';
+      document.querySelectorAll('.filter-checkbox').forEach(cb => cb.classList.remove('checked'));
+      document.querySelector('#categoryFilters [data-cat=""] .filter-checkbox')?.classList.add('checked');
+      document.getElementById('stockCheck').classList.remove('checked');
+      applyFilters(); updateActiveFilters();
+    }
+    window.resetFilters = resetFilters;
+
+    function initControls() {
+      // Sort select
+      document.getElementById('sortSelect').addEventListener('change', function() {
+        currentSort = this.value; currentPage = 1; applyFilters();
+      });
+
+      // Price apply
+      document.getElementById('applyPrice').addEventListener('click', () => {
+        priceMin = Number(document.getElementById('priceMin').value) || 0;
+        priceMax = Number(document.getElementById('priceMax').value) || Infinity;
+        if (priceMax === 0) priceMax = Infinity;
+        currentPage = 1; applyFilters(); updateActiveFilters(); closeSidebar();
+      });
+
+      // Stock
+      document.getElementById('stockCheck').addEventListener('click', () => {
+        inStockOnly = !inStockOnly;
+        document.getElementById('stockCheck').classList.toggle('checked', inStockOnly);
+        applyFilters();
+      });
+
+      // Reset
+      document.getElementById('resetFilter').addEventListener('click', resetFilters);
+
+      // View toggle
+      document.getElementById('viewGrid').addEventListener('click', () => {
+        document.getElementById('productsGrid').className = 'products-grid';
+        document.getElementById('viewGrid').classList.add('active');
+        document.getElementById('viewList').classList.remove('active');
+      });
+      document.getElementById('viewList').addEventListener('click', () => {
+        document.getElementById('productsGrid').className = 'products-grid grid-2';
+        document.getElementById('viewList').classList.add('active');
+        document.getElementById('viewGrid').classList.remove('active');
+      });
+
+      // Filter toggle (mobile)
+      document.getElementById('filterToggle').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('sidebar-open');
+        document.getElementById('sidebarBackdrop2').classList.toggle('active');
+      });
+      document.getElementById('sidebarBackdrop2').addEventListener('click', closeSidebar);
+    }
+
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('sidebar-open');
+      document.getElementById('sidebarBackdrop2').classList.remove('active');
+    }
+  </script>
+</body>
+</html>
