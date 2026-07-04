@@ -100,4 +100,5 @@ Genesis統合マッピング:
   - 注意: D1本番は稼働継続中 → P4切替直前に差分再同期（golfwing-import関数は残置、切替後に削除）
 - [x] P3: 実装完了（2026-07-04）— `src/lib/pgdb.ts`（D1互換Postgresアダプタ: ?→$n変換、boolean/julianday/GROUP_CONCAT方言変換、INSERT自動RETURNING id、batch対応）、`api/index.ts`（Vercel Nodeエントリ）、`vercel.json`、auth.tsをSupabase Auth化（メール+パスワード、staffテーブル照合、env varフォールバック付き）、migration 0008でtenant_id互換列追加（既存SQL無修正）。デモログインは/loginへリダイレクト化。tsc --noEmit エラー0確認済み
   - TODO: isAdminは暫定全員true（rolesテーブル連携は後続）。バックアップ復元機能のINSERT OR REPLACEはON CONFLICT非対応（既知の制限）
-- [ ] P4: Vercelプロジェクト`golfwing-order`作成（Root: apps/golfwing、Framework: Other、env 6つ）→ 動作検証 → D1差分再同期 → 切替。env: GW_DATABASE_URL / SUPABASE_URL / SUPABASE_ANON_KEY / AUTH_SECRET / AUTH_USERNAME / AUTH_PASSWORD
+- [x] P4前半: Vercel `shift-cloud-golfwing` 本番稼働・全ページ検証合格（2026-07-04）。URL: https://shift-cloud-golfwing.vercel.app。今日やること/発注一覧31件/残注3件/商品マスタ1,734件すべて実データ表示確認。ログイン=Supabase Auth or フォールバック(admin)。トラブルシュート履歴: Vercelビルダーの.tsx/ESM非対応→esbuild単一バンドル(api/handler.mjs)、関数形式→名前付きメソッドexport、トークン区切り衝突→envuser-プレフィックス、DBパスワード不明→リセット(pooler=aws-0-ap-northeast-1:6543)、GROUP BY厳格化→11クエリ修正、日付Date型→文字列固定
+- [ ] P4後半（切替時に実施）: (1) D1差分再同期（golfwing-import関数は残置・要secret） (2) 運用URLの切替周知 or カスタムドメイン設定 (3) 旧Cloudflare Pages `golfwing` 停止 (4) golfwing-import関数削除。※golfwing-dbtest関数は無効化済み(410)
