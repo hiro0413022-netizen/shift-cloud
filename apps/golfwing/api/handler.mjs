@@ -13895,11 +13895,24 @@ function createPgD1(databaseUrl) {
 
 // src/vercel-entry.ts
 var db = null;
-async function handler(req) {
+var handler = async (req) => {
   if (!db) db = createPgD1(process.env.GW_DATABASE_URL || "");
   const env = { ...process.env, DB: db };
   return app3.fetch(req, env);
-}
+};
+var GET = handler;
+var POST = handler;
+var PUT = handler;
+var PATCH = handler;
+var DELETE = handler;
+var OPTIONS = handler;
+var HEAD = handler;
 export {
-  handler as default
+  DELETE,
+  GET,
+  HEAD,
+  OPTIONS,
+  PATCH,
+  POST,
+  PUT
 };
