@@ -13894,9 +13894,26 @@ function createPgD1(databaseUrl) {
 }
 
 // src/vercel-entry.ts
+var PROJECT_REF = "qrgpblnnhdudigarrtuz";
+function normalizeDbUrl(raw2) {
+  try {
+    const u = new URL(raw2);
+    if (u.hostname.endsWith(".pooler.supabase.com") && !u.username.includes(".")) {
+      u.username = `postgres.${PROJECT_REF}`;
+    }
+    if (u.hostname === `db.${PROJECT_REF}.supabase.co`) {
+      u.hostname = "aws-0-ap-northeast-1.pooler.supabase.com";
+      u.port = "6543";
+      u.username = `postgres.${PROJECT_REF}`;
+    }
+    return u.toString();
+  } catch {
+    return raw2;
+  }
+}
 var db = null;
 var handler = async (req) => {
-  if (!db) db = createPgD1(process.env.GW_DATABASE_URL || "");
+  if (!db) db = createPgD1(normalizeDbUrl(process.env.GW_DATABASE_URL || ""));
   const env = { ...process.env, DB: db };
   return app3.fetch(req, env);
 };
