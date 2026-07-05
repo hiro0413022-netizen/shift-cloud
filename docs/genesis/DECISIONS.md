@@ -24,4 +24,7 @@
 - #20 (2026-07-04) GolfOrderのテナント: 実店舗はGOLF WING宝塚のみ → tenants/usersテーブル廃止、companies/stores/staff+Supabase Authに統合。デモテナントは移行後廃止
 - #21 (2026-07-06) 財務管理は自作financeモジュール（fin_segments/fin_categories/fin_entries、事業別月次PL）。データは税理士資料の手入力＋CSV取込を正とし、会計ソフトAPI連携・資金繰り予測・予実管理は後続フェーズ
 - #22 (2026-07-06) 会員・体験予約・入会/退会KPIはGOLF WINGの会員管理「Smart Hello」（システムディ、公開API無し）からCSV手動エクスポート→Genesis取込で接続（#21の財務と同型）。API連携は提供され次第切替
-- #25 (2026-07-06) CEO AIの頭脳はアプリ内蔵のClaude API呼び出し（ANTHROPIC_API_KEY設定時、モデルはCEO_AI_MODELで変更可・既定claude-haiku-4-5）。キー未設定/失敗時はルールベースに自動フォールバックし日次レポートは必ず生成。毎朝6時(JST)にVercel Cronで自動実行（/api/cron/daily、CRON_SECRET認証）。指示案はprompts下書きとして保存し実行はしない（VISION §7）。※#23/#24はmember-os方針転換用に別セッションで採番済み
+- #23 (2026-07-06) 体験予約受付はGenesisに自作（member-osモジュール、migration 0011: mbr_guests/mbr_trial_bookings/mbr_intake_tokens）。紙+Excel運用を廃止し、スタッフWeb入力（/members）＋お客様タブレット自己入力（公開ルート /intake/[token]、トークン#12方式）＋電子サインで受付。体験予約数・入会率は refresh_member_kpis で自動集計（0010の手動更新を置換）。設計: docs/modules/member-os/TRIAL_INTAKE.md
+- #24 (2026-07-06) 予約システムの棲み分け: 当面GOLF WING(宝塚)の予約はSmart Hello継続。姫路FRUNK GOLFはGenesis自作の予約システムを新規導入 → member-osは体験受付から予約・会員名簿へ拡張する前提でマルチストア設計（company_id/store_id分離）。会員名簿本体も将来Genesisへ移管
+- #25 (2026-07-06) CEO AIの頭脳はアプリ内蔵のClaude API呼び出し（ANTHROPIC_API_KEY設定時、モデルはCEO_AI_MODELで変更可・既定claude-haiku-4-5）。キー未設定/失敗時はルールベースに自動フォールバックし日次レポートは必ず生成。毎朝6時(JST)にVercel Cronで自動実行（/api/cron/daily、CRON_SECRET認証）。指示案はprompts下書きとして保存し実行はしない（VISION §7）
+- #26 (2026-07-06) システム台帳（Vault）はGenesis内ページ `/vault` ＋ `vault_systems` テーブルで一元管理。RLSポリシーを作らずservice_role専用（給与系と同等保護、#3の例外扱い）。アクセスは view_hq ログイン＋Vaultパスワードの二重ゲート（sha256照合、`VAULT_PASSWORD` envで変更可・平文はコードに置かない）。秘密情報はDBのみに保存しPublicリポジトリ（#14）には一切書かない。新システムはページ上のフォーム or AI経由でDB行追加＝ページは常に自動反映
