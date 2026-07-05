@@ -19,7 +19,7 @@ export default async function FuturePage() {
   const timeline = [
     { label: "今日", items: ["Shift Cloud 4店舗運用", `Genesis Kernel ${genesis?.progress ?? 0}%`] },
     { label: "今週", items: ["Genesis Cockpit稼働開始", "実運用フィードバック収集"] },
-    { label: "今月", items: ["Webhook連携（GitHub/Vercel）有効化", "KPI実データ接続の設計"] },
+    { label: "今月", items: ["Webhook連携（GitHub/Vercel）有効化", "売上・会員KPIの実データ接続（会計/POS・CRM）"] },
     { label: "3ヶ月後", items: ["在庫 or 予約モジュール着手", "AIエージェント実行の自動記録"] },
     { label: "半年後", items: ["多店舗展開対応の検証", "KALLINOS EC管理の設計"] },
     { label: "1年後", items: ["Module Generatorによる新規モジュール量産", "未来シミュレーションの実データ化"] },
@@ -30,7 +30,7 @@ export default async function FuturePage() {
       <header>
         <h1 className="text-xl font-bold">Future Simulation</h1>
         <p className="text-sm text-[--color-dim]">
-          KPIと未来予測タイムライン（現在はダミー予測 — 実データ接続後に自動算出へ）
+          KPIと未来予測タイムライン（労務系KPIはShift Cloud実データ、売上・会員は接続待ち）
         </p>
       </header>
 

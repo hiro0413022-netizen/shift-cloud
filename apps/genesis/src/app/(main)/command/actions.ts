@@ -93,15 +93,51 @@ export async function generatePrompt(formData: FormData) {
   revalidatePath("/command");
 }
 
-/** 日次レポート生成（DB横断集計 → reports保存 → Company Event記録） */
+/** KPI実データ更新（Shift Cloud → kpis 再集計、migration 0008） */
+export async function refreshKpis() {
+  const actor = await requireGenesisActor();
+  const admin = createAdmin();
+  const { error } = await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: actor.companyId });
+  await logAudit(actor, "kpi.refresh", "kpis", null, null, { error: error?.message ?? null });
+  if (!error) {
+    await logEvent(actor.companyId, {
+      event_type: "kpi.refreshed",
+      title: "KPIをShift Cloud実データから再集計",
+      source: "genesis",
+      source_type: "system",
+    });
+  }
+  revalidatePath("/command");
+  revalidatePath("/future");
+  revalidatePath("/");
+}
+
+function fmtKpiValue(v: unknown, unit: unknown): string {
+  if (v == null) return "未接続";
+  const n = Number(v);
+  return `${Number.isInteger(n) ? n.toLocaleString("ja-JP") : n}${String(unit ?? "")}`;
+}
+
+/** 日次レポート生成（KPI再集計 → DB横断集計 → reports保存 → Company Event記録） */
 export async function generateDailyReport() {
   const actor = await requireGenesisActor();
   const admin = createAdmin();
+  await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: actor.companyId });
   const d = await getCockpitData(actor.companyId);
 
   const today = new Date().toLocaleDateString("ja-JP");
   const lines = [
     `# YOZAN GENESIS 日次レポート（${today}）`,
+    "",
+    "## KPI（Shift Cloud実データ）",
+    ...(d.kpis.length === 0
+      ? ["- KPI未登録"]
+      : d.kpis.map(
+          (k) =>
+            `- ${k.name}: ${fmtKpiValue(k.current_value, k.unit)}${
+              k.target_value != null ? `（目標 ${fmtKpiValue(k.target_value, k.unit)}）` : ""
+            }`
+        )),
     "",
     "## 開発状況",
     ...d.devStatuses.map(

@@ -1,15 +1,21 @@
 # NEXT_TASKS
 
-## GENESIS本番稼働開始（2026-07-04）
+## GENESIS実運用フェーズ（2026-07-05〜）
 
-- 本番: https://yozan-genesis.vercel.app（Vercel `yozan-genesis`、Root: apps/genesis、env 3つ設定済み）
-- push済み: commit f245bf6。Supabase migrations 0005/0006適用済み
+- 本番: https://yozan-genesis.vercel.app（Vercel `yozan-genesis`、Root: apps/genesis）
+- KPI実データ接続済み（労務系）: 在籍スタッフ数 / 総労働時間 / 人件費（migration 0008、`refresh_shift_cloud_kpis()`）
+- 日次レポート生成時にKPI自動再集計。手動は Command Center「KPI更新」ボタン
 
 ## 要対応
 
-0. **Web移行完了（2026-07-04）**: yozan-inc.jp=Vercel`yozan-corporate`（モーション版・画像ローカル化済み）、www.kallinos.jp=Vercel`kallinos`（静的ミラー）、apps/golfwing=ソース回収済み（本番は当面Cloudflare Pages `golfwing`継続）
-0-a. **掃除（ユーザー作業）**: Cloudflareダッシュボードで旧Pagesのカスタムドメイン解除 — `yozan-group`から yozan-inc.jp/www.yozan-inc.jp、`kallinos`から www.kallinos.jp。※`golfwing`プロジェクトは本番稼働中なので触らない
-0-b. **セキュリティ**: チャット共有されたCloudflare APIトークンを再発行、R2キーは失効（R2未有効化）
-0-c. **GolfOrder移行**: P1〜P4前半完了。新本番: https://shift-cloud-golfwing.vercel.app（検証合格）。残り=切替儀式: D1差分同期→運用切替宣言→旧Pages `golfwing` 停止→import関数削除（設計書§11）。旧D1版は当面併存OK（ただし新規入力は新版に統一すること）
-1. **ログイン動作確認**（ユーザー）: オーナー/本部アカウント（view_hq権限）で https://yozan-genesis.vercel.app にログイン → Cockpit表示確認
-2. **未コミットのdocs変更を
+1. **Genesis実運用の習慣化**（ユーザー）: 毎日 Command Center で「日次レポート生成」を実行。AI指示が必要な作業はプロンプト生成を使う
+2. **デプロイ**（ユーザー）: 本コミットをユーザーPCからpush → Vercel自動デプロイ → KPI表示確認（Cockpit / Future Simulation）
+3. **売上・会員KPIの実データ接続**: 会計/POS・CRM連携後（monthly_sales / members は未接続のまま）
+4. **Shift Cloud実運用フィードバックの収集と反映**: 現場の声を集めて改善バックログ化
+5. **GolfOrder切替儀式**: D1差分同期 → 運用切替宣言 → 旧Pages `golfwing` 停止 → import関数削除（設計書§11）。新規入力は新版（https://shift-cloud-golfwing.vercel.app）に統一
+6. **掃除（ユーザー作業）**: Cloudflareで旧Pagesのカスタムドメイン解除 — `yozan-group`から yozan-inc.jp/www.yozan-inc.jp、`kallinos`から www.kallinos.jp。※`golfwing`は本番稼働中なので触らない
+7. **セキュリティ**: チャット共有されたCloudflare APIトークンを再発行、R2キーは失効（R2未有効化）
+
+## メモ
+
+- 前回セッション中断でgit index等が破損 → 2026-07-05に修復済み。異常があればまずgit fsck

@@ -2,7 +2,7 @@ import { requireGenesisActor } from "@/lib/auth";
 import { getCockpitData } from "@/lib/kernel";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, StatusDot, Empty, Field, inputCls, btnCls, severityTone, fmtDate } from "@/components/ui";
-import { generatePrompt, generateDailyReport } from "./actions";
+import { generatePrompt, generateDailyReport, refreshKpis } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,9 +26,14 @@ export default async function CommandPage() {
           <h1 className="text-xl font-bold">CEO AI Command Center</h1>
           <p className="text-sm text-[--color-dim]">「今どうなってる？」に答える管制塔</p>
         </div>
-        <form action={generateDailyReport}>
-          <button className={btnCls}>日次レポート生成</button>
-        </form>
+        <div className="flex items-center gap-2">
+          <form action={refreshKpis}>
+            <button className={btnCls}>KPI更新</button>
+          </form>
+          <form action={generateDailyReport}>
+            <button className={btnCls}>日次レポート生成</button>
+          </form>
+        </div>
       </header>
 
       {/* サマリ行 */}
