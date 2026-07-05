@@ -232,13 +232,13 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                       {e.memo != null && <span className="ml-2 text-xs text-[--color-dim]">{String(e.memo)}</span>}
                       {String(e.source) !== "manual" && <Badge tone="gold">{String(e.source)}</Badge>}
                     </span>
-                    <span className="flex shrink-0 items-center gap-3 tabular-nums">
-                      {yen(Number(e.amount))}円
+                    <div className="flex shrink-0 items-center gap-3 tabular-nums">
+                      <span>{yen(Number(e.amount))}円</span>
                       <form action={deleteEntry}>
                         <input type="hidden" name="id" value={String(e.id)} />
                         <button className="text-xs text-[--color-dim] hover:text-red-300">削除</button>
                       </form>
-                    </span>
+                    </div>
                   </li>
                 );
               })}

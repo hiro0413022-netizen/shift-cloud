@@ -1,6 +1,12 @@
 # CHANGELOG
 
 ## 2026-07-06
+- fix(genesis): /finance明細行の不正なHTML入れ子（span内form）を修正 — hydrationクラッシュ（Application error: client-side exception）の原因
+- feat(genesis): Vault（システム台帳）新設 `/vault`（DECISIONS #26） — 全関連システムのURL・ログインID・パスワードを一元管理。view_hqログイン＋Vaultパスワードの二重ゲート（sha256照合・8時間cookie、`VAULT_PASSWORD` envで変更可）、パスワード目隠し表示＋ワンクリックコピー、カテゴリ別グルーピング、追加/編集/論理削除フォーム、監査ログ（vault.unlock/create/update/delete）。サイドバーに「Vault」追加
+- db: `0013_vault.sql` **適用済**（MCP経由） — vault_systems（RLS有効・ポリシーなし=service_role専用）。初期データ8件投入済み（Genesis本番/Shift Cloud本番/Supabase/Vercel/GitHub/お名前レンタルサーバー/お名前Navi/Gmail。URLとIDのみ、パスワードはユーザーがページから入力）
+- feat(genesis): 体験受付システム（member-os / DECISIONS #23,#24）を新設 — 紙+Excel運用を廃止。スタッフ画面 `/members`（体験予約の登録・当日一覧・来店/キャンセル/無断欠のステータス更新・入会可否/見送り理由・タブレット受付URL発行）＋お客様タブレット自己入力の公開ルート `/intake/[token]`（個人情報＋アンケート＋同意＋指サイン、トークン#12方式・service_role経由）。体験予約数・入会率は自動集計。サイドバーに「体験受付」追加、middlewareに /intake を公開許可
+- db: `0011_member_trial.sql` **適用済（2026-07-06、本番qrgpblnnhdudigarrtuz、スモークテスト検証済）** — mbr_guests / mbr_trial_bookings / mbr_intake_tokens（RLS＋トリガー標準準拠）＋ `refresh_member_kpis()`（体験予約数=当月非キャンセル件数、入会率=入会÷来店）。0010の手動KPIを自動化。Command Centerの日次更新は既に refresh_member_kpis を耐性呼び出し済のため0011適用で自動有効化
+- docs: member-os 設計（docs/modules/member-os/TRIAL_INTAKE.md）＋ Smart Hello実サンプル分析（SMART_HELLO_IMPORT.md）。VISION.md/DECISIONS #22-#24/NEXT_TASKS 更新
 - feat(genesis): CEO AIに頭脳を接続（VISION §1/§3/§8） — lib/ceo-ai.ts新設。Claude APIで実データ（KPI/リスク/ブロッカー/イベント/開発状況）を分析し「今何が起きているか」「何をすれば売上が上がるか」「誰に何を指示すべきか」を生成。指示案はAI社員宛てプロンプト下書きとして自動保存＋対象AIをworking状態に。実行ログをai_execution_logsに記録。APIキー未設定時はルールベースに自動フォールバック
 - feat(genesis): 毎朝6時(JST)の自動報告 — Vercel Cron（vercel.json + /api/cron/daily、CRON_SECRET認証）。ボタンを押さなくてもCEO AIの朝報告がCommand Centerに届く
 - db: `0012_agent_duties.sql` 適用 — AI社員19体すべてに「見る・判断・実行」を定義（VISION §4「並べるだけにしない」）。Agentsページに表示。DECISIONS #25
@@ -27,12 +33,4 @@
 - docs: GolfOrder Supabase移行設計書を作成（docs/genesis/GOLFWING_SUPABASE_MIGRATION.md、方式B=DB先行移行を推奨）
 - feat(corporate): 画像11枚をGenspark CDNからapps/corporate/public/imagesへローカル化（GitHub Actions asset-mirror経由）。constants.tsをローカルパスに変更
 - feat: `apps/kallinos` 新規追加 — www.kallinos.jpの静的ミラー（index/products/brand + css/js。残6ページはworkflow再実行で取得予定）
-- feat: `apps/golfwing` 新規追加 — GolfOrder発注管理システムのソースをGensparkから回収（golfwing-srcブランチ経由、Hono+Cloudflare D1、migrations 0001〜0015、docs一式）。デプロイは当面Cloudflare Pages継続、将来Supabase/inventoryモジュールへ移行予定
-- feat(corporate): モーションデザイン強化 — スクロール進捗バー、data-reveal汎用リビール（方向/ディレイ対応）、ヒーローKen Burns＋ゴールドグラデ文字、マーキー帯、CountUp統計バンド、モザイク写真キャプション、CTA発光ボーダー、prefers-reduced-motion対応。新規: MotionFx.tsx / CountUp.tsx。トップページにCTAボタン・バッジ・統計セクション追加
-- fix: Gensparkによるmainへのforce push事故（336f880、SaaS履歴上書き）をローカルf245bf6からのforce pushで復旧。本番影響なし（該当デプロイはビルドERRORで旧版稼働継続）
-- feat: `apps/corporate` 新規追加 — Genspark製コーポレートサイト（Next.js 16 + Tailwind v4、/business /marketing /about /vision /recruit /contact）をモノレポに統合。package name: yozan-corporate
-- ops: 旧Vercelプロジェクト`shift-cloud`削除（稼働は`shift-cloud-shift-cloud`のみ）。リポジトリはPublic運用と決定（DECISIONS #14）
-- db: `0005_genesis_kernel.sql`適用 — Genesis Kernel 16テーブル（modules / company_events / business_memories / decision_logs / ai_agents / ai_execution_logs / development_statuses / risks / blockers / kpis / simulations / prompts / reports / connectors / webhook_logs / external_events）＋RLS＋トリガー
-- db: `0006_genesis_seed.sql`適用 — モジュール9件・AIエージェント19体・KPI4件・コネクタ13件・開発状況2件・決定ログ#1〜#18バックフィル・初期イベント/記憶
-- feat: `apps/genesis` 新規作成（Next.js、ポート3001） — Genesis Cockpit（リング型UI・状態モーション）/ CEO AI Command Center（開発状況・リスク・ブロッカー・承認待ち・AI指示プロンプト生成・日次レポート生成）/ Company Events / Business Memory / Decision Log / AI Agents / Approvals / Development Map / Future Simulation / Integration Mesh（Webhookトークン発行）
-- feat: Webhook受信基盤 `POST /api/webhooks/{connector}?token=` — webhook_logs → external_events → company
+- feat: `apps/golfwing` 新規追加 — GolfOrder発注管理システムのソースをGensparkから回収（golfwing-srcブランチ経由、Hono+Cloudflare D1、migrations 0001〜0015、docs一式）。デプロイは当面Cloudflare Pages継続、将来Supabase/inventoryモジュール
