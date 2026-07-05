@@ -1,6 +1,6 @@
 import { requireGenesisActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { Panel, Badge, Empty } from "@/components/ui";
+import { Panel, Badge, Empty, KpiCard } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -27,36 +27,36 @@ export default async function FuturePage() {
 
   return (
     <div className="space-y-4">
-      <header>
+      <header className="reveal">
         <h1 className="text-xl font-bold">Future Simulation</h1>
         <p className="text-sm text-[--color-dim]">
           KPIと未来予測タイムライン（労務系KPIはShift Cloud実データ、売上・会員は接続待ち）
         </p>
       </header>
 
-      {/* KPI */}
+      {/* KPI（カウントアップ＋スパークライン） */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {(kpis ?? []).map((k) => (
-          <div key={k.id} className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-            <p className="text-xs text-[--color-dim]">{k.name}</p>
-            <p className="mt-1 text-2xl font-bold">
-              {k.current_value != null ? `${Number(k.current_value).toLocaleString()}${k.unit}` : "—"}
-            </p>
-            <p className="mt-1 text-xs text-[--color-dim]">
-              {k.target_value != null ? `目標 ${Number(k.target_value).toLocaleString()}${k.unit}` : (k.notes ?? "")}
-            </p>
-          </div>
+          <KpiCard
+            key={String(k.id)}
+            name={String(k.name)}
+            value={k.current_value != null ? Number(k.current_value) : null}
+            unit={String(k.unit ?? "")}
+            trend={k.trend}
+            target={k.target_value != null ? Number(k.target_value) : null}
+            note={k.notes != null ? String(k.notes) : null}
+          />
         ))}
       </div>
 
       {/* タイムライン */}
-      <Panel title="未来タイムライン">
+      <Panel title="未来タイムライン" className="d2">
         <ol className="relative space-y-6 border-l border-[--color-line] pl-6">
           {timeline.map((t, i) => (
-            <li key={t.label} className="relative">
+            <li key={t.label} className="reveal relative" style={{ animationDelay: `${0.1 + i * 0.08}s` }}>
               <span
                 className={`absolute -left-[31px] top-0.5 flex h-2.5 w-2.5 rounded-full ${
-                  i === 0 ? "bg-sky-400" : i < 3 ? "bg-indigo-400" : "bg-zinc-600"
+                  i === 0 ? "bg-sky-400 node-processing" : i < 3 ? "bg-indigo-400" : "bg-zinc-600"
                 }`}
               />
               <p className="text-sm font-semibold text-sky-200">{t.label}</p>
@@ -70,7 +70,7 @@ export default async function FuturePage() {
         </ol>
       </Panel>
 
-      <Panel title="シミュレーション履歴">
+      <Panel title="シミュレーション履歴" className="d3">
         {!sims || sims.length === 0 ? (
           <Empty>まだシミュレーションはありません（実データ接続後に「月会費+1,000円なら？」等に回答予定）</Empty>
         ) : (

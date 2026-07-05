@@ -2,6 +2,7 @@ import { requireGenesisActor } from "@/lib/auth";
 import { getCockpitData } from "@/lib/kernel";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, StatusDot, Empty, Field, inputCls, btnCls, severityTone, fmtDate } from "@/components/ui";
+import { CountUp } from "@/components/count-up";
 import { generatePrompt, generateDailyReport, refreshKpis } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export default async function CommandPage() {
 
   return (
     <div className="space-y-4">
-      <header className="flex items-center justify-between">
+      <header className="reveal flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">CEO AI Command Center</h1>
           <p className="text-sm text-[--color-dim]">「今どうなってる？」に答える管制塔</p>
@@ -38,16 +39,16 @@ export default async function CommandPage() {
 
       {/* サマリ行 */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="開発中" value={`${d.devStatuses.filter((s) => s.status === "active").length}件`} />
-        <Stat label="ブロッカー" value={`${d.blockers.length}件`} tone={d.blockers.length ? "danger" : "ok"} />
-        <Stat label="オープンリスク" value={`${d.risks.length}件`} tone={d.risks.length ? "warn" : "ok"} />
-        <Stat label="承認待ち" value={`${d.approvals.length}件`} tone={d.approvals.length ? "warn" : "ok"} />
-        <Stat label="AIエージェント" value={`${d.agents.length}体`} />
+        <Stat label="開発中" count={d.devStatuses.filter((s) => s.status === "active").length} suffix="件" />
+        <Stat label="ブロッカー" count={d.blockers.length} suffix="件" tone={d.blockers.length ? "danger" : "ok"} />
+        <Stat label="オープンリスク" count={d.risks.length} suffix="件" tone={d.risks.length ? "warn" : "ok"} />
+        <Stat label="承認待ち" count={d.approvals.length} suffix="件" tone={d.approvals.length ? "warn" : "ok"} />
+        <Stat label="AIエージェント" count={d.agents.length} suffix="体" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* 今どうなってる？ */}
-        <Panel title="開発状況">
+        <Panel title="開発状況" className="d1">
           <ul className="space-y-3 text-sm">
             {d.devStatuses.map((s) => (
               <li key={String(s.id)}>
@@ -67,7 +68,7 @@ export default async function CommandPage() {
           </ul>
         </Panel>
 
-        <Panel title="今日やるべきこと / 判断待ち">
+        <Panel title="今日やるべきこと / 判断待ち" className="d2">
           {nextActions.length === 0 && d.approvals.length === 0 ? (
             <Empty>アクションなし</Empty>
           ) : (
@@ -92,7 +93,7 @@ export default async function CommandPage() {
         </Panel>
 
         {/* リスク */}
-        <Panel title="リスク / ブロッカー">
+        <Panel title="リスク / ブロッカー" className="d3">
           {d.risks.length === 0 && d.blockers.length === 0 ? (
             <Empty>オープンなし</Empty>
           ) : (
@@ -120,7 +121,7 @@ export default async function CommandPage() {
         </Panel>
 
         {/* AI指示生成 */}
-        <Panel title="AI指示プロンプト生成（Fable5 / Claude / Codexへ貼るだけ）">
+        <Panel title="AI指示プロンプト生成（Fable5 / Claude / Codexへ貼るだけ）" className="d4">
           <form action={generatePrompt} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <Field label="対象AI">
@@ -164,7 +165,7 @@ export default async function CommandPage() {
       </div>
 
       {/* 生成済みプロンプト */}
-      <Panel title="生成済みプロンプト（コピーして各AIへ）">
+      <Panel title="生成済みプロンプト（コピーして各AIへ）" className="d5">
         {prompts.length === 0 ? (
           <Empty>まだ生成されていません</Empty>
         ) : (
@@ -189,7 +190,7 @@ export default async function CommandPage() {
 
       {/* 最新レポート */}
       {latestReport && (
-        <Panel title={`最新レポート: ${String(latestReport.title)}`}>
+        <Panel title={`最新レポート: ${String(latestReport.title)}`} className="d6">
           <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-3 text-xs leading-relaxed">
             {String(latestReport.body)}
           </pre>
@@ -199,13 +200,16 @@ export default async function CommandPage() {
   );
 }
 
-function Stat({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "ok" | "warn" | "danger" }) {
+function Stat({ label, count, suffix, tone = "default" }: { label: string; count: number; suffix: string; tone?: "default" | "ok" | "warn" | "danger" }) {
   const color =
     tone === "danger" ? "text-red-300" : tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-[--color-txt]";
   return (
-    <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-3">
+    <div className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-3">
       <p className="text-xs text-[--color-dim]">{label}</p>
-      <p className={`text-lg font-bold ${color}`}>{value}</p>
+      <p className={`text-lg font-bold tabular-nums ${color}`}>
+        <CountUp value={count} />
+        {suffix}
+      </p>
     </div>
   );
 }

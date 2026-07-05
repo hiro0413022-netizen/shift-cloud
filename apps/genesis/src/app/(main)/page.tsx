@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireGenesisActor } from "@/lib/auth";
 import { getCockpitData } from "@/lib/kernel";
-import { Panel, Badge, StatusDot, Empty, fmtDate, severityTone } from "@/components/ui";
+import { Panel, Badge, StatusDot, Empty, fmtDate, severityTone, KpiCard } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -66,27 +66,68 @@ export default async function CockpitPage() {
   ];
 
   const N = nodes.length;
+  const pos = nodes.map((_, i) => {
+    const angle = (i / N) * 2 * Math.PI - Math.PI / 2;
+    return { x: 50 + 38 * Math.cos(angle), y: 50 + 38 * Math.sin(angle) };
+  });
+
+  // KPI表示順（実データ→未接続の順で主要4件＋α）
+  const kpiOrder = ["labor_cost", "work_hours", "active_staff", "monthly_sales", "members", "dev_progress"];
+  const kpis = kpiOrder
+    .map((code) => d.kpis.find((k) => k.code === code))
+    .filter((k): k is NonNullable<typeof k> => k != null);
 
   return (
     <div className="space-y-6">
       {/* コックピットリング */}
       <div className="relative mx-auto aspect-square w-full max-w-3xl">
+        {/* レーダースキャン */}
+        <div className="radar-sweep absolute inset-[8%] opacity-70" />
+        {/* 軌道リング（低速回転・逆回転） */}
+        <div className="orbit absolute inset-[4%] rounded-full border border-dashed border-sky-900/60" />
+        <div className="orbit-rev absolute inset-[16%] rounded-full border border-dashed border-indigo-900/50" />
+        <div className="absolute left-1/2 top-1/2 h-[76%] w-[76%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[--color-line]" />
+
+        {/* 接続線（中央 → 各ノードへのデータフロー） */}
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" aria-hidden>
+          {pos.map((p, i) => {
+            const st = nodes[i].state;
+            const stroke =
+              st === "danger" ? "rgba(248,113,113,0.5)"
+              : st === "approval_required" ? "rgba(192,132,252,0.45)"
+              : st === "processing" ? "rgba(56,189,248,0.5)"
+              : st === "completed" ? "rgba(52,211,153,0.35)"
+              : "rgba(124,138,165,0.18)";
+            return (
+              <line
+                key={nodes[i].key}
+                x1="50" y1="50" x2={p.x} y2={p.y}
+                stroke={stroke}
+                strokeWidth="0.25"
+                className="link-line"
+                style={{ animationDelay: `${(i % 5) * 0.28}s` }}
+              />
+            );
+          })}
+        </svg>
+
         {/* 中央: CEO AI */}
         <Link
           href="/command"
-          className="ai-flow absolute left-1/2 top-1/2 z-10 flex h-40 w-40 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-sky-700/60 text-center node-processing"
+          className="ai-flow absolute left-1/2 top-1/2 z-10 flex h-40 w-40 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-sky-700/60 text-center node-processing transition-transform hover:scale-105"
         >
           <span className="text-[10px] tracking-[0.3em] text-[--color-gold]">YOZAN</span>
           <span className="text-xl font-bold tracking-wider text-sky-200">CEO AI</span>
           <span className="mt-1 text-[10px] text-[--color-dim]">Command Center</span>
+          <span className="mt-1 flex items-center gap-1 text-[9px] text-emerald-300">
+            <span className="blink inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            ONLINE
+          </span>
         </Link>
-        {/* リングライン */}
-        <div className="absolute left-1/2 top-1/2 h-[76%] w-[76%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[--color-line]" />
+
         {/* 周囲ノード */}
         {nodes.map((node, i) => {
-          const angle = (i / N) * 2 * Math.PI - Math.PI / 2;
-          const x = 50 + 38 * Math.cos(angle);
-          const y = 50 + 38 * Math.sin(angle);
+          const { x, y } = pos[i];
           const stateCls =
             node.state === "danger"
               ? "border-red-500/60 node-danger"
@@ -103,8 +144,8 @@ export default async function CockpitPage() {
             <Link
               key={node.key}
               href={node.href}
-              style={{ left: `${x}%`, top: `${y}%` }}
-              className={`absolute flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border bg-[--color-panel] text-center transition-transform hover:scale-110 ${stateCls}`}
+              style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${0.05 * i}s` }}
+              className={`reveal absolute flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border bg-[--color-panel] text-center transition-all hover:z-20 hover:scale-110 hover:shadow-[0_0_20px_-4px_rgba(56,189,248,0.6)] ${stateCls}`}
             >
               <StatusDot status={node.state} />
               <span className="mt-1 text-[11px] font-medium leading-tight">{node.label}</span>
@@ -114,9 +155,24 @@ export default async function CockpitPage() {
         })}
       </div>
 
+      {/* KPIバンド（Shift Cloud実データ） */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+        {kpis.map((k) => (
+          <KpiCard
+            key={String(k.code)}
+            name={String(k.name)}
+            value={k.current_value != null ? Number(k.current_value) : null}
+            unit={String(k.unit ?? "")}
+            trend={k.trend}
+            target={k.target_value != null ? Number(k.target_value) : null}
+            note={k.notes != null ? String(k.notes) : null}
+          />
+        ))}
+      </div>
+
       {/* 下段: 状況サマリ */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Panel title="ACTIVITY FEED（Company Events）">
+        <Panel title="ACTIVITY FEED（Company Events）" className="d1">
           {d.recentEvents.length === 0 ? (
             <Empty>イベントなし</Empty>
           ) : (
@@ -135,7 +191,7 @@ export default async function CockpitPage() {
             </ul>
           )}
         </Panel>
-        <Panel title="RISKS / BLOCKERS">
+        <Panel title="RISKS / BLOCKERS" className="d2">
           {d.risks.length === 0 && d.blockers.length === 0 ? (
             <Empty>オープンなリスク・ブロッカーなし</Empty>
           ) : (
@@ -155,7 +211,7 @@ export default async function CockpitPage() {
             </ul>
           )}
         </Panel>
-        <Panel title="開発ステータス">
+        <Panel title="開発ステータス" className="d3">
           <ul className="space-y-3">
             {d.devStatuses.map((s) => (
               <li key={String(s.id)} className="text-sm">
@@ -168,7 +224,7 @@ export default async function CockpitPage() {
                 </div>
                 <div className="h-1.5 w-full overflow-hidden rounded-full bg-[--color-panel-2]">
                   <div
-                    className={`h-full ${Number(s.progress) >= 100 ? "bg-emerald-400" : "bg-sky-400"}`}
+                    className={`bar-grow h-full ${Number(s.progress) >= 100 ? "bg-emerald-400" : "bg-sky-400"}`}
                     style={{ width: `${Number(s.progress)}%` }}
                   />
                 </div>
