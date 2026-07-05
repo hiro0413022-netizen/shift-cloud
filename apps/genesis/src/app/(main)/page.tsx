@@ -23,12 +23,12 @@ export default async function CockpitPage() {
   const blockedDev = d.devStatuses.filter((s) => s.status === "blocked").length;
   const workingAgents = d.agents.filter((a) => a.current_status === "working").length;
 
-  const moduleNode = (code: string, label: string): Node => {
+  const moduleNode = (code: string, label: string, href = "/dev"): Node => {
     const m = d.modules.find((x) => x.code === code);
     const status = String(m?.status ?? "planned");
     const state =
       status === "live" ? "completed" : status === "building" ? "processing" : status === "error" ? "danger" : "normal";
-    return { key: code, label, href: "/dev", state, detail: statusJa(status) };
+    return { key: code, label, href, state, detail: statusJa(status) };
   };
 
   const nodes: Node[] = [
@@ -42,7 +42,7 @@ export default async function CockpitPage() {
     { key: "sns", label: "SNS", href: "/agents", state: "normal", detail: "待機" },
     moduleNode("reservation", "予約"),
     moduleNode("inventory", "在庫"),
-    { key: "accounting", label: "経理", href: "/agents", state: "normal", detail: "待機" },
+    moduleNode("finance", "財務", "/finance"),
     { key: "hr", label: "採用", href: "/agents", state: "normal", detail: "待機" },
     { key: "lesson", label: "レッスン", href: "/agents", state: "normal", detail: "待機" },
     moduleNode("kallinos-ec", "KALLINOS"),
@@ -71,8 +71,8 @@ export default async function CockpitPage() {
     return { x: 50 + 38 * Math.cos(angle), y: 50 + 38 * Math.sin(angle) };
   });
 
-  // KPI表示順（実データ→未接続の順で主要4件＋α）
-  const kpiOrder = ["labor_cost", "work_hours", "active_staff", "monthly_sales", "members", "dev_progress"];
+  // KPI表示順（財務系 → 労務系 → 未接続）
+  const kpiOrder = ["monthly_sales", "operating_profit", "labor_cost", "work_hours", "active_staff", "members"];
   const kpis = kpiOrder
     .map((code) => d.kpis.find((k) => k.code === code))
     .filter((k): k is NonNullable<typeof k> => k != null);
@@ -155,7 +155,7 @@ export default async function CockpitPage() {
         })}
       </div>
 
-      {/* KPIバンド（Shift Cloud実データ） */}
+      {/* KPIバンド（実データ） */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {kpis.map((k) => (
           <KpiCard

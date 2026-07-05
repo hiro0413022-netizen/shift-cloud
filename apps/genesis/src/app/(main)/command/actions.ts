@@ -93,20 +93,24 @@ export async function generatePrompt(formData: FormData) {
   revalidatePath("/command");
 }
 
-/** KPI実データ更新（Shift Cloud → kpis 再集計、migration 0008） */
+/** 全KPIの実データ再集計（Shift Cloud労務 + 財務） */
+async function refreshAllKpis(companyId: string) {
+  const admin = createAdmin();
+  await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: companyId });
+  await admin.rpc("refresh_finance_kpis", { p_company_id: companyId });
+}
+
+/** KPI実データ更新（migration 0008 / 0009） */
 export async function refreshKpis() {
   const actor = await requireGenesisActor();
-  const admin = createAdmin();
-  const { error } = await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: actor.companyId });
-  await logAudit(actor, "kpi.refresh", "kpis", null, null, { error: error?.message ?? null });
-  if (!error) {
-    await logEvent(actor.companyId, {
-      event_type: "kpi.refreshed",
-      title: "KPIをShift Cloud実データから再集計",
-      source: "genesis",
-      source_type: "system",
-    });
-  }
+  await refreshAllKpis(actor.companyId);
+  await logAudit(actor, "kpi.refresh", "kpis", null);
+  await logEvent(actor.companyId, {
+    event_type: "kpi.refreshed",
+    title: "KPIを実データから再集計（労務＋財務）",
+    source: "genesis",
+    source_type: "system",
+  });
   revalidatePath("/command");
   revalidatePath("/future");
   revalidatePath("/");
@@ -122,14 +126,14 @@ function fmtKpiValue(v: unknown, unit: unknown): string {
 export async function generateDailyReport() {
   const actor = await requireGenesisActor();
   const admin = createAdmin();
-  await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: actor.companyId });
+  await refreshAllKpis(actor.companyId);
   const d = await getCockpitData(actor.companyId);
 
   const today = new Date().toLocaleDateString("ja-JP");
   const lines = [
     `# YOZAN GENESIS 日次レポート（${today}）`,
     "",
-    "## KPI（Shift Cloud実データ）",
+    "## KPI（実データ）",
     ...(d.kpis.length === 0
       ? ["- KPI未登録"]
       : d.kpis.map(
