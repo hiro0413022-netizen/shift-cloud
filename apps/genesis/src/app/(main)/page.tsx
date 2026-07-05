@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireGenesisActor } from "@/lib/auth";
-import { getCockpitData } from "@/lib/kernel";
+import { getCockpitData, computeGenesisScore, buildJudgmentList } from "@/lib/kernel";
 import { Panel, Badge, StatusDot, Empty, fmtDate, severityTone, KpiCard } from "@/components/ui";
+import { CountUp } from "@/components/count-up";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ type Node = {
 export default async function CockpitPage() {
   const actor = await requireGenesisActor();
   const d = await getCockpitData(actor.companyId);
+  const { score, grade, factors } = computeGenesisScore(d);
+  const judgments = buildJudgmentList(d);
 
   const openHigh = d.risks.filter((r) => ["high", "critical"].includes(String(r.severity))).length;
   const pendingApprovals = d.approvals.length;
@@ -71,24 +74,60 @@ export default async function CockpitPage() {
     return { x: 50 + 38 * Math.cos(angle), y: 50 + 38 * Math.sin(angle) };
   });
 
-  // KPI表示順（財務系 → 労務系 → 未接続）
-  const kpiOrder = ["monthly_sales", "operating_profit", "labor_cost", "work_hours", "active_staff", "members"];
+  // KPI表示順（VISION §6: 5大KPI → 次に見る）
+  const kpiOrder = [
+    "monthly_sales", "members", "trial_bookings", "conversion_rate", "churn_rate", "labor_cost_ratio",
+    "operating_profit", "labor_cost", "work_hours", "active_staff",
+  ];
   const kpis = kpiOrder
     .map((code) => d.kpis.find((k) => k.code === code))
     .filter((k): k is NonNullable<typeof k> => k != null);
 
+  const scoreColor = grade === "good" ? "text-emerald-300" : grade === "watch" ? "text-amber-300" : "text-red-300";
+  const judgmentIcon = { approval: "✓", blocker: "⛔", risk: "⚠", kpi: "📊" } as const;
+
   return (
     <div className="space-y-6">
+      {/* トップ: 全体スコア＋今日の判断リスト（VISION §5） */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="hud reveal flex flex-col justify-between rounded-xl border border-[--color-line] bg-[--color-panel] p-5">
+          <p className="text-xs tracking-[0.2em] text-[--color-dim]">今日のYOZAN全体スコア</p>
+          <p className={`my-2 text-6xl font-bold tabular-nums ${scoreColor}`}>
+            <CountUp value={score} />
+            <span className="ml-1 text-xl text-[--color-dim]">点</span>
+          </p>
+          <div className="space-y-0.5 text-[11px] text-[--color-dim]">
+            {factors.length === 0 ? <p>減点要因なし — 順調です</p> : factors.map((f) => <p key={f}>{f}</p>)}
+          </div>
+        </div>
+        <Panel title={`今日、判断すべきこと（${judgments.length}件）`} className="d1 lg:col-span-2">
+          {judgments.length === 0 ? (
+            <Empty>判断待ちなし — CEO AIが引き続き監視します</Empty>
+          ) : (
+            <ol className="space-y-2 text-sm">
+              {judgments.slice(0, 7).map((j, i) => (
+                <li key={`${j.kind}-${i}`}>
+                  <Link href={j.href} className="group flex items-start gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-[--color-panel-2]">
+                    <span className="shrink-0">{judgmentIcon[j.kind]}</span>
+                    <span>
+                      <span className="group-hover:text-sky-300">{j.title}</span>
+                      {j.detail && <span className="block text-xs text-[--color-dim]">{j.detail}</span>}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
+      </div>
+
       {/* コックピットリング */}
       <div className="relative mx-auto aspect-square w-full max-w-3xl">
-        {/* レーダースキャン */}
         <div className="radar-sweep absolute inset-[8%] opacity-70" />
-        {/* 軌道リング（低速回転・逆回転） */}
         <div className="orbit absolute inset-[4%] rounded-full border border-dashed border-sky-900/60" />
         <div className="orbit-rev absolute inset-[16%] rounded-full border border-dashed border-indigo-900/50" />
         <div className="absolute left-1/2 top-1/2 h-[76%] w-[76%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-[--color-line]" />
 
-        {/* 接続線（中央 → 各ノードへのデータフロー） */}
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" aria-hidden>
           {pos.map((p, i) => {
             const st = nodes[i].state;
@@ -111,7 +150,6 @@ export default async function CockpitPage() {
           })}
         </svg>
 
-        {/* 中央: CEO AI */}
         <Link
           href="/command"
           className="ai-flow absolute left-1/2 top-1/2 z-10 flex h-40 w-40 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-sky-700/60 text-center node-processing transition-transform hover:scale-105"
@@ -125,7 +163,6 @@ export default async function CockpitPage() {
           </span>
         </Link>
 
-        {/* 周囲ノード */}
         {nodes.map((node, i) => {
           const { x, y } = pos[i];
           const stateCls =
@@ -155,8 +192,8 @@ export default async function CockpitPage() {
         })}
       </div>
 
-      {/* KPIバンド（実データ） */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+      {/* KPIバンド（VISION §6: 5大KPI優先） */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {kpis.map((k) => (
           <KpiCard
             key={String(k.code)}

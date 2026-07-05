@@ -1,9 +1,9 @@
 import { requireGenesisActor } from "@/lib/auth";
-import { getCockpitData } from "@/lib/kernel";
+import { getCockpitData, CORE_KPI_CODES } from "@/lib/kernel";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, StatusDot, Empty, Field, inputCls, btnCls, severityTone, fmtDate } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
-import { generatePrompt, generateDailyReport, refreshKpis } from "./actions";
+import { generatePrompt, generateDailyReport, refreshKpis, updateKpiManual } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,11 @@ export default async function CommandPage() {
   const latestReport = (reportsRes.data ?? [])[0];
 
   const nextActions = d.devStatuses.filter((s) => s.next_action);
+  const coreSet = new Set<string>(CORE_KPI_CODES);
+  const kpisSorted = [
+    ...d.kpis.filter((k) => coreSet.has(String(k.code))),
+    ...d.kpis.filter((k) => !coreSet.has(String(k.code))),
+  ];
 
   return (
     <div className="space-y-4">
@@ -120,8 +125,36 @@ export default async function CommandPage() {
           )}
         </Panel>
 
+        {/* KPI手動更新（VISION §6 — CRM/予約接続までの暫定経路） */}
+        <Panel title="KPI手動更新（会員数・体験予約・入会率・退会率など）" className="d4">
+          <form action={updateKpiManual} className="space-y-3">
+            <Field label="KPI（★=5大KPI）">
+              <select name="code" className={inputCls}>
+                {kpisSorted.map((k) => (
+                  <option key={String(k.code)} value={String(k.code)}>
+                    {coreSet.has(String(k.code)) ? "★ " : ""}{String(k.name)}
+                    {k.current_value != null ? `（現在 ${Number(k.current_value).toLocaleString("ja-JP")}${k.unit}）` : "（未接続）"}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="現在値（空欄なら据え置き）">
+                <input name="value" inputMode="decimal" className={inputCls} placeholder="例: 128" />
+              </Field>
+              <Field label="目標値（空欄なら据え置き）">
+                <input name="target" inputMode="decimal" className={inputCls} placeholder="例: 150" />
+              </Field>
+            </div>
+            <button className={btnCls}>KPIを更新</button>
+            <p className="text-xs text-[--color-dim]">
+              目標を入れるとCEO AIが未達を検知し、全体スコアと「今日の判断リスト」に反映します。売上・利益・人件費系は自動集計のため入力不要。
+            </p>
+          </form>
+        </Panel>
+
         {/* AI指示生成 */}
-        <Panel title="AI指示プロンプト生成（Fable5 / Claude / Codexへ貼るだけ）" className="d4">
+        <Panel title="AI指示プロンプト生成（Fable5 / Claude / Codexへ貼るだけ）" className="d5 lg:col-span-2">
           <form action={generatePrompt} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <Field label="対象AI">
