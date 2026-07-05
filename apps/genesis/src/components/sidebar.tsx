@@ -7,6 +7,7 @@ const NAV = [
   { href: "/", label: "Cockpit", icon: "◉" },
   { href: "/command", label: "CEO AI Command", icon: "⌘" },
   { href: "/finance", label: "Finance", icon: "¥" },
+  { href: "/members", label: "体験受付", icon: "🎫" },
   { href: "/events", label: "Company Events", icon: "⚡" },
   { href: "/memories", label: "Business Memory", icon: "🧠" },
   { href: "/decisions", label: "Decision Log", icon: "⚖" },
@@ -15,6 +16,7 @@ const NAV = [
   { href: "/dev", label: "Development", icon: "🛠" },
   { href: "/future", label: "Future", icon: "📈" },
   { href: "/connectors", label: "Connectors", icon: "🔌" },
+  { href: "/vault", label: "Vault", icon: "🔐" },
 ];
 
 export function Sidebar({ userName }: { userName: string }) {

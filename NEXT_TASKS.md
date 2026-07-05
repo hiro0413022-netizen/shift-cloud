@@ -15,10 +15,10 @@
 0. **財務データ投入（ユーザー）**: /finance で直近月の実績を入力（税理士の試算表から転記 or CSV取込）→ 月次売上・営業利益KPIが自動接続される
 1. **Genesis実運用の習慣化**（ユーザー）: 毎日 Command Center で「日次レポート生成」を実行。AI指示が必要な作業はプロンプト生成を使う
 2. **デプロイ**（ユーザー）: 本コミットをユーザーPCからpush → Vercel自動デプロイ → KPI表示確認（Cockpit / Future Simulation）
-3. **体験予約受付システム（member-os / DECISIONS #23,#24）** ← 方針転換: 体験予約は紙+Excelを廃し**Genesis自作で受付**（0-bのSmart Hello取込は会員名簿本体＝会員数/退会率のみに縮小、体験系はこちらに一本化）。migration 0011作成済（mbr_guests / mbr_trial_bookings / mbr_intake_tokens ＋ refresh_member_kpis）**未適用**。
-   - まず 0011 をSupabaseに適用（ユーザーPC or ブランチ検証後）
-   - Phase 1a: スタッフ用 体験予約 登録＋一覧＋当日ステータス/入会可否更新（apps/genesis）→ 体験予約数・入会率が自動集計
-   - Phase 1b: タブレット自己入力フォーム＋同意・電子サイン（トークンURL・顧客向けルート・service_role経由）
-   - Phase 2: 予約システム本体を姫路FRUNK GOLFに導入（#24）／会員名簿のGenesis移管
+2-b. **Vault（システム台帳 /vault）**: 実装完了・DB適用済（0013）・初期8件投入済。push後に /vault でパスワード入力→各システムのパスワードをページ上で入力保存（DECISIONS #26）。任意: Vercel envに `VAULT_PASSWORD` を設定するとパスワード変更可（未設定時は既定値）
+3. **体験予約受付システム（member-os / DECISIONS #23,#24）**: Phase 1a/1b **実装完了・未デプロイ**。0-bのSmart Hello取込は会員名簿本体（会員数/退会率）のみに縮小、体験系はこちらに一本化。
+   - ✅ 実装済: migration 0011（mbr_guests/mbr_trial_bookings/mbr_intake_tokens＋refresh_member_kpis）、スタッフ画面 /members、公開タブレット /intake/[token]（自己入力＋同意＋指サイン）、サイドバー・middleware更新
+   - ☐ **ユーザー作業**: (1) 0011 をSupabaseに適用 (2) ユーザーPCからpush → Vercel自動デプロイ (3) /members で予約1件登録→「タブレット受付」→ /intake で自己入力→入会 まで通しテスト
+   - Phase 2（次段）: 予約サイト／予約システム本体を姫路FRUNK GOLFに導入（#24）／会員名簿のGenesis移管
    - 設計: docs/modules/member-os/TRIAL_INTAKE.md
 4. **Shif
