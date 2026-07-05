@@ -4,6 +4,8 @@ import { Panel, Badge, StatusDot, Empty, fmtDate, severityTone } from "@/compone
 
 export const dynamic = "force-dynamic";
 
+type Duty = { watch?: string[]; judge?: string[]; execute?: string[] };
+
 export default async function AgentsPage() {
   const actor = await requireGenesisActor();
   const admin = createAdmin();
@@ -20,33 +22,47 @@ export default async function AgentsPage() {
 
   return (
     <div className="space-y-4">
-      <header>
+      <header className="reveal">
         <h1 className="text-xl font-bold">AI Agent Workforce</h1>
         <p className="text-sm text-[--color-dim]">
-          専門AIチームの台帳と実行ログ。実行は各AIツール（Cowork/n8n等）が担い、結果をここに記録する
+          専門AI社員（VISION §4: 見る・判断・実行まで定義）。CEO AIが毎朝の分析で指示を振り、実行結果はここに記録される
         </p>
       </header>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {(agents ?? []).map((a) => (
-          <div key={a.id} className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 font-medium">
-                <StatusDot status={a.current_status} />
-                {a.name}
-              </span>
-              <Badge tone={severityTone(a.risk_level)}>risk: {a.risk_level}</Badge>
+        {(agents ?? []).map((a) => {
+          const duty = (a.permissions ?? {}) as Duty;
+          return (
+            <div key={a.id} className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-2 font-medium">
+                  <StatusDot status={a.current_status} />
+                  {a.name}
+                </span>
+                <Badge tone={severityTone(a.risk_level)}>risk: {a.risk_level}</Badge>
+              </div>
+              <p className="mt-2 line-clamp-2 text-xs text-[--color-dim]">{a.role}</p>
+              <div className="mt-3 space-y-1.5 text-xs">
+                {duty.watch && duty.watch.length > 0 && (
+                  <p><span className="text-sky-300">見る:</span> <span className="text-[--color-dim]">{duty.watch.join(" / ")}</span></p>
+                )}
+                {duty.judge && duty.judge.length > 0 && (
+                  <p><span className="text-amber-300">判断:</span> <span className="text-[--color-dim]">{duty.judge.join(" / ")}</span></p>
+                )}
+                {duty.execute && duty.execute.length > 0 && (
+                  <p><span className="text-emerald-300">実行:</span> <span className="text-[--color-dim]">{duty.execute.join(" / ")}</span></p>
+                )}
+              </div>
+              <div className="mt-3 space-y-1 border-t border-[--color-line]/60 pt-2 text-xs text-[--color-dim]">
+                <p>状態: {statusJa(a.current_status)}{a.current_task ? ` — ${a.current_task}` : ""}</p>
+                <p>最終実行: {a.last_run_at ? fmtDate(a.last_run_at) : "未実行"}</p>
+                {Array.isArray(a.approval_required_actions) && a.approval_required_actions.length > 0 && (
+                  <p className="text-purple-300">要承認: {a.approval_required_actions.join(" / ")}</p>
+                )}
+              </div>
             </div>
-            <p className="mt-2 line-clamp-2 text-xs text-[--color-dim]">{a.role}</p>
-            <div className="mt-3 space-y-1 text-xs text-[--color-dim]">
-              <p>状態: {statusJa(a.current_status)}{a.current_task ? ` — ${a.current_task}` : ""}</p>
-              <p>最終実行: {a.last_run_at ? fmtDate(a.last_run_at) : "未実行"}</p>
-              {Array.isArray(a.approval_required_actions) && a.approval_required_actions.length > 0 && (
-                <p className="text-purple-300">要承認: {a.approval_required_actions.join(" / ")}</p>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <Panel title="実行ログ（AI Execution Log）">

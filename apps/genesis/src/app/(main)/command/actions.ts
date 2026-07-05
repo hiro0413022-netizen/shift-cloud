@@ -3,13 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireGenesisActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import {
-  logAudit,
-  logEvent,
-  getCockpitData,
-  computeGenesisScore,
-  buildJudgmentList,
-} from "@/lib/kernel";
+import { logAudit, logEvent } from "@/lib/kernel";
+import { runDailyCeoReport } from "@/lib/ceo-ai";
 
 /** AI指示プロンプト生成（背景・現在の状態はDBから自動注入） */
 export async function generatePrompt(formData: FormData) {
@@ -99,17 +94,13 @@ export async function generatePrompt(formData: FormData) {
   revalidatePath("/command");
 }
 
-/** 全KPIの実データ再集計（Shift Cloud労務 + 財務） */
-async function refreshAllKpis(companyId: string) {
-  const admin = createAdmin();
-  await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: companyId });
-  await admin.rpc("refresh_finance_kpis", { p_company_id: companyId });
-}
-
-/** KPI実データ更新（migration 0008 / 0009 / 0010） */
+/** KPI実データ更新（migration 0008 / 0009 / 0010。会員系0011は適用後に有効） */
 export async function refreshKpis() {
   const actor = await requireGenesisActor();
-  await refreshAllKpis(actor.companyId);
+  const admin = createAdmin();
+  await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: actor.companyId });
+  await admin.rpc("refresh_finance_kpis", { p_company_id: actor.companyId });
+  await admin.rpc("refresh_member_kpis", { p_company_id: actor.companyId }); // 0011未適用時はエラーが返るだけで無害
   await logAudit(actor, "kpi.refresh", "kpis", null);
   await logEvent(actor.companyId, {
     event_type: "kpi.refreshed",
@@ -170,97 +161,13 @@ export async function updateKpiManual(formData: FormData) {
   revalidatePath("/");
 }
 
-function fmtKpiValue(v: unknown, unit: unknown): string {
-  if (v == null) return "未接続";
-  const n = Number(v);
-  return `${Number.isInteger(n) ? n.toLocaleString("ja-JP") : n}${String(unit ?? "")}`;
-}
-
-/** 日次レポート生成（VISION §3: 何が起きているか/何が危ないか/今日判断すべきこと） */
+/** 日次レポート生成（本体は lib/ceo-ai.ts — Cronと同一ロジック。VISION §3） */
 export async function generateDailyReport() {
   const actor = await requireGenesisActor();
-  const admin = createAdmin();
-  await refreshAllKpis(actor.companyId);
-  const d = await getCockpitData(actor.companyId);
-  const { score, factors } = computeGenesisScore(d);
-  const judgments = buildJudgmentList(d);
-
-  const today = new Date().toLocaleDateString("ja-JP");
-  const lines = [
-    `# YOZAN GENESIS 日次レポート（${today}）`,
-    "",
-    `## 今日のYOZAN全体スコア: ${score}点`,
-    factors.length === 0 ? "- 減点要因なし" : factors.map((f) => `- ${f}`).join("\n"),
-    "",
-    "## 今日、古川さんが判断すべきこと",
-    judgments.length === 0
-      ? "- なし（順調です）"
-      : judgments.map((j, i) => `${i + 1}. ${j.title}${j.detail ? ` — ${j.detail}` : ""}`).join("\n"),
-    "",
-    "## 何が危ないか",
-    d.risks.length === 0 && d.blockers.length === 0
-      ? "- オープンなリスク・ブロッカーなし"
-      : [
-          ...d.blockers.map((b) => `- [ブロッカー] ${b.title}${b.needs ? `（解消条件: ${b.needs}）` : ""}`),
-          ...d.risks.map((r) => `- [リスク/${r.severity}] ${r.title}${r.mitigation ? `（対策: ${r.mitigation}）` : ""}`),
-        ].join("\n"),
-    "",
-    "## KPI（実データ）",
-    ...(d.kpis.length === 0
-      ? ["- KPI未登録"]
-      : d.kpis.map(
-          (k) =>
-            `- ${k.name}: ${fmtKpiValue(k.current_value, k.unit)}${
-              k.target_value != null ? `（目標 ${fmtKpiValue(k.target_value, k.unit)}）` : ""
-            }`
-        )),
-    "",
-    "## 開発状況",
-    ...d.devStatuses.map(
-      (s) =>
-        `- ${s.module_name}: ${s.progress}%（${String(s.status)}）${s.next_action ? ` / 次: ${s.next_action}` : ""}`
-    ),
-    "",
-    "## AIエージェント",
-    `- 登録${d.agents.length}体 / 稼働中${d.agents.filter((a) => a.current_status === "working").length}体`,
-    "",
-    "## 直近イベント",
-    ...d.recentEvents.slice(0, 5).map((e) => `- ${String(e.title)}`),
-    "",
-    "## 次にやるべきこと",
-    ...d.devStatuses
-      .filter((s) => s.next_action)
-      .map((s) => `- ${s.module_name}: ${s.next_action}`),
-  ].join("\n");
-
-  const { data: report } = await admin
-    .from("reports")
-    .insert({
-      company_id: actor.companyId,
-      report_type: "daily",
-      title: `日次レポート ${today}（スコア${score}点）`,
-      body: lines,
-      generated_by: "ceo_ai",
-      data: {
-        score,
-        judgments: judgments.length,
-        dev: d.devStatuses.length,
-        risks: d.risks.length,
-        blockers: d.blockers.length,
-        approvals: d.approvals.length,
-      },
-    })
-    .select("id")
-    .single();
-
-  await logAudit(actor, "report.generate", "reports", report?.id ?? null);
-  await logEvent(actor.companyId, {
-    event_type: "report.daily",
-    title: `日次レポート生成（${today}・スコア${score}点・判断${judgments.length}件）`,
-    source: "ceo_ai",
-    source_type: "ai",
-  });
+  const result = await runDailyCeoReport(actor.companyId, "human");
+  await logAudit(actor, "report.generate", "reports", result.reportId);
   revalidatePath("/command");
+  revalidatePath("/");
 }
 
 function statusJa(s: string) {
