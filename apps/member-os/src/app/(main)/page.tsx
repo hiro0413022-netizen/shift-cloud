@@ -2,264 +2,198 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
-import {
-  createBooking,
-  updateBookingStatus,
-  setJoinResult,
-  deleteBooking,
-  issueTabletToken,
-} from "./actions";
+import { VISIT_TYPES, VISIT_TYPE_LABEL, RESULTS, PAYMENT_METHODS, DISCOUNTS, REFERRAL_SOURCES } from "@/lib/walkin";
+import { createVisitManual, updateVisit, deleteVisit, issueStoreToken } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 type Row = Record<string, unknown>;
 
-const SOURCE_LABEL: Record<string, string> = {
-  hp: "HP", phone: "電話", walkin: "来店", referral: "紹介", sns: "SNS", other: "その他",
-};
-const STATUS_LABEL: Record<string, string> = {
-  reserved: "予約", visited: "来店済", canceled: "キャンセル", no_show: "無断欠",
-};
-const STATUS_TONE: Record<string, "default" | "ok" | "warn" | "danger" | "accent"> = {
-  reserved: "accent", visited: "ok", canceled: "default", no_show: "danger",
+const TYPE_TONE: Record<string, "default" | "ok" | "warn" | "danger" | "accent"> = {
+  trial: "accent", fitting: "ok", bay: "default", visitor_bay: "default", other: "default",
 };
 
-function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 function monthStart(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
 }
-function fmtTime(t: unknown): string {
-  const s = t == null ? "" : String(t);
-  return s ? s.slice(0, 5) : "";
-}
 
-export default async function MembersPage({
+export default async function LedgerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; intake_url?: string; bid?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; type?: string; reception_url?: string }>;
 }) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
   const sp = await searchParams;
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : todayStr();
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? "") ? (sp.from as string) : monthStart();
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? (sp.to as string) : new Date().toISOString().slice(0, 10);
+  const typeFilter = VISIT_TYPES.some((v) => v.value === sp.type) ? sp.type : "";
 
-  const [{ data: stores }, { data: staff }, { data: monthBookings }, { data: dayBookings }] = await Promise.all([
+  let q = admin
+    .from("mbr_walkin_visits")
+    .select("*, mbr_guests(name, name_kana, phone, email), reception:staff!reception_staff_id(name)")
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .gte("visited_on", from)
+    .lte("visited_on", to)
+    .order("visited_on", { ascending: false })
+    .order("visit_seq", { ascending: false });
+  if (typeFilter) q = q.eq("visit_type", typeFilter);
+
+  const [{ data: visits }, { data: stores }, { data: monthAll }] = await Promise.all([
+    q,
     admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
-    admin.from("staff").select("id, name").eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null).order("name"),
-    admin
-      .from("mbr_trial_bookings")
-      .select("id, status, joined, lesson_date, created_at")
-      .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .gte("lesson_date", monthStart()),
-    admin
-      .from("mbr_trial_bookings")
-      .select("*, mbr_guests(name, name_kana, mobile, email), assignee:staff!staff_id(name)")
-      .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .eq("lesson_date", date)
-      .order("start_time", { nullsFirst: false }),
+    admin.from("mbr_walkin_visits").select("visit_type, result")
+      .eq("company_id", actor.companyId).is("deleted_at", null).gte("visited_on", monthStart()),
   ]);
 
+  const list = (visits ?? []) as Row[];
   const storeList = (stores ?? []) as Row[];
-  const staffList = (staff ?? []) as Row[];
-  const month = (monthBookings ?? []) as Row[];
-  const day = (dayBookings ?? []) as Row[];
+  const month = (monthAll ?? []) as Row[];
 
-  // 当月サマリ
-  const mTrials = month.filter((b) => b.status !== "canceled").length;
-  const mVisited = month.filter((b) => b.status === "visited").length;
-  const mJoined = month.filter((b) => b.joined === true).length;
-  const convRate = mVisited > 0 ? Math.round((mJoined / mVisited) * 1000) / 10 : null;
+  const mTrial = month.filter((v) => v.visit_type === "trial").length;
+  const mTrialJoin = month.filter((v) => v.visit_type === "trial" && v.result === "join").length;
+  const mFitting = month.filter((v) => v.visit_type === "fitting").length;
+  const mFittingBuy = month.filter((v) => v.visit_type === "fitting" && v.result === "purchase").length;
+  const convRate = mTrial > 0 ? Math.round((mTrialJoin / mTrial) * 1000) / 10 : null;
+  const buyRate = mFitting > 0 ? Math.round((mFittingBuy / mFitting) * 1000) / 10 : null;
 
-  const intakeUrl = sp.intake_url ?? null;
+  const receptionUrl = sp.reception_url ?? null;
 
   return (
     <div className="space-y-4">
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">体験受付 — Member OS</h1>
-          <p className="text-sm text-[--color-dim]">紙・Excelを廃止。予約→来店→入会をここで管理し、体験予約数・入会率を自動集計</p>
+          <h1 className="text-xl font-bold">一時利用者名簿 — 受付台帳</h1>
+          <p className="text-sm text-[--color-dim]">体験・フィッティング・打席の一時利用をここで記録。紙・Excelを廃止し、体験→入会率も自動集計</p>
         </div>
-        <form className="flex items-center gap-2">
-          <input type="date" name="date" defaultValue={date} className={inputCls} />
+        <form className="flex flex-wrap items-center gap-2">
+          <input type="date" name="from" defaultValue={from} className={inputCls} />
+          <span className="text-[--color-dim]">〜</span>
+          <input type="date" name="to" defaultValue={to} className={inputCls} />
+          <select name="type" defaultValue={typeFilter} className={inputCls}>
+            <option value="">全区分</option>
+            {VISIT_TYPES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
+          </select>
           <button className={btnGhostCls}>表示</button>
         </form>
       </header>
 
-      {/* タブレット受付URL（発行直後に一度だけ表示） */}
-      {intakeUrl && (
-        <Panel title="タブレット受付URL（このお客様用・一度だけ表示）" className="d1">
+      {/* 受付URL（発行直後に一度だけ表示） */}
+      {receptionUrl && (
+        <Panel title="店頭タブレット受付URL（このURL/QRを店頭タブレットで開いてください・一度だけ表示）" className="d1">
           <p className="mb-2 text-xs text-[--color-dim]">
-            この端末でタブレットの受付画面を開くか、下のURLをタブレットのブラウザに入力してお客様に渡してください（有効期限12時間）。
+            このURLは長期有効です。タブレットのブラウザで開いてホーム画面に追加するか、QRにして店頭に掲示してください。予約不要でお客様が自己入力できます。
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-sky-300">
-              {intakeUrl}
-            </code>
-            <a href={intakeUrl} target="_blank" rel="noreferrer" className={btnCls}>受付画面を開く ↗</a>
+            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-sky-300">{receptionUrl}</code>
+            <a href={receptionUrl} target="_blank" rel="noreferrer" className={btnCls}>受付画面を開く ↗</a>
           </div>
         </Panel>
       )}
 
       {/* 当月サマリ */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <SummaryCard label="体験予約（当月）" value={mTrials} unit="件" />
-        <SummaryCard label="来店（当月）" value={mVisited} unit="件" />
-        <SummaryCard label="入会（当月）" value={mJoined} unit="件" tone="gold" />
-        <SummaryCard label="入会率（当月）" value={convRate ?? 0} unit="%" tone="ok" dim={convRate === null} />
+        <SummaryCard label="体験（当月）" value={mTrial} unit="件" />
+        <SummaryCard label="体験→入会率" value={convRate ?? 0} unit="%" tone="ok" dim={convRate === null} />
+        <SummaryCard label="フィッティング（当月）" value={mFitting} unit="件" />
+        <SummaryCard label="フィッティング→購入率" value={buyRate ?? 0} unit="%" tone="gold" dim={buyRate === null} />
       </div>
 
-      {/* 新規予約フォーム */}
-      <Panel title="体験予約を登録" className="d1">
-        <form action={createBooking} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Field label="お名前（電話予約時）">
-            <input name="guest_name" placeholder="山田 太郎" className={inputCls} />
+      {/* 手動追加 */}
+      <Panel title="一時利用を手動で登録（電話・飛び込み等）" className="d1">
+        <form action={createVisitManual} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="日付">
+            <input type="date" name="visited_on" defaultValue={to} className={inputCls} />
           </Field>
-          <Field label="携帯番号">
-            <input name="guest_mobile" placeholder="090-..." className={inputCls} />
-          </Field>
-          <Field label="体験メニュー">
-            <input name="program" list="programs" placeholder="初回体験" className={inputCls} />
-            <datalist id="programs">
-              <option value="初回体験（無料）" />
-              <option value="体験レッスン" />
-              <option value="1DAY体験" />
-            </datalist>
-          </Field>
-          <Field label="経路">
-            <select name="source" className={inputCls} defaultValue="phone">
-              {Object.entries(SOURCE_LABEL).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
+          <Field label="利用区分">
+            <select name="visit_type" className={inputCls} defaultValue="trial">
+              {VISIT_TYPES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
             </select>
           </Field>
-          <Field label="日付">
-            <input type="date" name="lesson_date" defaultValue={date} className={inputCls} />
+          <Field label="お名前">
+            <input name="name" placeholder="山田 太郎" className={inputCls} />
           </Field>
-          <Field label="開始">
-            <input type="time" name="start_time" className={inputCls} />
+          <Field label="電話番号">
+            <input name="phone" placeholder="090-..." className={inputCls} />
           </Field>
-          <Field label="終了">
-            <input type="time" name="end_time" className={inputCls} />
+          <Field label="利用料">
+            <input name="fee" inputMode="numeric" placeholder="5500" className={inputCls} />
           </Field>
-          <Field label="打席">
-            <input name="bay" placeholder="打席A" className={inputCls} />
+          <Field label="経路">
+            <select name="referral_source" className={inputCls} defaultValue="">
+              <option value="">-</option>
+              {REFERRAL_SOURCES.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
           </Field>
           {storeList.length > 1 && (
             <Field label="店舗">
               <select name="store_id" className={inputCls}>
                 <option value="">-</option>
-                {storeList.map((s) => (
-                  <option key={String(s.id)} value={String(s.id)}>{String(s.name)}</option>
-                ))}
+                {storeList.map((s) => <option key={String(s.id)} value={String(s.id)}>{String(s.name)}</option>)}
               </select>
             </Field>
           )}
-          <Field label="担当">
-            <select name="staff_id" className={inputCls}>
-              <option value="">-</option>
-              {staffList.map((s) => (
-                <option key={String(s.id)} value={String(s.id)}>{String(s.name)}</option>
-              ))}
-            </select>
-          </Field>
           <div className="col-span-2 flex items-end sm:col-span-1">
             <button className={`${btnCls} w-full justify-center`}>＋ 登録</button>
           </div>
         </form>
       </Panel>
 
-      {/* 当日一覧 */}
-      <Panel title={`予約一覧（${date}）`} className="d2">
-        {day.length === 0 ? (
-          <Empty>この日の体験予約はありません</Empty>
+      {/* 一覧 */}
+      <Panel title={`受付一覧（${from} 〜 ${to}）${typeFilter ? ` / ${VISIT_TYPE_LABEL[typeFilter]}` : ""}`} className="d2">
+        {list.length === 0 ? (
+          <Empty>この期間の一時利用はありません</Empty>
         ) : (
           <div className="space-y-2">
-            {day.map((b) => {
-              const guest = (b.mbr_guests ?? null) as Row | null;
-              const assignee = (b.assignee ?? null) as Row | null;
-              const status = String(b.status);
+            {list.map((v) => {
+              const guest = (v.mbr_guests ?? null) as Row | null;
+              const rec = (v.reception ?? null) as Row | null;
               const name = guest?.name ? String(guest.name) : "（氏名未入力）";
-              const selfDone = !!b.consent_at;
+              const selfDone = !!v.consent_at;
+              const vtype = String(v.visit_type);
               return (
-                <div key={String(b.id)} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
+                <div key={String(v.id)} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Badge tone={STATUS_TONE[status] ?? "default"}>{STATUS_LABEL[status] ?? status}</Badge>
+                      <Badge tone={TYPE_TONE[vtype] ?? "default"}>{VISIT_TYPE_LABEL[vtype] ?? vtype}</Badge>
                       <span className="font-semibold">{name}</span>
                       {guest?.name_kana ? <span className="text-xs text-[--color-dim]">{String(guest.name_kana)}</span> : null}
-                      {b.joined ? <Badge tone="gold">入会</Badge> : null}
+                      {v.result === "join" ? <Badge tone="gold">入会</Badge> : null}
+                      {v.result === "purchase" ? <Badge tone="ok">購入</Badge> : null}
                       {selfDone ? <Badge tone="ok">自己入力済</Badge> : null}
                     </div>
                     <div className="text-xs text-[--color-dim]">
-                      {[fmtTime(b.start_time) && `${fmtTime(b.start_time)}${fmtTime(b.end_time) ? `–${fmtTime(b.end_time)}` : ""}`, b.bay && String(b.bay), b.program && String(b.program), assignee?.name && `担当 ${String(assignee.name)}`, SOURCE_LABEL[String(b.source)] && `経路 ${SOURCE_LABEL[String(b.source)]}`]
-                        .filter(Boolean)
-                        .join("　")}
+                      {[String(v.visited_on), guest?.phone && String(guest.phone), v.referral_source && `経路 ${String(v.referral_source)}`, rec?.name && `受付 ${String(rec.name)}`]
+                        .filter(Boolean).join("　")}
                     </div>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    {/* ステータス操作 */}
-                    {status !== "visited" && (
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="id" value={String(b.id)} />
-                        <input type="hidden" name="status" value="visited" />
-                        <button className={btnGhostCls}>来店にする</button>
-                      </form>
-                    )}
-                    {status !== "no_show" && (
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="id" value={String(b.id)} />
-                        <input type="hidden" name="status" value="no_show" />
-                        <button className={btnGhostCls}>無断欠</button>
-                      </form>
-                    )}
-                    {status !== "canceled" && (
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="id" value={String(b.id)} />
-                        <input type="hidden" name="status" value="canceled" />
-                        <button className={btnGhostCls}>キャンセル</button>
-                      </form>
-                    )}
+                  {/* スタッフ追記 */}
+                  <form action={updateVisit} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-6">
+                    <input type="hidden" name="id" value={String(v.id)} />
+                    <select name="result" defaultValue={String(v.result ?? "none")} className={`${inputCls} !py-1`}>
+                      {RESULTS.map((r) => <option key={r.value} value={r.value}>{r.label === "—" ? "成約なし" : r.label}</option>)}
+                    </select>
+                    <input name="fee" defaultValue={v.fee != null ? String(v.fee) : ""} inputMode="numeric" placeholder="利用料" className={`${inputCls} !py-1`} />
+                    <select name="discount" defaultValue={v.discount ? String(v.discount) : ""} className={`${inputCls} !py-1`}>
+                      <option value="">割引なし</option>
+                      {DISCOUNTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <select name="payment_method" defaultValue={v.payment_method ? String(v.payment_method) : ""} className={`${inputCls} !py-1`}>
+                      <option value="">支払-</option>
+                      {PAYMENT_METHODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                    <input name="pro_staff" defaultValue={v.pro_staff ? String(v.pro_staff) : ""} placeholder="担当プロ" className={`${inputCls} !py-1`} />
+                    <input name="reapproach_date" type="date" defaultValue={v.reapproach_date ? String(v.reapproach_date) : ""} className={`${inputCls} !py-1`} />
+                    <input name="note" defaultValue={v.note ? String(v.note) : ""} placeholder="備考・フォロー状況" className={`${inputCls} !py-1 col-span-2 sm:col-span-5`} />
+                    <button className={btnGhostCls}>保存</button>
+                  </form>
 
-                    {/* タブレット受付 */}
-                    <form action={issueTabletToken}>
-                      <input type="hidden" name="booking_id" value={String(b.id)} />
-                      <button className={btnGhostCls}>📱 タブレット受付</button>
-                    </form>
-
-                    {/* 入会可否 */}
-                    {!b.joined ? (
-                      <form action={setJoinResult} className="flex items-center gap-1">
-                        <input type="hidden" name="id" value={String(b.id)} />
-                        <input type="hidden" name="joined" value="1" />
-                        <button className={btnCls}>✓ 入会</button>
-                      </form>
-                    ) : (
-                      <form action={setJoinResult}>
-                        <input type="hidden" name="id" value={String(b.id)} />
-                        <input type="hidden" name="joined" value="0" />
-                        <button className={btnGhostCls}>入会を取消</button>
-                      </form>
-                    )}
-
-                    {/* 見送り理由 */}
-                    {!b.joined && (
-                      <form action={setJoinResult} className="flex items-center gap-1">
-                        <input type="hidden" name="id" value={String(b.id)} />
-                        <input type="hidden" name="joined" value="0" />
-                        <input name="decline_reason" placeholder="見送り理由" className={`${inputCls} !w-40 !py-1`} />
-                        <button className={btnGhostCls}>記録</button>
-                      </form>
-                    )}
-
-                    <form action={deleteBooking} className="ml-auto">
-                      <input type="hidden" name="id" value={String(b.id)} />
+                  <div className="mt-1 flex justify-end">
+                    <form action={deleteVisit}>
+                      <input type="hidden" name="id" value={String(v.id)} />
                       <button className="text-xs text-[--color-dim] hover:text-red-400">削除</button>
                     </form>
                   </div>
@@ -268,6 +202,25 @@ export default async function MembersPage({
             })}
           </div>
         )}
+      </Panel>
+
+      {/* 店頭タブレットURL発行 */}
+      <Panel title="店頭タブレット受付URLの発行" className="d3">
+        <p className="mb-2 text-xs text-[--color-dim]">店舗ごとに常設の受付URLを発行します（予約不要）。発行すると同じ店舗の旧URLは無効化されます。</p>
+        <form action={issueStoreToken} className="flex flex-wrap items-end gap-2">
+          {storeList.length > 0 && (
+            <Field label="店舗">
+              <select name="store_id" className={inputCls}>
+                <option value="">-</option>
+                {storeList.map((s) => <option key={String(s.id)} value={String(s.id)}>{String(s.name)}</option>)}
+              </select>
+            </Field>
+          )}
+          <Field label="ラベル（任意）">
+            <input name="label" placeholder="宝塚 受付タブレット" className={inputCls} />
+          </Field>
+          <button className={btnCls}>受付URLを発行</button>
+        </form>
       </Panel>
     </div>
   );

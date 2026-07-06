@@ -1077,8 +1077,8 @@ app.post('/receipts', async (c) => {
   const slipDate = body.slip_date || null
   const inspectedBy = normalize(body.inspected_by)
   const note = normalize(body.note)
-  const noSlip = body.no_slip ? 1 : 0
-  const slipVerified = (slipDate || noSlip) ? 1 : 0  // 納品書日付入力済み or 納品書なし → 確認済み
+  const noSlip = body.no_slip ? true : false
+  const slipVerified = (slipDate || noSlip) ? true : false  // 納品書日付入力済み or 納品書なし → 確認済み
   const slipNote = normalize(body.slip_note)
   const actualSupplierId = body.actual_supplier_id ?? null
 
@@ -1253,10 +1253,10 @@ app.put('/receipts/:id', async (c) => {
   if (body.slip_note     !== undefined)      { sets.push('slip_note=?');           binds.push(normalize(body.slip_note)) }
   // 納品書なしフラグ: trueにしたらslip_verifiedも1にする（照合済み扱い）
   if (body.no_slip !== undefined) {
-    const noSlipVal = body.no_slip ? 1 : 0
+    const noSlipVal = body.no_slip ? true : false
     sets.push('no_slip=?'); binds.push(noSlipVal)
     if (body.no_slip) {
-      sets.push('slip_verified=?'); binds.push(1)
+      sets.push('slip_verified=?'); binds.push(true)
     }
   }
   // slip_verified 自動化ロジック:
@@ -1267,7 +1267,7 @@ app.put('/receipts/:id', async (c) => {
   if (!body.no_slip) {
     // no_slip は上のブロックで設定済み。here は no_slip=false or undefined の場合
     if (body.slip_verified !== undefined || autoVerify) {
-      const verifiedVal = autoVerify ? 1 : (body.slip_verified ? 1 : 0)
+      const verifiedVal = autoVerify ? true : (body.slip_verified ? true : false)
       sets.push('slip_verified=?'); binds.push(verifiedVal)
     }
   }
@@ -1382,8 +1382,8 @@ app.post('/receipts/free', async (c) => {
   const slipDate     = body.slip_date || null
   const inspectedBy  = normalize(body.inspected_by)
   const note         = normalize(body.note)
-  const noSlip       = body.no_slip ? 1 : 0
-  const slipVerified = (slipDate || noSlip) ? 1 : 0
+  const noSlip       = body.no_slip ? true : false
+  const slipVerified = (slipDate || noSlip) ? true : false
   const slipNote     = normalize(body.slip_note)
 
   const tenantId = getTenantId(c)
@@ -1689,7 +1689,7 @@ app.post('/suppliers', async (c) => {
       (name, alias_names, contact_name, honorific, order_method, order_method_detail,
        phone, fax, fax_number, email, cc_emails, line_id, line_group_id,
        payment_method, shipping_rule, free_shipping_threshold, website, postal_code, address, notes, is_active, updated_at, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,true,CURRENT_TIMESTAMP,?)
   `).bind(
     normalize(b['name']), normalize(b['alias_names']), normalize(b['contact_name']),
     normalize(b['honorific']) || '様', normalize(b['order_method']), normalize(b['order_method_detail']),
@@ -1776,7 +1776,7 @@ app.post('/product-suppliers', async (c) => {
   `).bind(
     productId, supplierId,
     b['rate'] ? parseFloat(String(b['rate'])) : null,
-    b['is_default'] ? 1 : 0,
+    b['is_default'] ? true : false,
     b['notes'] ? String(b['notes']) : null,
     b['sort_order'] ? parseInt(String(b['sort_order'])) : 0,
     tenantId
@@ -1804,7 +1804,7 @@ app.put('/product-suppliers/:id', async (c) => {
   if (!supplierId || supplierId === 0) {
     // is_defaultだけ更新
     await db.prepare('UPDATE product_suppliers SET is_default=? WHERE id=? AND tenant_id=?')
-      .bind(b['is_default'] ? 1 : 0, id, tenantId).run()
+      .bind(b['is_default'] ? true : false, id, tenantId).run()
   } else {
     await db.prepare(`
       UPDATE product_suppliers SET supplier_id=?, rate=?, is_default=?, notes=?, sort_order=?
@@ -1812,7 +1812,7 @@ app.put('/product-suppliers/:id', async (c) => {
     `).bind(
       supplierId,
       b['rate'] != null ? parseFloat(String(b['rate'])) : null,
-      b['is_default'] ? 1 : 0,
+      b['is_default'] ? true : false,
       b['notes'] ? String(b['notes']) : null,
       b['sort_order'] ? parseInt(String(b['sort_order'])) : 0,
       id, tenantId
@@ -1868,7 +1868,7 @@ app.post('/products', async (c) => {
     INSERT INTO products
       (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
        list_price, default_rate, default_supplier_id, unit, source, is_active, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
   `).bind(
     normalize(b['product_code'] as string), normalize(b['barcode'] as string),
     normalize(b['item_category'] as string), normalize(b['manufacturer'] as string),
@@ -2151,7 +2151,7 @@ app.post('/products/bulk-import', async (c) => {
             INSERT INTO products
               (item_category, manufacturer, name, spec, color, club_type,
                list_price, default_rate, unit, source, default_supplier_id, is_active, tenant_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,true,?)
           `).bind(
             item_category, manufacturer || null, name,
             varSpec || null, varColor || null, club_type || null,
@@ -2197,7 +2197,7 @@ app.post('/products/bulk-import', async (c) => {
         INSERT INTO products
           (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
            list_price, default_rate, unit, source, default_supplier_id, is_active, tenant_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
       `).bind(
         product_code || null, barcode || null,
         item_category, manufacturer || null, name,

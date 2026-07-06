@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit, logEvent } from "@/lib/kernel";
-import { hashToken, generateToken, INTAKE_TOKEN_TTL_HOURS } from "@/lib/intake";
+import { hashToken, generateToken } from "@/lib/intake";
 
 async function refreshMemberKpis(companyId: string) {
   const admin = createAdmin();
@@ -20,177 +20,150 @@ function orNull(v: FormDataEntryValue | null): string | null {
   const s = str(v);
   return s === "" ? null : s;
 }
+function intOrNull(v: FormDataEntryValue | null): number | null {
+  const s = str(v).replace(/[^\d-]/g, "");
+  return s === "" ? null : parseInt(s, 10);
+}
 
-const SOURCES = ["hp", "phone", "walkin", "referral", "sns", "other"];
-const STATUSES = ["reserved", "visited", "canceled", "no_show"];
+const VISIT_TYPES = ["trial", "fitting", "bay", "visitor_bay", "other"];
+const RESULTS = ["none", "join", "purchase"];
+const PAYMENTS = ["store", "web", "free_campaign", "other"];
 
-/** 体験予約を作成（スタッフ入力）。氏名を入れれば見込み客も同時登録 */
-export async function createBooking(formData: FormData) {
+/** スタッフが手動で一時利用を登録（電話・当日の飛び込み等、タブレット未使用時） */
+export async function createVisitManual(formData: FormData) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
 
+  const visitType = VISIT_TYPES.includes(str(formData.get("visit_type"))) ? str(formData.get("visit_type")) : "trial";
+  const visitedOn = orNull(formData.get("visited_on"));
+  const name = orNull(formData.get("name"));
+  const phone = orNull(formData.get("phone"));
   const storeId = orNull(formData.get("store_id"));
-  const program = orNull(formData.get("program"));
-  const lessonDate = orNull(formData.get("lesson_date"));
-  const startTime = orNull(formData.get("start_time"));
-  const endTime = orNull(formData.get("end_time"));
-  const bay = orNull(formData.get("bay"));
-  const staffId = orNull(formData.get("staff_id"));
-  const source = SOURCES.includes(str(formData.get("source"))) ? str(formData.get("source")) : "walkin";
-  const guestName = orNull(formData.get("guest_name"));
-  const guestMobile = orNull(formData.get("guest_mobile"));
-
-  if (!program && !lessonDate && !guestName) return; // 空送信ガード
+  if (!name && !phone) return; // 空送信ガード
 
   let guestId: string | null = null;
-  if (guestName) {
+  if (name) {
     const { data: g } = await admin
       .from("mbr_guests")
-      .insert({
-        company_id: actor.companyId,
-        store_id: storeId,
-        name: guestName,
-        mobile: guestMobile,
-      })
+      .insert({ company_id: actor.companyId, store_id: storeId, name, phone })
       .select("id")
       .single();
     guestId = g?.id ?? null;
   }
 
-  const { data: booking } = await admin
-    .from("mbr_trial_bookings")
+  const { data: visit } = await admin
+    .from("mbr_walkin_visits")
     .insert({
       company_id: actor.companyId,
       store_id: storeId,
       guest_id: guestId,
-      program,
-      lesson_date: lessonDate,
-      start_time: startTime,
-      end_time: endTime,
-      bay,
-      staff_id: staffId,
-      source,
-      status: "reserved",
+      visited_on: visitedOn ?? new Date().toISOString().slice(0, 10),
+      visit_type: visitType,
+      fee: intOrNull(formData.get("fee")),
+      reception_staff_id: actor.staffId,
+      referral_source: orNull(formData.get("referral_source")),
       created_by: actor.staffId,
     })
     .select("id")
     .single();
 
-  await logAudit(actor, "member.booking_create", "mbr_trial_bookings", booking?.id ?? null, null, {
-    program,
-    lessonDate,
-    guestName,
-  });
+  await logAudit(actor, "walkin.create", "mbr_walkin_visits", visit?.id ?? null, null, { visitType, name });
   await logEvent(actor.companyId, {
-    event_type: "member.trial_booked",
-    title: `体験予約を登録: ${guestName ?? "（氏名未登録）"}${lessonDate ? ` / ${lessonDate}` : ""}`,
-    source: "member-os",
-    source_type: "human",
-    severity: "info",
+    event_type: "member.walkin_manual",
+    title: `一時利用を登録: ${name ?? "（氏名未登録）"}（${visitType}）`,
+    source: "member-os", source_type: "human", severity: "info",
   });
   await refreshMemberKpis(actor.companyId);
   revalidatePath("/");
 }
 
-/** 予約ステータス更新（来店 / キャンセル / no-show / 予約に戻す） */
-export async function updateBookingStatus(formData: FormData) {
+/** スタッフによる追記（利用料/割引/支払/担当プロ/成約/フォロー等） */
+export async function updateVisit(formData: FormData) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
-  const status = str(formData.get("status"));
-  if (!id || !STATUSES.includes(status)) return;
-
-  await admin
-    .from("mbr_trial_bookings")
-    .update({ status })
-    .eq("id", id)
-    .eq("company_id", actor.companyId)
-    .is("deleted_at", null);
-
-  await logAudit(actor, "member.booking_status", "mbr_trial_bookings", id, null, { status });
-  await refreshMemberKpis(actor.companyId);
-  revalidatePath("/");
-}
-
-/** 入会可否の登録（入会 or 見送り＋理由） */
-export async function setJoinResult(formData: FormData) {
-  const actor = await requireReceptionActor();
-  const admin = createAdmin();
-  const id = str(formData.get("id"));
-  const joined = str(formData.get("joined")) === "1";
-  const declineReason = orNull(formData.get("decline_reason"));
   if (!id) return;
 
+  const patch: Record<string, unknown> = {};
+  if (formData.has("fee")) patch.fee = intOrNull(formData.get("fee"));
+  if (formData.has("discount")) patch.discount = orNull(formData.get("discount"));
+  if (formData.has("payment_method")) {
+    const p = str(formData.get("payment_method"));
+    patch.payment_method = PAYMENTS.includes(p) ? p : null;
+  }
+  if (formData.has("pro_staff")) patch.pro_staff = orNull(formData.get("pro_staff"));
+  if (formData.has("result")) {
+    const r = str(formData.get("result"));
+    patch.result = RESULTS.includes(r) ? r : "none";
+  }
+  if (formData.has("repeat_date")) patch.repeat_date = orNull(formData.get("repeat_date"));
+  if (formData.has("reapproach_date")) patch.reapproach_date = orNull(formData.get("reapproach_date"));
+  if (formData.has("note")) patch.note = orNull(formData.get("note"));
+  if (Object.keys(patch).length === 0) return;
+
   await admin
-    .from("mbr_trial_bookings")
-    .update({
-      joined,
-      joined_at: joined ? new Date().toISOString().slice(0, 10) : null,
-      decline_reason: joined ? null : declineReason,
-      status: joined ? "visited" : undefined,
-    })
+    .from("mbr_walkin_visits")
+    .update(patch)
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .is("deleted_at", null);
 
-  await logAudit(actor, "member.join_result", "mbr_trial_bookings", id, null, { joined });
-  await logEvent(actor.companyId, {
-    event_type: joined ? "member.joined" : "member.declined",
-    title: joined ? "体験から入会が成立しました" : `体験見送り: ${declineReason ?? "理由未記入"}`,
-    source: "member-os",
-    source_type: "human",
-    severity: joined ? "notice" : "info",
-  });
+  await logAudit(actor, "walkin.update", "mbr_walkin_visits", id, null, patch);
+  if ("result" in patch) {
+    await logEvent(actor.companyId, {
+      event_type: patch.result === "join" ? "member.joined" : patch.result === "purchase" ? "member.purchased" : "member.result",
+      title: patch.result === "join" ? "一時利用から入会が成立" : patch.result === "purchase" ? "フィッティングから購入が成立" : "成約結果を更新",
+      source: "member-os", source_type: "human", severity: patch.result === "none" ? "info" : "notice",
+    });
+  }
   await refreshMemberKpis(actor.companyId);
   revalidatePath("/");
 }
 
 /** 論理削除 */
-export async function deleteBooking(formData: FormData) {
+export async function deleteVisit(formData: FormData) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
   await admin
-    .from("mbr_trial_bookings")
+    .from("mbr_walkin_visits")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
     .eq("company_id", actor.companyId);
-  await logAudit(actor, "member.booking_delete", "mbr_trial_bookings", id);
+  await logAudit(actor, "walkin.delete", "mbr_walkin_visits", id);
   await refreshMemberKpis(actor.companyId);
   revalidatePath("/");
 }
 
-/**
- * タブレット受付トークンを発行。生トークンでURLを組み、?intake_url= に載せて一度だけ表示（DECISIONS #12）。
- */
-export async function issueTabletToken(formData: FormData) {
+/** 店頭常設タブレットの受付URLを発行（店舗単位・長期有効。生URLは発行直後に一度だけ表示） */
+export async function issueStoreToken(formData: FormData) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
-  const bookingId = str(formData.get("booking_id"));
-  if (!bookingId) return;
+  const storeId = orNull(formData.get("store_id"));
+  const label = orNull(formData.get("label"));
 
-  // 既存の未使用トークンを無効化（重複防止）
+  // 既存の同店舗トークンを無効化（1店舗1URL運用）
   await admin
-    .from("mbr_intake_tokens")
-    .update({ used_at: new Date().toISOString() })
+    .from("mbr_walkin_tokens")
+    .update({ active: false })
     .eq("company_id", actor.companyId)
-    .eq("booking_id", bookingId)
-    .is("used_at", null);
+    .eq("store_id", storeId ?? "")
+    .eq("active", true);
 
   const token = generateToken();
-  const expires = new Date(Date.now() + INTAKE_TOKEN_TTL_HOURS * 3600 * 1000).toISOString();
-  await admin.from("mbr_intake_tokens").insert({
+  await admin.from("mbr_walkin_tokens").insert({
     company_id: actor.companyId,
-    booking_id: bookingId,
+    store_id: storeId,
     token_hash: hashToken(token),
-    expires_at: expires,
+    label,
+    created_by: actor.staffId,
   });
-  await logAudit(actor, "member.intake_token_issue", "mbr_intake_tokens", bookingId);
+  await logAudit(actor, "walkin.token_issue", "mbr_walkin_tokens", null, null, { storeId, label });
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? "https";
-  const url = `${proto}://${host}/intake/${token}`;
-  redirect(`/?intake_url=${encodeURIComponent(url)}&bid=${bookingId}`);
+  const url = `${proto}://${host}/reception/${token}`;
+  redirect(`/?reception_url=${encodeURIComponent(url)}`);
 }
