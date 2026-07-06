@@ -2294,7 +2294,7 @@ app.get('/mail-batch/:batch_code', async (c) => {
   const db = c.env.DB
   const { tenantId } = getLayoutOpts(c)
   const batchCode = c.req.param('batch_code')
-  const BATCH_DEFAULT_CC = c.env.APP_DEFAULT_CC || ''
+  const BATCH_DEFAULT_CC = c.env.APP_DEFAULT_CC || 'h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idoo@golfwing.jp;a_tanigawa@golfwing.jp;u_furukawa@golfwing.jp'
 
   const orders = await db.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
@@ -2419,10 +2419,11 @@ ${sig ? '\n' + sig : ''}`
     ]
     // 重複除去
     const ccUniq = [...new Set(ccCandidates)]
-    // 初期CC値: 仕入先固有CCがあればそれ、なければAPP_DEFAULT_CC
-    const initialCC = group.supplierCcEmails
-      ? group.supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean).join(', ')
-      : BATCH_DEFAULT_CC
+    // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）
+    const initialCC = [...new Set([
+      ...(BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
+      ...(group.supplierCcEmails ? group.supplierCcEmails.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
+    ])].join(', ')
 
     // CC候補ボタン群HTML
     const ccCandidateHtml = ccUniq.length > 0
@@ -2931,7 +2932,7 @@ app.get('/orders/:id', async (c) => {
 </div>`
 
   // メールパネル
-  const DEFAULT_CC = c.env.APP_DEFAULT_CC || ''
+  const DEFAULT_CC = c.env.APP_DEFAULT_CC || 'h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idoo@golfwing.jp;a_tanigawa@golfwing.jp;u_furukawa@golfwing.jp'
   // CC候補: 仕入先のcc_emails + APP_DEFAULT_CC を合わせて重複除去
   const supplierCcEmails = String(order['supplier_cc_emails'] ?? '')
   const detailCcCandidates: string[] = [
@@ -2942,10 +2943,11 @@ app.get('/orders/:id', async (c) => {
     ),
   ]
   const detailCcUniq = [...new Set(detailCcCandidates)]
-  // 初期CC値: 仕入先設定のCC優先 → なければAPP_DEFAULT_CC
-  const initialDetailCC = supplierCcEmails
-    ? supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean).join(', ')
-    : DEFAULT_CC
+  // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）
+  const initialDetailCC = [...new Set([
+    ...(DEFAULT_CC ? DEFAULT_CC.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
+    ...(supplierCcEmails ? supplierCcEmails.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
+  ])].join(', ')
   const mailtoWithCC = supplierEmail
     ? 'mailto:' + supplierEmail + '?' +
       (initialDetailCC ? 'cc=' + encodeURIComponent(initialDetailCC) + '&' : '') +

@@ -102,6 +102,10 @@ export function createPgD1(databaseUrl: string) {
     // D1(SQLite)互換: 日付系はDateオブジェクトにせず文字列のまま返す
     types: {
       rawDate: { to: 1184, from: [1082, 1114, 1184], serialize: (v: unknown) => v as never, parse: (v: string) => v },
+      // numeric/decimal(OID 1700)はpostgres.jsが既定で文字列を返すため、
+      // D1(SQLite)同様に数値へ変換する。これをしないと金額の加算が
+      // 文字列連結になり合計(例: 発注プールのpool_total)が壊れる。
+      numeric: { to: 1700, from: [1700], serialize: (v: unknown) => String(v), parse: (v: string) => (v === null ? null : parseFloat(v)) },
     },
   })
   return {

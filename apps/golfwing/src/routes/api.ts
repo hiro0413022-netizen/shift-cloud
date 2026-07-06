@@ -491,6 +491,7 @@ app.post('/orders', async (c) => {
     requested_delivery_date: string | null
     line_note: string
     product_id: number | null
+    unit: string
   }> = []
 
   for (const raw of linesRaw) {
@@ -531,6 +532,14 @@ app.post('/orders', async (c) => {
     }
     const amount = unitPrice != null ? unitPrice * raw.quantity : null
 
+    // 単位は商品マスタの登録値を優先（無ければ「本」）
+    let unit = '本'
+    if (raw.product_id) {
+      const pu = await db.prepare('SELECT unit FROM products WHERE id=? AND tenant_id=?')
+        .bind(raw.product_id, tenantId).first<{ unit: string }>()
+      if (pu?.unit) unit = pu.unit
+    }
+
     lines.push({
       supplier_id: supplier['id'] as number,
       item_category: raw.item_category,
@@ -549,6 +558,7 @@ app.post('/orders', async (c) => {
       requested_delivery_date: requestedDeliveryDate,
       line_note: normalize(raw.line_note),
       product_id: raw.product_id ?? null,
+      unit,
     })
   }
 
@@ -584,13 +594,13 @@ app.post('/orders', async (c) => {
           `INSERT INTO purchase_order_items
             (purchase_order_id, product_id, item_category, manufacturer, product_name,
              spec, color, club_type, quantity, list_price, rate, unit_price, amount,
-             customer_name, usage_type, requested_delivery_date, line_note)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             customer_name, usage_type, requested_delivery_date, line_note, unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(orderId, line.product_id, line.item_category, line.manufacturer, line.product_name,
               line.spec, line.color, line.club_type, line.quantity, line.list_price,
               line.rate, line.unit_price, line.amount, line.customer_name, line.usage_type,
-              line.requested_delivery_date, line.line_note)
+              line.requested_delivery_date, line.line_note, line.unit)
         .run()
     }
 
@@ -711,13 +721,21 @@ app.post('/orders/:id/items', async (c) => {
   }
   const amount = unitPrice != null ? unitPrice * body.quantity : null
 
+  // 単位は商品マスタの登録値を優先（無ければ「本」）
+  let unit = '本'
+  if (body.product_id) {
+    const pu = await db.prepare('SELECT unit FROM products WHERE id=? AND tenant_id=?')
+      .bind(body.product_id, tenantId).first<{ unit: string }>()
+    if (pu?.unit) unit = pu.unit
+  }
+
   // INSERT
   await db.prepare(`
     INSERT INTO purchase_order_items
       (purchase_order_id, product_id, item_category, manufacturer, product_name,
        spec, color, club_type, quantity, list_price, rate, unit_price, amount,
-       customer_name, usage_type, requested_delivery_date, line_note)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       customer_name, usage_type, requested_delivery_date, line_note, unit)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     orderId,
     body.product_id ?? null,
@@ -735,7 +753,8 @@ app.post('/orders/:id/items', async (c) => {
     order['customer_name']            ?? null,
     order['usage_type']               ?? null,
     order['requested_delivery_date']  ?? null,
-    normalize(body.line_note)
+    normalize(body.line_note),
+    unit
   ).run()
 
   // メール下書きを再生成（追加した商品を含める）
@@ -2299,13 +2318,13 @@ app.post('/orders/:id/copy', async (c) => {
       INSERT INTO purchase_order_items
         (purchase_order_id, product_id, item_category, manufacturer, product_name,
          spec, color, club_type, quantity, list_price, rate, unit_price, amount,
-         customer_name, usage_type, requested_delivery_date, line_note)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         customer_name, usage_type, requested_delivery_date, line_note, unit)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).bind(
       newOrderId, item['product_id'], item['item_category'], item['manufacturer'], item['product_name'],
       item['spec'], item['color'], item['club_type'], item['quantity'], item['list_price'],
       item['rate'], item['unit_price'], item['amount'],
-      item['customer_name'], item['usage_type'], item['requested_delivery_date'], item['line_note']
+      item['customer_name'], item['usage_type'], item['requested_delivery_date'], item['line_note'], item['unit'] ?? '本'
     ).run()
   }
 

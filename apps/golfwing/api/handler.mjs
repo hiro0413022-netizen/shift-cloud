@@ -3042,6 +3042,11 @@ app.post("/orders", async (c) => {
       unitPrice = Math.round(raw2.list_price * rate);
     }
     const amount = unitPrice != null ? unitPrice * raw2.quantity : null;
+    let unit = "\u672C";
+    if (raw2.product_id) {
+      const pu = await db2.prepare("SELECT unit FROM products WHERE id=? AND tenant_id=?").bind(raw2.product_id, tenantId).first();
+      if (pu?.unit) unit = pu.unit;
+    }
     lines.push({
       supplier_id: supplier["id"],
       item_category: raw2.item_category,
@@ -3059,7 +3064,8 @@ app.post("/orders", async (c) => {
       usage_type: usageType,
       requested_delivery_date: requestedDeliveryDate,
       line_note: normalize(raw2.line_note),
-      product_id: raw2.product_id ?? null
+      product_id: raw2.product_id ?? null,
+      unit
     });
   }
   if (lines.length === 0) {
@@ -3097,8 +3103,8 @@ app.post("/orders", async (c) => {
         `INSERT INTO purchase_order_items
             (purchase_order_id, product_id, item_category, manufacturer, product_name,
              spec, color, club_type, quantity, list_price, rate, unit_price, amount,
-             customer_name, usage_type, requested_delivery_date, line_note)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             customer_name, usage_type, requested_delivery_date, line_note, unit)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         orderId,
         line.product_id,
@@ -3116,7 +3122,8 @@ app.post("/orders", async (c) => {
         line.customer_name,
         line.usage_type,
         line.requested_delivery_date,
-        line.line_note
+        line.line_note,
+        line.unit
       ).run();
     }
     if (!isPool) {
@@ -3181,12 +3188,17 @@ app.post("/orders/:id/items", async (c) => {
     unitPrice = Math.round(body.list_price * rate);
   }
   const amount = unitPrice != null ? unitPrice * body.quantity : null;
+  let unit = "\u672C";
+  if (body.product_id) {
+    const pu = await db2.prepare("SELECT unit FROM products WHERE id=? AND tenant_id=?").bind(body.product_id, tenantId).first();
+    if (pu?.unit) unit = pu.unit;
+  }
   await db2.prepare(`
     INSERT INTO purchase_order_items
       (purchase_order_id, product_id, item_category, manufacturer, product_name,
        spec, color, club_type, quantity, list_price, rate, unit_price, amount,
-       customer_name, usage_type, requested_delivery_date, line_note)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       customer_name, usage_type, requested_delivery_date, line_note, unit)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     orderId,
     body.product_id ?? null,
@@ -3204,7 +3216,8 @@ app.post("/orders/:id/items", async (c) => {
     order["customer_name"] ?? null,
     order["usage_type"] ?? null,
     order["requested_delivery_date"] ?? null,
-    normalize(body.line_note)
+    normalize(body.line_note),
+    unit
   ).run();
   const allItems = await db2.prepare(
     "SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id"
@@ -4607,8 +4620,8 @@ app.post("/orders/:id/copy", async (c) => {
       INSERT INTO purchase_order_items
         (purchase_order_id, product_id, item_category, manufacturer, product_name,
          spec, color, club_type, quantity, list_price, rate, unit_price, amount,
-         customer_name, usage_type, requested_delivery_date, line_note)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         customer_name, usage_type, requested_delivery_date, line_note, unit)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).bind(
       newOrderId,
       item["product_id"],
@@ -4626,7 +4639,8 @@ app.post("/orders/:id/copy", async (c) => {
       item["customer_name"],
       item["usage_type"],
       item["requested_delivery_date"],
-      item["line_note"]
+      item["line_note"],
+      item["unit"] ?? "\u672C"
     ).run();
   }
   const supplier = await db2.prepare("SELECT * FROM suppliers WHERE id=? AND tenant_id=?").bind(src["supplier_id"], tenantId).first();
@@ -7120,7 +7134,7 @@ app2.get("/mail-batch/:batch_code", async (c) => {
   const db2 = c.env.DB;
   const { tenantId } = getLayoutOpts(c);
   const batchCode = c.req.param("batch_code");
-  const BATCH_DEFAULT_CC = c.env.APP_DEFAULT_CC || "";
+  const BATCH_DEFAULT_CC = c.env.APP_DEFAULT_CC || "h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idoo@golfwing.jp;a_tanigawa@golfwing.jp;u_furukawa@golfwing.jp";
   const orders = await db2.prepare(`
     SELECT po.*, s.name AS supplier_name, s.email AS supplier_email,
            s.cc_emails AS supplier_cc_emails, s.contact_name, s.order_method
@@ -7212,7 +7226,10 @@ ${sig ? "\n" + sig : ""}`;
       ...group.supplierCcEmails ? group.supplierCcEmails.split(",").map((s) => s.trim()).filter(Boolean) : []
     ];
     const ccUniq = [...new Set(ccCandidates)];
-    const initialCC = group.supplierCcEmails ? group.supplierCcEmails.split(",").map((s) => s.trim()).filter(Boolean).join(", ") : BATCH_DEFAULT_CC;
+    const initialCC = [.../* @__PURE__ */ new Set([
+      ...BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : [],
+      ...group.supplierCcEmails ? group.supplierCcEmails.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : []
+    ])].join(", ");
     const ccCandidateHtml = ccUniq.length > 0 ? `<div class="mt-1 d-flex flex-wrap gap-1">
           <span class="small text-muted me-1">CC\u5019\u88DC:</span>
           ${ccUniq.map(
@@ -7670,14 +7687,17 @@ app2.get("/orders/:id", async (c) => {
     <i class="fas fa-magic me-1"></i>\u30C6\u30F3\u30D7\u30EC\u30FC\u30C8\u3092\u751F\u6210\u3059\u308B
   </button>
 </div>`;
-  const DEFAULT_CC = c.env.APP_DEFAULT_CC || "";
+  const DEFAULT_CC = c.env.APP_DEFAULT_CC || "h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idoo@golfwing.jp;a_tanigawa@golfwing.jp;u_furukawa@golfwing.jp";
   const supplierCcEmails = String(order["supplier_cc_emails"] ?? "");
   const detailCcCandidates = [
     ...DEFAULT_CC ? [DEFAULT_CC] : [],
     ...supplierCcEmails ? supplierCcEmails.split(",").map((s) => s.trim()).filter(Boolean) : []
   ];
   const detailCcUniq = [...new Set(detailCcCandidates)];
-  const initialDetailCC = supplierCcEmails ? supplierCcEmails.split(",").map((s) => s.trim()).filter(Boolean).join(", ") : DEFAULT_CC;
+  const initialDetailCC = [.../* @__PURE__ */ new Set([
+    ...DEFAULT_CC ? DEFAULT_CC.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : [],
+    ...supplierCcEmails ? supplierCcEmails.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : []
+  ])].join(", ");
   const mailtoWithCC = supplierEmail ? "mailto:" + supplierEmail + "?" + (initialDetailCC ? "cc=" + encodeURIComponent(initialDetailCC) + "&" : "") + "subject=" + encodeURIComponent(emailSubject) + "&body=" + encodeURIComponent(emailBody) : "";
   const detailCcCandidateHtml = detailCcUniq.length > 0 ? `<div class="mt-1 d-flex flex-wrap gap-1">
         <span class="small text-muted me-1">CC\u5019\u88DC:</span>
@@ -13846,7 +13866,11 @@ function createPgD1(databaseUrl) {
     connection: { search_path: "golfwing,public" },
     // D1(SQLite)互換: 日付系はDateオブジェクトにせず文字列のまま返す
     types: {
-      rawDate: { to: 1184, from: [1082, 1114, 1184], serialize: (v) => v, parse: (v) => v }
+      rawDate: { to: 1184, from: [1082, 1114, 1184], serialize: (v) => v, parse: (v) => v },
+      // numeric/decimal(OID 1700)はpostgres.jsが既定で文字列を返すため、
+      // D1(SQLite)同様に数値へ変換する。これをしないと金額の加算が
+      // 文字列連結になり合計(例: 発注プールのpool_total)が壊れる。
+      numeric: { to: 1700, from: [1700], serialize: (v) => String(v), parse: (v) => v === null ? null : parseFloat(v) }
     }
   });
   return {
