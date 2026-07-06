@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { getActiveSegment, canWriteSegment, latestCashBalance, toNum, DENOMS } from "@/lib/money";
+import { getCurrentStore, canWriteStore, latestCashBalance, toNum, DENOMS } from "@/lib/money";
 
-/** 金種棚卸を1件保存。合計を自動計算し、現金出納の理論残高との差異を算出。 */
+/** 金種棚卸を1件保存。合計を自動計算し、その店舗の理論残高との差異を算出。 */
 export async function addCount(formData: FormData): Promise<void> {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
-  const seg = await getActiveSegment(actor.companyId);
-  if (!seg || !canWriteSegment(actor, seg.id)) return;
+  const store = await getCurrentStore(actor);
+  if (!store || !store.segmentId || !canWriteStore(actor, store.id)) return;
 
   const countedAt = String(formData.get("counted_at") ?? "").trim() || new Date().toISOString();
   const location = String(formData.get("location") ?? "register").trim();
@@ -26,10 +26,11 @@ export async function addCount(formData: FormData): Promise<void> {
   }
   if (total === 0) return;
 
-  const theoretical = await latestCashBalance(actor.companyId, seg.id);
+  const theoretical = await latestCashBalance(actor.companyId, store.id);
   await admin.from("mon_cash_count").insert({
     company_id: actor.companyId,
-    segment_id: seg.id,
+    store_id: store.id,
+    segment_id: store.segmentId,
     counted_at: countedAt,
     location,
     denominations,

@@ -1,6 +1,6 @@
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { getActiveSegment, latestCashBalance, DENOMS } from "@/lib/money";
+import { getCurrentStore, latestCashBalance, DENOMS } from "@/lib/money";
 import { Panel, Empty, Badge, yen, inputCls, btnCls } from "@/components/ui";
 import { addCount, deleteCount } from "./actions";
 
@@ -14,21 +14,21 @@ type Count = {
 export default async function CountPage() {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
-  const seg = await getActiveSegment(actor.companyId);
+  const store = await getCurrentStore(actor);
 
-  const { data } = seg
+  const { data } = store
     ? await admin.from("mon_cash_count").select("*")
-        .eq("company_id", actor.companyId).eq("segment_id", seg.id).is("deleted_at", null)
+        .eq("company_id", actor.companyId).eq("store_id", store.id).is("deleted_at", null)
         .order("counted_at", { ascending: false }).limit(30)
     : { data: [] };
   const rows = (data ?? []) as Count[];
-  const theoretical = seg ? await latestCashBalance(actor.companyId, seg.id) : 0;
+  const theoretical = store ? await latestCashBalance(actor.companyId, store.id) : 0;
   const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-4">
       <header>
-        <h1 className="text-xl font-bold">金種棚卸 — {seg?.name ?? "事業未設定"}</h1>
+        <h1 className="text-xl font-bold">金種棚卸 — {store?.name ?? "店舗未選択"}</h1>
         <p className="text-sm text-[--color-dim]">レジ・金庫の枚数を入力 → 合計を自動計算し、出納の理論残高と突合します</p>
       </header>
 
@@ -38,8 +38,8 @@ export default async function CountPage() {
       </Panel>
 
       <Panel title="棚卸を記録">
-        {!seg ? (
-          <Empty>この事業（segment）が未設定です</Empty>
+        {!store ? (
+          <Empty>店舗が選択されていません。上部の店舗切替で選んでください</Empty>
         ) : (
           <form action={addCount} className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">

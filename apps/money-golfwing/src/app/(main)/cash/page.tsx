@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { getActiveSegment, latestCashBalance, monthRange } from "@/lib/money";
+import { getCurrentStore, latestCashBalance, monthRange } from "@/lib/money";
 import { Panel, Empty, yen, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { addCashEntry, deleteCashEntry } from "./actions";
 
@@ -18,26 +18,26 @@ function shift(y: string, n: number) { const [a, m] = y.split("-").map(Number); 
 export default async function CashPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
-  const seg = await getActiveSegment(actor.companyId);
+  const store = await getCurrentStore(actor);
   const sp = await searchParams;
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
   const { from, to } = monthRange(month);
 
-  const { data } = seg
+  const { data } = store
     ? await admin.from("mon_cash_ledger").select("*")
-        .eq("company_id", actor.companyId).eq("segment_id", seg.id)
+        .eq("company_id", actor.companyId).eq("store_id", store.id)
         .gte("entry_date", from).lt("entry_date", to).is("deleted_at", null)
         .order("entry_date", { ascending: true }).order("created_at", { ascending: true })
     : { data: [] };
   const rows = (data ?? []) as Row[];
-  const balance = seg ? await latestCashBalance(actor.companyId, seg.id) : 0;
+  const balance = store ? await latestCashBalance(actor.companyId, store.id) : 0;
   const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold">現金出納 — {seg?.name ?? "事業未設定"}</h1>
+          <h1 className="text-xl font-bold">現金出納 — {store?.name ?? "店舗未選択"}</h1>
           <p className="text-sm text-[--color-dim]">入金・出金を入力すると残高が自動計算されます</p>
         </div>
         <div className="flex items-center gap-2">
@@ -52,8 +52,8 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       </Panel>
 
       <Panel title="出納を追加">
-        {!seg ? (
-          <Empty>この事業（segment）が未設定です</Empty>
+        {!store ? (
+          <Empty>店舗が選択されていません。上部の店舗切替で選んでください</Empty>
         ) : (
           <form action={addCashEntry} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <input type="date" name="entry_date" defaultValue={today} className={inputCls} required />

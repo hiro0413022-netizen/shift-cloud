@@ -1,45 +1,39 @@
 import "server-only";
+import { cookies } from "next/headers";
 import { createAdmin } from "@/lib/supabase/admin";
-import type { MoneyActor } from "@/lib/auth";
-
-export type Segment = { id: string; code: string; name: string };
+import type { MoneyActor, AccessibleStore } from "@/lib/auth";
 
 /** 金種（棚卸で使う額面） */
 export const DENOMS = [10000, 5000, 1000, 500, 100, 50, 10, 5, 1];
 
-/** このアプリが扱う事業（既定=GOLF WING）。環境変数で他事業アプリに転用可。 */
-export function activeSegmentCode(): string {
-  return process.env.MONEY_SEGMENT_CODE ?? "golf";
-}
+export const STORE_COOKIE = "mg_store";
 
-export async function getActiveSegment(companyId: string): Promise<Segment | null> {
-  const admin = createAdmin();
-  const { data } = await admin
-    .from("fin_segments")
-    .select("id, code, name")
-    .eq("company_id", companyId)
-    .eq("code", activeSegmentCode())
-    .is("deleted_at", null)
-    .single();
-  return (data as Segment | null) ?? null;
-}
-
-/** 事業への書込権限（本部横断 or 当該事業のinput/manager） */
-export function canWriteSegment(actor: MoneyActor, segmentId: string): boolean {
-  if (actor.canManageAll) return true;
-  return actor.grants.some(
-    (g) => g.segmentId === segmentId && (g.role === "input" || g.role === "manager")
+/** 現在選択中の店舗（cookie）。未選択なら主店舗→先頭。アクセス外のcookieは無視。 */
+export async function getCurrentStore(actor: MoneyActor): Promise<AccessibleStore | null> {
+  if (actor.stores.length === 0) return null;
+  const jar = await cookies();
+  const sel = jar.get(STORE_COOKIE)?.value;
+  return (
+    actor.stores.find((s) => s.id === sel) ??
+    actor.stores.find((s) => s.isPrimary) ??
+    actor.stores[0]
   );
 }
 
-/** 直近の現金残高（現金出納の最新行） */
-export async function latestCashBalance(companyId: string, segmentId: string): Promise<number> {
+/** その店舗に書き込めるか（本部は全店舗、現場は配属店舗） */
+export function canWriteStore(actor: MoneyActor, storeId: string): boolean {
+  if (actor.canManageAll) return true;
+  return actor.stores.some((s) => s.id === storeId);
+}
+
+/** 直近の現金残高（店舗別・現金出納の最新行） */
+export async function latestCashBalance(companyId: string, storeId: string): Promise<number> {
   const admin = createAdmin();
   const { data } = await admin
     .from("mon_cash_ledger")
     .select("balance, entry_date, created_at")
     .eq("company_id", companyId)
-    .eq("segment_id", segmentId)
+    .eq("store_id", storeId)
     .is("deleted_at", null)
     .order("entry_date", { ascending: false })
     .order("created_at", { ascending: false })

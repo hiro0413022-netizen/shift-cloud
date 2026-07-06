@@ -3,14 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { getActiveSegment, canWriteSegment, latestCashBalance, toNum } from "@/lib/money";
+import { getCurrentStore, canWriteStore, latestCashBalance, toNum } from "@/lib/money";
 
 /** 売上明細を1件追加。支払方法=現金なら現金出納へ入金行を自動連携。 */
 export async function addSale(formData: FormData): Promise<void> {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
-  const seg = await getActiveSegment(actor.companyId);
-  if (!seg || !canWriteSegment(actor, seg.id)) return;
+  const store = await getCurrentStore(actor);
+  if (!store || !store.segmentId || !canWriteStore(actor, store.id)) return;
 
   const soldOn = String(formData.get("sold_on") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
@@ -32,7 +32,8 @@ export async function addSale(formData: FormData): Promise<void> {
     .from("mon_sales")
     .insert({
       company_id: actor.companyId,
-      segment_id: seg.id,
+      store_id: store.id,
+      segment_id: store.segmentId,
       sold_on: soldOn,
       category,
       customer_name: customer,
@@ -48,13 +49,14 @@ export async function addSale(formData: FormData): Promise<void> {
     .select("id")
     .single();
 
-  // 現金売上 → 現金出納に入金として自動反映
+  // 現金売上 → 店舗の現金出納に入金として自動反映
   if (payMethod === "現金") {
     const inAmount = taxIncluded ?? amount;
-    const prev = await latestCashBalance(actor.companyId, seg.id);
+    const prev = await latestCashBalance(actor.companyId, store.id);
     await admin.from("mon_cash_ledger").insert({
       company_id: actor.companyId,
-      segment_id: seg.id,
+      store_id: store.id,
+      segment_id: store.segmentId,
       entry_date: soldOn,
       summary: category,
       description: productName || customer || "現金売上",

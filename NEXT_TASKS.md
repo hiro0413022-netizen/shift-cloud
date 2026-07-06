@@ -8,6 +8,14 @@
 
 ## 要対応
 
+LINE. **LINE公式アカウント連携（DECISIONS #29 / 手順 OPERATIONS §6）**: n8nを統合ハブに、既存CEO Inbox（`sec_inquiries`）で受ける＝スキーマ変更ゼロ。
+   - ☐ **Phase 0（ユーザー・最初にこれだけ）**: LINE公式アカウントの Messaging API を有効化し、channel secret / 長期アクセストークンを発行（OPERATIONS §6 Phase 0）。完了したらClaudeに連絡
+   - ☐ **Phase 0b（ユーザー）**: Claudeが作る `vault_systems` 行に、/vault でシークレット/トークンを入力保存
+   - ☐ **Phase A（Claude構築）**: n8n Webhook受信→署名検証→`sec_inquiries`(source='line')insert。Webhook URLをユーザーがLINE側に貼付・応答メッセージOFF。→ 顧客問い合わせがCEO Inbox(/inbox)に自動集約
+   - ☐ **Phase B（Claude構築）**: LINEリッチメニュー「体験予約」→ member-os `/intake` 誘導。体験予約数・入会率KPIは既存 `refresh_member_kpis` で自動
+   - ☐ **Phase C（Claude構築）**: SNS AI生成文の承認→n8nでLINE一斉配信（外部送信=承認必須）
+   - ☐ **Phase D（後続）**: Instagram（Meta Graph API）をn8nで
+
 00. **Vercel環境変数の設定（ユーザー・CEO AI起動に必須）**: `yozan-genesis`プロジェクトに (1) `CRON_SECRET`=ランダム文字列（毎朝6時の自動報告に必須） (2) `ANTHROPIC_API_KEY`（CEO AIのClaude分析。未設定でもルールベースで動作） を追加 → Redeploy
 0-a. **5大KPIの目標値設定（ユーザー）**: Command Centerの「KPI手動更新」で会員数・体験予約数・入会率・退会率の現在値と、5大KPI全部の目標値を入力 → 全体スコアと判断リストが機能し始める
 0-b. **Member OS（Smart Hello取込）実装**: 仕様書 docs/modules/member-os/SMART_HELLO_IMPORT.md（実サンプル分析済み）に基づき会員名簿・予約一覧の取込→会員数/入会/退会/体験予約/入会率KPI自動化（DECISIONS #22）。個人情報は取り込まない設計

@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## 2026-07-06
+- feat(member-os): 予約システム Phase F（DECISIONS #24, 姫路FRUNK GOLF）。migration 0020適用（FRUNK GOLF 姫路 店舗＋打席6・パーソナルレッスン1、res_resources/res_bookings/res_tokens、営業時間からの枠生成、同枠ダブルブッキング防止のunique index）。member-osに `/reservations`（スタッフ: 空き状況グリッド・電話/店頭予約入力・来店/取消/削除・会員/都度・課金・Web予約URL発行）と公開 `/book/[token]`（お客様Web予約: 日付選択→空き枠選択→氏名/連絡先/会員番号/人数→予約確定→確認画面）。middlewareに /book 公開許可、TopBarに導線。next build 検証済。会員数KPIは会員名簿集計で229・退会率3.5%を反映済
 - feat(member-os): Smart Hello取込 Phase E（DECISIONS #22）。migration 0019適用（mbr_members スナップショット＋mbr_reservations、refresh_smart_hello_kpis＝在籍会員数・退会率。口座/カード等の機微列は非取込）。member-osに `/import` 追加＝会員名簿/予約一覧のExcelをアップロード→exceljsでパース→会員は全件洗い替え・予約は予約番号でupsert→KPI自動更新。TopBarに導線。合成データでKPI関数を検証（在籍・退会率）。会員244/予約2,189の実データは /import から取込む運用（在籍219＝スタッフ15除く・退会予定10・休会11）
 - feat(member-os): 一時利用者名簿 Phase C/D。C=Excel出力（/api/ledger-export、現行「一時利用顧客名簿」57列を1:1再現・期間/区分フィルタ、exceljs、台帳に⬇Excel出力ボタン、ヘッダ完全一致を検証）。D=既存2,281行の移行SQL生成（空134行除外・表記ゆれ正規化・区分/性別/支払の名寄せ・survey化）、2行で本番スキーマ検証通過。PIIのためリポジトリ非格納、SQL EditorでSupabase実行（walkin_import_1_guests.sql→2_visits.sql）
 - feat(member-os): 一時利用者名簿へ再設計 Phase A/B（DECISIONS #28）。migration 0018適用（mbr_walkin_visits/mbr_walkin_tokens、mbr_guestsに職業/連絡方法/距離を追加、refresh_member_kpisを一時利用台帳ベースへ拡張＝体験→入会率）。member-osを予約起点から受付台帳へ刷新: トップ/=受付台帳（当月サマリ・区分別・スタッフ追記・手動登録・受付URL発行）、/reception/[token]=店頭常設タブレットの予約なし自己入力（利用区分5種・アンケート・同意・電子サイン）。旧/intake（予約起点）は撤去。両アプリ next build 検証済。Phase C(Excel出力)/D(既存2,415行移行)/E(Smart Hello取込)/F(姫路予約サイト)は後続
