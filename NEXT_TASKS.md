@@ -22,4 +22,6 @@
    - ☐ **ユーザー作業**: (1) ユーザーPCからpush → Vercel自動デプロイ (2) /members で予約1件登録→「タブレット受付」→ /intake で自己入力→入会 まで通しテスト
    - Phase 2（次段）: 予約サイト／予約システム本体を姫路FRUNK GOLFに導入（#24）／会員名簿のGenesis移管
    - 設計: docs/modules/member-os/TRIAL_INTAKE.md
-4. **Shif
+4. **Shift Cloud実運用フィードバックの収集と反映**: 現場の声を集めて改善バックログ化
+5. **GolfOrder切替儀式**: D1差分同期 → 運用切替宣言 → 旧Pages `golfwing` 停止 → import関数削除（設計書§11）。新規入力は新版（https://shift-cloud-golfwing.vercel.app）に統一
+6. **掃除（ユーザー作業）**: Cloudflareで旧Pagesのカスタムドメイン解除 — `yozan-group`から yozan-inc.jp/www.yozan-inc.jp、`kallinos`から www.kallinos.jp。※`golfwing`プロジェクトは本番稼働中なので触らない
