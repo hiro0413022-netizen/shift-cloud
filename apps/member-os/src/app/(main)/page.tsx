@@ -77,6 +77,12 @@ export default async function LedgerPage({
             {VISIT_TYPES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
           </select>
           <button className={btnGhostCls}>表示</button>
+          <a
+            href={`/api/ledger-export?from=${from}&to=${to}${typeFilter ? `&type=${typeFilter}` : ""}`}
+            className={btnCls}
+          >
+            ⬇ Excel出力
+          </a>
         </form>
       </header>
 
