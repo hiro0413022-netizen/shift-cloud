@@ -2,7 +2,7 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { genSlots, BOOKING_STATUS_LABEL, CUSTOMER_KIND, HIMEJI_STORE_CODE } from "@/lib/reservation";
-import { createBooking, setBookingStatus, deleteBooking, issueBookingToken } from "./actions";
+import { createBooking, setBookingStatus, deleteBooking, issueBookingToken, issueBoardToken } from "./actions";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -14,7 +14,7 @@ function today(): string {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; booking_url?: string; err?: string }>;
+  searchParams: Promise<{ date?: string; booking_url?: string; board_url?: string; err?: string }>;
 }) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
@@ -44,6 +44,7 @@ export default async function ReservationsPage({
   }
 
   const bookingUrl = sp.booking_url ?? null;
+  const boardUrl = sp.board_url ?? null;
 
   return (
     <div className="space-y-4">
@@ -65,6 +66,15 @@ export default async function ReservationsPage({
           <div className="flex flex-wrap items-center gap-2">
             <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-sky-300">{bookingUrl}</code>
             <a href={bookingUrl} target="_blank" rel="noreferrer" className={btnCls}>予約画面を開く ↗</a>
+          </div>
+        </Panel>
+      )}
+
+      {boardUrl && (
+        <Panel title="店頭カレンダーURL（ロビー掲示・常設タブレット用・一度だけ表示）" className="d1">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-amber-300">{boardUrl}</code>
+            <a href={boardUrl} target="_blank" rel="noreferrer" className={btnCls}>カレンダーを開く ↗</a>
           </div>
         </Panel>
       )}
@@ -178,12 +188,17 @@ export default async function ReservationsPage({
         )}
       </Panel>
 
-      {/* Web予約URL発行 */}
-      <Panel title="お客様Web予約URLの発行" className="d3">
-        <p className="mb-2 text-xs text-[--color-dim]">HP掲載やQR掲示用の予約URLを発行します（発行すると旧URLは無効化）。</p>
-        <form action={issueBookingToken}>
-          <button className={btnCls}>Web予約URLを発行</button>
-        </form>
+      {/* URL発行 */}
+      <Panel title="公開URLの発行" className="d3">
+        <p className="mb-3 text-xs text-[--color-dim]">HP掲載やQR掲示、ロビー掲示に使うURLを発行します（発行すると同種の旧URLは無効化）。</p>
+        <div className="flex flex-wrap gap-2">
+          <form action={issueBookingToken}>
+            <button className={btnCls}>お客様Web予約URLを発行</button>
+          </form>
+          <form action={issueBoardToken}>
+            <button className={btnGhostCls}>店頭カレンダーURLを発行</button>
+          </form>
+        </div>
       </Panel>
     </div>
   );

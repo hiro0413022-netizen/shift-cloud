@@ -94,25 +94,35 @@ export async function deleteBooking(formData: FormData) {
   revalidatePath("/reservations");
 }
 
-/** お客様Web予約URL（店舗単位・長期有効）を発行 */
-export async function issueBookingToken() {
+/** 公開トークン（お客様Web予約 or 店頭カレンダー）を発行。用途ごとに1つに保つ */
+async function issueToken(purpose: "book" | "board", label: string, urlPath: string, urlParam: string) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
   const storeId = await himejiStoreId(actor.companyId);
   if (!storeId) return;
 
   await admin.from("res_tokens").update({ active: false })
-    .eq("company_id", actor.companyId).eq("store_id", storeId).eq("active", true);
+    .eq("company_id", actor.companyId).eq("store_id", storeId).eq("purpose", purpose).eq("active", true);
 
   const token = generateToken();
   await admin.from("res_tokens").insert({
     company_id: actor.companyId, store_id: storeId, token_hash: hashToken(token),
-    label: "FRUNK GOLF 姫路 Web予約", created_by: actor.staffId,
+    purpose, label, created_by: actor.staffId,
   });
-  await logAudit(actor, "reservation.token_issue", "res_tokens", null);
+  await logAudit(actor, "reservation.token_issue", "res_tokens", null, null, { purpose });
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? "https";
-  redirect(`/reservations?booking_url=${encodeURIComponent(`${proto}://${host}/book/${token}`)}`);
+  redirect(`/reservations?${urlParam}=${encodeURIComponent(`${proto}://${host}/${urlPath}/${token}`)}`);
+}
+
+/** お客様Web予約URL（店舗単位・長期有効）を発行 */
+export async function issueBookingToken() {
+  await issueToken("book", "FRUNK GOLF 姫路 Web予約", "book", "booking_url");
+}
+
+/** 店頭常設カレンダーの表示URLを発行（ロビー掲示・タブレット用） */
+export async function issueBoardToken() {
+  await issueToken("board", "FRUNK GOLF 姫路 店頭カレンダー", "board", "board_url");
 }
