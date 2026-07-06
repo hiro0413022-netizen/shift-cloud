@@ -1426,7 +1426,7 @@ var Hono = class _Hono {
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
-  const match2 = ((method2, path2) => {
+  const match2 = (method2, path2) => {
     const matcher = matchers[method2] || matchers[METHOD_NAME_ALL];
     const staticMatch = matcher[2][path2];
     if (staticMatch) {
@@ -1438,7 +1438,7 @@ function match(method, path) {
     }
     const index = match3.indexOf("", 1);
     return [matcher[1][index], match3];
-  });
+  };
   this.match = match2;
   return match2(method, path);
 }
@@ -2384,7 +2384,7 @@ var WSContext = class {
   }
 };
 var defineWebSocketHelper = (handler2) => {
-  return ((...args) => {
+  return (...args) => {
     if (typeof args[0] === "function") {
       const [createEvents, options] = args;
       return async function upgradeWebSocket2(c, next) {
@@ -2405,7 +2405,7 @@ var defineWebSocketHelper = (handler2) => {
         return upgraded;
       })();
     }
-  });
+  };
 };
 
 // node_modules/hono/dist/adapter/cloudflare-workers/websocket.js
@@ -3431,8 +3431,8 @@ app.post("/receipts", async (c) => {
   const slipDate = body.slip_date || null;
   const inspectedBy = normalize(body.inspected_by);
   const note = normalize(body.note);
-  const noSlip = body.no_slip ? 1 : 0;
-  const slipVerified = slipDate || noSlip ? 1 : 0;
+  const noSlip = body.no_slip ? true : false;
+  const slipVerified = slipDate || noSlip ? true : false;
   const slipNote = normalize(body.slip_note);
   const actualSupplierId = body.actual_supplier_id ?? null;
   const tenantId = getTenantId(c);
@@ -3568,18 +3568,18 @@ app.put("/receipts/:id", async (c) => {
     binds.push(normalize(body.slip_note));
   }
   if (body.no_slip !== void 0) {
-    const noSlipVal = body.no_slip ? 1 : 0;
+    const noSlipVal = body.no_slip ? true : false;
     sets.push("no_slip=?");
     binds.push(noSlipVal);
     if (body.no_slip) {
       sets.push("slip_verified=?");
-      binds.push(1);
+      binds.push(true);
     }
   }
   const autoVerify = !!body.no_slip || !!(body.slip_date && body.slip_date.length > 0);
   if (!body.no_slip) {
     if (body.slip_verified !== void 0 || autoVerify) {
-      const verifiedVal = autoVerify ? 1 : body.slip_verified ? 1 : 0;
+      const verifiedVal = autoVerify ? true : body.slip_verified ? true : false;
       sets.push("slip_verified=?");
       binds.push(verifiedVal);
     }
@@ -3670,8 +3670,8 @@ app.post("/receipts/free", async (c) => {
   const slipDate = body.slip_date || null;
   const inspectedBy = normalize(body.inspected_by);
   const note = normalize(body.note);
-  const noSlip = body.no_slip ? 1 : 0;
-  const slipVerified = slipDate || noSlip ? 1 : 0;
+  const noSlip = body.no_slip ? true : false;
+  const slipVerified = slipDate || noSlip ? true : false;
   const slipNote = normalize(body.slip_note);
   const tenantId = getTenantId(c);
   const ins = await db2.prepare(
@@ -4018,7 +4018,7 @@ app.post("/suppliers", async (c) => {
       (name, alias_names, contact_name, honorific, order_method, order_method_detail,
        phone, fax, fax_number, email, cc_emails, line_id, line_group_id,
        payment_method, shipping_rule, free_shipping_threshold, website, postal_code, address, notes, is_active, updated_at, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,true,CURRENT_TIMESTAMP,?)
   `).bind(
     normalize(b2["name"]),
     normalize(b2["alias_names"]),
@@ -4120,7 +4120,7 @@ app.post("/product-suppliers", async (c) => {
     productId,
     supplierId,
     b2["rate"] ? parseFloat(String(b2["rate"])) : null,
-    b2["is_default"] ? 1 : 0,
+    b2["is_default"] ? true : false,
     b2["notes"] ? String(b2["notes"]) : null,
     b2["sort_order"] ? parseInt(String(b2["sort_order"])) : 0,
     tenantId
@@ -4140,7 +4140,7 @@ app.put("/product-suppliers/:id", async (c) => {
   }
   const supplierId = b2["supplier_id"] ? parseInt(String(b2["supplier_id"])) : null;
   if (!supplierId || supplierId === 0) {
-    await db2.prepare("UPDATE product_suppliers SET is_default=? WHERE id=? AND tenant_id=?").bind(b2["is_default"] ? 1 : 0, id, tenantId).run();
+    await db2.prepare("UPDATE product_suppliers SET is_default=? WHERE id=? AND tenant_id=?").bind(b2["is_default"] ? true : false, id, tenantId).run();
   } else {
     await db2.prepare(`
       UPDATE product_suppliers SET supplier_id=?, rate=?, is_default=?, notes=?, sort_order=?
@@ -4148,7 +4148,7 @@ app.put("/product-suppliers/:id", async (c) => {
     `).bind(
       supplierId,
       b2["rate"] != null ? parseFloat(String(b2["rate"])) : null,
-      b2["is_default"] ? 1 : 0,
+      b2["is_default"] ? true : false,
       b2["notes"] ? String(b2["notes"]) : null,
       b2["sort_order"] ? parseInt(String(b2["sort_order"])) : 0,
       id,
@@ -4194,7 +4194,7 @@ app.post("/products", async (c) => {
     INSERT INTO products
       (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
        list_price, default_rate, default_supplier_id, unit, source, is_active, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
   `).bind(
     normalize(b2["product_code"]),
     normalize(b2["barcode"]),
@@ -4441,7 +4441,7 @@ app.post("/products/bulk-import", async (c) => {
             INSERT INTO products
               (item_category, manufacturer, name, spec, color, club_type,
                list_price, default_rate, unit, source, default_supplier_id, is_active, tenant_id)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,true,?)
           `).bind(
             item_category,
             manufacturer || null,
@@ -4500,7 +4500,7 @@ app.post("/products/bulk-import", async (c) => {
         INSERT INTO products
           (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
            list_price, default_rate, unit, source, default_supplier_id, is_active, tenant_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
       `).bind(
         product_code || null,
         barcode || null,
@@ -4949,7 +4949,6 @@ app.post("/backup/restore/all", async (c) => {
         inserted++;
       }
       stats[tbl] = inserted;
-      void keys;
     }
     return c.json({ ok: true, stats });
   } catch (e) {
@@ -11662,7 +11661,7 @@ async function resetDemoData(db2) {
     }
   }
 }
-var index_default = {
+var src_default = {
   fetch: app3.fetch,
   async scheduled(_event, env, _ctx) {
     await resetDemoData(env.DB);
@@ -11677,7 +11676,7 @@ import fs from "fs";
 // node_modules/postgres/src/query.js
 var originCache = /* @__PURE__ */ new Map();
 var originStackCache = /* @__PURE__ */ new Map();
-var originError = /* @__PURE__ */ Symbol("OriginError");
+var originError = Symbol("OriginError");
 var CLOSE = {};
 var Query = class extends Promise {
   constructor(strings, args, handler2, canceller, options = {}) {
@@ -12326,7 +12325,6 @@ var errorFields = {
 };
 function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
   const {
-    sslnegotiation,
     ssl,
     max,
     user,
@@ -12344,12 +12342,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     target_session_attrs
   } = options;
   const sent = queue_default(), id = uid++, backend = { pid: null, secret: null }, idleTimer = timer(end, options.idle_timeout), lifeTimer = timer(end, options.max_lifetime), connectTimer = timer(connectTimedOut, options.connect_timeout);
-  let socket = null, cancelMessage, errorResponse = null, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedTime = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream = null, chunk = null, ended = null, nonce = null, query = null, final = null;
+  let socket = null, cancelMessage, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedDate = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream = null, chunk = null, ended = null, nonce = null, query = null, final = null;
   const connection2 = {
     queue: queues.closed,
     idleTimer,
     connect(query2) {
-      initial = query2;
+      initial = query2 || true;
       reconnect();
     },
     terminate,
@@ -12387,8 +12385,6 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function execute(q) {
     if (terminated)
       return queryError(q, Errors.connection("CONNECTION_DESTROYED", options));
-    if (stream)
-      return queryError(q, Errors.generic("COPY_IN_PROGRESS", "You cannot execute queries during copy"));
     if (q.cancelled)
       return;
     try {
@@ -12458,24 +12454,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.destroy();
   }
   async function secure() {
-    if (sslnegotiation !== "direct") {
-      write(SSLRequest);
-      const canSSL = await new Promise((r) => socket.once("data", (x) => r(x[0] === 83)));
-      if (!canSSL && ssl === "prefer")
-        return connected();
-    }
-    const options2 = {
-      socket,
-      servername: net.isIP(socket.host) ? void 0 : socket.host
-    };
-    if (sslnegotiation === "direct")
-      options2.ALPNProtocols = ["postgresql"];
-    if (ssl === "require" || ssl === "allow" || ssl === "prefer")
-      options2.rejectUnauthorized = false;
-    else if (typeof ssl === "object")
-      Object.assign(options2, ssl);
+    write(SSLRequest);
+    const canSSL = await new Promise((r) => socket.once("data", (x) => r(x[0] === 83)));
+    if (!canSSL && ssl === "prefer")
+      return connected();
     socket.removeAllListeners();
-    socket = tls.connect(options2);
+    socket = tls.connect({
+      socket,
+      servername: net.isIP(socket.host) ? void 0 : socket.host,
+      ...ssl === "require" || ssl === "allow" || ssl === "prefer" ? { rejectUnauthorized: false } : ssl === "verify-full" ? {} : typeof ssl === "object" ? ssl : {}
+    });
     socket.on("secureConnect", connected);
     socket.on("error", error);
     socket.on("close", closed);
@@ -12488,7 +12476,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (incomings) {
       incomings.push(x);
       remaining -= x.length;
-      if (remaining > 0)
+      if (remaining >= 0)
         return;
     }
     incoming = incomings ? Buffer.concat(incomings, length - remaining) : incoming.length === 0 ? x : Buffer.concat([incoming, x], incoming.length + x.length);
@@ -12529,7 +12517,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     hostIndex = (hostIndex + 1) % port.length;
   }
   function reconnect() {
-    setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0);
+    setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0);
   }
   function connected() {
     try {
@@ -12559,11 +12547,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     initial && (queryError(initial, err), initial = null);
   }
   function queryError(query2, err) {
-    if (query2.reserve)
-      return query2.reject(err);
-    if (!err || typeof err !== "object")
-      err = new Error(err);
-    "query" in err || "parameters" in err || Object.defineProperties(err, {
+    Object.defineProperties(err, {
       stack: { value: err.stack + query2.origin.replace(/.*\n/, "\n"), enumerable: options.debug },
       query: { value: query2.string, enumerable: options.debug },
       parameters: { value: query2.parameters, enumerable: options.debug },
@@ -12602,7 +12586,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (initial)
       return reconnect();
     !hadError && (query || sent.length) && error(Errors.connection("CONNECTION_CLOSED", options, socket));
-    closedTime = performance.now();
+    closedDate = performance.now();
     hadError && options.shared.retries++;
     delay = (typeof backoff2 === "function" ? backoff2(options.shared.retries) : backoff2) * 1e3;
     onclose(connection2, Errors.connection("CONNECTION_CLOSED", options, socket));
@@ -12707,16 +12691,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     }
   }
   function ReadyForQuery(x) {
-    if (query) {
-      if (errorResponse) {
-        query.retried ? errored(query.retried) : query.prepared && retryRoutines.has(errorResponse.routine) ? retry(query, errorResponse) : errored(errorResponse);
-      } else {
-        query.resolve(results || result);
-      }
-    } else if (errorResponse) {
-      errored(errorResponse);
-    }
-    query = results = errorResponse = null;
+    query && query.options.simple && query.resolve(results || result);
+    query = results = null;
     result = new Result();
     connectTimer.cancel();
     if (initial) {
@@ -12727,10 +12703,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
           return terminate();
       }
       if (needsTypes) {
-        initial.reserve && (initial = null);
+        initial === true && (initial = null);
         return fetchArrayTypes();
       }
-      initial && !initial.reserve && execute(initial);
+      initial !== true && execute(initial);
       options.shared.retries = retries = 0;
       initial = null;
       return;
@@ -12761,6 +12737,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       result.count && query.cursorFn(result);
       write(Sync);
     }
+    query.resolve(result);
   }
   function ParseComplete() {
     query.parsing = false;
@@ -12908,12 +12885,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     query2.execute();
   }
   function ErrorResponse(x) {
-    if (query) {
-      (query.cursorFn || query.describeFirst) && write(Sync);
-      errorResponse = Errors.postgres(parseError(x));
-    } else {
-      errored(Errors.postgres(parseError(x)));
-    }
+    query && (query.cursorFn || query.describeFirst) && write(Sync);
+    const error2 = Errors.postgres(parseError(x));
+    query && query.retried ? errored(query.retried) : query && query.prepared && retryRoutines.has(error2.routine) ? retry(query, error2) : errored(error2);
   }
   function retry(q, error2) {
     delete statements[q.signature];
@@ -12958,7 +12932,6 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       final(callback) {
         socket.write(bytes_default().c().end());
         final = callback;
-        stream = null;
       }
     });
     query.resolve(stream);
@@ -13409,7 +13382,7 @@ Object.assign(Postgres, {
     serialize: (x) => x.toString()
   }
 });
-var src_default = Postgres;
+var src_default2 = Postgres;
 function Postgres(a, b2) {
   const options = parseOptions(a, b2), subscribe = options.no_subscribe || Subscribe(Postgres, { ...options });
   let ending = false;
@@ -13526,10 +13499,9 @@ function Postgres(a, b2) {
   }
   async function reserve() {
     const queue = queue_default();
-    const c = open.length ? open.shift() : await new Promise((resolve, reject) => {
-      const query = { reserve: resolve, reject };
-      queries.push(query);
-      closed.length && connect(closed.shift(), query);
+    const c = open.length ? open.shift() : await new Promise((r) => {
+      queries.push({ reserve: r });
+      closed.length && connect(closed.shift());
     });
     move(c, reserved);
     c.reserved = () => queue.length ? c.execute(queue.shift()) : move(c, reserved);
@@ -13687,9 +13659,8 @@ function parseOptions(a, b2) {
   query.sslrootcert === "system" && (query.ssl = "verify-full");
   const ints = ["idle_timeout", "connect_timeout", "max_lifetime", "max_pipeline", "backoff", "keep_alive"];
   const defaults = {
-    max: globalThis.Cloudflare ? 3 : 10,
+    max: 10,
     ssl: false,
-    sslnegotiation: null,
     idle_timeout: null,
     connect_timeout: 30,
     max_lifetime,
@@ -13718,7 +13689,7 @@ function parseOptions(a, b2) {
       {}
     ),
     connection: {
-      application_name: env.PGAPPNAME || "postgres.js",
+      application_name: "postgres.js",
       ...o.connection,
       ...Object.entries(query).reduce((acc, [k, v]) => (k in defaults || (acc[k] = v), acc), {})
     },
@@ -13838,9 +13809,6 @@ var PgStatement = class _PgStatement {
     this.sqlText = sqlText;
     this.params = params;
   }
-  client;
-  sqlText;
-  params;
   bind(...args) {
     return new _PgStatement(this.client, this.sqlText, args);
   }
@@ -13871,7 +13839,7 @@ var PgStatement = class _PgStatement {
   }
 };
 function createPgD1(databaseUrl) {
-  const client = src_default(databaseUrl, {
+  const client = src_default2(databaseUrl, {
     prepare: false,
     max: 1,
     idle_timeout: 20,
