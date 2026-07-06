@@ -5,7 +5,7 @@ import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 
-export type RequestEntry = { date: string; template_id: string | null; memo: string };
+export type RequestEntry = { date: string; template_id: string | null; memo: string; start_time?: string | null; end_time?: string | null };
 
 /**
  * シフト提出（一括）
@@ -24,13 +24,15 @@ export async function submitRequests(periodId: string, entries: RequestEntry[]):
   if (!period || period.status !== "open") return { error: "この募集期間は締め切られています" };
 
   const rows = entries
-    .filter((e) => e.template_id || e.memo)
+    .filter((e) => e.template_id || e.memo || (e.start_time && e.end_time))
     .map((e) => ({
       company_id: actor.companyId,
       period_id: periodId,
       staff_id: actor.staffId,
       date: e.date,
       template_id: e.template_id,
+      start_time: e.start_time || null,
+      end_time: e.end_time || null,
       memo: e.memo || null,
       status: "submitted" as const,
     }));
@@ -59,19 +61,25 @@ export async function submitRequests(periodId: string, entries: RequestEntry[]):
     const publishedDates = new Set((existing ?? []).filter((s) => s.status === "published").map((s) => s.date));
 
     const drafts = rows
-      .filter((r) => r.template_id && !publishedDates.has(r.date))
+      .filter((r) => (r.template_id || (r.start_time && r.end_time)) && !publishedDates.has(r.date))
       .map((r) => {
-        const t = tmap.get(r.template_id!);
-        if (!t) return null;
+        let start_time: string | null, end_time: string | null, is_day_off: boolean;
+        if (r.template_id) {
+          const t = tmap.get(r.template_id);
+          if (!t) return null;
+          start_time = t.start_time; end_time = t.end_time; is_day_off = t.is_day_off;
+        } else {
+          start_time = r.start_time; end_time = r.end_time; is_day_off = false;
+        }
         return {
           company_id: actor.companyId,
           staff_id: actor.staffId,
           store_id: storeId,
           date: r.date,
           template_id: r.template_id,
-          start_time: t.start_time,
-          end_time: t.end_time,
-          is_day_off: t.is_day_off,
+          start_time,
+          end_time,
+          is_day_off,
           status: "draft" as const,
           published_at: null,
           deleted_at: null,

@@ -7,6 +7,7 @@ import {
   logEvent,
   type CockpitData,
 } from "@/lib/kernel";
+import { summarizeInquiriesForReport, getInquiryStats } from "@/lib/secretary";
 
 /* ============================================================
    CEO AI — 古川さんの分身（正典: docs/genesis/VISION.md §1/§3/§8）
@@ -193,6 +194,7 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
 
   // 4. レポート組み立て
   const today = new Date().toLocaleDateString("ja-JP");
+  const inquiryLines = await summarizeInquiriesForReport(companyId);
   const lines = [
     `# YOZAN GENESIS 日次レポート（${today}）`,
     "",
@@ -222,6 +224,9 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
     analysis.instructions.length === 0
       ? "- 本日の新規指示なし"
       : analysis.instructions.map((i) => `- ${i.agent_code}: ${i.instruction}`).join("\n"),
+    "",
+    "## 未対応の問い合わせ（CEO Inboxで確認・承認）",
+    inquiryLines.join("\n"),
     "",
     "## KPI（実データ）",
     ...d.kpis.map(
@@ -257,6 +262,7 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
         risks: d.risks.length,
         blockers: d.blockers.length,
         approvals: d.approvals.length,
+        open_inquiries: (await getInquiryStats(companyId)).open,
       },
     })
     .select("id")

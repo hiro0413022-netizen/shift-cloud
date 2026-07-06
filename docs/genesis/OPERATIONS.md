@@ -16,7 +16,7 @@ git push origin main
 ```
 
 - pushするとVercelが自動ビルド（1〜2分）。確認: https://vercel.com → 該当プロジェクト → Deployments が「Ready」
-- 対象アプリ: yozan-genesis（Genesis） / shift-cloud-shift-cloud（Shift Cloud） / shift-cloud-golfwing（GolfOrder） / yozan-corporate / kallinos — すべて同一リポジトリからビルドされる
+- 対象アプリ: yozan-genesis（Genesis） / shift-cloud-shift-cloud（Shift Cloud） / member-os（体験受付） / shift-cloud-golfwing（GolfOrder） / yozan-corporate / kallinos — すべて同一リポジトリからビルドされる
 
 ## 2. Vercel環境変数の追加・変更
 
@@ -35,6 +35,22 @@ git push origin main
 | CRON_SECRET | ★ | 毎朝6時の自動報告の認証。ランダム文字列。PowerShellで生成: `-join ((48..57)+(97..122) | Get-Random -Count 32 | % {[char]$_})` |
 | ANTHROPIC_API_KEY | 推奨 | CEO AIのClaude分析。https://console.anthropic.com → Settings → API Keys → Create Key（`sk-ant-`で始まる値）。未設定でもルールベースで動作 |
 | CEO_AI_MODEL | 任意 | 分析モデル変更用（既定: claude-haiku-4-5-20251001） |
+
+### member-os（体験受付）の初回セットアップ（新Vercelプロジェクト）
+
+1. https://vercel.com → **Add New… → Project** → 同じリポジトリ `shift-cloud` を選択
+2. **Root Directory** を `apps/member-os` に設定（Framework: Next.js 自動検出）
+3. Project Name は `member-os`（＝ member-os.vercel.app）
+4. **Environment Variables** に3つ設定（値はGenesis/Shift Cloudと同じDBのもの）:
+
+| Key | 用途 |
+|---|---|
+| NEXT_PUBLIC_SUPABASE_URL | Supabase URL（既存と同値） |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | anonキー（既存と同値） |
+| SUPABASE_SERVICE_ROLE_KEY | service_roleキー（既存と同値） |
+
+5. **Deploy**。以降は`git push`で自動再デプロイ（§1と同じ）
+6. ログイン: `use_reception` または `view_hq` 権限を持つスタッフのみ。受付スタッフには Shift Cloud のロール設定で `use_reception` を付与（migration不要・権限キーを追加するだけ）
 
 ## 3. 動作確認（CEO AI）
 

@@ -1,4 +1,4 @@
-import { requireGenesisActor } from "@/lib/auth";
+import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
@@ -42,7 +42,7 @@ export default async function MembersPage({
 }: {
   searchParams: Promise<{ date?: string; intake_url?: string; bid?: string }>;
 }) {
-  const actor = await requireGenesisActor();
+  const actor = await requireReceptionActor();
   const admin = createAdmin();
   const sp = await searchParams;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : todayStr();

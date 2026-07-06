@@ -1,7 +1,7 @@
 import { requireActor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Empty, Card, Badge, Button } from "@/components/ui";
-import { daysOfMonth, todayJST, hm, dowJP } from "@/lib/util";
+import { daysOfMonth, daysBetween, fmtDateJP, todayJST, hm, dowJP } from "@/lib/util";
 import { RequestForm } from "./request-form";
 import { applyHelp } from "./actions";
 
@@ -75,11 +75,21 @@ export default async function RequestsPage() {
         ) : (
           <>
             <p className="mb-4 mt-1 text-sm text-zinc-500">
-              {period.target_month.slice(0, 7).replace("-", "年")}月分 ・ 締切 {period.deadline}
+              {period.title ? `${period.title} ・ ` : ""}
+              {period.start_date && period.end_date
+                ? `${fmtDateJP(period.start_date)}〜${fmtDateJP(period.end_date)}`
+                : `${period.target_month.slice(0, 7).replace("-", "年")}月分`}
+              {" ・ 締切 "}{period.deadline}
               <br />
               <span className="text-xs">提出した内容は管理者の確認後に確定します。</span>
             </p>
-            <RequestFormLoader periodId={period.id} ym={period.target_month.slice(0, 7)} staffId={actor.staffId} />
+            <RequestFormLoader
+              periodId={period.id}
+              ym={period.target_month.slice(0, 7)}
+              startDate={period.start_date}
+              endDate={period.end_date}
+              staffId={actor.staffId}
+            />
           </>
         )}
       </section>
@@ -87,13 +97,13 @@ export default async function RequestsPage() {
   );
 }
 
-async function RequestFormLoader({ periodId, ym, staffId }: { periodId: string; ym: string; staffId: string }) {
+async function RequestFormLoader({ periodId, ym, startDate, endDate, staffId }: { periodId: string; ym: string; startDate: string | null; endDate: string | null; staffId: string }) {
   const supabase = await createClient();
-  const days = daysOfMonth(ym);
+  const days = startDate && endDate ? daysBetween(startDate, endDate) : daysOfMonth(ym);
   const [{ data: templates }, { data: existing }] = await Promise.all([
     supabase.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color")
       .is("deleted_at", null).order("sort_order"),
-    supabase.from("shift_requests").select("date, template_id, memo")
+    supabase.from("shift_requests").select("date, template_id, memo, start_time, end_time")
       .eq("period_id", periodId).eq("staff_id", staffId).is("deleted_at", null),
   ]);
   return (

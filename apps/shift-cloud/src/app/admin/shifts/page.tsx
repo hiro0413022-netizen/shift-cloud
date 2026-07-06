@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { PageTitle, Card, Button, Input, Label, Badge } from "@/components/ui";
-import { currentYM, addMonths, daysOfMonth } from "@/lib/util";
+import { PageTitle, Card, Badge } from "@/components/ui";
+import { currentYM, addMonths, daysOfMonth, fmtDateJP } from "@/lib/util";
 import { ShiftBuilder } from "./builder";
-import { openPeriod, closePeriod } from "./actions";
+import { PeriodForm } from "./period-form";
+import { closePeriod, reopenPeriod } from "./actions";
 
 export default async function ShiftBuilderPage({ searchParams }: { searchParams: Promise<{ store?: string; ym?: string }> }) {
   const actor = await requireActor("create_shifts");
@@ -24,18 +25,19 @@ export default async function ShiftBuilderPage({ searchParams }: { searchParams:
       .eq("staff_store_assignments.store_id", storeId).order("name"),
     admin.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color")
       .eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
-    admin.from("shifts").select("staff_id, date, template_id, status")
+    admin.from("shifts").select("staff_id, date, template_id, status, start_time, end_time")
       .eq("company_id", actor.companyId).eq("store_id", storeId).is("deleted_at", null)
       .gte("date", days[0]).lte("date", days[days.length - 1]),
     admin.from("shift_request_periods").select("*")
       .eq("company_id", actor.companyId).is("deleted_at", null)
-      .order("target_month", { ascending: false }).limit(6),
+      .eq("target_month", `${ym}-01`).order("start_date"),
   ]);
 
-  const period = (periods ?? []).find((p) => p.target_month.slice(0, 7) === ym);
-  const { data: requests } = period
-    ? await admin.from("shift_requests").select("staff_id, date, template_id, memo")
-        .eq("period_id", period.id).eq("status", "submitted").is("deleted_at", null)
+  // この月に紐づく全期間（前半/後半など複数可）の希望を集約
+  const periodIds = (periods ?? []).map((p) => p.id);
+  const { data: requests } = periodIds.length
+    ? await admin.from("shift_requests").select("staff_id, date, template_id, memo, start_time, end_time")
+        .in("period_id", periodIds).eq("status", "submitted").is("deleted_at", null)
     : { data: [] };
 
   return (
@@ -43,10 +45,10 @@ export default async function ShiftBuilderPage({ searchParams }: { searchParams:
       <PageTitle>シフト作成</PageTitle>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <Link href={`/admin/shifts?store=${storeId}&ym=${addMonths(ym, -1)}`} className="text-zinc-400">←</Link>
+        <div className="flex items-center gap-2 rounded-lg bg-white px-2 py-1 shadow-sm ring-1 ring-zinc-200">
+          <Link href={`/admin/shifts?store=${storeId}&ym=${addMonths(ym, -1)}`} className="rounded px-1.5 text-zinc-400 hover:bg-zinc-100">←</Link>
           <p className="font-semibold">{ym.replace("-", "年")}月</p>
-          <Link href={`/admin/shifts?store=${storeId}&ym=${addMonths(ym, 1)}`} className="text-zinc-400">→</Link>
+          <Link href={`/admin/shifts?store=${storeId}&ym=${addMonths(ym, 1)}`} className="rounded px-1.5 text-zinc-400 hover:bg-zinc-100">→</Link>
         </div>
         <div className="flex gap-1">
           {stores?.map((s) => (
@@ -56,34 +58,45 @@ export default async function ShiftBuilderPage({ searchParams }: { searchParams:
             </Link>
           ))}
         </div>
+        <Link
+          href={`/admin/shifts/print?store=${storeId}&ym=${ym}`}
+          className="ml-auto inline-flex items-center gap-1 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+        >
+          🖨 紙シフト出力
+        </Link>
       </div>
 
       <Card className="mb-4 !p-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <p className="text-sm font-medium">希望募集:</p>
-          {period ? (
-            <>
-              <Badge color={period.status === "open" ? "green" : "zinc"}>
-                {period.status === "open" ? `募集中（締切 ${period.deadline}）` : "締切済み"}
+        <p className="mb-3 text-sm font-semibold">希望募集の期間</p>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {(periods ?? []).length === 0 && (
+            <p className="text-sm text-zinc-400">まだ募集期間がありません。下から作成してください。</p>
+          )}
+          {(periods ?? []).map((p) => (
+            <div key={p.id} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5">
+              <Badge color={p.status === "open" ? "green" : "zinc"}>
+                {p.status === "open" ? "募集中" : "締切済み"}
               </Badge>
-              {period.status === "open" && (
+              <span className="text-xs font-medium">
+                {p.title ? `${p.title}：` : ""}
+                {p.start_date && p.end_date ? `${fmtDateJP(p.start_date)}〜${fmtDateJP(p.end_date)}` : p.target_month.slice(0, 7)}
+              </span>
+              <span className="text-[11px] text-zinc-400">締切 {p.deadline}</span>
+              {p.status === "open" ? (
                 <form action={closePeriod}>
-                  <input type="hidden" name="id" value={period.id} />
-                  <Button variant="secondary" type="submit">締め切る</Button>
+                  <input type="hidden" name="id" value={p.id} />
+                  <button className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-100">締め切る</button>
+                </form>
+              ) : (
+                <form action={reopenPeriod}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <button className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">↩ 募集中に戻す</button>
                 </form>
               )}
-            </>
-          ) : (
-            <form action={openPeriod} className="flex items-end gap-2">
-              <input type="hidden" name="target_month" value={ym} />
-              <div>
-                <Label>希望提出の締切日</Label>
-                <Input name="deadline" type="date" required />
-              </div>
-              <Button type="submit">{ym.replace("-", "年")}月分の募集を開始</Button>
-            </form>
-          )}
+            </div>
+          ))}
         </div>
+        <PeriodForm ym={ym} storeId={storeId} />
       </Card>
 
       {!staffRows?.length ? (

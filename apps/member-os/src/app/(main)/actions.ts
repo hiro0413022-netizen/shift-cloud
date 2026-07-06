@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { requireGenesisActor } from "@/lib/auth";
+import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit, logEvent } from "@/lib/kernel";
 import { hashToken, generateToken, INTAKE_TOKEN_TTL_HOURS } from "@/lib/intake";
@@ -26,7 +26,7 @@ const STATUSES = ["reserved", "visited", "canceled", "no_show"];
 
 /** 体験予約を作成（スタッフ入力）。氏名を入れれば見込み客も同時登録 */
 export async function createBooking(formData: FormData) {
-  const actor = await requireGenesisActor();
+  const actor = await requireReceptionActor();
   const admin = createAdmin();
 
   const storeId = orNull(formData.get("store_id"));
@@ -84,18 +84,17 @@ export async function createBooking(formData: FormData) {
   await logEvent(actor.companyId, {
     event_type: "member.trial_booked",
     title: `体験予約を登録: ${guestName ?? "（氏名未登録）"}${lessonDate ? ` / ${lessonDate}` : ""}`,
-    source: "genesis",
+    source: "member-os",
     source_type: "human",
     severity: "info",
   });
   await refreshMemberKpis(actor.companyId);
-  revalidatePath("/members");
   revalidatePath("/");
 }
 
 /** 予約ステータス更新（来店 / キャンセル / no-show / 予約に戻す） */
 export async function updateBookingStatus(formData: FormData) {
-  const actor = await requireGenesisActor();
+  const actor = await requireReceptionActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   const status = str(formData.get("status"));
@@ -110,13 +109,12 @@ export async function updateBookingStatus(formData: FormData) {
 
   await logAudit(actor, "member.booking_status", "mbr_trial_bookings", id, null, { status });
   await refreshMemberKpis(actor.companyId);
-  revalidatePath("/members");
   revalidatePath("/");
 }
 
 /** 入会可否の登録（入会 or 見送り＋理由） */
 export async function setJoinResult(formData: FormData) {
-  const actor = await requireGenesisActor();
+  const actor = await requireReceptionActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   const joined = str(formData.get("joined")) === "1";
@@ -139,18 +137,17 @@ export async function setJoinResult(formData: FormData) {
   await logEvent(actor.companyId, {
     event_type: joined ? "member.joined" : "member.declined",
     title: joined ? "体験から入会が成立しました" : `体験見送り: ${declineReason ?? "理由未記入"}`,
-    source: "genesis",
+    source: "member-os",
     source_type: "human",
     severity: joined ? "notice" : "info",
   });
   await refreshMemberKpis(actor.companyId);
-  revalidatePath("/members");
   revalidatePath("/");
 }
 
 /** 論理削除 */
 export async function deleteBooking(formData: FormData) {
-  const actor = await requireGenesisActor();
+  const actor = await requireReceptionActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
@@ -161,14 +158,14 @@ export async function deleteBooking(formData: FormData) {
     .eq("company_id", actor.companyId);
   await logAudit(actor, "member.booking_delete", "mbr_trial_bookings", id);
   await refreshMemberKpis(actor.companyId);
-  revalidatePath("/members");
+  revalidatePath("/");
 }
 
 /**
  * タブレット受付トークンを発行。生トークンでURLを組み、?intake_url= に載せて一度だけ表示（DECISIONS #12）。
  */
 export async function issueTabletToken(formData: FormData) {
-  const actor = await requireGenesisActor();
+  const actor = await requireReceptionActor();
   const admin = createAdmin();
   const bookingId = str(formData.get("booking_id"));
   if (!bookingId) return;
@@ -195,5 +192,5 @@ export async function issueTabletToken(formData: FormData) {
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? "https";
   const url = `${proto}://${host}/intake/${token}`;
-  redirect(`/members?intake_url=${encodeURIComponent(url)}&bid=${bookingId}`);
+  redirect(`/?intake_url=${encodeURIComponent(url)}&bid=${bookingId}`);
 }

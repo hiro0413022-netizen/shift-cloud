@@ -30,6 +30,30 @@ export function daysOfMonth(ym: string): string[] {
   return Array.from({ length: last }, (_, i) => `${ym}-${String(i + 1).padStart(2, "0")}`);
 }
 
+/** "2026-07-01".."2026-07-15" → 期間内の日付配列（両端含む） */
+export function daysBetween(start: string, end: string): string[] {
+  const out: string[] = [];
+  const e = new Date(end + "T00:00:00+09:00");
+  for (let d = new Date(start + "T00:00:00+09:00"); d <= e; d.setDate(d.getDate() + 1)) {
+    out.push(new Intl.DateTimeFormat("sv-SE", { timeZone: TZ }).format(d));
+  }
+  return out;
+}
+
+/** "2026-07-15" → "7月15日（火）" */
+export function fmtDateJP(dateStr: string): string {
+  const [, m, d] = dateStr.split("-");
+  return `${Number(m)}月${Number(d)}日（${dowJP(dateStr)}）`;
+}
+
+/** 月の前半(1-15)/後半(16-末)の範囲を返す */
+export function halfMonthRange(ym: string, half: 1 | 2): { start: string; end: string } {
+  const [y, m] = ym.split("-").map(Number);
+  if (half === 1) return { start: `${ym}-01`, end: `${ym}-15` };
+  const last = new Date(y, m, 0).getDate();
+  return { start: `${ym}-16`, end: `${ym}-${String(last).padStart(2, "0")}` };
+}
+
 export function currentYM(): string {
   return todayJST().slice(0, 7);
 }

@@ -63,6 +63,32 @@ export async function recordTime(
   return { time: now };
 }
 
+/** ⑥ 打刻端末からの伝言・打刻忘れ連絡を保存 */
+export async function saveKioskMessage(
+  token: string,
+  staffId: string | null,
+  kind: "missing_clock" | "message",
+  body: string
+): Promise<{ error?: string; ok?: boolean }> {
+  const device = await verifyDevice(token);
+  if (!device) return { error: "端末が無効です。管理者に連絡してください。" };
+  const text = body.trim();
+  if (!text) return { error: "内容を入力してください" };
+
+  const admin = createAdmin();
+  const { error } = await admin.from("kiosk_messages").insert({
+    company_id: device.company_id,
+    store_id: device.store_id,
+    staff_id: staffId,
+    device_id: device.id,
+    kind,
+    body: text.slice(0, 1000),
+  });
+  if (error) return { error: error.message };
+  await logAudit(null, "kiosk.message", "kiosk_messages", null, null, { staffId, kind }, device.company_id);
+  return { ok: true };
+}
+
 /** キオスク表示用: 店舗スタッフと今日の打刻状態 */
 export async function getKioskState(token: string) {
   const device = await verifyDevice(token);

@@ -12,6 +12,7 @@ const MENU: { href: string; label: string; perm: Permission }[] = [
   { href: "/admin/shifts", label: "シフト作成", perm: "create_shifts" },
   { href: "/admin/help", label: "出勤募集", perm: "create_shifts" },
   { href: "/admin/attendance", label: "勤怠管理", perm: "edit_attendance" },
+  { href: "/admin/kiosk-messages", label: "打刻端末メモ", perm: "edit_attendance" },
   { href: "/admin/reconciliation", label: "月末照合", perm: "edit_attendance" },
   { href: "/admin/payroll", label: "給与", perm: "view_payroll" },
   { href: "/admin/announcements", label: "お知らせ", perm: "manage_announcements" },

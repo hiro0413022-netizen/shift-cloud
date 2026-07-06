@@ -16,10 +16,12 @@
 1. **Genesis実運用の習慣化**（ユーザー）: 毎日 Command Center で「日次レポート生成」を実行。AI指示が必要な作業はプロンプト生成を使う
 2. **デプロイ**（ユーザー）: 本コミットをユーザーPCからpush → Vercel自動デプロイ → KPI表示確認（Cockpit / Future Simulation）
 2-b. **Vault（システム台帳 /vault）**: 実装完了・DB適用済（0013）・初期8件投入済。push後に /vault でパスワード入力→各システムのパスワードをページ上で入力保存（DECISIONS #26）。任意: Vercel envに `VAULT_PASSWORD` を設定するとパスワード変更可（未設定時は既定値）
-3. **体験予約受付システム（member-os / DECISIONS #23,#24）**: Phase 1a/1b **実装完了・未デプロイ**。0-bのSmart Hello取込は会員名簿本体（会員数/退会率）のみに縮小、体験系はこちらに一本化。
-   - ✅ 実装済: migration 0011（mbr_guests/mbr_trial_bookings/mbr_intake_tokens＋refresh_member_kpis）、スタッフ画面 /members、公開タブレット /intake/[token]（自己入力＋同意＋指サイン）、サイドバー・middleware更新
-   - ✅ 0011 本番Supabase適用済（2026-07-06、スモークテスト検証済）
-   - ☐ **ユーザー作業**: (1) ユーザーPCからpush → Vercel自動デプロイ (2) /members で予約1件登録→「タブレット受付」→ /intake で自己入力→入会 まで通しテスト
+3. **体験受付システム（member-os / DECISIONS #23,#24,#27）**: 独立アプリへ分離（Shift Cloudと同型）・**未デプロイ**。0-bのSmart Hello取込は会員名簿本体（会員数/退会率）のみに縮小、体験系はこちらに一本化。
+   - ✅ 実装済: migration 0011（mbr_guests/mbr_trial_bookings/mbr_intake_tokens＋refresh_member_kpis、本番適用済）。`apps/member-os` 新設（トップ/＝受付ダッシュボード、公開 /intake/[token]、/login）。Genesisから /members・/intake・サイドバー項目を撤去。両アプリ next build 検証済
+   - ☐ **ユーザー作業(1) 新Vercelプロジェクト作成**: OPERATIONS §2「member-osの初回セットアップ」参照（Root Directory=apps/member-os、env3つ、Deploy）
+   - ☐ **ユーザー作業(2) push**: ユーザーPCから push → Genesis も member-os も自動デプロイ
+   - ☐ **ユーザー作業(3) 通しテスト**: member-os のトップで予約1件登録→「タブレット受付」→ /intake で自己入力→入会 まで
+   - ☐ **任意**: 受付スタッフに Shift Cloud のロールで `use_reception` 権限を付与（未付与でも view_hq 保持者は利用可）
    - Phase 2（次段）: 予約サイト／予約システム本体を姫路FRUNK GOLFに導入（#24）／会員名簿のGenesis移管
    - 設計: docs/modules/member-os/TRIAL_INTAKE.md
 4. **Shift Cloud実運用フィードバックの収集と反映**: 現場の声を集めて改善バックログ化

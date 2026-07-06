@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { requireGenesisActor } from "@/lib/auth";
 import { getCockpitData, CORE_KPI_CODES } from "@/lib/kernel";
+import { getInquiryStats } from "@/lib/secretary";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, StatusDot, Empty, Field, inputCls, btnCls, severityTone, fmtDate } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
@@ -10,10 +12,11 @@ export const dynamic = "force-dynamic";
 export default async function CommandPage() {
   const actor = await requireGenesisActor();
   const admin = createAdmin();
-  const [d, promptsRes, reportsRes] = await Promise.all([
+  const [d, promptsRes, reportsRes, inquiryStats] = await Promise.all([
     getCockpitData(actor.companyId),
     admin.from("prompts").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at", { ascending: false }).limit(5),
     admin.from("reports").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at", { ascending: false }).limit(1),
+    getInquiryStats(actor.companyId),
   ]);
   const prompts = promptsRes.data ?? [];
   const latestReport = (reportsRes.data ?? [])[0];
@@ -43,11 +46,14 @@ export default async function CommandPage() {
       </header>
 
       {/* サマリ行 */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <Stat label="開発中" count={d.devStatuses.filter((s) => s.status === "active").length} suffix="件" />
         <Stat label="ブロッカー" count={d.blockers.length} suffix="件" tone={d.blockers.length ? "danger" : "ok"} />
         <Stat label="オープンリスク" count={d.risks.length} suffix="件" tone={d.risks.length ? "warn" : "ok"} />
         <Stat label="承認待ち" count={d.approvals.length} suffix="件" tone={d.approvals.length ? "warn" : "ok"} />
+        <Link href="/inbox" className="block">
+          <Stat label="未対応問い合わせ" count={inquiryStats.open} suffix="件" tone={inquiryStats.open ? "warn" : "ok"} />
+        </Link>
         <Stat label="AIエージェント" count={d.agents.length} suffix="体" />
       </div>
 
