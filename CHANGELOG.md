@@ -1,6 +1,9 @@
 # CHANGELOG
 
 ## 2026-07-06
+- db: `0014_revoke_member_kpis_execute.sql` **適用済** — refresh_member_kpisのEXECUTEをanon/authenticatedから剥奪（Supabase advisor WARN対応、アプリはservice_role経由のため影響なし）
+- db: `0015_agent_roster_vision.sql` **適用済** — VISION §4準拠でai_agentsに顧客AI（退会リスク）と投資・新規事業AI（出店判断）を追加（計21体）、KALLINOS AIの役割を「ブランド統括」に明確化（NEXT_TASKS 0-c）
+- fix(docs): マウント同期切断で失われたNEXT_TASKS item4-6とCHANGELOG末尾をgit履歴から復元。切断されていたworktree5ファイルもHEADから復元
 - fix(genesis): /finance明細行の不正なHTML入れ子（span内form）を修正 — hydrationクラッシュ（Application error: client-side exception）の原因
 - feat(genesis): Vault（システム台帳）新設 `/vault`（DECISIONS #26） — 全関連システムのURL・ログインID・パスワードを一元管理。view_hqログイン＋Vaultパスワードの二重ゲート（sha256照合・8時間cookie、`VAULT_PASSWORD` envで変更可）、パスワード目隠し表示＋ワンクリックコピー、カテゴリ別グルーピング、追加/編集/論理削除フォーム、監査ログ（vault.unlock/create/update/delete）。サイドバーに「Vault」追加
 - db: `0013_vault.sql` **適用済**（MCP経由） — vault_systems（RLS有効・ポリシーなし=service_role専用）。初期データ8件投入済み（Genesis本番/Shift Cloud本番/Supabase/Vercel/GitHub/お名前レンタルサーバー/お名前Navi/Gmail。URLとIDのみ、パスワードはユーザーがページから入力）
