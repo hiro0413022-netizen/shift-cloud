@@ -2419,11 +2419,11 @@ ${sig ? '\n' + sig : ''}`
     ]
     // 重複除去
     const ccUniq = [...new Set(ccCandidates)]
-    // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）
+    // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）。区切りは「/」
     const initialCC = [...new Set([
-      ...(BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
-      ...(group.supplierCcEmails ? group.supplierCcEmails.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
-    ])].join(', ')
+      ...(BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
+      ...(group.supplierCcEmails ? group.supplierCcEmails.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
+    ])].join('/')
 
     // CC候補ボタン群HTML
     const ccCandidateHtml = ccUniq.length > 0
@@ -2943,11 +2943,11 @@ app.get('/orders/:id', async (c) => {
     ),
   ]
   const detailCcUniq = [...new Set(detailCcCandidates)]
-  // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）
+  // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）。区切りは「/」
   const initialDetailCC = [...new Set([
-    ...(DEFAULT_CC ? DEFAULT_CC.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
-    ...(supplierCcEmails ? supplierCcEmails.split(/[,;]/).map((s: string) => s.trim()).filter(Boolean) : []),
-  ])].join(', ')
+    ...(DEFAULT_CC ? DEFAULT_CC.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
+    ...(supplierCcEmails ? supplierCcEmails.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
+  ])].join('/')
   const mailtoWithCC = supplierEmail
     ? 'mailto:' + supplierEmail + '?' +
       (initialDetailCC ? 'cc=' + encodeURIComponent(initialDetailCC) + '&' : '') +

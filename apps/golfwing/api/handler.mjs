@@ -7227,9 +7227,9 @@ ${sig ? "\n" + sig : ""}`;
     ];
     const ccUniq = [...new Set(ccCandidates)];
     const initialCC = [.../* @__PURE__ */ new Set([
-      ...BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : [],
-      ...group.supplierCcEmails ? group.supplierCcEmails.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : []
-    ])].join(", ");
+      ...BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : [],
+      ...group.supplierCcEmails ? group.supplierCcEmails.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : []
+    ])].join("/");
     const ccCandidateHtml = ccUniq.length > 0 ? `<div class="mt-1 d-flex flex-wrap gap-1">
           <span class="small text-muted me-1">CC\u5019\u88DC:</span>
           ${ccUniq.map(
@@ -7695,9 +7695,9 @@ app2.get("/orders/:id", async (c) => {
   ];
   const detailCcUniq = [...new Set(detailCcCandidates)];
   const initialDetailCC = [.../* @__PURE__ */ new Set([
-    ...DEFAULT_CC ? DEFAULT_CC.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : [],
-    ...supplierCcEmails ? supplierCcEmails.split(/[,;]/).map((s) => s.trim()).filter(Boolean) : []
-  ])].join(", ");
+    ...DEFAULT_CC ? DEFAULT_CC.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : [],
+    ...supplierCcEmails ? supplierCcEmails.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : []
+  ])].join("/");
   const mailtoWithCC = supplierEmail ? "mailto:" + supplierEmail + "?" + (initialDetailCC ? "cc=" + encodeURIComponent(initialDetailCC) + "&" : "") + "subject=" + encodeURIComponent(emailSubject) + "&body=" + encodeURIComponent(emailBody) : "";
   const detailCcCandidateHtml = detailCcUniq.length > 0 ? `<div class="mt-1 d-flex flex-wrap gap-1">
         <span class="small text-muted me-1">CC\u5019\u88DC:</span>
