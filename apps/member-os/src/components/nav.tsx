@@ -1,6 +1,8 @@
+import Link from "next/link";
+
 export function TopBar({ userName }: { userName: string }) {
   return (
-    <header className="flex items-center justify-between border-b border-[--color-line] bg-[--color-panel] px-5 py-3">
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[--color-line] bg-[--color-panel] px-5 py-3">
       <div className="flex items-baseline gap-2">
         <span className="text-xs tracking-[0.3em] text-[--color-gold]">GOLF WING</span>
         <span className="text-base font-bold tracking-wide">体験受付 — Member OS</span>
@@ -9,12 +11,15 @@ export function TopBar({ userName }: { userName: string }) {
           ONLINE
         </span>
       </div>
-      <div className="flex items-center gap-3 text-xs text-[--color-dim]">
-        <span>{userName}</span>
+      <nav className="flex items-center gap-4 text-sm">
+        <Link href="/" className="text-[--color-dim] transition-colors hover:text-[--color-txt]">受付台帳</Link>
+        <Link href="/import" className="text-[--color-dim] transition-colors hover:text-[--color-txt]">Smart Hello取込</Link>
+        <span className="text-[--color-dim]">|</span>
+        <span className="text-xs text-[--color-dim]">{userName}</span>
         <form action="/api/logout" method="post">
-          <button className="transition-colors hover:text-[--color-txt]">ログアウト</button>
+          <button className="text-xs text-[--color-dim] transition-colors hover:text-[--color-txt]">ログアウト</button>
         </form>
-      </div>
+      </nav>
     </header>
   );
 }
