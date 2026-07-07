@@ -129,15 +129,33 @@ export async function importMembers(_prev: ImportState, formData: FormData): Pro
   });
   if (rows.length === 0) return { error: "会員データが見つかりません（列が想定と異なる可能性）" };
 
+  // 会員番号の重複を除外（法人会員の2枚目カード等は同一会員番号→先勝ちで1件に集約、会員数の二重計上も防止）
+  const seen = new Set<string>();
+  const deduped = rows.filter((r) => {
+    const k = String(r.member_no);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const dropped = rows.length - deduped.length;
+
   await admin.from("mbr_members").delete().eq("company_id", actor.companyId);
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await admin.from("mbr_members").insert(rows.slice(i, i + 500));
+  for (let i = 0; i < deduped.length; i += 500) {
+    const { error } = await admin.from("mbr_members").insert(deduped.slice(i, i + 500));
     if (error) return { error: `取込エラー: ${error.message}` };
   }
   await admin.rpc("refresh_smart_hello_kpis", { p_company_id: actor.companyId });
-  await logAudit(actor, "smarthello.members_import", "mbr_members", null, null, { count: rows.length });
+  await logAudit(actor, "smarthello.members_import", "mbr_members", null, null, {
+    count: deduped.length,
+    dropped,
+  });
   revalidatePath("/import");
-  return { ok: true, message: `会員名簿を取込みました（${rows.length}件）。会員数・退会率KPIを更新しました。` };
+  return {
+    ok: true,
+    message: `会員名簿を取込みました（${deduped.length}件${
+      dropped ? `／会員番号重複${dropped}件を集約` : ""
+    }）。会員数・退会率KPIを更新しました。`,
+  };
 }
 
 /** Smart Hello「予約一覧」取込（予約番号で重複防止・個人情報は取り込まない） */
