@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/kernel";
@@ -46,13 +47,48 @@ function cellNum(v: ExcelJS.CellValue): number | null {
   return m ? parseFloat(m[0]) : null;
 }
 
+const SML_MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+/**
+ * Smart Hello の一部エクスポートは SpreadsheetML本体を接頭辞付き（例 <x:workbook><x:sheets>）で出力する。
+ * ExcelJS は既定名前空間しか解釈できず workbook が undefined になり "reading 'sheets'" で落ちる。
+ * そこで本体名前空間の接頭辞を検出したら、該当XMLの接頭辞を外して既定名前空間に正規化し直す。
+ */
+async function normalizeSpreadsheetNamespace(buf: ArrayBuffer): Promise<Buffer | null> {
+  const zip = await JSZip.loadAsync(buf);
+  let changed = false;
+  const paths = Object.keys(zip.files).filter((p) => /\.(xml|rels)$/i.test(p) && !zip.files[p].dir);
+  for (const p of paths) {
+    const xml = await zip.files[p].async("string");
+    const m = xml.match(new RegExp(`xmlns:([A-Za-z0-9]+)="${SML_MAIN.replace(/[\/.]/g, "\\$&")}"`));
+    if (!m) continue;
+    const px = m[1];
+    const fixed = xml
+      .split(`<${px}:`).join("<")
+      .split(`</${px}:`).join("</")
+      .replace(`xmlns:${px}="${SML_MAIN}"`, `xmlns="${SML_MAIN}"`);
+    zip.file(p, fixed);
+    changed = true;
+  }
+  if (!changed) return null;
+  return zip.generateAsync({ type: "nodebuffer" });
+}
+
 async function loadSheet(formData: FormData): Promise<ExcelJS.Worksheet | null> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return null;
   const buf = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await wb.xlsx.load(buf as any);
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await wb.xlsx.load(buf as any);
+  } catch (e) {
+    // 名前空間接頭辞付き（Smart Hello形式）を正規化して再読込
+    const fixed = await normalizeSpreadsheetNamespace(buf);
+    if (!fixed) throw e;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await wb.xlsx.load(fixed as any);
+  }
   return wb.worksheets[0] ?? null;
 }
 
