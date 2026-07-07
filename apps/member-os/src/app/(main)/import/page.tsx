@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { importMembers, importReservations, type ImportState } from "./actions";
+import { importMembers, importReservations, importWalkins, type ImportState } from "./actions";
 import { Panel, inputCls, btnCls } from "@/components/ui";
 
 function UploadCard({
@@ -30,9 +30,9 @@ export default function ImportPage() {
   return (
     <div className="space-y-4">
       <header className="reveal">
-        <h1 className="text-xl font-bold">Smart Hello 取込</h1>
+        <h1 className="text-xl font-bold">データ取込</h1>
         <p className="text-sm text-[--color-dim]">
-          Smart Hello からエクスポートした Excel（会員名簿 / 予約一覧）を取込み、会員数・退会率KPIを自動更新します。
+          Smart Hello の Excel（会員名簿 / 予約一覧）と、現行の一時利用者名簿を取込み、各KPIを自動更新します。
           口座番号・クレジットカード等の機微情報は取り込みません。
         </p>
       </header>
@@ -46,8 +46,15 @@ export default function ImportPage() {
 
       <UploadCard
         title="予約一覧の取込（稼働・予約数）"
-        desc="Smart Hello →予約一覧を期間指定でエクスポートして選択。予約番号で重複を排除して追記します。個人情報（住所・電話・生年月日等）は取り込みません。"
+        desc="Smart Hello →予約一覧を期間指定でエクスポートして選択。予約番号で重複を排除して追記します。打席稼働・パーソナル件数の把握用（体験/フィッティング件数のKPIには使いません）。"
         action={importReservations}
+        accept=".xlsx,.xls"
+      />
+
+      <UploadCard
+        title="一時利用者名簿の取込（体験・フィッティング台帳）"
+        desc="現行の「（新）一時利用者名簿.xlsx」を選択。台帳シート（体験/フィッティング/打席）を移行し、体験→入会率・フィッティング→購入率KPIを更新します。取込むたびに移行分を洗い替え（タブレット受付の実来店は保持）。日付・氏名のある行のみ対象。"
+        action={importWalkins}
         accept=".xlsx,.xls"
       />
     </div>

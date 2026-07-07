@@ -74,9 +74,12 @@ KPI: 体験→入会率 = trial のうち result=join ÷ trial件数。フィッ
 - 「一時利用顧客名簿」1シートを、現行の列順（A〜X＋選択肢マスタ列）で生成。期間・利用区分でフィルタ出力可。
 - 会員数・会費等の集計タブは出力しない（決定#2）。会員系はSmart Hello取込＋CEO AI。
 
-## 既存データ移行
-- 現行xlsxの台帳2,415行をパースし mbr_guests / mbr_walkin_visits へ投入（履歴フラグ付き）。
-- 表記ゆれ正規化（距離"14.4km"→14.4、日付シリアル、区分の名寄せ）。移行は一度きりのスクリプト＋検証。
+## 既存データ移行（実装済み: importWalkins / `/import`）
+- 移行は一度きりスクリプトではなく **`/import` の取込カード**（`importWalkins`）で実施。現行xlsxをアップロードすると台帳シート(A〜X)をパースし mbr_guests / mbr_walkin_visits へ投入（`is_migrated=true`）。
+- 正規化: 区分名寄せ（体験利用→trial／フィッティング・シャフト試打→fitting／打席→bay／ビジター→visitor_bay／その他=other、原ラベルは survey.visit_type_label に保持）、成約→result(join/purchase/none、原文は survey.result_label)、距離"14.4km"→14.4、支払 店頭→store 等、性別 男/女→male/female。
+- 対象は **日付・氏名のある行のみ**（時系列KPI整合）。再取込は移行分(is_migrated=true)のみ洗い替え、タブレット受付の実来店(is_migrated=false)は保持。取込後 `refresh_member_kpis` を実行。
+- 実測(2026-07 サンプル): 2,281件取込／体験1,079(→入会30.6%)・フィッティング1,034(→購入31.1%)・打席24・ビジター46・その他98。
+- store_id は stores.code='takarazuka' を優先採用（宝塚storeの重複レコード対策）。空コードの重複storeは別途整理推奨。
 
 ## 会員系レポート（別系統・Smart Hello取込）
 SMART_HELLO_IMPORT.md（#22）に従い、会員名簿・予約一覧のCSV/Excelを取込→会員数/入会/退会/会費KPIをCEO AIへ。本台帳（一時利用）とは独立。
@@ -85,7 +88,7 @@ SMART_HELLO_IMPORT.md（#22）に従い、会員名簿・予約一覧のCSV/Exce
 - **Phase A**: DBスキーマ（migration）＋ `refresh_member_kpis` 拡張。
 - **Phase B**: タブレット自己入力（区分出し分け・同意・サイン）＋ スタッフ台帳一覧・追記。← 紙/手入力を廃止できる本丸。
 - **Phase C**: Excel出力（名簿シート同一）。
-- **Phase D**: 既存2,415行の移行。
+- **Phase D**（実装済み）: 既存台帳の移行を `/import` の `importWalkins` で実施（アップロード方式）。
 - **Phase E**: Smart Hello 会員レポート取込（会員数/会費/退会）。
 
 ## 未決（実装時に確認）

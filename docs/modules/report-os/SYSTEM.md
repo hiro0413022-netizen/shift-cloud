@@ -1,0 +1,149 @@
+# Report OS — 事業所別 月次資料 自動生成システム
+
+> 正典。設計判断は本書、実作業は NEXT_TASKS、方針は docs/genesis/VISION.md を参照。
+
+## 1. 目的
+
+事業所ごとの「月次報告資料（.pptx）」を、**数値は自動・文章はAI下書き**でほぼ自動生成する。
+古川さんは最後に「承認 / 修正」だけ。VISION §3「CEO AIが毎月出すもの」の月次アウトプット層。
+
+第1本丸は **GOLF WING**。型を完成させて FRUNK / KALLINOS / YOZAN 全体へ横展開する。
+
+## 2. 資料の構成（GOLF WING）
+
+生成される .pptx は8枚：
+
+1. 表紙（事業所名・対象月）
+2. 今月のサマリー（会員数・体験予約・入会率・退会率・物販売上・フィッティングの6KPI。各カードに前月比・前年比）
+3. 会員数の推移（12ヶ月ラインチャート＋前月比・前年比・年間純増）
+4. 物販売上・フィッティング（12ヶ月バーチャート＋当月実績）
+5. 月間の実施事項（AI下書き）
+6. 問題点の洗い出し ／ 実施予定（解決策）（AI下書き・左右対応）
+7. その他 情報共有事項（AI下書き）
+8. 指標一覧（全KPIの当月/前月/前月比/前年/前年比の表）
+
+## 3. データソースと自動化レベル
+
+| 項目 | ソース | 状態 |
+|---|---|---|
+| 会員数 | `kpis.code='members'`（Smart Hello名簿→自動集計） | ✅ 自動（現在229人） |
+| 退会率 | `kpis.code='churn_rate'` | ✅ 自動 |
+| 入会率 | `kpis.code='conversion_rate'`（体験受付モジュール） | ✅ 自動 |
+| 体験予約数 | `kpis.code='trial_bookings'`（mbr_trial_bookings） | ✅ 自動 |
+| 在籍スタッフ・人件費・労働時間 | Shift Cloud → `kpis`（0008） | ✅ 自動 |
+| 月次売上・営業利益 | 財務モジュール `fin_entries`（0009） | ⚠️ 財務入力が前提（現状0） |
+| **会員数の月次推移** | 現状 `kpis.trend` が空 | ❌ 履歴の蓄積が必要（下記4-A） |
+| **物販売上** | 専用テーブル無し（golfwing.receiptsは仕入れ入荷用） | ❌ 記録の入れ物が必要（下記4-B） |
+| **フィッティング件数** | 専用テーブル無し | ❌ 記録の入れ物が必要（下記4-B） |
+| 実施事項・問題点・解決策・情報共有 | 現場メモ＋数値 → Claude API | 🤖 AI下書き（人が承認） |
+
+**結論**: 骨格（KPI基盤・trend蓄積の仕組み・チャート・表・pptx生成）は完成。
+残るギャップは「物販売上・フィッティングの記録」と「会員推移の履歴蓄積」の3点だけ。
+
+## 4. 埋めるべきギャップ（次フェーズのDB作業）
+
+### 4-A. 会員数のカウントルール（正会員の定義）
+
+会員数 ＝ **正会員のみ**。次の区分は会員数に含めず、資料には小さく別掲する：
+**モニター・スタッフ・法人二枚目・トライアル**。
+また **当月末退会者は当月の会員数に含めない**（例：7月末退会者は7月の会員数から引く）。
+**表記は会員名簿の「会員種類名」どおり**に出す（ラベルを言い換えない）。
+
+**会員名簿の実際の会員種類名（会員種類名列, 会員名簿_20260707確定）**：
+`レギュラー会員・マスター会員・チケット会員・ライト会員・レギュラー家族割会員・法人会員・プラチナレギュラー会員`（正会員）
+＋ 除外4種 `スタッフ・モニター会員・法人会員2枚目・トライアル会員`。
+
+**除外区分の確定マッピング**（当初の要確認は名簿で解決済み）：
+- 「法人二枚目」＝ 会員種類名 **「法人会員2枚目」**（独立した会員種類名。2026-06末在籍5）。
+- 「トライアル」＝ 会員種類名 **「トライアル会員」**（会員名簿に存在。2026-06末在籍2）。
+- 「モニター」＝**「モニター会員」**、「スタッフ」＝**「スタッフ」**。
+
+**2026-06末 実績**（会員名簿_20260707から算出）：正会員210（レギュラー会員134・マスター会員35・チケット会員17・ライト会員9・レギュラー家族割会員7・法人会員5・プラチナレギュラー会員3）。除外＝スタッフ15・モニター会員7・法人会員2枚目5・トライアル会員2。6月新規入会9・退会0・退会予定10（7/31に8・8/31に2）。
+
+名簿 `mbr_members` は `member_type`（会員種類名）・`class_name`・`join_date`・`leave_date`・`leave_reason` を持つ（現状空。上記xlsxを取込めば自動算出）。除外配列 `:excluded = ['スタッフ','モニター会員','法人会員2枚目','トライアル会員']`。想定SQL：
+
+```sql
+-- 除外する種別
+-- member_type in ('モニター','スタッフ','法人二枚目','トライアル')
+
+-- 当月末時点の正会員数（当月＝:ym の 'YYYY-MM'）
+select count(*) as members
+from mbr_members
+where company_id = :cid
+  and member_type is distinct from all (array['モニター','スタッフ','法人二枚目','トライアル'])
+  and join_date <= (date_trunc('month', :ym::date) + interval '1 month - 1 day')::date
+  and (leave_date is null or leave_date > (date_trunc('month', :ym::date) + interval '1 month - 1 day')::date);
+
+-- 当月の退会者数 / 新規入会数
+select
+  count(*) filter (where leave_date >= date_trunc('month', :ym::date)::date
+                     and leave_date <  (date_trunc('month', :ym::date) + interval '1 month')::date) as leavers,
+  count(*) filter (where join_date  >= date_trunc('month', :ym::date)::date
+                     and join_date  <  (date_trunc('month', :ym::date) + interval '1 month')::date) as new_joins
+from mbr_members where company_id = :cid;
+
+-- 除外区分の内訳（当月末在籍）
+select member_type, count(*) v
+from mbr_members
+where company_id = :cid
+  and member_type in ('モニター','スタッフ','法人二枚目','トライアル')
+  and (leave_date is null or leave_date > (date_trunc('month', :ym::date) + interval '1 month - 1 day')::date)
+group by member_type;
+```
+
+※ 実際の `member_type` の表記（値）は取込む名簿に合わせて確定する。資料側の除外リスト・ラベルは JSON の `kpi.members.excluded[]` と `kpi.members.rule` で制御。
+
+### 4-A2. 会員数スナップショットの月次蓄積
+上記ルールで算出した**正会員数**を `kpis.trend` に毎月1日積む。既存の refresh 関数と同型で、月次スナップショットを追記するRPC（`snapshot_member_count(company_id)`）を追加し、月初にスケジュール実行。過去分は名簿の `join_date`/`leave_date` から1回だけバックフィル。
+
+### 4-B. 物販売上・フィッティングの記録テーブル
+最小構成（`rpt_` プレフィックス、company_idスコープ、RLSは既存標準に準拠。DATABASE_STANDARD.md）：
+
+```
+rpt_retail_sales   (company_id, ym date, amount numeric, source text, note text)
+rpt_fittings       (company_id, occurred_on date, member_id, staff, club_type, resulted_in_purchase bool, note)
+```
+
+- 物販はレジ/売上CSVの月次取込、またはMoney OSの物販科目から集計。
+- フィッティングは受付/レッスン記録から。当面は月次の件数入力でも可（Genesisの入力フォーム）。
+- これらから月次集計ビュー `v_rpt_monthly(company_id, ym, retail_sales, fittings)` を作り、生成時に読む。
+
+## 5. 生成パイプライン
+
+```
+[1] build-data  ── Supabase(kpis / v_rpt_monthly / trend) を読み、数値JSONを組み立て
+       │             物販/フィッティング/会員推移が無い月は「要入力」フラグ
+       ▼
+[2] narrative   ── 数値の変化＋現場メモを Claude API に渡し、
+       │             実施事項・問題点・解決策・情報共有の下書きを生成 → JSONに合流
+       ▼
+[3] generate.js ── JSON → .pptx（pptxgenjs、本リポジトリ apps/report-os/generate.js）
+       ▼
+[4] 承認         ── 古川さんが確認・修正（CEO Inbox / Genesis画面）→ 確定・配布
+```
+
+- **[1]+[2] の実装**: `apps/report-os/build-data.mjs`（雛形あり）。Supabase service_role で読み取り、`ANTHROPIC_API_KEY` でClaude呼び出し。
+- **[3]**: 完成・稼働中。`node generate.js data/<事業所>-<YYYY-MM>.json`
+- **秘密情報**: `ANTHROPIC_API_KEY` は環境変数（Vercel/ローカル .env）。Vaultにシステム登録（vault_systems、キー本体はページ入力。yozan-vault-rule）。
+
+## 6. AI（Claude API）の使い方
+
+- モデル: 文章品質重視のため上位モデル（例 claude-sonnet / opus 系）。月1回・数百トークンなのでコストは軽微。
+- 入力: 当月・前月・前年の全KPI＋前月からの変化＋現場メモ（箇条書き）＋事業所コンテキスト。
+- 出力: `activities[] / problems[] / plans[] / shareInfo[]` のJSON。problems と plans は index対応（問題→解決策）。
+- **AIは下書きまで**。数値の断定・対外配布はしない（AI_RULES.md の権限線引きに準拠）。人の承認を必須にする。
+
+## 7. スケジュール
+
+毎月1日朝に「先月分」を自動生成し、CEO Inboxに下書きとして提示（scheduled-task）。
+古川さんは承認/修正するだけ。VISION の「朝、CEO AIが報告する」体験に接続。
+
+## 8. 横展開
+
+`generate.js` は事業所非依存（JSON駆動）。事業所ごとに data JSON を作れば同じ資料が出る。
+FRUNK GOLF / KALLINOS は KPI項目が一部異なるため、JSONの `kpi` キーと narrative 見出しを事業所プロファイルで差し替える（将来 `profiles/<business>.json`）。
+
+## 9. 現状のサンプル
+
+`apps/report-os/GOLFWING_月次報告_2026-06_サンプル.pptx`
+会員数229・退会率3.5%・スタッフ7は**実データ**。物販売上・フィッティング・会員推移は4-A/4-B未整備のため代表値。文章はAI下書きの見本。
