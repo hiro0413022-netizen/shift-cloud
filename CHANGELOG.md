@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-07
+- feat(legal-os): 契約書・証憑の保管と期限管理を新設。**経理系（請求書・領収書＝Money OS `mon_receipts`）と法務系（契約書・覚書・規約・NDA）を分離**し、法務系を独立アプリ化。「GENESIS＝古川さん専用の司令室」を守るため、他者がアップロードする面はGENESIS外へ（DECISIONS #15/#27の勝ちパターン）。設計正典 docs/modules/legal-os/SYSTEM.md
+- db: `0024_legal_os.sql` **適用済（本番qrgpblnnhdudigarrtuz、MCP経由）** — leg_documents（種別/相手方/契約期間/自動更新/解約通知日数/next_action_date=解約判断期日/リスク/要点）、leg_files（証憑ファイル・Storage参照・OCR text）、leg_reminders（更新/解約通知/満了の期日アラート）、leg_grants（uploader/manager/viewer、全社=segment_id null）。Storageプライベートバケット `legal-docs`（company_id先頭パスでobject RLS）。RLSは既存標準app.current_company_id()。moduleコード `legal`（designing）。担当AI=legal_ai（登録済）。既存テーブル変更なし・追加のみ
+- feat(legal-os): 独立アプリ `apps/legal-os`（Next.js、別Vercel想定・ポート3004）を実装。認証は同一Supabase Auth＋ロール解決（view_hq/manage_legal_all=manager、leg_grants、use_legal=uploader）。画面＝ダッシュボード（期限90日以内/自動更新/高リスク/件数）・契約一覧（種別/状態/検索フィルタ）・登録（メタ＋ファイルアップロード→Storage→leg_files、next_action_date算出＋リマインダー自動生成）・詳細（情報/要点/リマインダー/ファイル署名URL閲覧/ステータス変更）。`/api/v1/documents`（Bearerトークン、legal_ai・CEO AI・バッチ用のGET一覧/POST登録）。company_events(`legal.document_registered`)・audit_logs記録。next build 検証済（全9ルート・型チェック通過）
+- ops: Legal OSは締結・更新・解約の正式承認をGENESIS側approval_requestsで古川さんが実施（入力面はGENESISに持たせない）。残作業＝Vercel新規プロジェクト作成＋env設定＋vault_systems登録＋module live化
+
 ## 2026-07-06
 - feat(member-os): 予約システム Phase F（DECISIONS #24, 姫路FRUNK GOLF）。migration 0020適用（FRUNK GOLF 姫路 店舗＋打席6・パーソナルレッスン1、res_resources/res_bookings/res_tokens、営業時間からの枠生成、同枠ダブルブッキング防止のunique index）。member-osに `/reservations`（スタッフ: 空き状況グリッド・電話/店頭予約入力・来店/取消/削除・会員/都度・課金・Web予約URL発行）と公開 `/book/[token]`（お客様Web予約: 日付選択→空き枠選択→氏名/連絡先/会員番号/人数→予約確定→確認画面）。middlewareに /book 公開許可、TopBarに導線。next build 検証済。会員数KPIは会員名簿集計で229・退会率3.5%を反映済
 - feat(member-os): Smart Hello取込 Phase E（DECISIONS #22）。migration 0019適用（mbr_members スナップショット＋mbr_reservations、refresh_smart_hello_kpis＝在籍会員数・退会率。口座/カード等の機微列は非取込）。member-osに `/import` 追加＝会員名簿/予約一覧のExcelをアップロード→exceljsでパース→会員は全件洗い替え・予約は予約番号でupsert→KPI自動更新。TopBarに導線。合成データでKPI関数を検証（在籍・退会率）。会員244/予約2,189の実データは /import から取込む運用（在籍219＝スタッフ15除く・退会予定10・休会11）
