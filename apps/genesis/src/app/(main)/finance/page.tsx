@@ -25,7 +25,19 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const actor = await requireGenesisActor();
   const admin = createAdmin();
   const sp = await searchParams;
-  const ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : monthStr(new Date());
+  let ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : "";
+  if (!ym) {
+    // 月指定が無ければ、データのある最新月を初期表示（当月は未入力で空になりがちなため）
+    const { data: latest } = await admin
+      .from("fin_entries")
+      .select("target_month")
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .order("target_month", { ascending: false })
+      .limit(1);
+    const lm = latest?.[0]?.target_month as string | undefined;
+    ym = lm ? String(lm).slice(0, 7) : monthStr(new Date());
+  }
   const monthDate = `${ym}-01`;
 
   const [{ data: segments }, { data: categories }, { data: entries }, { data: yearEntries }] = await Promise.all([
