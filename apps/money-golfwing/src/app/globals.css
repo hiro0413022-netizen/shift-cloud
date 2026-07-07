@@ -1,18 +1,28 @@
 @import "tailwindcss";
 
-:root {
-  --color-bg: #0b0f14;
-  --color-panel: #121821;
-  --color-line: #223042;
+@theme {
+  /* Money OS パレット（Genesis準拠の黒・濃紺基調＋ゴールド） */
+  --color-bg: #0b0f17;
+  --color-panel: #141a26;
+  --color-line: #263248;
   --color-txt: #e6edf5;
-  --color-dim: #8ea0b5;
+  --color-dim: #93a1b8;
   --color-accent: #f26d5b;
-  --color-gold: #d9a441;
-  --color-ok: #4bbe8a;
+  --color-gold: #e0b64a;
+  --color-ok: #34d399;
 }
 
-html, body {
-  background: var(--color-bg);
-  color: var(--color-txt);
-  font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+body {
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  @apply bg-[--color-bg] text-[--color-txt] antialiased;
+}
+
+/* 上部のごく淡いグロー（のっぺり感を軽減） */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(224, 182, 74, 0.06), transparent);
 }
