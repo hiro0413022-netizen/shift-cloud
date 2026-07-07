@@ -36,3 +36,22 @@ export const CUSTOMER_KIND = [
 export const BOOKING_STATUS_LABEL: Record<string, string> = {
   reserved: "予約", visited: "来店", canceled: "キャンセル", no_show: "無断欠",
 };
+
+export const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  unpaid: "未収", partial: "一部入金", paid: "入金済", waived: "免除",
+};
+
+export const PAY_METHODS = [
+  { value: "cash", label: "現金" },
+  { value: "card", label: "カード" },
+  { value: "e_money", label: "電子マネー" },
+  { value: "bank", label: "振込" },
+  { value: "other", label: "その他" },
+] as const;
+
+/** 未収額（請求額 amount に対する未入金分）。免除/請求なしは0 */
+export function outstanding(amount: number | null | undefined, paidAmount: number | null | undefined, status: string): number {
+  if (status === "waived" || amount == null) return 0;
+  const o = amount - (paidAmount ?? 0);
+  return o > 0 ? o : 0;
+}

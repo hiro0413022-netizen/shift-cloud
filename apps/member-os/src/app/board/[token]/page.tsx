@@ -1,6 +1,6 @@
 import { createAdmin } from "@/lib/supabase/admin";
 import { hashToken } from "@/lib/intake";
-import { genSlots, toMin } from "@/lib/reservation";
+import { genSlots, toMin, outstanding } from "@/lib/reservation";
 import { BoardAutoRefresh } from "./refresh";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +40,7 @@ export default async function BoardPage({ params }: { params: Promise<{ token: s
 
   const [{ data: resources }, { data: bookings }] = await Promise.all([
     admin.from("res_resources").select("id, name, kind").eq("store_id", tok.store_id as string).eq("active", true).is("deleted_at", null).order("sort_order"),
-    admin.from("res_bookings").select("resource_id, start_time, status, customer_kind, guest_name, member_no, party_size").eq("store_id", tok.store_id as string).is("deleted_at", null).eq("booking_date", date),
+    admin.from("res_bookings").select("resource_id, start_time, status, customer_kind, guest_name, member_no, party_size, payment_status, amount, paid_amount").eq("store_id", tok.store_id as string).is("deleted_at", null).eq("booking_date", date),
   ]);
   const resList = (resources ?? []) as Row[];
   const byCell = new Map<string, Row>();
@@ -96,6 +96,8 @@ export default async function BoardPage({ params }: { params: Promise<{ token: s
                       <div className={`rounded-md px-1 py-2 text-base font-bold leading-tight ${member ? "bg-sky-600 text-white" : "bg-emerald-600 text-white"}`}>
                         {label(b)}
                         {b.party_size && Number(b.party_size) > 1 ? <span className="ml-1 text-xs opacity-80">{String(b.party_size)}名</span> : null}
+                        {outstanding(b.amount as number | null, b.paid_amount as number | null, String(b.payment_status ?? "unpaid")) > 0
+                          ? <span className="ml-1 rounded bg-amber-400 px-1 text-[10px] font-bold text-black align-middle">未収</span> : null}
                       </div>
                     </td>
                   );

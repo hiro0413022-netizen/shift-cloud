@@ -126,3 +126,39 @@ export async function issueBookingToken() {
 export async function issueBoardToken() {
   await issueToken("board", "FRUNK GOLF 姫路 店頭カレンダー", "board", "board_url");
 }
+
+const PAY_METHOD_VALUES = ["cash", "card", "e_money", "bank", "other"];
+
+/** 入金を記録（全額/一部/免除/取消）。amountは請求額、paid_amountは入金額 */
+export async function recordPayment(formData: FormData) {
+  const actor = await requireReceptionActor();
+  const admin = createAdmin();
+  const id = str(formData.get("id"));
+  const mode = str(formData.get("mode"));
+  if (!id) return;
+
+  const billed = intOrNull(formData.get("amount"));
+  const methodRaw = str(formData.get("payment_method"));
+  const method = PAY_METHOD_VALUES.includes(methodRaw) ? methodRaw : null;
+
+  let patch: Record<string, unknown>;
+  if (mode === "waive") {
+    patch = { payment_status: "waived", paid_amount: 0, paid_at: new Date().toISOString() };
+  } else if (mode === "unpaid") {
+    patch = { payment_status: "unpaid", paid_amount: 0, payment_method: null, paid_at: null };
+  } else {
+    const paid = mode === "full" ? (billed ?? 0) : (intOrNull(formData.get("paid_amount")) ?? 0);
+    const status = billed != null && billed > 0 && paid >= billed ? "paid" : paid > 0 ? "partial" : "unpaid";
+    patch = {
+      paid_amount: paid,
+      payment_method: method,
+      payment_status: status,
+      paid_at: paid > 0 ? new Date().toISOString() : null,
+      ...(billed != null ? { amount: billed } : {}),
+    };
+  }
+
+  await admin.from("res_bookings").update(patch).eq("id", id).eq("company_id", actor.companyId).is("deleted_at", null);
+  await logAudit(actor, "reservation.payment", "res_bookings", id, null, { mode, ...patch });
+  revalidatePath("/reservations");
+}

@@ -1,14 +1,23 @@
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { genSlots, BOOKING_STATUS_LABEL, CUSTOMER_KIND, HIMEJI_STORE_CODE } from "@/lib/reservation";
-import { createBooking, setBookingStatus, deleteBooking, issueBookingToken, issueBoardToken } from "./actions";
+import {
+  genSlots, BOOKING_STATUS_LABEL, CUSTOMER_KIND, HIMEJI_STORE_CODE,
+  PAYMENT_STATUS_LABEL, PAY_METHODS, outstanding,
+} from "@/lib/reservation";
+import { createBooking, setBookingStatus, deleteBooking, issueBookingToken, issueBoardToken, recordPayment } from "./actions";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+function yen(n: number): string {
+  return `¥${n.toLocaleString("ja-JP")}`;
+}
+function payTone(status: string): "default" | "ok" | "warn" | "danger" | "accent" {
+  return status === "paid" ? "ok" : status === "partial" ? "warn" : status === "waived" ? "default" : "danger";
 }
 
 export default async function ReservationsPage({
@@ -29,9 +38,12 @@ export default async function ReservationsPage({
     return <Empty>FRUNK GOLF 姫路の店舗が見つかりません（migration 0020 の適用をご確認ください）。</Empty>;
   }
 
-  const [{ data: resources }, { data: bookings }] = await Promise.all([
+  const [{ data: resources }, { data: bookings }, { data: outstandingRows }] = await Promise.all([
     admin.from("res_resources").select("id, name, kind").eq("store_id", store.id).is("deleted_at", null).order("sort_order"),
     admin.from("res_bookings").select("*").eq("store_id", store.id).is("deleted_at", null).eq("booking_date", date).order("start_time"),
+    admin.from("res_bookings").select("*").eq("store_id", store.id).is("deleted_at", null)
+      .in("payment_status", ["unpaid", "partial"]).neq("status", "canceled")
+      .not("amount", "is", null).order("booking_date", { ascending: true }).limit(300),
   ]);
 
   const resList = (resources ?? []) as Row[];
@@ -42,6 +54,13 @@ export default async function ReservationsPage({
   for (const b of bkList) {
     if (b.status !== "canceled") byCell.set(`${b.resource_id}|${String(b.start_time).slice(0, 5)}`, b);
   }
+  const resName = (rid: unknown) => resList.find((r) => r.id === rid)?.name;
+
+  // 未収金サマリ（全期間・完済/免除を除く）
+  const unpaidList = ((outstandingRows ?? []) as Row[])
+    .map((b) => ({ b, out: outstanding(b.amount as number | null, b.paid_amount as number | null, String(b.payment_status)) }))
+    .filter((x) => x.out > 0);
+  const unpaidTotal = unpaidList.reduce((s, x) => s + x.out, 0);
 
   const bookingUrl = sp.booking_url ?? null;
   const boardUrl = sp.board_url ?? null;
@@ -51,7 +70,7 @@ export default async function ReservationsPage({
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">予約管理 — FRUNK GOLF 姫路</h1>
-          <p className="text-sm text-[--color-dim]">打席・レッスンの枠を管理し、電話/店頭予約の入力とお客様Web予約を受け付けます</p>
+          <p className="text-sm text-[--color-dim]">打席・レッスンの枠管理、電話/店頭予約、お客様Web予約、入金・未収金の管理</p>
         </div>
         <form className="flex items-center gap-2">
           <input type="date" name="date" defaultValue={date} className={inputCls} />
@@ -79,8 +98,44 @@ export default async function ReservationsPage({
         </Panel>
       )}
 
+      {/* 未収金サマリ */}
+      <Panel title={`未収金サマリ（未収・一部入金 ${unpaidList.length}件）`} className="d1">
+        {unpaidList.length === 0 ? (
+          <Empty>未収金はありません</Empty>
+        ) : (
+          <>
+            <div className="mb-3 flex items-baseline gap-2">
+              <span className="text-sm text-[--color-dim]">未収合計</span>
+              <span className="text-2xl font-bold tabular-nums text-red-300">{yen(unpaidTotal)}</span>
+            </div>
+            <div className="space-y-1.5">
+              {unpaidList.map(({ b, out }) => (
+                <div key={String(b.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge tone={payTone(String(b.payment_status))}>{PAYMENT_STATUS_LABEL[String(b.payment_status)]}</Badge>
+                    <span className="font-semibold">{b.guest_name ? String(b.guest_name) : b.member_no ? `会員 ${String(b.member_no)}` : "（名称未入力）"}</span>
+                    <span className="text-xs text-[--color-dim]">
+                      {[String(b.booking_date), String(b.start_time).slice(0, 5), resName(b.resource_id) && String(resName(b.resource_id))].filter(Boolean).join("　")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-[--color-dim]">請求 {yen(Number(b.amount))}／入金 {yen(Number(b.paid_amount ?? 0))}</span>
+                    <span className="font-semibold tabular-nums text-red-300">未収 {yen(out)}</span>
+                    <form action={recordPayment}>
+                      <input type="hidden" name="id" value={String(b.id)} />
+                      <input type="hidden" name="amount" value={String(b.amount)} />
+                      <button name="mode" value="full" className={btnGhostCls}>全額入金</button>
+                    </form>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Panel>
+
       {/* 空き状況グリッド */}
-      <Panel title={`空き状況（${date}）`} className="d1">
+      <Panel title={`空き状況（${date}）`} className="d2">
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-xs">
             <thead>
@@ -140,7 +195,7 @@ export default async function ReservationsPage({
           <Field label="人数">
             <input name="party_size" inputMode="numeric" defaultValue="1" className={inputCls} />
           </Field>
-          <Field label="料金">
+          <Field label="料金（請求額）">
             <input name="amount" inputMode="numeric" placeholder="0" className={inputCls} />
           </Field>
           <div className="col-span-2 flex items-end sm:col-span-1">
@@ -156,31 +211,54 @@ export default async function ReservationsPage({
         ) : (
           <div className="space-y-2">
             {bkList.map((b) => {
-              const resource = resList.find((r) => r.id === b.resource_id);
               const status = String(b.status);
+              const payStatus = String(b.payment_status ?? "unpaid");
+              const out = outstanding(b.amount as number | null, b.paid_amount as number | null, payStatus);
               return (
-                <div key={String(b.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
-                  <div className="flex items-center gap-2">
-                    <Badge tone={status === "canceled" ? "default" : status === "visited" ? "ok" : status === "no_show" ? "danger" : "accent"}>
-                      {BOOKING_STATUS_LABEL[status] ?? status}
-                    </Badge>
-                    <span className="font-semibold">{b.guest_name ? String(b.guest_name) : b.member_no ? `会員 ${String(b.member_no)}` : "（名称未入力）"}</span>
-                    <span className="text-xs text-[--color-dim]">
-                      {[String(b.start_time).slice(0, 5), resource && String(resource.name), String(b.customer_kind) === "member" ? "会員" : "都度", b.party_size && `${b.party_size}名`, b.source === "web" && "Web", b.amount != null && `¥${Number(b.amount).toLocaleString("ja-JP")}`].filter(Boolean).join("　")}
-                    </span>
+                <div key={String(b.id)} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge tone={status === "canceled" ? "default" : status === "visited" ? "ok" : status === "no_show" ? "danger" : "accent"}>
+                        {BOOKING_STATUS_LABEL[status] ?? status}
+                      </Badge>
+                      <span className="font-semibold">{b.guest_name ? String(b.guest_name) : b.member_no ? `会員 ${String(b.member_no)}` : "（名称未入力）"}</span>
+                      <span className="text-xs text-[--color-dim]">
+                        {[String(b.start_time).slice(0, 5), resName(b.resource_id) && String(resName(b.resource_id)), String(b.customer_kind) === "member" ? "会員" : "都度", b.party_size && `${b.party_size}名`, b.source === "web" && "Web"].filter(Boolean).join("　")}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {status !== "visited" && (
+                        <form action={setBookingStatus}><input type="hidden" name="id" value={String(b.id)} /><input type="hidden" name="status" value="visited" /><button className={btnGhostCls}>来店</button></form>
+                      )}
+                      {status !== "no_show" && (
+                        <form action={setBookingStatus}><input type="hidden" name="id" value={String(b.id)} /><input type="hidden" name="status" value="no_show" /><button className={btnGhostCls}>無断欠</button></form>
+                      )}
+                      {status !== "canceled" && (
+                        <form action={setBookingStatus}><input type="hidden" name="id" value={String(b.id)} /><input type="hidden" name="status" value="canceled" /><button className={btnGhostCls}>取消</button></form>
+                      )}
+                      <form action={deleteBooking}><input type="hidden" name="id" value={String(b.id)} /><button className="text-xs text-[--color-dim] hover:text-red-400">削除</button></form>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {status !== "visited" && (
-                      <form action={setBookingStatus}><input type="hidden" name="id" value={String(b.id)} /><input type="hidden" name="status" value="visited" /><button className={btnGhostCls}>来店</button></form>
-                    )}
-                    {status !== "no_show" && (
-                      <form action={setBookingStatus}><input type="hidden" name="id" value={String(b.id)} /><input type="hidden" name="status" value="no_show" /><button className={btnGhostCls}>無断欠</button></form>
-                    )}
-                    {status !== "canceled" && (
-                      <form action={setBookingStatus}><input type="hidden" name="id" value={String(b.id)} /><input type="hidden" name="status" value="canceled" /><button className={btnGhostCls}>取消</button></form>
-                    )}
-                    <form action={deleteBooking}><input type="hidden" name="id" value={String(b.id)} /><button className="text-xs text-[--color-dim] hover:text-red-400">削除</button></form>
-                  </div>
+
+                  {/* 入金行 */}
+                  <form action={recordPayment} className="flex flex-wrap items-center gap-2 border-t border-[--color-line] pt-2">
+                    <input type="hidden" name="id" value={String(b.id)} />
+                    <Badge tone={payTone(payStatus)}>{PAYMENT_STATUS_LABEL[payStatus]}</Badge>
+                    <label className="flex items-center gap-1 text-xs text-[--color-dim]">請求
+                      <input name="amount" inputMode="numeric" defaultValue={b.amount != null ? String(b.amount) : ""} className={`${inputCls} !w-24 !py-1`} />
+                    </label>
+                    <label className="flex items-center gap-1 text-xs text-[--color-dim]">入金
+                      <input name="paid_amount" inputMode="numeric" defaultValue={b.paid_amount != null ? String(b.paid_amount) : ""} className={`${inputCls} !w-24 !py-1`} />
+                    </label>
+                    <select name="payment_method" defaultValue={b.payment_method ? String(b.payment_method) : ""} className={`${inputCls} !w-28 !py-1`}>
+                      <option value="">方法</option>
+                      {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                    {out > 0 && <span className="text-xs font-semibold text-red-300">未収 {yen(out)}</span>}
+                    <button name="mode" value="partial" className={btnGhostCls}>記録</button>
+                    <button name="mode" value="full" className={btnCls}>全額入金</button>
+                    <button name="mode" value="waive" className="text-xs text-[--color-dim] hover:text-[--color-txt]">免除</button>
+                  </form>
                 </div>
               );
             })}
