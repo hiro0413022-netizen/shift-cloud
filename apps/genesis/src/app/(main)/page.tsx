@@ -101,7 +101,12 @@ export default async function CockpitPage() {
 
       {/* 3段目: 事業別 → 店舗ドリルダウン */}
       <Panel title="事業別パフォーマンス（クリックで店舗別に展開）" className="d2">
-        <BusinessBreakdown segments={business.segments} monthLabel={business.monthLabel} />
+        <BusinessBreakdown
+          segments={business.segments}
+          monthLabel={business.monthLabel}
+          forecastMonthLabel={business.forecastMonthLabel}
+          forecastTotal={business.forecastTotal}
+        />
       </Panel>
 
       {/* 4段目: アラート/リスク・承認・イベント */}

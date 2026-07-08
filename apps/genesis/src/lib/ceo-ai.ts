@@ -179,6 +179,7 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
 
   // 1. KPI再集計（労務＋財務＋会員系。会員系はmigration 0011適用後に有効化される — 未適用ならエラーを無視）
   await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: companyId });
+  await admin.rpc("refresh_golfwing_membership_forecast", { p_company_id: companyId }); // 当月の月会費予測を先に更新（実績があれば自動停止）
   await admin.rpc("refresh_finance_kpis", { p_company_id: companyId });
   await admin.rpc("refresh_member_kpis", { p_company_id: companyId }); // 0011未適用時はerrorが返るだけで無害
 

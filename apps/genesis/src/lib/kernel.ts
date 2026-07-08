@@ -255,8 +255,10 @@ export type SegmentMetric = {
 };
 
 export type BusinessBreakdown = {
-  monthLabel: string; // 例: "2026年6月"（財務の最新入力月）
+  monthLabel: string; // PL表示の対象＝最新の完了月（進行中の当月は除外）
   segments: SegmentMetric[];
+  forecastMonthLabel: string; // 当月（進行中）
+  forecastTotal: number; // 当月の予測売上合計（source='forecast'、主に月会費予測）
 };
 
 /** 事業(fin_segment)コード → 配下店舗の判定（DBにマッピングが無いため名称で対応付け） */
@@ -282,14 +284,26 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
   const admin = createAdmin();
 
   // 財務の最新入力月を特定
+  // PL表示は「最新の完了月」＝進行中の当月(monthStart以降)を除外した最新月
   const { data: latest } = await admin
     .from("fin_entries")
     .select("target_month")
     .eq("company_id", companyId)
     .is("deleted_at", null)
+    .lt("target_month", monthStart())
     .order("target_month", { ascending: false })
     .limit(1);
   const month: string | null = latest?.[0]?.target_month ?? null;
+
+  // 当月（進行中）の予測売上合計（月会費予測など source='forecast'）
+  const { data: fcRows } = await admin
+    .from("fin_entries")
+    .select("amount")
+    .eq("company_id", companyId)
+    .eq("source", "forecast")
+    .gte("target_month", monthStart())
+    .is("deleted_at", null);
+  const forecastTotal = (fcRows ?? []).reduce((s, r) => s + (Number((r as { amount: number | string }).amount) || 0), 0);
 
   const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes] = await Promise.all([
     admin.from("fin_segments").select("id,name,code").eq("company_id", companyId).is("deleted_at", null),
@@ -421,7 +435,12 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     return b.revenue - a.revenue;
   });
 
-  return { monthLabel: month ? fmtMonth(month) : "—", segments: result };
+  return {
+    monthLabel: month ? fmtMonth(month) : "—",
+    segments: result,
+    forecastMonthLabel: fmtMonth(monthStart()),
+    forecastTotal,
+  };
 }
 
 function monthStart(): string {

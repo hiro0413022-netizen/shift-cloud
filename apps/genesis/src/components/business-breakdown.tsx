@@ -121,13 +121,32 @@ function SegmentCard({ seg }: { seg: SegmentMetric }) {
   );
 }
 
-export function BusinessBreakdown({ segments, monthLabel }: { segments: SegmentMetric[]; monthLabel: string }) {
+export function BusinessBreakdown({
+  segments,
+  monthLabel,
+  forecastMonthLabel,
+  forecastTotal,
+}: {
+  segments: SegmentMetric[];
+  monthLabel: string;
+  forecastMonthLabel?: string;
+  forecastTotal?: number;
+}) {
   if (segments.length === 0) {
     return <p className="py-6 text-center text-sm text-[--color-dim]">事業データなし</p>;
   }
   return (
     <div>
-      <p className="mb-3 text-[11px] text-[--color-dim]">財務実績: {monthLabel}時点（Money OS連携）／店舗別の会員・入退会は会員名簿、スタッフ・シフトはShift Cloudから自動集計</p>
+      {forecastTotal != null && forecastTotal > 0 && (
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-sky-800/50 bg-sky-950/30 px-3 py-2">
+          <span className="text-[11px] text-[--color-dim]">
+            当月（{forecastMonthLabel}）見込み・月会費予測
+            <span className="ml-1 text-[10px]">※ファイン実績が入り次第 自動で実績に置換</span>
+          </span>
+          <span className="tabular-nums text-sm font-semibold text-sky-200">{yen(forecastTotal)}</span>
+        </div>
+      )}
+      <p className="mb-3 text-[11px] text-[--color-dim]">下段のPLは最新の完了月（{monthLabel}）。事業別=Money OS(fin_entries)、店舗別の会員・入退会は会員名簿、スタッフ・シフトはShift Cloudから自動集計</p>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {segments.map((seg) => (
           <SegmentCard key={seg.code} seg={seg} />
