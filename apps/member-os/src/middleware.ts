@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/login", "/reception", "/book", "/member", "/board"];
+const PUBLIC_PREFIXES = ["/login", "/reception", "/book", "/member", "/board", "/join"];
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 

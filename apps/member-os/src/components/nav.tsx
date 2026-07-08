@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/dashboard", label: "ダッシュボード" },
   { href: "/", label: "受付台帳" },
   { href: "/reservations", label: "予約（姫路）" },
+  { href: "/frunk", label: "FRUNK会員" },
   { href: "/import", label: "データ取込" },
 ];
 
