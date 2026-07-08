@@ -1,4 +1,5 @@
 import "server-only";
+// (経営ダッシュボード: 事業別ブレークダウン追加)
 import { createAdmin } from "@/lib/supabase/admin";
 import type { GenesisActor } from "@/lib/auth";
 
@@ -218,4 +219,223 @@ export function buildJudgmentList(d: CockpitData): JudgmentItem[] {
     });
   }
   return items;
+}
+
+/* ============================================================
+   事業別 → 店舗ドリルダウン（経営ダッシュボード用）
+   事業の器 = fin_segments、当月の実績を fin_entries から集計。
+   店舗 = stores。事業→店舗の対応はコードで定義（DBにFKが無いため）。
+   数字が無い箇所は捏造せず hasData=false / 0 で返し、UI側で明示する。
+   ============================================================ */
+
+export type StoreMetric = {
+  id: string;
+  name: string;
+  operating: boolean; // 当月シフトがあれば稼働中、無ければ準備中扱い
+  staff: number;
+  shifts: number; // 当月シフト数
+  trials: number; // 体験予約（累計）
+  members: number; // 在籍会員数（スタッフ除外・leave_date無し）
+  joins: number; // 今月入会数（本会員・スタッフ除外）
+  leavesCore: number; // 今月退会（本会員＝トライアル・スタッフ除く）痛い退会
+  leavesTrial: number; // 今月退会（トライアル会員）想定内
+  leaveReasons: string[]; // 今月の本会員退会の主な理由（重複除去・未記入除外）
+  revenue: number | null; // 当月売上（事業→店舗が1:1のとき按分、不明はnull）
+};
+
+export type SegmentMetric = {
+  code: string;
+  name: string;
+  revenue: number;
+  cogs: number;
+  expense: number;
+  profit: number;
+  hasFinance: boolean; // 当月に財務入力があるか
+  stores: StoreMetric[];
+};
+
+export type BusinessBreakdown = {
+  monthLabel: string; // 例: "2026年6月"（財務の最新入力月）
+  segments: SegmentMetric[];
+};
+
+/** 事業(fin_segment)コード → 配下店舗の判定（DBにマッピングが無いため名称で対応付け） */
+function storesForSegment(code: string, stores: { id: string; name: string }[]) {
+  if (code === "golf") return stores.filter((s) => s.name.includes("GOLF WING"));
+  if (code === "himeji") return stores.filter((s) => s.name.includes("FRUNK") || s.name.includes("姫路"));
+  return [];
+}
+
+/**
+ * 会員名簿の store_name（Smart Hello由来のテキスト）→ store.id へ対応付け。
+ * store_id列が無いためアプリ層で正規化。新店舗名が増えたらここに追記する。
+ */
+function storeIdForMemberStoreName(storeName: string | null, stores: { id: string; name: string }[]): string | null {
+  const n = (storeName ?? "").trim();
+  const find = (kw: string) => stores.find((s) => s.name.includes(kw))?.id ?? null;
+  if (n.includes("FRUNK") || n.includes("姫路")) return find("FRUNK") ?? find("姫路");
+  // 既定はGOLF WING（"ゴルフウィング" / "GOLF WING" / "宝塚" などを宝塚店に集約）
+  return find("GOLF WING") ?? find("宝塚");
+}
+
+export async function getBusinessBreakdown(companyId: string): Promise<BusinessBreakdown> {
+  const admin = createAdmin();
+
+  // 財務の最新入力月を特定
+  const { data: latest } = await admin
+    .from("fin_entries")
+    .select("target_month")
+    .eq("company_id", companyId)
+    .is("deleted_at", null)
+    .order("target_month", { ascending: false })
+    .limit(1);
+  const month: string | null = latest?.[0]?.target_month ?? null;
+
+  const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes] = await Promise.all([
+    admin.from("fin_segments").select("id,name,code").eq("company_id", companyId).is("deleted_at", null),
+    admin.from("fin_categories").select("id,kind").eq("company_id", companyId).is("deleted_at", null),
+    month
+      ? admin.from("fin_entries").select("segment_id,category_id,amount").eq("company_id", companyId).eq("target_month", month).is("deleted_at", null)
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    admin.from("stores").select("id,name,brand_id").eq("company_id", companyId).is("deleted_at", null),
+    admin.from("staff_store_assignments").select("store_id").eq("company_id", companyId),
+    admin.from("shifts").select("store_id,date").eq("company_id", companyId).gte("date", monthStart()),
+    admin.from("mbr_trial_bookings").select("store_id").eq("company_id", companyId),
+    admin.from("mbr_members").select("store_name,member_type,join_date,leave_date,leave_reason").eq("company_id", companyId),
+  ]);
+
+  const segments = (segRes.data ?? []) as { id: string; name: string; code: string }[];
+  const catKind = new Map<string, string>();
+  for (const c of (catRes.data ?? []) as { id: string; kind: string }[]) catKind.set(c.id, c.kind);
+  const stores = (storeRes.data ?? []) as { id: string; name: string }[];
+
+  // 店舗別カウント
+  const countBy = (rows: { store_id: string | null }[] | undefined) => {
+    const m = new Map<string, number>();
+    for (const r of rows ?? []) {
+      if (!r.store_id) continue;
+      m.set(r.store_id, (m.get(r.store_id) ?? 0) + 1);
+    }
+    return m;
+  };
+  const staffByStore = countBy(assignRes.data as { store_id: string | null }[]);
+  const shiftByStore = countBy(shiftRes.data as { store_id: string | null }[]);
+  const trialByStore = countBy(trialRes.data as { store_id: string | null }[]);
+
+  // 会員名簿を店舗別に集計（在籍会員数・今月入会・今月退会）
+  // 当月ウィンドウ [月初, 翌月初)。leave_date は月末付の退会予定日なので範囲判定する。
+  const from = monthStart(); // "YYYY-MM-01"
+  const to = nextMonthStart(); // "翌月-01"（ISO日付なので文字列比較で当月判定可能）
+  const inThisMonth = (d: string | null) => !!d && d >= from && d < to;
+  const memberByStore = new Map<string, number>();
+  const joinByStore = new Map<string, number>();
+  const leaveCoreByStore = new Map<string, number>();
+  const leaveTrialByStore = new Map<string, number>();
+  const reasonsByStore = new Map<string, Set<string>>();
+  const bump = (m: Map<string, number>, id: string) => m.set(id, (m.get(id) ?? 0) + 1);
+  const PLACEHOLDER_REASONS = new Set(["選択してください", "その他", ""]);
+
+  for (const mem of (memberRes.data ?? []) as {
+    store_name: string | null;
+    member_type: string | null;
+    join_date: string | null;
+    leave_date: string | null;
+    leave_reason: string | null;
+  }[]) {
+    const sid = storeIdForMemberStoreName(mem.store_name, stores);
+    if (!sid) continue;
+    const type = mem.member_type ?? "";
+    if (type === "スタッフ") continue; // スタッフは顧客会員から除外
+    const isTrial = type === "トライアル会員";
+
+    if (!mem.leave_date && !isTrial) bump(memberByStore, sid); // 在籍（本会員）
+    if (inThisMonth(mem.join_date) && !isTrial) bump(joinByStore, sid); // 今月入会（本会員）
+    if (inThisMonth(mem.leave_date)) {
+      if (isTrial) {
+        bump(leaveTrialByStore, sid); // トライアル退会（想定内）
+      } else {
+        bump(leaveCoreByStore, sid); // 本会員退会（痛い）
+        const r = (mem.leave_reason ?? "").trim();
+        if (!PLACEHOLDER_REASONS.has(r)) {
+          if (!reasonsByStore.has(sid)) reasonsByStore.set(sid, new Set());
+          reasonsByStore.get(sid)!.add(r);
+        }
+      }
+    }
+  }
+
+  const storeMetric = (s: { id: string; name: string }, revenue: number | null): StoreMetric => {
+    const shifts = shiftByStore.get(s.id) ?? 0;
+    const members = memberByStore.get(s.id) ?? 0;
+    return {
+      id: s.id,
+      name: s.name,
+      operating: shifts > 0 || members > 0,
+      staff: staffByStore.get(s.id) ?? 0,
+      shifts,
+      trials: trialByStore.get(s.id) ?? 0,
+      members,
+      joins: joinByStore.get(s.id) ?? 0,
+      leavesCore: leaveCoreByStore.get(s.id) ?? 0,
+      leavesTrial: leaveTrialByStore.get(s.id) ?? 0,
+      leaveReasons: Array.from(reasonsByStore.get(s.id) ?? []).slice(0, 3),
+      revenue,
+    };
+  };
+
+  // 事業別 財務集計（当月）
+  const bySeg = new Map<string, { revenue: number; cogs: number; expense: number }>();
+  for (const e of (entRes.data ?? []) as { segment_id: string; category_id: string; amount: number | string }[]) {
+    const kind = catKind.get(e.category_id);
+    if (!kind || !e.segment_id) continue;
+    const acc = bySeg.get(e.segment_id) ?? { revenue: 0, cogs: 0, expense: 0 };
+    const amt = Number(e.amount) || 0;
+    if (kind === "revenue") acc.revenue += amt;
+    else if (kind === "cogs") acc.cogs += amt;
+    else if (kind === "expense") acc.expense += amt;
+    bySeg.set(e.segment_id, acc);
+  }
+
+  const result: SegmentMetric[] = segments.map((seg) => {
+    const f = bySeg.get(seg.id) ?? { revenue: 0, cogs: 0, expense: 0 };
+    const hasFinance = f.revenue !== 0 || f.cogs !== 0 || f.expense !== 0;
+    const segStores = storesForSegment(seg.code, stores);
+    // 事業→店舗が1:1のときのみ、当月売上を店舗へ按分（複数店は不明=null）
+    const perStoreRevenue = segStores.length === 1 && hasFinance ? f.revenue : null;
+    return {
+      code: seg.code,
+      name: seg.name,
+      revenue: f.revenue,
+      cogs: f.cogs,
+      expense: f.expense,
+      profit: f.revenue - f.cogs - f.expense,
+      hasFinance,
+      stores: segStores.map((s) => storeMetric(s, perStoreRevenue)),
+    };
+  });
+
+  // 並び順: 配下店舗がある事業 → 財務入力がある事業 → その他
+  result.sort((a, b) => {
+    const rank = (s: SegmentMetric) => (s.stores.length > 0 ? 0 : s.hasFinance ? 1 : 2);
+    if (rank(a) !== rank(b)) return rank(a) - rank(b);
+    return b.revenue - a.revenue;
+  });
+
+  return { monthLabel: month ? fmtMonth(month) : "—", segments: result };
+}
+
+function monthStart(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function nextMonthStart(): string {
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function fmtMonth(d: string): string {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}年${dt.getMonth() + 1}月`;
 }
