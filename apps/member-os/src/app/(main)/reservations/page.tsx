@@ -78,12 +78,12 @@ export default async function ReservationsPage({
         </form>
       </header>
 
-      {sp.err && <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{sp.err}</p>}
+      {sp.err && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{sp.err}</p>}
 
       {bookingUrl && (
         <Panel title="お客様Web予約URL（QR掲示・HP掲載用・一度だけ表示）" className="d1">
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-sky-300">{bookingUrl}</code>
+            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-indigo-600">{bookingUrl}</code>
             <a href={bookingUrl} target="_blank" rel="noreferrer" className={btnCls}>予約画面を開く ↗</a>
           </div>
         </Panel>
@@ -92,7 +92,7 @@ export default async function ReservationsPage({
       {boardUrl && (
         <Panel title="店頭カレンダーURL（ロビー掲示・常設タブレット用・一度だけ表示）" className="d1">
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-amber-300">{boardUrl}</code>
+            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-amber-700">{boardUrl}</code>
             <a href={boardUrl} target="_blank" rel="noreferrer" className={btnCls}>カレンダーを開く ↗</a>
           </div>
         </Panel>
@@ -106,7 +106,7 @@ export default async function ReservationsPage({
           <>
             <div className="mb-3 flex items-baseline gap-2">
               <span className="text-sm text-[--color-dim]">未収合計</span>
-              <span className="text-2xl font-bold tabular-nums text-red-300">{yen(unpaidTotal)}</span>
+              <span className="text-2xl font-bold tabular-nums text-rose-600">{yen(unpaidTotal)}</span>
             </div>
             <div className="space-y-1.5">
               {unpaidList.map(({ b, out }) => (
@@ -120,7 +120,7 @@ export default async function ReservationsPage({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-[--color-dim]">請求 {yen(Number(b.amount))}／入金 {yen(Number(b.paid_amount ?? 0))}</span>
-                    <span className="font-semibold tabular-nums text-red-300">未収 {yen(out)}</span>
+                    <span className="font-semibold tabular-nums text-rose-600">未収 {yen(out)}</span>
                     <form action={recordPayment}>
                       <input type="hidden" name="id" value={String(b.id)} />
                       <input type="hidden" name="amount" value={String(b.amount)} />
@@ -134,34 +134,49 @@ export default async function ReservationsPage({
         )}
       </Panel>
 
-      {/* 空き状況グリッド */}
+      {/* 空き状況グリッド（大型・見やすく） */}
       <Panel title={`空き状況（${date}）`} className="d2">
-        <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-xs">
-            <thead>
-              <tr>
-                <th className="sticky left-0 bg-[--color-panel] p-1 text-left">枠 \ 時間</th>
-                {slots.map((s) => <th key={s} className="p-1 font-normal text-[--color-dim]">{s}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {resList.map((r) => (
-                <tr key={String(r.id)} className="border-t border-[--color-line]">
-                  <td className="sticky left-0 bg-[--color-panel] p-1 font-semibold whitespace-nowrap">{String(r.name)}</td>
-                  {slots.map((s) => {
-                    const b = byCell.get(`${r.id}|${s}`);
-                    return (
-                      <td key={s} className={`p-1 text-center ${b ? "bg-sky-500/15 text-sky-300" : "text-[--color-dim]/40"}`}>
-                        {b ? (String(b.customer_kind) === "member" ? "会" : "○") : "・"}
-                      </td>
-                    );
-                  })}
-                </tr>
+        <div className="overflow-x-auto pb-1">
+          <div className="min-w-max">
+            {/* 時間ヘッダー */}
+            <div className="flex">
+              <div className="sticky left-0 z-10 w-28 shrink-0 bg-[--color-panel] px-2 py-2 text-xs font-semibold text-[--color-dim]">枠 ＼ 時間</div>
+              {slots.map((s) => (
+                <div key={s} className="w-20 shrink-0 px-1 py-2 text-center text-xs font-semibold text-[--color-dim]">{s}</div>
               ))}
-            </tbody>
-          </table>
+            </div>
+            {resList.map((r) => (
+              <div key={String(r.id)} className="flex border-t border-[--color-line]">
+                <div className="sticky left-0 z-10 flex w-28 shrink-0 items-center bg-[--color-panel] px-2 py-1.5 text-sm font-semibold whitespace-nowrap">{String(r.name)}</div>
+                {slots.map((s) => {
+                  const b = byCell.get(`${r.id}|${s}`);
+                  if (!b) {
+                    return (
+                      <div key={s} className="w-20 shrink-0 px-1 py-1.5">
+                        <div className="h-11 rounded-lg border border-dashed border-[--color-line] bg-[--color-panel-2]" />
+                      </div>
+                    );
+                  }
+                  const member = String(b.customer_kind) === "member";
+                  const nm = b.guest_name ? String(b.guest_name) : b.member_no ? `会員 ${String(b.member_no)}` : "予約";
+                  return (
+                    <div key={s} className="w-20 shrink-0 px-1 py-1.5">
+                      <div className={`flex h-11 flex-col justify-center overflow-hidden rounded-lg px-1.5 text-[11px] leading-tight ${member ? "bg-indigo-100 text-indigo-800" : "bg-emerald-100 text-emerald-800"}`}>
+                        <span className="truncate font-semibold">{nm}</span>
+                        <span className="truncate opacity-70">{member ? "会員" : "都度"}{b.party_size ? `・${String(b.party_size)}名` : ""}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
         </div>
-        <p className="mt-1 text-[10px] text-[--color-dim]">○=予約 / 会=会員予約 / ・=空き</p>
+        <div className="mt-2 flex flex-wrap gap-4 text-xs text-[--color-dim]">
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-indigo-100" />会員予約</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-emerald-100" />都度予約</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded border border-dashed border-[--color-line] bg-[--color-panel-2]" />空き</span>
+        </div>
       </Panel>
 
       {/* 予約作成 */}
@@ -254,7 +269,7 @@ export default async function ReservationsPage({
                       <option value="">方法</option>
                       {PAY_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
-                    {out > 0 && <span className="text-xs font-semibold text-red-300">未収 {yen(out)}</span>}
+                    {out > 0 && <span className="text-xs font-semibold text-rose-600">未収 {yen(out)}</span>}
                     <button name="mode" value="partial" className={btnGhostCls}>記録</button>
                     <button name="mode" value="full" className={btnCls}>全額入金</button>
                     <button name="mode" value="waive" className="text-xs text-[--color-dim] hover:text-[--color-txt]">免除</button>

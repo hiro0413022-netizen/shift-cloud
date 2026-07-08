@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState, useEffect, useCallback } from "react";
+import { useActionState, useState } from "react";
 import { submitReception, type ReceptionState } from "./actions";
 import {
   VISIT_TYPES, OCCUPATIONS, CONTACT_METHODS, REFERRAL_SOURCES,
@@ -8,15 +8,16 @@ import {
 } from "@/lib/walkin";
 
 const field =
-  "w-full rounded-xl border border-[--color-line] bg-[--color-panel-2] px-4 py-3 text-base text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-sky-500 focus:outline-none";
+  "w-full rounded-xl border border-[--color-line] bg-white px-4 py-3 text-base text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
 const labelCls = "mb-1 block text-sm font-medium text-[--color-dim]";
+const cardCls = "rounded-2xl border border-[--color-line] bg-[--color-panel] p-5 shadow-sm";
 
 function CheckGroup({ name, options }: { name: string; options: string[] }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {options.map((o) => (
-        <label key={o} className="flex items-center gap-2 rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm">
-          <input type="checkbox" name={name} value={o} className="h-5 w-5" />
+        <label key={o} className="flex items-center gap-2 rounded-lg border border-[--color-line] bg-white px-3 py-2.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/5">
+          <input type="checkbox" name={name} value={o} className="h-5 w-5 accent-[--color-accent]" />
           {o}
         </label>
       ))}
@@ -26,13 +27,12 @@ function CheckGroup({ name, options }: { name: string; options: string[] }) {
 
 export function ReceptionForm({ token, storeName }: { token: string; storeName: string | null }) {
   const [state, action, pending] = useActionState<ReceptionState, FormData>(submitReception, {});
-  const [signature, setSignature] = useState("");
   const [visitType, setVisitType] = useState("trial");
 
   if (state.ok) {
     return (
-      <div className="rounded-xl border border-emerald-500/40 bg-[--color-panel] p-8 text-center">
-        <p className="text-3xl">✓</p>
+      <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-3xl text-emerald-600">✓</div>
         <p className="mt-3 text-lg font-semibold">ご記入ありがとうございました</p>
         <p className="mt-2 text-sm text-[--color-dim]">受付が完了しました。タブレットをスタッフにお渡しください。</p>
       </div>
@@ -40,27 +40,26 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
   }
 
   return (
-    <form action={action} className="space-y-5 pb-10">
+    <form action={action} className="space-y-4 pb-10">
       <input type="hidden" name="token" value={token} />
-      <input type="hidden" name="signature" value={signature} />
 
       {storeName && (
-        <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-3 text-center text-sm text-[--color-dim]">
+        <div className="rounded-xl border border-[--color-line] bg-white p-3 text-center text-sm font-medium text-[--color-dim] shadow-sm">
           {storeName}
         </div>
       )}
 
       {/* 利用区分 */}
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-5 space-y-3">
-        <p className="text-sm font-semibold text-[--color-txt]">本日のご利用 <span className="text-red-400">*</span></p>
+      <div className={`${cardCls} space-y-3`}>
+        <p className="text-sm font-semibold text-[--color-txt]">本日のご利用 <span className="text-rose-500">*</span></p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {VISIT_TYPES.map((v) => (
             <label
               key={v.value}
-              className={`flex cursor-pointer items-center justify-center rounded-lg border px-3 py-3 text-sm ${
+              className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-3.5 text-sm font-medium transition-colors ${
                 visitType === v.value
-                  ? "border-sky-500 bg-sky-500/10 text-sky-300"
-                  : "border-[--color-line] bg-[--color-panel-2] text-[--color-dim]"
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-[--color-line] bg-white text-[--color-dim]"
               }`}
             >
               <input
@@ -74,10 +73,10 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
       </div>
 
       {/* お客様情報 */}
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-5 space-y-4">
+      <div className={`${cardCls} space-y-4`}>
         <p className="text-sm font-semibold text-[--color-txt]">お客様情報</p>
         <div>
-          <label className={labelCls}>お名前 <span className="text-red-400">*</span></label>
+          <label className={labelCls}>お名前 <span className="text-rose-500">*</span></label>
           <input name="name" required placeholder="山田 太郎" className={field} />
         </div>
         <div>
@@ -102,7 +101,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className={labelCls}>電話番号 <span className="text-red-400">*</span></label>
+            <label className={labelCls}>電話番号 <span className="text-rose-500">*</span></label>
             <input name="phone" type="tel" required placeholder="090-1234-5678" className={field} />
           </div>
           <div>
@@ -139,7 +138,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
       </div>
 
       {/* アンケート */}
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-5 space-y-4">
+      <div className={`${cardCls} space-y-4`}>
         <p className="text-sm font-semibold text-[--color-txt]">アンケート（任意）</p>
         <div>
           <label className={labelCls}>当店を何で知りましたか</label>
@@ -182,110 +181,22 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
         </div>
       </div>
 
-      {/* 同意・署名 */}
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-5 space-y-3">
-        <p className="text-sm font-semibold text-[--color-txt]">同意・署名</p>
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" name="consent" value="1" required className="mt-0.5 h-5 w-5" />
-          <span>個人情報をサービス提供・入会手続きの目的で利用することに同意します。<span className="text-red-400">*</span></span>
+      {/* 同意 */}
+      <div className={`${cardCls} space-y-3`}>
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" name="consent" value="1" required className="mt-0.5 h-5 w-5 accent-[--color-accent]" />
+          <span>個人情報をサービス提供・入会手続きの目的で利用することに同意します。<span className="text-rose-500">*</span></span>
         </label>
-        <div>
-          <label className={labelCls}>ご署名（指でご記入ください）</label>
-          <SignaturePad value={signature} onChange={setSignature} />
-        </div>
       </div>
 
-      {state.error && <p className="text-center text-sm text-red-400">{state.error}</p>}
+      {state.error && <p className="text-center text-sm text-rose-600">{state.error}</p>}
 
       <button
         disabled={pending}
-        className="w-full rounded-xl bg-sky-600 py-4 text-lg font-semibold text-white transition-all hover:bg-sky-500 disabled:opacity-50"
+        className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-accent/90 disabled:opacity-50"
       >
         {pending ? "送信中..." : "この内容で受付する"}
       </button>
     </form>
-  );
-}
-
-function SignaturePad({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const drawing = useRef(false);
-  const last = useRef<{ x: number; y: number } | null>(null);
-
-  const setup = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.scale(dpr, dpr);
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "#e2e8f0";
-    }
-  }, []);
-
-  useEffect(() => {
-    setup();
-    window.addEventListener("resize", setup);
-    return () => window.removeEventListener("resize", setup);
-  }, [setup]);
-
-  const pos = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  };
-  const start = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drawing.current = true;
-    last.current = pos(e);
-  };
-  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!drawing.current) return;
-    const ctx = canvasRef.current?.getContext("2d");
-    const p = pos(e);
-    if (ctx && last.current) {
-      ctx.beginPath();
-      ctx.moveTo(last.current.x, last.current.y);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-    }
-    last.current = p;
-  };
-  const end = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    last.current = null;
-    const canvas = canvasRef.current;
-    if (canvas) onChange(canvas.toDataURL("image/png"));
-  };
-  const clear = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (canvas && ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      onChange("");
-    }
-  };
-
-  return (
-    <div>
-      <canvas
-        ref={canvasRef}
-        onPointerDown={start}
-        onPointerMove={move}
-        onPointerUp={end}
-        onPointerLeave={end}
-        className="h-40 w-full touch-none rounded-xl border border-dashed border-[--color-line] bg-[--color-panel-2]"
-      />
-      <div className="mt-1 flex justify-between text-xs text-[--color-dim]">
-        <span>{value ? "署名を記入済み" : "上の枠内にご署名ください"}</span>
-        <button type="button" onClick={clear} className="hover:text-[--color-txt]">消してやり直す</button>
-      </div>
-    </div>
   );
 }
