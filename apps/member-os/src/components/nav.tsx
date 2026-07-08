@@ -1,25 +1,74 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+const LINKS = [
+  { href: "/dashboard", label: "ダッシュボード" },
+  { href: "/", label: "受付台帳" },
+  { href: "/reservations", label: "予約（姫路）" },
+  { href: "/import", label: "データ取込" },
+];
+
+function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function TopBar({ userName }: { userName: string }) {
+  const pathname = usePathname() || "/";
   return (
-    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[--color-line] bg-[--color-panel] px-5 py-3">
-      <div className="flex items-baseline gap-2">
-        <span className="text-xs tracking-[0.3em] text-[--color-gold]">GOLF WING</span>
-        <span className="text-base font-bold tracking-wide">Member OS</span>
-        <span className="ml-1 flex items-center gap-1.5 text-[10px] text-emerald-300/80">
-          <span className="blink inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          ONLINE
-        </span>
+    <header className="sticky top-0 z-20 border-b border-[--color-line] bg-[--color-panel]/85 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+        <div className="flex items-center gap-6">
+          <Link href="/dashboard" className="flex items-baseline gap-2">
+            <span className="text-[11px] font-semibold tracking-[0.28em] text-[--color-gold]">GOLF WING</span>
+            <span className="text-base font-bold tracking-tight text-[--color-txt]">Member OS</span>
+          </Link>
+          <nav className="hidden items-center gap-1 md:flex">
+            {LINKS.map((l) => {
+              const active = isActive(pathname, l.href);
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-accent/10 text-accent"
+                      : "text-[--color-dim] hover:bg-[--color-panel-2] hover:text-[--color-txt]"
+                  }`}
+                >
+                  {l.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="hidden text-sm text-[--color-dim] sm:inline">{userName}</span>
+          <form action="/api/logout" method="post">
+            <button className="rounded-lg border border-[--color-line] bg-white px-3 py-1.5 text-xs font-medium text-[--color-dim] transition-colors hover:text-[--color-txt]">
+              ログアウト
+            </button>
+          </form>
+        </div>
       </div>
-      <nav className="flex items-center gap-4 text-sm">
-        <Link href="/" className="text-[--color-dim] transition-colors hover:text-[--color-txt]">受付台帳</Link>
-        <Link href="/reservations" className="text-[--color-dim] transition-colors hover:text-[--color-txt]">予約(姫路)</Link>
-        <Link href="/import" className="text-[--color-dim] transition-colors hover:text-[--color-txt]">Smart Hello取込</Link>
-        <span className="text-[--color-dim]">|</span>
-        <span className="text-xs text-[--color-dim]">{userName}</span>
-        <form action="/api/logout" method="post">
-          <button className="text-xs text-[--color-dim] transition-colors hover:text-[--color-txt]">ログアウト</button>
-        </form>
+      {/* モバイル用ナビ */}
+      <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-2 md:hidden">
+        {LINKS.map((l) => {
+          const active = isActive(pathname, l.href);
+          return (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                active ? "bg-accent/10 text-accent" : "text-[--color-dim]"
+              }`}
+            >
+              {l.label}
+            </Link>
+          );
+        })}
       </nav>
     </header>
   );

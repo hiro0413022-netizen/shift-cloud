@@ -5,12 +5,12 @@ import { CountUp } from "./count-up";
 
 export function Panel({ title, children, action, className = "" }: { title?: string; children: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <section className={`hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-4 ${className}`}>
+    <section className={`hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-5 ${className}`}>
       {(title || action) && (
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-3">
           {title && (
-            <h2 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-[--color-dim]">
-              <span className="inline-block h-3 w-0.5 rounded-full bg-[--color-accent]" />
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-[--color-txt]">
+              <span className="inline-block h-4 w-1 rounded-full bg-accent" />
               {title}
             </h2>
           )}
@@ -55,15 +55,15 @@ export function StatusDot({ status }: { status: string }) {
 
 export function Badge({ children, tone = "default" }: { children: ReactNode; tone?: "default" | "ok" | "warn" | "danger" | "accent" | "gold" }) {
   const tones = {
-    default: "border-[--color-line] text-[--color-dim]",
-    ok: "border-emerald-500/40 text-emerald-300",
-    warn: "border-amber-500/40 text-amber-300",
-    danger: "border-red-500/40 text-red-300",
-    accent: "border-sky-500/40 text-sky-300",
-    gold: "border-yellow-600/50 text-[--color-gold]",
+    default: "border-transparent bg-slate-100 text-slate-600",
+    ok: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    warn: "border-amber-200 bg-amber-50 text-amber-700",
+    danger: "border-red-200 bg-red-50 text-red-700",
+    accent: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    gold: "border-yellow-200 bg-yellow-50 text-yellow-800",
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${tones[tone]}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -96,13 +96,13 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-sky-500 focus:outline-none";
+  "w-full rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
 
 export const btnCls =
-  "inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition-all hover:bg-sky-500 hover:shadow-[0_0_16px_-2px_rgba(56,189,248,0.6)] disabled:opacity-50";
+  "inline-flex items-center gap-1 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90 disabled:opacity-50";
 
 export const btnGhostCls =
-  "inline-flex items-center gap-1 rounded-lg border border-[--color-line] px-3 py-2 text-sm text-[--color-dim] transition-colors hover:text-[--color-txt] hover:border-sky-700";
+  "inline-flex items-center gap-1 rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm text-[--color-txt] transition-colors hover:bg-[--color-panel-2]";
 
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="py-6 text-center text-sm text-[--color-dim]">{children}</p>;
@@ -146,7 +146,7 @@ export function Sparkline({ trend, tone = "accent" }: { trend: unknown; tone?: "
   });
   const poly = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const [lx, ly] = coords[coords.length - 1];
-  const stroke = tone === "gold" ? "#d4af37" : tone === "ok" ? "#34d399" : "#38bdf8";
+  const stroke = tone === "gold" ? "#b7791f" : tone === "ok" ? "#059669" : "#4f46e5";
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="h-7 w-full" preserveAspectRatio="none" aria-hidden>
       <polyline points={poly} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9" />

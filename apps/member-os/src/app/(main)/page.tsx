@@ -93,7 +93,7 @@ export default async function LedgerPage({
             このURLは長期有効です。タブレットのブラウザで開いてホーム画面に追加するか、QRにして店頭に掲示してください。予約不要でお客様が自己入力できます。
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-sky-300">{receptionUrl}</code>
+            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-indigo-600">{receptionUrl}</code>
             <a href={receptionUrl} target="_blank" rel="noreferrer" className={btnCls}>受付画面を開く ↗</a>
           </div>
         </Panel>
@@ -237,7 +237,7 @@ function SummaryCard({
 }: {
   label: string; value: number; unit: string; tone?: "accent" | "gold" | "ok"; dim?: boolean;
 }) {
-  const color = tone === "gold" ? "text-[--color-gold]" : tone === "ok" ? "text-emerald-300" : "text-sky-300";
+  const color = tone === "gold" ? "text-[--color-gold]" : tone === "ok" ? "text-emerald-600" : "text-indigo-600";
   return (
     <div className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
       <p className="text-xs text-[--color-dim]">{label}</p>

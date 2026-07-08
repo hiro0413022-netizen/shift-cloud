@@ -6,7 +6,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar userName={actor.name} />
-      <main className="min-w-0 flex-1 p-6">{children}</main>
+      <main className="mx-auto w-full max-w-7xl min-w-0 flex-1 px-5 py-6">{children}</main>
     </div>
   );
 }

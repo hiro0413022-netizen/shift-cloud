@@ -1,161 +1,74 @@
 @import "tailwindcss";
 
 @theme {
-  /* Genesis Cockpit palette（DESIGN_SYSTEM: 黒・濃紺・グレー基調＋ブルー/シアン/パープル/ゴールド） */
-  --color-bg: #07090f;
-  --color-panel: #0d1119;
-  --color-panel-2: #121826;
-  --color-line: #1e2637;
-  --color-txt: #e2e8f0;
-  --color-dim: #7c8aa5;
-  --color-accent: #38bdf8;
-  --color-accent-2: #818cf8;
-  --color-gold: #d4af37;
-  --color-ok: #34d399;
-  --color-warn: #fbbf24;
-  --color-danger: #f87171;
+  /* Member OS — 明るいクリーンSaaS配色（Stripe/Notion風） */
+  --color-bg: #f6f7f9;
+  --color-panel: #ffffff;
+  --color-panel-2: #f4f6fa;
+  --color-line: #e6e9ef;
+  --color-txt: #111827;
+  --color-dim: #6b7280;
+  --color-accent: #4f46e5;      /* indigo-600 */
+  --color-accent-2: #6366f1;
+  --color-gold: #b7791f;
+  --color-ok: #059669;
+  --color-warn: #d97706;
+  --color-danger: #dc2626;
+}
+
+html, body {
+  background: var(--color-bg);
 }
 
 body {
   font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
-  @apply bg-[--color-bg] text-[--color-txt] antialiased;
+  @apply text-[--color-txt] antialiased;
 }
 
-/* ============================================================
-   背景: 微細グリッド＋上部グロー（管制室の空気感）
-   ============================================================ */
+/* やわらかな上部グラデーションだけ（管制室グリッドは撤去） */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(56, 189, 248, 0.08), transparent),
-    linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
-  background-size: 100% 100%, 36px 36px, 36px 36px;
+  background:
+    radial-gradient(60% 40% at 50% -10%, rgba(79, 70, 229, 0.06), transparent 70%),
+    var(--color-bg);
 }
 
 /* ============================================================
    キーフレーム
    ============================================================ */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 6px 0 rgba(56, 189, 248, 0.35); }
-  50% { box-shadow: 0 0 18px 2px rgba(56, 189, 248, 0.55); }
-}
-@keyframes pulse-danger {
-  0%, 100% { box-shadow: 0 0 6px 0 rgba(248, 113, 113, 0.4); }
-  50% { box-shadow: 0 0 20px 3px rgba(248, 113, 113, 0.65); }
-}
-@keyframes flow {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
-}
-@keyframes spin-slow {
-  to { transform: rotate(360deg); }
-}
-@keyframes spin-rev {
-  to { transform: rotate(-360deg); }
-}
-@keyframes dash-move {
-  to { stroke-dashoffset: -20; }
-}
 @keyframes reveal-up {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.25; }
-}
-@keyframes bar-grow {
-  from { width: 0; }
-}
-
-/* ============================================================
-   状態モーション（意味のある動きのみ）
-   ============================================================ */
-.node-processing { animation: pulse-glow 2.4s ease-in-out infinite; }
-.node-danger { animation: pulse-danger 1.6s ease-in-out infinite; }
-.ai-flow {
-  background: linear-gradient(90deg, #0d1119, #16324a, #0d1119);
-  background-size: 200% 100%;
-  animation: flow 3s linear infinite;
-}
-.blink { animation: blink 1.6s ease-in-out infinite; }
-
-/* 軌道リング（回転） */
-.orbit { animation: spin-slow 80s linear infinite; }
-.orbit-rev { animation: spin-rev 120s linear infinite; }
-
-/* レーダースキャン（コニックグラデの回転扇） */
-.radar-sweep {
-  border-radius: 9999px;
-  background: conic-gradient(
-    from 0deg,
-    rgba(56, 189, 248, 0.14),
-    rgba(56, 189, 248, 0.05) 40deg,
-    transparent 80deg
-  );
-  animation: spin-slow 8s linear infinite;
-}
-
-/* 接続線（データフロー） */
-.link-line {
-  stroke-dasharray: 3 5;
-  animation: dash-move 1.4s linear infinite;
-}
+@keyframes bar-grow { from { width: 0; } }
 
 /* エントランス（下から浮上） */
-.reveal { animation: reveal-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.d1 { animation-delay: 0.06s; }
-.d2 { animation-delay: 0.12s; }
-.d3 { animation-delay: 0.18s; }
-.d4 { animation-delay: 0.24s; }
-.d5 { animation-delay: 0.3s; }
-.d6 { animation-delay: 0.36s; }
+.reveal { animation: reveal-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.d1 { animation-delay: 0.05s; }
+.d2 { animation-delay: 0.1s; }
+.d3 { animation-delay: 0.15s; }
+.d4 { animation-delay: 0.2s; }
+.d5 { animation-delay: 0.25s; }
+.d6 { animation-delay: 0.3s; }
 
-/* プログレスバーの伸長 */
 .bar-grow { animation: bar-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* ============================================================
-   HUDパネル（四隅ブラケット＋ホバーグロー）
+   カード（クリーン: 枠線＋ソフト影＋ホバーで軽く浮く）
+   旧HUDの四隅ブラケット/グローは撤去
    ============================================================ */
 .hud {
   position: relative;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
-}
-.hud::before,
-.hud::after {
-  content: "";
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  pointer-events: none;
-  transition: border-color 0.25s ease;
-}
-.hud::before {
-  top: -1px;
-  left: -1px;
-  border-top: 1px solid rgba(56, 189, 248, 0.45);
-  border-left: 1px solid rgba(56, 189, 248, 0.45);
-  border-top-left-radius: 0.75rem;
-}
-.hud::after {
-  bottom: -1px;
-  right: -1px;
-  border-bottom: 1px solid rgba(56, 189, 248, 0.45);
-  border-right: 1px solid rgba(56, 189, 248, 0.45);
-  border-bottom-right-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 .hud:hover {
-  border-color: rgba(56, 189, 248, 0.35);
-  box-shadow: 0 0 24px -6px rgba(56, 189, 248, 0.25);
-}
-.hud:hover::before,
-.hud:hover::after {
-  border-color: rgba(56, 189, 248, 0.9);
+  box-shadow: 0 4px 12px -2px rgba(16, 24, 40, 0.1), 0 2px 6px -2px rgba(16, 24, 40, 0.06);
+  transform: translateY(-1px);
 }
 
 /* ============================================================
