@@ -47,28 +47,37 @@ function cellNum(v: ExcelJS.CellValue): number | null {
   return m ? parseFloat(m[0]) : null;
 }
 
-const SML_MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+// ExcelJS が「既定名前空間」で来ることを前提にしているパート本体の名前空間。
+// Smart Hello の一部エクスポートはこれらを接頭辞付き（<x:workbook>, <ap:Properties> 等）で出力するため
+// ExcelJS が解釈できず undefined 参照で落ちる（"reading 'sheets'" / "reading 'company'"）。
+// core.xml(dc/cp) は元々接頭辞付きが正なので対象外。
+const DEFAULT_NS_URIS = [
+  "http://schemas.openxmlformats.org/spreadsheetml/2006/main", // workbook/worksheet/styles/sharedStrings
+  "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties", // docProps/app.xml
+];
 
-/**
- * Smart Hello の一部エクスポートは SpreadsheetML本体を接頭辞付き（例 <x:workbook><x:sheets>）で出力する。
- * ExcelJS は既定名前空間しか解釈できず workbook が undefined になり "reading 'sheets'" で落ちる。
- * そこで本体名前空間の接頭辞を検出したら、該当XMLの接頭辞を外して既定名前空間に正規化し直す。
- */
+/** 接頭辞付きの本体名前空間を検出したら、該当接頭辞を外して既定名前空間に正規化し直す。 */
 async function normalizeSpreadsheetNamespace(buf: ArrayBuffer): Promise<Buffer | null> {
   const zip = await JSZip.loadAsync(buf);
   let changed = false;
   const paths = Object.keys(zip.files).filter((p) => /\.(xml|rels)$/i.test(p) && !zip.files[p].dir);
   for (const p of paths) {
-    const xml = await zip.files[p].async("string");
-    const m = xml.match(new RegExp(`xmlns:([A-Za-z0-9]+)="${SML_MAIN.replace(/[\/.]/g, "\\$&")}"`));
-    if (!m) continue;
-    const px = m[1];
-    const fixed = xml
-      .split(`<${px}:`).join("<")
-      .split(`</${px}:`).join("</")
-      .replace(`xmlns:${px}="${SML_MAIN}"`, `xmlns="${SML_MAIN}"`);
-    zip.file(p, fixed);
-    changed = true;
+    let xml = await zip.files[p].async("string");
+    let partChanged = false;
+    for (const uri of DEFAULT_NS_URIS) {
+      const m = xml.match(new RegExp(`xmlns:([A-Za-z0-9]+)="${uri.replace(/[\/.]/g, "\\$&")}"`));
+      if (!m) continue;
+      const px = m[1];
+      xml = xml
+        .split(`<${px}:`).join("<")
+        .split(`</${px}:`).join("</")
+        .replace(`xmlns:${px}="${uri}"`, `xmlns="${uri}"`);
+      partChanged = true;
+    }
+    if (partChanged) {
+      zip.file(p, xml);
+      changed = true;
+    }
   }
   if (!changed) return null;
   return zip.generateAsync({ type: "nodebuffer" });
