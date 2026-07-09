@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdmin } from "@/lib/supabase/admin";
@@ -22,7 +23,7 @@ export type MoneyActor = {
  * - view_hq / manage_money_all を持つ人 = 全店舗を閲覧・締め
  * - それ以外 = staff_store_assignments で配属された店舗のみ入力可
  */
-export async function getMoneyActor(): Promise<MoneyActor | null> {
+export const getMoneyActor = cache(async (): Promise<MoneyActor | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -32,17 +33,14 @@ export async function getMoneyActor(): Promise<MoneyActor | null> {
   const admin = createAdmin();
   const { data: staff } = await admin
     .from("staff")
-    .select("id, company_id, name, email, status")
+    .select("id, company_id, name, email, status, staff_roles(deleted_at, roles(permissions))")
     .eq("auth_user_id", user.id)
     .is("deleted_at", null)
     .single();
   if (!staff || staff.status !== "active") return null;
 
-  const { data: roleRows } = await admin
-    .from("staff_roles")
-    .select("roles(permissions)")
-    .eq("staff_id", staff.id)
-    .is("deleted_at", null);
+  const roleRows = ((staff as { staff_roles?: Array<{ deleted_at: string | null; roles: { permissions: Record<string, boolean> } | null }> }).staff_roles ?? [])
+    .filter((r) => r.deleted_at == null);
 
   const canManageAll = (roleRows ?? []).some((row) => {
     const perms = (row as unknown as { roles: { permissions: Record<string, boolean> } | null })
@@ -88,7 +86,7 @@ export async function getMoneyActor(): Promise<MoneyActor | null> {
     canManageAll,
     stores,
   };
-}
+});
 
 export async function requireMoneyActor(): Promise<MoneyActor> {
   const actor = await getMoneyActor();

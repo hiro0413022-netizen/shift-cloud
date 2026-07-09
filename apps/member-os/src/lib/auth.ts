@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdmin } from "@/lib/supabase/admin";
@@ -15,7 +16,7 @@ export type ReceptionActor = {
  * Member OS（体験受付）は use_reception 権限、または view_hq（経営層）保持者のみアクセス可。
  * ロール・権限データはGenesis / Shift Cloudと共通（同一DB）。DECISIONS #27。
  */
-export async function getReceptionActor(): Promise<ReceptionActor | null> {
+export const getReceptionActor = cache(async (): Promise<ReceptionActor | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -25,17 +26,14 @@ export async function getReceptionActor(): Promise<ReceptionActor | null> {
   const admin = createAdmin();
   const { data: staff } = await admin
     .from("staff")
-    .select("id, company_id, name, email, status")
+    .select("id, company_id, name, email, status, staff_roles(deleted_at, roles(permissions))")
     .eq("auth_user_id", user.id)
     .is("deleted_at", null)
     .single();
   if (!staff || staff.status !== "active") return null;
 
-  const { data: roleRows } = await admin
-    .from("staff_roles")
-    .select("roles(permissions)")
-    .eq("staff_id", staff.id)
-    .is("deleted_at", null);
+  const roleRows = ((staff as { staff_roles?: Array<{ deleted_at: string | null; roles: { permissions: Record<string, boolean> } | null }> }).staff_roles ?? [])
+    .filter((r) => r.deleted_at == null);
 
   const hasAccess = (roleRows ?? []).some((row) => {
     const perms = (row as unknown as { roles: { permissions: Record<string, boolean> } | null })
@@ -52,7 +50,7 @@ export async function getReceptionActor(): Promise<ReceptionActor | null> {
     name: staff.name,
     email: staff.email,
   };
-}
+});
 
 export async function requireReceptionActor(): Promise<ReceptionActor> {
   const actor = await getReceptionActor();
