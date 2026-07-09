@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
-import { asOptions, asConfig, type AnswerValue, type Question } from "@/lib/survey";
+import { asOptions, asConfig, type AnswerValue, type Question, type QuestionType } from "@/lib/survey";
 
 export type LoadedSurvey = {
   survey: { id: string; slug: string; title: string; status: string; response_count: number };
@@ -38,7 +38,7 @@ export async function loadSurveyData(surveyId: string, companyId: string): Promi
     section: q.section as string | null,
     position: q.position as number,
     code: q.code as string,
-    type: q.type,
+    type: q.type as QuestionType,
     title: q.title as string,
     help_text: q.help_text as string | null,
     required: q.required as boolean,

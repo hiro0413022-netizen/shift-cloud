@@ -1,5 +1,5 @@
 import { createAdmin } from "@/lib/supabase/admin";
-import { asOptions, asConfig, type Question } from "@/lib/survey";
+import { asOptions, asConfig, type Question, type QuestionType } from "@/lib/survey";
 import { SurveyForm } from "./survey-form";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +56,7 @@ export default async function SurveyPublicPage({ params }: { params: Promise<{ s
     section: q.section as string | null,
     position: q.position as number,
     code: q.code as string,
-    type: q.type,
+    type: q.type as QuestionType,
     title: q.title as string,
     help_text: q.help_text as string | null,
     required: q.required as boolean,

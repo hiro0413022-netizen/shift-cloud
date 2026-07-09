@@ -11,6 +11,7 @@
 - db: `0031_survey_golfwing_seed.sql` **投入済（execute_sql、冪等ファイルはGit-as-truth用）** — GOLF WING会員アンケート（slug=`golfwing-2026`・全26問・匿名・公開中）。コーチ評価13順位（対象: 古川博庸/井殿康和/榎本剛志/安東茉優/春馬凡夫、小川うらら除外）＋WING NOTE＋イベント/ご意見。集計はボルダ平均(0-100)＋平均順位の両方
 - ops: vault_systems に「Survey OS（アンケート）」行を追加（URLはVercel作成後に記入）。OPERATIONS §2 に survey-os 初回セットアップ手順を追記。正典 docs/modules/survey-os/SYSTEM.md
 - ops: 残作業＝`npm install`（qrcode追加）→ push → Vercel新規プロジェクト `survey-os`（Root=apps/survey-os、env3つ）→ Deploy → vault URL記入。アンケートビルダー（項目編集GUI）はフェーズ2
+- fix(survey-os): Vercelビルド失敗を修正（`auth.ts` の staff_roles(roles(permissions)) ネスト取得でSupabase型推論に依存し型エラー）。取得結果を自前の型に `as unknown as` で確定させる方式へ変更。あわせて設問マッピングの `type` 代入を `as QuestionType` で明示（s/[slug]/page.tsx・lib/results.ts）
 
 ## 2026-07-07
 - feat(legal-os): 契約書・証憑の保管と期限管理を新設。**経理系（請求書・領収書＝Money OS `mon_receipts`）と法務系（契約書・覚書・規約・NDA）を分離**し、法務系を独立アプリ化。「GENESIS＝古川さん専用の司令室」を守るため、他者がアップロードする面はGENESIS外へ（DECISIONS #15/#27の勝ちパターン）。設計正典 docs/modules/legal-os/SYSTEM.md
