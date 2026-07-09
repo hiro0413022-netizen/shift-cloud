@@ -102,6 +102,45 @@ git push origin main
 7. **アクセス権**: アンケート管理（集計・CSV）は `view_hq` または `use_survey` 権限を持つスタッフのみ。※コーチ評価は機微情報のため既定は本部/オーナー（view_hq）想定。公開回答ページ `/s/[slug]` はログイン不要・匿名
 8. 公開URL: `https://survey-os.vercel.app/s/golfwing-2026`（QRは管理画面の一覧カードに自動表示）。デプロイ後、Claudeが `vault_systems` のSurvey OS行にURLを記入
 
+### reserve-os（ビジター予約 / Reserve OS）の初回セットアップ（新Vercelプロジェクト）
+
+前提: DBは適用済み（migration 0032_reserve_os、シャフトFTサービスseed済）。あなたの作業は「Resend準備 → push → Vercelプロジェクト作成 → メールenv設定 → 通しテスト → LINE掲出」。
+
+**A. Resend（メール送信）の準備**
+1. https://resend.com にサインアップ（無料枠あり）
+2. **Domains → Add Domain** で `yozan-inc.jp` を追加 → 表示されるDKIM/SPF等のDNSレコードを、お名前のDNS（またはメール管理先）に登録 → Resendで「Verified」になるまで待つ（数分〜数十分）
+   - ※ドメイン認証をしないと迷惑メール扱いになりやすい。急ぐ場合はResendのテスト用送信元でも動くが本番はドメイン認証必須
+3. **API Keys → Create API Key**（Full Access）→ 生成された `re_...` をコピー（この画面でしか表示されない）
+
+**B. push**（§1）。reserve-os のコードが main に入っていることを確認
+
+**C. Vercelプロジェクト作成**
+4. https://vercel.com → **Add New… → Project** → 同じリポジトリ `shift-cloud` を選択
+5. **Root Directory** を `apps/reserve-os` に設定（Framework: Next.js 自動検出）
+6. Project Name は `reserve-os`（＝ reserve-os.vercel.app）
+7. **Environment Variables** に設定:
+
+| Key | 必須 | 値 |
+|---|---|---|
+| NEXT_PUBLIC_SUPABASE_URL | ★ | Supabase URL（既存と同値） |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | ★ | anonキー（既存と同値） |
+| SUPABASE_SERVICE_ROLE_KEY | ★ | service_roleキー（既存と同値） |
+| RESEND_API_KEY | ★ | AでコピーしたResendキー `re_...` |
+| RESERVE_FROM_EMAIL | ★ | `info@yozan-inc.jp`（送信元＝YOZAN） |
+| RESERVE_STAFF_EMAIL | ★ | GOLF WINGの受信用メールアドレス（申込通知の宛先） |
+| NEXT_PUBLIC_SITE_URL | 任意 | `https://reserve-os.vercel.app`（メール内リンク用。デプロイ後に確定URLを設定） |
+
+8. **Deploy**。以降は`git push`で自動再デプロイ。`NEXT_PUBLIC_SITE_URL` は本番URL確定後に入れて再Deploy
+9. **アクセス権**: 予約管理（/、/requests）は `use_reception` または `view_hq` を持つスタッフのみ（member-osと同じ権限）。公開予約ページ `/reserve/[slug]` はログイン不要
+
+**D. 通しテスト**
+10. `https://reserve-os.vercel.app/reserve/shaft-fitting` を開き、テスト申込を送信 → GOLF WING宛（RESERVE_STAFF_EMAIL）に通知メール、申込者宛に受付確認メールが届くことを確認
+11. `/login`（use_reception|view_hq）→ 一覧に申込が出る → 詳細で候補日時を選び「この日時で確定する」→ 申込者に確定メールが届く（このメールへの返信はGOLF WING宛に届く）
+
+**E. 公式LINEに掲出**
+12. LINE公式アカウントのリッチメニュー/あいさつメッセージに公開URL `https://reserve-os.vercel.app/reserve/shaft-fitting` を設定
+13. デプロイ後、Claudeが `vault_systems` のReserve OS行に本番URLを記入（またはユーザーが /vault で更新）
+
 ## 3. 動作確認（CEO AI）
 
 1. https://yozan-genesis.vercel.app → Command Center → **日次レポート生成** を押す
