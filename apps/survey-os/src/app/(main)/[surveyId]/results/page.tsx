@@ -65,6 +65,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
           <p className="mt-1 text-sm text-[--color-dim]">回答数 {total} 件</p>
         </div>
         <div className="flex gap-2">
+          <Link href={`/${survey.id}/edit`} className={btnGhostCls}>編集</Link>
           <a href={`/api/export/${survey.id}?type=wide`} className={btnGhostCls}>CSV（全回答）</a>
           <a href={`/api/export/${survey.id}?type=coach`} className={btnGhostCls}>CSV（コーチ得点）</a>
         </div>

@@ -150,7 +150,13 @@ label(ws, 'A42', 'その他固定費小計(家賃/人件費/広告除く)')
 calc(ws, 'B42', '=B14+B15+B16+B17+B18+B19+B20+B21', YEN)
 label(ws, 'A43', '予備費'); calc(ws, 'B43', '=B42*B22', YEN)
 label(ws, 'A44', 'その他固定費 計'); calc(ws, 'B44', '=B42+B43', YEN)
+label(ws, 'A46', '■ 前受け（月会費先取り）', sub=True)
+label(ws, 'A47', '前受けON(1=有効,0=無効)'); inp(ws, 'B47', 1, '#,##0')
+ws['C47'] = '3ヶ月前取り等の運転資本効果をCFに反映'; ws['C47'].font = f_note
+label(ws, 'A48', '前受けフロート係数(月分)'); inp(ws, 'B48', 1.5, '0.0')
+ws['C48'] = '3ヶ月前取り≒1.5。会員増加分×係数×会費が現金前倒し'; ws['C48'].font = f_note
 ws.column_dimensions['A'].width = 34; ws.column_dimensions['B'].width = 15
+ws.column_dimensions['C'].width = 40
 # ref map
 A = {'cap':'Assumptions!$B$5','join_fee':'Assumptions!$B$6','trial_p':'Assumptions!$B$7',
      'cogs':'Assumptions!$B$8','pay':'Assumptions!$B$9','payr':'Assumptions!$B$10',
@@ -304,32 +310,37 @@ PL_L='Monthly_PL!$L'; PL_V='Monthly_PL!$V'; PL_Y='Monthly_PL!$Y'; PL_G='Monthly_
 ws = wb.create_sheet('Cash_Flow')
 ws['A1'] = '月次キャッシュフロー'; ws['A1'].font = f_title
 ws['A2'] = '期末現金がマイナス＝資金ショート（赤表示）。営業CF=税引後利益+減価償却。'; ws['A2'].font = f_note
-hdr(ws, 3, ['月','営業CF','投資CF','財務CF','純増減','期末現金','累計営業CF'])
+hdr(ws, 3, ['月','営業CF','投資CF','財務CF','前受けCF(運転資本)','純増減','期末現金','累計営業CF'])
+# 列: A月 B営業CF C投資CF D財務CF E前受けCF F純増減 G期末現金 H累計営業CF
 # month0 row4
 ws['A4'] = 0
 ws['B4'] = 0
 ws['C4'] = f'=-{CAPEX_TOTAL}'; ws['C4'].font=f_link
 ws['D4'] = '=Assumptions!$B$24+Assumptions!$B$25'; ws['D4'].font=f_link
-ws['E4'] = '=B4+C4+D4'
-ws['F4'] = '=E4'
-ws['G4'] = 0
-for col in 'ABCDEFG':
+ws['E4'] = 0
+ws['F4'] = '=B4+C4+D4+E4'
+ws['G4'] = '=F4'
+ws['H4'] = 0
+for col in 'ABCDEFGH':
     ws[f'{col}4'].border=border; ws[f'{col}4'].number_format=YEN
 for m in range(1, 37):
     r = 4 + m  # month1 row5 ... month36 row40
     plr = 3 + m  # Monthly_PL row for month m
+    prev = '0' if m == 1 else f'Monthly_PL!$G${plr-1}'
     ws[f'A{r}'] = m
     ws[f'B{r}'] = f'={PL_Y}{plr}+{PL_U}{plr}'; ws[f'B{r}'].font=f_link
     ws[f'C{r}'] = 0
     ws[f'D{r}'] = 0
-    ws[f'E{r}'] = f'=B{r}+C{r}+D{r}'
-    ws[f'F{r}'] = f'=F{r-1}+E{r}'
-    ws[f'G{r}'] = f'=SUM($B$5:B{r})'
-    for col in 'ABCDEFG':
+    ws[f'E{r}'] = f'=Assumptions!$B$47*Assumptions!$B$48*Assumptions!$B$28*(Monthly_PL!$G${plr}-{prev})'
+    ws[f'E{r}'].font=f_link
+    ws[f'F{r}'] = f'=B{r}+C{r}+D{r}+E{r}'
+    ws[f'G{r}'] = f'=G{r-1}+F{r}'
+    ws[f'H{r}'] = f'=SUM($B$5:B{r})'
+    for col in 'ABCDEFGH':
         ws[f'{col}{r}'].border=border; ws[f'{col}{r}'].number_format=YEN
     ws[f'A{r}'].number_format='#,##0'
-ws.conditional_formatting.add('F5:F40', CellIsRule(operator='lessThan', formula=['0'], fill=fill_warn, font=Font(name=BASE,color='9C0006')))
-for col, wdt in zip('ABCDEFG',[8,13,13,13,13,14,14]): ws.column_dimensions[col].width=wdt
+ws.conditional_formatting.add('G5:G40', CellIsRule(operator='lessThan', formula=['0'], fill=fill_warn, font=Font(name=BASE,color='9C0006')))
+for col, wdt in zip('ABCDEFGH',[8,13,11,11,15,13,14,14]): ws.column_dimensions[col].width=wdt
 ws.freeze_panes='B4'
 CF_F='Cash_Flow!$F'; CF_G='Cash_Flow!$G'; CF_A='Cash_Flow!$A'
 
@@ -442,9 +453,9 @@ smap = [
     ('出資金', '=Assumptions!$B$24', YEN),
     ('自己資金・融資', '=Assumptions!$B$25', YEN),
     ('開業時運転資金(手元)', '=Assumptions!$B$24+Assumptions!$B$25-'+CAPEX_TOTAL, YEN),
-    ('最低現金残高(0-36月)', '=MIN(Cash_Flow!$F$4:$F$40)', YEN),
-    ('資金ショート月数', '=COUNTIF(Cash_Flow!$F$5:$F$40,"<0")', '#,##0'),
-    ('投資回収期間(月)', '=IF(MAX(Cash_Flow!$G$5:$G$40)>='+CAPEX_TOTAL+',MINIFS(Cash_Flow!$A$5:$A$40,Cash_Flow!$G$5:$G$40,">="&'+CAPEX_TOTAL+'),"36ヶ月内未回収")', 'General'),
+    ('最低現金残高(0-36月)', '=MIN(Cash_Flow!$G$4:$G$40)', YEN),
+    ('資金ショート月数', '=COUNTIF(Cash_Flow!$G$5:$G$40,"<0")', '#,##0'),
+    ('投資回収期間(月)', '=IF(MAX(Cash_Flow!$H$5:$H$40)>='+CAPEX_TOTAL+',MINIFS(Cash_Flow!$A$5:$A$40,Cash_Flow!$H$5:$H$40,">="&'+CAPEX_TOTAL+'),"36ヶ月内未回収")', 'General'),
 ]
 r = 5
 for lb, val, fmt in smap:

@@ -14,7 +14,8 @@ SVY. **Survey OS（アンケート / DECISIONS #33）**: 独立アプリ・**未
    - ☐ **ユーザー作業(2) 新Vercelプロジェクト作成**: OPERATIONS §2「survey-os 初回セットアップ」（Root=apps/survey-os、env3つ、Deploy）
    - ☐ **ユーザー作業(3) 動作確認**: `survey-os.vercel.app/s/golfwing-2026` で回答→管理ログイン（view_hq）で集計・CSV確認。QRを会員へ配布
    - ☐ **Claude(デプロイ後)**: vault_systems の Survey OS 行にURL記入
-   - ☐ **フェーズ2**: アンケートビルダー（項目編集GUI）／条件分岐／KPI接続（回答率・WING NOTE満足度）／n8n連携
+   - ✅ **フェーズ2**: アンケートビルダー（項目編集GUI `/[surveyId]/edit`）＝設問の追加/編集/削除/並び替え・型変更・選択肢編集・新規アンケート作成（実装済、push＆再デプロイで反映）
+   - ☐ **フェーズ3**: 条件分岐／KPI接続（回答率・WING NOTE満足度）／n8n連携
    - 設計: docs/modules/survey-os/SYSTEM.md
 
 LINE. **LINE公式アカウント連携（DECISIONS #29 / 手順 OPERATIONS §6）**: n8nを統合ハブに、既存CEO Inbox（`sec_inquiries`）で受ける＝スキーマ変更ゼロ。

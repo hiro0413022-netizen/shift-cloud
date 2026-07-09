@@ -4,6 +4,7 @@ import { requireSurveyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { publicOrigin } from "@/lib/base-url";
 import { Panel, Badge, Empty, fmtDate, STATUS_LABEL, btnGhostCls } from "@/components/ui";
+import { NewSurveyButton } from "@/components/new-survey-button";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +35,9 @@ export default async function SurveyListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">アンケート一覧</h1>
-          <p className="mt-1 text-sm text-[--color-dim]">回答の集計・CSV出力・公開URL/QRの確認ができます。</p>
+          <p className="mt-1 text-sm text-[--color-dim]">作成・編集・回答の集計・CSV出力・公開URL/QRの確認ができます。</p>
         </div>
+        <NewSurveyButton />
       </div>
 
       {cards.length === 0 && (
@@ -83,6 +85,9 @@ export default async function SurveyListPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               <Link href={`/${s.id}/results`} className="inline-flex items-center gap-1 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-accent/90">
                 集計を見る
+              </Link>
+              <Link href={`/${s.id}/edit`} className={btnGhostCls}>
+                編集
               </Link>
               <a href={`/api/export/${s.id}?type=wide`} className={btnGhostCls}>
                 CSV（全回答）

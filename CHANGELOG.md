@@ -11,6 +11,7 @@
 - db: `0031_survey_golfwing_seed.sql` **投入済（execute_sql、冪等ファイルはGit-as-truth用）** — GOLF WING会員アンケート（slug=`golfwing-2026`・全26問・匿名・公開中）。コーチ評価13順位（対象: 古川博庸/井殿康和/榎本剛志/安東茉優/春馬凡夫、小川うらら除外）＋WING NOTE＋イベント/ご意見。集計はボルダ平均(0-100)＋平均順位の両方
 - ops: vault_systems に「Survey OS（アンケート）」行を追加（URLはVercel作成後に記入）。OPERATIONS §2 に survey-os 初回セットアップ手順を追記。正典 docs/modules/survey-os/SYSTEM.md
 - ops: 残作業＝`npm install`（qrcode追加）→ push → Vercel新規プロジェクト `survey-os`（Root=apps/survey-os、env3つ）→ Deploy → vault URL記入。アンケートビルダー（項目編集GUI）はフェーズ2
+- feat(survey-os): アンケートビルダー（項目編集画面）を追加 `/[surveyId]/edit`。設問の**追加/編集/削除(論理)/▲▼並び替え**、型変更(6種)、選択肢編集（内部value自動採番で既存回答を保護）、複数選択の「その他許可」「順位母集団」フラグ、順位付けのpool＋連動設問(source_code)設定、アンケート設定（タイトル/slug/公開状態/匿名/冒頭・お礼文/想定時間）。一覧に「＋新規アンケート」、一覧・集計から編集導線。edit/actions.ts（updateSurvey/saveQuestion/deleteQuestion/moveQuestion/createSurvey、requireSurveyActor＋company_id検証＋audit_logs）。SYSTEM.md §6に反映
 - fix(survey-os): Vercelビルド失敗を修正（`auth.ts` の staff_roles(roles(permissions)) ネスト取得でSupabase型推論に依存し型エラー）。取得結果を自前の型に `as unknown as` で確定させる方式へ変更。あわせて設問マッピングの `type` 代入を `as QuestionType` で明示（s/[slug]/page.tsx・lib/results.ts）
 
 ## 2026-07-07
