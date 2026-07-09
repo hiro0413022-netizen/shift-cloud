@@ -24,21 +24,35 @@
 
 ## 3. データソースと自動化レベル
 
-| 項目 | ソース | 状態 |
+**データの真実（DECISIONS #22/#28・member-os準拠）**：Smart Helloの3ファイルを member-os `/import` に取り込む（`importMembers`/`importWalkins`/`importReservations`）。report-osはそのテーブルを読む。
+
+| 項目 | 正ソース（テーブル / 取込） | 状態 |
 |---|---|---|
-| 会員数 | `kpis.code='members'`（Smart Hello名簿→自動集計） | ✅ 自動（現在229人） |
-| 退会率 | `kpis.code='churn_rate'` | ✅ 自動 |
-| 入会率 | `kpis.code='conversion_rate'`（体験受付モジュール） | ✅ 自動 |
-| 体験予約数 | `kpis.code='trial_bookings'`（mbr_trial_bookings） | ✅ 自動 |
+| 会員数（正会員） | `mbr_members`（会員名簿→`importMembers`）を §4-Aルールで集計 | ✅ 名簿取込で自動（2026-06=210） |
+| 会員種類名の構成・除外区分 | `mbr_members.member_type` | ✅ 名簿取込で自動 |
+| 退会率・新規入会・退会者数・退会予定 | `mbr_members.join_date/leave_date` | ✅ 名簿取込で自動 |
+| **体験（trial）・フィッティング（fitting）** | **`mbr_walkin_visits`（一時利用者名簿→`importWalkins`）** visit_type別・visited_on月次 | ⏳ 一時利用者名簿の取込待ち |
+| **入会率（入会/体験）** | 会員名簿の当月入会数（`mbr_members.join_date`）÷ 一時利用の当月体験数（`mbr_walkin_visits` trial）。※体験非経由の直接入会も含むため100%超あり（ユーザー定義2026-07）。2026-06=9÷7=128.6% | ✅ 名簿＋一時利用で実数 |
+| **打席稼働・パーソナル件数** | **`mbr_reservations`（予約一覧→`importReservations`）** program_type/place/staff、status≠キャンセルで集計 | ⏳ 予約一覧の取込待ち |
 | 在籍スタッフ・人件費・労働時間 | Shift Cloud → `kpis`（0008） | ✅ 自動 |
-| 月次売上・営業利益 | 財務モジュール `fin_entries`（0009） | ⚠️ 財務入力が前提（現状0） |
-| **会員数の月次推移** | 現状 `kpis.trend` が空 | ❌ 履歴の蓄積が必要（下記4-A） |
-| **物販売上** | 専用テーブル無し（golfwing.receiptsは仕入れ入荷用） | ❌ 記録の入れ物が必要（下記4-B） |
-| **フィッティング件数** | 専用テーブル無し | ❌ 記録の入れ物が必要（下記4-B） |
+| 月次売上・営業利益 | 財務モジュール `fin_entries`（0009） | ⚠️ 財務入力が前提 |
+| 会員数の月次推移 | `mbr_members` から算出（当面は入会日再構成／将来 `kpis.trend`蓄積） | ⚠️ 参考値（過去の退会者未反映） |
+| **物販売上** | 売上データxlsx（品目「販売」税込）。将来はMoney OS `mon_sales`（現状23行のみ・未接続） | ✅ 売上データで実数（2026-06=¥1,174,200）。DB自動化は要取込 |
+| 打席稼働・パーソナル件数 | 予約一覧 `mbr_reservations`（program_type=パーソナル等、キャンセル除外） | ✅ ファイルで実数（6月パーソナル30） |
 | 実施事項・問題点・解決策・情報共有 | 現場メモ＋数値 → Claude API | 🤖 AI下書き（人が承認） |
 
-**結論**: 骨格（KPI基盤・trend蓄積の仕組み・チャート・表・pptx生成）は完成。
-残るギャップは「物販売上・フィッティングの記録」と「会員推移の履歴蓄積」の3点だけ。
+> ⚠️ **予約一覧の体験数・フィッティング件数は使わない**：キャンセル時に予約を削除しない運用のため過大。体験・フィッティングの正は一時利用者名簿（`mbr_walkin_visits`）。予約一覧は**打席稼働・パーソナル監視**に用いる。
+
+> ⚠️ **会員数の定義差**：`kpis.code='members'`（`refresh_smart_hello_kpis`）は現状「在籍−スタッフ」（モニター/法人2枚目/トライアルを含む＝約219）。report-osの正会員（210）とは定義が異なる。Genesis Cockpitと資料を一致させるには `refresh_smart_hello_kpis` を4区分除外に合わせる（要マイグレーション。次フェーズ）。
+
+**結論**：会員系は名簿取込で自動化可能（骨格完成）。残ギャップは①一時利用者名簿の取込（体験/フィッティング/入会率）②予約一覧の取込（打席稼働/パーソナル）③物販売上のソース確定④会員数KPI定義の統一。
+
+## 3.5 毎月の運用フロー
+
+1. Smart Helloから3ファイルをエクスポート：**会員名簿 / 一時利用者名簿 / 予約一覧**。
+2. member-os `/import` に3ファイルをアップロード（`importMembers`→mbr_members＋KPI更新、`importWalkins`→mbr_walkin_visits、`importReservations`→mbr_reservations）。
+3. report-os `build-data.mjs` がDBを読み＋Claude APIで文章下書き→ `generate.js` で当月.pptx生成。
+4. 古川さんが承認・修正 → 配布。
 
 ## 4. 埋めるべきギャップ（次フェーズのDB作業）
 

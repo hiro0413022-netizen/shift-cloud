@@ -83,13 +83,18 @@ function build(data, outPath) {
       const x = mx + col * (cw + gap), y = top + row * (ch + vgap);
       s.addShape(p.shapes.ROUNDED_RECTANGLE, { x, y, w: cw, h: ch, rectRadius: 0.08, fill: { color: C.tint }, line: { type: "none" }, shadow: mkShadow() });
       s.addText(c.d.label, { x: x + 0.22, y: y + 0.16, w: cw - 0.4, h: 0.3, fontFace: FONT, fontSize: 12, color: C.muted, bold: true, margin: 0 });
-      s.addText(fmtVal(c.d.current, c.d.unit), { x: x + 0.2, y: y + 0.44, w: cw - 0.4, h: 0.6, fontFace: FONT, fontSize: c.d.unit === "円" ? 26 : 34, color: C.green, bold: true, margin: 0 });
-      const dm = delta(c.d.current, c.d.prevMonth, c.d.unit, c.lb);
-      const dy = delta(c.d.current, c.d.prevYear, c.d.unit, c.lb);
-      s.addText([{ text: "前月比 ", options: { color: C.muted } }, { text: dm.txt, options: { color: dm.color, bold: true } }],
-        { x: x + 0.22, y: y + 1.14, w: cw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, margin: 0 });
-      s.addText([{ text: "前年比 ", options: { color: C.muted } }, { text: dy.txt, options: { color: dy.color, bold: true } }],
-        { x: x + 0.22, y: y + 1.42, w: cw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, margin: 0 });
+      if (c.d.current == null) {
+        s.addText("取込待ち", { x: x + 0.2, y: y + 0.52, w: cw - 0.4, h: 0.5, fontFace: FONT, fontSize: 22, color: C.muted, bold: true, margin: 0 });
+        s.addText(c.d.pending || "データ取込待ち", { x: x + 0.22, y: y + 1.2, w: cw - 0.4, h: 0.5, fontFace: FONT, fontSize: 9.5, color: C.muted, italic: true, margin: 0 });
+      } else {
+        s.addText(fmtVal(c.d.current, c.d.unit), { x: x + 0.2, y: y + 0.44, w: cw - 0.4, h: 0.6, fontFace: FONT, fontSize: c.d.unit === "円" ? 26 : 34, color: C.green, bold: true, margin: 0 });
+        const dm = delta(c.d.current, c.d.prevMonth, c.d.unit, c.lb);
+        const dy = delta(c.d.current, c.d.prevYear, c.d.unit, c.lb);
+        s.addText([{ text: "前月比 ", options: { color: C.muted } }, { text: dm.txt, options: { color: dm.color, bold: true } }],
+          { x: x + 0.22, y: y + 1.14, w: cw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, margin: 0 });
+        s.addText([{ text: "前年比 ", options: { color: C.muted } }, { text: dy.txt, options: { color: dy.color, bold: true } }],
+          { x: x + 0.22, y: y + 1.42, w: cw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, margin: 0 });
+      }
     });
   })();
 
@@ -150,15 +155,20 @@ function build(data, outPath) {
     const dyf = delta(ft.current, ft.prevYear, "件");
     s.addShape(p.shapes.ROUNDED_RECTANGLE, { x: bx, y: 1.35, w: bw, h: 1.35, rectRadius: 0.08, fill: { color: C.tint }, line: { type: "none" } });
     s.addText("当月 物販売上", { x: bx + 0.2, y: 1.48, w: bw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, color: C.muted, bold: true, margin: 0 });
-    s.addText("¥" + nfInt(rs.current), { x: bx + 0.2, y: 1.75, w: bw - 0.4, h: 0.5, fontFace: FONT, fontSize: 24, color: C.green, bold: true, margin: 0 });
+    s.addText("¥" + nfInt(rs.current), { x: bx + 0.2, y: 1.78, w: bw - 0.4, h: 0.45, fontFace: FONT, fontSize: 19, color: C.green, bold: true, margin: 0 });
     s.addText([{ text: "前月比 ", options: { color: C.muted } }, { text: dmr.txt, options: { color: dmr.color, bold: true } }],
       { x: bx + 0.2, y: 2.28, w: bw - 0.4, h: 0.3, fontFace: FONT, fontSize: 11, margin: 0 });
     s.addShape(p.shapes.ROUNDED_RECTANGLE, { x: bx, y: 2.85, w: bw, h: 1.6, rectRadius: 0.08, fill: { color: C.darkGreen }, line: { type: "none" } });
     s.addText("フィッティング件数", { x: bx + 0.2, y: 2.98, w: bw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, color: C.gold, bold: true, margin: 0 });
-    s.addText(nfInt(ft.current) + "件", { x: bx + 0.2, y: 3.26, w: bw - 0.4, h: 0.55, fontFace: FONT, fontSize: 34, color: C.light, bold: true, margin: 0 });
-    s.addText([{ text: "前月比 ", options: { color: "9FB6A6" } }, { text: dmf.txt, options: { color: "FFFFFF", bold: true }, breakLine: true },
-               { text: "前年比 ", options: { color: "9FB6A6" } }, { text: dyf.txt, options: { color: "FFFFFF", bold: true } }],
-      { x: bx + 0.2, y: 3.85, w: bw - 0.4, h: 0.55, fontFace: FONT, fontSize: 11, margin: 0, lineSpacingMultiple: 1.1 });
+    s.addText(ft.current == null ? "取込待ち" : nfInt(ft.current) + "件", { x: bx + 0.2, y: 3.26, w: bw - 0.4, h: 0.55, fontFace: FONT, fontSize: ft.current == null ? 22 : 34, color: C.light, bold: true, margin: 0, valign: "middle" });
+    if (ft.current == null) {
+      s.addText(ft.pending || "取込待ち", { x: bx + 0.2, y: 3.82, w: bw - 0.4, h: 0.5, fontFace: FONT, fontSize: 9.5, color: "CFE0D3", italic: true, margin: 0 });
+    } else {
+      s.addText([{ text: "前月比 ", options: { color: "9FB6A6" } }, { text: dmf.txt, options: { color: "FFFFFF", bold: true } }],
+        { x: bx + 0.2, y: 3.82, w: bw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, margin: 0 });
+      s.addText([{ text: "前年比 ", options: { color: "9FB6A6" } }, { text: dyf.txt, options: { color: "FFFFFF", bold: true } }],
+        { x: bx + 0.2, y: 4.1, w: bw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, margin: 0 });
+    }
   })();
 
   // 5. 月間の実施事項
@@ -238,7 +248,7 @@ function build(data, outPath) {
       const cell = (t, opt = {}) => ({ text: t, options: { fontFace: FONT, fontSize: 10.5, valign: "middle", fill: { color: fill }, color: C.text, ...opt } });
       return [
         cell(d.label, { bold: true, align: "left" }),
-        cell(fmtVal(d.current, d.unit), { align: "right", bold: true }),
+        cell(d.current == null ? "取込待ち" : fmtVal(d.current, d.unit), { align: "right", bold: true, color: d.current == null ? C.muted : C.text }),
         cell(d.prevMonth != null ? fmtVal(d.prevMonth, d.unit) : "—", { align: "right", color: C.muted }),
         cell(dm.txt, { align: "right", color: dm.color }),
         cell(d.prevYear != null ? fmtVal(d.prevYear, d.unit) : "—", { align: "right", color: C.muted }),

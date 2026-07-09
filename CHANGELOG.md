@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 2026-07-09
+- feat(reserve-os): ビジター向け**申込型予約**アプリを新設（DECISIONS #34、独立アプリ `apps/reserve-os`・別Vercel想定・ポート3004・DB共有）。第一弾=GOLF WING シャフトフィッティング。既存 res_bookings（姫路=即時枠予約）と別概念で、**候補日時3つ（必須）＋事前ヒアリング → スタッフが目視で確定**するモデル。公開 `/reserve/[slug]`（スマホ最適・白×緑×金の高級感、①FTとは②メニュー料金③流れ④ヒアリングフォーム⑤注意事項⑥FAQ⑦完了）。スタッフ `/`（一覧・確認待ち優先・タブ・CSV）／`/requests/[id]`（候補から確定・確定メール送信・見送り/完了・社内メモ・電話/メール返信）。member-os規約準拠（型・規約合わせ済、next build はユーザーPC/Vercelで実行）
+- db: `0032_reserve_os.sql` **適用済（本番qrgpblnnhdudigarrtuz、MCP name=reserve_os）** — res_services（サービスカタログ＝メニュー/料金/導入文、slug・category・active）／res_requests（申込＝お客様情報・pref1-3_at・ヒアリング各項目・intake jsonb・status・confirmed_at・notified_at/ack_sent_at）。RLSテナント分離・updated_atトリガー・論理削除。GOLF WINGシャフトFT（slug=`shaft-fitting`）をseed。既存テーブル変更なし・追加のみ（※0031はSurvey seedが先取りのため0032にリネーム）
+- feat(mail): 汎用メール送信レイヤ `src/lib/mail.ts`（Resend・fetch直叩き）。申込→**YOZANアドレスからGOLF WINGへ通知**（reply_to=お客様、スタッフは返信でお客様に届く）＋お客様へ受付確認＋確定連絡。API未設定でも申込は成功。LINE通知は `notifyLine()` フックのみ（n8n整備後・DECISIONS #29）
+- ops: vault_systems に「Reserve OS（予約OS）」行を追加（URLはVercel作成後に更新）。正典 docs/modules/reserve-os/SYSTEM.md
+- ops: 残作業＝ユーザーが (1)`npm install` → push (2)Vercel新規プロジェクト `reserve-os`（Root=apps/reserve-os、env: Supabase3つ＋RESEND_API_KEY/RESERVE_FROM_EMAIL/RESERVE_STAFF_EMAIL/NEXT_PUBLIC_SITE_URL）→ Deploy (3)Resend APIキー発行＋GOLF WINGメールアドレス設定 (4)公式LINEに `/reserve/shaft-fitting` を掲出 (5)vault URL更新
+- feat(survey-os): アンケート/情報収集システムを新設（DECISIONS #33、独立アプリ `apps/survey-os`・別Vercel想定・ポート3003・DB共有）。Googleフォーム不可の要件に対応 — 単一/複数（その他自由記述）/短文/自由記述/**順位付け(ドラッグ&ドロップ＋▲▼)**/スケール。順位付けは `multi(is_ranking_source)` → `ranking(source_code)` 連動で**受講経験のあるコーチのみ**を並び替え対象にできる。公開回答は匿名・トークンレス（slug + status='open' 検証で service_role 書込）、管理は `view_hq`/`use_survey`。画面＝一覧（公開URL＋QR自動生成・回答数・集計/CSV導線）、集計 `/[surveyId]/results`（**コーチ総合ランキング・強み弱みヒートマップ・設問別内訳・自由記述一覧**）、CSV `/api/export/[id]?type=wide|coach`。回答10件ごとに company_events 記録。member-os規約準拠で実装（型・規約合わせ済、next build はユーザーPC/Vercelで実行）
+- db: `0030_survey_os.sql` **適用済（本番qrgpblnnhdudigarrtuz、MCP経由）** — svy_surveys / svy_questions / svy_answers / svy_responses（RLSテナント分離・updated_atトリガー・論理削除、既存標準準拠）。汎用jsonbスキーマ（options/config/value）。既存テーブル変更なし・追加のみ
+- db: `0031_survey_golfwing_seed.sql` **投入済（execute_sql、冪等ファイルはGit-as-truth用）** — GOLF WING会員アンケート（slug=`golfwing-2026`・全26問・匿名・公開中）。コーチ評価13順位（対象: 古川博庸/井殿康和/榎本剛志/安東茉優/春馬凡夫、小川うらら除外）＋WING NOTE＋イベント/ご意見。集計はボルダ平均(0-100)＋平均順位の両方
+- ops: vault_systems に「Survey OS（アンケート）」行を追加（URLはVercel作成後に記入）。OPERATIONS §2 に survey-os 初回セットアップ手順を追記。正典 docs/modules/survey-os/SYSTEM.md
+- ops: 残作業＝`npm install`（qrcode追加）→ push → Vercel新規プロジェクト `survey-os`（Root=apps/survey-os、env3つ）→ Deploy → vault URL記入。アンケートビルダー（項目編集GUI）はフェーズ2
+
 ## 2026-07-07
 - feat(legal-os): 契約書・証憑の保管と期限管理を新設。**経理系（請求書・領収書＝Money OS `mon_receipts`）と法務系（契約書・覚書・規約・NDA）を分離**し、法務系を独立アプリ化。「GENESIS＝古川さん専用の司令室」を守るため、他者がアップロードする面はGENESIS外へ（DECISIONS #15/#27の勝ちパターン）。設計正典 docs/modules/legal-os/SYSTEM.md
 - db: `0024_legal_os.sql` **適用済（本番qrgpblnnhdudigarrtuz、MCP経由）** — leg_documents（種別/相手方/契約期間/自動更新/解約通知日数/next_action_date=解約判断期日/リスク/要点）、leg_files（証憑ファイル・Storage参照・OCR text）、leg_reminders（更新/解約通知/満了の期日アラート）、leg_grants（uploader/manager/viewer、全社=segment_id null）。Storageプライベートバケット `legal-docs`（company_id先頭パスでobject RLS）。RLSは既存標準app.current_company_id()。moduleコード `legal`（designing）。担当AI=legal_ai（登録済）。既存テーブル変更なし・追加のみ

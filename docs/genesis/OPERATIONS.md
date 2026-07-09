@@ -81,6 +81,27 @@ git push origin main
 - `modules.money` を `designing` → `live` に更新
 - AMEX/信金の全件CSV取込は、稼働後に画面の「カード・口座取込」からあなたがCSVをアップロード（手作業のバルク投入は不要）
 
+### survey-os（アンケート / Survey OS）の初回セットアップ（新Vercelプロジェクト）
+
+前提: DBは適用済み（migration 0030_survey_os、GOLF WINGアンケートは0031で投入済）。あなたの作業は「push → Vercelプロジェクト作成 → 権限付与」の3つ。
+
+1. **push**（§1）。survey-os のコードが main に入っていることを確認
+2. https://vercel.com → **Add New… → Project** → 同じリポジトリ `shift-cloud` を選択
+3. **Root Directory** を `apps/survey-os` に設定（Framework: Next.js 自動検出）
+4. Project Name は `survey-os`（＝ survey-os.vercel.app）
+5. **Environment Variables** に設定（値はGenesis/member-osと同じDBのもの）:
+
+| Key | 必須 | 用途 |
+|---|---|---|
+| NEXT_PUBLIC_SUPABASE_URL | ★ | Supabase URL（既存と同値） |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | ★ | anonキー（既存と同値） |
+| SUPABASE_SERVICE_ROLE_KEY | ★ | service_roleキー（既存と同値） |
+| NEXT_PUBLIC_SURVEY_ORIGIN | 任意 | QR/公開URLの生成元。未設定ならリクエストのホストを自動使用（通常は不要） |
+
+6. **Deploy**。以降は`git push`で自動再デプロイ（§1と同じ）
+7. **アクセス権**: アンケート管理（集計・CSV）は `view_hq` または `use_survey` 権限を持つスタッフのみ。※コーチ評価は機微情報のため既定は本部/オーナー（view_hq）想定。公開回答ページ `/s/[slug]` はログイン不要・匿名
+8. 公開URL: `https://survey-os.vercel.app/s/golfwing-2026`（QRは管理画面の一覧カードに自動表示）。デプロイ後、Claudeが `vault_systems` のSurvey OS行にURLを記入
+
 ## 3. 動作確認（CEO AI）
 
 1. https://yozan-genesis.vercel.app → Command Center → **日次レポート生成** を押す

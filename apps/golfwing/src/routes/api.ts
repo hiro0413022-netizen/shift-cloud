@@ -1886,8 +1886,8 @@ app.post('/products', async (c) => {
   const r = await db.prepare(`
     INSERT INTO products
       (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
-       list_price, default_rate, default_supplier_id, unit, source, is_active, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
+       list_price, default_rate, default_supplier_id, unit, source, supplier_item_code, is_active, tenant_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
   `).bind(
     normalize(b['product_code'] as string), normalize(b['barcode'] as string),
     normalize(b['item_category'] as string), normalize(b['manufacturer'] as string),
@@ -1897,7 +1897,8 @@ app.post('/products', async (c) => {
     b['default_rate'] ? Number(b['default_rate']) : null,
     b['default_supplier_id'] ? Number(b['default_supplier_id']) : null,
     normalize(b['unit'] as string) || '本',
-    normalize(b['source'] as string), tenantId
+    normalize(b['source'] as string),
+    normalize(b['supplier_item_code'] as string), tenantId
   ).run()
   return c.json({ ok: true, id: r.meta.last_row_id })
 })
@@ -1923,7 +1924,7 @@ app.put('/products/:id', async (c) => {
   await db.prepare(`
     UPDATE products SET
       product_code=?, barcode=?, item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
-      list_price=?, default_rate=?, default_supplier_id=?, unit=?, source=?
+      list_price=?, default_rate=?, default_supplier_id=?, unit=?, source=?, supplier_item_code=?
     WHERE id=? AND tenant_id=?
   `).bind(
     normalize(b['product_code'] as string), normalize(b['barcode'] as string),
@@ -1935,6 +1936,7 @@ app.put('/products/:id', async (c) => {
     b['default_supplier_id'] ? Number(b['default_supplier_id']) : null,
     normalize(b['unit'] as string) || '本',
     normalize(b['source'] as string),
+    normalize(b['supplier_item_code'] as string),
     id, tenantId
   ).run()
   return c.json({ ok: true })

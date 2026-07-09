@@ -62,7 +62,7 @@ document.querySelectorAll('.btn-edit-product').forEach(function(btn){
     document.getElementById('pmTitle').textContent = '商品を編集';
     var f = document.getElementById('productForm');
     ['product_code','barcode','item_category','manufacturer','name','spec','color','club_type',
-     'list_price','default_rate','unit','source'].forEach(function(k){ if(f[k]) f[k].value = r[k]!=null?r[k]:''; });
+     'list_price','default_rate','unit','source','supplier_item_code'].forEach(function(k){ if(f[k]) f[k].value = r[k]!=null?r[k]:''; });
     f['default_supplier_id'].value = r['default_supplier_id'] != null ? r['default_supplier_id'] : '';
     productModal.show();
   });

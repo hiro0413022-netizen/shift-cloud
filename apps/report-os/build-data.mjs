@@ -39,18 +39,58 @@ async function loadKpis() {
     prevMonth: fromTrend(code, prevMonth(ym)),
     prevYear: fromTrend(code, prevYear(ym)),
   });
-  // v_rpt_monthly（§4-B, 未整備なら null）から物販/フィッティング
-  const { data: rpt } = await sb.from("v_rpt_monthly").select("ym,retail_sales,fittings")
-    .eq("company_id", companyId).in("ym", [`${ym}-01`, `${prevMonth(ym)}-01`, `${prevYear(ym)}-01`]).maybeSingle?.() ?? { data: null };
+  // 体験/フィッティングは一時利用者名簿(mbr_walkin_visits)が正（予約一覧は不使用）
+  const trial = await walkinCount("trial", "体験（一時利用）");
+  const fitting = await walkinCount("fitting", "フィッティング");
+  const conversion = await conversionRate();
   return {
     members: await computeMembers(byCode), // 正会員ルール（SYSTEM.md §4-A）
-    trialBookings: kpi("trial_bookings", "体験予約数", "件"),
-    conversionRate: kpi("conversion_rate", "入会率", "%"),
+    trialBookings: trial,
+    conversionRate: conversion,
     churnRate: kpi("churn_rate", "退会率", "%"),
-    retailSales: { label: "物販売上", unit: "円", current: null, prevMonth: null, prevYear: null }, // TODO §4-B
-    fittings: { label: "フィッティング", unit: "件", current: null, prevMonth: null, prevYear: null }, // TODO §4-B
+    retailSales: { label: "物販売上", unit: "円", current: null, prevMonth: null, prevYear: null, pending: "物販ソース未確定" }, // TODO 物販ソース
+    fittings: fitting,
     staff: kpi("active_staff", "在籍スタッフ", "人"),
   };
+}
+
+// --- 1c. 体験/フィッティング（mbr_walkin_visits, visit_type別・月次） ---
+const monStart = (m) => `${m}-01`;
+const monNext = (m) => { const [y, mo] = m.split("-").map(Number); return new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 10); };
+async function walkinMonthCount(vt, m) {
+  const { count } = await sb.from("mbr_walkin_visits").select("*", { count: "exact", head: true })
+    .eq("company_id", companyId).eq("visit_type", vt).gte("visited_on", monStart(m)).lt("visited_on", monNext(m));
+  return count; // 未取込なら 0 / null
+}
+async function walkinCount(vt, label) {
+  const cur = await walkinMonthCount(vt, ym);
+  // データ0件＝未取込とみなし pending 表示（取込済みで実0のケースは稀）
+  if (!cur) return { label, unit: "件", current: null, prevMonth: null, prevYear: null, pending: "一時利用者名簿の取込待ち" };
+  return { label, unit: "件", current: cur, prevMonth: await walkinMonthCount(vt, prevMonth(ym)), prevYear: await walkinMonthCount(vt, prevYear(ym)) };
+}
+// 入会率＝会員名簿の当月入会数(mbr_members.join_date) ÷ 一時利用の当月体験数(mbr_walkin_visits.trial)
+// ※会員名簿の入会には体験非経由の直接入会も含むため100%を超えることがある（ユーザー定義, 2026-07）。
+async function convRateForMonth(m) {
+  const { count: trial } = await sb.from("mbr_walkin_visits").select("*", { count: "exact", head: true })
+    .eq("company_id", companyId).eq("visit_type", "trial").gte("visited_on", monStart(m)).lt("visited_on", monNext(m));
+  if (!trial) return null;
+  const { count: joins } = await sb.from("mbr_members").select("*", { count: "exact", head: true })
+    .eq("company_id", companyId).gte("join_date", monStart(m)).lt("join_date", monNext(m));
+  return Math.round(((joins || 0) / trial) * 1000) / 10;
+}
+async function conversionRate() {
+  const cur = await convRateForMonth(ym);
+  if (cur == null) return { label: "入会率(入会/体験)", unit: "%", current: null, prevMonth: null, prevYear: null, pending: "一時利用者名簿の取込待ち" };
+  return { label: "入会率(入会/体験)", unit: "%", current: cur, prevMonth: await convRateForMonth(prevMonth(ym)), prevYear: await convRateForMonth(prevYear(ym)) };
+}
+
+// --- 1d. 打席稼働・パーソナル（mbr_reservations, キャンセル除外） ---
+// 予約一覧の体験/フィッティング数はキャンセル未削除で不正確なため使わない。打席稼働・パーソナル監視のみ。
+async function loadReservationsOps() {
+  const inMonth = (q) => q.eq("company_id", companyId).gte("lesson_date", monStart(ym)).lt("lesson_date", monNext(ym)).not("status", "ilike", "%キャンセル%");
+  const { count: personal } = await inMonth(sb.from("mbr_reservations").select("*", { count: "exact", head: true }).ilike("program_type", "%パーソナル%"));
+  const { count: total } = await inMonth(sb.from("mbr_reservations").select("*", { count: "exact", head: true }));
+  return { personal: personal ?? null, reservations: total ?? null }; // 打席稼働率は打席数×営業日で別途
 }
 
 // --- 1b. 会員数（正会員ルール, SYSTEM.md §4-A） ---
@@ -87,13 +127,13 @@ async function computeMembers(byCode) {
     prevYear: await activeCount(endOf(prevYear(ym))) || null,
     newJoins: newJoins ?? null, leavers: leavers ?? null,
     excluded: EXCLUDE_TYPES.map((t) => ({ label: t, v: exCount[t] || 0 })),
-    rule: "正会員＝総名簿からモニター・スタッフ・法人二枚目・トライアルを除外。当月末退会者は当月の会員数に含めない。",
+    rule: "会員数（正会員）＝会員名簿の在籍から、会員種類名「スタッフ」「モニター会員」「法人会員2枚目」「トライアル会員」を除外。当月末退会者は当月の会員数に含めない。表記は会員名簿の会員種類名どおり。",
   };
 }
 
 // --- 2. Claude APIで文章を下書き ---
 async function draftNarrative(kpi, memo) {
-  const prompt = `あなたはGOLF WING（尼崎インドアゴルフ）の運営を熟知したCEO秘書です。
+  const prompt = `あなたはGOLF WING（宝塚・インドアゴルフ）の運営を熟知したCEO秘書です。
 以下の当月KPIと現場メモから、月次報告資料の文章を作成してください。数値は断定的な創作をせず、与えられた数値と現場メモの範囲で書くこと。
 
 # 当月KPI(${ym})

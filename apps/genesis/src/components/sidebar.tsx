@@ -8,6 +8,7 @@ const NAV = [
   { href: "/command", label: "CEO AI Command", icon: "⌘" },
   { href: "/inbox", label: "CEO Inbox", icon: "📨" },
   { href: "/finance", label: "Finance", icon: "¥" },
+  { href: "/legal", label: "契約・法務", icon: "📄" },
   { href: "/events", label: "Company Events", icon: "⚡" },
   { href: "/memories", label: "Business Memory", icon: "🧠" },
   { href: "/decisions", label: "Decision Log", icon: "⚖" },

@@ -1265,7 +1265,12 @@ ${buildPager()}
               <label class="form-label fw-semibold">品番 (product_code)</label>
               <input class="form-control" name="product_code">
             </div>
-            <div class="col-md-8">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">ワークス商品コード</label>
+              <input class="form-control" name="supplier_item_code" placeholder="ダイレクト注文CSV用">
+              <div class="form-text">ウェブ発注（ワークス）のダイレクト注文で使う商品コード</div>
+            </div>
+            <div class="col-md-4">
               <label class="form-label fw-semibold">出典 / メモ</label>
               <input class="form-control" name="source">
             </div>
@@ -2808,6 +2813,57 @@ app.get('/orders/:id/edit', async (c) => {
 })
 
 // ============================================================
+// ワークス ダイレクト注文用CSVダウンロード (/orders/:id/works-csv)
+// 形式: 商品コード,注文数,ケース注文 （Shift-JIS / CRLF）
+// ★ /orders/:id より前に定義（余分なセグメントがあるため衝突はしないが慣例に合わせる）
+// ============================================================
+app.get('/orders/:id/works-csv', async (c) => {
+  const db = c.env.DB
+  const { tenantId } = getLayoutOpts(c)
+  const id = parseInt(c.req.param('id'))
+  if (isNaN(id)) return c.text('不正なIDです。', 400)
+
+  const order = await db.prepare(
+    'SELECT order_no FROM purchase_orders WHERE id=? AND tenant_id=?'
+  ).bind(id, tenantId).first<{ order_no: string }>()
+  if (!order) return c.text('発注データが見つかりません。', 404)
+
+  const itemsRes = await db.prepare(`
+    SELECT poi.quantity,
+           (SELECT p.supplier_item_code FROM products p WHERE p.id=poi.product_id) AS supplier_item_code
+    FROM purchase_order_items poi
+    WHERE poi.purchase_order_id=? ORDER BY poi.id
+  `).bind(id).all<{ quantity: number; supplier_item_code: string | null }>()
+
+  // Shift-JISヘッダー "商品コード,注文数,ケース注文" + CRLF（固定バイト列）
+  const bytes: number[] = [
+    0x8f,0xa4,0x95,0x69,0x83,0x52,0x81,0x5b,0x83,0x68, // 商品コード
+    0x2c,
+    0x92,0x8d,0x95,0xb6,0x90,0x94,                     // 注文数
+    0x2c,
+    0x83,0x50,0x81,0x5b,0x83,0x58,0x92,0x8d,0x95,0xb6, // ケース注文
+    0x0d,0x0a,
+  ]
+  const enc = new TextEncoder()
+  for (const it of itemsRes.results) {
+    const code = String(it.supplier_item_code ?? '').trim()
+    if (!code) continue // コード未登録はスキップ
+    const qty = Number(it.quantity) || 0
+    // 商品コード・数量は英数字想定。非ASCIIは'?'に落として文字化けを防ぐ
+    for (const b of enc.encode(`${code},${qty},0\r\n`)) bytes.push(b < 0x80 ? b : 0x3f)
+  }
+
+  const filename = `works_order_${String(order.order_no || id).replace(/[^A-Za-z0-9_\-]/g, '_')}.csv`
+  return new Response(new Uint8Array(bytes), {
+    headers: {
+      'Content-Type': 'text/csv; charset=Shift_JIS',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Cache-Control': 'no-store',
+    },
+  })
+})
+
+// ============================================================
 // 発注詳細
 // ============================================================
 app.get('/orders/:id', async (c) => {
@@ -2832,7 +2888,8 @@ app.get('/orders/:id', async (c) => {
   const [items, receipts, productRes, supplierRes] = await Promise.all([
     db.prepare(`
       SELECT poi.*,
-        COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+        COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty,
+        (SELECT p.supplier_item_code FROM products p WHERE p.id=poi.product_id) AS supplier_item_code
       FROM purchase_order_items poi WHERE poi.purchase_order_id=? ORDER BY poi.id
     `).bind(id).all<Record<string,unknown>>(),
     db.prepare('SELECT * FROM receipts WHERE purchase_order_id=? ORDER BY id DESC').bind(id).all<Record<string,unknown>>(),
@@ -3024,6 +3081,42 @@ ${emailBody ? '' : noBodyBlock}
   <button class="btn btn-outline-secondary btn-sm" id="btn-copy-fax"><i class="fas fa-copy me-1"></i>本文をコピー</button>
 </div>`
 
+  // ウェブ発注（ワークス ダイレクト注文）パネル
+  // 注文サイトURL: order_method_detail が http で始まればそれを、なければ既定URL
+  const webOrderUrl = /^https?:\/\//i.test(String(order['order_method_detail'] ?? ''))
+    ? String(order['order_method_detail'])
+    : 'https://webedi-sv.worksweb-jp.com/websys/orderlogin/login/'
+  const webItems      = items.results
+  const webMissing    = webItems.filter(i => !String(i['supplier_item_code'] ?? '').trim())
+  const webReadyCount = webItems.length - webMissing.length
+  const webMissingList = webMissing.length
+    ? `<div class="alert alert-warning py-2 mb-2">
+        <i class="fas fa-exclamation-triangle me-1"></i>
+        ${webMissing.length}件の商品にワークス商品コードが未登録です。CSVには含まれません。商品マスタでコードを登録してください。
+        <ul class="mb-0 mt-1 small">${webMissing.map(i => `<li>${esc(i['product_name'])}${i['spec'] ? ' '+esc(i['spec']) : ''}</li>`).join('')}</ul>
+      </div>`
+    : ''
+  const webPanel = `
+<div class="alert alert-info py-2 mb-2">
+  <i class="fas fa-globe me-1"></i>
+  ワークスのダイレクト注文（CSVアップロード）で発注します。
+  <a class="btn btn-sm btn-outline-primary ms-2" href="${esc(webOrderUrl)}" target="_blank" rel="noopener">
+    <i class="fas fa-external-link-alt me-1"></i>注文サイトを開く
+  </a>
+</div>
+${webMissingList}
+<div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+  ${webReadyCount > 0
+    ? `<a class="btn btn-success btn-sm" href="/orders/${id}/works-csv" download>
+         <i class="fas fa-file-csv me-1"></i>ワークス発注CSVをダウンロード（${webReadyCount}件）
+       </a>`
+    : `<button class="btn btn-success btn-sm" disabled><i class="fas fa-file-csv me-1"></i>ダウンロードできる商品がありません</button>`}
+</div>
+<p class="small text-muted mb-0">
+  ダウンロードしたCSVを注文サイトの「ダイレクト注文」でアップロードしてください。
+  形式: <code>商品コード, 注文数, ケース注文</code>（Shift-JIS）。
+</p>`
+
   // 発注方法に応じてパネルを選択
   let orderPanel: string
   let orderPanelTitle: string
@@ -3032,6 +3125,8 @@ ${emailBody ? '' : noBodyBlock}
     orderPanel = linePanel; orderPanelTitle = 'LINE送信'; orderPanelIcon = 'fab fa-line text-success'
   } else if (omDetail === 'fax' || omDetail.includes('fax') || omDetail.includes('ファックス')) {
     orderPanel = faxPanel; orderPanelTitle = 'FAX送信'; orderPanelIcon = 'fas fa-fax text-secondary'
+  } else if (omDetail === 'web' || omDetail.includes('ウェブ') || omDetail.includes('web') || omDetail.includes('ダイレクト')) {
+    orderPanel = webPanel; orderPanelTitle = 'ウェブ発注（CSV）'; orderPanelIcon = 'fas fa-globe text-info'
   } else {
     orderPanel = emailPanel; orderPanelTitle = 'メール下書き'; orderPanelIcon = 'fas fa-envelope text-primary'
   }
