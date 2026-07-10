@@ -1,5 +1,8 @@
 # CHANGELOG
 
+## 2026-07-10
+- fix(shift-cloud): 募集期間まわりの整理。(1)**削除機能を追加**（`deletePeriod` ソフト削除＝期間＋紐づく提出希望をまとめて論理削除、確認ダイアログ付き `delete-period-button.tsx`）。(2)管理ビルダーの期間一覧を**店舗で絞り込み**（`store_id=当該店舗 or null` のみ表示。従来は他店舗の期間まで月内全件を表示し希望集約が混線）。期間カードに「この店舗/全店舗」バッジと🗑削除を追加。(3)スタッフ側 `requests/page.tsx` は重複時に**店舗個別の募集を全店舗共通より優先**（取り違え防止）。(4)データ整理: 不要な全店舗向け 8/1-31（希望0件）を論理削除。※GOLF WING宝塚 8/1-15（締切済み・希望13件）は温存
+
 ## 2026-07-09
 - feat(reserve-os): ビジター向け**申込型予約**アプリを新設（DECISIONS #34、独立アプリ `apps/reserve-os`・別Vercel想定・ポート3004・DB共有）。第一弾=GOLF WING シャフトフィッティング。既存 res_bookings（姫路=即時枠予約）と別概念で、**候補日時3つ（必須）＋事前ヒアリング → スタッフが目視で確定**するモデル。公開 `/reserve/[slug]`（スマホ最適・白×緑×金の高級感、①FTとは②メニュー料金③流れ④ヒアリングフォーム⑤注意事項⑥FAQ⑦完了）。スタッフ `/`（一覧・確認待ち優先・タブ・CSV）／`/requests/[id]`（候補から確定・確定メール送信・見送り/完了・社内メモ・電話/メール返信）。member-os規約準拠（型・規約合わせ済、next build はユーザーPC/Vercelで実行）
 - db: `0032_reserve_os.sql` **適用済（本番qrgpblnnhdudigarrtuz、MCP name=reserve_os）** — res_services（サービスカタログ＝メニュー/料金/導入文、slug・category・active）／res_requests（申込＝お客様情報・pref1-3_at・ヒアリング各項目・intake jsonb・status・confirmed_at・notified_at/ack_sent_at）。RLSテナント分離・updated_atトリガー・論理削除。GOLF WINGシャフトFT（slug=`shaft-fitting`）をseed。既存テーブル変更なし・追加のみ（※0031はSurvey seedが先取りのため0032にリネーム）
@@ -62,8 +65,4 @@
 - feat: golfwing移行P3 — D1互換Postgresアダプタ(src/lib/pgdb.ts)・Vercelエントリ(api/index.ts)・Supabase Auth化(auth.ts)・migration 0008(tenant_id互換列)。ルートコード8,500行は無修正で移行。tsc全緑
 - db: golfwing移行P2完了 — D1(golfwing-production)の全業務データ2,079行をgolfwingスキーマへ投入（Edge Function `golfwing-import` 経由、デモ除外・件数検証済み）
 - db: `0007_golfwing_schema.sql` 適用 — golfwingスキーマ（suppliers/supplier_rules/products/product_suppliers/purchase_orders/purchase_order_items/receipts/receipt_items + RLS + v_monthly_purchase_cost）。DECISIONS #19/#20
-- ops: yozan-genesisのVercel Function Regionをiad1→hnd1(東京)に変更し再デプロイ（Supabase東京との往復短縮）
-- docs: GolfOrder Supabase移行設計書を作成（docs/genesis/GOLFWING_SUPABASE_MIGRATION.md、方式B=DB先行移行を推奨）
-- feat(corporate): 画像11枚をGenspark CDNからapps/corporate/public/imagesへローカル化（GitHub Actions asset-mirror経由）。constants.tsをローカルパスに変更
-- feat: `apps/kallinos` 新規追加 — www.kallinos.jpの静的ミラー（index/products/brand + css/js。残6ページはworkflow再実行で取得予定）
-- feat: `apps/golfwing` 新規追加 — GolfOrder発注管理システムのソースをGensparkから回収（golfwing-srcブランチ経由、Hono+Cloudflare D1、migrations 0001〜0015、docs一式）。デプロイは当面Cloudflare Pages継続、将来Supabase/inventoryモジュールへ移行予定
+- ops: yozan-genesisのVercel Function Regionをiad1→hnd1(東京)に変更し再デプロイ（Supab

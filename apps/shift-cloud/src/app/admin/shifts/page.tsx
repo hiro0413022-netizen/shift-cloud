@@ -5,6 +5,7 @@ import { PageTitle, Card, Badge } from "@/components/ui";
 import { currentYM, addMonths, daysOfMonth, fmtDateJP } from "@/lib/util";
 import { ShiftBuilder } from "./builder";
 import { PeriodForm } from "./period-form";
+import { DeletePeriodButton } from "./delete-period-button";
 import { closePeriod, reopenPeriod } from "./actions";
 
 export default async function ShiftBuilderPage({ searchParams }: { searchParams: Promise<{ store?: string; ym?: string }> }) {
@@ -28,17 +29,22 @@ export default async function ShiftBuilderPage({ searchParams }: { searchParams:
     admin.from("shifts").select("staff_id, date, template_id, status, start_time, end_time")
       .eq("company_id", actor.companyId).eq("store_id", storeId).is("deleted_at", null)
       .gte("date", days[0]).lte("date", days[days.length - 1]),
+    // この店舗向け＋全店舗共通(store_id=null)の期間のみ表示（他店舗の期間は混ぜない）
     admin.from("shift_request_periods").select("*")
       .eq("company_id", actor.companyId).is("deleted_at", null)
-      .eq("target_month", `${ym}-01`).order("start_date"),
+      .eq("target_month", `${ym}-01`)
+      .or(`store_id.eq.${storeId},store_id.is.null`)
+      .order("start_date"),
   ]);
 
   // この月に紐づく全期間（前半/後半など複数可）の希望を集約
   const periodIds = (periods ?? []).map((p) => p.id);
   const { data: requests } = periodIds.length
-    ? await admin.from("shift_requests").select("staff_id, date, template_id, memo, start_time, end_time")
+    ? await admin.from("shift_requests").select("period_id, staff_id, date, template_id, memo, start_time, end_time")
         .in("period_id", periodIds).eq("status", "submitted").is("deleted_at", null)
     : { data: [] };
+  const reqCountByPeriod = new Map<string, number>();
+  for (const r of requests ?? []) reqCountByPeriod.set(r.period_id, (reqCountByPeriod.get(r.period_id) ?? 0) + 1);
 
   return (
     <>
@@ -82,6 +88,7 @@ export default async function ShiftBuilderPage({ searchParams }: { searchParams:
                 {p.start_date && p.end_date ? `${fmtDateJP(p.start_date)}〜${fmtDateJP(p.end_date)}` : p.target_month.slice(0, 7)}
               </span>
               <span className="text-[11px] text-zinc-400">締切 {p.deadline}</span>
+              <Badge color={p.store_id ? "zinc" : "amber"}>{p.store_id ? "この店舗" : "全店舗"}</Badge>
               {p.status === "open" ? (
                 <form action={closePeriod}>
                   <input type="hidden" name="id" value={p.id} />
@@ -93,6 +100,11 @@ export default async function ShiftBuilderPage({ searchParams }: { searchParams:
                   <button className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">↩ 募集中に戻す</button>
                 </form>
               )}
+              <DeletePeriodButton
+                id={p.id}
+                reqCount={reqCountByPeriod.get(p.id) ?? 0}
+                label={`${p.title ? `${p.title}：` : ""}${p.start_date && p.end_date ? `${fmtDateJP(p.start_date)}〜${fmtDateJP(p.end_date)}` : p.target_month.slice(0, 7)}`}
+              />
             </div>
           ))}
         </div>

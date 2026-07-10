@@ -22,7 +22,9 @@ export default async function RequestsPage() {
       .eq("staff_id", actor.staffId),
   ]);
 
-  const period = (periods ?? []).find((p) => !p.store_id || actor.storeIds.includes(p.store_id));
+  // 自分に該当する募集のうち、店舗個別を全店舗共通より優先（重複時の取り違え防止）
+  const matched = (periods ?? []).filter((p) => !p.store_id || actor.storeIds.includes(p.store_id));
+  const period = matched.find((p) => p.store_id) ?? matched[0];
   const appMap = new Map((myApps ?? []).map((a) => [a.help_request_id, a.status]));
 
   const APP_LABEL: Record<string, { label: string; color: "amber" | "green" | "zinc" }> = {

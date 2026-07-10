@@ -76,6 +76,32 @@ export async function reopenPeriod(formData: FormData) {
   revalidatePath("/admin/shifts");
 }
 
+/** ⑤ 募集期間を削除（ソフト削除。紐づく提出希望もまとめて削除） */
+export async function deletePeriod(formData: FormData) {
+  const actor = await requireActor("create_shifts");
+  const admin = createAdmin();
+  const id = String(formData.get("id"));
+  const now = new Date().toISOString();
+
+  // 対象期間が自社のものか確認
+  const { data: period } = await admin.from("shift_request_periods")
+    .select("id").eq("id", id).eq("company_id", actor.companyId).is("deleted_at", null).single();
+  if (!period) return;
+
+  // 紐づく提出希望を先にソフト削除
+  const { count } = await admin.from("shift_requests")
+    .update({ deleted_at: now })
+    .eq("period_id", id).is("deleted_at", null)
+    .select("id", { count: "exact", head: true });
+
+  // 期間本体をソフト削除
+  await admin.from("shift_request_periods")
+    .update({ deleted_at: now }).eq("id", id).eq("company_id", actor.companyId);
+
+  await logAudit(actor, "request_period.delete", "shift_request_periods", id, null, { requestsDeleted: count ?? 0 });
+  revalidatePath("/admin/shifts");
+}
+
 /** ドラフト保存（グリッド全体を反映） */
 export async function saveDraft(storeId: string, cells: CellShift[]): Promise<{ error?: string }> {
   const actor = await requireActor("create_shifts");
