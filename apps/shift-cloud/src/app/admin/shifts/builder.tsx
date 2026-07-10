@@ -39,6 +39,24 @@ export function ShiftBuilder({
   const [pending, start] = useTransition();
   const lsKey = `shiftdraft:${storeId}:${ym}`;
 
+  // 未保存編集の集合を常に最新で参照できるようにする
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  // サーバー側の最新シフト（保存/確定/他者編集の結果）を grid へ同期。
+  // 未保存(dirty)のセルだけは上書きせず保持 → リロード不要で反映される。
+  const shiftsSig = JSON.stringify(shifts);
+  useEffect(() => {
+    const base: Record<string, Cell> = {};
+    for (const s of shifts) base[`${s.staff_id}|${s.date}`] = { template_id: s.template_id, start_time: s.start_time, end_time: s.end_time, status: s.status };
+    setGrid((prev) => {
+      const next: Record<string, Cell> = { ...base };
+      for (const k of dirtyRef.current) if (prev[k]) next[k] = prev[k];
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shiftsSig]);
+
   const reqMap = new Map<string, Request>();
   for (const r of requests) reqMap.set(`${r.staff_id}|${r.date}`, r);
   const tmap = new Map(templates.map((t) => [t.id, t]));
@@ -146,7 +164,7 @@ export function ShiftBuilder({
             <tr className="bg-gradient-to-r from-brand-light to-white">
               <th className="sticky left-0 z-10 min-w-28 border-b border-r border-zinc-200 bg-brand-light px-3 py-2 text-left font-semibold text-brand">スタッフ</th>
               {days.map((d) => {
-                const w = dow[new Date(d + "T00:00:00+09:00").getDay()];
+                const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
                 return (
                   <th key={d} className={`min-w-24 border-b border-zinc-200 px-1 py-2 font-medium ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-500"}`}>
                     {d.slice(8)}<span className="block text-[10px]">（{w}）</span>

@@ -65,8 +65,14 @@ export function addMonths(ym: string, n: number): string {
 }
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+/**
+ * YYYY-MM-DD（JSTのカレンダー日付）から曜日を返す。
+ * 実行環境のタイムゾーンに依存しないよう Date.UTC + getUTCDay で算出する。
+ * （getDay() はランタイムTZ依存で、Vercel(UTC)だと1日ずれるため使わない）
+ */
 export function dowJP(dateStr: string): string {
-  return DOW[new Date(dateStr + "T00:00:00+09:00").getDay()];
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
 /** "HH:MM:SS" or "HH:MM" → "HH:MM" */

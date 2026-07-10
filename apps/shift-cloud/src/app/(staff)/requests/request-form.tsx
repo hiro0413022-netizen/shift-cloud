@@ -63,7 +63,7 @@ export function RequestForm({
   return (
     <div className="space-y-2 pb-24">
       {days.map((d) => {
-        const w = dow[new Date(d + "T00:00:00+09:00").getDay()];
+        const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
         const cur = entries[d];
         return (
           <div key={d} className="rounded-xl border border-zinc-200 bg-white p-3 shadow-sm">

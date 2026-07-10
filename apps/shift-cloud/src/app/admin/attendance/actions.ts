@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 /**
  * 打刻修正: 元打刻は書き換えず、修正レコードを積む（DECISIONS #6）
  * clock_in / clock_out をそれぞれ HH:MM で指定（空なら変更なし）
+ * 休憩: break_minutes で分数を手動上書き、break_reset=ON で自動計算に戻す
  */
 export async function correctAttendance(formData: FormData): Promise<{ error?: string }> {
   const actor = await requireActor("edit_attendance");
@@ -21,8 +22,21 @@ export async function correctAttendance(formData: FormData): Promise<{ error?: s
   const newOut = String(formData.get("clock_out") || "");
   const reason = String(formData.get("reason") || "").trim();
 
+  // 休憩の手動修正：break_reset=ON で自動に戻す、break_minutes 入力で分数を上書き
+  const breakReset = String(formData.get("break_reset") || "") === "on";
+  const breakRaw = String(formData.get("break_minutes") || "").trim();
+  let breakOverride: number | null | undefined; // undefined=変更なし / null=自動へ戻す / number=上書き
+  if (breakReset) {
+    breakOverride = null;
+  } else if (breakRaw !== "") {
+    const n = Number(breakRaw);
+    if (!Number.isFinite(n) || n < 0 || n > 24 * 60) return { error: "休憩時間は0〜1440分で入力してください" };
+    breakOverride = Math.round(n);
+  }
+  const breakChanged = breakOverride !== undefined;
+
   if (!reason) return { error: "修正理由は必須です" };
-  if (!newIn && !newOut) return { error: "修正する時刻を入力してください" };
+  if (!newIn && !newOut && !breakChanged) return { error: "修正する時刻または休憩を入力してください" };
 
   // 有効な既存打刻を取得
   const { data: records } = await admin
@@ -65,7 +79,16 @@ export async function correctAttendance(formData: FormData): Promise<{ error?: s
     return { error: (e as Error).message };
   }
 
-  await recalcAttendance(actor.companyId, staffId, date);
+  if (breakChanged) {
+    await logAudit(actor, "attendance.correct_break", "attendance_days", null, null, { date, breakOverride, reason });
+  }
+
+  await recalcAttendance(
+    actor.companyId,
+    staffId,
+    date,
+    breakChanged ? { breakOverride } : {},
+  );
   revalidatePath("/admin/attendance");
   return {};
 }

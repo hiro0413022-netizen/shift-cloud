@@ -88,11 +88,14 @@ export async function deletePeriod(formData: FormData) {
     .select("id").eq("id", id).eq("company_id", actor.companyId).is("deleted_at", null).single();
   if (!period) return;
 
-  // 紐づく提出希望を先にソフト削除
+  // 紐づく提出希望の件数を先に取得（監査ログ用）
   const { count } = await admin.from("shift_requests")
-    .update({ deleted_at: now })
-    .eq("period_id", id).is("deleted_at", null)
-    .select("id", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .eq("period_id", id).is("deleted_at", null);
+
+  // 紐づく提出希望をソフト削除
+  await admin.from("shift_requests")
+    .update({ deleted_at: now }).eq("period_id", id).is("deleted_at", null);
 
   // 期間本体をソフト削除
   await admin.from("shift_request_periods")

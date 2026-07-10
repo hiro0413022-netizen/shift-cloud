@@ -1,6 +1,11 @@
 # CHANGELOG
 
+## 2026-07-10（続き）
+- feat(shift-cloud): **休憩の自動計算**を勤怠実績に追加（給与計算に反映）。労基法準拠の段階式＝労働6時間超→45分／8時間超→60分（9時間勤務なら1時間休憩）。休憩の決定順位は「手動上書き＞休憩打刻＞段階式自動」。`src/lib/attendance.ts` に `autoBreakMinutes()` と再計算ロジックを実装。従来は休憩打刻が無いと休憩0＝9時間がそのまま計上されていた問題を解消。
+- feat(shift-cloud): **休憩をあとから修正**可能に。勤怠の修正フォームに「休憩（分）」入力と「自動計算に戻す」チェックを追加。`attendance_days.break_override_minutes`（null=自動）で保持し、`correctAttendance` から設定/解除。勤怠一覧に「手動／自動」表示。DB: migration `0033_attendance_break_override.sql`（**本番qrgpblnnhdudigarrtuz適用済**）。
+
 ## 2026-07-10
+- fix(shift-cloud): シフトビルダーで**保存/確定の結果がリロードしないと反映されない**問題を修正。`grid` を初回マウント時のみ初期化していたため、サーバー側更新（ドラフト保存の再検証・確定後の緑表示・他者編集）が画面に流れ込まなかった。`shifts` prop の変化を検知して `grid` へ同期する useEffect を追加（未保存=dirty のセルは保持）。
 - fix(shift-cloud): 募集期間まわりの整理。(1)**削除機能を追加**（`deletePeriod` ソフト削除＝期間＋紐づく提出希望をまとめて論理削除、確認ダイアログ付き `delete-period-button.tsx`）。(2)管理ビルダーの期間一覧を**店舗で絞り込み**（`store_id=当該店舗 or null` のみ表示。従来は他店舗の期間まで月内全件を表示し希望集約が混線）。期間カードに「この店舗/全店舗」バッジと🗑削除を追加。(3)スタッフ側 `requests/page.tsx` は重複時に**店舗個別の募集を全店舗共通より優先**（取り違え防止）。(4)データ整理: 不要な全店舗向け 8/1-31（希望0件）を論理削除。※GOLF WING宝塚 8/1-15（締切済み・希望13件）は温存
 
 ## 2026-07-09
@@ -65,4 +70,8 @@
 - feat: golfwing移行P3 — D1互換Postgresアダプタ(src/lib/pgdb.ts)・Vercelエントリ(api/index.ts)・Supabase Auth化(auth.ts)・migration 0008(tenant_id互換列)。ルートコード8,500行は無修正で移行。tsc全緑
 - db: golfwing移行P2完了 — D1(golfwing-production)の全業務データ2,079行をgolfwingスキーマへ投入（Edge Function `golfwing-import` 経由、デモ除外・件数検証済み）
 - db: `0007_golfwing_schema.sql` 適用 — golfwingスキーマ（suppliers/supplier_rules/products/product_suppliers/purchase_orders/purchase_order_items/receipts/receipt_items + RLS + v_monthly_purchase_cost）。DECISIONS #19/#20
-- ops: yozan-genesisのVercel Function Regionをiad1→hnd1(東京)に変更し再デプロイ（Supab
+- ops: yozan-genesisのVercel Function Regionをiad1→hnd1(東京)に変更し再デプロイ（Supabase東京との往復短縮）
+- docs: GolfOrder Supabase移行設計書を作成（docs/genesis/GOLFWING_SUPABASE_MIGRATION.md、方式B=DB先行移行を推奨）
+- feat(corporate): 画像11枚をGenspark CDNからapps/corporate/public/imagesへローカル化（GitHub Actions asset-mirror経由）。constants.tsをローカルパスに変更
+- feat: `apps/kallinos` 新規追加 — www.kallinos.jpの静的ミラー（index/products/brand + css/js。残6ページはworkflow再実行で取得予定）
+- feat: `apps/golfwing` 新規追加 — GolfOrder発注管理システムのソースをGensparkから回収（golfwing-srcブランチ経由、Hono+Cloudflare D1、migrations 0001〜0015、docs一式）。デプロイは当面Cloudflare Pages継続、将来Supabase/inventoryモジュールへ移行予定

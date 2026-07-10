@@ -10,10 +10,40 @@ type TimeRecord = {
 };
 
 /**
+ * 段階式の自動休憩（労基法準拠）。拘束時間(分)から付与する休憩(分)を返す。
+ * 労働6時間超 → 45分 / 8時間超 → 60分（9時間なら1時間）。
+ */
+export function autoBreakMinutes(spanMinutes: number): number {
+  if (spanMinutes > 8 * 60) return 60;
+  if (spanMinutes > 6 * 60) return 45;
+  return 0;
+}
+
+type RecalcOpts = {
+  /**
+   * 休憩の手動上書き。
+   * - 省略(undefined): DBの既存 break_override_minutes をそのまま維持
+   * - number: その分数で上書き（0=休憩なしの手動指定）
+   * - null: 上書きを解除して自動計算に戻す
+   */
+  breakOverride?: number | null;
+};
+
+/**
  * 指定スタッフ・日付の勤怠を打刻イベントから再計算してattendance_daysへupsert。
  * 修正打刻（correction_of）は元打刻を置き換える（DECISIONS #6）。
+ *
+ * 休憩の決定順位：
+ *   1) 手動上書き(break_override_minutes)があればそれ
+ *   2) 休憩打刻(break_start/break_end)があればその合計
+ *   3) どちらも無ければ拘束時間から段階式に自動付与
  */
-export async function recalcAttendance(companyId: string, staffId: string, date: string) {
+export async function recalcAttendance(
+  companyId: string,
+  staffId: string,
+  date: string,
+  opts: RecalcOpts = {},
+) {
   const admin = createAdmin();
 
   // JSTの1日ウィンドウ
@@ -38,17 +68,31 @@ export async function recalcAttendance(companyId: string, staffId: string, date:
   const clockIn = clockIns[0]?.recorded_at ?? null;
   const clockOut = clockOuts.length ? clockOuts[clockOuts.length - 1].recorded_at : null;
 
-  // 休憩ペア集計
-  let breakMinutes = 0;
+  // 休憩打刻ペア集計
+  let punchedBreak = 0;
   let breakStart: string | null = null;
   for (const r of effective) {
     if (r.type === "break_start") breakStart = r.recorded_at;
     if (r.type === "break_end" && breakStart) {
-      breakMinutes += Math.round(
+      punchedBreak += Math.round(
         (new Date(r.recorded_at).getTime() - new Date(breakStart).getTime()) / 60000
       );
       breakStart = null;
     }
+  }
+
+  // 休憩の手動上書き値を決定（呼び出しで指定が無ければDBの既存値を維持）
+  let override: number | null;
+  if ("breakOverride" in opts) {
+    override = opts.breakOverride ?? null;
+  } else {
+    const { data: existing } = await admin
+      .from("attendance_days")
+      .select("break_override_minutes")
+      .eq("staff_id", staffId)
+      .eq("date", date)
+      .maybeSingle();
+    override = existing?.break_override_minutes ?? null;
   }
 
   // 確定シフト
@@ -69,14 +113,18 @@ export async function recalcAttendance(companyId: string, staffId: string, date:
     return;
   }
 
-  let workMinutes = 0;
-  if (clockIn && clockOut) {
-    workMinutes = Math.max(
-      0,
-      Math.round((new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 60000) -
-        breakMinutes
-    );
-  }
+  // 拘束時間（出退勤の差）
+  const spanMinutes =
+    clockIn && clockOut
+      ? Math.max(0, Math.round((new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 60000))
+      : 0;
+
+  // 実効休憩：手動上書き＞休憩打刻＞段階式自動
+  const autoBreak = autoBreakMinutes(spanMinutes);
+  const breakMinutes =
+    override != null ? override : punchedBreak > 0 ? punchedBreak : autoBreak;
+
+  const workMinutes = clockIn && clockOut ? Math.max(0, spanMinutes - breakMinutes) : 0;
 
   let late = 0, early = 0, overtime = 0;
   if (hasWorkShift && shift) {
@@ -90,7 +138,7 @@ export async function recalcAttendance(companyId: string, staffId: string, date:
   }
 
   const isMissing = hasWorkShift && (!clockIn || !clockOut);
-  const wasCorrected = effective.some((r) => r.correction_of);
+  const wasCorrected = effective.some((r) => r.correction_of) || override != null;
   const storeId = shift?.store_id ?? effective[0]?.store_id;
   if (!storeId) return;
 
@@ -104,6 +152,7 @@ export async function recalcAttendance(companyId: string, staffId: string, date:
       clock_in: clockIn,
       clock_out: clockOut,
       break_minutes: breakMinutes,
+      break_override_minutes: override,
       work_minutes: workMinutes,
       late_minutes: late,
       early_leave_minutes: early,

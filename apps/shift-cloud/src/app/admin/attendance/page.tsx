@@ -54,7 +54,12 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
               <Td className="font-medium">{(d.staff as unknown as { name: string } | null)?.name}</Td>
               <Td>{timeJST(d.clock_in)}</Td>
               <Td>{timeJST(d.clock_out)}</Td>
-              <Td>{d.break_minutes}分</Td>
+              <Td>
+                <span className="whitespace-nowrap">{d.break_minutes}分</span>
+                {d.break_override_minutes != null
+                  ? <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">手動</span>
+                  : <span className="ml-1 text-[10px] text-zinc-400">自動</span>}
+              </Td>
               <Td className="font-medium">{fmtMinutes(d.work_minutes)}</Td>
               <Td>
                 <div className="flex flex-wrap gap-1">
@@ -66,7 +71,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
                 </div>
               </Td>
               <Td>{d.status === "corrected" ? <Badge color="amber">修正済</Badge> : <Badge color="zinc">自動</Badge>}</Td>
-              <Td><CorrectionForm staffId={d.staff_id} storeId={d.store_id} date={d.date} /></Td>
+              <Td><CorrectionForm staffId={d.staff_id} storeId={d.store_id} date={d.date} breakMinutes={d.break_override_minutes ?? d.break_minutes} isBreakManual={d.break_override_minutes != null} /></Td>
             </tr>
           ))}
         </Table>

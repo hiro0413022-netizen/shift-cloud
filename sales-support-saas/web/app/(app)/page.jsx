@@ -12,13 +12,16 @@ export default async function HomePage() {
   // 段階（勝ち/負け判定用）
   const { data: stages } = await supa.from("pipeline_stages").select("*").eq("project_id", projectId).order("sort");
   const firstStageId = stages?.[0]?.id;
-  const openStageIds = (stages || []).filter((s) => !s.is_won && !s.is_lost).map((s) => s.id);
+  // 「対応中」は先頭ステージ（DM送付済みなどの初期リスト）と、勝ち(導入)・負け(見送り)を除いた“進行中”のみ
+  const openStageIds = (stages || []).filter((s) => !s.is_won && !s.is_lost && s.id !== firstStageId).map((s) => s.id);
+  // 「新しい問い合わせ」は先頭ステージの次（問い合わせ）を表示。無ければ進行中の先頭
+  const inquiryStageId = stages?.[1]?.id || openStageIds[0];
 
   // まとめて並列取得（レイテンシ削減）
   const monthStart = t.slice(0, 7) + "-01";
   const [tasksRes, newLeadsRes, activeRes, meetRes, custRes] = await Promise.all([
     supa.from("tasks").select("*, leads(id,title,company_id, companies(name))").eq("owner_id", session.uid).eq("is_done", false).order("due_date", { ascending: true, nullsFirst: false }),
-    supa.from("leads").select("id,title,inquiry_date,status_note, companies(name), channels(name)").eq("project_id", projectId).eq("stage_id", firstStageId || "00000000-0000-0000-0000-000000000000").order("inquiry_date", { ascending: false }).limit(6),
+    supa.from("leads").select("id,title,inquiry_date,status_note, companies(name), channels(name)").eq("project_id", projectId).eq("stage_id", inquiryStageId || "00000000-0000-0000-0000-000000000000").order("inquiry_date", { ascending: false }).limit(6),
     supa.from("leads").select("id", { count: "exact", head: true }).eq("project_id", projectId).in("stage_id", openStageIds.length ? openStageIds : ["x"]),
     supa.from("activities").select("id", { count: "exact", head: true }).eq("type", "visit").gte("occurred_at", monthStart),
     supa.from("customers").select("id", { count: "exact", head: true }).eq("project_id", projectId).gte("contract_date", monthStart),
