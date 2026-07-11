@@ -6,9 +6,10 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions };
 /**
  * 認証ミドルウェア生成（独立アプリ共通）。
  * 使い方（各アプリの src/middleware.ts）:
- *   import { createAuthMiddleware, AUTH_MIDDLEWARE_MATCHER } from "@yozan/core/middleware";
+ *   import { createAuthMiddleware } from "@yozan/core/middleware";
  *   export const middleware = createAuthMiddleware({ publicPrefixes: ["/login", "/s"] });
- *   export const config = { matcher: AUTH_MIDDLEWARE_MATCHER };
+ *   export const config = { matcher: ["..."] }; // ※Next.jsの静的解析のためmatcherはリテラル必須
+ *   （AUTH_MIDDLEWARE_MATCHERをconfigに直接使うことはできない — 値のコピー元として参照）
  */
 export function createAuthMiddleware(options: { publicPrefixes: string[] }) {
   return async function middleware(request: NextRequest) {

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-11(3) — UP-2: 既存4アプリを @yozan/core へ移行（NEXT_TASKS UP-2、古川さん承認済）
+- **refactor(survey-os/reserve-os/member-os/legal-os): 共通コードをpackages/coreへ集約** — 各アプリの supabase/admin・supabase/server・kernel を薄い再export化、auth を `createActorResolver` ラッパー化（survey/reserve/member。既存のexport名・挙動は不変）。legal-os の auth はカスタムロール解決（leg_grants）のため据え置き。middleware は `createAuthMiddleware` 化
+- **fix(core/template): middlewareのmatcherはリテラル必須** — Next.jsがconfigを静的解析するため `AUTH_MIDDLEWARE_MATCHER` のimport参照はビルドエラー。4アプリ・templates/app-template ともインラインリテラルへ（テンプレートの潜在バグをCI前に検出）
+- **fix(core): kernel logEventの入力型を全アプリの上位互換に拡張**（amount/related_*/ai_summary等のオプション項目）
+- 検証: 4アプリの `tsc --noEmit`＋`next build` をLinux実機で全green確認。lockに@yozan/core依存4件追記
+- 注意（push後）: **member-os / legal-os は本番稼働中** → Vercelデプロイが成功したか要確認（失敗時は直前コミットへRedeployで戻せる）
+
 ## 2026-07-11(2) — CI red修正（初回run #1の全build失敗に対応）
 - **fix: 壊れたpackage-lock.jsonを再生成** — 初回コミットのlockは一部エントリがメタデータ欠落（enhanced-resolve等が`{"dev":true}`のみ）＋lightningcssのLinuxバイナリ全欠落 → CIの`next build`が「Cannot find module 'enhanced-resolve'」で全滅。サンドボックス（Linux/npm 10.9.8）で`--package-lock-only`再生成（全770エントリにversion/resolved/integrity、全プラットフォームバイナリ収録）。corporate buildがgreenになることを実機検証済
 - **fix(legal-os/reserve-os/money-golfwing/member-os): auth.tsのSupabaseネスト型キャスト** — `staff as {...}`直接キャストが新しい型推論（rolesが配列推論）でTS2352 → survey-osと同じ`as unknown as`方式に統一（挙動変更なし）。4アプリの`tsc --noEmit`をLinux実機で検証済

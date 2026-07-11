@@ -1,68 +1,13 @@
-import "server-only";
-import { cache } from "react";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { createAdmin } from "@/lib/supabase/admin";
-
-export type SurveyActor = {
-  staffId: string;
-  authUserId: string;
-  companyId: string;
-  name: string;
-  email: string | null;
-};
+import { createActorResolver, type Actor } from "@yozan/core/auth";
 
 /**
- * Survey OS（アンケート管理）は use_survey 権限、または view_hq（経営層）保持者のみ。
+ * Survey OS（アンケート管理） は use_survey 権限、または view_hq（経営層 #18）保持者のみ。
  * ロール・権限データはGenesis / Shift Cloudと共通（同一DB）。DECISIONS #27と同型。
- * ※コーチ評価は機微情報のため既定は view_hq（本部/オーナー）想定。
+ * 実装は @yozan/core/auth に集約（DECISIONS #35。挙動は従来と同一: active・read_only除外・anyOf判定）。
  */
-export const getSurveyActor = cache(async (): Promise<SurveyActor | null> => {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+export type SurveyActor = Actor;
 
-  const admin = createAdmin();
-  const { data: staffData } = await admin
-    .from("staff")
-    .select("id, company_id, name, email, status, staff_roles(deleted_at, roles(permissions))")
-    .eq("auth_user_id", user.id)
-    .is("deleted_at", null)
-    .single();
+const resolver = createActorResolver({ anyOf: ["use_survey", "view_hq"] });
 
-  // Supabaseのネスト取得の型推論に依存せず、自前の型に確定させる（環境差による型エラー回避）
-  type StaffShape = {
-    id: string;
-    company_id: string;
-    name: string;
-    email: string | null;
-    status: string;
-    staff_roles?: Array<{ deleted_at: string | null; roles: { permissions: Record<string, boolean> | null } | null }>;
-  };
-  const staff = staffData as unknown as StaffShape | null;
-  if (!staff || staff.status !== "active") return null;
-
-  const roleRows = (staff.staff_roles ?? []).filter((r) => r.deleted_at == null);
-  const hasAccess = roleRows.some((row) => {
-    const perms = row.roles?.permissions;
-    if (!perms || perms.read_only) return false;
-    return !!perms.use_survey || !!perms.view_hq;
-  });
-  if (!hasAccess) return null;
-
-  return {
-    staffId: staff.id,
-    authUserId: user.id,
-    companyId: staff.company_id,
-    name: staff.name,
-    email: staff.email,
-  };
-});
-
-export async function requireSurveyActor(): Promise<SurveyActor> {
-  const actor = await getSurveyActor();
-  if (!actor) redirect("/login?denied=1");
-  return actor;
-}
+export const getSurveyActor = resolver.getActor;
+export const requireSurveyActor = resolver.requireActor;

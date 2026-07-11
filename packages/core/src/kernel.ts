@@ -13,8 +13,14 @@ export async function logEvent(
     severity?: "info" | "notice" | "warning" | "critical";
     status?: string;
     priority?: number;
+    amount?: number;
     tags?: string[];
+    related_module_id?: string | null;
+    related_staff_id?: string | null;
     raw_payload?: unknown;
+    ai_summary?: string;
+    ai_next_action?: string;
+    human_approval_required?: boolean;
   }
 ): Promise<string | null> {
   const admin = createAdmin();
