@@ -8,6 +8,7 @@ const LINKS = [
   { href: "/cash", label: "現金出納" },
   { href: "/count", label: "金種棚卸" },
   { href: "/import", label: "カード・口座取込" },
+  { href: "/receipts", label: "証憑" },
 ];
 
 export function TopBar({

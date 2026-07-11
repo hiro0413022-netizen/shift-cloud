@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-11(5) — Phase 1続行: Legal OSフェーズ2（legal_ai）＋Money OS証憑（mon_receipts）
+- **feat(genesis): Legal OS日次チェック（DECISIONS #40a）** — legal-checks.ts新設。解約判断期日90日以内（超過含む）/契約満了60日以内/高リスク契約/AI提案の確認待ち14日滞留 を毎朝「今日、古川さんが判断すべきこと」へ。Claude API不要
+- **feat(genesis): legal_ai契約書自動抽出（DECISIONS #40b）** — legal-ai.ts新設、日次cronに組込。未抽出の契約書を1件/日、Storage上のPDF/画像をClaude APIで読み、相手方・契約期間・自動更新・解約通知日数・リスク・要点を抽出→**提案として保存**（人の入力は上書きしない、status=under_review、確定は人）。next_action_date自動計算＋リマインダー自動生成。ANTHROPIC_API_KEY未設定時は完全スキップ
+- **feat(money-golfwing): 証憑保管 /receipts（DECISIONS #41・#29a）** — db: `0034_mon_receipts.sql` **適用済（本番qrgpblnnhdudigarrtuz、MCP経由）**＝mon_receipts＋プライベートバケットmon-receipts。画面=アップロード（画像/PDF、8MBまで）・月/種別フィルタ一覧・行を開いてメタ編集/突合状態変更・署名付きURL閲覧・論理削除。ナビに「証憑」追加。レシート撮影→OCR→経費自動起票は経理AIフェーズ（後続）
+- 検証: genesis / money-golfwing の tsc＋next build をLinux実機でgreen確認
+- **ユーザー作業**: push（CI green確認）のみ。抽出AIを動かすには yozan-genesis の `ANTHROPIC_API_KEY`（NEXT_TASKS 00で設定済みならそのまま動く）
+
 ## 2026-07-11(4) — UP-3/UP-4: 現場RUNBOOK＋時給の月中変更対応
 - **feat(shift-cloud): 時給の月中変更を日付按分（DECISIONS #39・監査D-3）** — `calcMonthlyPayroll`/`wageOnDate` を payroll-calc.ts に追加し buildPayroll を置換。日ごとに有効な時給・交通費で計算し、レート別内訳を `payroll_items.detail.wage_periods`（from/to日付つき）へ保存。賃金開始日前の勤務日は最古の賃金へフォールバック（0円事故防止）。**単一時給は従来と完全一致**（equivalenceテストで固定）。テスト5件追加（計26件・全pass）、shift-cloudのtsc+buildをLinux実機で検証済
 - **docs(RUNBOOK): 現場向け手順書3本を新設** — `docs/modules/member-os/RUNBOOK.md`（受付タブレットの朝の準備〜入会処理〜Excel出力）、`docs/modules/workforce-os/RUNBOOK.md`（iPad打刻・打刻修正・休憩上書き・打刻端末メモ・月末前チェック）、`docs/modules/legal-os/RUNBOOK.md`（契約書登録・経理系との切り分け・期限管理）。PCに不慣れな人向け・困ったとき表つき

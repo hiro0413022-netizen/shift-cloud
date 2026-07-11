@@ -2,7 +2,7 @@
 
 形式: `#N (日付) 決定内容 — 理由`。同じ議論を繰り返さない。
 
-> ⚠採番注意: #28と#29は歴史的に重複採番（各2件）。参照を壊さないため振り直さず【#28a/#28b】【#29a/#29b】の注記で区別する（AUDIT_2026-07-11）。**次に使う番号は #40**。
+> ⚠採番注意: #28と#29は歴史的に重複採番（各2件）。参照を壊さないため振り直さず【#28a/#28b】【#29a/#29b】の注記で区別する（AUDIT_2026-07-11）。**次に使う番号は #42**。
 
 - #1 (2026-07-02) リポジトリは軽量モノレポ（npm workspaces、単一Next.jsアプリ＋packages分離）。Turborepoはアプリ2つ目から — MVP速度優先、構造だけ将来対応
 - #2 (2026-07-02) 認証はメール＋パスワード基本、メールなしスタッフはログインID＋パスワード（擬似メール方式）— アルバイトがメール非保持の可能性
@@ -45,3 +45,5 @@
 - #37 (2026-07-11) **KPI整合性チェッカー**を日次cron（runDailyCeoReport）に組込（apps/genesis/src/lib/kpi-checks.ts、Claude API不要のルールベース）。完了月の経費0円（利益過大）／forecast残存（実績未入力）／売上前月比±50%超／5大KPI目標未設定 を検知し「今日、古川さんが判断すべきこと」の先頭に表示 — 間違った数字でCEO AIが判断する事故を止める
 - #38 (2026-07-11) **migration採番ルール**: 過去の番号重複6ペア（0020/0022/0023/0024/0027/0031、全て適用済）はリネームせず凍結し、supabase/migrations/README.md を適用台帳とする。次番号は0034〜、作成時に台帳を更新。追加のみの原則は不変
 - #39 (2026-07-11) **時給の月中変更は日付按分**（監査D-3の解消）: 給与計算は日ごとに「その日に有効な賃金（staff_wages.effective_from <= 勤務日の最新）」を適用し、レート別に集計して合算（calcMonthlyPayroll）。交通費/日も同様。賃金開始日より前の勤務日は**最古の賃金行へフォールバック**（登録遅れで0円になる事故を防ぐ）。単一時給のスタッフは従来計算と完全一致（テストで固定）。レート別内訳は payroll_items.detail.wage_periods に保存（説明可能性）。旧実装（月末時点の賃金を月全体へ遡及）を置換
+- #40 (2026-07-11) **Legal OS フェーズ2（legal_ai接続）**: (a) 日次チェック=ルールベース（apps/genesis/src/lib/legal-checks.ts）— 解約判断期日90日以内/契約満了60日以内/高リスク/確認待ち14日滞留 を「今日、古川さんが判断すべきこと」へ合流。 (b) 自動抽出=Claude API（legal-ai.ts）— 日次cronで未抽出の契約書を**1件/日**、PDF/画像を読み相手方・契約期間・自動更新・解約通知日数・リスク・要点を抽出し**提案として保存**（人の入力は上書きしない・提案全文はdetail.ai_extracted・status=under_review・確定は人=VISION §7）。next_action_date自動計算とリマインダー自動生成つき。APIキー未設定なら何もしない（日次レポートに影響なし）。モデルはLEGAL_AI_MODEL envで変更可（既定claude-haiku-4-5）
+- #41 (2026-07-11) **Money OS mon_receipts（経理証憑）フェーズ1**: migration 0034適用済 — mon_receipts（種別invoice/quote/receipt/delivery/other・発行日・発行元・金額・突合状態unmatched/matched/archived・mon_expense_id/mon_bank_txn_id/leg_document_idリンク #29a）＋プライベートバケット mon-receipts（legal-docsと同方式）。money-golfwingに /receipts（アップロード・一覧・編集・論理削除。署名付きURL閲覧、Server Actions bodySizeLimit 8MB）。**「まず撮って登録→後で整える」運用**。OCR自動読取・経費自動起票は経理AIフェーズ（後続）。削除は論理削除のみでStorage実体は残す（電帳法配慮）

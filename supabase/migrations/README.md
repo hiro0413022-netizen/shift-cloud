@@ -2,7 +2,8 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0034` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0035` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- ✅ `0034_mon_receipts.sql` — 適用済（2026-07-11、MCP name=mon_receipts。mon_receipts＋バケットmon-receipts #41）
 - 追加のみ。既存テーブルの破壊的変更禁止（DROP/型変更/NOT NULL化は要承認）
 - 適用は Supabase MCP `apply_migration`（本番 qrgpblnnhdudigarrtuz）。適用したら本台帳に✅を記す
 - **過去の番号重複（6ペア）はリネームしない**: 全て適用済みで、リネームは適用履歴と乖離するため凍結（AUDIT_2026-07-11）

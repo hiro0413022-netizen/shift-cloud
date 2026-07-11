@@ -9,6 +9,8 @@ import {
 } from "@/lib/kernel";
 import { summarizeInquiriesForReport, getInquiryStats } from "@/lib/secretary";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
+import { runLegalChecks } from "@/lib/legal-checks";
+import { runLegalAiExtraction } from "@/lib/legal-ai";
 
 /* ============================================================
    CEO AI — 古川さんの分身（正典: docs/genesis/VISION.md §1/§3/§8）
@@ -184,13 +186,18 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   await admin.rpc("refresh_finance_kpis", { p_company_id: companyId });
   await admin.rpc("refresh_member_kpis", { p_company_id: companyId }); // 0011未適用時はerrorが返るだけで無害
 
+  // 1.5 legal_ai: 未抽出の契約書を1件抽出（APIキー無し/対象無しなら即スキップ。DECISIONS #40）
+  await runLegalAiExtraction(companyId).catch(() => null);
+
   // 2. データ収集 → 分析（Claude → フォールバック: ルール）
   const d = await getCockpitData(companyId);
   const { score, factors } = computeGenesisScore(d);
   // KPI整合性チェック（経費0円月/予測残存/売上急変/目標未設定）を判断リストの先頭に合流
   // — 「間違った数字でCEO AIが判断する」事故を止める（AUDIT_2026-07-11 D-4）
   const integrity = await runKpiIntegrityChecks(companyId, d.kpis).catch(() => []);
-  const judgments = [...integrity, ...buildJudgmentList(d)];
+  // 契約の期限・リスク（Legal OS フェーズ2a）も判断リストへ合流
+  const legal = await runLegalChecks(companyId).catch(() => []);
+  const judgments = [...integrity, ...legal, ...buildJudgmentList(d)];
   const startedAt = new Date().toISOString();
   const analysis = (await claudeAnalysis(d)) ?? ruleBasedAnalysis(d);
 

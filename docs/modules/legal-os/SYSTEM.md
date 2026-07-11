@@ -188,3 +188,9 @@ Money OS `mon_grants` と同じく **ユーザー × 役割** で持つ。新テ
 
 - 契約・書類の**保管・期限管理・リスク提示**まで。契約書の作成代行・法的助言・実際の締結交渉は対象外（legal_ai はレビュー提案、締結は人が承認・実行）。
 - 請求書・領収書の金額突合と電帳法保存は **Money OS `mon_receipts`** の担当（本モジュールではない）。
+
+## 9. フェーズ2実装記録（2026-07-11 / DECISIONS #40）
+
+- **日次チェック**: `apps/genesis/src/lib/legal-checks.ts`（ルールベース・Claude API不要）。解約判断期日（next_action_date）90日以内・契約満了60日以内・risk_level=high・under_review14日滞留 を判断リストへ。文書1件につき最重要1項目のみ起票
+- **自動抽出**: `apps/genesis/src/lib/legal-ai.ts`。日次cron（runDailyCeoReport）から1件/日。対象=未抽出（detail.ai_extractedなし）かつ主要項目欠落のdraft/under_review。leg_filesのPDF/画像（4MB以下）をClaude APIで読解→抽出。**人の入力は上書きせずnull項目のみ提案で埋める**。提案全文はdetail.ai_extractedに保存（やり直し可能）。ocr_textには要点ダイジェストを保存（全文転写はコスト過大のため非実施）。抽出後next_action_date自動計算＋scheduledリマインダーが無ければ自動生成。ai_execution_logs/company_eventsに記録
+- 環境変数: `ANTHROPIC_API_KEY`（genesis。未設定なら抽出はスキップ）、`LEGAL_AI_MODEL`（既定claude-haiku-4-5）
