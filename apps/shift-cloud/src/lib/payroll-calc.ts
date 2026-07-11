@@ -76,7 +76,49 @@ export type WageRow = {
   hourly_wage: number;
   commute_allowance: number | null;
   effective_from: string; // YYYY-MM-DD
+  /** 'monthly' なら monthly_salary を固定支給し、実労働時間は金額に影響しない（DECISIONS #44） */
+  wage_type?: "hourly" | "monthly";
+  monthly_salary?: number | null;
 };
+
+/* ============================================================
+   手当（DECISIONS #44 / migration 0035）
+   実際のGOLF WING給与明細で確認した支給式:
+     時給者 = 時給×実労働 + 交通費日額×出勤日数 + Σ手当
+     月給者 = 月給（固定）   + 交通費実費           + Σ手当
+   手当の内訳: パーソナル(単価×件数) / フィッティング紹介料 / コンペ / ラウンドレッスン
+   `commute_actual` だけは交通費(commute_amount)側に足す（課税区分が違うため分けて持つ）。
+   ============================================================ */
+
+export type AllowanceRow = {
+  staff_id: string;
+  kind: "personal" | "fitting_referral" | "compe" | "round_lesson" | "commute_actual" | "other";
+  amount: number;
+};
+
+export type PayrollOptions = {
+  /** 月末日（YYYY-MM-DD）。月給者に適用する賃金行の判定に使う */
+  monthEnd?: string;
+  allowances?: AllowanceRow[];
+  /** 勤怠が0日でも計算対象に含めるスタッフ（月給者・役員は出勤日数0で満額支給される） */
+  includeStaffIds?: string[];
+};
+
+/** スタッフ別の手当合計。commute_actual は交通費側へ回すため分けて返す */
+export function sumAllowances(
+  rows: AllowanceRow[],
+  staffId: string
+): { allowance: number; commuteActual: number } {
+  let allowance = 0;
+  let commuteActual = 0;
+  for (const r of rows) {
+    if (r.staff_id !== staffId) continue;
+    const amt = Math.max(0, Math.floor(Number(r.amount) || 0));
+    if (r.kind === "commute_actual") commuteActual += amt;
+    else allowance += amt;
+  }
+  return { allowance, commuteActual };
+}
 
 /**
  * その日に有効な賃金（effective_from <= date の最新）。
@@ -110,19 +152,28 @@ export type WagePeriodBreakdown = {
 };
 
 export type MonthlyPayrollResult = StaffAggregate &
-  PayrollAmounts & { periods: WagePeriodBreakdown[] };
+  PayrollAmounts & {
+    periods: WagePeriodBreakdown[];
+    allowance_amount: number;
+    /** 'monthly' の場合、実労働時間は支給額に影響しない（説明可能性のため記録） */
+    wage_type: "hourly" | "monthly";
+  };
 
 /**
  * 月次給与計算（スタッフ別・時給レート別の按分つき）。
  * - 日次丸め（roundDailyWork）→ レート別に集計 → レートごとに calcPayrollAmounts → 合算
  * - 交通費/日もその日に有効な賃金の commute_allowance を使う
+ * - opts を渡すと 月給者（wage_type='monthly'）と 手当 を反映する（DECISIONS #44）。
+ *   opts 無しの呼び出しは従来と完全に同じ結果（後方互換 / テストで固定）。
  */
 export function calcMonthlyPayroll(
   days: Array<DayAttendance & { date: string }>,
   wages: WageRow[],
   roundingMinutes: number,
-  overtimeRate: number
+  overtimeRate: number,
+  opts: PayrollOptions = {}
 ): Map<string, MonthlyPayrollResult> {
+  const allowances = opts.allowances ?? [];
   // staffId → レートキー → 集計
   type Bucket = { hourly: number; commute: number; from: string; to: string; agg: StaffAggregate };
   const byStaff = new Map<string, Map<string, Bucket>>();
@@ -144,14 +195,43 @@ export function calcMonthlyPayroll(
     byStaff.set(d.staff_id, staffBuckets);
   }
 
+  // 勤怠0日でも支給される人（月給者・役員）を対象に含める（DECISIONS #44）
+  for (const sid of opts.includeStaffIds ?? []) {
+    if (!byStaff.has(sid)) byStaff.set(sid, new Map());
+  }
+
   const results = new Map<string, MonthlyPayrollResult>();
   for (const [staffId, buckets] of byStaff) {
+    const { allowance, commuteActual } = sumAllowances(allowances, staffId);
+    // 月給/時給の判定は「月末時点で有効な賃金行」で行う（賃金種別は月中で変わらない前提）
+    const wageAtEnd = wageOnDate(wages, staffId, opts.monthEnd ?? "9999-12-31");
+    const isMonthly = wageAtEnd?.wage_type === "monthly";
+
     const r: MonthlyPayrollResult = {
       work: 0, overtime: 0, daysWorked: 0,
       base_amount: 0, overtime_amount: 0, commute_amount: 0, total_amount: 0,
       periods: [],
+      allowance_amount: allowance,
+      wage_type: isMonthly ? "monthly" : "hourly",
     };
     const sorted = [...buckets.values()].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+
+    if (isMonthly) {
+      // 月給: 実労働時間は金額に影響しない。交通費は実費（commute_actual）。
+      // 実費が無ければ従来どおり「日額×出勤日数」にフォールバックする。
+      for (const b of sorted) {
+        r.work += b.agg.work;
+        r.overtime += b.agg.overtime;
+        r.daysWorked += b.agg.daysWorked;
+      }
+      r.base_amount = Math.max(0, Math.floor(Number(wageAtEnd?.monthly_salary ?? 0)));
+      r.commute_amount =
+        commuteActual > 0 ? commuteActual : (wageAtEnd?.commute_allowance ?? 0) * r.daysWorked;
+      r.total_amount = r.base_amount + r.overtime_amount + r.commute_amount + r.allowance_amount;
+      results.set(staffId, r);
+      continue;
+    }
+
     for (const b of sorted) {
       const a = calcPayrollAmounts(b.agg, b.hourly, b.commute, overtimeRate);
       r.work += b.agg.work;
@@ -174,6 +254,12 @@ export function calcMonthlyPayroll(
         commute_amount: a.commute_amount,
       });
     }
+    // 時給者は交通費実費が入っていればそれを優先（日額運用と併用しない前提）
+    if (commuteActual > 0) {
+      r.total_amount += commuteActual - r.commute_amount;
+      r.commute_amount = commuteActual;
+    }
+    r.total_amount += r.allowance_amount;
     results.set(staffId, r);
   }
   return results;
