@@ -5,7 +5,8 @@ import {
   sumAllowances,
   type WageRow,
   type AllowanceRow,
-} from "../apps/shift-cloud/src/lib/payroll-calc";
+  // ※ import は .ts 拡張子付きが必須（node --test の型ストリップの制約）
+} from "../apps/shift-cloud/src/lib/payroll-calc.ts";
 
 /* ============================================================
    手当・月給の給与計算（DECISIONS #44 / migration 0035）

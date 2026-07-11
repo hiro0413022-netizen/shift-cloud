@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildInvoice, closingDateOf, jpDate, invoiceNo } from "../apps/caddy-os/src/lib/invoice";
+// ※ import は .ts 拡張子付きが必須（node --test の型ストリップの制約）
+import { buildInvoice, closingDateOf, jpDate, invoiceNo } from "../apps/caddy-os/src/lib/invoice.ts";
 
 /* ============================================================
    請求書ロジック（DECISIONS #46）

@@ -44,9 +44,19 @@
 4. migration追加（番号は supabase/migrations/README.md の台帳で最新+1。追加のみ・既存テーブル変更は要承認）
 5. ドメイン機能を実装（金額integer円・時間integer分 #4、論理削除 #5、書込はservice_role+requireActor+監査 #11）
 6. **金額に触れるロジックは tests/ にテストを追加**（node --test。CIが自動実行）
-7. デプロイ: OPERATIONS.md §7「新アプリ デプロイ定型チェックリスト」
-8. development_statuses更新 → status: live でモジュール稼働、vault_systems登録（#26）
-9. CHANGELOG.md・DECISIONS.md更新
+7. **`.github/workflows/ci.yml` の matrix.app に新アプリを追加**（忘れると型エラーがCIをすり抜ける）
+8. デプロイ: OPERATIONS.md §7「新アプリ デプロイ定型チェックリスト」
+9. development_statuses更新 → status: live でモジュール稼働、vault_systems登録（#26）
+10. CHANGELOG.md・DECISIONS.md更新
+
+### ⚠ 過去に踏んだ落とし穴（scaffold直後に必ず確認する）
+
+| 症状 | 原因 | 対策 |
+|---|---|---|
+| ログインできない／ボタンが反応しない | `src/middleware.ts` の `export const config = { matcher: [...] }` が無い → 静的JSまで認証で307になる | scaffold直後に `middleware.ts` に `config` があるか目視 |
+| `next build` が型エラー | Server Componentの `<form action={fn}>` に **戻り値がある関数**を渡した | フォームに直接渡すServer Actionは `Promise<void>` にする（クライアントから `await` する場合のみ戻り値OK） |
+| CIの `npm test` が落ちる | tests/ の import に **`.ts` 拡張子が無い** | `from "../apps/xxx/src/lib/yyy.ts"` と拡張子付きで書く（node --test の型ストリップの制約） |
+| 新アプリの型エラーがCIで検知されない | ci.yml の matrix に追加し忘れ | 手順7 |
 
 ## 5. モジュール別メモ（着手時に具体化）
 
