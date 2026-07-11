@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-07-11(6) — 経理AIフェーズ1: 証憑OCR自動読取（DECISIONS #42）
+- **feat(genesis): receipt-ai.ts新設・日次cronに組込** — /receiptsに撮って置いた証憑を毎朝最大3件、Claude APIが読取り。発行日・金額・発行元・種別の**空欄だけ**を補完（人の入力は上書きしない）。読取ダイジェストはocr_textに保存され/receiptsの行で確認可能。ANTHROPIC_API_KEY未設定なら完全スキップ
+- 運用イメージ: **現場は撮って登録するだけ → 翌朝には日付・金額・店名が埋まっている → 人は確認と突合だけ**。mon_expenseへの自動起票は読取精度の実績を見てフェーズ2で
+- 検証: genesis tsc＋next build green（Linux実機）
+
 ## 2026-07-11(5) — Phase 1続行: Legal OSフェーズ2（legal_ai）＋Money OS証憑（mon_receipts）
 - **feat(genesis): Legal OS日次チェック（DECISIONS #40a）** — legal-checks.ts新設。解約判断期日90日以内（超過含む）/契約満了60日以内/高リスク契約/AI提案の確認待ち14日滞留 を毎朝「今日、古川さんが判断すべきこと」へ。Claude API不要
 - **feat(genesis): legal_ai契約書自動抽出（DECISIONS #40b）** — legal-ai.ts新設、日次cronに組込。未抽出の契約書を1件/日、Storage上のPDF/画像をClaude APIで読み、相手方・契約期間・自動更新・解約通知日数・リスク・要点を抽出→**提案として保存**（人の入力は上書きしない、status=under_review、確定は人）。next_action_date自動計算＋リマインダー自動生成。ANTHROPIC_API_KEY未設定時は完全スキップ

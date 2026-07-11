@@ -11,6 +11,7 @@ import { summarizeInquiriesForReport, getInquiryStats } from "@/lib/secretary";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { runLegalAiExtraction } from "@/lib/legal-ai";
+import { runReceiptAiExtraction } from "@/lib/receipt-ai";
 
 /* ============================================================
    CEO AI — 古川さんの分身（正典: docs/genesis/VISION.md §1/§3/§8）
@@ -188,6 +189,8 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
 
   // 1.5 legal_ai: 未抽出の契約書を1件抽出（APIキー無し/対象無しなら即スキップ。DECISIONS #40）
   await runLegalAiExtraction(companyId).catch(() => null);
+  // 1.6 経理AI: 未読取の証憑を最大3件OCR（同上のフォールバック。DECISIONS #42）
+  await runReceiptAiExtraction(companyId).catch(() => null);
 
   // 2. データ収集 → 分析（Claude → フォールバック: ルール）
   const d = await getCockpitData(companyId);
