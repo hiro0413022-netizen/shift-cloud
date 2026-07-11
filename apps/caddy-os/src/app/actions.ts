@@ -97,6 +97,70 @@ export async function saveDispatch(fd: FormData): Promise<{ error?: string }> {
   return {};
 }
 
+/* ============================================================
+   一括登録（スプレッドシート風グリッドから / DECISIONS #46）
+   派遣件数が多い（月40〜60件）ため、1件ずつのフォームでは運用に耐えない。
+   ============================================================ */
+
+const bulkRowSchema = z.object({
+  dispatch_date: z.string().min(10),
+  client_id: z.string().uuid().nullable(),
+  sales_amount: z.coerce.number().int().min(0),
+  assignee: z.string().min(1),
+  fee_amount: z.coerce.number().int().min(0),
+  transport_amount: z.coerce.number().int().min(0),
+  special_amount: z.coerce.number().int().min(0),
+  memo: z.string().max(500).nullable(),
+});
+
+export async function saveDispatchesBulk(
+  input: z.input<typeof bulkRowSchema>[]
+): Promise<{ error?: string; count?: number }> {
+  const actor = await requireActor();
+  const parsed = z.array(bulkRowSchema).min(1).max(200).safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力エラー" };
+
+  const admin = createAdmin();
+  const rows: Array<Record<string, unknown>> = [];
+  const months = new Set<string>();
+
+  for (const [i, v] of parsed.data.entries()) {
+    const { partner_id, staff_id } = parseAssignee(v.assignee);
+    if (!partner_id && !staff_id) return { error: `${i + 1}行目: 担当キャディを選んでください` };
+    if (staff_id && (v.fee_amount > 0 || v.special_amount > 0)) {
+      return { error: `${i + 1}行目: 自社スタッフに委託料・手当は付けられません（給与で支給＝二重計上）` };
+    }
+    months.add(v.dispatch_date.slice(0, 7));
+    rows.push({
+      company_id: actor.companyId,
+      dispatch_date: v.dispatch_date,
+      kind: "dispatch",
+      client_id: v.client_id,
+      sales_amount: v.sales_amount,
+      partner_id,
+      staff_id,
+      fee_amount: staff_id ? 0 : v.fee_amount,
+      transport_amount: v.transport_amount,
+      special_amount: staff_id ? 0 : v.special_amount,
+      memo: v.memo,
+    });
+  }
+
+  const { error } = await admin.from("cad_dispatches").insert(rows);
+  if (error) return { error: error.message };
+
+  // 採番（seq）は登録後にまとめて振り直す（日付順に 2026-06-001 …）
+  for (const ym of months) {
+    await admin.rpc("renumber_caddy_seq", { p_company_id: actor.companyId, p_month: `${ym}-01` });
+    await refreshFinance(actor.companyId, ym);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/dispatches");
+  revalidatePath("/invoices");
+  return { count: rows.length };
+}
+
 /**
  * 削除（論理削除）。
  * Server Component の <form action={...}> に直接渡すため **戻り値は void**
@@ -127,6 +191,40 @@ async function refreshFinance(companyId: string, ym: string) {
     p_company_id: companyId,
     p_month: ym ? `${ym}-01` : null,
   });
+}
+
+/* ============================================================
+   出勤可否（DECISIONS #46）
+   委託先キャディの「その日出られるか」だけを持つ。空文字は未回答＝行を消す。
+   ============================================================ */
+export async function setAvailability(
+  partnerId: string,
+  date: string,
+  status: "available" | "maybe" | "unavailable" | ""
+): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  const admin = createAdmin();
+
+  if (!status) {
+    await admin
+      .from("cad_availability")
+      .delete()
+      .eq("company_id", actor.companyId)
+      .eq("partner_id", partnerId)
+      .eq("date", date);
+    revalidatePath("/availability");
+    return {};
+  }
+
+  const { error } = await admin
+    .from("cad_availability")
+    .upsert(
+      { company_id: actor.companyId, partner_id: partnerId, date, status, deleted_at: null },
+      { onConflict: "partner_id,date" }
+    );
+  if (error) return { error: error.message };
+  revalidatePath("/availability");
+  return {};
 }
 
 /** 財務へ再集計（同上・Server Componentのformから呼ぶため戻り値はvoid） */

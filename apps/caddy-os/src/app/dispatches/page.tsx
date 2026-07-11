@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
 import { getDispatches, getMasters, summarize, currentYm, yen, dispatchCost } from "@/lib/caddy";
-import { DispatchForm } from "./dispatch-form";
+import { BulkGrid } from "./bulk-grid";
 import { deleteDispatch } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -36,8 +36,13 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
       </header>
 
       <section className={`${cardCls} mb-6`}>
-        <h2 className="mb-3 font-semibold">派遣を登録</h2>
-        <DispatchForm clients={masters.clients} partners={masters.partners} staff={masters.staff} defaultYm={ym} />
+        <h2 className="mb-3 font-semibold">派遣をまとめて登録</h2>
+        <BulkGrid
+          clients={masters.clients}
+          partners={masters.partners}
+          staff={masters.staff}
+          defaultDate={`${ym}-01`}
+        />
       </section>
 
       <section className={cardCls}>

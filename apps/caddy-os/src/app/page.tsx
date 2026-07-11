@@ -29,6 +29,12 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <Link href="/dispatches" className="text-sm underline">
             派遣台帳
           </Link>
+          <Link href="/invoices" className="text-sm underline">
+            請求
+          </Link>
+          <Link href="/availability" className="text-sm underline">
+            出勤可否
+          </Link>
           <Link href="/masters" className="text-sm underline">
             マスタ
           </Link>
