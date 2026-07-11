@@ -34,15 +34,19 @@
 - [ ] **development_statuses** に開発状況レコードを作成（CEO AIが進捗把握）
 - [ ] 外部連携が必要なら **connectors** に登録（Webhookは `/api/webhooks/{code}` が受ける）
 
-## 4. 実装手順（標準フロー）
+## 4. 実装手順（標準フロー / DECISIONS #35 scaffold対応）
 
 1. modulesテーブルに行を追加（status: designing）
 2. このテンプレートを埋めて docs/modules/{code}/ に保存
-3. CEO AI Command Centerでプロンプト生成 → 実装AIへ
-4. migration追加（既存テーブル変更は要承認）
-5. apps/genesis 配下 or 独立アプリとして画面実装（DECISIONS #15参照）
-6. development_statuses更新 → status: live でモジュール稼働
-7. CHANGELOG.md・DECISIONS.md更新
+3. **雛形生成**: `npm run new-app -- --name <code>-os --title "<名称>" --prefix <接頭辞> --permission use_<code> --port 3xxx`
+   - 生成物: ログイン・認可（@yozan/core）・レイアウト・`/api/v1/health`・ログアウト（独立アプリの勝ちパターン #30/#33/#34）
+   - 入力面は独立アプリに置き、GENESIS側は閲覧＋承認のみ
+4. migration追加（番号は supabase/migrations/README.md の台帳で最新+1。追加のみ・既存テーブル変更は要承認）
+5. ドメイン機能を実装（金額integer円・時間integer分 #4、論理削除 #5、書込はservice_role+requireActor+監査 #11）
+6. **金額に触れるロジックは tests/ にテストを追加**（node --test。CIが自動実行）
+7. デプロイ: OPERATIONS.md §7「新アプリ デプロイ定型チェックリスト」
+8. development_statuses更新 → status: live でモジュール稼働、vault_systems登録（#26）
+9. CHANGELOG.md・DECISIONS.md更新
 
 ## 5. モジュール別メモ（着手時に具体化）
 

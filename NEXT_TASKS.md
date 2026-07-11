@@ -1,5 +1,13 @@
 # NEXT_TASKS
 
+## 基盤アップグレード（2026-07-11 Phase 0監査済 — 正典: docs/genesis/AUDIT_2026-07-11.md）
+
+UP-1. **ユーザー作業（次回push時・5分）**: ルートで `npm install` → `package-lock.json` を含めてpush → GitHubの「Actions」タブでCIがgreenになるか確認（給与計算バグ修正＋テスト21件＋全アプリビルドが自動検証される）
+UP-2. **既存アプリのpackages/core移行（B-6）**: 1アプリずつ・Vercelビルド確認付き。推奨順: survey-os→reserve-os（最新でコピー元に近い）→legal-os→member-os。着手前に古川さん承認
+UP-3. **現場RUNBOOK作成（B-9）**: docs/modules/*/RUNBOOK.md（member-os受付タブレット / shift-cloud打刻修正 / legal-os契約書登録）。PCに不慣れな人が読んで完了できるレベル
+UP-4. **時給の月中変更対応（B-7・監査D-3）**: wageForが月末時点の賃金を月全体へ適用している。期間按分の要否を古川さんに確認してから着手
+UP-5. 監査で検知された「6月ゴルフ経費未入力」はKPIチェッカー（#37）がデプロイ後、日次レポートに自動表示される → Money OSでの経費取込で解消
+
 ## GENESIS実運用フェーズ（2026-07-05〜）
 
 - 本番: https://yozan-genesis.vercel.app（Vercel `yozan-genesis`、Root: apps/genesis）

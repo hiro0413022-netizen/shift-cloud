@@ -1,6 +1,10 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstDateTime } from "@/lib/util";
+import { autoBreakMinutes } from "@/lib/payroll-calc";
+
+// 純粋ロジックは payroll-calc.ts へ集約（テスト対象）。既存importの互換のため再export。
+export { autoBreakMinutes };
 
 type TimeRecord = {
   id: string;
@@ -8,16 +12,6 @@ type TimeRecord = {
   recorded_at: string;
   correction_of: string | null;
 };
-
-/**
- * 段階式の自動休憩（労基法準拠）。拘束時間(分)から付与する休憩(分)を返す。
- * 労働6時間超 → 45分 / 8時間超 → 60分（9時間なら1時間）。
- */
-export function autoBreakMinutes(spanMinutes: number): number {
-  if (spanMinutes > 8 * 60) return 60;
-  if (spanMinutes > 6 * 60) return 45;
-  return 0;
-}
 
 type RecalcOpts = {
   /**

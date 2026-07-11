@@ -42,19 +42,5 @@ export async function latestCashBalance(companyId: string, storeId: string): Pro
   return b == null ? 0 : Number(b);
 }
 
-/** "1,234" / 全角 → number */
-export function toNum(input: FormDataEntryValue | null): number {
-  if (input == null) return 0;
-  let s = String(input).trim().replace(/[",，\s]/g, "");
-  s = s.replace(/[０-９．－]/g, (c) => "0123456789.-"["０１２３４５６７８９．－".indexOf(c)]);
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/** "YYYY-MM" → その月の月初/翌月初 */
-export function monthRange(ym: string): { from: string; to: string } {
-  const [y, m] = ym.split("-").map(Number);
-  const from = `${y}-${String(m).padStart(2, "0")}-01`;
-  const nm = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-  return { from, to: nm };
-}
+// 純粋ユーティリティは money-util.ts へ集約（テスト対象）。既存importの互換のため再export。
+export { toNum, monthRange } from "@/lib/money-util";

@@ -8,6 +8,7 @@ import {
   type CockpitData,
 } from "@/lib/kernel";
 import { summarizeInquiriesForReport, getInquiryStats } from "@/lib/secretary";
+import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 
 /* ============================================================
    CEO AI — 古川さんの分身（正典: docs/genesis/VISION.md §1/§3/§8）
@@ -186,7 +187,10 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   // 2. データ収集 → 分析（Claude → フォールバック: ルール）
   const d = await getCockpitData(companyId);
   const { score, factors } = computeGenesisScore(d);
-  const judgments = buildJudgmentList(d);
+  // KPI整合性チェック（経費0円月/予測残存/売上急変/目標未設定）を判断リストの先頭に合流
+  // — 「間違った数字でCEO AIが判断する」事故を止める（AUDIT_2026-07-11 D-4）
+  const integrity = await runKpiIntegrityChecks(companyId, d.kpis).catch(() => []);
+  const judgments = [...integrity, ...buildJudgmentList(d)];
   const startedAt = new Date().toISOString();
   const analysis = (await claudeAnalysis(d)) ?? ruleBasedAnalysis(d);
 

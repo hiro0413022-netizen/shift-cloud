@@ -184,3 +184,36 @@ git push origin main
 - **B 体験予約取込**: LINEリッチメニュー「体験予約」→ member-os の入力フォームへ誘導（体験予約数KPIが自動集計）
 - **C 配信**: SNS AIが作ったお知らせを承認 → LINE一斉配信
 - **D Instagram**: 後続
+
+## 7. 新アプリ デプロイ定型チェックリスト（これが正典。個別アプリの手順は§2の各節を参照）
+
+新しい独立アプリ（member-os / survey-os / reserve-os 型）を本番に出すときは、毎回このコピペで終わる。所要 約10分。
+
+**あなたの作業:**
+
+1. **push**: リポジトリのルートで `npm install` → `git add -A` → `git commit`（済みのことが多い）→ `git push`
+2. **Vercel新規プロジェクト作成**: https://vercel.com/new → リポジトリ `yozan-genesis` をImport →
+   - Project Name: アプリ名（例: `reserve-os`）
+   - **Root Directory: `apps/<アプリ名>`**（これを忘れると動かない）
+   - Environment Variables に最低3つ:
+     - `NEXT_PUBLIC_SUPABASE_URL`（既存プロジェクトと同じ値）
+     - `NEXT_PUBLIC_SUPABASE_ANON_KEY`（同上）
+     - `SUPABASE_SERVICE_ROLE_KEY`（同上）
+     - ＋アプリ固有のenv（メール送信ならRESEND系等。各アプリのREADME/NEXT_TASKSに記載）
+   - Deploy を押す
+3. **権限付与**: 使うスタッフに専用権限（`use_reception` / `use_survey` / `use_legal` 等）を付与（§8）。view_hq保持者（あなた）は付与不要で入れる
+4. **動作確認**: ログイン→主要1画面→（公開ページがあれば）公開URLを開く
+
+**Claudeの作業（デプロイ後に依頼）:**
+
+5. `vault_systems` にURL・ID行を登録（#26。パスワードはあなたが /vault で入力）
+6. modulesテーブルを `live` に更新、CHANGELOG/NEXT_TASKSを更新
+
+## 8. 権限の付与手順（use_reception / use_survey / use_legal / view_hq 等）
+
+権限はDBの `roles.permissions`（JSON）にフラグとして入っており、スタッフにはロール経由で付く。
+
+- **一番簡単な方法**: Claudeに「○○さんに use_survey を付けて」と伝える → MCP経由でロール付与のSQLを実行（本番DB変更なのであなたの承認後）
+- **自分でやる場合（Shift Cloud管理画面）**: Shift Cloud → スタッフ管理 → 対象スタッフ → ロール編集 → 該当権限を含むロールを割り当て。該当ロールが無ければ「ロール管理」で新規ロールを作成し permissions に `{"use_survey": true}` 等を設定
+- **注意**: `view_hq` は経営層専用（Genesis本体に入れる権限 #18）。現場スタッフには各アプリの `use_*` だけを付ける
+- 給与系（`view_payroll` / `manage_payroll`）は追加認証付き（#3の例外）。付与は慎重に

@@ -1,0 +1,19 @@
+{
+  "name": "@yozan/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "YOZAN GENESIS 共通コア（auth / kernel / supabase client）。TSソースのまま提供 — 利用側next.config.tsで transpilePackages: ['@yozan/core'] を指定",
+  "exports": {
+    "./auth": "./src/auth.ts",
+    "./kernel": "./src/kernel.ts",
+    "./middleware": "./src/middleware.ts",
+    "./supabase/admin": "./src/supabase/admin.ts",
+    "./supabase/server": "./src/supabase/server.ts"
+  },
+  "peerDependencies": {
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.50.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0"
+  }
+}

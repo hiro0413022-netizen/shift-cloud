@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 2026-07-11 — 基盤アップグレード（Phase 0監査 → B-1〜B-5実装。監査全文: docs/genesis/AUDIT_2026-07-11.md）
+- **fix(shift-cloud): 給与計算の月末日バグ（監査D-1）** — buildPayrollの期間上限が `-31` 固定で、31日が無い月（6月・9月等）はPostgresのdate型エラーで勤怠0件扱い→給与計算失敗の恐れ。`monthRange()`（実在する月末日を算出）へ置換。あわせて丸め×残業の相互作用で通常分が負になり得るケースをガード（D-2）
+- **feat(tests): 金額ロジックの回帰テスト新設（DECISIONS #36）** — `tests/` に21テスト（給与計算 payroll-calc / 自動休憩 / 銀行CSV取込 bankCsv / 科目推測 categorize / 月会費予測SQLの単価表固定）。純粋ロジックを `apps/shift-cloud/src/lib/payroll-calc.ts`・`apps/money-golfwing/src/lib/money-util.ts` に抽出（既存importは再exportで互換維持）。実行は `npm test`（node --test、依存インストール不要）。**21/21 pass検証済**
+- **feat(genesis): KPI整合性チェッカー（DECISIONS #37）** — `src/lib/kpi-checks.ts` 新設、日次cron（runDailyCeoReport）に組込。完了月の経費0円（例:「6月のゴルフ経費が未入力です。利益が過大に見えています」）／forecast残存／売上前月比±50%超／KPI目標未設定 を検知し「今日、古川さんが判断すべきこと」の先頭に表示
+- **feat(ci): GitHub Actions CI新設** — push/PRごとに (1) `npm test` (2) 全Nextアプリ8本のmatrixで `tsc --noEmit`＋`next build`（ダミーenv、実キー不使用 #14）。ローカルtscが信頼できない問題（メモリ記録済）の恒久解
+- **feat(scaffold): アプリ量産の型を固定化（DECISIONS #35、#10の履行）** — `packages/core`（@yozan/core: auth/kernel/supabase/middleware、TSソース提供+transpilePackages）、`templates/app-template`（ログイン・認可・/api/v1・ログアウト完備の雛形）、`scripts/new-app.mjs`（`npm run new-app -- --name xxx-os --prefix xxx ...` で生成、動作検証済）。root package.jsonのworkspacesに `packages/*` 追加
+- **docs**: OPERATIONS §7「新アプリ デプロイ定型チェックリスト」・§8「権限の付与手順」新設／ARCHITECTURE.mdを実態（11アプリ・独立アプリ方式・packages/core・sales-support-saasは別物）に全面書き直し／MODULE_TEMPLATE §4をscaffold手順に更新／supabase/migrations/README.md（採番台帳、重複6ペア凍結、次番号0034〜 #38）／DECISIONS #28・#29の重複採番に【a】【b】注記＋#35〜#38追記
+- **ユーザー作業（次回push時）**: ルートで `npm install` → package-lock.json をコミット（workspaces変更のため。CI/Vercelの再現性向上）→ push → GitHub ActionsのCI結果を確認
+
 ## 2026-07-10（続き）
 - feat(shift-cloud): **休憩の自動計算**を勤怠実績に追加（給与計算に反映）。労基法準拠の段階式＝労働6時間超→45分／8時間超→60分（9時間勤務なら1時間休憩）。休憩の決定順位は「手動上書き＞休憩打刻＞段階式自動」。`src/lib/attendance.ts` に `autoBreakMinutes()` と再計算ロジックを実装。従来は休憩打刻が無いと休憩0＝9時間がそのまま計上されていた問題を解消。
 - feat(shift-cloud): **休憩をあとから修正**可能に。勤怠の修正フォームに「休憩（分）」入力と「自動計算に戻す」チェックを追加。`attendance_days.break_override_minutes`（null=自動）で保持し、`correctAttendance` から設定/解除。勤怠一覧に「手動／自動」表示。DB: migration `0033_attendance_break_override.sql`（**本番qrgpblnnhdudigarrtuz適用済**）。

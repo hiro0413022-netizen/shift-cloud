@@ -6,6 +6,7 @@ import { requireActor, loginIdToEmail } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { grantPayrollAccess } from "@/lib/reauth";
 import { logAudit } from "@/lib/audit";
+import { monthRange, aggregateAttendance, calcPayrollAmounts } from "@/lib/payroll-calc";
 
 /** 再認証: パスワードを確認して15分間の給与アクセスを付与 */
 export async function verifyPayrollAccess(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
@@ -37,7 +38,8 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
   const actor = await requireActor("manage_payroll");
   const admin = createAdmin();
   const ym = String(formData.get("ym"));
-  const from = `${ym}-01`, to = `${ym}-31`;
+  // 旧: `${ym}-31` 固定 → 31日が無い月はdate型エラーで勤怠0件になるバグ（AUDIT_2026-07-11 D-1）
+  const { from, to } = monthRange(ym);
 
   const { data: period } = await admin.from("payroll_periods")
     .upsert({ company_id: actor.companyId, target_month: from }, { onConflict: "company_id,target_month" })
@@ -57,16 +59,7 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
   const rounding = settings.rounding_minutes ?? 0;
   const otRate = settings.overtime_rate ?? 1.25;
 
-  const byStaff = new Map<string, { work: number; overtime: number; daysWorked: number }>();
-  for (const d of days ?? []) {
-    const cur = byStaff.get(d.staff_id) ?? { work: 0, overtime: 0, daysWorked: 0 };
-    let w = d.work_minutes;
-    if (rounding > 0) w = Math.floor(w / rounding) * rounding;
-    cur.work += w;
-    cur.overtime += d.overtime_minutes;
-    if (d.work_minutes > 0) cur.daysWorked += 1;
-    byStaff.set(d.staff_id, cur);
-  }
+  const byStaff = aggregateAttendance(days ?? [], rounding);
 
   function wageFor(staffId: string) {
     return (wages ?? []).find((w) => w.staff_id === staffId && w.effective_from <= to) ?? null;
@@ -75,22 +68,19 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
   const items = [...byStaff.entries()].map(([staffId, agg]) => {
     const w = wageFor(staffId);
     const hourly = w?.hourly_wage ?? 0;
-    const normalMin = agg.work - agg.overtime;
-    const base = Math.floor((normalMin / 60) * hourly);
-    const ot = Math.floor((agg.overtime / 60) * hourly * otRate);
-    const commute = (w?.commute_allowance ?? 0) * agg.daysWorked;
+    const amounts = calcPayrollAmounts(agg, hourly, w?.commute_allowance ?? 0, otRate);
     return {
       company_id: actor.companyId,
       period_id: period.id,
       staff_id: staffId,
       work_minutes: agg.work,
       overtime_minutes: agg.overtime,
-      base_amount: base,
-      overtime_amount: ot,
-      commute_amount: commute,
+      base_amount: amounts.base_amount,
+      overtime_amount: amounts.overtime_amount,
+      commute_amount: amounts.commute_amount,
       allowance_amount: 0,
       deduction_amount: 0,
-      total_amount: base + ot + commute,
+      total_amount: amounts.total_amount,
       detail: { days_worked: agg.daysWorked, hourly_wage: hourly, overtime_rate: otRate, rounding_minutes: rounding },
     };
   });
