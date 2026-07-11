@@ -66,13 +66,13 @@ export default async function RequestDetail({
           </div>
           <Badge tone={STATUS_TONE[status] ?? "default"}>{STATUS_LABEL[status] ?? status}</Badge>
         </div>
-        {status === "confirmed" && r.confirmed_at && (
+        {status === "confirmed" && !!r.confirmed_at && (
           <p className="mt-4 rounded-xl bg-[--color-accent]/8 px-4 py-3 text-sm font-semibold text-[--color-accent]">
             確定日時：{fmtJst(r.confirmed_at as string)}
           </p>
         )}
         <div className="mt-4 flex flex-wrap gap-2">
-          {r.phone && <a href={`tel:${r.phone}`} className="rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm">☎ {String(r.phone)}</a>}
+          {!!r.phone && <a href={`tel:${r.phone}`} className="rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm">☎ {String(r.phone)}</a>}
           {mailto && <a href={mailto} className="rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm">✉ メールで返信</a>}
         </div>
       </div>

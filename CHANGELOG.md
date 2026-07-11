@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-11(2) — CI red修正（初回run #1の全build失敗に対応）
+- **fix: 壊れたpackage-lock.jsonを再生成** — 初回コミットのlockは一部エントリがメタデータ欠落（enhanced-resolve等が`{"dev":true}`のみ）＋lightningcssのLinuxバイナリ全欠落 → CIの`next build`が「Cannot find module 'enhanced-resolve'」で全滅。サンドボックス（Linux/npm 10.9.8）で`--package-lock-only`再生成（全770エントリにversion/resolved/integrity、全プラットフォームバイナリ収録）。corporate buildがgreenになることを実機検証済
+- **fix(legal-os/reserve-os/money-golfwing/member-os): auth.tsのSupabaseネスト型キャスト** — `staff as {...}`直接キャストが新しい型推論（rolesが配列推論）でTS2352 → survey-osと同じ`as unknown as`方式に統一（挙動変更なし）。4アプリの`tsc --noEmit`をLinux実機で検証済
+- **fix(reserve-os): 詳細ページのJSX条件で`unknown`型をそのまま使用** — `r.confirmed_at &&`/`r.phone &&`がTS2322（ReactNode非互換）→ `!!`でboolean化
+- 教訓: **CIは初回から信じられる基準になった**（未デプロイアプリの潜在型エラー2種をVercelより先に検出）
+
 ## 2026-07-11 — 基盤アップグレード（Phase 0監査 → B-1〜B-5実装。監査全文: docs/genesis/AUDIT_2026-07-11.md）
 - **fix(shift-cloud): 給与計算の月末日バグ（監査D-1）** — buildPayrollの期間上限が `-31` 固定で、31日が無い月（6月・9月等）はPostgresのdate型エラーで勤怠0件扱い→給与計算失敗の恐れ。`monthRange()`（実在する月末日を算出）へ置換。あわせて丸め×残業の相互作用で通常分が負になり得るケースをガード（D-2）
 - **feat(tests): 金額ロジックの回帰テスト新設（DECISIONS #36）** — `tests/` に21テスト（給与計算 payroll-calc / 自動休憩 / 銀行CSV取込 bankCsv / 科目推測 categorize / 月会費予測SQLの単価表固定）。純粋ロジックを `apps/shift-cloud/src/lib/payroll-calc.ts`・`apps/money-golfwing/src/lib/money-util.ts` に抽出（既存importは再exportで互換維持）。実行は `npm test`（node --test、依存インストール不要）。**21/21 pass検証済**

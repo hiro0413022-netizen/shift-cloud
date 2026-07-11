@@ -44,7 +44,7 @@ export const getLegalActor = cache(async (): Promise<LegalActor | null> => {
     .single();
   if (!staff || staff.status !== "active") return null;
 
-  const roleRows = ((staff as { staff_roles?: Array<{ deleted_at: string | null; roles: { permissions: Record<string, boolean> } | null }> }).staff_roles ?? [])
+  const roleRows = ((staff as unknown as { staff_roles?: Array<{ deleted_at: string | null; roles: { permissions: Record<string, boolean> } | null }> }).staff_roles ?? [])
     .filter((r) => r.deleted_at == null);
 
   let hasHq = false;
