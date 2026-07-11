@@ -61,6 +61,9 @@ export async function runLegalChecks(companyId: string): Promise<JudgmentItem[]>
             ? "自動更新契約。継続なら何もしない／解約なら通知期限内に相手方へ通知が必要"
             : "更新・終了の方針を決める期日です",
           href: LEGAL_OS_URL,
+          // 期日超過は取り返しがつかない（自動更新が確定する）ため重い（DECISIONS #43）
+          weight: days < 0 ? 10 : 5,
+          scoreLabel: days < 0 ? "契約の期日超過" : "契約の判断期日接近",
         });
         continue; // 同一契約の重複起票を避ける（最重要の1件のみ）
       }
@@ -75,6 +78,8 @@ export async function runLegalChecks(companyId: string): Promise<JudgmentItem[]>
           title: `契約満了が接近: ${label}（あと${days}日）`,
           detail: "更新契約の締結 or 終了処理の判断が必要です",
           href: LEGAL_OS_URL,
+          weight: 5,
+          scoreLabel: "契約満了の接近",
         });
         continue;
       }
@@ -87,6 +92,8 @@ export async function runLegalChecks(companyId: string): Promise<JudgmentItem[]>
         title: `高リスク契約の確認: ${label}`,
         detail: "legal_ai/担当者が高リスクと評価。条項の見直し・専門家相談を検討",
         href: LEGAL_OS_URL,
+        weight: 6,
+        scoreLabel: "高リスク契約",
       });
       continue;
     }
@@ -100,6 +107,8 @@ export async function runLegalChecks(companyId: string): Promise<JudgmentItem[]>
           title: `契約書の確認待ちが滞留: ${label}（${staleDays}日）`,
           detail: "legal_aiの抽出提案が未確認のまま。Legal OSで内容を確定してください",
           href: LEGAL_OS_URL,
+          weight: 2,
+          scoreLabel: "契約書の確認滞留",
         });
       }
     }

@@ -110,6 +110,15 @@ export type JudgmentItem = {
   title: string;
   detail?: string;
   href: string;
+  /**
+   * 全体スコアからの減点（省略＝0点）。DECISIONS #43。
+   * computeGenesisScore が見ない外部チェック（KPI整合性・法務）が、
+   * 自分の重みを申告してスコアに反映させるための欄。
+   * これが無いと「判断リストに警告3件あるのにスコア100点」になる。
+   */
+  weight?: number;
+  /** スコアの説明（factors）に出す短いラベル。weight>0のとき必須相当 */
+  scoreLabel?: string;
 };
 
 export type GenesisScore = {
@@ -169,6 +178,36 @@ export function computeGenesisScore(d: CockpitData): GenesisScore {
   if (missed > 0) {
     score -= missed * 8;
     factors.push(`5大KPI目標未達${missed}件 (-${missed * 8})`);
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const grade = score >= 80 ? "good" : score >= 60 ? "watch" : "danger";
+  return { score, grade, factors };
+}
+
+/**
+ * 外部チェック（KPI整合性 #37 / 法務 #40）の判断項目をスコアへ反映する（DECISIONS #43）。
+ * computeGenesisScore は CockpitData しか見ないため、これらは従来スコアに載らず
+ * 「警告が出ているのに100点」という事故が起きていた（2026-07-11 発見）。
+ *
+ * 数字の整合性違反は「経営判断の土台が嘘」なので最も重い減点にする。
+ */
+export function applyJudgmentPenalties(base: GenesisScore, items: JudgmentItem[]): GenesisScore {
+  let score = base.score;
+  const factors = [...base.factors];
+
+  // 同じラベルはまとめて「〇〇2件 (-24)」と出す（説明可能性）
+  const byLabel = new Map<string, { count: number; total: number }>();
+  for (const it of items) {
+    const w = Number(it.weight ?? 0);
+    if (!Number.isFinite(w) || w <= 0) continue;
+    const label = it.scoreLabel ?? "要対応";
+    const cur = byLabel.get(label) ?? { count: 0, total: 0 };
+    byLabel.set(label, { count: cur.count + 1, total: cur.total + w });
+  }
+  for (const [label, v] of byLabel) {
+    score -= v.total;
+    factors.push(`${label}${v.count}件 (-${v.total})`);
   }
 
   score = Math.max(0, Math.min(100, score));

@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { requireGenesisActor } from "@/lib/auth";
-import { getCockpitData, computeGenesisScore, buildJudgmentList, getBusinessBreakdown } from "@/lib/kernel";
+import {
+  getCockpitData,
+  computeGenesisScore,
+  applyJudgmentPenalties,
+  buildJudgmentList,
+  getBusinessBreakdown,
+} from "@/lib/kernel";
+import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
+import { runLegalChecks } from "@/lib/legal-checks";
 import { Panel, Badge, StatusDot, Empty, fmtDate, severityTone, KpiCard } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { BusinessBreakdown } from "@/components/business-breakdown";
@@ -13,8 +21,15 @@ export default async function CockpitPage() {
     getCockpitData(actor.companyId),
     getBusinessBreakdown(actor.companyId),
   ]);
-  const { score, grade, factors } = computeGenesisScore(d);
-  const judgments = buildJudgmentList(d);
+  // ダッシュボードも日次レポートと同じ判断リスト/スコアを出す（DECISIONS #43）。
+  // 以前はここが buildJudgmentList だけで、整合性・法務の警告がトップ画面に出ず、
+  // スコアも満点のままだった（レポートとダッシュボードで数字が食い違っていた）。
+  const [integrity, legal] = await Promise.all([
+    runKpiIntegrityChecks(actor.companyId, d.kpis).catch(() => []),
+    runLegalChecks(actor.companyId).catch(() => []),
+  ]);
+  const judgments = [...integrity, ...legal, ...buildJudgmentList(d)];
+  const { score, grade, factors } = applyJudgmentPenalties(computeGenesisScore(d), judgments);
 
   const openHigh = d.risks.filter((r) => ["high", "critical"].includes(String(r.severity))).length;
   const pendingApprovals = d.approvals.length;

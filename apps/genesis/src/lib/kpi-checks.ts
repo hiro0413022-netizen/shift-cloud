@@ -17,6 +17,14 @@ import type { JudgmentItem } from "@/lib/kernel";
 
 const CORE_KPI_CODES = ["monthly_sales", "members", "trial_bookings", "churn_rate", "labor_cost_ratio"];
 
+/**
+ * スコア減点の重み（DECISIONS #43）。
+ * 数字の整合性違反＝「経営判断の土台が嘘」なので、ブロッカー(-10)より重い -12。
+ * 目標未設定は1KPIあたり -4（5件全部なら -20）。
+ */
+const INTEGRITY_WEIGHT = 12;
+const NO_TARGET_WEIGHT = 4;
+
 type FinRow = {
   segment_id: string;
   target_month: string;
@@ -81,6 +89,8 @@ export async function runKpiIntegrityChecks(
         title: `⚠数字の整合性: ${ymLabel(v.month)}の${v.segName}経費が未入力です`,
         detail: `売上${Math.round(v.revenue).toLocaleString("ja-JP")}円に対し経費0円 → 利益が過大に見えています。Money OS/財務入力で経費を取り込んでください`,
         href: "/finance",
+        weight: INTEGRITY_WEIGHT,
+        scoreLabel: "数字の整合性",
       });
     }
   }
@@ -93,6 +103,8 @@ export async function runKpiIntegrityChecks(
         title: `⚠数字の整合性: ${ymLabel(v.month)}の${v.segName}に予測値が残っています`,
         detail: `月会費等${Math.round(v.forecastAmount).toLocaleString("ja-JP")}円が予測(forecast)のまま。実績（ファイン等）を取り込むと自動で置換されます`,
         href: "/finance",
+        weight: INTEGRITY_WEIGHT,
+        scoreLabel: "数字の整合性",
       });
     }
   }
@@ -116,6 +128,8 @@ export async function runKpiIntegrityChecks(
           title: `⚠数字の整合性: 売上が前月比${ratio > 1 ? "+" : ""}${Math.round((ratio - 1) * 100)}%（${ymLabel(prev)}→${ymLabel(last)}）`,
           detail: `${Math.round(prevRev).toLocaleString("ja-JP")}円 → ${Math.round(lastRev).toLocaleString("ja-JP")}円。入力漏れ・二重計上・実態の急変のいずれかを確認してください`,
           href: "/finance",
+          weight: INTEGRITY_WEIGHT,
+          scoreLabel: "数字の整合性",
         });
       }
     }
@@ -135,6 +149,8 @@ export async function runKpiIntegrityChecks(
       title: `KPI目標値の設定: ${names}（${noTarget.length}件）が未設定です`,
       detail: "目標が無いと全体スコアと未達検知が機能しません。Command Centerの「KPI手動更新」で設定してください",
       href: "/command",
+      weight: NO_TARGET_WEIGHT * noTarget.length,
+      scoreLabel: "5大KPI目標未設定",
     });
   }
 

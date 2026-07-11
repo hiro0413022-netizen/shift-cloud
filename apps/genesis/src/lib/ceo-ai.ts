@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import {
   getCockpitData,
   computeGenesisScore,
+  applyJudgmentPenalties,
   buildJudgmentList,
   logEvent,
   type CockpitData,
@@ -194,13 +195,15 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
 
   // 2. データ収集 → 分析（Claude → フォールバック: ルール）
   const d = await getCockpitData(companyId);
-  const { score, factors } = computeGenesisScore(d);
   // KPI整合性チェック（経費0円月/予測残存/売上急変/目標未設定）を判断リストの先頭に合流
   // — 「間違った数字でCEO AIが判断する」事故を止める（AUDIT_2026-07-11 D-4）
   const integrity = await runKpiIntegrityChecks(companyId, d.kpis).catch(() => []);
   // 契約の期限・リスク（Legal OS フェーズ2a）も判断リストへ合流
   const legal = await runLegalChecks(companyId).catch(() => []);
   const judgments = [...integrity, ...legal, ...buildJudgmentList(d)];
+  // スコアは整合性・法務の警告も反映する（DECISIONS #43）。
+  // 反映しないと「判断リストに警告3件あるのにスコア100点」になり、朝の一目で安心してしまう。
+  const { score, factors } = applyJudgmentPenalties(computeGenesisScore(d), judgments);
   const startedAt = new Date().toISOString();
   const analysis = (await claudeAnalysis(d)) ?? ruleBasedAnalysis(d);
 
