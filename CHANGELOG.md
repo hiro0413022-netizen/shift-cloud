@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2026-07-11(4) — UP-3/UP-4: 現場RUNBOOK＋時給の月中変更対応
+- **feat(shift-cloud): 時給の月中変更を日付按分（DECISIONS #39・監査D-3）** — `calcMonthlyPayroll`/`wageOnDate` を payroll-calc.ts に追加し buildPayroll を置換。日ごとに有効な時給・交通費で計算し、レート別内訳を `payroll_items.detail.wage_periods`（from/to日付つき）へ保存。賃金開始日前の勤務日は最古の賃金へフォールバック（0円事故防止）。**単一時給は従来と完全一致**（equivalenceテストで固定）。テスト5件追加（計26件・全pass）、shift-cloudのtsc+buildをLinux実機で検証済
+- **docs(RUNBOOK): 現場向け手順書3本を新設** — `docs/modules/member-os/RUNBOOK.md`（受付タブレットの朝の準備〜入会処理〜Excel出力）、`docs/modules/workforce-os/RUNBOOK.md`（iPad打刻・打刻修正・休憩上書き・打刻端末メモ・月末前チェック）、`docs/modules/legal-os/RUNBOOK.md`（契約書登録・経理系との切り分け・期限管理）。PCに不慣れな人向け・困ったとき表つき
+
 ## 2026-07-11(3) — UP-2: 既存4アプリを @yozan/core へ移行（NEXT_TASKS UP-2、古川さん承認済）
 - **refactor(survey-os/reserve-os/member-os/legal-os): 共通コードをpackages/coreへ集約** — 各アプリの supabase/admin・supabase/server・kernel を薄い再export化、auth を `createActorResolver` ラッパー化（survey/reserve/member。既存のexport名・挙動は不変）。legal-os の auth はカスタムロール解決（leg_grants）のため据え置き。middleware は `createAuthMiddleware` 化
 - **fix(core/template): middlewareのmatcherはリテラル必須** — Next.jsがconfigを静的解析するため `AUTH_MIDDLEWARE_MATCHER` のimport参照はビルドエラー。4アプリ・templates/app-template ともインラインリテラルへ（テンプレートの潜在バグをCI前に検出）

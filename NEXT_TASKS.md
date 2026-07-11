@@ -2,10 +2,10 @@
 
 ## 基盤アップグレード（2026-07-11 Phase 0監査済 — 正典: docs/genesis/AUDIT_2026-07-11.md）
 
-UP-1. **ユーザー作業（5分）**: 最新コミットをpush → GitHubの「Actions」タブでCIがgreenになるか確認。※初回run #1のredは修正済み（壊れたlockの再生成＋型エラー3件。CHANGELOG 2026-07-11(2)）。**ローカルで`npm install`し直す場合は、lockが変わったので先に`git pull`（またはこのコミットの取り込み）を行うこと**
+UP-1. ~~push→CI green確認~~ ✅完了（2026-07-11、run #2 green・UP-2デプロイも動作確認済）
 UP-2. ~~既存アプリのpackages/core移行（B-6）~~ ✅完了（2026-07-11、4アプリ移行・Linux実機で全build検証済）。残: push後に member-os / legal-os のVercelデプロイ成功を確認（本番稼働中のため）。money-golfwing / shift-cloud / genesis の移行は後続（authの形が異なるため個別設計）
-UP-3. **現場RUNBOOK作成（B-9）**: docs/modules/*/RUNBOOK.md（member-os受付タブレット / shift-cloud打刻修正 / legal-os契約書登録）。PCに不慣れな人が読んで完了できるレベル
-UP-4. **時給の月中変更対応（B-7・監査D-3）**: wageForが月末時点の賃金を月全体へ適用している。期間按分の要否を古川さんに確認してから着手
+UP-3. ~~現場RUNBOOK作成（B-9）~~ ✅完了（2026-07-11、member-os/workforce-os/legal-osの3本。**現場スタッフへの共有はユーザー作業**＝印刷 or URL共有）
+UP-4. ~~時給の月中変更対応（B-7・監査D-3）~~ ✅完了（2026-07-11、日付按分 DECISIONS #39。給与画面のdetailにレート別内訳wage_periodsが残る）
 UP-5. 監査で検知された「6月ゴルフ経費未入力」はKPIチェッカー（#37）がデプロイ後、日次レポートに自動表示される → Money OSでの経費取込で解消
 
 ## GENESIS実運用フェーズ（2026-07-05〜）

@@ -6,7 +6,7 @@ import { requireActor, loginIdToEmail } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { grantPayrollAccess } from "@/lib/reauth";
 import { logAudit } from "@/lib/audit";
-import { monthRange, aggregateAttendance, calcPayrollAmounts } from "@/lib/payroll-calc";
+import { monthRange, calcMonthlyPayroll, type WageRow } from "@/lib/payroll-calc";
 
 /** 再認証: パスワードを確認して15分間の給与アクセスを付与 */
 export async function verifyPayrollAccess(_prev: { error?: string }, formData: FormData): Promise<{ error?: string }> {
@@ -59,29 +59,36 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
   const rounding = settings.rounding_minutes ?? 0;
   const otRate = settings.overtime_rate ?? 1.25;
 
-  const byStaff = aggregateAttendance(days ?? [], rounding);
+  // 日付按分: 日ごとに「その日に有効な時給」で計算（月中の時給変更に対応 / DECISIONS #39）
+  const results = calcMonthlyPayroll(
+    (days ?? []) as Array<{ staff_id: string; date: string; work_minutes: number; overtime_minutes: number }>,
+    (wages ?? []) as WageRow[],
+    rounding,
+    otRate
+  );
 
-  function wageFor(staffId: string) {
-    return (wages ?? []).find((w) => w.staff_id === staffId && w.effective_from <= to) ?? null;
-  }
-
-  const items = [...byStaff.entries()].map(([staffId, agg]) => {
-    const w = wageFor(staffId);
-    const hourly = w?.hourly_wage ?? 0;
-    const amounts = calcPayrollAmounts(agg, hourly, w?.commute_allowance ?? 0, otRate);
+  const items = [...results.entries()].map(([staffId, r]) => {
     return {
       company_id: actor.companyId,
       period_id: period.id,
       staff_id: staffId,
-      work_minutes: agg.work,
-      overtime_minutes: agg.overtime,
-      base_amount: amounts.base_amount,
-      overtime_amount: amounts.overtime_amount,
-      commute_amount: amounts.commute_amount,
+      work_minutes: r.work,
+      overtime_minutes: r.overtime,
+      base_amount: r.base_amount,
+      overtime_amount: r.overtime_amount,
+      commute_amount: r.commute_amount,
       allowance_amount: 0,
       deduction_amount: 0,
-      total_amount: amounts.total_amount,
-      detail: { days_worked: agg.daysWorked, hourly_wage: hourly, overtime_rate: otRate, rounding_minutes: rounding },
+      total_amount: r.total_amount,
+      detail: {
+        days_worked: r.daysWorked,
+        // 互換: 従来の単一時給表示（複数レートの月は時系列で最後=最新レート）
+        hourly_wage: r.periods.length ? r.periods[r.periods.length - 1].hourly_wage : 0,
+        overtime_rate: otRate,
+        rounding_minutes: rounding,
+        // 月中の時給変更があった場合のレート別内訳（監査・説明可能性）
+        wage_periods: r.periods,
+      },
     };
   });
 

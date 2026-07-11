@@ -63,6 +63,122 @@ export type PayrollAmounts = {
   total_amount: number;
 };
 
+/* ============================================================
+   時給の月中変更対応（日付按分 / AUDIT D-3・DECISIONS #39）
+   旧実装は「月末時点で有効な賃金」を月全体に適用していたため、
+   月中の時給変更が変更前の日にも遡及していた。
+   新実装: 日ごとに「その日に有効な賃金」を引き、レート別に集計して合算する。
+   単一時給のスタッフは従来と完全に同一の結果になる（テストで固定）。
+   ============================================================ */
+
+export type WageRow = {
+  staff_id: string;
+  hourly_wage: number;
+  commute_allowance: number | null;
+  effective_from: string; // YYYY-MM-DD
+};
+
+/**
+ * その日に有効な賃金（effective_from <= date の最新）。
+ * 該当が無い場合（賃金行の開始日より前の勤務日）は、そのスタッフの最古の賃金行へ
+ * フォールバックする — 旧実装は月末時点の賃金を全日に適用していたため、
+ * 「時給登録が勤務より後日だった」ケースで突然0円にならないようにする安全策。
+ */
+export function wageOnDate(wages: WageRow[], staffId: string, date: string): WageRow | null {
+  let best: WageRow | null = null;
+  let earliest: WageRow | null = null;
+  for (const w of wages) {
+    if (w.staff_id !== staffId) continue;
+    if (!earliest || w.effective_from < earliest.effective_from) earliest = w;
+    if (w.effective_from > date) continue;
+    if (!best || w.effective_from > best.effective_from) best = w;
+  }
+  return best ?? earliest;
+}
+
+export type WagePeriodBreakdown = {
+  hourly_wage: number;
+  commute_allowance: number;
+  from_date: string; // このレートが適用された最初の勤務日
+  to_date: string; // 同・最後の勤務日
+  work_minutes: number;
+  overtime_minutes: number;
+  days_worked: number;
+  base_amount: number;
+  overtime_amount: number;
+  commute_amount: number;
+};
+
+export type MonthlyPayrollResult = StaffAggregate &
+  PayrollAmounts & { periods: WagePeriodBreakdown[] };
+
+/**
+ * 月次給与計算（スタッフ別・時給レート別の按分つき）。
+ * - 日次丸め（roundDailyWork）→ レート別に集計 → レートごとに calcPayrollAmounts → 合算
+ * - 交通費/日もその日に有効な賃金の commute_allowance を使う
+ */
+export function calcMonthlyPayroll(
+  days: Array<DayAttendance & { date: string }>,
+  wages: WageRow[],
+  roundingMinutes: number,
+  overtimeRate: number
+): Map<string, MonthlyPayrollResult> {
+  // staffId → レートキー → 集計
+  type Bucket = { hourly: number; commute: number; from: string; to: string; agg: StaffAggregate };
+  const byStaff = new Map<string, Map<string, Bucket>>();
+  for (const d of days) {
+    const w = wageOnDate(wages, d.staff_id, d.date);
+    const hourly = w?.hourly_wage ?? 0;
+    const commute = w?.commute_allowance ?? 0;
+    const key = `${hourly}|${commute}`;
+    const staffBuckets = byStaff.get(d.staff_id) ?? new Map<string, Bucket>();
+    const bucket =
+      staffBuckets.get(key) ??
+      { hourly, commute, from: d.date, to: d.date, agg: { work: 0, overtime: 0, daysWorked: 0 } };
+    bucket.agg.work += roundDailyWork(d.work_minutes, roundingMinutes);
+    bucket.agg.overtime += d.overtime_minutes;
+    if (d.work_minutes > 0) bucket.agg.daysWorked += 1;
+    if (d.date < bucket.from) bucket.from = d.date;
+    if (d.date > bucket.to) bucket.to = d.date;
+    staffBuckets.set(key, bucket);
+    byStaff.set(d.staff_id, staffBuckets);
+  }
+
+  const results = new Map<string, MonthlyPayrollResult>();
+  for (const [staffId, buckets] of byStaff) {
+    const r: MonthlyPayrollResult = {
+      work: 0, overtime: 0, daysWorked: 0,
+      base_amount: 0, overtime_amount: 0, commute_amount: 0, total_amount: 0,
+      periods: [],
+    };
+    const sorted = [...buckets.values()].sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+    for (const b of sorted) {
+      const a = calcPayrollAmounts(b.agg, b.hourly, b.commute, overtimeRate);
+      r.work += b.agg.work;
+      r.overtime += b.agg.overtime;
+      r.daysWorked += b.agg.daysWorked;
+      r.base_amount += a.base_amount;
+      r.overtime_amount += a.overtime_amount;
+      r.commute_amount += a.commute_amount;
+      r.total_amount += a.total_amount;
+      r.periods.push({
+        hourly_wage: b.hourly,
+        commute_allowance: b.commute,
+        from_date: b.from,
+        to_date: b.to,
+        work_minutes: b.agg.work,
+        overtime_minutes: b.agg.overtime,
+        days_worked: b.agg.daysWorked,
+        base_amount: a.base_amount,
+        overtime_amount: a.overtime_amount,
+        commute_amount: a.commute_amount,
+      });
+    }
+    results.set(staffId, r);
+  }
+  return results;
+}
+
 /**
  * スタッフ1名分の支給額計算。
  * - 通常分 = max(0, 丸め後実働合計 - 残業合計)。丸めで実働が残業を下回るケースの負値ガード（監査D-2）
