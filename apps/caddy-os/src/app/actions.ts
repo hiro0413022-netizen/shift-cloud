@@ -97,24 +97,27 @@ export async function saveDispatch(fd: FormData): Promise<{ error?: string }> {
   return {};
 }
 
-export async function deleteDispatch(fd: FormData): Promise<{ error?: string }> {
+/**
+ * 削除（論理削除）。
+ * Server Component の <form action={...}> に直接渡すため **戻り値は void**
+ * （Next.jsの型: (formData: FormData) => void | Promise<void>）。
+ */
+export async function deleteDispatch(fd: FormData): Promise<void> {
   const actor = await requireActor();
   const id = String(fd.get("id") ?? "");
   const ym = String(fd.get("ym") ?? "");
-  if (!id) return { error: "idが必要です" };
+  if (!id) return;
 
   const admin = createAdmin();
-  const { error } = await admin
+  await admin
     .from("cad_dispatches")
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id)
     .eq("company_id", actor.companyId);
-  if (error) return { error: error.message };
 
   await refreshFinance(actor.companyId, ym);
   revalidatePath("/");
   revalidatePath("/dispatches");
-  return {};
 }
 
 /** 台帳 → fin_entries（月次PL）へ集計。Genesisの事業別PL・KPIがこれを読む */
@@ -126,9 +129,9 @@ async function refreshFinance(companyId: string, ym: string) {
   });
 }
 
-export async function refreshFinanceAction(fd: FormData): Promise<{ error?: string }> {
+/** 財務へ再集計（同上・Server Componentのformから呼ぶため戻り値はvoid） */
+export async function refreshFinanceAction(fd: FormData): Promise<void> {
   const actor = await requireActor();
   await refreshFinance(actor.companyId, String(fd.get("ym") ?? ""));
   revalidatePath("/");
-  return {};
 }
