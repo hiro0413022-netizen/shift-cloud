@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Radar } from "@/components/radar";
+import type { Phases } from "@/lib/phases";
+import { ShareVideo } from "./share-video";
 
 /**
  * 生徒向けマイページ（DECISIONS #50 / PGA NOTEユーザーアプリ準拠・青×白テーマ）
@@ -31,7 +33,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
   const [{ data: videos }, { data: items }, { data: prog }, { data: models }] = await Promise.all([
     admin
       .from("lsn_videos")
-      .select("id, storage_path, shot_at, club, distance_yd, note, is_best, created_at")
+      .select("id, storage_path, shot_at, club, distance_yd, note, is_best, phases, created_at")
       .eq("student_id", student.id)
       .is("deleted_at", null)
       .order("shot_at", { ascending: false })
@@ -138,7 +140,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
                 {v.is_best && <span className="ml-auto text-[#c9a545]">★ ベストスイング</span>}
               </div>
               {videoUrls.get(v.id) && (
-                <video src={videoUrls.get(v.id)!} controls playsInline preload="metadata" className="max-h-96 w-full bg-black" />
+                <ShareVideo src={videoUrls.get(v.id)!} phases={(v.phases as Phases | null) ?? null} />
               )}
               <div className="space-y-2 px-4 py-3">
                 {v.note && <p className="text-xs text-gray-500">{v.note}</p>}

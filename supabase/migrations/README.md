@@ -31,3 +31,4 @@
 
 - `0028_golfwing_membership_forecast.sql` — 月会費予測の単価表・課金ルール（tests/membership-forecast-sql.test.ts が固定）
 - `0008_kpi_real_data.sql` / `0029_finance_kpis_completed_month.sql` — KPI集計
+- `0044_lesson_os_phases.sql` — Lesson OS: lsn_videos.phases（スイング7フェーズの秒数JSONB）/ duration_sec / source、lsn_model_videosにも同様（#51）

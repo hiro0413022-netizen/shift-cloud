@@ -2,6 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { CLUBS, type Annotations } from "@/lib/lesson";
+import type { Phases } from "@/lib/phases";
+import { SwingRecorder, type Captured } from "./swing-recorder";
 import { VideoPlayer } from "./video-player";
 import { CompareView, type CompareSource } from "./compare-view";
 import { ProgressPanel, type ProgressItem } from "./progress-panel";
@@ -26,6 +28,7 @@ export type VideoItem = {
   isBest: boolean;
   uploadedBy: string;
   annotations: Annotations | null;
+  phases: Phases | null;
   comments: { id: string; body: string; coach: string; at: string }[];
 };
 
@@ -69,6 +72,8 @@ export function KarteClient({
   const [openVideo, setOpenVideo] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [recOpen, setRecOpen] = useState(false);
+  const [captured, setCaptured] = useState<Captured | null>(null);
   const [pending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -76,16 +81,18 @@ export function KarteClient({
   const distRef = useRef<HTMLInputElement>(null);
   const noteRef = useRef<HTMLInputElement>(null);
 
+  /** 撮影モジュールで撮った動画 or 選択したファイルを登録（フェーズは撮影時に自動推定済み） */
   const upload = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) { setMsg("動画を選択してください"); return; }
+    const blob: Blob | undefined = captured?.blob ?? fileRef.current?.files?.[0];
+    if (!blob) { setMsg("撮影するか、動画を選択してください"); return; }
+    const name = captured ? `swing_${Date.now()}.${captured.ext}` : (blob as File).name;
     setBusy(true);
     setProgressText("準備中…");
     try {
-      const r = await createVideoUploadUrl(student.id, file.name, file.size);
+      const r = await createVideoUploadUrl(student.id, name, blob.size);
       if (!r.url || !r.path) { setMsg(r.error ?? "URL発行に失敗しました"); return; }
-      setProgressText(`アップロード中…（${(file.size / 1024 / 1024).toFixed(1)}MB）`);
-      const res = await fetch(r.url, { method: "PUT", headers: { "Content-Type": file.type || "video/mp4" }, body: file });
+      setProgressText(`アップロード中…（${(blob.size / 1024 / 1024).toFixed(1)}MB）`);
+      const res = await fetch(r.url, { method: "PUT", headers: { "Content-Type": blob.type || "video/mp4" }, body: blob });
       if (!res.ok) { setMsg(`アップロードに失敗しました（${res.status}）`); return; }
       const reg = await registerVideo(student.id, {
         path: r.path,
@@ -93,10 +100,16 @@ export function KarteClient({
         club: clubRef.current?.value || undefined,
         distanceYd: distRef.current?.value ? Number(distRef.current.value) : undefined,
         note: noteRef.current?.value || undefined,
-        size: file.size,
+        size: blob.size,
+        phases: captured?.phases ?? null,
+        duration: captured?.duration,
+        source: captured ? "recorder" : "upload",
       });
       setMsg(reg.error ?? "スイングを登録しました");
-      if (!reg.error && fileRef.current) fileRef.current.value = "";
+      if (!reg.error) {
+        if (fileRef.current) fileRef.current.value = "";
+        if (captured) { URL.revokeObjectURL(captured.url); setCaptured(null); }
+      }
     } catch {
       setMsg("通信エラー。もう一度お試しください");
     } finally {
@@ -188,9 +201,32 @@ export function KarteClient({
         <div className="space-y-4">
           {/* スイング撮影・登録 */}
           <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
-            <p className="mb-3 text-sm font-medium text-(--color-gold)">スイング撮影・登録（スマホはその場で撮影できます）</p>
+            <p className="mb-3 text-sm font-medium text-(--color-gold)">スイング撮影・登録</p>
+
+            {/* 撮影モジュール（アプリ内カメラ） */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button onClick={() => setRecOpen(true)} className="btn-gold">📹 その場で撮影</button>
+              <span className="text-xs text-(--color-dim)">ガイド線・カウントダウン・自動停止つき。撮ると同時にフェーズを自動マーク</span>
+            </div>
+            {captured && (
+              <div className="mb-3 flex items-center gap-3 rounded-lg border border-(--color-active) bg-(--color-panel-2) p-2">
+                <video src={captured.url} muted playsInline loop autoPlay className="h-20 w-32 rounded bg-black object-contain" />
+                <div className="min-w-0 flex-1 text-xs">
+                  <p className="text-(--color-active)">撮影済み（{(captured.blob.size / 1024 / 1024).toFixed(1)}MB）— 下の「登録」で保存されます</p>
+                  <p className="text-(--color-dim)">
+                    {captured.phases?._method === "audio"
+                      ? "打球音からインパクトを検出済み"
+                      : captured.phases
+                      ? "フェーズは仮置き（再生画面で調整してください）"
+                      : "フェーズ未設定"}
+                  </p>
+                </div>
+                <button onClick={() => { URL.revokeObjectURL(captured.url); setCaptured(null); }} className="btn-ghost !py-1.5 text-xs">破棄</button>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-              <input ref={fileRef} type="file" accept="video/*" className="col-span-2 text-sm file:mr-3 file:rounded-lg file:border file:border-(--color-line) file:bg-(--color-panel-2) file:px-3 file:py-1.5 file:text-sm file:text-(--color-txt) md:col-span-1" />
+              <input ref={fileRef} type="file" accept="video/*" disabled={!!captured} className="col-span-2 text-sm file:mr-3 file:rounded-lg file:border file:border-(--color-line) file:bg-(--color-panel-2) file:px-3 file:py-1.5 file:text-sm file:text-(--color-txt) disabled:opacity-40 md:col-span-1" />
               <input ref={dateRef} type="date" defaultValue={new Date().toISOString().slice(0, 10)} className="input-dark" />
               <select ref={clubRef} className="input-dark" defaultValue="">
                 <option value="">クラブ</option>
@@ -203,6 +239,18 @@ export function KarteClient({
               <button onClick={upload} disabled={busy} className="btn-gold">{busy ? progressText ?? "処理中…" : "⬆ 登録"}</button>
             </div>
           </div>
+
+          {recOpen && (
+            <SwingRecorder
+              onClose={() => setRecOpen(false)}
+              onDone={(c) => {
+                if (captured) URL.revokeObjectURL(captured.url);
+                setCaptured(c);
+                setRecOpen(false);
+                setMsg("撮影しました。クラブ・飛距離を入れて「登録」してください");
+              }}
+            />
+          )}
 
           {/* 動画タイムライン */}
           {videos.length === 0 && <p className="text-sm text-(--color-dim)">まだスイングがありません</p>}
@@ -219,7 +267,7 @@ export function KarteClient({
 
               {openVideo === v.id && playUrls[v.id] ? (
                 <div className="mt-3">
-                  <VideoPlayer videoId={v.id} src={playUrls[v.id]} initial={v.annotations} />
+                  <VideoPlayer videoId={v.id} src={playUrls[v.id]} initial={v.annotations} initialPhases={v.phases} />
                 </div>
               ) : (
                 <button onClick={() => open(v.id)} disabled={pending} className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg border border-(--color-line) bg-black/40 py-6 text-sm text-(--color-dim) hover:text-(--color-txt) disabled:opacity-40">

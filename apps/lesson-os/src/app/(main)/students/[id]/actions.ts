@@ -6,6 +6,7 @@ import { requireLessonActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { encSeg } from "@/lib/libkey";
 import type { Annotations } from "@/lib/lesson";
+import { sanitizePhases, type Phases } from "@/lib/phases";
 
 /**
  * 生徒カルテのアクション（DECISIONS #49/#50）
@@ -46,7 +47,17 @@ export async function createVideoUploadUrl(
 
 export async function registerVideo(
   studentId: string,
-  input: { path: string; shotAt?: string; club?: string; distanceYd?: number; note?: string; size?: number }
+  input: {
+    path: string;
+    shotAt?: string;
+    club?: string;
+    distanceYd?: number;
+    note?: string;
+    size?: number;
+    phases?: Phases | null;
+    duration?: number;
+    source?: "recorder" | "upload";
+  }
 ): Promise<{ error?: string }> {
   const { actor, admin, ok } = await ownStudent(studentId);
   if (!ok) return { error: "生徒が見つかりません" };
@@ -60,10 +71,39 @@ export async function registerVideo(
     distance_yd: input.distanceYd && input.distanceYd > 0 ? Math.floor(input.distanceYd) : null,
     note: input.note?.trim().slice(0, 500) || null,
     size_bytes: input.size ?? null,
+    phases: input.phases ? sanitizePhases(input.phases, input.duration) : {},
+    duration_sec: input.duration && input.duration > 0 ? Number(input.duration.toFixed(2)) : null,
+    source: input.source ?? "upload",
     uploaded_by: actor.staffId,
   });
   if (error) return { error: error.message };
   revalidatePath(`/students/${studentId}`);
+  return {};
+}
+
+/** スイングフェーズ（アドレス〜フィニッシュの秒数）の保存 — 自動推定の結果も手動調整もここを通る */
+export async function savePhases(
+  videoId: string,
+  phases: Phases,
+  duration?: number
+): Promise<{ error?: string }> {
+  const actor = await requireLessonActor();
+  const admin = createAdmin();
+  const { data: video } = await admin
+    .from("lsn_videos")
+    .select("id, student_id, company_id")
+    .eq("id", videoId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!video || video.company_id !== actor.companyId) return { error: "動画が見つかりません" };
+  const patch: Record<string, unknown> = {
+    phases: sanitizePhases(phases, duration),
+    updated_at: new Date().toISOString(),
+  };
+  if (duration && duration > 0) patch.duration_sec = Number(duration.toFixed(2));
+  const { error } = await admin.from("lsn_videos").update(patch).eq("id", video.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/students/${video.student_id}`);
   return {};
 }
 

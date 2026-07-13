@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireLessonActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import type { Annotations } from "@/lib/lesson";
+import type { Phases } from "@/lib/phases";
 import { KarteClient, type VideoItem, type StudentData } from "./karte-client";
 import type { CompareSource } from "./compare-view";
 import type { ProgressItem } from "./progress-panel";
@@ -25,7 +26,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
   const [{ data: videos }, { data: items }, { data: prog }, { data: models }] = await Promise.all([
     admin
       .from("lsn_videos")
-      .select("id, shot_at, club, distance_yd, note, is_best, annotations, created_at, staff:uploaded_by(name)")
+      .select("id, shot_at, club, distance_yd, note, is_best, annotations, phases, created_at, staff:uploaded_by(name)")
       .eq("student_id", id)
       .is("deleted_at", null)
       .order("shot_at", { ascending: false })
@@ -66,6 +67,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     isBest: v.is_best,
     uploadedBy: (v.staff as unknown as { name: string } | null)?.name ?? "",
     annotations: (v.annotations as Annotations | null) ?? null,
+    phases: (v.phases as Phases | null) ?? null,
     comments: (comments ?? [])
       .filter((c) => c.video_id === v.id)
       .map((c) => ({

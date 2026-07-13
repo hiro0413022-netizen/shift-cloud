@@ -2,13 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Annotations, Shape } from "@/lib/lesson";
-import { saveAnnotations } from "./actions";
+import { PHASES, estimatePhases, hasPhases, type PhaseKey, type Phases } from "@/lib/phases";
+import { PhaseBar } from "@/components/phase-bar";
+import { saveAnnotations, savePhases } from "./actions";
 
 /**
- * 動画プレーヤー＋描画ツール（PGA NOTE「スイング映像への線・図形の入力」「ガイド線」準拠）
+ * 動画プレーヤー＋描画ツール＋フェーズ移動（PGA NOTE準拠 / DECISIONS #51）
  * - 線 / 円 / フリーハンド、4色、取り消し、全消し
  * - ガイド線プリセット: スイングプレーン / 前傾ライン
  * - コマ送り・スロー再生（0.25x/0.5x/1x）
+ * - フェーズ移動: アドレス〜フィニッシュにワンタップ。自動推定＋手動微調整。
  * - 形状は0〜1の正規化座標で保存（annotations JSONB）
  */
 type Tool = "none" | "line" | "circle" | "free";
@@ -18,11 +21,13 @@ export function VideoPlayer({
   videoId,
   src,
   initial,
+  initialPhases,
   canDraw = true,
 }: {
   videoId: string;
   src: string;
   initial?: Annotations | null;
+  initialPhases?: Phases | null;
   canDraw?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -34,6 +39,46 @@ export function VideoPlayer({
   const [rate, setRate] = useState(1);
   const [msg, setMsg] = useState<string | null>(null);
   const drawing = useRef<{ sx: number; sy: number; pts: [number, number][] } | null>(null);
+
+  // --- フェーズ ---
+  const [phases, setPhases] = useState<Phases | null>(initialPhases ?? null);
+  const [phaseEdit, setPhaseEdit] = useState(false);
+  const [cur, setCur] = useState(0);
+  const [dur, setDur] = useState(0);
+  const [estimating, setEstimating] = useState(false);
+
+  const jump = (t: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    v.currentTime = t;
+    setCur(t);
+  };
+  const setPhaseHere = (k: PhaseKey) => {
+    const v = videoRef.current;
+    if (!v) return;
+    setPhases((p) => ({ ...(p ?? {}), [k]: Number(v.currentTime.toFixed(3)), _method: "manual" }));
+  };
+  const cyclePhase = (dir: 1 | -1) => {
+    const list = PHASES.map((p) => phases?.[p.key]).filter((t): t is number => typeof t === "number").sort((a, b) => a - b);
+    if (!list.length) return;
+    const next = dir === 1 ? list.find((t) => t > cur + 0.02) : [...list].reverse().find((t) => t < cur - 0.02);
+    jump(next ?? (dir === 1 ? list[0] : list[list.length - 1]));
+  };
+  const autoEstimate = async () => {
+    setEstimating(true);
+    const p = await estimatePhases(src, videoRef.current?.duration);
+    setEstimating(false);
+    if (!p) { setMsg("自動推定できませんでした。手動で設定してください"); return; }
+    setPhases(p);
+    setPhaseEdit(true);
+    setMsg(p._method === "audio" ? "打球音からインパクトを検出しました。ズレていれば直してください" : "尺から仮置きしました。位置を直してください");
+  };
+  const commitPhases = async () => {
+    const r = await savePhases(videoId, phases ?? {}, dur || undefined);
+    setPhaseEdit(false);
+    setMsg(r.error ?? "フェーズを保存しました");
+  };
 
   // 描画
   const redraw = () => {
@@ -150,7 +195,17 @@ export function VideoPlayer({
   return (
     <div>
       <div ref={wrapRef} className="relative overflow-hidden rounded-lg bg-black">
-        <video ref={videoRef} src={src} controls playsInline className="max-h-[68vh] w-full" />
+        <video
+          ref={videoRef}
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          onLoadedMetadata={(e) => setDur(e.currentTarget.duration || 0)}
+          onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
+          onSeeked={(e) => setCur(e.currentTarget.currentTime)}
+          className="max-h-[68vh] w-full"
+        />
         <canvas
           ref={canvasRef}
           onPointerDown={onDown}
@@ -160,6 +215,44 @@ export function VideoPlayer({
           className="absolute inset-0"
           style={{ pointerEvents: tool === "none" ? "none" : "auto", touchAction: tool === "none" ? "auto" : "none" }}
         />
+      </div>
+
+      {/* フェーズ移動（アドレス〜フィニッシュ） */}
+      <div className="mt-3 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-2.5">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="font-medium text-(--color-gold)">
+            {phaseEdit ? "位置を調整中: 動画を止めてフェーズを押す" : "フェーズ移動"}
+          </span>
+          <button onClick={() => cyclePhase(-1)} className="btn-ghost !px-2 !py-1" title="前のフェーズ">◀</button>
+          <button onClick={() => cyclePhase(1)} className="btn-ghost !px-2 !py-1" title="次のフェーズ">▶</button>
+          <span className="ml-auto tabular-nums text-(--color-dim)">
+            {cur.toFixed(2)} / {dur ? dur.toFixed(2) : "-"}s
+          </span>
+        </div>
+        <PhaseBar
+          phases={phases}
+          duration={dur}
+          current={cur}
+          onJump={jump}
+          edit={phaseEdit && canDraw}
+          onSet={setPhaseHere}
+        />
+        {canDraw && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+            <button onClick={() => setPhaseEdit((e) => !e)} className="btn-ghost !px-2 !py-1.5">
+              {phaseEdit ? "調整をやめる" : hasPhases(phases) ? "✎ 位置を調整" : "✎ 位置を設定"}
+            </button>
+            <button onClick={autoEstimate} disabled={estimating} className="btn-ghost !px-2 !py-1.5">
+              {estimating ? "推定中…" : "⚡ 自動推定"}
+            </button>
+            {phaseEdit && (
+              <>
+                <button onClick={() => setPhases(null)} className="btn-ghost !px-2 !py-1.5">全解除</button>
+                <button onClick={commitPhases} className="btn-gold !px-3 !py-1.5">フェーズを保存</button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 再生コントロール */}
