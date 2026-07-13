@@ -26,23 +26,6 @@ body {
   @apply text-[--color-txt] antialiased;
 }
 
-/* 請求書の印刷（ブラウザの印刷 → PDF保存で使う）。A4・余白は請求書側のpaddingで作る */
-@media print {
-  @page {
-    size: A4;
-    margin: 12mm;
-  }
-  html,
-  body {
-    background: #fff;
-  }
-  /* 画面用のナビ等は print:hidden で消える（Tailwind）。請求書だけを全幅で出す */
-  .invoice {
-    max-width: none;
-    padding: 0;
-  }
-}
-
 /* ============================================================
    モバイル対応（NEXT_TASKS MB / 基準: docs/genesis/DESIGN_SYSTEM.md）
    既存ページの grid-cols-N はPC前提のため、md未満では段組みを畳む。
