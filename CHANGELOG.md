@@ -1,10 +1,17 @@
 # CHANGELOG
 
+## 2026-07-13(5) — 社内連絡ノート・役員共有パック・SaaS化計画
+- db: `0040_gn_messages.sql` 適用 — 社内連絡ノート（役員→経営、status open/done・返信メモ）
+- feat(genesis): **社内連絡 /notes** 新設＋サイドバー追加 — 役員が書き残し、古川さんが未対応一覧で確認→「✓対応済み」＋返信メモ。口頭・LINEで流れる連絡の集約場所
+- docs: **ONBOARDING_EXEC.md**（小川さん向け共有パック: できること/業務→入力先対応表/毎朝6時に動くもの一覧/最初の1週間）、**SAAS_PLAN.md**（販売計画: 初期設定はウィザード＋AI設定コンシェルジュ＋導入代行、HP/予約は共存から段階移行、リポジトリPrivate化が前提）
+- 検証: esbuild parse green。push後にVercelビルド確認
+
 ## 2026-07-13(4) — GENESIS役員展開: タブ日本語化・マニュアル・資料室・権限
 - feat(genesis): **サイドバーのタブ名を「何ができるか」が分かる日本語に**（Cockpit→経営ダッシュボード等、旧名はツールチップ）。よく使う順に並べ替え（承認待ち・受信箱を上へ）
 - feat(genesis): **役員向けマニュアル** docs/genesis/RUNBOOK.md 新規（毎日見るのは3つだけ/各タブ表/権限管理手順）→ /manual で公開配信＋ログイン画面にリンク（member-os等と同方式）
 - feat(genesis): **資料室 /library** — プライベートバケット`library`（service_role専用）に分類つきアップロード/署名URLダウンロード/削除。**Publicリポジトリに資料を置かないための置き場**。next.config bodySizeLimit 26mb
 - db: 「役員（本部閲覧）」ロール新設（view_hqのみ）、小川うららに付与済み。アカウント発行（初期パスワード）はShift Cloud管理画面から＝権限は古川さんのアカウントで一元管理
+- fix(caddy-os): 3bbd4e8で消えた請求書印刷CSS（@media print）を復元（原因はVMキャッシュ経由の追記事故。以後globals追記はclone側で行う）
 - 検証: esbuild parse green。push後にVercelビルド確認
 
 ## 2026-07-13(3) — マニュアル配信・モバイル全アプリ展開・Tokyoリージョン化（MN/MB/速度）

@@ -9,6 +9,7 @@ export const NAV = [
   { href: "/command", label: "CEO AI 司令室", en: "CEO AI Command", icon: "⌘" },
   { href: "/approvals", label: "承認待ち", en: "Approvals", icon: "✓" },
   { href: "/inbox", label: "問い合わせ受信箱", en: "CEO Inbox", icon: "📨" },
+  { href: "/notes", label: "社内連絡", en: "Notes", icon: "📝" },
   { href: "/finance", label: "財務（売上・利益）", en: "Finance", icon: "¥" },
   { href: "/legal", label: "契約・法務", en: "Legal", icon: "📄" },
   { href: "/library", label: "資料室", en: "Library", icon: "📁" },
