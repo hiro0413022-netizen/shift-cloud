@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2026-07-13(8) — Lesson OS 本番稼働
+- ops: Vercel `lesson-os` デプロイREADY確認（https://lesson-os.vercel.app）。vault_systemsへ登録、RUNBOOK/manualにURL記載
+- feat(genesis): System Networkに lesson-os ノード＋フロー図（flows/lesson-os.svg）を追加（新システム時の必須ルール）
+
 ## 2026-07-13(7) — Lesson OS P1（WING NOTE代替アプリ本体）
 - 調査: **WING NOTE実機**（ログイン済みChrome）と**GOLF WING Finder**（コーチ診断ナレッジのデモ）を確認。機能マップと弱み→改善表を SYSTEM.md §6 に記録
 - feat: **apps/lesson-os 新設**（独立アプリ・port 3006・use_lesson|view_hq・hnd1）— 生徒一覧（**名前だけで登録できる**・検索・最終レッスン日順・動画数）／生徒カルテ（動画タイムライン・**スマホカメラ直撮影対応**の署名URL直PUTアップロード・再生・コーチコメント・**★ベストスイング**・目標/メモ編集）／/manual（RUNBOOK新規）
