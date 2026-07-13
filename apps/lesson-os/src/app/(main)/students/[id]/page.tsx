@@ -116,10 +116,10 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm text-[--color-dim]">
+      <div className="flex items-center gap-2 text-sm text-(--color-dim)">
         <Link href="/" className="underline underline-offset-2">生徒一覧</Link>
         <span>›</span>
-        <span className="text-[--color-txt]">{student.name}</span>
+        <span className="text-(--color-txt)">{student.name}</span>
       </div>
       <KarteClient student={studentData} videos={videoItems} progress={progressItems} compareSources={compareSources} />
     </div>

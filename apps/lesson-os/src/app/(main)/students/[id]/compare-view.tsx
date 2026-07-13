@@ -55,7 +55,7 @@ export function CompareView({ sources }: { sources: CompareSource[] }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-[--color-dim]">
+      <p className="text-sm text-(--color-dim)">
         過去と現在のスイング、またはコーチのお手本と並べて同時再生できます
       </p>
       <div className="grid grid-cols-2 gap-3">
@@ -73,14 +73,14 @@ export function CompareView({ sources }: { sources: CompareSource[] }) {
               <button
                 key={r}
                 onClick={() => { setRate(r); both((v) => { v.playbackRate = r; }); }}
-                className={`rounded-lg border px-2 py-1.5 text-xs ${rate === r ? "border-[--color-gold] text-[--color-gold]" : "border-[--color-line] text-[--color-dim]"}`}
+                className={`rounded-lg border px-2 py-1.5 text-xs ${rate === r ? "border-(--color-gold) text-(--color-gold)" : "border-(--color-line) text-(--color-dim)"}`}
               >
                 {r}x
               </button>
             ))}
           </>
         )}
-        {msg && <span className="text-xs text-[--color-danger]">{msg}</span>}
+        {msg && <span className="text-xs text-(--color-danger)">{msg}</span>}
       </div>
       {urls[leftId] && urls[rightId] && (
         <div className="grid grid-cols-2 gap-3">

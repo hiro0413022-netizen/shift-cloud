@@ -48,12 +48,12 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-xl font-semibold tracking-tight">
-          レッスンノート <span className="text-sm font-normal text-[--color-dim]">{students?.length ?? 0}人</span>
+          レッスンノート <span className="text-sm font-normal text-(--color-dim)">{students?.length ?? 0}人</span>
         </h1>
         <div className="flex items-center gap-2">
           <form className="flex gap-2">
             <input name="q" defaultValue={q} placeholder="氏名、かな、会員番号で検索" className="input-dark w-64 max-w-full" />
-            <button className="rounded-lg bg-[--color-header] px-4 py-2 text-sm font-medium text-white">検索</button>
+            <button className="rounded-lg bg-(--color-header) px-4 py-2 text-sm font-medium text-white">検索</button>
           </form>
           <a href="/api/export?kind=lessons" className="btn-ghost hidden whitespace-nowrap text-xs md:block" title="レッスン記録をCSVで保存">⬇ CSV</a>
         </div>
@@ -63,7 +63,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {sorted.length === 0 && (
-          <p className="col-span-2 rounded-xl border border-[--color-line] bg-[--color-panel] p-6 text-sm text-[--color-dim] md:col-span-4">
+          <p className="col-span-2 rounded-xl border border-(--color-line) bg-(--color-panel) p-6 text-sm text-(--color-dim) md:col-span-4">
             {q ? "該当する生徒がいません" : "まだ生徒がいません。上のフォームから追加してください"}
           </p>
         )}
@@ -74,14 +74,14 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
             <Link
               key={s.id}
               href={`/students/${s.id}`}
-              className="group overflow-hidden rounded-xl border border-[--color-line] bg-[--color-panel] transition-colors hover:border-[--color-gold]"
+              className="group overflow-hidden rounded-xl border border-(--color-line) bg-(--color-panel) transition-colors hover:border-(--color-gold)"
             >
-              <div className="relative aspect-square bg-[--color-panel-2]">
+              <div className="relative aspect-square bg-(--color-panel-2)">
                 {photo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={photo} alt={s.name} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-[--color-gold]/60">
+                  <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-(--color-gold)/60">
                     {s.name.slice(0, 1)}
                   </div>
                 )}
@@ -90,7 +90,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                   {s.name_kana && <p className="truncate text-[10px] text-white/70">{s.name_kana}</p>}
                 </div>
               </div>
-              <div className="px-2.5 py-2 text-[11px] text-[--color-dim]">
+              <div className="px-2.5 py-2 text-[11px] text-(--color-dim)">
                 <p className="truncate">{s.goal ? `🎯 ${s.goal}` : "目標未設定"}</p>
                 <p>{st ? `動画${st.count}本 ・ 最終 ${st.last}` : "記録なし"}</p>
               </div>

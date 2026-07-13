@@ -58,19 +58,19 @@ export function ProfileForm({
   };
 
   return (
-    <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
+    <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
       {kind === "profile" && (
-        <div className="mb-4 flex items-center gap-4 border-b border-[--color-line] pb-4">
+        <div className="mb-4 flex items-center gap-4 border-b border-(--color-line) pb-4">
           {photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={photoUrl} alt="顔写真" className="h-20 w-20 rounded-lg object-cover" />
           ) : (
-            <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-[--color-panel-2] text-2xl text-[--color-dim]">👤</div>
+            <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-(--color-panel-2) text-2xl text-(--color-dim)">👤</div>
           )}
           <div className="min-w-0">
-            <p className="mb-1 text-xs text-[--color-dim]">顔写真（カルテの取り違え防止）</p>
+            <p className="mb-1 text-xs text-(--color-dim)">顔写真（カルテの取り違え防止）</p>
             <div className="flex flex-wrap items-center gap-2">
-              <input ref={photoRef} type="file" accept="image/*" className="text-xs file:mr-2 file:rounded-lg file:border file:border-[--color-line] file:bg-[--color-panel-2] file:px-2 file:py-1 file:text-xs file:text-[--color-txt]" />
+              <input ref={photoRef} type="file" accept="image/*" className="text-xs file:mr-2 file:rounded-lg file:border file:border-(--color-line) file:bg-(--color-panel-2) file:px-2 file:py-1 file:text-xs file:text-(--color-txt)" />
               <button onClick={uploadPhoto} disabled={busy} className="btn-ghost !py-1.5 text-xs">{busy ? "登録中…" : "写真を登録"}</button>
             </div>
           </div>
@@ -81,18 +81,18 @@ export function ProfileForm({
         {kind === "profile" && (
           <>
             <label className="block">
-              <span className="text-xs text-[--color-dim]">目標設定</span>
+              <span className="text-xs text-(--color-dim)">目標設定</span>
               <input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="例: いつも90台で回りたい" className="input-dark mt-1 w-full" />
             </label>
             <label className="block">
-              <span className="text-xs text-[--color-dim]">会員番号（Smart Hallo）</span>
+              <span className="text-xs text-(--color-dim)">会員番号（Smart Hallo）</span>
               <input value={code} onChange={(e) => setCode(e.target.value)} className="input-dark mt-1 w-full" />
             </label>
           </>
         )}
         {fields.map((f) => (
           <label key={f.key} className="block">
-            <span className="text-xs text-[--color-dim]">{f.label}{f.unit ? `（${f.unit}）` : ""}</span>
+            <span className="text-xs text-(--color-dim)">{f.label}{f.unit ? `（${f.unit}）` : ""}</span>
             {f.type === "select" ? (
               <select
                 value={form[f.key] ?? ""}
@@ -114,14 +114,14 @@ export function ProfileForm({
         ))}
         {kind === "profile" && (
           <label className="col-span-2 block md:col-span-3">
-            <span className="text-xs text-[--color-dim]">メモ（体の特徴・注意点など）</span>
+            <span className="text-xs text-(--color-dim)">メモ（体の特徴・注意点など）</span>
             <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={2} className="input-dark mt-1 w-full" />
           </label>
         )}
       </div>
       <div className="mt-4 flex items-center gap-3">
         <button onClick={save} disabled={pending} className="btn-gold">{pending ? "保存中…" : "登録"}</button>
-        {msg && <span className="text-xs text-[--color-dim]">{msg}</span>}
+        {msg && <span className="text-xs text-(--color-dim)">{msg}</span>}
       </div>
     </div>
   );

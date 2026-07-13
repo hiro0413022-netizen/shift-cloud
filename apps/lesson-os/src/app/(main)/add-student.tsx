@@ -16,7 +16,7 @@ export function AddStudentForm() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full rounded-xl border border-dashed border-[--color-line] bg-[--color-panel] py-3 text-sm text-[--color-dim] hover:text-[--color-txt]"
+        className="w-full rounded-xl border border-dashed border-(--color-line) bg-(--color-panel) py-3 text-sm text-(--color-dim) hover:text-(--color-txt)"
       >
         ＋ 生徒を追加（名前だけでOK）
       </button>
@@ -32,7 +32,7 @@ export function AddStudentForm() {
           else if (r.id) router.push(`/students/${r.id}`);
         })
       }
-      className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4"
+      className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4"
     >
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <input name="name" required placeholder="名前 *" className="input-dark" />
@@ -44,7 +44,7 @@ export function AddStudentForm() {
         <button disabled={pending} className="btn-gold">
           {pending ? "登録中…" : "登録してカルテを開く"}
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="text-sm text-[--color-dim]">キャンセル</button>
+        <button type="button" onClick={() => setOpen(false)} className="text-sm text-(--color-dim)">キャンセル</button>
         {msg && <span className="text-xs text-red-400">{msg}</span>}
       </div>
     </form>

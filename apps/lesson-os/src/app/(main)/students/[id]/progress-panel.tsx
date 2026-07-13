@@ -19,12 +19,12 @@ export function ProgressPanel({ studentId, items }: { studentId: string; items: 
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-        <p className="mb-2 text-sm font-medium text-[--color-gold]">進捗率</p>
+      <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+        <p className="mb-2 text-sm font-medium text-(--color-gold)">進捗率</p>
         <Radar items={values.map((v) => ({ name: v.name, percent: v.percent }))} />
       </div>
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-        <p className="mb-3 text-sm font-medium text-[--color-gold]">レッスン目標（達成度）</p>
+      <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+        <p className="mb-3 text-sm font-medium text-(--color-gold)">レッスン目標（達成度）</p>
         <div className="space-y-3">
           {values.map((v) => (
             <div key={v.itemId}>
@@ -43,7 +43,7 @@ export function ProgressPanel({ studentId, items }: { studentId: string; items: 
                 step={5}
                 value={v.percent}
                 onChange={(e) => set(v.itemId, Number(e.target.value))}
-                className="mt-1 w-full accent-[--color-active]"
+                className="mt-1 w-full accent-(--color-active)"
               />
             </div>
           ))}
@@ -61,7 +61,7 @@ export function ProgressPanel({ studentId, items }: { studentId: string; items: 
           >
             {pending ? "保存中…" : "登録"}
           </button>
-          {msg && <span className="text-xs text-[--color-dim]">{msg}</span>}
+          {msg && <span className="text-xs text-(--color-dim)">{msg}</span>}
         </div>
       </div>
     </div>

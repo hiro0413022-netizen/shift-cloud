@@ -6,7 +6,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   return (
     <div className="flex min-h-screen flex-col">
       {/* 紺ヘッダ（PGA NOTE準拠） */}
-      <header className="sticky top-0 z-20 bg-[--color-header] text-white shadow">
+      <header className="sticky top-0 z-20 bg-(--color-header) text-white shadow">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <Link href="/" className="flex items-baseline gap-2">
             <span className="text-[10px] font-semibold tracking-[0.28em] text-[#ffd97a]">GOLF WING</span>

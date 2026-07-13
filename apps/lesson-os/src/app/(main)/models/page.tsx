@@ -26,7 +26,7 @@ export default async function ModelsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold tracking-tight">お手本スイング</h1>
-      <p className="text-sm text-[--color-dim]">
+      <p className="text-sm text-(--color-dim)">
         コーチのお手本や施設独自のテクニック動画。生徒カルテの「比較再生」と生徒への共有ページに表示されます
       </p>
       <ModelsClient items={items} />

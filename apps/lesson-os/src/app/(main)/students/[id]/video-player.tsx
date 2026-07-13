@@ -170,7 +170,7 @@ export function VideoPlayer({
           <button
             key={r}
             onClick={() => setSpeed(r)}
-            className={`rounded-lg border px-2 py-1.5 ${rate === r ? "border-[--color-gold] text-[--color-gold]" : "border-[--color-line] text-[--color-dim]"}`}
+            className={`rounded-lg border px-2 py-1.5 ${rate === r ? "border-(--color-gold) text-(--color-gold)" : "border-(--color-line) text-(--color-dim)"}`}
           >
             {r}x
           </button>
@@ -183,7 +183,7 @@ export function VideoPlayer({
             <button
               key={t}
               onClick={() => setTool(t)}
-              className={`rounded-lg border px-2.5 py-1.5 ${tool === t ? "border-[--color-active] text-[--color-active]" : "border-[--color-line] text-[--color-dim]"}`}
+              className={`rounded-lg border px-2.5 py-1.5 ${tool === t ? "border-(--color-active) text-(--color-active)" : "border-(--color-line) text-(--color-dim)"}`}
             >
               {lab}
             </button>
@@ -197,10 +197,10 @@ export function VideoPlayer({
               aria-label={`色 ${c}`}
             />
           ))}
-          <span className="mx-1 text-[--color-line]">|</span>
+          <span className="mx-1 text-(--color-line)">|</span>
           <button onClick={() => addGuide("plane")} className="btn-ghost !px-2 !py-1.5">スイングプレーン</button>
           <button onClick={() => addGuide("posture")} className="btn-ghost !px-2 !py-1.5">前傾ガイド</button>
-          <span className="mx-1 text-[--color-line]">|</span>
+          <span className="mx-1 text-(--color-line)">|</span>
           <button onClick={() => setShapes((p) => p.slice(0, -1))} className="btn-ghost !px-2 !py-1.5">↩ 取り消し</button>
           <button onClick={() => setShapes([])} className="btn-ghost !px-2 !py-1.5">全消し</button>
           <button
@@ -212,7 +212,7 @@ export function VideoPlayer({
           >
             描画を保存
           </button>
-          {msg && <span className="text-[--color-dim]">{msg}</span>}
+          {msg && <span className="text-(--color-dim)">{msg}</span>}
         </div>
       )}
     </div>

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { login } from "./actions";
 
 const inputCls =
-  "w-full rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2.5 text-sm placeholder:text-[--color-dim]";
+  "w-full rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2.5 text-sm placeholder:text-(--color-dim)";
 
 function LoginForm() {
   const [state, action, pending] = useActionState(login, {});
@@ -16,11 +16,11 @@ function LoginForm() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <p className="text-xs tracking-[0.4em] text-[--color-gold]">GOLF WING</p>
+          <p className="text-xs tracking-[0.4em] text-(--color-gold)">GOLF WING</p>
           <h1 className="text-3xl font-bold tracking-widest">Lesson OS</h1>
-          <p className="mt-2 text-sm text-[--color-dim]">レッスンカルテ — コーチログイン</p>
+          <p className="mt-2 text-sm text-(--color-dim)">レッスンカルテ — コーチログイン</p>
         </div>
-        <form action={action} className="space-y-4 rounded-xl border border-[--color-line] bg-[--color-panel] p-6">
+        <form action={action} className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-6">
           <input name="id" placeholder="メールアドレス または ログインID" className={inputCls} autoComplete="username" />
           <input name="password" type="password" placeholder="パスワード" className={inputCls} autoComplete="current-password" />
           {state.error && <p className="text-sm text-red-400">{state.error}</p>}
@@ -35,7 +35,7 @@ function LoginForm() {
           </button>
         </form>
         <p className="mt-4 text-center">
-          <a href="/manual" className="text-sm text-[--color-dim] underline underline-offset-2">📖 使い方マニュアル</a>
+          <a href="/manual" className="text-sm text-(--color-dim) underline underline-offset-2">📖 使い方マニュアル</a>
         </p>
       </div>
     </main>
