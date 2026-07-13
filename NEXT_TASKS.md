@@ -1,115 +1,73 @@
 # NEXT_TASKS
 
-## 基盤アップグレード（2026-07-11 Phase 0監査済 — 正典: docs/genesis/AUDIT_2026-07-11.md）
+> **2026-07-14 実データ照合済み**（Vercel Deployments / Supabase / リポジトリを1件ずつ確認）。
+> 「未デプロイ」等の古い記載を全面的に更新。完了分は §完了ログ に移動。
 
-UP-1. ~~push→CI green確認~~ ✅完了（2026-07-11、run #2 green・UP-2デプロイも動作確認済）
-UP-2. ~~既存アプリのpackages/core移行（B-6）~~ ✅完了（2026-07-11、4アプリ移行・Linux実機で全build検証済）。残: push後に member-os / legal-os のVercelデプロイ成功を確認（本番稼働中のため）。money-golfwing / shift-cloud / genesis の移行は後続（authの形が異なるため個別設計）
-UP-3. ~~現場RUNBOOK作成（B-9）~~ ✅完了（2026-07-11、member-os/workforce-os/legal-osの3本。**現場スタッフへの共有はユーザー作業**＝印刷 or URL共有）
-UP-4. ~~時給の月中変更対応（B-7・監査D-3）~~ ✅完了（2026-07-11、日付按分 DECISIONS #39。給与画面のdetailにレート別内訳wage_periodsが残る）
-UP-5. 監査で検知された「6月ゴルフ経費未入力」はKPIチェッカー（#37）がデプロイ後、日次レポートに自動表示される → Money OSでの経費取込で解消
+---
 
-## GENESIS実運用フェーズ（2026-07-05〜）
+## A. ユーザー作業（これがブロッカー）
 
-- 本番: https://yozan-genesis.vercel.app（Vercel `yozan-genesis`、Root: apps/genesis）
-- KPI実データ接続済み（労務系）: 在籍スタッフ数 / 総労働時間 / 人件費（migration 0008、`refresh_shift_cloud_kpis()`）
-- 日次レポート生成時にKPI自動再集計。手動は Command Center「KPI更新」ボタン
+A-1. **小川うららのアカウント発行** — DB上 `staff.auth_user_id` が null ＝**未発行**（ロール「役員（本部閲覧）」は付与済み）
+   - Shift Cloud管理画面 → スタッフ → 小川うらら編集 → 初期パスワード（8文字以上）設定 → 保存
+   - 発行後: GENESIS(/manual・/library)を触ってもらう。共有パック docs/genesis/ONBOARDING_EXEC.md
 
-## 要対応
+A-2. **コーチへ `use_lesson` 権限を付与** — この権限を持つロールがDB上に**1つも存在しない**＝Lesson OSはまだ古川さんしか使えない
+   - Shift Cloud → ロール（役員ロールと同様に新ロール or 既存ロールに権限追加）
 
-RPT. **Genesisの報告・提案・実行指示（2026-07-14 / DECISIONS #52 / migration 0045適用済）**
-   - ✅ 原因特定と修正: 日次レポートが自動で出ていなかったのは **Vercel Cron の `/api/cron/daily` が middleware で /login へ307されていた**ため（`PUBLIC_PREFIXES` に `/api/cron` を追加して修正）
-   - ☐ **ユーザー作業(1) push**（OPERATIONS §1）— ワークスペースのマウント不整合でClaudeはコミット不可。**古川さんのPCで `git add -A && git commit && git push`**
-   - ☐ **ユーザー作業(2) Vercel `yozan-genesis` に `CRON_SECRET` を設定**（未設定だと修正後も cron が401で弾かれる）→ Redeploy。翌朝6時に日次レポートが自動生成されるか確認
-   - ☐ **ユーザー作業(3) n8n**: ワークフロー「LINE返信送信 (承認済み→Push)」を開き、Data table `app_config` に `LINE_CHANNEL_ACCESS_TOKEN`（LINE Developersの長期アクセストークン）を追加 → **Activate**。これで /inbox の「承認して LINE送信」が実際に送信される
-   - ☐ **ユーザー作業(4) 動作確認**: /inbox（返信案7件が承認待ち・リッチメニューは自動除外）→ /suggestions（改善提案4件）→ /directives（指示を出す）
-   - ☐ **Claude(push後)**: Vercelビルド確認 → /suggestions・/directives の表示確認、System Network（topology.ts）への反映
-   - ☐ 後続: 提案のClaude生成をweekly固定にする／スタッフ指示の完了報告をCEO AI日次レポートへ流入／LINE配信（Phase C 一斉配信）
+A-3. **Reserve OS の通しテスト** — `res_requests` **0件**＝一度も申込が通っていない
+   - https://shift-cloud-reserve-os.vercel.app/reserve/shaft-fitting で申込 → GOLF WING宛に通知メール到達 → /login（use_reception|view_hq）→ /requests で確定メール送信 まで
+   - Resend（APIキー・送信ドメイン認証）と env（RESERVE_FROM_EMAIL / RESERVE_STAFF_EMAIL / NEXT_PUBLIC_SITE_URL）が効いているかもここで判明する
+   - 通ったら 公式LINEのリッチメニュー/トークに `/reserve/shaft-fitting` を掲出
 
-LSN. **Lesson OS（WING NOTE代替 / DECISIONS #49）**: DB適用済（0041: lsn_*＋lesson-videosバケット）。正典 docs/modules/lesson-os/SYSTEM.md
-   - ✅ P1実装（2026-07-13）: apps/lesson-os — 生徒一覧（名前だけ登録可・最終レッスン日順）/ カルテ（動画アップ=署名URL直PUT・スマホカメラ対応・再生・コーチコメント・★ベストスイング・目標/メモ）/ /manual。WING NOTE実機調査と弱み→改善はSYSTEM.md §6
-   - ☐ **ユーザー作業(1) Storage上限の引き上げ**: Supabaseダッシュボード→Storage→Settings→Upload file size limit を200MBに（動画用。既定50MBのままだと長い動画が失敗）
-   - ✅ ユーザー作業(2) デプロイ完了（2026-07-13）: **https://lesson-os.vercel.app**（READY確認済・Vault登録済・相関図/フロー図追加済）
-   - ☐ **ユーザー作業(3)**: 動作確認 → コーチに use_lesson 権限付与（Shift Cloud管理画面のロール or 役員ロール同様に新ロール）
-   - ✅ **P2大型アップデート（2026-07-13 / DECISIONS #50）**: PGA NOTE準拠 — 顔写真・基本/詳細情報・進捗9項目＋レーダー・描画ツール＋ガイド線・比較再生・お手本スイング・生徒共有リンク(/s/)・CSVエクスポート・UI刷新（紺×金／生徒ページ青×白）
-   - ☐ **ユーザー作業: push → 実機確認**（スマホ推奨: 生徒登録→撮影→描画→進捗→共有リンクをLINEで自分に送って生徒ページ確認）
-   - ☐ P2b: **GOLF WING Finder連携（コメントに診断ナレッジ挿入）**・会員名簿突合・KPI接続 / P3: Trackman CSV取込・レッスンAI
-   - ☐ 確認（ユーザー）: WING NOTEに過去データのエクスポート機能があるか（あれば移行、なければ新規蓄積で開始）
+A-4. **LINE公式アカウント Phase 0** — Vaultに LINE の行なし＝未着手。以降のPhase A〜Dが全部これ待ち
+   - Messaging API を有効化 → channel secret / 長期アクセストークンを発行（OPERATIONS §6 Phase 0）→ Claudeに連絡
 
-FIX. **不具合修正（2026-07-13夕）**: ①資料室アップロード=署名URL直PUT化＋**Storageキー日本語不可をbase64url化で解消**（アップロードできない原因はこれ。push後に再テストを）②スタッフ編集の主店舗必須を解除（役員=店舗なしで保存可→小川さんのパスワード設定が通る）③作成済み資料13件を資料室へ投入済（社内マニュアル5・事業計画1・出店計画7）
+A-5. **営業利益の目標値** — 5大KPIのうち営業利益だけ target が未設定（会員数/入会率/退会率/月次売上は設定済）
 
-GN. **GENESIS役員展開（2026-07-13）**: タブ名日本語化・役員向けマニュアル(/manual)・資料室(/library、プライベートStorage `library`)・「役員（本部閲覧）」ロール新設＋小川うららに付与済み
-   - ☐ **ユーザー作業(1) push**: OPERATIONS §1
-   - ☐ **ユーザー作業(2) 小川うららのアカウント発行**: Shift Cloud管理画面→スタッフ→小川うらら編集→初期パスワード（8文字以上）設定→保存。ロールは「役員（本部閲覧）」のまま（GENESISマニュアル§6参照）
-   - ☐ **ユーザー作業(3) 資料の投入**: GENESIS→資料室→出店計画Excel等をアップロード（PCから。25MB/件）
-   - ☐ **Claude(push後)**: Vercelビルド確認。RUNBOOK更新時は public/manual.md へ再コピー
-   - 追加(2026-07-13夕): **社内連絡 /notes**（gn_messages 0040適用済＝役員→古川の連絡ノート、未対応/対応済・返信メモ）、**小川さん向け共有パック** docs/genesis/ONBOARDING_EXEC.md（できること・業務→入力対応表・自動スケジュール一覧）→ 資料室へアップロード推奨
+A-6. **Lesson OS 実機確認**（生徒1件・動画1件のみ＝ほぼ未使用）— スマホで 生徒登録→撮影→描画→進捗→共有リンク(/s/) をLINEで自分に送って確認
 
-SAAS. **GENESIS販売（SaaS化）**: 計画の正典 docs/genesis/SAAS_PLAN.md（2026-07-13作成）。要点=商品はオンボーディング／初期設定はウィザード＋**AI設定コンシェルジュ（チャットで設定変更・実行前確認）**＋導入代行の3段構え／HP・予約は「共存から段階移行」／**リポジトリPrivate化が販売の前提**
-   - ☐ Phase S0: FRUNK GOLF姫路を2店舗目テナントとして発行してみる（ウィザードの要件出し）
-   - ☐ AI設定コンシェルジュのプロトタイプ（/concierge、設定read/write＋確認画面＋audit_logs）
+## B. 明日の朝に判定すること
 
-SP. **スタッフポータル拡張（DECISIONS #48 / migration 0039適用済）**: Shift Cloudスタッフ画面に カレンダー(/calendar)・やること・日報週報(/reports)・クイックリンク・給与見込み精緻化 を実装済。正典 docs/modules/workforce-os/STAFF_PORTAL.md
-   - ☐ **ユーザー作業(1) push**: OPERATIONS §1（→shift-cloud-shift-cloudが自動デプロイ）
-   - ☐ **Claude(push後)**: Vercel `get_deployment_build_logs` でビルド成功確認 → スタッフ画面で動作確認依頼
-   - ☐ **後続フェーズ**: 店長タスク配信 / Genesis判断リスト→sp_tasks自動配信 / 日報週報のCEO AI要約流入 / 予約ソース実接続（STAFF_PORTAL.md §5）
+B-1. **日次レポートの自動生成** — 停止の主因は cron が middleware で307されていたこと（DECISIONS #52）。修正 `82b3f5d` は本番反映済み。
+   - 判定: 7/15 6:00 JST 後に `reports` へ当日の行が入るか。入らなければ CRON_SECRET / ANTHROPIC_API_KEY を疑う
 
-MB. **モバイル対応（仕様変更A）**: 基準はDESIGN_SYSTEM.md「モバイル対応」節（2026-07-13追記）。
-   - ✅ genesis（2026-07-13）: MobileNav（ハンバーガー＋ドロワー）新設・Sidebarはmd以上のみ・globals.cssにmd未満のgrid畳み＋テーブル横スクロール救済
-   - ☐ **ユーザー作業: push後、スマホで https://yozan-genesis.vercel.app を確認**（特にCockpit/Command/Finance）。崩れている画面名をClaudeに伝える→個別調整
-   - ✅ 全アプリ展開（2026-07-13）: member-os/legal-os/money-golfwing/survey-os/reserve-os/caddy-os/shift-cloudのglobals.cssに同じgrid畳み＋table横スクロール救済を追加（member-osのナビは元からモバイル対応済だった）
-   - ☐ 実機で崩れが残る画面の個別調整（ユーザーからの報告ベース）
-MN. **マニュアルDL（仕様変更B）**:
-   - ✅ member-os / shift-cloud / legal-os（2026-07-13）: /login に「📖使い方マニュアル」→ /manual（ログイン不要・印刷=PDF保存・⬇ダウンロード）。中身は public/manual.md（**正典はdocs/modules/<os>/RUNBOOK.md — 更新したらpublic/manual.mdへコピーし直す**）
-   - ☐ 未作成RUNBOOK: money-golfwing / survey-os / reserve-os / caddy-os（report-osはスクリプトのため対象外）→ 作成後、同方式で /manual 配信
+## C. Claude作業（未着手）
 
-SVY. **Survey OS（アンケート / DECISIONS #33）**: 独立アプリ・**未デプロイ**。DBは 0030 適用済、GOLF WINGアンケート 0031 投入済（slug=`golfwing-2026`・公開中）。
-   - ✅ 実装済: `apps/survey-os`（公開回答 /s/[slug]・一覧・集計 /[id]/results・CSV /api/export/[id]）。svy_* スキーマ＋集計ロジック（ボルダ平均＋平均順位・ヒートマップ）。member-os規約準拠
-   - ☐ **ユーザー作業(1) 依存導入＋push**: ルートで `npm install`（qrcode 追加のため）→ ユーザーPCから push
-   - ☐ **ユーザー作業(2) 新Vercelプロジェクト作成**: OPERATIONS §2「survey-os 初回セットアップ」（Root=apps/survey-os、env3つ、Deploy）
-   - ☐ **ユーザー作業(3) 動作確認**: `survey-os.vercel.app/s/golfwing-2026` で回答→管理ログイン（view_hq）で集計・CSV確認。QRを会員へ配布
-   - ☐ **Claude(デプロイ後)**: vault_systems の Survey OS 行にURL記入
-   - ✅ **フェーズ2**: アンケートビルダー（項目編集GUI `/[surveyId]/edit`）＝設問の追加/編集/削除/並び替え・型変更・選択肢編集・新規アンケート作成（実装済、push＆再デプロイで反映）
-   - ☐ **フェーズ3**: 条件分岐／KPI接続（回答率・WING NOTE満足度）／n8n連携
-   - 設計: docs/modules/survey-os/SYSTEM.md
+C-1. **RUNBOOK未作成**: money-golfwing / survey-os / reserve-os / caddy-os → 作成後 public/manual.md へコピーし /manual 配信（既存: genesis / shift-cloud / member-os / legal-os / lesson-os）
 
-LINE. **LINE公式アカウント連携（DECISIONS #29 / 手順 OPERATIONS §6）**: n8nを統合ハブに、既存CEO Inbox（`sec_inquiries`）で受ける＝スキーマ変更ゼロ。
-   - ☐ **Phase 0（ユーザー・最初にこれだけ）**: LINE公式アカウントの Messaging API を有効化し、channel secret / 長期アクセストークンを発行（OPERATIONS §6 Phase 0）。完了したらClaudeに連絡
-   - ☐ **Phase 0b（ユーザー）**: Claudeが作る `vault_systems` 行に、/vault でシークレット/トークンを入力保存
-   - ☐ **Phase A（Claude構築）**: n8n Webhook受信→署名検証→`sec_inquiries`(source='line')insert。Webhook URLをユーザーがLINE側に貼付・応答メッセージOFF。→ 顧客問い合わせがCEO Inbox(/inbox)に自動集約
-   - ☐ **Phase B（Claude構築）**: LINEリッチメニュー「体験予約」→ member-os `/intake` 誘導。体験予約数・入会率KPIは既存 `refresh_member_kpis` で自動
-   - ☐ **Phase C（Claude構築）**: SNS AI生成文の承認→n8nでLINE一斉配信（外部送信=承認必須）
-   - ☐ **Phase D（後続）**: Instagram（Meta Graph API）をn8nで
+C-2. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI
+   - 確認事項（ユーザー）: WING NOTEに過去データのエクスポート機能があるか（あれば移行、なければ新規蓄積）
 
-00. **Vercel環境変数の設定（ユーザー・CEO AI起動に必須）**: `yozan-genesis`プロジェクトに (1) `CRON_SECRET`=ランダム文字列（毎朝6時の自動報告に必須） (2) `ANTHROPIC_API_KEY`（CEO AIのClaude分析。未設定でもルールベースで動作） を追加 → Redeploy
-0-a. **5大KPIの目標値設定（ユーザー）**: Command Centerの「KPI手動更新」で会員数・体験予約数・入会率・退会率の現在値と、5大KPI全部の目標値を入力 → 全体スコアと判断リストが機能し始める
-0-b. **Member OS（Smart Hello取込）実装**: 仕様書 docs/modules/member-os/SMART_HELLO_IMPORT.md（実サンプル分析済み）に基づき会員名簿・予約一覧の取込→会員数/入会/退会/体験予約/入会率KPI自動化（DECISIONS #22）。個人情報は取り込まない設計
-0-c. ~~AI社員の「見る・判断・実行」定義~~ ✅完了（2026-07-06, migration 0015）: VISION §4の15役割を反映 — 顧客AI・投資新規事業AI追加で計21体。cs_ai等の6体はVISION外の具体化として存続
-0. **財務データ投入（ユーザー）**: /finance で直近月の実績を入力（税理士の試算表から転記 or CSV取込）→ 月次売上・営業利益KPIが自動接続される
-1. **Genesis実運用の習慣化**（ユーザー）: 毎日 Command Center で「日次レポート生成」を実行。AI指示が必要な作業はプロンプト生成を使う
-2. **デプロイ**（ユーザー）: 本コミットをユーザーPCからpush → Vercel自動デプロイ → KPI表示確認（Cockpit / Future Simulation）
-2-b. **Vault（システム台帳 /vault）**: 実装完了・DB適用済（0013）・初期8件投入済。push後に /vault でパスワード入力→各システムのパスワードをページ上で入力保存（DECISIONS #26）。任意: Vercel envに `VAULT_PASSWORD` を設定するとパスワード変更可（未設定時は既定値）
-3. **体験受付システム（member-os / DECISIONS #23,#24,#27）**: 独立アプリへ分離（Shift Cloudと同型）・**未デプロイ**。0-bのSmart Hello取込は会員名簿本体（会員数/退会率）のみに縮小、体験系はこちらに一本化。
-   - ✅ 実装済: migration 0011（mbr_guests/mbr_trial_bookings/mbr_intake_tokens＋refresh_member_kpis、本番適用済）。`apps/member-os` 新設（トップ/＝受付ダッシュボード、公開 /intake/[token]、/login）。Genesisから /members・/intake・サイドバー項目を撤去。両アプリ next build 検証済
-   - ☐ **ユーザー作業(1) 新Vercelプロジェクト作成**: OPERATIONS §2「member-osの初回セットアップ」参照（Root Directory=apps/member-os、env3つ、Deploy）
-   - ☐ **ユーザー作業(2) push**: ユーザーPCから push → Genesis も member-os も自動デプロイ
-   - ☐ **ユーザー作業(3) 通しテスト**: member-os のトップで予約1件登録→「タブレット受付」→ /intake で自己入力→入会 まで
-   - ☐ **任意**: 受付スタッフに Shift Cloud のロールで `use_reception` 権限を付与（未付与でも view_hq 保持者は利用可）
-   - Phase 2（次段）: 予約サイト／予約システム本体を姫路FRUNK GOLFに導入（#24）／会員名簿のGenesis移管
-   - 設計: docs/modules/member-os/TRIAL_INTAKE.md
-4. **Shift Cloud実運用フィードバックの収集と反映**: 現場の声を集めて改善バックログ化
-5. **GolfOrder切替儀式**: D1差分同期 → 運用切替宣言 → 旧Pages `golfwing` 停止 → import関数削除（設計書§11）。新規入力は新版（https://shift-cloud-golfwing.vercel.app）に統一
-6. **掃除（ユーザー作業）**: Cloudflareで旧Pagesのカスタムドメイン解除 — `yozan-group`から yozan-inc.jp/www.yozan-inc.jp、`kallinos`から www.kallinos.jp。※`golfwing`プロジェクトは本番稼働中なので触らない
-7. **Legal OS（契約・法務管理 / DECISIONS #29,#30）**: 独立アプリ・**本番稼働中**（https://legal-os-peach.vercel.app、migration 0024適用済、module live、Vault登録済）。設計: docs/modules/legal-os/SYSTEM.md
-   - ✅ 実装済: leg_documents/leg_files/leg_grants/leg_reminders＋Storage `legal-docs`。apps/legal-os（ダッシュボード/一覧/詳細/登録＋ファイル署名URL＋/api/v1、Bearer `LEGAL_API_TOKEN`）。next build検証・push・デプロイ済
-   - ✅ **フェーズ2 legal_ai接続**（2026-07-11 DECISIONS #40）: 日次チェック（期限接近/高リスク/滞留→判断リスト）＋自動抽出（1件/日、提案保存・確定は人）。要ANTHROPIC_API_KEY（genesis env）。締結・更新・解約の正式承認はapproval_requests（変わらず）
-   - ☐ **任意（ユーザー）**: 登録担当スタッフに `use_legal` 権限 or `leg_grants`(uploader/manager/viewer) を付与
-   - ☐ **軽微（掃除）**: マイグレーション番号重複（0024が legal_os / reservation_payments の2本）を次に触る際いずれか0025+へリネーム
-8. **Money OS `mon_receipts`（経理系証憑 / DECISIONS #29a・#41）**: ✅フェーズ1完了（2026-07-11）— 0034適用済・money-golfwing /receipts（撮影アップロード→保管・突合台帳・電帳法配慮の論理削除）。✅OCR自動読取（2026-07-11 #42、毎朝3件・空欄のみ補完）。☐後続=経費自動起票（読取精度の実績確認後）＋mon_expense/mon_bank_txnとの突合UI強化
-9. **Reserve OS（ビジター向け予約 / DECISIONS #34）**: 独立アプリ・**実装済/未デプロイ**。第一弾=GOLF WING シャフトフィッティング。申込型（候補日時3つ必須＋事前ヒアリング→スタッフ目視確定）。設計: docs/modules/reserve-os/SYSTEM.md
-   - ✅ 実装済: migration `0032_reserve_os.sql`（res_services/res_requests、本番適用済）。`apps/reserve-os`（公開 /reserve/[slug]、スタッフ /・/requests/[id]、CSV、/login）。メール汎用レイヤ src/lib/mail.ts（Resend）。vault登録済
-   - ☐ **ユーザー作業(1)** ルートで `npm install` → ユーザーPCからpush
-   - ☐ **ユーザー作業(2) 新Vercelプロジェクト作成**: Root Directory=`apps/reserve-os`。env: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY / RESEND_API_KEY / RESERVE_FROM_EMAIL(YOZANアドレス) / RESERVE_STAFF_EMAIL(GOLF WINGアドレス) / NEXT_PUBLIC_SITE_URL → Deploy
-   - ☐ **ユーザー作業(3) メール**: https://resend.com でAPIキー発行＋送信ドメイン（yozan-inc.jp等）認証。RESERVE_STAFF_EMAIL にGOLF WINGのメールアドレスを設定
-   - ☐ **ユーザー作業(4) 通しテスト**: /reserve/shaft-fitting で申込→GOLF WING宛に通知メール到達→ /login（use_reception|view_hq）→ /requests で確定メール送信 まで
-   - ☐ **ユーザー作業(5)** 公式LINEのリッチメニュー/トークに公開URL `/reserve/shaft-fitting` を掲出。vault_systems のURLを本番URLに更新
-   - Phase後続: LINE通知（notifyLine実装・#29 n8n）／サービス追加GUI／体験レッスン・クラブFTへ横展開（res_services行追加）／Googleスプレッドシート自動同期
+C-3. **SaaS化（正典 docs/genesis/SAAS_PLAN.md）**: Phase S0＝FRUNK GOLF姫路を2店舗目テナントとして発行（ウィザードの要件出し） / AI設定コンシェルジュ試作（/concierge） / **リポジトリPrivate化が販売の前提**
+
+C-4. **Money OS**: 経費自動起票（OCR精度の実績待ち。`mon_receipts` は0件＝運用未開始）／mon_expense・mon_bank_txn との突合UI強化
+
+C-5. **スタッフポータル後続（STAFF_PORTAL.md §5）**: 店長タスク配信 / Genesis判断リスト→sp_tasks自動配信 / 日報週報のCEO AI要約流入 / 予約ソース実接続（`sp_reports` 0件＝運用これから）
+
+C-6. **Survey OS フェーズ3**: 条件分岐 / KPI接続（回答率・満足度）/ n8n連携（GOLF WINGアンケートは公開中・回答2件）
+
+C-7. **モバイル対応**: 実機で崩れが残る画面の個別調整（ユーザーからの報告ベース）
+
+C-8. **掃除（軽微）**
+   - マイグレーション番号重複（0024が legal_os / reservation_payments の2本）→ いずれか0046+へリネーム
+   - GolfOrder切替儀式: D1差分同期 → 切替宣言 → 旧Pages `golfwing` 停止 → import関数削除
+   - Cloudflareで旧Pagesのカスタムドメイン解除（`yozan-group`／`kallinos`）※`golfwing`は本番稼働中なので触らない
+   - Member OS 通しテスト（予約→タブレット受付→/intake自己入力→入会）
+
+C-9. **Shift Cloud 実運用フィードバック**の収集と改善バックログ化
+
+---
+
+## 完了ログ（2026-07-14 照合で確認）
+
+- ✅ push（LSN P2 / GN役員展開 / SP / FIX / MB）: `82b3f5d`・`634dbf0` で本番反映。genesis・lesson-os とも READY
+- ✅ **Survey OS デプロイ済**: https://survey-os-mu.vercel.app（`golfwing-2026` 公開中・回答2件・Vault登録済）
+- ✅ **Reserve OS デプロイ済**: https://shift-cloud-reserve-os.vercel.app（Vault登録済。申込0件＝A-3へ）
+- ✅ **Lesson OS 本番**: https://lesson-os.vercel.app（0041〜0044適用済・P2実装済）
+- ✅ **資料室に13件投入済**（Storage `library`）
+- ✅ **財務データ投入済**: `fin_entries` 133件 → 月次売上・営業利益KPIが接続
+- ✅ **5大KPI目標値**: 会員数250 / 入会率50 / 退会率2.5 / 月次売上600万（営業利益のみA-5）
+- ✅ **migration 0045まで全て適用済**（0044 lesson_os_phases / 0045 inbox_filter_suggestions_directives）
+- ✅ Storage上限200MB・CRON_SECRET: ユーザー設定済み（実効性はB-1で最終判定）
+- ✅ 基盤アップグレード（2026-07-11）: packages/core移行・RUNBOOK・時給の月中変更（日付按分 #39）・KPIチェッカー・CI
+- ✅ Legal OS 本番稼働 + legal_ai 日次チェック（#40）／Money OS `mon_receipts` フェーズ1＋OCR（#41,#42）／Caddy OS（#46）／社内連絡 /notes（0040）
