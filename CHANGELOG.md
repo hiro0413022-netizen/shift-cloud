@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-13(9) — Lesson OS P2: PGA NOTE準拠の大型アップデート（DECISIONS #50）
+- 調査: PGA NOTE公式サイトの機能ページを実機閲覧し、コーチアプリ/ユーザーアプリの全機能とUI（紺×黒×金／青×白）を仕様化
+- db: `0043_lesson_os_p2.sql` 適用 — profile/skill(JSONB)・photo_path・distance_yd・annotations・lsn_progress(+items 9項目シード)・lsn_model_videos・lsn_share_tokens
+- feat(lesson-os): **カルテのタブ化**（本日のレッスン/進捗/基本情報/詳細情報/比較再生）、**描画ツール**（直線・円・フリーハンド・4色・保存）＋**ガイド線**（スイングプレーン/前傾）＋コマ送り/スロー、**比較再生**（同時再生）、**進捗スライダー＋レーダーチャート**、**お手本スイング/models**、**生徒共有ページ/s/[token]**（青×白・進捗/記録/アドバイス/お手本・停止/再発行）、**CSVエクスポート**、顔写真、一覧のカードグリッド化
+- 検証: 全ファイルesbuild parse green。push後にVercelビルド＋実機確認
+
 ## 2026-07-13(8) — Lesson OS 本番稼働
 - ops: Vercel `lesson-os` デプロイREADY確認（https://lesson-os.vercel.app）。vault_systemsへ登録、RUNBOOK/manualにURL記載
 - feat(genesis): System Networkに lesson-os ノード＋フロー図（flows/lesson-os.svg）を追加（新システム時の必須ルール）

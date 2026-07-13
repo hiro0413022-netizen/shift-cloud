@@ -35,13 +35,13 @@ export function AddStudentForm() {
       className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4"
     >
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <input name="name" required placeholder="名前 *" className="rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm" />
-        <input name="name_kana" placeholder="かな" className="rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm" />
-        <input name="member_code" placeholder="会員番号（Smart Hallo）" className="rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm" />
-        <input name="goal" placeholder="目標（例: 90台で回る）" className="rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm" />
+        <input name="name" required placeholder="名前 *" className="input-dark" />
+        <input name="name_kana" placeholder="かな" className="input-dark" />
+        <input name="member_code" placeholder="会員番号（Smart Hallo）" className="input-dark" />
+        <input name="goal" placeholder="目標（例: 90台で回る）" className="input-dark" />
       </div>
       <div className="mt-3 flex items-center gap-3">
-        <button disabled={pending} className="rounded-lg bg-sky-500/20 px-4 py-2 text-sm text-sky-300 disabled:opacity-40">
+        <button disabled={pending} className="btn-gold">
           {pending ? "登録中…" : "登録してカルテを開く"}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="text-sm text-[--color-dim]">キャンセル</button>

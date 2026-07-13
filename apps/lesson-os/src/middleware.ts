@@ -1,7 +1,7 @@
 import { createAuthMiddleware } from "@yozan/core/middleware";
 
 // 公開プレフィックス: /login, /manual。実装は @yozan/core（DECISIONS #35）
-export const middleware = createAuthMiddleware({ publicPrefixes: ["/login", "/manual"] });
+export const middleware = createAuthMiddleware({ publicPrefixes: ["/login", "/manual", "/s"] });
 
 // Next.jsの静的解析のためmatcherはリテラル必須（@yozan/coreからのimport識別子は使えない）
 export const config = {
