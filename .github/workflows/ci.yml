@@ -32,6 +32,7 @@ jobs:
       matrix:
         app:
           - caddy-os
+          - lesson-os
           - corporate
           - genesis
           - legal-os

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-13(7) — Lesson OS P1（WING NOTE代替アプリ本体）
+- 調査: **WING NOTE実機**（ログイン済みChrome）と**GOLF WING Finder**（コーチ診断ナレッジのデモ）を確認。機能マップと弱み→改善表を SYSTEM.md §6 に記録
+- feat: **apps/lesson-os 新設**（独立アプリ・port 3006・use_lesson|view_hq・hnd1）— 生徒一覧（**名前だけで登録できる**・検索・最終レッスン日順・動画数）／生徒カルテ（動画タイムライン・**スマホカメラ直撮影対応**の署名URL直PUTアップロード・再生・コーチコメント・**★ベストスイング**・目標/メモ編集）／/manual（RUNBOOK新規）
+- db: `0042_lesson_os_p1.sql` 適用 — lsn_videos.is_best / lsn_students.goal
+- ci: matrixにlesson-os追加
+- 検証: 全ファイルesbuild parse green。push→Vercelプロジェクト作成後に動作確認（NEXT_TASKS LSN）
+
 ## 2026-07-13(6) — 資料室の不具合修正・スタッフ編集修正・Lesson OS土台
 - fix(genesis/library): アップロード失敗の2原因を解消 — ①Server Action経由はVercel約4.5MB上限 → **署名付きURLでブラウザ→Storage直PUT**に変更（50MBまで） ②**Storageキーは日本語不可**（"Invalid key"）→ 分類・ファイル名をbase64urlで持ち表示時に復号（lib/libkey.ts新設）
 - fix(shift-cloud): スタッフ編集の主店舗必須を解除 — 店舗に立たない役員・本部は「なし」で保存可（小川さんのパスワード設定が主店舗バリデーションで止まっていた）
