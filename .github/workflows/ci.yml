@@ -23,6 +23,10 @@ jobs:
           node-version: 22
       # tests/ は依存パッケージ不要（純粋ロジックのみを対象にしているため install しない）
       - run: npm test
+      # 給与・労働時間ロジックの二重実装ガード（DECISIONS #53）
+      # 画面ごとに work_minutes を合計したり hourly_wage を掛けたりすると、
+      # 15分丸め・月給・交通費が抜けて給与画面と数字が割れる。機械的に落とす。
+      - run: npm run check:labor
 
   build:
     name: build+tsc (${{ matrix.app }})

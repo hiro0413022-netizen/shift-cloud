@@ -7,6 +7,13 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 
 /* 派遣の登録・更新・削除（Server Action。書き込みは service_role のみ / RLS標準 #3） */
 
+/** "YYYY-MM" → その月の実在する月末日（"YYYY-MM-DD"）。-31固定は2月等で壊れる（DECISIONS #53） */
+function monthEnd(ym: string): string {
+  const [y, m] = ym.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${ym}-${String(last).padStart(2, "0")}`;
+}
+
 const dispatchSchema = z.object({
   id: z.string().uuid().optional(),
   dispatch_date: z.string().min(10),
@@ -84,7 +91,8 @@ export async function saveDispatch(fd: FormData): Promise<{ error?: string }> {
       .select("id", { count: "exact", head: true })
       .eq("company_id", actor.companyId)
       .gte("dispatch_date", `${ym}-01`)
-      .lte("dispatch_date", `${ym}-31`)
+      // 月末日は実在する日で（-31固定は2月等で0件になる / DECISIONS #53）
+      .lte("dispatch_date", monthEnd(ym))
       .is("deleted_at", null);
     const seq = `${ym}-${String((count ?? 0) + 1).padStart(3, "0")}`;
     const { error } = await admin.from("cad_dispatches").insert({ ...row, seq });

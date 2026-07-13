@@ -3,6 +3,7 @@ import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Badge, Empty } from "@/components/ui";
 import { currentYM, addMonths, timeJST, fmtMinutes, dowJP } from "@/lib/util";
+import { monthRange } from "@/lib/payroll-calc";
 import { CorrectionForm } from "./correction-form";
 
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<{ store?: string; ym?: string }> }) {
@@ -21,8 +22,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     .select("*, staff(name)")
     .eq("company_id", actor.companyId)
     .eq("store_id", storeId)
-    .gte("date", `${ym}-01`)
-    .lte("date", `${ym}-31`)
+    .gte("date", monthRange(ym).from)
+    .lte("date", monthRange(ym).to)
     .order("date", { ascending: false });
 
   return (

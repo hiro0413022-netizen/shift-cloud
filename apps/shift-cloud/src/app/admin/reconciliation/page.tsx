@@ -3,6 +3,7 @@ import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Badge, Empty } from "@/components/ui";
 import { currentYM, addMonths, timeJST, fmtMinutes, hm, dowJP } from "@/lib/util";
+import { monthRange } from "@/lib/payroll-calc";
 
 /** 月末照合: 希望 / 確定 / 打刻 / 実勤務 の突き合わせ */
 export default async function ReconciliationPage({ searchParams }: { searchParams: Promise<{ store?: string; ym?: string }> }) {
@@ -16,7 +17,7 @@ export default async function ReconciliationPage({ searchParams }: { searchParam
   const storeId = sp.store ?? stores?.[0]?.id;
   if (!storeId) return <PageTitle>月末照合</PageTitle>;
 
-  const from = `${ym}-01`, to = `${ym}-31`;
+  const { from, to } = monthRange(ym); // -31固定は2月等で0件になる（DECISIONS #53）
   const [{ data: shifts }, { data: attendance }, { data: requests }] = await Promise.all([
     admin.from("shifts").select("staff_id, date, start_time, end_time, is_day_off, staff(name), shift_templates(name)")
       .eq("company_id", actor.companyId).eq("store_id", storeId).eq("status", "published")

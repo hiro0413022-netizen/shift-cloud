@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Card, Badge } from "@/components/ui";
 import { todayJST, currentYM, hm, timeJST, fmtMinutes, yen, dowJP } from "@/lib/util";
-import { calcMonthlyPayroll, type WageRow, type AllowanceRow } from "@/lib/payroll-calc";
+import { calcMonthlyPayroll, monthRange, type WageRow, type AllowanceRow } from "@/lib/payroll-calc";
 import { TasksCard, type TaskItem } from "./tasks-card";
 import Link from "next/link";
 
@@ -32,7 +32,7 @@ export default async function HomePage() {
       .eq("staff_id", actor.staffId)
       .gte("recorded_at", `${today}T00:00:00+09:00`).order("recorded_at"),
     supabase.from("attendance_days").select("staff_id, date, work_minutes, overtime_minutes")
-      .eq("staff_id", actor.staffId).gte("date", `${ym}-01`).lte("date", `${ym}-31`),
+      .eq("staff_id", actor.staffId).gte("date", monthRange(ym).from).lte("date", monthRange(ym).to),
     supabase.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary")
       .eq("staff_id", actor.staffId).is("deleted_at", null),
     supabase.from("announcements").select("id, title, body, created_at")
@@ -62,8 +62,6 @@ export default async function HomePage() {
   const lastRecord = todayRecords?.[todayRecords.length - 1];
   const clockIn = todayRecords?.find((r) => r.type === "clock_in");
   const clockOut = [...(todayRecords ?? [])].reverse().find((r) => r.type === "clock_out");
-  const workMin = (monthDays ?? []).reduce((s, d) => s + d.work_minutes, 0);
-
   // 給与見込み（DECISIONS #48: 本計算と同じ calcMonthlyPayroll を使う＝月給制・手当・日付按分対応）
   const settings = (company?.settings ?? {}) as { rounding_minutes?: number; overtime_rate?: number };
   const payroll = calcMonthlyPayroll(
@@ -71,9 +69,11 @@ export default async function HomePage() {
     (wages ?? []) as WageRow[],
     settings.rounding_minutes ?? 0,
     settings.overtime_rate ?? 1.25,
-    { monthEnd: `${ym}-31`, allowances, includeStaffIds: [actor.staffId] }
+    { monthEnd: monthRange(ym).to, allowances, includeStaffIds: [actor.staffId] }
   ).get(actor.staffId);
   const estPay = payroll ? payroll.total_amount : null;
+  // 表示する労働時間も給与計算と同じ「丸め後」を使う（生の合計だと給与見込みと分数が食い違う / DECISIONS #53）
+  const workMin = payroll?.work ?? 0;
 
   // クイックリンク: 全店共通(store_id null) + 所属店舗のもの
   const myLinks = (links ?? []).filter((l) => !l.store_id || actor.storeIds.includes(l.store_id));
