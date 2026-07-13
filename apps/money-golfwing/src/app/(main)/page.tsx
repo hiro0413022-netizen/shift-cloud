@@ -34,7 +34,7 @@ export default async function DashboardPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">お金管理 ダッシュボード</h1>
-          <p className="text-sm text-[--color-dim]">GOLF WING の売上・現金・経費を一元管理（Money OS）</p>
+          <p className="text-sm text-(--color-dim)">GOLF WING の売上・現金・経費を一元管理（Money OS）</p>
         </div>
         <Link href="/import" className={btnCls}>カード・口座を取込</Link>
       </header>
@@ -42,13 +42,13 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Panel title="未仕分けの明細">
           <p className="text-3xl font-bold tabular-nums">{unassigned}</p>
-          <p className="mt-1 text-sm text-[--color-dim]">
-            {unassigned > 0 ? <Link href="/import" className="text-[--color-gold] hover:underline">仕分けする →</Link> : "すべて仕分け済み"}
+          <p className="mt-1 text-sm text-(--color-dim)">
+            {unassigned > 0 ? <Link href="/import" className="text-(--color-gold) hover:underline">仕分けする →</Link> : "すべて仕分け済み"}
           </p>
         </Panel>
         <Panel title="取込済み明細（合計）" className="sm:col-span-2">
           <p className="text-3xl font-bold tabular-nums">{all.length}</p>
-          <p className="mt-1 text-sm text-[--color-dim]">確定 {all.filter((t) => t.status === "confirmed").length} / 除外 {all.filter((t) => t.status === "ignored").length}</p>
+          <p className="mt-1 text-sm text-(--color-dim)">確定 {all.filter((t) => t.status === "confirmed").length} / 除外 {all.filter((t) => t.status === "ignored").length}</p>
         </Panel>
       </div>
 
@@ -56,7 +56,7 @@ export default async function DashboardPage() {
         {months.length === 0 ? (
           <Empty>まだ確定済みの経費がありません。取込 → 仕分けで反映されます</Empty>
         ) : (
-          <ul className="divide-y divide-[--color-line]">
+          <ul className="divide-y divide-(--color-line)">
             {months.map(([m, v]) => (
               <li key={m} className="flex items-center justify-between py-2 text-sm">
                 <span className="flex items-center gap-2"><Badge tone="gold">{m}</Badge></span>
@@ -67,7 +67,7 @@ export default async function DashboardPage() {
         )}
       </Panel>
 
-      <p className="text-xs text-[--color-dim]">
+      <p className="text-xs text-(--color-dim)">
         ※ 確定した経費は財務(fin_entries)へ自動集約され、GENESISの営業利益KPIに反映されます。
       </p>
     </div>

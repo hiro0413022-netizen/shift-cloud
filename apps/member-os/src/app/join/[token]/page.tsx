@@ -8,9 +8,9 @@ function Shell({ storeName, children }: { storeName?: string | null; children: R
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-8">
       <div className="mb-6 text-center">
-        <p className="text-xs font-semibold tracking-[0.3em] text-[--color-gold]">FRUNK GOLF</p>
+        <p className="text-xs font-semibold tracking-[0.3em] text-(--color-gold)">FRUNK GOLF</p>
         <h1 className="text-2xl font-bold tracking-tight">入会申込</h1>
-        <p className="mt-1 text-xs text-[--color-dim]">{storeName ?? "タブレットにご記入をお願いします"}</p>
+        <p className="mt-1 text-xs text-(--color-dim)">{storeName ?? "タブレットにご記入をお願いします"}</p>
       </div>
       {children}
     </main>
@@ -30,9 +30,9 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
   if (!tok || !tok.active) {
     return (
       <Shell>
-        <div className="rounded-2xl border border-[--color-line] bg-white p-6 text-center shadow-sm">
+        <div className="rounded-2xl border border-(--color-line) bg-white p-6 text-center shadow-sm">
           <p className="text-lg font-semibold">入会URLが無効です</p>
-          <p className="mt-2 text-sm text-[--color-dim]">お手数ですがスタッフにお声がけください。</p>
+          <p className="mt-2 text-sm text-(--color-dim)">お手数ですがスタッフにお声がけください。</p>
         </div>
       </Shell>
     );

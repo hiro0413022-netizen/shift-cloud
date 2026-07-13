@@ -46,7 +46,7 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {stats.map((s) => (
           <Panel key={s.label}>
-            <p className="text-xs text-[--color-dim]">{s.label}</p>
+            <p className="text-xs text-(--color-dim)">{s.label}</p>
             <p className="mt-1 text-2xl font-bold tabular-nums">
               <CountUp value={s.value} />
             </p>
@@ -58,14 +58,14 @@ export default async function DashboardPage() {
         {db.upcoming.length === 0 ? (
           <Empty>90日以内に対応期限の来る契約はありません</Empty>
         ) : (
-          <ul className="divide-y divide-[--color-line]">
+          <ul className="divide-y divide-(--color-line)">
             {db.upcoming.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-3 py-2.5">
                 <div className="min-w-0">
                   <Link href={`/documents/${d.id}`} className="truncate font-medium hover:text-sky-300">
                     {d.title}
                   </Link>
-                  <p className="text-xs text-[--color-dim]">
+                  <p className="text-xs text-(--color-dim)">
                     {DOC_TYPE_LABELS[d.doc_type]}
                     {d.counterparty ? ` ・ ${d.counterparty}` : ""} ・ 期日 {fmtDay(d.next_action_date ?? d.expiry_date)}
                   </p>

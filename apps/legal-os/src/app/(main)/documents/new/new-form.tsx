@@ -57,7 +57,7 @@ export function NewForm({ segments }: { segments: Segment[] }) {
           <input name="renewal_notice_days" type="number" step="1" className={inputCls} placeholder="日数" />
         </Field>
         <label className="flex items-center gap-2 pb-2 text-sm">
-          <input name="auto_renew" type="checkbox" className="h-4 w-4 rounded border-[--color-line] bg-[--color-panel-2]" />
+          <input name="auto_renew" type="checkbox" className="h-4 w-4 rounded border-(--color-line) bg-(--color-panel-2)" />
           自動更新あり
         </label>
       </div>
@@ -67,7 +67,7 @@ export function NewForm({ segments }: { segments: Segment[] }) {
       </Field>
 
       <Field label="ファイル（PDF / 画像）">
-        <input name="file" type="file" accept=".pdf,image/*" className="block w-full text-sm text-[--color-dim] file:mr-3 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:text-white" />
+        <input name="file" type="file" accept=".pdf,image/*" className="block w-full text-sm text-(--color-dim) file:mr-3 file:rounded-lg file:border-0 file:bg-sky-600 file:px-3 file:py-1.5 file:text-white" />
       </Field>
 
       {state.error && <p className="text-sm text-red-400">{state.error}</p>}
@@ -77,7 +77,7 @@ export function NewForm({ segments }: { segments: Segment[] }) {
           {pending ? "登録中..." : "登録する"}
         </button>
       </div>
-      <p className="text-xs text-[--color-dim]">
+      <p className="text-xs text-(--color-dim)">
         登録後は「下書き」で保存されます。締結・有効化の承認はGENESIS側で古川さんが行います。
       </p>
     </form>

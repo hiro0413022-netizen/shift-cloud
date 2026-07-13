@@ -45,11 +45,11 @@ export default async function MastersPage() {
   return (
     <main className="mx-auto max-w-6xl p-6">
       <header className="mb-6">
-        <Link href="/" className="text-xs text-[--color-dim] underline">
+        <Link href="/" className="text-xs text-(--color-dim) underline">
           ← ダッシュボード
         </Link>
         <h1 className="text-2xl font-bold tracking-widest">マスタ</h1>
-        <p className="mt-1 text-sm text-[--color-dim]">
+        <p className="mt-1 text-sm text-(--color-dim)">
           取引先（ゴルフ場）と委託先（キャディ）。※個人情報（住所・生年月日・口座）は保持していません
         </p>
       </header>
@@ -57,7 +57,7 @@ export default async function MastersPage() {
       <section className={`${cardCls} mb-6`}>
         <h2 className="mb-3 font-semibold">取引先（{cs.length}）</h2>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-[--color-dim]">
+          <thead className="text-left text-xs text-(--color-dim)">
             <tr>
               <th className="pb-2">コード</th>
               <th className="pb-2">ゴルフ場</th>
@@ -69,8 +69,8 @@ export default async function MastersPage() {
           </thead>
           <tbody>
             {cs.map((c) => (
-              <tr key={c.id} className="border-t border-[--color-line]">
-                <td className="py-1.5 text-[--color-dim]">{c.code}</td>
+              <tr key={c.id} className="border-t border-(--color-line)">
+                <td className="py-1.5 text-(--color-dim)">{c.code}</td>
                 <td className="py-1.5">{c.name}</td>
                 <td className="py-1.5 text-right tabular-nums">
                   {c.unit_price ? `¥${c.unit_price.toLocaleString()}` : "—"}
@@ -93,7 +93,7 @@ export default async function MastersPage() {
       <section className={cardCls}>
         <h2 className="mb-3 font-semibold">委託先（{ps.length}）</h2>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-[--color-dim]">
+          <thead className="text-left text-xs text-(--color-dim)">
             <tr>
               <th className="pb-2">コード</th>
               <th className="pb-2">氏名</th>
@@ -104,8 +104,8 @@ export default async function MastersPage() {
           </thead>
           <tbody>
             {ps.map((p) => (
-              <tr key={p.id} className="border-t border-[--color-line]">
-                <td className="py-1.5 text-[--color-dim]">{p.code ?? "—"}</td>
+              <tr key={p.id} className="border-t border-(--color-line)">
+                <td className="py-1.5 text-(--color-dim)">{p.code ?? "—"}</td>
                 <td className="py-1.5">{p.name}</td>
                 <td className="py-1.5 text-right tabular-nums">
                   {p.default_fee ? `¥${p.default_fee.toLocaleString()}` : "—"}

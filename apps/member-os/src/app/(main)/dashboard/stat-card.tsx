@@ -41,13 +41,13 @@ export function StatCard({
   const active = groups.find((g) => g.key === open) ?? null;
 
   return (
-    <div className="hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-5">
-      <p className="text-sm font-medium text-[--color-dim]">{label}</p>
+    <div className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-5">
+      <p className="text-sm font-medium text-(--color-dim)">{label}</p>
       <p className={`mt-1 text-3xl font-bold tabular-nums ${VALUE_TONE[tone]}`}>
         <CountUp value={value} />
-        <span className="ml-1 text-base font-medium text-[--color-dim]">{unit}</span>
+        <span className="ml-1 text-base font-medium text-(--color-dim)">{unit}</span>
       </p>
-      {hint ? <p className="mt-1 text-xs text-[--color-dim]">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-xs text-(--color-dim)">{hint}</p> : null}
 
       {groups.length > 0 && (
         <div className="mt-3">
@@ -69,15 +69,15 @@ export function StatCard({
           </div>
 
           {active && (
-            <div className="mt-3 max-h-72 overflow-auto rounded-xl border border-[--color-line] bg-[--color-panel-2]">
+            <div className="mt-3 max-h-72 overflow-auto rounded-xl border border-(--color-line) bg-(--color-panel-2)">
               {active.items.length === 0 ? (
-                <p className="px-3 py-4 text-center text-xs text-[--color-dim]">対象なし</p>
+                <p className="px-3 py-4 text-center text-xs text-(--color-dim)">対象なし</p>
               ) : (
                 <ul className="divide-y divide-line">
                   {active.items.map((it, i) => (
                     <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                      <span className="truncate font-medium text-[--color-txt]">{it.name}</span>
-                      {it.sub ? <span className="shrink-0 text-xs text-[--color-dim]">{it.sub}</span> : null}
+                      <span className="truncate font-medium text-(--color-txt)">{it.name}</span>
+                      {it.sub ? <span className="shrink-0 text-xs text-(--color-dim)">{it.sub}</span> : null}
                     </li>
                   ))}
                 </ul>

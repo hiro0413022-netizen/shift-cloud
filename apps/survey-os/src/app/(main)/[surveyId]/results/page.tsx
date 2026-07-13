@@ -62,7 +62,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
             </Badge>
           </div>
           <h1 className="text-xl font-bold">{survey.title}</h1>
-          <p className="mt-1 text-sm text-[--color-dim]">回答数 {total} 件</p>
+          <p className="mt-1 text-sm text-(--color-dim)">回答数 {total} 件</p>
         </div>
         <div className="flex gap-2">
           <Link href={`/${survey.id}/edit`} className={btnGhostCls}>編集</Link>
@@ -76,7 +76,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
       {/* コーチ総合ランキング */}
       {total > 0 && rankingQs.length > 0 && (
         <Panel title="コーチ総合評価（全13設問のボルダ平均）">
-          <p className="mb-3 text-xs text-[--color-dim]">
+          <p className="mb-3 text-xs text-(--color-dim)">
             ボルダ平均 = 各設問で「1位=100点〜最下位」に換算した得点の平均（受講経験ありの評価のみ・0〜100、高いほど良い）。
           </p>
           <div className="space-y-2">
@@ -86,7 +86,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
                 <span className="w-28 shrink-0 truncate text-sm font-medium">{r.coach.label}</span>
                 <div className="flex-1"><ProgressBar value={r.overall ?? 0} tone={i === 0 ? "gold" : "accent"} /></div>
                 <span className="w-14 shrink-0 text-right text-sm font-bold tabular-nums">{r.overall ?? "—"}</span>
-                <span className="w-24 shrink-0 text-right text-xs text-[--color-dim]">1位{r.firsts}回 / 評価{r.appear}</span>
+                <span className="w-24 shrink-0 text-right text-xs text-(--color-dim)">1位{r.firsts}回 / 評価{r.appear}</span>
               </div>
             ))}
           </div>
@@ -100,9 +100,9 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 bg-[--color-panel] px-2 py-2 text-left font-semibold">コーチ \ 項目</th>
+                  <th className="sticky left-0 z-10 bg-(--color-panel) px-2 py-2 text-left font-semibold">コーチ \ 項目</th>
                   {rankingQs.map((q) => (
-                    <th key={q.code} className="min-w-[64px] px-1 py-2 text-center font-medium text-[--color-dim]" title={q.title}>
+                    <th key={q.code} className="min-w-[64px] px-1 py-2 text-center font-medium text-(--color-dim)" title={q.title}>
                       {shortRankLabel(q.title)}
                     </th>
                   ))}
@@ -111,7 +111,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
               <tbody>
                 {pool.map((c) => (
                   <tr key={c.value}>
-                    <td className="sticky left-0 z-10 bg-[--color-panel] px-2 py-1.5 font-medium">{c.label}</td>
+                    <td className="sticky left-0 z-10 bg-(--color-panel) px-2 py-1.5 font-medium">{c.label}</td>
                     {rankingQs.map((q) => {
                       const st = rankStatsByCode.get(q.code)?.get(c.value);
                       const v = st && st.appearances > 0 ? st.bordaAvg : null;
@@ -126,7 +126,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11px] text-[--color-dim]">セル値=ボルダ平均（緑ほど高評価/赤ほど要改善）。マウスオーバーで平均順位・評価数を表示。</p>
+          <p className="mt-2 text-[11px] text-(--color-dim)">セル値=ボルダ平均（緑ほど高評価/赤ほど要改善）。マウスオーバーで平均順位・評価数を表示。</p>
         </Panel>
       )}
 
@@ -141,8 +141,8 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
             <Panel key={q.code} title={`${q.code}. ${q.title}`}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="text-xs text-[--color-dim]">
-                    <tr className="border-b border-[--color-line]">
+                  <thead className="text-xs text-(--color-dim)">
+                    <tr className="border-b border-(--color-line)">
                       <th className="py-2 text-left">順位</th>
                       <th className="py-2 text-left">コーチ</th>
                       <th className="py-2 text-right">ボルダ平均</th>
@@ -153,13 +153,13 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
                   </thead>
                   <tbody>
                     {stats.map((s, i) => (
-                      <tr key={s.value} className="border-b border-[--color-line]/60">
+                      <tr key={s.value} className="border-b border-(--color-line)/60">
                         <td className="py-2">{i + 1}</td>
                         <td className="py-2 font-medium">{s.label}</td>
                         <td className="py-2 text-right font-bold tabular-nums">{s.bordaAvg}</td>
                         <td className="py-2 text-right tabular-nums">{s.avgRank ?? "—"}</td>
                         <td className="py-2 text-right tabular-nums">{s.firsts}</td>
-                        <td className="py-2 text-right tabular-nums text-[--color-dim]">{s.appearances}</td>
+                        <td className="py-2 text-right tabular-nums text-(--color-dim)">{s.appearances}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -183,7 +183,7 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
           const others = q.type === "multi" ? vals.map((v) => v.other).filter((x): x is string => !!x && x.trim() !== "") : [];
           return (
             <Panel key={q.code} title={`${q.code}. ${q.title}`}>
-              <p className="mb-3 text-xs text-[--color-dim]">
+              <p className="mb-3 text-xs text-(--color-dim)">
                 {q.type === "multi" ? `回答者 ${total} 名中（複数選択）` : `回答 ${flat.length} 件`}
               </p>
               <div className="space-y-2">
@@ -191,13 +191,13 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
                   <div key={c.option.value} className="flex items-center gap-3">
                     <span className="w-40 shrink-0 truncate text-sm">{c.option.label}</span>
                     <div className="flex-1"><ProgressBar value={c.pct} /></div>
-                    <span className="w-24 shrink-0 text-right text-xs tabular-nums text-[--color-dim]">{c.count}件 ({c.pct}%)</span>
+                    <span className="w-24 shrink-0 text-right text-xs tabular-nums text-(--color-dim)">{c.count}件 ({c.pct}%)</span>
                   </div>
                 ))}
               </div>
               {others.length > 0 && (
-                <div className="mt-3 rounded-lg bg-[--color-panel-2] p-3">
-                  <p className="mb-1 text-xs font-semibold text-[--color-dim]">その他の記述</p>
+                <div className="mt-3 rounded-lg bg-(--color-panel-2) p-3">
+                  <p className="mb-1 text-xs font-semibold text-(--color-dim)">その他の記述</p>
                   <ul className="list-disc space-y-0.5 pl-5 text-sm">
                     {others.map((o, i) => <li key={i}>{o}</li>)}
                   </ul>
@@ -211,13 +211,13 @@ export default async function ResultsPage({ params }: { params: Promise<{ survey
         const texts = (byCode.get(q.code) ?? []).map((v) => v.text).filter((x): x is string => !!x && x.trim() !== "");
         return (
           <Panel key={q.code} title={`${q.code}. ${q.title}`}>
-            <p className="mb-2 text-xs text-[--color-dim]">{texts.length} 件の記述</p>
+            <p className="mb-2 text-xs text-(--color-dim)">{texts.length} 件の記述</p>
             {texts.length === 0 ? (
               <Empty>記述はありません。</Empty>
             ) : (
               <ul className="space-y-2">
                 {texts.map((t, i) => (
-                  <li key={i} className="rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm whitespace-pre-wrap">{t}</li>
+                  <li key={i} className="rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm whitespace-pre-wrap">{t}</li>
                 ))}
               </ul>
             )}

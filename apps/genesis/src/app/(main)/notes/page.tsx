@@ -32,7 +32,7 @@ export default async function NotesPage() {
   return (
     <div>
       <h1 className="mb-1 text-xl font-semibold tracking-tight">社内連絡</h1>
-      <p className="mb-6 text-sm text-[--color-dim]">
+      <p className="mb-6 text-sm text-(--color-dim)">
         役員から経営への連絡ノート。書き残せば流れません。{openCount > 0 ? `未対応 ${openCount} 件` : "未対応はありません"}
       </p>
       <NotesClient items={items} myName={actor.name} />

@@ -81,7 +81,7 @@ export default async function ReceiptsPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">証憑（請求書・領収書・レシート）</h1>
-          <p className="text-sm text-[--color-dim]">
+          <p className="text-sm text-(--color-dim)">
             電子帳簿保存法の保管＋経費突合の土台。契約書はLegal OSへ（こちらは経理系のみ）
           </p>
         </div>
@@ -111,7 +111,7 @@ export default async function ReceiptsPage({
           <input name="memo" placeholder="メモ（任意）" className={`${inputCls} md:col-span-5`} />
           <button className={btnCls}>登録</button>
         </form>
-        <p className="mt-2 text-xs text-[--color-dim]">
+        <p className="mt-2 text-xs text-(--color-dim)">
           日付・金額は後から編集できます。まず撮って登録→あとで整えるでOK（OCR自動読み取りは経理AIフェーズで追加予定）
         </p>
       </Panel>
@@ -122,12 +122,12 @@ export default async function ReceiptsPage({
         ) : (
           <div className="space-y-3">
             {rows.map((r) => (
-              <details key={r.id} className="rounded-xl border border-[--color-line] bg-white">
+              <details key={r.id} className="rounded-xl border border-(--color-line) bg-white">
                 <summary className="flex cursor-pointer flex-wrap items-center gap-3 p-3">
                   <Badge tone={r.status === "matched" ? "ok" : r.status === "archived" ? "dim" : "accent"}>
                     {STATUS_LABEL[r.status] ?? r.status}
                   </Badge>
-                  <span className="text-sm tabular-nums text-[--color-dim]">{r.issue_date ?? "日付未入力"}</span>
+                  <span className="text-sm tabular-nums text-(--color-dim)">{r.issue_date ?? "日付未入力"}</span>
                   <span className="text-sm">{KIND_LABEL[r.kind] ?? r.kind}</span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.counterparty ?? r.file_name}</span>
                   <span className="text-sm font-semibold tabular-nums">{r.amount != null ? yen(Number(r.amount)) : "-"}</span>
@@ -136,13 +136,13 @@ export default async function ReceiptsPage({
                       href={signed.get(r.id)}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm text-[--color-accent] underline"
+                      className="text-sm text-(--color-accent) underline"
                     >
                       📄開く
                     </a>
                   )}
                 </summary>
-                <div className="border-t border-[--color-line] p-3">
+                <div className="border-t border-(--color-line) p-3">
                   <form action={updateReceipt} className="grid gap-3 md:grid-cols-6">
                     <input type="hidden" name="id" value={r.id} />
                     <select name="kind" defaultValue={r.kind} className={inputCls}>
@@ -161,7 +161,7 @@ export default async function ReceiptsPage({
                     <button className={btnCls}>保存</button>
                     <input name="memo" defaultValue={r.memo ?? ""} placeholder="メモ" className={`${inputCls} md:col-span-6`} />
                   </form>
-                  <div className="mt-2 flex items-center justify-between text-xs text-[--color-dim]">
+                  <div className="mt-2 flex items-center justify-between text-xs text-(--color-dim)">
                     <span>
                       {r.file_name}
                       {r.mon_expense_id ? "・経費行と突合済" : ""}
@@ -169,7 +169,7 @@ export default async function ReceiptsPage({
                     </span>
                     <form action={deleteReceipt}>
                       <input type="hidden" name="id" value={r.id} />
-                      <button className="text-[--color-danger] hover:underline">削除（台帳から除外）</button>
+                      <button className="text-(--color-danger) hover:underline">削除（台帳から除外）</button>
                     </form>
                   </div>
                 </div>

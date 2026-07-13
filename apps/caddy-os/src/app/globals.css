@@ -23,7 +23,7 @@ body {
 
 body {
   font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
-  @apply text-[--color-txt] antialiased;
+  @apply text-(--color-txt) antialiased;
 }
 
 /* 請求書の印刷（ブラウザの印刷 → PDF保存で使う）。A4・余白は請求書側のpaddingで作る */

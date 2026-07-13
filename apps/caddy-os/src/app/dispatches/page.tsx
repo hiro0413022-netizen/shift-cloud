@@ -19,7 +19,7 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
     <main className="mx-auto max-w-6xl p-6">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <Link href="/" className="text-xs text-[--color-dim] underline">
+          <Link href="/" className="text-xs text-(--color-dim) underline">
             ← ダッシュボード
           </Link>
           <h1 className="text-2xl font-bold tracking-widest">派遣台帳</h1>
@@ -29,9 +29,9 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
             type="month"
             name="ym"
             defaultValue={ym}
-            className="rounded-lg border border-[--color-line] bg-white px-3 py-1.5 text-sm"
+            className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm"
           />
-          <button className="rounded-lg border border-[--color-line] px-3 py-1.5 text-sm">表示</button>
+          <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm">表示</button>
         </form>
       </header>
 
@@ -50,18 +50,18 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
           <h2 className="font-semibold">
             {ym} の派遣（{rows.length}件）
           </h2>
-          <p className="text-sm text-[--color-dim]">
+          <p className="text-sm text-(--color-dim)">
             売上 {yen(s.sales)} / 外注費 {yen(s.outsourcing)} / 粗利{" "}
             <b className={s.gross >= 0 ? "text-emerald-700" : "text-red-600"}>{yen(s.gross)}</b>
           </p>
         </div>
 
         {rows.length === 0 ? (
-          <p className="text-sm text-[--color-dim]">この月の派遣はまだありません</p>
+          <p className="text-sm text-(--color-dim)">この月の派遣はまだありません</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-left text-xs text-[--color-dim]">
+              <thead className="text-left text-xs text-(--color-dim)">
                 <tr>
                   <th className="pb-2">日付</th>
                   <th className="pb-2">取引先</th>
@@ -80,9 +80,9 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                   const gross = r.sales_amount - cost;
                   const isStaff = !!r.staff_id;
                   return (
-                    <tr key={r.id} className="border-t border-[--color-line]">
+                    <tr key={r.id} className="border-t border-(--color-line)">
                       <td className="py-1.5 whitespace-nowrap">{r.dispatch_date.slice(5)}</td>
-                      <td className="py-1.5">{r.cad_clients?.name ?? <span className="text-[--color-dim]">—</span>}</td>
+                      <td className="py-1.5">{r.cad_clients?.name ?? <span className="text-(--color-dim)">—</span>}</td>
                       <td className="py-1.5 text-right tabular-nums">
                         {r.sales_amount > 0 ? yen(r.sales_amount) : "—"}
                       </td>
@@ -93,14 +93,14 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                             <span className="ml-1 rounded bg-sky-100 px-1 text-[10px] text-sky-800">自社</span>
                           </span>
                         ) : (
-                          (r.cad_partners?.name ?? <span className="text-[--color-dim]">—</span>)
+                          (r.cad_partners?.name ?? <span className="text-(--color-dim)">—</span>)
                         )}
                       </td>
                       <td className="py-1.5 text-right tabular-nums">{isStaff ? "—" : yen(r.fee_amount)}</td>
                       <td className="py-1.5 text-right tabular-nums">
                         {r.transport_amount > 0 ? yen(r.transport_amount) : "—"}
                         {isStaff && r.transport_amount > 0 ? (
-                          <span className="ml-1 text-[10px] text-[--color-dim]">給与</span>
+                          <span className="ml-1 text-[10px] text-(--color-dim)">給与</span>
                         ) : null}
                       </td>
                       <td className="py-1.5 text-right tabular-nums">
@@ -115,7 +115,7 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                         <form action={deleteDispatch}>
                           <input type="hidden" name="id" value={r.id} />
                           <input type="hidden" name="ym" value={ym} />
-                          <button className="text-xs text-[--color-dim] hover:text-red-600">削除</button>
+                          <button className="text-xs text-(--color-dim) hover:text-red-600">削除</button>
                         </form>
                       </td>
                     </tr>

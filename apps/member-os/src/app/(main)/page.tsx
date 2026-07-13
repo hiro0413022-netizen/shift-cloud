@@ -66,11 +66,11 @@ export default async function LedgerPage({
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">一時利用者名簿 — 受付台帳</h1>
-          <p className="text-sm text-[--color-dim]">体験・フィッティング・打席の一時利用をここで記録。紙・Excelを廃止し、体験→入会率も自動集計</p>
+          <p className="text-sm text-(--color-dim)">体験・フィッティング・打席の一時利用をここで記録。紙・Excelを廃止し、体験→入会率も自動集計</p>
         </div>
         <form className="flex flex-wrap items-center gap-2">
           <input type="date" name="from" defaultValue={from} className={inputCls} />
-          <span className="text-[--color-dim]">〜</span>
+          <span className="text-(--color-dim)">〜</span>
           <input type="date" name="to" defaultValue={to} className={inputCls} />
           <select name="type" defaultValue={typeFilter} className={inputCls}>
             <option value="">全区分</option>
@@ -89,11 +89,11 @@ export default async function LedgerPage({
       {/* 受付URL（発行直後に一度だけ表示） */}
       {receptionUrl && (
         <Panel title="店頭タブレット受付URL（このURL/QRを店頭タブレットで開いてください・一度だけ表示）" className="d1">
-          <p className="mb-2 text-xs text-[--color-dim]">
+          <p className="mb-2 text-xs text-(--color-dim)">
             このURLは長期有効です。タブレットのブラウザで開いてホーム画面に追加するか、QRにして店頭に掲示してください。予約不要でお客様が自己入力できます。
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-indigo-600">{receptionUrl}</code>
+            <code className="flex-1 break-all rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-xs text-indigo-600">{receptionUrl}</code>
             <a href={receptionUrl} target="_blank" rel="noreferrer" className={btnCls}>受付画面を開く ↗</a>
           </div>
         </Panel>
@@ -160,17 +160,17 @@ export default async function LedgerPage({
               const selfDone = !!v.consent_at;
               const vtype = String(v.visit_type);
               return (
-                <div key={String(v.id)} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
+                <div key={String(v.id)} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Badge tone={TYPE_TONE[vtype] ?? "default"}>{VISIT_TYPE_LABEL[vtype] ?? vtype}</Badge>
                       <span className="font-semibold">{name}</span>
-                      {guest?.name_kana ? <span className="text-xs text-[--color-dim]">{String(guest.name_kana)}</span> : null}
+                      {guest?.name_kana ? <span className="text-xs text-(--color-dim)">{String(guest.name_kana)}</span> : null}
                       {v.result === "join" ? <Badge tone="gold">入会</Badge> : null}
                       {v.result === "purchase" ? <Badge tone="ok">購入</Badge> : null}
                       {selfDone ? <Badge tone="ok">自己入力済</Badge> : null}
                     </div>
-                    <div className="text-xs text-[--color-dim]">
+                    <div className="text-xs text-(--color-dim)">
                       {[String(v.visited_on), guest?.phone && String(guest.phone), v.referral_source && `経路 ${String(v.referral_source)}`, rec?.name && `受付 ${String(rec.name)}`]
                         .filter(Boolean).join("　")}
                     </div>
@@ -200,7 +200,7 @@ export default async function LedgerPage({
                   <div className="mt-1 flex justify-end">
                     <form action={deleteVisit}>
                       <input type="hidden" name="id" value={String(v.id)} />
-                      <button className="text-xs text-[--color-dim] hover:text-red-400">削除</button>
+                      <button className="text-xs text-(--color-dim) hover:text-red-400">削除</button>
                     </form>
                   </div>
                 </div>
@@ -212,7 +212,7 @@ export default async function LedgerPage({
 
       {/* 店頭タブレットURL発行 */}
       <Panel title="店頭タブレット受付URLの発行" className="d3">
-        <p className="mb-2 text-xs text-[--color-dim]">店舗ごとに常設の受付URLを発行します（予約不要）。発行すると同じ店舗の旧URLは無効化されます。</p>
+        <p className="mb-2 text-xs text-(--color-dim)">店舗ごとに常設の受付URLを発行します（予約不要）。発行すると同じ店舗の旧URLは無効化されます。</p>
         <form action={issueStoreToken} className="flex flex-wrap items-end gap-2">
           {storeList.length > 0 && (
             <Field label="店舗">
@@ -237,13 +237,13 @@ function SummaryCard({
 }: {
   label: string; value: number; unit: string; tone?: "accent" | "gold" | "ok"; dim?: boolean;
 }) {
-  const color = tone === "gold" ? "text-[--color-gold]" : tone === "ok" ? "text-emerald-600" : "text-indigo-600";
+  const color = tone === "gold" ? "text-(--color-gold)" : tone === "ok" ? "text-emerald-600" : "text-indigo-600";
   return (
-    <div className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-      <p className="text-xs text-[--color-dim]">{label}</p>
-      <p className={`mt-1 text-2xl font-bold tabular-nums ${dim ? "text-[--color-dim]" : color}`}>
+    <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+      <p className="text-xs text-(--color-dim)">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${dim ? "text-(--color-dim)" : color}`}>
         {dim ? "—" : <CountUp value={value} />}
-        <span className="ml-1 text-sm font-normal text-[--color-dim]">{dim ? "" : unit}</span>
+        <span className="ml-1 text-sm font-normal text-(--color-dim)">{dim ? "" : unit}</span>
       </p>
     </div>
   );

@@ -70,7 +70,7 @@ export default async function ReservationsPage({
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">予約管理 — FRUNK GOLF 姫路</h1>
-          <p className="text-sm text-[--color-dim]">打席・レッスンの枠管理、電話/店頭予約、お客様Web予約、入金・未収金の管理</p>
+          <p className="text-sm text-(--color-dim)">打席・レッスンの枠管理、電話/店頭予約、お客様Web予約、入金・未収金の管理</p>
         </div>
         <form className="flex items-center gap-2">
           <input type="date" name="date" defaultValue={date} className={inputCls} />
@@ -83,7 +83,7 @@ export default async function ReservationsPage({
       {bookingUrl && (
         <Panel title="お客様Web予約URL（QR掲示・HP掲載用・一度だけ表示）" className="d1">
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-indigo-600">{bookingUrl}</code>
+            <code className="flex-1 break-all rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-xs text-indigo-600">{bookingUrl}</code>
             <a href={bookingUrl} target="_blank" rel="noreferrer" className={btnCls}>予約画面を開く ↗</a>
           </div>
         </Panel>
@@ -92,7 +92,7 @@ export default async function ReservationsPage({
       {boardUrl && (
         <Panel title="店頭カレンダーURL（ロビー掲示・常設タブレット用・一度だけ表示）" className="d1">
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-xs text-amber-700">{boardUrl}</code>
+            <code className="flex-1 break-all rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-xs text-amber-700">{boardUrl}</code>
             <a href={boardUrl} target="_blank" rel="noreferrer" className={btnCls}>カレンダーを開く ↗</a>
           </div>
         </Panel>
@@ -105,21 +105,21 @@ export default async function ReservationsPage({
         ) : (
           <>
             <div className="mb-3 flex items-baseline gap-2">
-              <span className="text-sm text-[--color-dim]">未収合計</span>
+              <span className="text-sm text-(--color-dim)">未収合計</span>
               <span className="text-2xl font-bold tabular-nums text-rose-600">{yen(unpaidTotal)}</span>
             </div>
             <div className="space-y-1.5">
               {unpaidList.map(({ b, out }) => (
-                <div key={String(b.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2 text-sm">
+                <div key={String(b.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm">
                   <div className="flex items-center gap-2">
                     <Badge tone={payTone(String(b.payment_status))}>{PAYMENT_STATUS_LABEL[String(b.payment_status)]}</Badge>
                     <span className="font-semibold">{b.guest_name ? String(b.guest_name) : b.member_no ? `会員 ${String(b.member_no)}` : "（名称未入力）"}</span>
-                    <span className="text-xs text-[--color-dim]">
+                    <span className="text-xs text-(--color-dim)">
                       {[String(b.booking_date), String(b.start_time).slice(0, 5), resName(b.resource_id) && String(resName(b.resource_id))].filter(Boolean).join("　")}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-[--color-dim]">請求 {yen(Number(b.amount))}／入金 {yen(Number(b.paid_amount ?? 0))}</span>
+                    <span className="text-xs text-(--color-dim)">請求 {yen(Number(b.amount))}／入金 {yen(Number(b.paid_amount ?? 0))}</span>
                     <span className="font-semibold tabular-nums text-rose-600">未収 {yen(out)}</span>
                     <form action={recordPayment}>
                       <input type="hidden" name="id" value={String(b.id)} />
@@ -140,20 +140,20 @@ export default async function ReservationsPage({
           <div className="min-w-max">
             {/* 時間ヘッダー */}
             <div className="flex">
-              <div className="sticky left-0 z-10 w-28 shrink-0 bg-[--color-panel] px-2 py-2 text-xs font-semibold text-[--color-dim]">枠 ＼ 時間</div>
+              <div className="sticky left-0 z-10 w-28 shrink-0 bg-(--color-panel) px-2 py-2 text-xs font-semibold text-(--color-dim)">枠 ＼ 時間</div>
               {slots.map((s) => (
-                <div key={s} className="w-20 shrink-0 px-1 py-2 text-center text-xs font-semibold text-[--color-dim]">{s}</div>
+                <div key={s} className="w-20 shrink-0 px-1 py-2 text-center text-xs font-semibold text-(--color-dim)">{s}</div>
               ))}
             </div>
             {resList.map((r) => (
-              <div key={String(r.id)} className="flex border-t border-[--color-line]">
-                <div className="sticky left-0 z-10 flex w-28 shrink-0 items-center bg-[--color-panel] px-2 py-1.5 text-sm font-semibold whitespace-nowrap">{String(r.name)}</div>
+              <div key={String(r.id)} className="flex border-t border-(--color-line)">
+                <div className="sticky left-0 z-10 flex w-28 shrink-0 items-center bg-(--color-panel) px-2 py-1.5 text-sm font-semibold whitespace-nowrap">{String(r.name)}</div>
                 {slots.map((s) => {
                   const b = byCell.get(`${r.id}|${s}`);
                   if (!b) {
                     return (
                       <div key={s} className="w-20 shrink-0 px-1 py-1.5">
-                        <div className="h-11 rounded-lg border border-dashed border-[--color-line] bg-[--color-panel-2]" />
+                        <div className="h-11 rounded-lg border border-dashed border-(--color-line) bg-(--color-panel-2)" />
                       </div>
                     );
                   }
@@ -172,10 +172,10 @@ export default async function ReservationsPage({
             ))}
           </div>
         </div>
-        <div className="mt-2 flex flex-wrap gap-4 text-xs text-[--color-dim]">
+        <div className="mt-2 flex flex-wrap gap-4 text-xs text-(--color-dim)">
           <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-indigo-100" />会員予約</span>
           <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-emerald-100" />都度予約</span>
-          <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded border border-dashed border-[--color-line] bg-[--color-panel-2]" />空き</span>
+          <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded border border-dashed border-(--color-line) bg-(--color-panel-2)" />空き</span>
         </div>
       </Panel>
 
@@ -230,14 +230,14 @@ export default async function ReservationsPage({
               const payStatus = String(b.payment_status ?? "unpaid");
               const out = outstanding(b.amount as number | null, b.paid_amount as number | null, payStatus);
               return (
-                <div key={String(b.id)} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3 space-y-2">
+                <div key={String(b.id)} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <Badge tone={status === "canceled" ? "default" : status === "visited" ? "ok" : status === "no_show" ? "danger" : "accent"}>
                         {BOOKING_STATUS_LABEL[status] ?? status}
                       </Badge>
                       <span className="font-semibold">{b.guest_name ? String(b.guest_name) : b.member_no ? `会員 ${String(b.member_no)}` : "（名称未入力）"}</span>
-                      <span className="text-xs text-[--color-dim]">
+                      <span className="text-xs text-(--color-dim)">
                         {[String(b.start_time).slice(0, 5), resName(b.resource_id) && String(resName(b.resource_id)), String(b.customer_kind) === "member" ? "会員" : "都度", b.party_size && `${b.party_size}名`, b.source === "web" && "Web"].filter(Boolean).join("　")}
                       </span>
                     </div>
@@ -251,18 +251,18 @@ export default async function ReservationsPage({
                       {status !== "canceled" && (
                         <form action={setBookingStatus}><input type="hidden" name="id" value={String(b.id)} /><input type="hidden" name="status" value="canceled" /><button className={btnGhostCls}>取消</button></form>
                       )}
-                      <form action={deleteBooking}><input type="hidden" name="id" value={String(b.id)} /><button className="text-xs text-[--color-dim] hover:text-red-400">削除</button></form>
+                      <form action={deleteBooking}><input type="hidden" name="id" value={String(b.id)} /><button className="text-xs text-(--color-dim) hover:text-red-400">削除</button></form>
                     </div>
                   </div>
 
                   {/* 入金行 */}
-                  <form action={recordPayment} className="flex flex-wrap items-center gap-2 border-t border-[--color-line] pt-2">
+                  <form action={recordPayment} className="flex flex-wrap items-center gap-2 border-t border-(--color-line) pt-2">
                     <input type="hidden" name="id" value={String(b.id)} />
                     <Badge tone={payTone(payStatus)}>{PAYMENT_STATUS_LABEL[payStatus]}</Badge>
-                    <label className="flex items-center gap-1 text-xs text-[--color-dim]">請求
+                    <label className="flex items-center gap-1 text-xs text-(--color-dim)">請求
                       <input name="amount" inputMode="numeric" defaultValue={b.amount != null ? String(b.amount) : ""} className={`${inputCls} !w-24 !py-1`} />
                     </label>
-                    <label className="flex items-center gap-1 text-xs text-[--color-dim]">入金
+                    <label className="flex items-center gap-1 text-xs text-(--color-dim)">入金
                       <input name="paid_amount" inputMode="numeric" defaultValue={b.paid_amount != null ? String(b.paid_amount) : ""} className={`${inputCls} !w-24 !py-1`} />
                     </label>
                     <select name="payment_method" defaultValue={b.payment_method ? String(b.payment_method) : ""} className={`${inputCls} !w-28 !py-1`}>
@@ -272,7 +272,7 @@ export default async function ReservationsPage({
                     {out > 0 && <span className="text-xs font-semibold text-rose-600">未収 {yen(out)}</span>}
                     <button name="mode" value="partial" className={btnGhostCls}>記録</button>
                     <button name="mode" value="full" className={btnCls}>全額入金</button>
-                    <button name="mode" value="waive" className="text-xs text-[--color-dim] hover:text-[--color-txt]">免除</button>
+                    <button name="mode" value="waive" className="text-xs text-(--color-dim) hover:text-(--color-txt)">免除</button>
                   </form>
                 </div>
               );
@@ -283,7 +283,7 @@ export default async function ReservationsPage({
 
       {/* URL発行 */}
       <Panel title="公開URLの発行" className="d3">
-        <p className="mb-3 text-xs text-[--color-dim]">HP掲載やQR掲示、ロビー掲示に使うURLを発行します（発行すると同種の旧URLは無効化）。</p>
+        <p className="mb-3 text-xs text-(--color-dim)">HP掲載やQR掲示、ロビー掲示に使うURLを発行します（発行すると同種の旧URLは無効化）。</p>
         <div className="flex flex-wrap gap-2">
           <form action={issueBookingToken}>
             <button className={btnCls}>お客様Web予約URLを発行</button>

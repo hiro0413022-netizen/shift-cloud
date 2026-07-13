@@ -73,7 +73,7 @@ export default async function InvoiceDetail({
     <>
       <div className="mx-auto max-w-3xl p-4 print:hidden">
         <div className="flex items-center justify-between">
-          <Link href={`/invoices?ym=${ym}`} className="text-xs text-[--color-dim] underline">
+          <Link href={`/invoices?ym=${ym}`} className="text-xs text-(--color-dim) underline">
             ← 請求一覧
           </Link>
           <PrintButton />
@@ -173,7 +173,7 @@ export default async function InvoiceDetail({
         <p className="mt-6 text-right text-[10px] text-slate-400">請求番号: {no}</p>
       </div>
 
-      <div className="mx-auto max-w-3xl p-4 text-xs text-[--color-dim] print:hidden">
+      <div className="mx-auto max-w-3xl p-4 text-xs text-(--color-dim) print:hidden">
         派遣台帳から自動生成しています（{inv.lines.length}明細 / {inv.lines.reduce((s, l) => s + l.qty, 0)}人工）。
         金額が合わない場合は台帳を修正してください。
       </div>

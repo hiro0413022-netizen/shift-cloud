@@ -20,7 +20,7 @@ export default async function DecisionsPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">Decision Log</h1>
-        <p className="text-sm text-[--color-dim]">意思決定の記録 — 何を・なぜ・結果どうだったか</p>
+        <p className="text-sm text-(--color-dim)">意思決定の記録 — 何を・なぜ・結果どうだったか</p>
       </header>
 
       <Panel title="意思決定を記録">
@@ -64,20 +64,20 @@ export default async function DecisionsPage() {
         ) : (
           <ul className="space-y-3">
             {decisions.map((d) => (
-              <li key={d.id} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
+              <li key={d.id} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{d.title}</span>
                   <Badge>{d.decision_type}</Badge>
                   <Badge tone={d.outcome === "success" ? "ok" : d.outcome === "failure" ? "danger" : "warn"}>
                     {d.outcome}
                   </Badge>
-                  <span className="text-xs text-[--color-dim]">{fmtDate(d.decided_at)}</span>
+                  <span className="text-xs text-(--color-dim)">{fmtDate(d.decided_at)}</span>
                 </div>
-                {d.reason && <p className="mt-1 text-xs text-[--color-dim]">理由: {d.reason}</p>}
+                {d.reason && <p className="mt-1 text-xs text-(--color-dim)">理由: {d.reason}</p>}
                 {d.actual_result && <p className="mt-1 text-xs text-emerald-300">結果: {d.actual_result}</p>}
                 {d.outcome === "pending" && (
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-[--color-dim]">結果を記録する</summary>
+                    <summary className="cursor-pointer text-xs text-(--color-dim)">結果を記録する</summary>
                     <form action={updateOutcome} className="mt-2 flex flex-wrap items-end gap-2">
                       <input type="hidden" name="id" value={d.id} />
                       <select name="outcome" className={`${inputCls} w-32`}>

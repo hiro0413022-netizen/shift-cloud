@@ -49,11 +49,11 @@ export default async function CockpitPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold tracking-wide">経営ダッシュボード</h1>
-          <p className="text-xs text-[--color-dim]">今日の会社の状態を一目で・事業所ごとに判断する</p>
+          <p className="text-xs text-(--color-dim)">今日の会社の状態を一目で・事業所ごとに判断する</p>
         </div>
         <Link
           href="/command"
-          className="inline-flex items-center gap-2 rounded-lg border border-sky-700/60 bg-[--color-panel] px-3 py-2 text-sm text-sky-200 transition-all hover:scale-[1.02] hover:shadow-[0_0_16px_-4px_rgba(56,189,248,0.6)]"
+          className="inline-flex items-center gap-2 rounded-lg border border-sky-700/60 bg-(--color-panel) px-3 py-2 text-sm text-sky-200 transition-all hover:scale-[1.02] hover:shadow-[0_0_16px_-4px_rgba(56,189,248,0.6)]"
         >
           <span className="blink inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
           CEO AI に相談
@@ -62,13 +62,13 @@ export default async function CockpitPage() {
 
       {/* 1段目: 全体スコア + 今日の判断リスト */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="hud reveal flex flex-col justify-between rounded-xl border border-[--color-line] bg-[--color-panel] p-5">
-          <p className="text-xs tracking-[0.2em] text-[--color-dim]">今日のYOZAN全体スコア</p>
+        <div className="hud reveal flex flex-col justify-between rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
+          <p className="text-xs tracking-[0.2em] text-(--color-dim)">今日のYOZAN全体スコア</p>
           <p className={`my-2 text-6xl font-bold tabular-nums ${scoreColor}`}>
             <CountUp value={score} />
-            <span className="ml-1 text-xl text-[--color-dim]">点</span>
+            <span className="ml-1 text-xl text-(--color-dim)">点</span>
           </p>
-          <div className="space-y-0.5 text-[11px] text-[--color-dim]">
+          <div className="space-y-0.5 text-[11px] text-(--color-dim)">
             {factors.length === 0 ? <p>減点要因なし — 順調です</p> : factors.map((f) => <p key={f}>{f}</p>)}
           </div>
           <div className="mt-3 flex gap-2">
@@ -83,11 +83,11 @@ export default async function CockpitPage() {
             <ol className="space-y-2 text-sm">
               {judgments.slice(0, 7).map((j, i) => (
                 <li key={`${j.kind}-${i}`}>
-                  <Link href={j.href} className="group flex items-start gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-[--color-panel-2]">
+                  <Link href={j.href} className="group flex items-start gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-(--color-panel-2)">
                     <span className="shrink-0">{judgmentIcon[j.kind]}</span>
                     <span>
                       <span className="group-hover:text-sky-300">{j.title}</span>
-                      {j.detail && <span className="block text-xs text-[--color-dim]">{j.detail}</span>}
+                      {j.detail && <span className="block text-xs text-(--color-dim)">{j.detail}</span>}
                     </span>
                   </Link>
                 </li>
@@ -153,7 +153,7 @@ export default async function CockpitPage() {
             <ul className="space-y-2">
               {d.approvals.slice(0, 8).map((a) => (
                 <li key={String(a.id)} className="text-sm">
-                  <Link href="/approvals" className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-[--color-panel-2]">
+                  <Link href="/approvals" className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-(--color-panel-2)">
                     <span className="truncate">{String(a.title ?? a.kind ?? "承認リクエスト")}</span>
                     <Badge tone="accent">承認待ち</Badge>
                   </Link>
@@ -172,7 +172,7 @@ export default async function CockpitPage() {
                   <StatusDot status={String(e.severity) === "critical" ? "danger" : String(e.severity) === "warning" ? "warning" : "normal"} />
                   <div className="min-w-0">
                     <p className="truncate">{String(e.title)}</p>
-                    <p className="text-xs text-[--color-dim]">
+                    <p className="text-xs text-(--color-dim)">
                       {fmtDate(String(e.occurred_at))} ・ {String(e.event_type)}
                     </p>
                   </div>

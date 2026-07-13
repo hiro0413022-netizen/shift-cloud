@@ -15,7 +15,7 @@ function UploadCard({
   const [state, formAction, pending] = useActionState<ImportState, FormData>(action, {});
   return (
     <Panel title={title} className="d1">
-      <p className="mb-3 text-sm text-[--color-dim]">{desc}</p>
+      <p className="mb-3 text-sm text-(--color-dim)">{desc}</p>
       <form action={formAction} className="flex flex-wrap items-center gap-3">
         <input type="file" name="file" accept={accept} className={inputCls} required />
         <button disabled={pending} className={btnCls}>{pending ? "取込中..." : "取込む"}</button>
@@ -31,7 +31,7 @@ export default function ImportPage() {
     <div className="space-y-4">
       <header className="reveal">
         <h1 className="text-xl font-bold">データ取込</h1>
-        <p className="text-sm text-[--color-dim]">
+        <p className="text-sm text-(--color-dim)">
           Smart Hello の Excel（会員名簿 / 予約一覧）と、現行の一時利用者名簿を取込み、各KPIを自動更新します。
           口座番号・クレジットカード等の機微情報は取り込みません。
         </p>

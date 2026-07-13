@@ -28,7 +28,7 @@ const TYPE_LABEL: Record<QuestionType, string> = {
 };
 const TYPES: QuestionType[] = ["single", "multi", "text", "textarea", "ranking", "scale"];
 
-const labelCls = "mb-1 block text-xs font-medium text-[--color-dim]";
+const labelCls = "mb-1 block text-xs font-medium text-(--color-dim)";
 const rand = () => "opt_" + Math.random().toString(36).slice(2, 8);
 
 // ============================================================
@@ -39,7 +39,7 @@ function OptionsEditor({ options, onChange }: { options: QOption[]; onChange: (o
     <div className="space-y-2">
       {options.map((o, i) => (
         <div key={i} className="flex items-center gap-2">
-          <span className="w-6 text-right text-xs text-[--color-dim]">{i + 1}</span>
+          <span className="w-6 text-right text-xs text-(--color-dim)">{i + 1}</span>
           <input
             className={inputCls}
             value={o.label}
@@ -53,7 +53,7 @@ function OptionsEditor({ options, onChange }: { options: QOption[]; onChange: (o
           <button
             type="button"
             onClick={() => onChange(options.filter((_, j) => j !== i))}
-            className="shrink-0 rounded-lg border border-[--color-line] px-2 py-2 text-xs text-rose-500 hover:bg-rose-50"
+            className="shrink-0 rounded-lg border border-(--color-line) px-2 py-2 text-xs text-rose-500 hover:bg-rose-50"
           >
             削除
           </button>
@@ -142,20 +142,20 @@ function QuestionCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[--color-line] bg-[--color-panel] p-4 shadow-sm">
+    <div className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-4 shadow-sm">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input className={`${inputCls} w-24`} value={code} placeholder="コード" onChange={(e) => setCode(e.target.value)} />
         <select className={`${inputCls} w-32`} value={type} onChange={(e) => setType(e.target.value as QuestionType)}>
           {TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
         </select>
-        <label className="flex items-center gap-1 text-xs text-[--color-dim]">
-          <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="h-4 w-4 accent-[--color-accent]" />
+        <label className="flex items-center gap-1 text-xs text-(--color-dim)">
+          <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="h-4 w-4 accent-(--color-accent)" />
           必須
         </label>
         {!isNew && question?.id && (
           <span className="ml-auto flex gap-1">
-            <button type="button" onClick={() => move("up")} disabled={pending} className="rounded border border-[--color-line] px-2 py-1 text-xs disabled:opacity-40">▲</button>
-            <button type="button" onClick={() => move("down")} disabled={pending} className="rounded border border-[--color-line] px-2 py-1 text-xs disabled:opacity-40">▼</button>
+            <button type="button" onClick={() => move("up")} disabled={pending} className="rounded border border-(--color-line) px-2 py-1 text-xs disabled:opacity-40">▲</button>
+            <button type="button" onClick={() => move("down")} disabled={pending} className="rounded border border-(--color-line) px-2 py-1 text-xs disabled:opacity-40">▼</button>
           </span>
         )}
       </div>
@@ -184,26 +184,26 @@ function QuestionCard({
       )}
 
       {type === "multi" && (
-        <div className="mt-3 flex flex-wrap gap-4 rounded-lg bg-[--color-panel-2] p-3">
+        <div className="mt-3 flex flex-wrap gap-4 rounded-lg bg-(--color-panel-2) p-3">
           <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={allowOther} onChange={(e) => setAllowOther(e.target.checked)} className="h-4 w-4 accent-[--color-accent]" />
+            <input type="checkbox" checked={allowOther} onChange={(e) => setAllowOther(e.target.checked)} className="h-4 w-4 accent-(--color-accent)" />
             「その他」自由記述を許可
           </label>
           <label className="flex items-center gap-2 text-xs">
-            <input type="checkbox" checked={isRankingSource} onChange={(e) => setIsRankingSource(e.target.checked)} className="h-4 w-4 accent-[--color-accent]" />
+            <input type="checkbox" checked={isRankingSource} onChange={(e) => setIsRankingSource(e.target.checked)} className="h-4 w-4 accent-(--color-accent)" />
             順位付けの母集団にする（受講コーチ選択など）
           </label>
         </div>
       )}
 
       {type === "ranking" && (
-        <div className="mt-3 rounded-lg bg-[--color-panel-2] p-3">
+        <div className="mt-3 rounded-lg bg-(--color-panel-2) p-3">
           <label className={labelCls}>連動する選択設問（任意）</label>
           <select className={inputCls} value={sourceCode} onChange={(e) => setSourceCode(e.target.value)}>
             <option value="">連動しない（候補を全員表示）</option>
             {multiCodes.map((m) => <option key={m.code} value={m.code}>{m.code}: {m.title}</option>)}
           </select>
-          <p className="mt-1 text-[11px] text-[--color-dim]">指定すると、その複数選択設問で選ばれた項目だけを並び替え対象にします。</p>
+          <p className="mt-1 text-[11px] text-(--color-dim)">指定すると、その複数選択設問で選ばれた項目だけを並び替え対象にします。</p>
         </div>
       )}
 
@@ -305,7 +305,7 @@ export function Editor({ surveyId, meta, questions }: { surveyId: string; meta: 
             <textarea rows={2} className={inputCls} value={m.thanks_text ?? ""} onChange={(e) => setM({ ...m, thanks_text: e.target.value })} />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={m.is_anonymous} onChange={(e) => setM({ ...m, is_anonymous: e.target.checked })} className="h-4 w-4 accent-[--color-accent]" />
+            <input type="checkbox" checked={m.is_anonymous} onChange={(e) => setM({ ...m, is_anonymous: e.target.checked })} className="h-4 w-4 accent-(--color-accent)" />
             匿名回答
           </label>
         </div>

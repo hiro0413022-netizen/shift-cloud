@@ -35,7 +35,7 @@ export default async function SurveyListPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">アンケート一覧</h1>
-          <p className="mt-1 text-sm text-[--color-dim]">作成・編集・回答の集計・CSV出力・公開URL/QRの確認ができます。</p>
+          <p className="mt-1 text-sm text-(--color-dim)">作成・編集・回答の集計・CSV出力・公開URL/QRの確認ができます。</p>
         </div>
         <NewSurveyButton />
       </div>
@@ -55,27 +55,27 @@ export default async function SurveyListPage() {
                   <Badge tone={s.status === "open" ? "ok" : s.status === "closed" ? "danger" : "default"}>
                     {STATUS_LABEL[s.status] ?? s.status}
                   </Badge>
-                  <span className="text-xs text-[--color-dim]">更新 {fmtDate(s.updated_at)}</span>
+                  <span className="text-xs text-(--color-dim)">更新 {fmtDate(s.updated_at)}</span>
                 </div>
                 <h2 className="truncate text-base font-bold">{s.title}</h2>
-                {s.description && <p className="mt-0.5 truncate text-sm text-[--color-dim]">{s.description}</p>}
+                {s.description && <p className="mt-0.5 truncate text-sm text-(--color-dim)">{s.description}</p>}
                 <p className="mt-2 text-2xl font-bold tabular-nums">
                   {s.response_count}
-                  <span className="ml-1 text-sm font-medium text-[--color-dim]">件の回答</span>
+                  <span className="ml-1 text-sm font-medium text-(--color-dim)">件の回答</span>
                 </p>
               </div>
               {qr && (
                 <div className="shrink-0 text-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={qr} alt="QRコード" className="h-24 w-24 rounded-lg border border-[--color-line]" />
-                  <p className="mt-1 text-[10px] text-[--color-dim]">回答用QR</p>
+                  <img src={qr} alt="QRコード" className="h-24 w-24 rounded-lg border border-(--color-line)" />
+                  <p className="mt-1 text-[10px] text-(--color-dim)">回答用QR</p>
                 </div>
               )}
             </div>
 
             {s.status !== "draft" && (
-              <div className="mt-3 rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-2">
-                <p className="text-[11px] text-[--color-dim]">公開URL</p>
+              <div className="mt-3 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2">
+                <p className="text-[11px] text-(--color-dim)">公開URL</p>
                 <a href={url} target="_blank" rel="noreferrer" className="break-all text-xs font-medium text-accent">
                   {url}
                 </a>

@@ -34,7 +34,7 @@ export default async function InboxPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">CEO Inbox — 秘書</h1>
-        <p className="text-sm text-[--color-dim]">
+        <p className="text-sm text-(--color-dim)">
           問い合わせを確認して返信を承認。返信の送信は承認後に秘書が実行、日程はカレンダーへ自動登録（VISION §7）
         </p>
       </header>
@@ -61,17 +61,17 @@ export default async function InboxPage() {
         ) : (
           <ul className="space-y-3">
             {open.map((q) => (
-              <li key={q.id} className="rounded-lg border border-sky-700/30 bg-[--color-panel-2] p-3">
+              <li key={q.id} className="rounded-lg border border-sky-700/30 bg-(--color-panel-2) p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={q.priority === "high" ? "danger" : "accent"}>{typeLabel(q.inquiry_type)}</Badge>
                   {q.priority === "high" && <Badge tone="danger">優先</Badge>}
                   <span className="text-sm font-medium">{q.from_name ?? q.from_email ?? "（差出人不明）"}</span>
-                  {q.subject && <span className="text-xs text-[--color-dim]">／ {q.subject}</span>}
-                  <span className="ml-auto text-xs text-[--color-dim]">{q.received_at ? fmtDate(q.received_at) : fmtDate(q.created_at)}</span>
+                  {q.subject && <span className="text-xs text-(--color-dim)">／ {q.subject}</span>}
+                  <span className="ml-auto text-xs text-(--color-dim)">{q.received_at ? fmtDate(q.received_at) : fmtDate(q.created_at)}</span>
                 </div>
 
                 {q.ai_summary && <p className="mt-2 text-sm">{q.ai_summary}</p>}
-                {q.snippet && <p className="mt-1 text-xs text-[--color-dim] line-clamp-2">{q.snippet}</p>}
+                {q.snippet && <p className="mt-1 text-xs text-(--color-dim) line-clamp-2">{q.snippet}</p>}
 
                 {q.proposed_event && (
                   <div className="mt-2 rounded-md border border-emerald-700/40 bg-black/20 p-2 text-xs">
@@ -82,14 +82,14 @@ export default async function InboxPage() {
                     {q.calendar_event_id ? (
                       <span className="ml-1 text-emerald-400">✓登録済</span>
                     ) : (
-                      <span className="ml-1 text-[--color-dim]">（自動登録対象）</span>
+                      <span className="ml-1 text-(--color-dim)">（自動登録対象）</span>
                     )}
                   </div>
                 )}
 
                 <form action={approveInquiry} className="mt-3 space-y-2">
                   <input type="hidden" name="id" value={q.id} />
-                  <label className="block text-xs text-[--color-dim]">返信案（この文面で送信 / 編集可）</label>
+                  <label className="block text-xs text-(--color-dim)">返信案（この文面で送信 / 編集可）</label>
                   <textarea
                     name="reply"
                     rows={5}
@@ -119,8 +119,8 @@ export default async function InboxPage() {
                   {INQUIRY_STATUS_LABELS[q.status] ?? q.status}
                 </Badge>
                 <span>{q.from_name ?? q.from_email ?? "問い合わせ"}</span>
-                {q.subject && <span className="text-xs text-[--color-dim]">／ {q.subject}</span>}
-                <span className="ml-auto text-xs text-[--color-dim]">{fmtDate(q.created_at)}</span>
+                {q.subject && <span className="text-xs text-(--color-dim)">／ {q.subject}</span>}
+                <span className="ml-auto text-xs text-(--color-dim)">{fmtDate(q.created_at)}</span>
               </li>
             ))}
           </ul>
@@ -141,10 +141,10 @@ function Stat({
   text?: string;
   tone?: "ok" | "warn" | "danger";
 }) {
-  const color = tone === "danger" ? "text-red-400" : tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-[--color-txt]";
+  const color = tone === "danger" ? "text-red-400" : tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-(--color-txt)";
   return (
-    <div className="rounded-lg border border-[--color-line] bg-[--color-panel] p-3">
-      <p className="text-xs text-[--color-dim]">{label}</p>
+    <div className="rounded-lg border border-(--color-line) bg-(--color-panel) p-3">
+      <p className="text-xs text-(--color-dim)">{label}</p>
       {text !== undefined ? (
         <p className={`mt-1 text-sm ${color}`}>{text}</p>
       ) : (

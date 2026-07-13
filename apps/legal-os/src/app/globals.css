@@ -18,7 +18,7 @@
 
 body {
   font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
-  @apply bg-[--color-bg] text-[--color-txt] antialiased;
+  @apply bg-(--color-bg) text-(--color-txt) antialiased;
 }
 
 /* ============================================================

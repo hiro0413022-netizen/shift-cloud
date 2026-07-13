@@ -5,11 +5,11 @@ import { CountUp } from "./count-up";
 
 export function Panel({ title, children, action, className = "" }: { title?: string; children: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <section className={`hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-5 ${className}`}>
+    <section className={`hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-5 ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex items-center justify-between gap-3">
           {title && (
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[--color-txt]">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-(--color-txt)">
               <span className="inline-block h-4 w-1 rounded-full bg-accent" />
               {title}
             </h2>
@@ -77,7 +77,7 @@ export function severityTone(sev: string): "ok" | "warn" | "danger" | "default" 
 
 export function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[--color-panel-2]">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-(--color-panel-2)">
       <div
         className={`bar-grow h-full rounded-full ${value >= 100 ? "bg-emerald-400" : "bg-sky-400"}`}
         style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
@@ -89,23 +89,23 @@ export function ProgressBar({ value }: { value: number }) {
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block text-sm">
-      <span className="mb-1 block text-xs text-[--color-dim]">{label}</span>
+      <span className="mb-1 block text-xs text-(--color-dim)">{label}</span>
       {children}
     </label>
   );
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+  "w-full rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
 
 export const btnCls =
   "inline-flex items-center gap-1 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90 disabled:opacity-50";
 
 export const btnGhostCls =
-  "inline-flex items-center gap-1 rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm text-[--color-txt] transition-colors hover:bg-[--color-panel-2]";
+  "inline-flex items-center gap-1 rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm text-(--color-txt) transition-colors hover:bg-(--color-panel-2)";
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-6 text-center text-sm text-[--color-dim]">{children}</p>;
+  return <p className="py-6 text-center text-sm text-(--color-dim)">{children}</p>;
 }
 
 export function fmtDate(d: string | null | undefined) {
@@ -172,20 +172,20 @@ export function KpiCard({
   note?: string | null;
 }) {
   return (
-    <div className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-      <p className="text-xs tracking-wide text-[--color-dim]">{name}</p>
+    <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+      <p className="text-xs tracking-wide text-(--color-dim)">{name}</p>
       <p className="mt-1 text-2xl font-bold tabular-nums">
         {value != null ? (
           <>
             <CountUp value={value} />
-            <span className="ml-0.5 text-sm font-medium text-[--color-dim]">{unit}</span>
+            <span className="ml-0.5 text-sm font-medium text-(--color-dim)">{unit}</span>
           </>
         ) : (
-          <span className="text-base font-medium text-[--color-dim]">— 未接続</span>
+          <span className="text-base font-medium text-(--color-dim)">— 未接続</span>
         )}
       </p>
       {value != null && <Sparkline trend={trend} />}
-      <p className="mt-1 truncate text-[11px] text-[--color-dim]" title={note ?? undefined}>
+      <p className="mt-1 truncate text-[11px] text-(--color-dim)" title={note ?? undefined}>
         {target != null ? `目標 ${Number(target).toLocaleString("ja-JP")}${unit}` : (note ?? "")}
       </p>
     </div>

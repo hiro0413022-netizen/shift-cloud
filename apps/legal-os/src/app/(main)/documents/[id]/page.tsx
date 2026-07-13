@@ -58,7 +58,7 @@ export default async function DocumentDetailPage({
     <div className="mx-auto max-w-4xl space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <Link href="/documents" className="text-xs text-[--color-dim] hover:text-[--color-txt]">← 一覧へ</Link>
+          <Link href="/documents" className="text-xs text-(--color-dim) hover:text-(--color-txt)">← 一覧へ</Link>
           <h1 className="mt-1 truncate text-lg font-bold tracking-wide">{doc.title}</h1>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1.5 text-sm">
@@ -69,10 +69,10 @@ export default async function DocumentDetailPage({
 
       <div className="grid gap-5 md:grid-cols-2">
         <Panel title="契約情報">
-          <dl className="divide-y divide-[--color-line] text-sm">
+          <dl className="divide-y divide-(--color-line) text-sm">
             {rows.map(([k, v]) => (
               <div key={k} className="flex justify-between gap-3 py-2">
-                <dt className="text-[--color-dim]">{k}</dt>
+                <dt className="text-(--color-dim)">{k}</dt>
                 <dd className="text-right">{v}</dd>
               </div>
             ))}
@@ -95,7 +95,7 @@ export default async function DocumentDetailPage({
               <ul className="space-y-1.5 text-sm">
                 {reminders.map((r) => (
                   <li key={r.id} className="flex items-center justify-between gap-2">
-                    <span className="text-[--color-dim]">{REMINDER_LABELS[r.kind] ?? r.kind}</span>
+                    <span className="text-(--color-dim)">{REMINDER_LABELS[r.kind] ?? r.kind}</span>
                     <span className="tabular-nums">{fmtDay(r.due_date)}（{r.lead_days}日前通知）</span>
                   </li>
                 ))}
@@ -109,7 +109,7 @@ export default async function DocumentDetailPage({
         {files.length === 0 ? (
           <Empty>ファイルはありません</Empty>
         ) : (
-          <ul className="divide-y divide-[--color-line]">
+          <ul className="divide-y divide-(--color-line)">
             {files.map((f) => (
               <li key={f.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                 <div className="min-w-0">
@@ -121,7 +121,7 @@ export default async function DocumentDetailPage({
                   >
                     {f.file_name}
                   </a>
-                  <span className="ml-2 text-xs text-[--color-dim]">{fmtSize(f.size_bytes)}</span>
+                  <span className="ml-2 text-xs text-(--color-dim)">{fmtSize(f.size_bytes)}</span>
                 </div>
                 <Badge>{f.kind}</Badge>
               </li>
@@ -135,15 +135,15 @@ export default async function DocumentDetailPage({
           <form action={setStatusAction} className="flex flex-wrap items-end gap-3 text-sm">
             <input type="hidden" name="id" value={doc.id} />
             <label className="block">
-              <span className="mb-1 block text-xs text-[--color-dim]">新しい状態</span>
-              <select name="status" defaultValue={doc.status} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-1.5">
+              <span className="mb-1 block text-xs text-(--color-dim)">新しい状態</span>
+              <select name="status" defaultValue={doc.status} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-1.5">
                 {Object.entries(STATUS_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
             </label>
             <button className="rounded-lg bg-sky-600 px-3 py-1.5 text-white hover:bg-sky-500">更新</button>
-            <p className="w-full text-xs text-[--color-dim]">
+            <p className="w-full text-xs text-(--color-dim)">
               ※ 締結・更新・解約の正式承認はGENESIS側（approval_requests）で古川さんが実施します。
             </p>
           </form>

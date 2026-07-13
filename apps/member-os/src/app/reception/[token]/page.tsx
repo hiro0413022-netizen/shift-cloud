@@ -8,9 +8,9 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-8">
       <div className="mb-6 text-center">
-        <p className="text-xs tracking-[0.4em] text-[--color-gold]">GOLF WING</p>
+        <p className="text-xs tracking-[0.4em] text-(--color-gold)">GOLF WING</p>
         <h1 className="text-2xl font-bold tracking-wide">ご来店受付</h1>
-        <p className="mt-1 text-xs text-[--color-dim]">タブレットにご記入をお願いします</p>
+        <p className="mt-1 text-xs text-(--color-dim)">タブレットにご記入をお願いします</p>
       </div>
       {children}
     </main>
@@ -20,9 +20,9 @@ function Shell({ children }: { children: React.ReactNode }) {
 function Notice({ title, body }: { title: string; body: string }) {
   return (
     <Shell>
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-6 text-center">
+      <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-6 text-center">
         <p className="text-lg font-semibold">{title}</p>
-        <p className="mt-2 text-sm text-[--color-dim]">{body}</p>
+        <p className="mt-2 text-sm text-(--color-dim)">{body}</p>
       </div>
     </Shell>
   );

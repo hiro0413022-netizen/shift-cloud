@@ -33,7 +33,7 @@ export default async function CommandPage() {
       <header className="reveal flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">CEO AI Command Center</h1>
-          <p className="text-sm text-[--color-dim]">「今どうなってる？」に答える管制塔</p>
+          <p className="text-sm text-(--color-dim)">「今どうなってる？」に答える管制塔</p>
         </div>
         <div className="flex items-center gap-2">
           <form action={refreshKpis}>
@@ -69,10 +69,10 @@ export default async function CommandPage() {
                     {String(s.module_name)}
                     <Badge>{String(s.phase)}</Badge>
                   </span>
-                  <span className="text-xs text-[--color-dim]">{Number(s.progress)}%</span>
+                  <span className="text-xs text-(--color-dim)">{Number(s.progress)}%</span>
                 </div>
                 {Array.isArray(s.remaining_items) && (s.remaining_items as string[]).length > 0 && (
-                  <p className="mt-1 text-xs text-[--color-dim]">残: {(s.remaining_items as string[]).join(" / ")}</p>
+                  <p className="mt-1 text-xs text-(--color-dim)">残: {(s.remaining_items as string[]).join(" / ")}</p>
                 )}
               </li>
             ))}
@@ -88,7 +88,7 @@ export default async function CommandPage() {
                 <li key={String(s.id)} className="flex items-start gap-2">
                   <span className="text-sky-400">▸</span>
                   <span>
-                    <span className="text-[--color-dim]">{String(s.module_name)}: </span>
+                    <span className="text-(--color-dim)">{String(s.module_name)}: </span>
                     {String(s.next_action)}
                   </span>
                 </li>
@@ -115,7 +115,7 @@ export default async function CommandPage() {
                     <span>{String(r.title)}</span>
                     <Badge tone={severityTone(String(r.severity))}>{String(r.severity)}</Badge>
                   </div>
-                  {r.mitigation != null && <p className="text-xs text-[--color-dim]">対策: {String(r.mitigation)}</p>}
+                  {r.mitigation != null && <p className="text-xs text-(--color-dim)">対策: {String(r.mitigation)}</p>}
                 </li>
               ))}
               {d.blockers.map((b) => (
@@ -124,7 +124,7 @@ export default async function CommandPage() {
                     <span>{String(b.title)}</span>
                     <Badge tone="danger">blocker</Badge>
                   </div>
-                  {b.needs != null && <p className="text-xs text-[--color-dim]">解消条件: {String(b.needs)}</p>}
+                  {b.needs != null && <p className="text-xs text-(--color-dim)">解消条件: {String(b.needs)}</p>}
                 </li>
               ))}
             </ul>
@@ -153,7 +153,7 @@ export default async function CommandPage() {
               </Field>
             </div>
             <button className={btnCls}>KPIを更新</button>
-            <p className="text-xs text-[--color-dim]">
+            <p className="text-xs text-(--color-dim)">
               目標を入れるとCEO AIが未達を検知し、全体スコアと「今日の判断リスト」に反映します。売上・利益・人件費系は自動集計のため入力不要。
             </p>
           </form>
@@ -211,11 +211,11 @@ export default async function CommandPage() {
           <ul className="space-y-2">
             {prompts.map((p) => (
               <li key={String(p.id)}>
-                <details className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
+                <details className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                   <summary className="cursor-pointer text-sm">
                     <Badge tone="accent">{String(p.target_ai)}</Badge>{" "}
                     <span className="ml-1">{String(p.title)}</span>
-                    <span className="ml-2 text-xs text-[--color-dim]">{fmtDate(String(p.created_at))}</span>
+                    <span className="ml-2 text-xs text-(--color-dim)">{fmtDate(String(p.created_at))}</span>
                   </summary>
                   <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-3 text-xs leading-relaxed">
                     {String(p.body)}
@@ -241,10 +241,10 @@ export default async function CommandPage() {
 
 function Stat({ label, count, suffix, tone = "default" }: { label: string; count: number; suffix: string; tone?: "default" | "ok" | "warn" | "danger" }) {
   const color =
-    tone === "danger" ? "text-red-300" : tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-[--color-txt]";
+    tone === "danger" ? "text-red-300" : tone === "warn" ? "text-amber-300" : tone === "ok" ? "text-emerald-300" : "text-(--color-txt)";
   return (
-    <div className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-3">
-      <p className="text-xs text-[--color-dim]">{label}</p>
+    <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-3">
+      <p className="text-xs text-(--color-dim)">{label}</p>
       <p className={`text-lg font-bold tabular-nums ${color}`}>
         <CountUp value={count} />
         {suffix}

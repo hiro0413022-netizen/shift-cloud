@@ -42,7 +42,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">売上 — {store?.name ?? "店舗未選択"}</h1>
-          <p className="text-sm text-[--color-dim]">日々の売上を入力。現金はそのまま現金出納にも反映されます</p>
+          <p className="text-sm text-(--color-dim)">日々の売上を入力。現金はそのまま現金出納にも反映されます</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/sales?month=${shift(month, -1)}`} className={btnGhostCls}>← 前月</Link>
@@ -53,7 +53,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
 
       <Panel title={`当月売上合計（税抜）`}>
         <p className="text-3xl font-bold tabular-nums">{yen(total)} 円</p>
-        <p className="mt-1 text-sm text-[--color-dim]">{rows.length} 件</p>
+        <p className="mt-1 text-sm text-(--color-dim)">{rows.length} 件</p>
       </Panel>
 
       <Panel title="売上を追加">
@@ -91,7 +91,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[--color-line] text-xs text-[--color-dim]">
+                <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
                   <th className="py-2 pr-2 text-left font-medium">日付</th>
                   <th className="px-2 py-2 text-left font-medium">区分</th>
                   <th className="px-2 py-2 text-left font-medium">品名/お客様</th>
@@ -102,16 +102,16 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-[--color-line]">
-                    <td className="py-2 pr-2 tabular-nums text-[--color-dim]">{r.sold_on}</td>
+                  <tr key={r.id} className="border-b border-(--color-line)">
+                    <td className="py-2 pr-2 tabular-nums text-(--color-dim)">{r.sold_on}</td>
                     <td className="px-2 py-2">{r.category}</td>
                     <td className="px-2 py-2">{String(r.detail?.product_name ?? "") || r.customer_name || "—"}</td>
                     <td className="px-2 py-2 text-right tabular-nums">{yen(Number(r.amount))}</td>
-                    <td className="px-2 py-2 text-[--color-dim]">{r.pay_method ?? "—"}</td>
+                    <td className="px-2 py-2 text-(--color-dim)">{r.pay_method ?? "—"}</td>
                     <td className="px-2 py-2 text-right">
                       <form action={deleteSale}>
                         <input type="hidden" name="id" value={r.id} />
-                        <button className="text-xs text-[--color-dim] hover:text-[--color-accent]">削除</button>
+                        <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
                       </form>
                     </td>
                   </tr>

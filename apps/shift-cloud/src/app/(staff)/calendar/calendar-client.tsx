@@ -127,7 +127,7 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
                     type="checkbox"
                     checked={t.status === "done"}
                     onChange={() => startTransition(async () => { await toggleTask(t.id); })}
-                    className="h-4 w-4 accent-[--color-brand]"
+                    className="h-4 w-4 accent-(--color-brand)"
                   />
                   <span className={t.status === "done" ? "text-zinc-300 line-through" : ""}>{t.title}</span>
                   {t.source !== "manual" && <span className="rounded bg-brand-light px-1 text-[10px] text-brand">{t.source === "manager" ? "店長" : "AI"}</span>}

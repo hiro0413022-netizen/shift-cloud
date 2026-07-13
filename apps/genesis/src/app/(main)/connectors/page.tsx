@@ -18,14 +18,14 @@ export default async function ConnectorsPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">Integration Mesh</h1>
-        <p className="text-sm text-[--color-dim]">
+        <p className="text-sm text-(--color-dim)">
           外部ツール連携。Webhook受信 → External Event → Company Event へ自動変換
         </p>
       </header>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {(connectors ?? []).map((c) => (
-          <div key={c.id} className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
+          <div key={c.id} className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2 font-medium">
                 <StatusDot status={c.status === "active" ? "completed" : c.status === "configured" ? "active" : c.status === "error" ? "danger" : "planned"} />
@@ -35,7 +35,7 @@ export default async function ConnectorsPage() {
                 {c.status}
               </Badge>
             </div>
-            <p className="mt-1 text-xs text-[--color-dim]">
+            <p className="mt-1 text-xs text-(--color-dim)">
               {c.kind} ・ 最終イベント: {c.last_event_at ? fmtDate(c.last_event_at) : "なし"}
             </p>
             <div className="mt-3">
@@ -57,7 +57,7 @@ export default async function ConnectorsPage() {
                     {l.status}
                   </Badge>
                   <span>{(l as unknown as { connectors: { name: string } | null }).connectors?.name ?? "-"}</span>
-                  <span className="text-xs text-[--color-dim]">{fmtDate(l.created_at)}</span>
+                  <span className="text-xs text-(--color-dim)">{fmtDate(l.created_at)}</span>
                 </li>
               ))}
             </ul>
@@ -73,7 +73,7 @@ export default async function ConnectorsPage() {
                   <StatusDot status={e.processed ? "completed" : "warning"} />
                   <span>{(e as unknown as { connectors: { name: string } | null }).connectors?.name ?? "-"}</span>
                   <Badge>{e.external_type}</Badge>
-                  <span className="text-xs text-[--color-dim]">{fmtDate(e.created_at)}</span>
+                  <span className="text-xs text-(--color-dim)">{fmtDate(e.created_at)}</span>
                 </li>
               ))}
             </ul>

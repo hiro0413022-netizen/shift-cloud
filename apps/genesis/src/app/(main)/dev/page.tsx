@@ -22,13 +22,13 @@ export default async function DevPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">Development Map</h1>
-        <p className="text-sm text-[--color-dim]">モジュール別の開発状況・リスク・ブロッカー</p>
+        <p className="text-sm text-(--color-dim)">モジュール別の開発状況・リスク・ブロッカー</p>
       </header>
 
       {/* モジュールマップ */}
       <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
         {(modules ?? []).map((m) => (
-          <div key={m.id} className="rounded-xl border border-[--color-line] bg-[--color-panel] p-3">
+          <div key={m.id} className="rounded-xl border border-(--color-line) bg-(--color-panel) p-3">
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2 text-sm font-medium">
                 <StatusDot status={m.status} />
@@ -38,7 +38,7 @@ export default async function DevPage() {
                 {m.status}
               </Badge>
             </div>
-            {m.description && <p className="mt-1 line-clamp-2 text-xs text-[--color-dim]">{m.description}</p>}
+            {m.description && <p className="mt-1 line-clamp-2 text-xs text-(--color-dim)">{m.description}</p>}
           </div>
         ))}
       </div>
@@ -50,23 +50,23 @@ export default async function DevPage() {
         ) : (
           <ul className="space-y-4">
             {statuses.map((s) => (
-              <li key={s.id} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
+              <li key={s.id} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="flex items-center gap-2 font-medium">
                     <StatusDot status={s.status} />
                     {s.module_name}
                   </span>
-                  <span className="text-sm text-[--color-dim]">{s.progress}%</span>
+                  <span className="text-sm text-(--color-dim)">{s.progress}%</span>
                 </div>
                 <ProgressBar value={s.progress} />
                 {Array.isArray(s.completed_items) && s.completed_items.length > 0 && (
                   <p className="mt-2 text-xs text-emerald-300/80">完了: {(s.completed_items as string[]).join(" / ")}</p>
                 )}
                 {Array.isArray(s.remaining_items) && s.remaining_items.length > 0 && (
-                  <p className="mt-1 text-xs text-[--color-dim]">残: {(s.remaining_items as string[]).join(" / ")}</p>
+                  <p className="mt-1 text-xs text-(--color-dim)">残: {(s.remaining_items as string[]).join(" / ")}</p>
                 )}
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-xs text-[--color-dim]">更新する</summary>
+                  <summary className="cursor-pointer text-xs text-(--color-dim)">更新する</summary>
                   <form action={updateDevStatus} className="mt-2 grid gap-2 lg:grid-cols-5">
                     <input type="hidden" name="id" value={s.id} />
                     <Field label="フェーズ">
@@ -124,13 +124,13 @@ export default async function DevPage() {
                 <li key={r.id} className="flex items-center justify-between gap-2">
                   <span>
                     {r.title}
-                    {r.mitigation && <span className="block text-xs text-[--color-dim]">対策: {r.mitigation}</span>}
+                    {r.mitigation && <span className="block text-xs text-(--color-dim)">対策: {r.mitigation}</span>}
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
                     <Badge tone={severityTone(r.severity)}>{r.severity}</Badge>
                     <form action={closeRisk}>
                       <input type="hidden" name="id" value={r.id} />
-                      <button className="text-xs text-[--color-dim] hover:text-emerald-300">対処済み</button>
+                      <button className="text-xs text-(--color-dim) hover:text-emerald-300">対処済み</button>
                     </form>
                   </span>
                 </li>
@@ -160,11 +160,11 @@ export default async function DevPage() {
                 <li key={b.id} className="flex items-center justify-between gap-2">
                   <span>
                     {b.title}
-                    {b.needs && <span className="block text-xs text-[--color-dim]">解消条件: {b.needs}</span>}
+                    {b.needs && <span className="block text-xs text-(--color-dim)">解消条件: {b.needs}</span>}
                   </span>
                   <form action={resolveBlocker}>
                     <input type="hidden" name="id" value={b.id} />
-                    <button className="shrink-0 text-xs text-[--color-dim] hover:text-emerald-300">解消</button>
+                    <button className="shrink-0 text-xs text-(--color-dim) hover:text-emerald-300">解消</button>
                   </form>
                 </li>
               ))}

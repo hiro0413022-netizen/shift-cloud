@@ -27,9 +27,9 @@ export const NAV = [
 export function Sidebar({ userName }: { userName: string }) {
   const pathname = usePathname();
   return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-[--color-line] bg-[--color-panel] p-3 md:flex">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-(--color-line) bg-(--color-panel) p-3 md:flex">
       <div className="mb-6 px-2 pt-2">
-        <p className="text-xs tracking-[0.3em] text-[--color-gold]">YOZAN</p>
+        <p className="text-xs tracking-[0.3em] text-(--color-gold)">YOZAN</p>
         <p className="text-lg font-bold tracking-wide">GENESIS</p>
         <p className="mt-1 flex items-center gap-1.5 text-[10px] text-emerald-300/80">
           <span className="blink inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -46,8 +46,8 @@ export function Sidebar({ userName }: { userName: string }) {
               title={item.en}
               className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                 active
-                  ? "bg-[--color-panel-2] text-sky-300 shadow-[inset_2px_0_0_0_#38bdf8]"
-                  : "text-[--color-dim] hover:translate-x-0.5 hover:bg-[--color-panel-2] hover:text-[--color-txt]"
+                  ? "bg-(--color-panel-2) text-sky-300 shadow-[inset_2px_0_0_0_#38bdf8]"
+                  : "text-(--color-dim) hover:translate-x-0.5 hover:bg-(--color-panel-2) hover:text-(--color-txt)"
               }`}
             >
               <span className="w-4 text-center text-xs">{item.icon}</span>
@@ -56,10 +56,10 @@ export function Sidebar({ userName }: { userName: string }) {
           );
         })}
       </nav>
-      <div className="border-t border-[--color-line] px-2 pt-3 text-xs text-[--color-dim]">
+      <div className="border-t border-(--color-line) px-2 pt-3 text-xs text-(--color-dim)">
         <p>{userName}</p>
         <form action="/api/logout" method="post">
-          <button className="mt-1 text-[--color-dim] transition-colors hover:text-[--color-txt]">ログアウト</button>
+          <button className="mt-1 text-(--color-dim) transition-colors hover:text-(--color-txt)">ログアウト</button>
         </form>
       </div>
     </aside>

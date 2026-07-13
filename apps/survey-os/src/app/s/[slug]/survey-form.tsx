@@ -5,8 +5,8 @@ import { submitSurvey, type SubmitState } from "./actions";
 import type { AnswerValue, Question, QOption } from "@/lib/survey";
 
 const field =
-  "w-full rounded-xl border border-[--color-line] bg-white px-4 py-3 text-base text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
-const cardCls = "rounded-2xl border border-[--color-line] bg-[--color-panel] p-5 shadow-sm";
+  "w-full rounded-xl border border-(--color-line) bg-white px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5 shadow-sm";
 
 type Answers = Record<string, AnswerValue>;
 
@@ -46,7 +46,7 @@ function RankingList({ items, onReorder }: { items: QOption[]; onReorder: (order
             setDragIdx(null);
             setOverIdx(null);
           }}
-          className={`rank-item flex items-center gap-3 rounded-xl border border-[--color-line] bg-white px-3 py-3 ${
+          className={`rank-item flex items-center gap-3 rounded-xl border border-(--color-line) bg-white px-3 py-3 ${
             dragIdx === idx ? "dragging" : ""
           } ${overIdx === idx && dragIdx !== idx ? "over" : ""}`}
         >
@@ -60,7 +60,7 @@ function RankingList({ items, onReorder }: { items: QOption[]; onReorder: (order
               aria-label="上へ"
               onClick={() => move(idx, idx - 1)}
               disabled={idx === 0}
-              className="rounded border border-[--color-line] px-2 text-xs leading-5 text-[--color-dim] disabled:opacity-30"
+              className="rounded border border-(--color-line) px-2 text-xs leading-5 text-(--color-dim) disabled:opacity-30"
             >
               ▲
             </button>
@@ -69,12 +69,12 @@ function RankingList({ items, onReorder }: { items: QOption[]; onReorder: (order
               aria-label="下へ"
               onClick={() => move(idx, idx + 1)}
               disabled={idx === items.length - 1}
-              className="rounded border border-[--color-line] px-2 text-xs leading-5 text-[--color-dim] disabled:opacity-30"
+              className="rounded border border-(--color-line) px-2 text-xs leading-5 text-(--color-dim) disabled:opacity-30"
             >
               ▼
             </button>
           </span>
-          <span className="cursor-grab select-none px-1 text-[--color-dim]" aria-hidden>⋮⋮</span>
+          <span className="cursor-grab select-none px-1 text-(--color-dim)" aria-hidden>⋮⋮</span>
         </li>
       ))}
     </ul>
@@ -166,7 +166,7 @@ export function SurveyForm({
       <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-3xl text-emerald-600">✓</div>
         <p className="mt-3 text-lg font-semibold">送信が完了しました</p>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-[--color-dim]">
+        <p className="mt-2 whitespace-pre-wrap text-sm text-(--color-dim)">
           {thanks ?? "ご協力ありがとうございました。"}
         </p>
       </div>
@@ -193,8 +193,8 @@ export function SurveyForm({
 
       {/* イントロ */}
       <div className={`${cardCls} space-y-2`}>
-        {intro && <p className="whitespace-pre-wrap text-sm leading-relaxed text-[--color-txt]">{intro}</p>}
-        <p className="text-xs text-[--color-dim]">
+        {intro && <p className="whitespace-pre-wrap text-sm leading-relaxed text-(--color-txt)">{intro}</p>}
+        <p className="text-xs text-(--color-dim)">
           {anonymous ? "匿名アンケート" : "記名アンケート"}
           {estMinutes ? ` ・ 所要時間 約${estMinutes}分` : ""}
         </p>
@@ -229,12 +229,12 @@ export function SurveyForm({
             return (
               <div key={q.code} className={`${cardCls} space-y-3`}>
                 <div>
-                  <p className="text-sm font-semibold text-[--color-txt]">
-                    <span className="mr-1 text-xs text-[--color-dim]">{q.code}</span>
+                  <p className="text-sm font-semibold text-(--color-txt)">
+                    <span className="mr-1 text-xs text-(--color-dim)">{q.code}</span>
                     {q.title}
                     {q.required && <span className="ml-1 text-rose-500">*</span>}
                   </p>
-                  {q.help_text && <p className="mt-1 text-xs text-[--color-dim]">{q.help_text}</p>}
+                  {q.help_text && <p className="mt-1 text-xs text-(--color-dim)">{q.help_text}</p>}
                 </div>
 
                 {/* 単一選択 */}
@@ -246,7 +246,7 @@ export function SurveyForm({
                         <label
                           key={o.value}
                           className={`flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 text-sm transition-colors ${
-                            checked ? "border-accent bg-accent/10 text-accent" : "border-[--color-line] bg-white text-[--color-txt]"
+                            checked ? "border-accent bg-accent/10 text-accent" : "border-(--color-line) bg-white text-(--color-txt)"
                           }`}
                         >
                           <input
@@ -272,7 +272,7 @@ export function SurveyForm({
                         <label
                           key={o.value}
                           className={`flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-3 text-sm transition-colors ${
-                            checked ? "border-accent bg-accent/10 text-accent" : "border-[--color-line] bg-white text-[--color-txt]"
+                            checked ? "border-accent bg-accent/10 text-accent" : "border-(--color-line) bg-white text-(--color-txt)"
                           }`}
                         >
                           <input type="radio" name={`s_${q.code}`} className="sr-only" checked={checked} onChange={() => set(q.code, { value: o.value })} />
@@ -295,12 +295,12 @@ export function SurveyForm({
                           <label
                             key={o.value}
                             className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
-                              checked ? "border-accent bg-accent/5" : "border-[--color-line] bg-white"
+                              checked ? "border-accent bg-accent/5" : "border-(--color-line) bg-white"
                             }`}
                           >
                             <input
                               type="checkbox"
-                              className="h-5 w-5 accent-[--color-accent]"
+                              className="h-5 w-5 accent-(--color-accent)"
                               checked={checked}
                               onChange={() => {
                                 if (isSource) toggleSourceValue(q.code, o.value);
@@ -349,13 +349,13 @@ export function SurveyForm({
                 {/* 順位付け */}
                 {q.type === "ranking" && (
                   rankingBlocked ? (
-                    <p className="rounded-lg border border-dashed border-[--color-line] bg-[--color-panel-2] px-3 py-3 text-xs text-[--color-dim]">
+                    <p className="rounded-lg border border-dashed border-(--color-line) bg-(--color-panel-2) px-3 py-3 text-xs text-(--color-dim)">
                       受講経験のあるコーチを上の設問で選択すると、ここで順位付けできます。（受講していないコーチは評価不要です）
                     </p>
                   ) : rankingItems.length <= 1 ? (
                     <div className="space-y-2">
                       {rankingItems.map((it) => (
-                        <div key={it.value} className="flex items-center gap-3 rounded-xl border border-[--color-line] bg-white px-3 py-3">
+                        <div key={it.value} className="flex items-center gap-3 rounded-xl border border-(--color-line) bg-white px-3 py-3">
                           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/10 text-sm font-bold text-accent">1</span>
                           <span className="text-sm font-medium">{it.label}</span>
                         </div>
@@ -381,7 +381,7 @@ export function SurveyForm({
       >
         {pending ? "送信中..." : "この内容で送信する"}
       </button>
-      <p className="text-center text-xs text-[--color-dim]">送信後の再送信はご遠慮ください。</p>
+      <p className="text-center text-xs text-(--color-dim)">送信後の再送信はご遠慮ください。</p>
     </form>
   );
 }

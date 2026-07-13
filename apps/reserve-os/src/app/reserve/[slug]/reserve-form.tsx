@@ -4,17 +4,17 @@ import { useActionState } from "react";
 import { submitRequest, type SubmitState } from "./actions";
 
 function Req() {
-  return <span className="ml-1 align-middle text-xs font-bold text-[--color-danger]">必須</span>;
+  return <span className="ml-1 align-middle text-xs font-bold text-(--color-danger)">必須</span>;
 }
 function Opt() {
-  return <span className="ml-1 align-middle text-[11px] text-[--color-dim]">任意</span>;
+  return <span className="ml-1 align-middle text-[11px] text-(--color-dim)">任意</span>;
 }
 
 function Group({ title, desc, children }: { title: string; desc?: string; children: React.ReactNode }) {
   return (
-    <fieldset className="hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-5">
-      <legend className="px-1 text-sm font-bold text-[--color-accent]">{title}</legend>
-      {desc && <p className="mb-3 mt-1 text-xs leading-relaxed text-[--color-dim]">{desc}</p>}
+    <fieldset className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-5">
+      <legend className="px-1 text-sm font-bold text-(--color-accent)">{title}</legend>
+      {desc && <p className="mb-3 mt-1 text-xs leading-relaxed text-(--color-dim)">{desc}</p>}
       <div className="space-y-4">{children}</div>
     </fieldset>
   );
@@ -23,7 +23,7 @@ function Group({ title, desc, children }: { title: string; desc?: string; childr
 function L({ label, required, opt, children }: { label: string; required?: boolean; opt?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-[--color-txt]">
+      <span className="mb-1.5 block text-sm font-medium text-(--color-txt)">
         {label}
         {required && <Req />}
         {opt && <Opt />}
@@ -59,8 +59,8 @@ export function ReserveForm({ slug, minDateTime }: { slug: string; minDateTime: 
           <L label="利き手" required>
             <div className="flex gap-2">
               {[["right", "右打ち"], ["left", "左打ち"]].map(([v, t]) => (
-                <label key={v} className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[--color-line] bg-white px-3 py-3 text-sm has-[:checked]:border-[--color-accent] has-[:checked]:bg-[--color-accent]/8 has-[:checked]:font-semibold has-[:checked]:text-[--color-accent]">
-                  <input type="radio" name="handedness" value={v} required className="accent-[--color-accent]" />
+                <label key={v} className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border border-(--color-line) bg-white px-3 py-3 text-sm has-[:checked]:border-(--color-accent) has-[:checked]:bg-(--color-accent)/8 has-[:checked]:font-semibold has-[:checked]:text-(--color-accent)">
+                  <input type="radio" name="handedness" value={v} required className="accent-(--color-accent)" />
                   {t}
                 </label>
               ))}
@@ -132,15 +132,15 @@ export function ReserveForm({ slug, minDateTime }: { slug: string; minDateTime: 
         </L>
       </Group>
 
-      <label className="flex items-start gap-3 rounded-2xl border border-[--color-line] bg-[--color-panel] p-4 text-sm">
-        <input type="checkbox" name="consent" value="1" required className="mt-0.5 h-5 w-5 accent-[--color-accent]" />
-        <span className="text-[--color-dim]">
+      <label className="flex items-start gap-3 rounded-2xl border border-(--color-line) bg-(--color-panel) p-4 text-sm">
+        <input type="checkbox" name="consent" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
+        <span className="text-(--color-dim)">
           注意事項（予約・キャンセル・持ち物・お支払い・所要時間）を確認し、同意します。
         </span>
       </label>
 
       {state.error && (
-        <p className="rounded-xl border border-[--color-danger]/30 bg-[--color-danger]/8 px-4 py-3 text-center text-sm font-medium text-[--color-danger]">
+        <p className="rounded-xl border border-(--color-danger)/30 bg-(--color-danger)/8 px-4 py-3 text-center text-sm font-medium text-(--color-danger)">
           {state.error}
         </p>
       )}
@@ -148,7 +148,7 @@ export function ReserveForm({ slug, minDateTime }: { slug: string; minDateTime: 
       <button type="submit" disabled={pending} className="cta">
         {pending ? "送信中…" : "この内容で予約を申し込む"}
       </button>
-      <p className="pb-2 text-center text-xs text-[--color-dim]">
+      <p className="pb-2 text-center text-xs text-(--color-dim)">
         送信後、確認メールをお送りします。確定のご連絡をお待ちください。
       </p>
     </form>

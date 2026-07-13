@@ -33,7 +33,7 @@ export default async function ImportPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">カード・口座取込</h1>
-        <p className="text-sm text-[--color-dim]">AMEX・尼崎信金のCSVを取込 → 事業・科目を割当てて確定 → 経費KPIへ自動反映</p>
+        <p className="text-sm text-(--color-dim)">AMEX・尼崎信金のCSVを取込 → 事業・科目を割当てて確定 → 経費KPIへ自動反映</p>
       </header>
 
       <Panel title="CSVアップロード">
@@ -47,7 +47,7 @@ export default async function ImportPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[--color-line] text-xs text-[--color-dim]">
+                <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
                   <th className="py-2 pr-2 text-left font-medium">日付</th>
                   <th className="px-2 py-2 text-left font-medium">摘要</th>
                   <th className="px-2 py-2 text-right font-medium">金額</th>
@@ -60,10 +60,10 @@ export default async function ImportPage() {
                   const proposed = proposeCategory(t.description);
                   const isExpense = t.amount < 0;
                   return (
-                    <tr key={t.id} className="border-b border-[--color-line] align-middle">
-                      <td className="py-2 pr-2 tabular-nums text-[--color-dim]">{t.txn_date}</td>
+                    <tr key={t.id} className="border-b border-(--color-line) align-middle">
+                      <td className="py-2 pr-2 tabular-nums text-(--color-dim)">{t.txn_date}</td>
                       <td className="px-2 py-2">{t.description || "—"}</td>
-                      <td className={`px-2 py-2 text-right tabular-nums ${isExpense ? "" : "text-[--color-ok]"}`}>{yen(t.amount)}</td>
+                      <td className={`px-2 py-2 text-right tabular-nums ${isExpense ? "" : "text-(--color-ok)"}`}>{yen(t.amount)}</td>
                       <td className="px-2 py-2">
                         <form action={confirmTxn} className="flex items-center gap-2">
                           <input type="hidden" name="id" value={t.id} />
@@ -80,7 +80,7 @@ export default async function ImportPage() {
                         {isExpense ? <Badge tone="dim">経費候補</Badge> : <Badge tone="ok">入金</Badge>}
                         <form action={ignoreTxn} className="mt-1">
                           <input type="hidden" name="id" value={t.id} />
-                          <button className="text-xs text-[--color-dim] hover:text-[--color-accent]">除外</button>
+                          <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">除外</button>
                         </form>
                       </td>
                     </tr>

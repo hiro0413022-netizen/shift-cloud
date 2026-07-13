@@ -135,23 +135,23 @@ export default async function DashboardPage({
       <header className="reveal flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">店舗ダッシュボード</h1>
-          <p className="mt-0.5 text-sm text-[--color-dim]">GOLF WING 宝塚 ・ 月次サマリー</p>
+          <p className="mt-0.5 text-sm text-(--color-dim)">GOLF WING 宝塚 ・ 月次サマリー</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/dashboard?month=${prev}`} className="rounded-lg border border-[--color-line] bg-white px-2.5 py-1.5 text-sm text-[--color-dim] hover:text-[--color-txt]" aria-label="前月">←</Link>
+          <Link href={`/dashboard?month=${prev}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="前月">←</Link>
           <form>
             <input
               type="month"
               name="month"
               defaultValue={month}
-              className="rounded-lg border border-[--color-line] bg-white px-3 py-1.5 text-sm font-medium text-[--color-txt] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
+              className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm font-medium text-(--color-txt) focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
             />
           </form>
-          <Link href={`/dashboard?month=${next}`} className="rounded-lg border border-[--color-line] bg-white px-2.5 py-1.5 text-sm text-[--color-dim] hover:text-[--color-txt]" aria-label="翌月">→</Link>
+          <Link href={`/dashboard?month=${next}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="翌月">→</Link>
         </div>
       </header>
 
-      <p className="reveal text-sm font-semibold text-[--color-txt]">{label} の実績</p>
+      <p className="reveal text-sm font-semibold text-(--color-txt)">{label} の実績</p>
 
       {/* 主要4指標（ボタンで内訳展開） */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -169,10 +169,10 @@ export default async function DashboardPage({
       </div>
 
       <Panel title="この画面について" className="d2">
-        <ul className="space-y-1.5 text-sm text-[--color-dim]">
+        <ul className="space-y-1.5 text-sm text-(--color-dim)">
           <li>・各指標の色付きボタンを押すと、名前・プランなどの内訳が展開します。</li>
-          <li>・<span className="text-[--color-txt]">入会者／退会者</span>は会員名簿（Smart Hello取込）から、当月の入会日／退会日で抽出。退会は「6月末退会＝6月」に集計されます。</li>
-          <li>・<span className="text-[--color-txt]">体験／フィッティング</span>は一時利用者台帳から集計。再来者は「割引=再来 / 経路=再来 / 再来日あり」で判定。</li>
+          <li>・<span className="text-(--color-txt)">入会者／退会者</span>は会員名簿（Smart Hello取込）から、当月の入会日／退会日で抽出。退会は「6月末退会＝6月」に集計されます。</li>
+          <li>・<span className="text-(--color-txt)">体験／フィッティング</span>は一時利用者台帳から集計。再来者は「割引=再来 / 経路=再来 / 再来日あり」で判定。</li>
           <li>・右上の月セレクタ（←／→）で対象月を切り替えられます。</li>
         </ul>
       </Panel>
@@ -182,10 +182,10 @@ export default async function DashboardPage({
 
 function MiniStat({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: string }) {
   return (
-    <div className="hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-5">
-      <p className="text-sm font-medium text-[--color-dim]">{label}</p>
+    <div className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-5">
+      <p className="text-sm font-medium text-(--color-dim)">{label}</p>
       <p className={`mt-1 text-3xl font-bold tabular-nums ${tone}`}>{value}</p>
-      <p className="mt-1 text-xs text-[--color-dim]">{sub}</p>
+      <p className="mt-1 text-xs text-(--color-dim)">{sub}</p>
     </div>
   );
 }

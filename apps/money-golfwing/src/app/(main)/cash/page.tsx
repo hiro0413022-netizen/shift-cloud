@@ -38,7 +38,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">現金出納 — {store?.name ?? "店舗未選択"}</h1>
-          <p className="text-sm text-[--color-dim]">入金・出金を入力すると残高が自動計算されます</p>
+          <p className="text-sm text-(--color-dim)">入金・出金を入力すると残高が自動計算されます</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/cash?month=${shift(month, -1)}`} className={btnGhostCls}>← 前月</Link>
@@ -75,7 +75,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[--color-line] text-xs text-[--color-dim]">
+                <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
                   <th className="py-2 pr-2 text-left font-medium">日付</th>
                   <th className="px-2 py-2 text-left font-medium">摘要 / 内容</th>
                   <th className="px-2 py-2 text-right font-medium">入金</th>
@@ -86,19 +86,19 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-[--color-line]">
-                    <td className="py-2 pr-2 tabular-nums text-[--color-dim]">{r.entry_date}</td>
+                  <tr key={r.id} className="border-b border-(--color-line)">
+                    <td className="py-2 pr-2 tabular-nums text-(--color-dim)">{r.entry_date}</td>
                     <td className="px-2 py-2">
                       {r.summary ?? "—"}{r.description ? ` / ${r.description}` : ""}
-                      {r.source === "sales" && <span className="ml-1 text-xs text-[--color-gold]">売上</span>}
+                      {r.source === "sales" && <span className="ml-1 text-xs text-(--color-gold)">売上</span>}
                     </td>
-                    <td className="px-2 py-2 text-right tabular-nums text-[--color-ok]">{r.in_amount ? yen(Number(r.in_amount)) : ""}</td>
+                    <td className="px-2 py-2 text-right tabular-nums text-(--color-ok)">{r.in_amount ? yen(Number(r.in_amount)) : ""}</td>
                     <td className="px-2 py-2 text-right tabular-nums">{r.out_amount ? yen(Number(r.out_amount)) : ""}</td>
                     <td className="px-2 py-2 text-right tabular-nums font-medium">{r.balance == null ? "—" : yen(Number(r.balance))}</td>
                     <td className="px-2 py-2 text-right">
                       <form action={deleteCashEntry}>
                         <input type="hidden" name="id" value={r.id} />
-                        <button className="text-xs text-[--color-dim] hover:text-[--color-accent]">削除</button>
+                        <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
                       </form>
                     </td>
                   </tr>

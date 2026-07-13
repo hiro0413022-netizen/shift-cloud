@@ -34,7 +34,7 @@ export default async function LibraryPage() {
   return (
     <div>
       <h1 className="mb-1 text-xl font-semibold tracking-tight">資料室</h1>
-      <p className="mb-6 text-sm text-[--color-dim]">
+      <p className="mb-6 text-sm text-(--color-dim)">
         会社の資料の置き場。ここに上げたファイルはPC・スマホどこからでもダウンロードできます（view_hq保持者のみ）
       </p>
       <LibraryClient items={items} categories={folders.map(decSeg)} />

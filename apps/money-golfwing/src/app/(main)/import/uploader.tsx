@@ -28,11 +28,11 @@ export function Uploader({ sources }: { sources: { code: string; name: string }[
         <button disabled={pending} className={btnCls}>{pending ? "取込中..." : "CSVを取込"}</button>
       </div>
       {result && (
-        <div className="rounded-lg border border-[--color-line] bg-[--color-bg] p-3 text-sm">
+        <div className="rounded-lg border border-(--color-line) bg-(--color-bg) p-3 text-sm">
           {result.errors.length > 0 && result.ok === 0 ? (
             <p className="text-red-400">取込失敗: {result.errors.join(" / ")}</p>
           ) : (
-            <p className="text-[--color-ok]">
+            <p className="text-(--color-ok)">
               取込 {result.ok} 件 / 重複スキップ {result.skipped} 件
               {result.errors.length > 0 && `（警告 ${result.errors.length} 件）`}
             </p>

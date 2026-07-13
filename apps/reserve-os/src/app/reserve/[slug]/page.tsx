@@ -32,7 +32,7 @@ function Hero({ service }: { service: Row }) {
       <p className="mx-auto max-w-md text-[15px] leading-relaxed text-[#e8e4d6]">
         {String(service.lead_text ?? "")}
       </p>
-      <a href="#form" className="mt-8 inline-block rounded-full bg-[--color-gold] px-8 py-3 text-sm font-bold text-[#1a1508] shadow-lg transition-transform hover:-translate-y-0.5">
+      <a href="#form" className="mt-8 inline-block rounded-full bg-(--color-gold) px-8 py-3 text-sm font-bold text-[#1a1508] shadow-lg transition-transform hover:-translate-y-0.5">
         予約フォームへ進む
       </a>
       <p className="mt-3 text-xs text-[#b9b39c]">公式LINEからそのままお申し込みいただけます</p>
@@ -44,7 +44,7 @@ function Section({ n, title, children }: { n: string; title: string; children: R
   return (
     <section className="mx-auto max-w-xl px-6 py-10">
       <div className="mb-5 flex items-center gap-3">
-        <span className="text-sm font-bold tracking-widest text-[--color-gold]">{n}</span>
+        <span className="text-sm font-bold tracking-widest text-(--color-gold)">{n}</span>
         <h2 className="section-title">{title}</h2>
       </div>
       {children}
@@ -77,18 +77,18 @@ export default async function ReservePage({
       <main className="min-h-screen">
         <Hero service={service} />
         <div className="mx-auto max-w-xl px-6 py-14">
-          <div className="hud reveal rounded-2xl border border-emerald-500/30 bg-[--color-panel] p-8 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[--color-accent] text-3xl text-white">✓</div>
+          <div className="hud reveal rounded-2xl border border-emerald-500/30 bg-(--color-panel) p-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--color-accent) text-3xl text-white">✓</div>
             <h2 className="mt-5 text-xl font-bold">お申し込みを受け付けました</h2>
-            <p className="mt-3 text-sm leading-relaxed text-[--color-dim]">
+            <p className="mt-3 text-sm leading-relaxed text-(--color-dim)">
               ご入力ありがとうございます。<br />ご希望日時をもとにスタッフが空き状況を確認し、確定のご連絡を差し上げます。
             </p>
-            <div className="mt-6 space-y-2 rounded-xl bg-[--color-panel-2] p-4 text-left text-sm">
+            <div className="mt-6 space-y-2 rounded-xl bg-(--color-panel-2) p-4 text-left text-sm">
               <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">1</span>受付確認メールをお送りしました（届かない場合は迷惑メールをご確認ください）</p>
               <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">2</span>スタッフが日程を確認し、確定のご連絡をします</p>
               <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">3</span>公式LINEにも通知が届きます</p>
             </div>
-            <a href={`/reserve/${slug}`} className="mt-6 inline-block text-sm font-medium text-[--color-accent]">トップへ戻る</a>
+            <a href={`/reserve/${slug}`} className="mt-6 inline-block text-sm font-medium text-(--color-accent)">トップへ戻る</a>
           </div>
         </div>
       </main>
@@ -124,14 +124,14 @@ export default async function ReservePage({
 
       {/* ① シャフトフィッティングとは */}
       <Section n="①" title="シャフトフィッティングとは">
-        <div className="hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-6">
-          <p className="leading-relaxed text-[--color-txt]">
+        <div className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
+          <p className="leading-relaxed text-(--color-txt)">
             シャフトは「クラブの背骨」とも呼ばれ、同じヘッドでもシャフトが変わるだけで飛距離・方向性・打感が大きく変わります。
             シャフトフィッティングは、弾道計測とプロの試打診断であなたのスイングを数値化し、最も力を引き出せる1本を見つける専門メニューです。
           </p>
-          <ul className="mt-4 space-y-2 text-sm text-[--color-dim]">
+          <ul className="mt-4 space-y-2 text-sm text-(--color-dim)">
             {["飛距離ロスの原因を数値で可視化", "方向性・ミスの傾向を安定させる", "自分に本当に合う重量・硬さ・調子が分かる", "無駄な買い替えを防ぎ、コスパよく上達"].map((t) => (
-              <li key={t} className="flex items-start gap-2"><span className="mt-1 text-[--color-accent]">◆</span>{t}</li>
+              <li key={t} className="flex items-start gap-2"><span className="mt-1 text-(--color-accent)">◆</span>{t}</li>
             ))}
           </ul>
         </div>
@@ -139,25 +139,25 @@ export default async function ReservePage({
 
       {/* ② メニュー・料金 */}
       <Section n="②" title="メニュー・料金">
-        <div className="hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-6">
+        <div className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
           <p className="text-lg font-bold">{String(service.name)}</p>
-          {service.summary && <p className="mt-1 text-sm leading-relaxed text-[--color-dim]">{String(service.summary)}</p>}
-          <dl className="mt-5 divide-y divide-[--color-line] text-sm">
+          {service.summary && <p className="mt-1 text-sm leading-relaxed text-(--color-dim)">{String(service.summary)}</p>}
+          <dl className="mt-5 divide-y divide-(--color-line) text-sm">
             {service.target_clubs && (
-              <div className="flex justify-between gap-4 py-3"><dt className="text-[--color-dim]">対象クラブ</dt><dd className="text-right font-medium">{String(service.target_clubs)}</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-(--color-dim)">対象クラブ</dt><dd className="text-right font-medium">{String(service.target_clubs)}</dd></div>
             )}
             {duration != null && (
-              <div className="flex justify-between gap-4 py-3"><dt className="text-[--color-dim]">所要時間</dt><dd className="font-medium">約 {duration} 分</dd></div>
+              <div className="flex justify-between gap-4 py-3"><dt className="text-(--color-dim)">所要時間</dt><dd className="font-medium">約 {duration} 分</dd></div>
             )}
             {price != null && (
               <div className="flex items-center justify-between gap-4 py-3">
-                <dt className="text-[--color-dim]">料金</dt>
-                <dd className="text-xl font-bold text-[--color-accent]">¥{price.toLocaleString("ja-JP")}<span className="ml-1 text-xs font-medium text-[--color-dim]">（税込）</span></dd>
+                <dt className="text-(--color-dim)">料金</dt>
+                <dd className="text-xl font-bold text-(--color-accent)">¥{price.toLocaleString("ja-JP")}<span className="ml-1 text-xs font-medium text-(--color-dim)">（税込）</span></dd>
               </div>
             )}
           </dl>
           {service.price_note && (
-            <p className="mt-3 rounded-lg bg-[--color-panel-2] p-3 text-xs leading-relaxed text-[--color-dim]">※ {String(service.price_note)}</p>
+            <p className="mt-3 rounded-lg bg-(--color-panel-2) p-3 text-xs leading-relaxed text-(--color-dim)">※ {String(service.price_note)}</p>
           )}
         </div>
       </Section>
@@ -166,11 +166,11 @@ export default async function ReservePage({
       <Section n="③" title="当日の流れ">
         <ol className="space-y-3">
           {flow.map(([t, d], i) => (
-            <li key={t} className="hud reveal flex gap-4 rounded-2xl border border-[--color-line] bg-[--color-panel] p-4">
+            <li key={t} className="hud reveal flex gap-4 rounded-2xl border border-(--color-line) bg-(--color-panel) p-4">
               <span className="step-num shrink-0">{i + 1}</span>
               <div>
                 <p className="font-semibold">{t}</p>
-                <p className="mt-0.5 text-sm leading-relaxed text-[--color-dim]">{d}</p>
+                <p className="mt-0.5 text-sm leading-relaxed text-(--color-dim)">{d}</p>
               </div>
             </li>
           ))}
@@ -180,10 +180,10 @@ export default async function ReservePage({
       {/* ④ 事前ヒアリング（予約フォーム） */}
       <section id="form" className="mx-auto max-w-xl scroll-mt-4 px-6 py-10">
         <div className="mb-5 flex items-center gap-3">
-          <span className="text-sm font-bold tracking-widest text-[--color-gold]">④</span>
+          <span className="text-sm font-bold tracking-widest text-(--color-gold)">④</span>
           <h2 className="section-title">ご予約・事前ヒアリング</h2>
         </div>
-        <p className="mb-5 text-sm leading-relaxed text-[--color-dim]">
+        <p className="mb-5 text-sm leading-relaxed text-(--color-dim)">
           下記フォームからお申し込みください。ご入力いただいた内容は、当日のフィッティング精度の向上に活用します。
         </p>
         <ReserveForm slug={slug} minDateTime={minDT} />
@@ -191,7 +191,7 @@ export default async function ReservePage({
 
       {/* ⑤ 注意事項 */}
       <Section n="⑤" title="注意事項">
-        <div className="hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-6">
+        <div className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
           <dl className="space-y-4 text-sm">
             {[
               ["ご予約について", "本フォームはお申し込みです。スタッフが空き状況を確認し、確定のご連絡をもってご予約成立となります。"],
@@ -201,8 +201,8 @@ export default async function ReservePage({
               ["所要時間", duration != null ? `目安 約${duration}分。内容により前後します。` : "内容により異なります。"],
             ].map(([t, d]) => (
               <div key={t}>
-                <dt className="font-semibold text-[--color-txt]">{t}</dt>
-                <dd className="mt-1 leading-relaxed text-[--color-dim]">{d}</dd>
+                <dt className="font-semibold text-(--color-txt)">{t}</dt>
+                <dd className="mt-1 leading-relaxed text-(--color-dim)">{d}</dd>
               </div>
             ))}
           </dl>
@@ -211,11 +211,11 @@ export default async function ReservePage({
 
       {/* ⑥ FAQ */}
       <Section n="⑥" title="よくあるご質問">
-        <div className="hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] px-6 py-2">
+        <div className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) px-6 py-2">
           {faqs.map(([q, a]) => (
             <details key={q} className="faq">
               <summary>{q}</summary>
-              <p className="pb-4 text-sm leading-relaxed text-[--color-dim]">{a}</p>
+              <p className="pb-4 text-sm leading-relaxed text-(--color-dim)">{a}</p>
             </details>
           ))}
         </div>
@@ -223,7 +223,7 @@ export default async function ReservePage({
 
       <footer className="hero mt-6 px-6 py-10 text-center">
         <p className="eyebrow" style={{ color: "#cdb26f" }}>GOLF WING</p>
-        <a href="#form" className="mt-4 inline-block rounded-full bg-[--color-gold] px-8 py-3 text-sm font-bold text-[#1a1508]">予約フォームへ進む</a>
+        <a href="#form" className="mt-4 inline-block rounded-full bg-(--color-gold) px-8 py-3 text-sm font-bold text-[#1a1508]">予約フォームへ進む</a>
         <p className="mt-6 text-xs text-[#b9b39c]">© GOLF WING</p>
       </footer>
     </main>

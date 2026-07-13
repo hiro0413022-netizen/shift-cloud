@@ -23,7 +23,7 @@ export default async function MemoriesPage() {
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">Business Memory</h1>
-        <p className="text-sm text-[--color-dim]">会社の記憶 — 判断理由・学び・勝ちパターンを残す</p>
+        <p className="text-sm text-(--color-dim)">会社の記憶 — 判断理由・学び・勝ちパターンを残す</p>
       </header>
 
       <Panel title="記憶を追加">
@@ -71,16 +71,16 @@ export default async function MemoriesPage() {
         ) : (
           <ul className="space-y-3">
             {memories.map((m) => (
-              <li key={m.id} className="rounded-lg border border-[--color-line] bg-[--color-panel-2] p-3">
+              <li key={m.id} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium">{m.title}</span>
                   <Badge tone="accent">{m.category}</Badge>
                   <Badge tone={m.importance <= 2 ? "gold" : "default"}>重要度{m.importance}</Badge>
                   {m.human_verified && <Badge tone="ok">検証済み</Badge>}
                   {m.ai_generated && <Badge>AI生成</Badge>}
-                  <span className="text-xs text-[--color-dim]">{fmtDate(m.created_at)}</span>
+                  <span className="text-xs text-(--color-dim)">{fmtDate(m.created_at)}</span>
                 </div>
-                <p className="mt-1 text-sm text-[--color-dim]">{m.summary}</p>
+                <p className="mt-1 text-sm text-(--color-dim)">{m.summary}</p>
                 {m.learnings && <p className="mt-1 text-xs text-emerald-300">学び: {m.learnings}</p>}
                 {m.future_recommendation && (
                   <p className="mt-1 text-xs text-sky-300">推奨: {m.future_recommendation}</p>

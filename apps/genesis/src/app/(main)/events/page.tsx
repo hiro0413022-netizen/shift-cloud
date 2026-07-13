@@ -24,7 +24,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">Company Events</h1>
-        <p className="text-sm text-[--color-dim]">会社で起きるすべての出来事のタイムライン</p>
+        <p className="text-sm text-(--color-dim)">会社で起きるすべての出来事のタイムライン</p>
       </header>
 
       <Panel title="イベントを記録">
@@ -58,7 +58,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
         {!events || events.length === 0 ? (
           <Empty>イベントなし</Empty>
         ) : (
-          <ul className="relative space-y-4 border-l border-[--color-line] pl-5">
+          <ul className="relative space-y-4 border-l border-(--color-line) pl-5">
             {events.map((e) => (
               <li key={e.id} className="relative">
                 <span className="absolute -left-[26px] top-1">
@@ -70,9 +70,9 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
                   <span className="text-sm font-medium">{e.title}</span>
                   <Badge>{e.event_type}</Badge>
                   <Badge tone={e.source_type === "ai" ? "accent" : "default"}>{e.source}</Badge>
-                  <span className="text-xs text-[--color-dim]">{fmtDate(e.occurred_at)}</span>
+                  <span className="text-xs text-(--color-dim)">{fmtDate(e.occurred_at)}</span>
                 </div>
-                {e.description && <p className="mt-1 text-sm text-[--color-dim]">{e.description}</p>}
+                {e.description && <p className="mt-1 text-sm text-(--color-dim)">{e.description}</p>}
                 {e.ai_next_action && (
                   <p className="mt-1 text-xs text-sky-300">AI次アクション: {e.ai_next_action}</p>
                 )}

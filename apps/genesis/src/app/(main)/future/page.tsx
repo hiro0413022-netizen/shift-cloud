@@ -29,7 +29,7 @@ export default async function FuturePage() {
     <div className="space-y-4">
       <header className="reveal">
         <h1 className="text-xl font-bold">Future Simulation</h1>
-        <p className="text-sm text-[--color-dim]">
+        <p className="text-sm text-(--color-dim)">
           KPIと未来予測タイムライン（労務系KPIはShift Cloud実データ、売上・会員は接続待ち）
         </p>
       </header>
@@ -51,7 +51,7 @@ export default async function FuturePage() {
 
       {/* タイムライン */}
       <Panel title="未来タイムライン" className="d2">
-        <ol className="relative space-y-6 border-l border-[--color-line] pl-6">
+        <ol className="relative space-y-6 border-l border-(--color-line) pl-6">
           {timeline.map((t, i) => (
             <li key={t.label} className="reveal relative" style={{ animationDelay: `${0.1 + i * 0.08}s` }}>
               <span
@@ -60,7 +60,7 @@ export default async function FuturePage() {
                 }`}
               />
               <p className="text-sm font-semibold text-sky-200">{t.label}</p>
-              <ul className="mt-1 space-y-1 text-sm text-[--color-dim]">
+              <ul className="mt-1 space-y-1 text-sm text-(--color-dim)">
                 {t.items.map((item) => (
                   <li key={item}>・{item}</li>
                 ))}

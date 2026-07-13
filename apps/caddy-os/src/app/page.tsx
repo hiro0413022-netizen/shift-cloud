@@ -21,9 +21,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     <main className="mx-auto max-w-6xl p-6">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <p className="text-xs tracking-[0.4em] text-[--color-gold]">YOZAN</p>
+          <p className="text-xs tracking-[0.4em] text-(--color-gold)">YOZAN</p>
           <h1 className="text-2xl font-bold tracking-widest">Caddy OS</h1>
-          <p className="mt-1 text-sm text-[--color-dim]">キャディ派遣 — 派遣台帳・売上・委託料・収支</p>
+          <p className="mt-1 text-sm text-(--color-dim)">キャディ派遣 — 派遣台帳・売上・委託料・収支</p>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/dispatches" className="text-sm underline">
@@ -39,7 +39,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             マスタ
           </Link>
           <form action="/api/logout" method="post">
-            <button className="text-sm text-[--color-dim] hover:text-[--color-txt]">
+            <button className="text-sm text-(--color-dim) hover:text-(--color-txt)">
               {actor.name} — ログアウト
             </button>
           </form>
@@ -51,9 +51,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           type="month"
           name="ym"
           defaultValue={ym}
-          className="rounded-lg border border-[--color-line] bg-white px-3 py-1.5 text-sm"
+          className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm"
         />
-        <button className="rounded-lg border border-[--color-line] px-3 py-1.5 text-sm">表示</button>
+        <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm">表示</button>
       </form>
 
       <section className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -73,10 +73,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className={cardCls}>
           <h2 className="mb-3 font-semibold">取引先別（請求のもと）</h2>
           {clients.length === 0 ? (
-            <p className="text-sm text-[--color-dim]">この月の派遣はまだありません</p>
+            <p className="text-sm text-(--color-dim)">この月の派遣はまだありません</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="text-left text-xs text-[--color-dim]">
+              <thead className="text-left text-xs text-(--color-dim)">
                 <tr>
                   <th className="pb-2">ゴルフ場</th>
                   <th className="pb-2 text-right">人工</th>
@@ -85,7 +85,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               </thead>
               <tbody>
                 {clients.map((c) => (
-                  <tr key={c.name} className="border-t border-[--color-line]">
+                  <tr key={c.name} className="border-t border-(--color-line)">
                     <td className="py-1.5">{c.name}</td>
                     <td className="py-1.5 text-right tabular-nums">{c.count}</td>
                     <td className="py-1.5 text-right tabular-nums">{yen(c.sales)}</td>
@@ -99,10 +99,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         <div className={cardCls}>
           <h2 className="mb-3 font-semibold">委託先別（支払のもと）</h2>
           {partners.length === 0 ? (
-            <p className="text-sm text-[--color-dim]">この月の委託はまだありません</p>
+            <p className="text-sm text-(--color-dim)">この月の委託はまだありません</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="text-left text-xs text-[--color-dim]">
+              <thead className="text-left text-xs text-(--color-dim)">
                 <tr>
                   <th className="pb-2">委託先</th>
                   <th className="pb-2 text-right">件数</th>
@@ -113,7 +113,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
               </thead>
               <tbody>
                 {partners.map((p) => (
-                  <tr key={p.name} className="border-t border-[--color-line]">
+                  <tr key={p.name} className="border-t border-(--color-line)">
                     <td className="py-1.5">{p.name}</td>
                     <td className="py-1.5 text-right tabular-nums">{p.count}</td>
                     <td className="py-1.5 text-right tabular-nums">{yen(p.fee)}</td>
@@ -132,11 +132,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h2 className="font-semibold">推移（直近6ヶ月）</h2>
           <form action={refreshFinanceAction}>
             <input type="hidden" name="ym" value={ym} />
-            <button className="rounded-lg border border-[--color-line] px-3 py-1.5 text-xs">財務へ再集計</button>
+            <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">財務へ再集計</button>
           </form>
         </div>
         <table className="w-full text-sm">
-          <thead className="text-left text-xs text-[--color-dim]">
+          <thead className="text-left text-xs text-(--color-dim)">
             <tr>
               <th className="pb-2">月</th>
               <th className="pb-2 text-right">人工</th>
@@ -148,7 +148,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </thead>
           <tbody>
             {trend.map((t) => (
-              <tr key={t.month} className="border-t border-[--color-line]">
+              <tr key={t.month} className="border-t border-(--color-line)">
                 <td className="py-1.5">{t.month}</td>
                 <td className="py-1.5 text-right tabular-nums">{t.count}</td>
                 <td className="py-1.5 text-right tabular-nums">{yen(t.sales)}</td>
@@ -169,10 +169,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "good" | "bad" }) {
   const color = tone === "bad" ? "text-red-600" : tone === "good" ? "text-emerald-700" : "";
   return (
-    <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-      <p className="text-xs text-[--color-dim]">{label}</p>
+    <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+      <p className="text-xs text-(--color-dim)">{label}</p>
       <p className={`mt-1 text-xl font-bold tabular-nums ${color}`}>{value}</p>
-      {sub ? <p className="mt-0.5 text-xs text-[--color-dim]">{sub}</p> : null}
+      {sub ? <p className="mt-0.5 text-xs text-(--color-dim)">{sub}</p> : null}
     </div>
   );
 }

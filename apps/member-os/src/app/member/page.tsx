@@ -48,12 +48,12 @@ export default async function MemberHomePage({
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-8">
       <header className="mb-5 flex items-center justify-between">
         <div>
-          <p className="text-xs tracking-[0.4em] text-[--color-gold]">FRUNK GOLF 姫路</p>
+          <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
           <h1 className="text-xl font-bold tracking-wide">{member.name} 様</h1>
-          <p className="text-xs text-[--color-dim]">会員番号 {member.memberNo}{member.isProvisional ? "（仮登録）" : ""}</p>
+          <p className="text-xs text-(--color-dim)">会員番号 {member.memberNo}{member.isProvisional ? "（仮登録）" : ""}</p>
         </div>
         <form action={memberLogout}>
-          <button className="rounded-lg border border-[--color-line] px-3 py-1.5 text-xs text-[--color-dim] hover:text-[--color-txt]">ログアウト</button>
+          <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs text-(--color-dim) hover:text-(--color-txt)">ログアウト</button>
         </form>
       </header>
 
@@ -65,20 +65,20 @@ export default async function MemberHomePage({
       </Link>
 
       <section className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold text-[--color-dim]">これからのご予約</h2>
+        <h2 className="mb-2 text-sm font-semibold text-(--color-dim)">これからのご予約</h2>
         {upcoming.length === 0 ? (
-          <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-5 text-center text-sm text-[--color-dim]">現在ご予約はありません</div>
+          <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-5 text-center text-sm text-(--color-dim)">現在ご予約はありません</div>
         ) : (
           <div className="space-y-2">
             {upcoming.map((b) => (
-              <div key={String(b.id)} className="flex items-center justify-between gap-2 rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
+              <div key={String(b.id)} className="flex items-center justify-between gap-2 rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
                 <div>
                   <p className="font-semibold">{String(b.booking_date)} {String(b.start_time).slice(0, 5)}</p>
-                  <p className="text-xs text-[--color-dim]">{resName.get(String(b.resource_id)) ?? "枠"}{b.party_size ? ` ・ ${String(b.party_size)}名` : ""}</p>
+                  <p className="text-xs text-(--color-dim)">{resName.get(String(b.resource_id)) ?? "枠"}{b.party_size ? ` ・ ${String(b.party_size)}名` : ""}</p>
                 </div>
                 <form action={cancelMyBooking}>
                   <input type="hidden" name="id" value={String(b.id)} />
-                  <button className="rounded-lg border border-[--color-line] px-3 py-2 text-xs text-[--color-dim] hover:text-red-400">キャンセル</button>
+                  <button className="rounded-lg border border-(--color-line) px-3 py-2 text-xs text-(--color-dim) hover:text-red-400">キャンセル</button>
                 </form>
               </div>
             ))}
@@ -87,15 +87,15 @@ export default async function MemberHomePage({
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-[--color-dim]">これまでのご利用</h2>
+        <h2 className="mb-2 text-sm font-semibold text-(--color-dim)">これまでのご利用</h2>
         {past.length === 0 ? (
-          <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-5 text-center text-sm text-[--color-dim]">履歴はありません</div>
+          <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-5 text-center text-sm text-(--color-dim)">履歴はありません</div>
         ) : (
           <div className="space-y-1.5">
             {past.map((b) => (
-              <div key={String(b.id)} className="flex items-center justify-between rounded-lg border border-[--color-line] bg-[--color-panel-2] px-4 py-2.5 text-sm">
+              <div key={String(b.id)} className="flex items-center justify-between rounded-lg border border-(--color-line) bg-(--color-panel-2) px-4 py-2.5 text-sm">
                 <span>{String(b.booking_date)} {String(b.start_time).slice(0, 5)} ・ {resName.get(String(b.resource_id)) ?? "枠"}</span>
-                <span className="text-xs text-[--color-dim]">{BOOKING_STATUS_LABEL[String(b.status)] ?? String(b.status)}</span>
+                <span className="text-xs text-(--color-dim)">{BOOKING_STATUS_LABEL[String(b.status)] ?? String(b.status)}</span>
               </div>
             ))}
           </div>

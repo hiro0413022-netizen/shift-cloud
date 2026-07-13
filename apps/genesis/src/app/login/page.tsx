@@ -14,11 +14,11 @@ function LoginForm() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <p className="text-xs tracking-[0.4em] text-[--color-gold]">YOZAN</p>
+          <p className="text-xs tracking-[0.4em] text-(--color-gold)">YOZAN</p>
           <h1 className="text-3xl font-bold tracking-widest">GENESIS</h1>
-          <p className="mt-2 text-sm text-[--color-dim]">会社を動かすOS — Cockpitへログイン</p>
+          <p className="mt-2 text-sm text-(--color-dim)">会社を動かすOS — Cockpitへログイン</p>
         </div>
-        <form action={action} className="space-y-4 rounded-xl border border-[--color-line] bg-[--color-panel] p-6">
+        <form action={action} className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-6">
           <input name="id" placeholder="メールアドレス または ログインID" className={inputCls} autoComplete="username" />
           <input name="password" type="password" placeholder="パスワード" className={inputCls} autoComplete="current-password" />
           {state.error && <p className="text-sm text-red-400">{state.error}</p>}
@@ -30,7 +30,7 @@ function LoginForm() {
           </button>
         </form>
         <p className="mt-4 text-center">
-          <a href="/manual" className="text-sm text-[--color-dim] underline underline-offset-2">📖 使い方マニュアル</a>
+          <a href="/manual" className="text-sm text-(--color-dim) underline underline-offset-2">📖 使い方マニュアル</a>
         </p>
       </div>
     </main>

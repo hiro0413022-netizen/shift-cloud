@@ -55,20 +55,20 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     <main className="mx-auto max-w-5xl p-6">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <Link href="/" className="text-xs text-[--color-dim] underline">
+          <Link href="/" className="text-xs text-(--color-dim) underline">
             ← ダッシュボード
           </Link>
           <h1 className="text-2xl font-bold tracking-widest">請求</h1>
-          <p className="mt-1 text-sm text-[--color-dim]">派遣台帳から自動生成。取引先ごとの締め日を反映します</p>
+          <p className="mt-1 text-sm text-(--color-dim)">派遣台帳から自動生成。取引先ごとの締め日を反映します</p>
         </div>
         <form method="get" className="flex items-center gap-2">
           <input
             type="month"
             name="ym"
             defaultValue={ym}
-            className="rounded-lg border border-[--color-line] bg-white px-3 py-1.5 text-sm"
+            className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm"
           />
-          <button className="rounded-lg border border-[--color-line] px-3 py-1.5 text-sm">表示</button>
+          <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm">表示</button>
         </form>
       </header>
 
@@ -81,10 +81,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         </div>
 
         {summaries.length === 0 ? (
-          <p className="text-sm text-[--color-dim]">この月に請求対象の派遣はありません</p>
+          <p className="text-sm text-(--color-dim)">この月に請求対象の派遣はありません</p>
         ) : (
           <table className="w-full text-sm">
-            <thead className="text-left text-xs text-[--color-dim]">
+            <thead className="text-left text-xs text-(--color-dim)">
               <tr>
                 <th className="pb-2">取引先</th>
                 <th className="pb-2">締切日</th>
@@ -98,7 +98,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             </thead>
             <tbody>
               {summaries.map((s) => (
-                <tr key={s.client.id} className="border-t border-[--color-line]">
+                <tr key={s.client.id} className="border-t border-(--color-line)">
                   <td className="py-2">{s.client.name}</td>
                   <td className="py-2 tabular-nums">{s.inv.closingDate}</td>
                   <td className="py-2">{s.client.payment_day || "—"}</td>
@@ -109,7 +109,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                   <td className="py-2 text-right">
                     <Link
                       href={`/invoices/${s.client.id}?ym=${ym}`}
-                      className="rounded-lg border border-[--color-line] px-3 py-1 text-xs"
+                      className="rounded-lg border border-(--color-line) px-3 py-1 text-xs"
                     >
                       請求書を開く
                     </Link>
@@ -121,7 +121,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
         )}
       </section>
 
-      <p className="mt-4 text-xs text-[--color-dim]">
+      <p className="mt-4 text-xs text-(--color-dim)">
         ※ 西宮高原ゴルフ倶楽部は「20日締め」のため、締切日が月末になりません（マスタの締め日を参照しています）。
       </p>
     </main>

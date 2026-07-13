@@ -73,19 +73,19 @@ export function LibraryClient({ items, categories }: { items: LibItem[]; categor
   return (
     <div className="space-y-6">
       {/* アップロード */}
-      <div className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
+      <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
         <p className="mb-3 text-sm font-medium">資料をアップロード（50MBまで）</p>
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <input
             ref={fileRef}
             type="file"
-            className="min-w-0 flex-1 text-sm file:mr-3 file:rounded-lg file:border file:border-[--color-line] file:bg-[--color-panel-2] file:px-3 file:py-1.5 file:text-sm file:text-[--color-txt]"
+            className="min-w-0 flex-1 text-sm file:mr-3 file:rounded-lg file:border file:border-(--color-line) file:bg-(--color-panel-2) file:px-3 file:py-1.5 file:text-sm file:text-(--color-txt)"
           />
           <input
             ref={catRef}
             list="lib-categories"
             placeholder="分類（例: 出店計画）"
-            className="rounded-lg border border-[--color-line] bg-[--color-panel-2] px-3 py-1.5 text-sm"
+            className="rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-1.5 text-sm"
           />
           <datalist id="lib-categories">
             {categories.map((c) => <option key={c} value={c} />)}
@@ -102,39 +102,39 @@ export function LibraryClient({ items, categories }: { items: LibItem[]; categor
             {busy ? "アップロード中…" : "アップロード"}
           </button>
         </div>
-        {msg && <p className="mt-2 text-xs text-[--color-dim]">{msg}</p>}
+        {msg && <p className="mt-2 text-xs text-(--color-dim)">{msg}</p>}
       </div>
 
       {/* 一覧 */}
       {items.length === 0 && (
-        <p className="text-sm text-[--color-dim]">まだ資料がありません。上のフォームからアップロードしてください</p>
+        <p className="text-sm text-(--color-dim)">まだ資料がありません。上のフォームからアップロードしてください</p>
       )}
       {[...grouped.entries()].map(([cat, list]) => (
         <div key={cat}>
-          <h2 className="mb-2 text-sm font-semibold text-[--color-gold]">📁 {cat}</h2>
-          <div className="overflow-hidden rounded-xl border border-[--color-line]">
+          <h2 className="mb-2 text-sm font-semibold text-(--color-gold)">📁 {cat}</h2>
+          <div className="overflow-hidden rounded-xl border border-(--color-line)">
             {list.map((it, i) => (
               <div
                 key={it.path}
-                className={`flex items-center gap-3 bg-[--color-panel] px-4 py-3 ${i > 0 ? "border-t border-[--color-line]" : ""}`}
+                className={`flex items-center gap-3 bg-(--color-panel) px-4 py-3 ${i > 0 ? "border-t border-(--color-line)" : ""}`}
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">{it.name}</p>
-                  <p className="text-[11px] text-[--color-dim]">
+                  <p className="text-[11px] text-(--color-dim)">
                     {fmtSize(it.size)}{it.createdAt ? ` ・ ${it.createdAt.slice(0, 10)}` : ""}
                   </p>
                 </div>
                 <button
                   onClick={() => download(it.path)}
                   disabled={pending}
-                  className="rounded-lg border border-[--color-line] px-3 py-1.5 text-sm text-sky-300 disabled:opacity-40"
+                  className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-sky-300 disabled:opacity-40"
                 >
                   ⬇ DL
                 </button>
                 <button
                   onClick={() => remove(it.path, it.name)}
                   disabled={pending}
-                  className="rounded-lg border border-[--color-line] px-2.5 py-1.5 text-sm text-[--color-dim] disabled:opacity-40"
+                  className="rounded-lg border border-(--color-line) px-2.5 py-1.5 text-sm text-(--color-dim) disabled:opacity-40"
                   title="削除"
                 >
                   🗑

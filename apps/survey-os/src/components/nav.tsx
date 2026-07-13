@@ -8,12 +8,12 @@ const LINKS = [{ href: "/", label: "アンケート一覧" }];
 export function TopBar({ userName }: { userName: string }) {
   const pathname = usePathname() || "/";
   return (
-    <header className="sticky top-0 z-20 border-b border-[--color-line] bg-[--color-panel]/85 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-(--color-line) bg-(--color-panel)/85 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-baseline gap-2">
-            <span className="text-[11px] font-semibold tracking-[0.28em] text-[--color-gold]">YOZAN</span>
-            <span className="text-base font-bold tracking-tight text-[--color-txt]">Survey OS</span>
+            <span className="text-[11px] font-semibold tracking-[0.28em] text-(--color-gold)">YOZAN</span>
+            <span className="text-base font-bold tracking-tight text-(--color-txt)">Survey OS</span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
             {LINKS.map((l) => {
@@ -23,7 +23,7 @@ export function TopBar({ userName }: { userName: string }) {
                   key={l.href}
                   href={l.href}
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                    active ? "bg-accent/10 text-accent" : "text-[--color-dim] hover:bg-[--color-panel-2] hover:text-[--color-txt]"
+                    active ? "bg-accent/10 text-accent" : "text-(--color-dim) hover:bg-(--color-panel-2) hover:text-(--color-txt)"
                   }`}
                 >
                   {l.label}
@@ -33,9 +33,9 @@ export function TopBar({ userName }: { userName: string }) {
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-[--color-dim] sm:inline">{userName}</span>
+          <span className="hidden text-sm text-(--color-dim) sm:inline">{userName}</span>
           <form action="/api/logout" method="post">
-            <button className="rounded-lg border border-[--color-line] bg-white px-3 py-1.5 text-xs font-medium text-[--color-dim] transition-colors hover:text-[--color-txt]">
+            <button className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-xs font-medium text-(--color-dim) transition-colors hover:text-(--color-txt)">
               ログアウト
             </button>
           </form>

@@ -74,14 +74,14 @@ export function AvailabilityGrid({
       <table className="text-xs">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-[--color-panel] px-2 py-1 text-left">委託先</th>
+            <th className="sticky left-0 z-10 bg-(--color-panel) px-2 py-1 text-left">委託先</th>
             {days.map((d) => {
               const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
               return (
                 <th
                   key={d}
                   className={`w-8 px-0 py-1 text-center font-normal ${
-                    wd === 0 ? "text-red-500" : wd === 6 ? "text-sky-600" : "text-[--color-dim]"
+                    wd === 0 ? "text-red-500" : wd === 6 ? "text-sky-600" : "text-(--color-dim)"
                   }`}
                 >
                   <div>{Number(d.slice(-2))}</div>
@@ -93,8 +93,8 @@ export function AvailabilityGrid({
         </thead>
         <tbody>
           {partners.map((p) => (
-            <tr key={p.id} className="border-t border-[--color-line]">
-              <td className="sticky left-0 z-10 whitespace-nowrap bg-[--color-panel] px-2 py-1">{p.name}</td>
+            <tr key={p.id} className="border-t border-(--color-line)">
+              <td className="sticky left-0 z-10 whitespace-nowrap bg-(--color-panel) px-2 py-1">{p.name}</td>
               {days.map((d) => {
                 const key = `${p.id}|${d}`;
                 const st = (state.get(key) ?? "") as Status;
@@ -105,7 +105,7 @@ export function AvailabilityGrid({
                       type="button"
                       onClick={() => toggle(p.id, d)}
                       title={isDispatched ? "派遣済み" : "クリックで ○→△→×→空欄"}
-                      className={`h-7 w-8 border border-[--color-line] text-center ${TONE[st]} ${
+                      className={`h-7 w-8 border border-(--color-line) text-center ${TONE[st]} ${
                         isDispatched ? "ring-2 ring-inset ring-sky-400" : ""
                       }`}
                     >
@@ -116,8 +116,8 @@ export function AvailabilityGrid({
               })}
             </tr>
           ))}
-          <tr className="border-t-2 border-[--color-line]">
-            <td className="sticky left-0 z-10 bg-[--color-panel] px-2 py-1 font-semibold">出勤可 人数</td>
+          <tr className="border-t-2 border-(--color-line)">
+            <td className="sticky left-0 z-10 bg-(--color-panel) px-2 py-1 font-semibold">出勤可 人数</td>
             {counts.map((c, i) => (
               <td key={i} className="px-0 py-1 text-center tabular-nums">
                 {c || ""}
@@ -127,7 +127,7 @@ export function AvailabilityGrid({
         </tbody>
       </table>
 
-      <p className="mt-3 text-xs text-[--color-dim]">
+      <p className="mt-3 text-xs text-(--color-dim)">
         {ym} / 委託先 {partners.length}名。最下段は「その日に出られるキャディの人数」です。
       </p>
     </div>

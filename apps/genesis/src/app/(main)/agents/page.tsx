@@ -24,7 +24,7 @@ export default async function AgentsPage() {
     <div className="space-y-4">
       <header className="reveal">
         <h1 className="text-xl font-bold">AI Agent Workforce</h1>
-        <p className="text-sm text-[--color-dim]">
+        <p className="text-sm text-(--color-dim)">
           専門AI社員（VISION §4: 見る・判断・実行まで定義）。CEO AIが毎朝の分析で指示を振り、実行結果はここに記録される
         </p>
       </header>
@@ -33,7 +33,7 @@ export default async function AgentsPage() {
         {(agents ?? []).map((a) => {
           const duty = (a.permissions ?? {}) as Duty;
           return (
-            <div key={a.id} className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
+            <div key={a.id} className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
               <div className="flex items-center justify-between">
                 <span className="flex items-center gap-2 font-medium">
                   <StatusDot status={a.current_status} />
@@ -41,19 +41,19 @@ export default async function AgentsPage() {
                 </span>
                 <Badge tone={severityTone(a.risk_level)}>risk: {a.risk_level}</Badge>
               </div>
-              <p className="mt-2 line-clamp-2 text-xs text-[--color-dim]">{a.role}</p>
+              <p className="mt-2 line-clamp-2 text-xs text-(--color-dim)">{a.role}</p>
               <div className="mt-3 space-y-1.5 text-xs">
                 {duty.watch && duty.watch.length > 0 && (
-                  <p><span className="text-sky-300">見る:</span> <span className="text-[--color-dim]">{duty.watch.join(" / ")}</span></p>
+                  <p><span className="text-sky-300">見る:</span> <span className="text-(--color-dim)">{duty.watch.join(" / ")}</span></p>
                 )}
                 {duty.judge && duty.judge.length > 0 && (
-                  <p><span className="text-amber-300">判断:</span> <span className="text-[--color-dim]">{duty.judge.join(" / ")}</span></p>
+                  <p><span className="text-amber-300">判断:</span> <span className="text-(--color-dim)">{duty.judge.join(" / ")}</span></p>
                 )}
                 {duty.execute && duty.execute.length > 0 && (
-                  <p><span className="text-emerald-300">実行:</span> <span className="text-[--color-dim]">{duty.execute.join(" / ")}</span></p>
+                  <p><span className="text-emerald-300">実行:</span> <span className="text-(--color-dim)">{duty.execute.join(" / ")}</span></p>
                 )}
               </div>
-              <div className="mt-3 space-y-1 border-t border-[--color-line]/60 pt-2 text-xs text-[--color-dim]">
+              <div className="mt-3 space-y-1 border-t border-(--color-line)/60 pt-2 text-xs text-(--color-dim)">
                 <p>状態: {statusJa(a.current_status)}{a.current_task ? ` — ${a.current_task}` : ""}</p>
                 <p>最終実行: {a.last_run_at ? fmtDate(a.last_run_at) : "未実行"}</p>
                 {Array.isArray(a.approval_required_actions) && a.approval_required_actions.length > 0 && (
@@ -76,10 +76,10 @@ export default async function AgentsPage() {
                 <span className="font-medium">
                   {(l as unknown as { ai_agents: { name: string } | null }).ai_agents?.name ?? "-"}
                 </span>
-                <span className="text-[--color-dim]">{l.task ?? "-"}</span>
+                <span className="text-(--color-dim)">{l.task ?? "-"}</span>
                 <Badge tone={l.status === "succeeded" ? "ok" : l.status === "failed" ? "danger" : "default"}>{l.status}</Badge>
-                <span className="text-xs text-[--color-dim]">{fmtDate(l.started_at)}</span>
-                {l.result_summary && <span className="w-full pl-4 text-xs text-[--color-dim]">{l.result_summary}</span>}
+                <span className="text-xs text-(--color-dim)">{fmtDate(l.started_at)}</span>
+                {l.result_summary && <span className="w-full pl-4 text-xs text-(--color-dim)">{l.result_summary}</span>}
               </li>
             ))}
           </ul>

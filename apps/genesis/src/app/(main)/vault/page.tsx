@@ -28,7 +28,7 @@ type VaultRow = {
 
 function SystemForm({ row }: { row?: VaultRow }) {
   return (
-    <form action={saveSystem} className="grid grid-cols-2 gap-2 rounded-lg bg-[--color-panel-2] p-3 text-sm">
+    <form action={saveSystem} className="grid grid-cols-2 gap-2 rounded-lg bg-(--color-panel-2) p-3 text-sm">
       {row && <input type="hidden" name="id" value={row.id} />}
       <input name="name" placeholder="システム名 *" defaultValue={row?.name} className={inputCls} required />
       <select name="category" defaultValue={row?.category ?? "other"} className={inputCls}>
@@ -85,7 +85,7 @@ export default async function VaultPage() {
           <button className={btnGhostCls}>🔒 ロックする</button>
         </form>
       </div>
-      <p className="text-xs text-[--color-dim]">
+      <p className="text-xs text-(--color-dim)">
         全関連システムのURL・ログイン情報を一元管理。新しいシステムは下の「追加」フォームか、AIに依頼すれば自動で登録されます。
       </p>
 
@@ -93,7 +93,7 @@ export default async function VaultPage() {
 
       {grouped.map(({ cat, items }) => (
         <Panel key={cat} title={CATEGORIES[cat]}>
-          <div className="flex flex-col divide-y divide-[--color-line]">
+          <div className="flex flex-col divide-y divide-(--color-line)">
             {items.map((row) => (
               <div key={row.id} className="flex flex-col gap-1 py-3">
                 <div className="flex flex-wrap items-center gap-3">
@@ -112,17 +112,17 @@ export default async function VaultPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-6 text-sm">
                   <span>
-                    <span className="text-xs text-[--color-dim]">ID: </span>
-                    {row.login_id ?? <span className="text-[--color-dim]">—</span>}
+                    <span className="text-xs text-(--color-dim)">ID: </span>
+                    {row.login_id ?? <span className="text-(--color-dim)">—</span>}
                   </span>
                   <span>
-                    <span className="text-xs text-[--color-dim]">PW: </span>
+                    <span className="text-xs text-(--color-dim)">PW: </span>
                     <SecretCell value={row.password} />
                   </span>
-                  {row.notes && <span className="text-xs text-[--color-dim]">{row.notes}</span>}
+                  {row.notes && <span className="text-xs text-(--color-dim)">{row.notes}</span>}
                 </div>
                 <details className="mt-1">
-                  <summary className="cursor-pointer text-xs text-[--color-dim] hover:text-[--color-txt]">
+                  <summary className="cursor-pointer text-xs text-(--color-dim) hover:text-(--color-txt)">
                     編集 / 削除
                   </summary>
                   <div className="mt-2 flex flex-col gap-2">

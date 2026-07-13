@@ -8,16 +8,16 @@ import {
 } from "@/lib/walkin";
 
 const field =
-  "w-full rounded-xl border border-[--color-line] bg-white px-4 py-3 text-base text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
-const labelCls = "mb-1 block text-sm font-medium text-[--color-dim]";
-const cardCls = "rounded-2xl border border-[--color-line] bg-[--color-panel] p-5 shadow-sm";
+  "w-full rounded-xl border border-(--color-line) bg-white px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+const labelCls = "mb-1 block text-sm font-medium text-(--color-dim)";
+const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5 shadow-sm";
 
 function CheckGroup({ name, options }: { name: string; options: string[] }) {
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
       {options.map((o) => (
-        <label key={o} className="flex items-center gap-2 rounded-lg border border-[--color-line] bg-white px-3 py-2.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/5">
-          <input type="checkbox" name={name} value={o} className="h-5 w-5 accent-[--color-accent]" />
+        <label key={o} className="flex items-center gap-2 rounded-lg border border-(--color-line) bg-white px-3 py-2.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/5">
+          <input type="checkbox" name={name} value={o} className="h-5 w-5 accent-(--color-accent)" />
           {o}
         </label>
       ))}
@@ -34,7 +34,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
       <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-3xl text-emerald-600">✓</div>
         <p className="mt-3 text-lg font-semibold">ご記入ありがとうございました</p>
-        <p className="mt-2 text-sm text-[--color-dim]">受付が完了しました。タブレットをスタッフにお渡しください。</p>
+        <p className="mt-2 text-sm text-(--color-dim)">受付が完了しました。タブレットをスタッフにお渡しください。</p>
       </div>
     );
   }
@@ -44,14 +44,14 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
       <input type="hidden" name="token" value={token} />
 
       {storeName && (
-        <div className="rounded-xl border border-[--color-line] bg-white p-3 text-center text-sm font-medium text-[--color-dim] shadow-sm">
+        <div className="rounded-xl border border-(--color-line) bg-white p-3 text-center text-sm font-medium text-(--color-dim) shadow-sm">
           {storeName}
         </div>
       )}
 
       {/* 利用区分 */}
       <div className={`${cardCls} space-y-3`}>
-        <p className="text-sm font-semibold text-[--color-txt]">本日のご利用 <span className="text-rose-500">*</span></p>
+        <p className="text-sm font-semibold text-(--color-txt)">本日のご利用 <span className="text-rose-500">*</span></p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {VISIT_TYPES.map((v) => (
             <label
@@ -59,7 +59,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
               className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-3.5 text-sm font-medium transition-colors ${
                 visitType === v.value
                   ? "border-accent bg-accent/10 text-accent"
-                  : "border-[--color-line] bg-white text-[--color-dim]"
+                  : "border-(--color-line) bg-white text-(--color-dim)"
               }`}
             >
               <input
@@ -74,7 +74,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
 
       {/* お客様情報 */}
       <div className={`${cardCls} space-y-4`}>
-        <p className="text-sm font-semibold text-[--color-txt]">お客様情報</p>
+        <p className="text-sm font-semibold text-(--color-txt)">お客様情報</p>
         <div>
           <label className={labelCls}>お名前 <span className="text-rose-500">*</span></label>
           <input name="name" required placeholder="山田 太郎" className={field} />
@@ -139,7 +139,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
 
       {/* アンケート */}
       <div className={`${cardCls} space-y-4`}>
-        <p className="text-sm font-semibold text-[--color-txt]">アンケート（任意）</p>
+        <p className="text-sm font-semibold text-(--color-txt)">アンケート（任意）</p>
         <div>
           <label className={labelCls}>当店を何で知りましたか</label>
           <select name="referral_source" defaultValue="" className={field}>
@@ -184,7 +184,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
       {/* 同意 */}
       <div className={`${cardCls} space-y-3`}>
         <label className="flex items-start gap-3 text-sm">
-          <input type="checkbox" name="consent" value="1" required className="mt-0.5 h-5 w-5 accent-[--color-accent]" />
+          <input type="checkbox" name="consent" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
           <span>個人情報をサービス提供・入会手続きの目的で利用することに同意します。<span className="text-rose-500">*</span></span>
         </label>
       </div>

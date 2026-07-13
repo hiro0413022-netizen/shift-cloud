@@ -91,7 +91,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold">Finance — 事業別月次PL</h1>
-          <p className="text-sm text-[--color-dim]">税理士データの手入力＋CSV取込 → 売上・利益KPIに自動反映</p>
+          <p className="text-sm text-(--color-dim)">税理士データの手入力＋CSV取込 → 売上・利益KPIに自動反映</p>
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/finance?month=${shiftMonth(ym, -1)}`} className={btnGhostCls}>← 前月</Link>
@@ -115,12 +115,12 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
           <div className="overflow-x-auto">
             <table className="w-full text-sm tabular-nums">
               <thead>
-                <tr className="border-b border-[--color-line] text-xs text-[--color-dim]">
+                <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
                   <th className="py-2 pr-2 text-left font-medium">科目</th>
                   {segs.map((s) => (
                     <th key={String(s.id)} className="px-2 py-2 text-right font-medium">{String(s.name)}</th>
                   ))}
-                  <th className="px-2 py-2 text-right font-semibold text-[--color-txt]">合計</th>
+                  <th className="px-2 py-2 text-right font-semibold text-(--color-txt)">合計</th>
                 </tr>
               </thead>
               <tbody>
@@ -131,7 +131,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                       const total = catTotal(String(c.id));
                       if (total === 0) return null;
                       return (
-                        <tr key={String(c.id)} className="border-b border-[--color-line]/50">
+                        <tr key={String(c.id)} className="border-b border-(--color-line)/50">
                           <td className="py-1.5 pr-2">
                             {String(c.name)}
                             {kind === "revenue" && <Badge tone="accent">収益</Badge>}
@@ -139,7 +139,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                           {segs.map((s) => {
                             const v = cell.get(`${s.id}:${c.id}`) ?? 0;
                             return (
-                              <td key={String(s.id)} className="px-2 py-1.5 text-right text-[--color-dim]">
+                              <td key={String(s.id)} className="px-2 py-1.5 text-right text-(--color-dim)">
                                 {v !== 0 ? yen(v) : "–"}
                               </td>
                             );
@@ -149,7 +149,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                       );
                     })
                 )}
-                <tr className="border-t border-[--color-line] font-semibold">
+                <tr className="border-t border-(--color-line) font-semibold">
                   <td className="py-2 pr-2 text-sky-300">営業利益</td>
                   {segs.map((s) => {
                     const p = segSum(String(s.id), ["revenue"]) - segSum(String(s.id), ["cogs", "expense"]);
@@ -200,7 +200,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             </div>
             <button className={btnCls}>保存 → KPI自動更新</button>
           </form>
-          <form action={importLaborFromShiftCloud} className="mt-3 border-t border-[--color-line] pt-3">
+          <form action={importLaborFromShiftCloud} className="mt-3 border-t border-(--color-line) pt-3">
             <input type="hidden" name="target_month" value={ym} />
             <button className={btnGhostCls}>Shift Cloud人件費概算を{ym.split("-")[1]}月に取込（本部・共通/人件費）</button>
           </form>
@@ -214,8 +214,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             </Field>
             <button className={btnCls}>取込実行</button>
           </form>
-          <div className="mt-3 rounded-lg bg-black/30 p-3 text-xs leading-relaxed text-[--color-dim]">
-            <p className="mb-1 font-medium text-[--color-txt]">形式: 年月,事業コード,科目コード,金額,メモ</p>
+          <div className="mt-3 rounded-lg bg-black/30 p-3 text-xs leading-relaxed text-(--color-dim)">
+            <p className="mb-1 font-medium text-(--color-txt)">形式: 年月,事業コード,科目コード,金額,メモ</p>
             <pre>{`2026-06,golf,sales,4500000,6月売上
 2026-06,golf,rent,350000,
 2026-06,kallinos,sales,820000,EC+卸`}</pre>
@@ -230,7 +230,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         {!hasData ? (
           <Empty>明細なし</Empty>
         ) : (
-          <ul className="divide-y divide-[--color-line]/50 text-sm">
+          <ul className="divide-y divide-(--color-line)/50 text-sm">
             {ents
               .sort((a, b) => Number(b.amount) - Number(a.amount))
               .map((e) => {
@@ -239,16 +239,16 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
                 return (
                   <li key={String(e.id)} className="flex items-center justify-between gap-2 py-1.5">
                     <span className="min-w-0 truncate">
-                      <span className="text-[--color-dim]">{String(seg?.name ?? "?")} / </span>
+                      <span className="text-(--color-dim)">{String(seg?.name ?? "?")} / </span>
                       {String(cat?.name ?? "?")}
-                      {e.memo != null && <span className="ml-2 text-xs text-[--color-dim]">{String(e.memo)}</span>}
+                      {e.memo != null && <span className="ml-2 text-xs text-(--color-dim)">{String(e.memo)}</span>}
                       {String(e.source) !== "manual" && <Badge tone="gold">{String(e.source)}</Badge>}
                     </span>
                     <div className="flex shrink-0 items-center gap-3 tabular-nums">
                       <span>{yen(Number(e.amount))}円</span>
                       <form action={deleteEntry}>
                         <input type="hidden" name="id" value={String(e.id)} />
-                        <button className="text-xs text-[--color-dim] hover:text-red-300">削除</button>
+                        <button className="text-xs text-(--color-dim) hover:text-red-300">削除</button>
                       </form>
                     </div>
                   </li>
@@ -275,15 +275,15 @@ function SummaryCard({
   negative?: boolean;
 }) {
   return (
-    <div className="hud reveal rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-      <p className="text-xs tracking-wide text-[--color-dim]">{label}</p>
+    <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+      <p className="text-xs tracking-wide text-(--color-dim)">{label}</p>
       <p className={`mt-1 text-2xl font-bold tabular-nums ${negative ? "text-red-300" : ""}`}>
         {negative && "▲"}
         <CountUp value={Math.abs(value)} />
-        <span className="ml-0.5 text-sm font-medium text-[--color-dim]">円</span>
+        <span className="ml-0.5 text-sm font-medium text-(--color-dim)">円</span>
       </p>
       {trend.length > 0 ? <Sparkline trend={trend} tone={tone} /> : <div className="h-7" />}
-      <p className="mt-1 text-[11px] text-[--color-dim]">直近12ヶ月</p>
+      <p className="mt-1 text-[11px] text-(--color-dim)">直近12ヶ月</p>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export function UnlockForm() {
   return (
     <form action={action} className="mx-auto mt-16 flex w-72 flex-col gap-3 text-center">
       <p className="text-3xl">🔐</p>
-      <p className="text-sm text-[--color-dim]">
+      <p className="text-sm text-(--color-dim)">
         システム台帳はパスワードで保護されています
       </p>
       <input
@@ -31,14 +31,14 @@ export function UnlockForm() {
 export function SecretCell({ value }: { value: string | null }) {
   const [show, setShow] = useState(false);
   const [copied, setCopied] = useState(false);
-  if (!value) return <span className="text-[--color-dim]">—</span>;
+  if (!value) return <span className="text-(--color-dim)">—</span>;
   return (
     <span className="inline-flex items-center gap-2">
       <span className="font-mono text-xs">{show ? value : "••••••••"}</span>
       <button
         type="button"
         onClick={() => setShow((v) => !v)}
-        className="text-xs text-[--color-dim] hover:text-[--color-txt]"
+        className="text-xs text-(--color-dim) hover:text-(--color-txt)"
         title={show ? "隠す" : "表示"}
       >
         {show ? "🙈" : "👁"}
@@ -50,7 +50,7 @@ export function SecretCell({ value }: { value: string | null }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         }}
-        className="text-xs text-[--color-dim] hover:text-[--color-txt]"
+        className="text-xs text-(--color-dim) hover:text-(--color-txt)"
         title="コピー"
       >
         {copied ? "✓" : "⧉"}

@@ -59,11 +59,11 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
     <main className="mx-auto max-w-[1400px] p-6">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <Link href="/" className="text-xs text-[--color-dim] underline">
+          <Link href="/" className="text-xs text-(--color-dim) underline">
             ← ダッシュボード
           </Link>
           <h1 className="text-2xl font-bold tracking-widest">出勤可否</h1>
-          <p className="mt-1 text-sm text-[--color-dim]">
+          <p className="mt-1 text-sm text-(--color-dim)">
             委託先キャディの稼働可能日。○=可 / △=要相談 / ×=不可（空欄=未回答）
           </p>
         </div>
@@ -72,9 +72,9 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
             type="month"
             name="ym"
             defaultValue={ym}
-            className="rounded-lg border border-[--color-line] bg-white px-3 py-1.5 text-sm"
+            className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm"
           />
-          <button className="rounded-lg border border-[--color-line] px-3 py-1.5 text-sm">表示</button>
+          <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm">表示</button>
         </form>
       </header>
 
@@ -82,7 +82,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
         <AvailabilityGrid partners={ps} days={days} availability={av} dispatched={ds} ym={ym} />
       </section>
 
-      <p className="mt-4 text-xs text-[--color-dim]">
+      <p className="mt-4 text-xs text-(--color-dim)">
         ※ セルをクリックするたびに ○ → △ → × → 空欄 と切り替わり、その場で保存されます。
         <b>青いセルは既に派遣が入っている日</b>です。
       </p>

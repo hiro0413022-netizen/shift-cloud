@@ -118,11 +118,11 @@ export function BulkGrid({
     }
   };
 
-  const cell = "w-full rounded border border-[--color-line] bg-white px-2 py-1 text-sm outline-none focus:border-[--color-accent]";
+  const cell = "w-full rounded border border-(--color-line) bg-white px-2 py-1 text-sm outline-none focus:border-(--color-accent)";
 
   return (
     <div ref={gridRef}>
-      <div className="mb-2 flex items-center gap-3 text-xs text-[--color-dim]">
+      <div className="mb-2 flex items-center gap-3 text-xs text-(--color-dim)">
         <span>
           <kbd className="rounded border px-1">Enter</kbd> で次の行（日付・取引先を引き継ぎます）
         </span>
@@ -131,7 +131,7 @@ export function BulkGrid({
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
-          <thead className="text-left text-xs text-[--color-dim]">
+          <thead className="text-left text-xs text-(--color-dim)">
             <tr>
               <th className="w-32 pb-1">派遣日</th>
               <th className="w-48 pb-1">取引先</th>
@@ -271,7 +271,7 @@ export function BulkGrid({
                     <button
                       type="button"
                       onClick={() => removeRow(i)}
-                      className="text-xs text-[--color-dim] hover:text-red-600"
+                      className="text-xs text-(--color-dim) hover:text-red-600"
                       title="この行を削除"
                     >
                       ×
@@ -285,7 +285,7 @@ export function BulkGrid({
       </div>
 
       <div className="mt-3 flex items-center gap-3">
-        <button type="button" onClick={() => addRow(rows.length - 1)} className="rounded-lg border border-[--color-line] px-3 py-1.5 text-sm">
+        <button type="button" onClick={() => addRow(rows.length - 1)} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm">
           ＋ 行を追加
         </button>
         <button type="button" onClick={submit} disabled={saving || filled.length === 0} className={btnCls}>

@@ -4,11 +4,11 @@ import type { ReactNode } from "react";
 
 export function Panel({ title, children, action, className = "" }: { title?: string; children: ReactNode; action?: ReactNode; className?: string }) {
   return (
-    <section className={`hud reveal rounded-2xl border border-[--color-line] bg-[--color-panel] p-5 ${className}`}>
+    <section className={`hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-5 ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex items-center justify-between gap-3">
           {title && (
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-[--color-txt]">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-(--color-txt)">
               <span className="inline-block h-4 w-1 rounded-full bg-accent" />
               {title}
             </h2>
@@ -38,13 +38,13 @@ export function Badge({ children, tone = "default" }: { children: ReactNode; ton
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-6 text-center text-sm text-[--color-dim]">{children}</p>;
+  return <p className="py-6 text-center text-sm text-(--color-dim)">{children}</p>;
 }
 
 export function ProgressBar({ value, tone = "accent" }: { value: number; tone?: "accent" | "ok" | "gold" }) {
   const bar = tone === "ok" ? "bg-emerald-500" : tone === "gold" ? "bg-yellow-600" : "bg-indigo-500";
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-[--color-panel-2]">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-(--color-panel-2)">
       <div className={`bar-grow h-full rounded-full ${bar}`} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
     </div>
   );
@@ -56,12 +56,12 @@ export function fmtDate(d: string | null | undefined) {
 }
 
 export const inputCls =
-  "w-full rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm text-[--color-txt] placeholder:text-[--color-dim]/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
+  "w-full rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
 
 export const btnCls =
   "inline-flex items-center gap-1 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90 disabled:opacity-50";
 
 export const btnGhostCls =
-  "inline-flex items-center gap-1 rounded-lg border border-[--color-line] bg-white px-3 py-2 text-sm text-[--color-txt] transition-colors hover:bg-[--color-panel-2]";
+  "inline-flex items-center gap-1 rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm text-(--color-txt) transition-colors hover:bg-(--color-panel-2)";
 
 export const STATUS_LABEL: Record<string, string> = { draft: "下書き", open: "公開中", closed: "終了" };
