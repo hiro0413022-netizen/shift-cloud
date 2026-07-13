@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-13 — スタッフポータル拡張（DECISIONS #48）
+- db: `0039_staff_portal.sql` 適用 — sp_tasks（やること）/ sp_reports（日報・週報）/ sp_calendar_memos（本人のみRLS）/ sp_links（クイックリンク）。sp_linksにSmart Hallo・GolfOrder・コーポレートの3件を初期投入
+- feat(shift-cloud): スタッフ画面に **/calendar**（月間グリッド: シフト色バー・休・イベント/予約/タスク/メモの●、日タップ詳細＋メモ書込み・タスク追加）と **/reports**（日報・週報upsert＋みんなのレポート）を新設。下部タブを5つに再編（ホーム/カレンダー/シフト提出/日報/お知らせ）
+- feat(shift-cloud): homeに「今日のやること」「クイックリンク」を追加、給与見込みを calcMonthlyPayroll ベース（月給制・手当・按分対応）に置換
+- 設計: 予約連携は lib/day-feed.ts の日別フィードに後からアダプタ合流（正典 docs/modules/workforce-os/STAFF_PORTAL.md）
+- 検証: 全11ファイル esbuild parse green。フルnext buildはサンドボックス45秒制限で完走不可のため **push後にVercelビルドログ確認**（次の作業）
+
 ## 2026-07-11(6) — 経理AIフェーズ1: 証憑OCR自動読取（DECISIONS #42）
 - **feat(genesis): receipt-ai.ts新設・日次cronに組込** — /receiptsに撮って置いた証憑を毎朝最大3件、Claude APIが読取り。発行日・金額・発行元・種別の**空欄だけ**を補完（人の入力は上書きしない）。読取ダイジェストはocr_textに保存され/receiptsの行で確認可能。ANTHROPIC_API_KEY未設定なら完全スキップ
 - 運用イメージ: **現場は撮って登録するだけ → 翌朝には日付・金額・店名が埋まっている → 人は確認と突合だけ**。mon_expenseへの自動起票は読取精度の実績を見てフェーズ2で

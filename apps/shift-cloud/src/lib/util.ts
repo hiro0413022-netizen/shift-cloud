@@ -54,6 +54,14 @@ export function halfMonthRange(ym: string, half: 1 | 2): { start: string; end: s
   return { start: `${ym}-16`, end: `${ym}-${String(last).padStart(2, "0")}` };
 }
 
+/** 週の月曜日（YYYY-MM-DD）。週報のdate正規化に使う（TZ非依存 / DECISIONS #48） */
+export function mondayOf(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - ((dt.getUTCDay() + 6) % 7));
+  return dt.toISOString().slice(0, 10);
+}
+
 export function currentYM(): string {
   return todayJST().slice(0, 7);
 }
