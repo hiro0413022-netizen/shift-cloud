@@ -37,8 +37,8 @@ const EDGE_COLOR: Record<EdgeType, string> = {
   data: "#38bdf8",
   kpi: "#34d399",
   approval: "#fbbf24",
-  external: "#94a3b8",
-  auto: "#f472b6",
+  external: "#7d93b3",
+  auto: "#60a5fa",
 };
 
 const EDGE_LABEL: Record<EdgeType, string> = {
@@ -54,11 +54,11 @@ function normalize(s: string): string {
 }
 
 function radius(n: SimNode): number {
-  if (n.kind === "core") return n.id === "supabase" ? 34 : 24;
-  if (n.kind === "app") return 20;
-  if (n.kind === "script") return 16;
-  if (n.auto) return 11;
-  return 12;
+  if (n.kind === "core") return n.id === "supabase" ? 38 : 27;
+  if (n.kind === "app") return 23;
+  if (n.kind === "script") return 18;
+  if (n.auto) return 13;
+  return 14;
 }
 
 function buildGraph(vaultSystems: VaultRow[]): { nodes: SimNode[]; edges: SystemEdge[] } {
@@ -326,7 +326,7 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
   const nodeName = (id: string) => nodes.find((n) => n.id === id)?.name ?? id;
 
   const btn =
-    "rounded-md border border-[--color-line] bg-[--color-panel-2] px-2.5 py-1 text-xs text-[--color-dim] hover:text-[--color-txt] transition-colors";
+    "rounded-md border border-[--color-line] bg-[--color-panel-2] px-3 py-1.5 text-[13px] text-[--color-dim] hover:text-[--color-txt] transition-colors";
 
   return (
     <div className="flex flex-col gap-3">
@@ -339,7 +339,7 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">System Network</h1>
-          <p className="text-xs text-[--color-dim]">
+          <p className="text-[13px] text-[--color-dim]">
             どのシステムが何とつながり、どこでエラーが起きているかの状況確認。ノードはドラッグ・クリック（詳細）・ホイール/ピンチで拡大縮小。
           </p>
         </div>
@@ -359,8 +359,8 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
       {tab === "flows" ? (
         <div className="flex flex-col gap-4">
           {FLOW_LIST.map((f) => (
-            <div key={f.file} className="rounded-xl border border-[--color-line] bg-[--color-panel] p-4">
-              <p className="mb-2 text-sm font-bold">{f.title}</p>
+            <div key={f.file} className="rounded-xl border border-[--color-line] bg-[#05070d] p-4">
+              <p className="mb-2 text-[15px] font-bold">{f.title}</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`/flows/${f.file}`} alt={f.title} className="w-full max-w-3xl" />
             </div>
@@ -368,13 +368,13 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
         </div>
       ) : (
         <div className="flex gap-3">
-          <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-[--color-line] bg-[--color-panel]">
+          <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-[--color-line] bg-[#05070d]">
             <div className="absolute left-3 top-3 z-10 flex flex-col gap-1">
               <button className={btn} onClick={() => zoomBtn(1)}>＋</button>
               <button className={btn} onClick={() => zoomBtn(-1)}>－</button>
               <button className={btn} onClick={() => setView({ tx: -120, ty: -40, k: 0.78 })}>⌂</button>
             </div>
-            <div className="absolute right-3 top-3 z-10 rounded-lg border border-[--color-line] bg-[--color-panel-2]/90 px-3 py-2 text-[10px] leading-4 text-[--color-dim]">
+            <div className="absolute right-3 top-3 z-10 rounded-lg border border-[--color-line] bg-[#0a1220]/90 px-3 py-2 text-xs leading-5 text-slate-300">
               <p><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-400" />稼働中　<span className="mr-1 inline-block h-2 w-2 rounded-full bg-red-400" />エラー</p>
               <p><span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-400" />未デプロイ/移行中　<span className="mr-1 inline-block h-2 w-2 rounded-full bg-slate-500" />監視対象外</p>
               <p className="mt-1">
@@ -416,9 +416,10 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
                       {hi && (
                         <text
                           x={(a.x + b.x) / 2}
-                          y={(a.y + b.y) / 2 - 5}
+                          y={(a.y + b.y) / 2 - 6}
                           textAnchor="middle"
-                          fontSize={11}
+                          fontSize={13.5}
+                          fontWeight={600}
                           fill={EDGE_COLOR[e.type]}
                         >
                           {e.label}
@@ -440,18 +441,18 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
                         cx={n.x}
                         cy={n.y}
                         r={r}
-                        fill={n.kind === "core" ? "#0c2f45" : n.auto ? "#3b1e33" : "#12233a"}
+                        fill={n.kind === "core" ? "#0b2e4f" : n.auto ? "#16233f" : "#0d1d38"}
                         stroke={isSel ? "#e2e8f0" : c}
                         strokeWidth={isSel ? 2.5 : 2}
                         strokeDasharray={n.auto ? "4 3" : undefined}
                       />
-                      <circle cx={n.x} cy={n.y} r={3.5} fill={c} />
-                      <text x={n.x} y={n.y + r + 15} textAnchor="middle" fontSize={n.kind === "external" ? 10 : 12} fill="#cbd5e1">
+                      <circle cx={n.x} cy={n.y} r={4} fill={c} />
+                      <text x={n.x} y={n.y + r + 19} textAnchor="middle" fontSize={n.kind === "external" ? 12.5 : 15} fontWeight={600} fill="#dbe6f5">
                         {n.name}
                       </text>
                       {n.schema && n.kind === "app" && (
-                        <text x={n.x} y={n.y + r + 29} textAnchor="middle" fontSize={9} fill="#64748b">
-                          {n.schema.length > 20 ? n.schema.slice(0, 20) + "…" : n.schema}
+                        <text x={n.x} y={n.y + r + 36} textAnchor="middle" fontSize={11} fill="#7f93b0">
+                          {n.schema.length > 22 ? n.schema.slice(0, 22) + "…" : n.schema}
                         </text>
                       )}
                     </g>
@@ -465,28 +466,28 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
             {sel ? (
               <div className="flex flex-col gap-3 text-sm">
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="text-base font-bold">{sel.name}</h2>
+                  <h2 className="text-lg font-bold">{sel.name}</h2>
                   <button className={btn} onClick={() => setSelected(null)}>✕</button>
                 </div>
-                <p className="flex items-center gap-2 text-xs">
-                  <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: statusColor(sel, health) }} />
+                <p className="flex items-center gap-2 text-sm">
+                  <span className="inline-block h-3 w-3 rounded-full" style={{ background: statusColor(sel, health) }} />
                   {statusText(sel, health)}
                 </p>
-                {sel.schema && <p className="text-xs text-[--color-dim]">スキーマ: {sel.schema}</p>}
-                <p className="text-xs leading-5 text-[--color-txt]">{sel.description}</p>
+                {sel.schema && <p className="text-[13px] text-[--color-dim]">スキーマ: {sel.schema}</p>}
+                <p className="text-sm leading-6 text-[--color-txt]">{sel.description}</p>
                 {(sel.url || sel.vault?.url) && (
                   <a
                     href={sel.url ?? sel.vault?.url ?? "#"}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-sky-300 underline underline-offset-2"
+                    className="text-[13px] text-sky-300 underline underline-offset-2"
                   >
                     {sel.url ?? sel.vault?.url} ↗
                   </a>
                 )}
-                {sel.vault && <p className="text-[10px] text-[--color-dim]">Vault登録: {sel.vault.name}（{sel.vault.category ?? "未分類"}）</p>}
+                {sel.vault && <p className="text-xs text-[--color-dim]">Vault登録: {sel.vault.name}（{sel.vault.category ?? "未分類"}）</p>}
                 <div>
-                  <p className="mb-1 text-xs font-bold text-[--color-dim]">つながり（{selEdges.length}）</p>
+                  <p className="mb-1 text-[13px] font-bold text-[--color-dim]">つながり（{selEdges.length}）</p>
                   <ul className="flex flex-col gap-1">
                     {selEdges.map((e, i) => {
                       const other = e.from === sel.id ? e.to : e.from;
@@ -494,11 +495,11 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
                       return (
                         <li key={i}>
                           <button
-                            className="w-full rounded-md border border-[--color-line] bg-[--color-panel-2] px-2 py-1 text-left text-[11px] hover:border-sky-500/50"
+                            className="w-full rounded-md border border-[--color-line] bg-[--color-panel-2] px-2.5 py-1.5 text-left text-[13px] hover:border-sky-500/50"
                             onClick={() => setSelected(other)}
                           >
                             <span style={{ color: EDGE_COLOR[e.type] }}>{dir}</span> {nodeName(other)}
-                            <span className="block text-[10px] text-[--color-dim]">{e.label}（{EDGE_LABEL[e.type]}）</span>
+                            <span className="block text-xs text-[--color-dim]">{e.label}（{EDGE_LABEL[e.type]}）</span>
                           </button>
                         </li>
                       );
@@ -507,24 +508,24 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
                 </div>
                 {sel.flow && (
                   <div>
-                    <p className="mb-1 text-xs font-bold text-[--color-dim]">フロー図</p>
+                    <p className="mb-1 text-[13px] font-bold text-[--color-dim]">フロー図</p>
                     <a href={`/flows/${sel.flow}`} target="_blank" rel="noreferrer">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={`/flows/${sel.flow}`} alt={`${sel.name} フロー図`} className="w-full rounded-lg border border-[--color-line]" />
                     </a>
-                    <p className="mt-1 text-[10px] text-[--color-dim]">クリックで拡大表示</p>
+                    <p className="mt-1 text-xs text-[--color-dim]">クリックで拡大表示</p>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="flex flex-col gap-2 text-xs text-[--color-dim]">
-                <p className="text-sm font-bold text-[--color-txt]">ノードをクリック</p>
+              <div className="flex flex-col gap-2 text-[13px] leading-6 text-[--color-dim]">
+                <p className="text-base font-bold text-[--color-txt]">ノードをクリック</p>
                 <p>説明・稼働状況・つながり・フロー図が表示されます。</p>
                 <p>ドラッグで位置調整、背景ドラッグで移動、ホイール/ピンチで拡大縮小。</p>
                 <p className="mt-2">
                   Vault（システム台帳）に新しいシステムを登録すると、このマップに自動でノードが追加されます（接続先が未定義の間は点線でDBにつながります）。
                 </p>
-                <p className="mt-2 text-[10px]">
+                <p className="mt-2 text-xs">
                   監視: 各アプリのURLへ60秒ごとにHTTP到達性を確認（5xx/接続不可=赤）。未デプロイのアプリは黄色で表示。
                 </p>
               </div>
