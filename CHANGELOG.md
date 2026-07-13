@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-07-13(2) — Genesisモバイル対応（NEXT_TASKS MB）
+- feat(genesis): **MobileNav新設**（md未満: 上部固定バー＋ハンバーガー→左ドロワー、遷移で自動クローズ）。Sidebarは `hidden md:flex` に、mainは `p-4 md:p-6`
+- style(genesis): globals.cssにモバイル救済 — md未満で grid-cols-2→1列 / 3〜6→2列、テーブルは横スクロール。**新規コードはレスポンシブ指定を書く**（DESIGN_SYSTEM「モバイル対応」節を新設＝全アプリ共通基準）
+- 検証: 変更3ファイル esbuild parse green。push後にVercelビルド＋スマホ実機確認（NEXT_TASKS MB）
+
 ## 2026-07-13 — スタッフポータル拡張（DECISIONS #48）
 - db: `0039_staff_portal.sql` 適用 — sp_tasks（やること）/ sp_reports（日報・週報）/ sp_calendar_memos（本人のみRLS）/ sp_links（クイックリンク）。sp_linksにSmart Hallo・GolfOrder・コーポレートの3件を初期投入
 - feat(shift-cloud): スタッフ画面に **/calendar**（月間グリッド: シフト色バー・休・イベント/予約/タスク/メモの●、日タップ詳細＋メモ書込み・タスク追加）と **/reports**（日報・週報upsert＋みんなのレポート）を新設。下部タブを5つに再編（ホーム/カレンダー/シフト提出/日報/お知らせ）

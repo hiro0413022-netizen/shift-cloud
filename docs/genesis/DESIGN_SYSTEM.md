@@ -32,3 +32,15 @@
 ## ステータス色
 
 シフト: draft=zinc / published=green。勤怠: 正常=green / 遅刻・早退=amber / 打刻漏れ=red。AI提案重要度: info=blue / warning=amber / critical=red
+
+## モバイル対応（NEXT_TASKS MB / 2026-07-13）
+
+全アプリ共通の基準。**新規画面はスマホ幅（375px）で崩れないことを実装時に確認する。**
+
+- **ナビ**: サイドバーは `hidden md:flex`。md未満はハンバーガー＋左ドロワー（genesis `components/mobile-nav.tsx` が参照実装）またはスタッフ向けは下部タブ（shift-cloud `StaffNav`）
+- **余白**: main は `p-4 md:p-6`
+- **段組み**: 新規コードは必ずレスポンシブ指定（`grid-cols-1 md:grid-cols-3` 等）。既存PC前提ページの救済として genesis の globals.css に md未満で grid-cols-2→1列 / 3〜6→2列 に畳むオーバーライドあり（**新規コードはこれに頼らない**）
+- **テーブル**: md未満は横スクロール（`table{display:block;overflow-x:auto}` 救済あり）。理想はカード表示への切替
+- **タップ対象**: 最小 40×40px（`h-10` 目安）
+- **viewport**: Next.jsのデフォルト（width=device-width）で足りる。上書き不要
+- 展開順: shift-cloud（済・元からモバイルファースト）→ genesis（済）→ member-os → money/legal/report/survey/reserve/caddy

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV = [
+export const NAV = [
   { href: "/", label: "Cockpit", icon: "◉" },
   { href: "/network", label: "System Network", icon: "🕸" },
   { href: "/command", label: "CEO AI Command", icon: "⌘" },
@@ -24,7 +24,7 @@ const NAV = [
 export function Sidebar({ userName }: { userName: string }) {
   const pathname = usePathname();
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-[--color-line] bg-[--color-panel] p-3">
+    <aside className="hidden w-56 shrink-0 flex-col border-r border-[--color-line] bg-[--color-panel] p-3 md:flex">
       <div className="mb-6 px-2 pt-2">
         <p className="text-xs tracking-[0.3em] text-[--color-gold]">YOZAN</p>
         <p className="text-lg font-bold tracking-wide">GENESIS</p>
