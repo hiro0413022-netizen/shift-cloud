@@ -111,9 +111,9 @@ export function StaffForm({ stores, roles, edit }: { stores: Store[]; roles: Rol
           </div>
         </div>
         <div>
-          <Label>主店舗</Label>
-          <Select name="primary_store_id" defaultValue={edit?.primary_store_id ?? ""} required>
-            <option value="">選択してください</option>
+          <Label>主店舗（店舗に立たない役員等は「なし」でOK）</Label>
+          <Select name="primary_store_id" defaultValue={edit?.primary_store_id ?? ""}>
+            <option value="">なし</option>
             {stores.filter((s) => selStores.includes(s.id)).map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}

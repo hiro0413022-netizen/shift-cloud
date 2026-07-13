@@ -15,8 +15,9 @@ const staffSchema = z.object({
   password: z.string().optional(),
   employment_type: z.enum(["fulltime", "parttime", "contractor", "lesson_pro"]),
   position: z.string().optional(),
-  store_ids: z.array(z.string().uuid()).min(1),
-  primary_store_id: z.string().uuid(),
+  // 店舗なしも許可（役員・本部スタッフは店舗に立たない / 2026-07-13）
+  store_ids: z.array(z.string().uuid()),
+  primary_store_id: z.string().uuid().optional().or(z.literal("")),
   role_id: z.string().uuid(),
   hourly_wage: z.coerce.number().int().min(0).optional(),
   commute_allowance: z.coerce.number().int().min(0).default(0),
@@ -96,16 +97,19 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
     await logAudit(actor, "staff.update", "staff", staffId, before, d);
   }
 
-  // 店舗割当を置き換え
+  // 店舗割当を置き換え（店舗なし=役員・本部は割当ゼロでOK）
   await admin.from("staff_store_assignments").delete().eq("staff_id", staffId);
-  await admin.from("staff_store_assignments").insert(
-    d.store_ids.map((sid) => ({
-      company_id: actor.companyId,
-      staff_id: staffId,
-      store_id: sid,
-      is_primary: sid === d.primary_store_id,
-    }))
-  );
+  if (d.store_ids.length > 0) {
+    const primary = d.primary_store_id && d.store_ids.includes(d.primary_store_id) ? d.primary_store_id : d.store_ids[0];
+    await admin.from("staff_store_assignments").insert(
+      d.store_ids.map((sid) => ({
+        company_id: actor.companyId,
+        staff_id: staffId,
+        store_id: sid,
+        is_primary: sid === primary,
+      }))
+    );
+  }
 
   // ロールを置き換え
   await admin.from("staff_roles").delete().eq("staff_id", staffId);

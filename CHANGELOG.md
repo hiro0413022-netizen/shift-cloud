@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-13(6) — 資料室の不具合修正・スタッフ編集修正・Lesson OS土台
+- fix(genesis/library): アップロード失敗の2原因を解消 — ①Server Action経由はVercel約4.5MB上限 → **署名付きURLでブラウザ→Storage直PUT**に変更（50MBまで） ②**Storageキーは日本語不可**（"Invalid key"）→ 分類・ファイル名をbase64urlで持ち表示時に復号（lib/libkey.ts新設）
+- fix(shift-cloud): スタッフ編集の主店舗必須を解除 — 店舗に立たない役員・本部は「なし」で保存可（小川さんのパスワード設定が主店舗バリデーションで止まっていた）
+- ops: 作成済み資料13件を資料室へ投入（Edge Function library-upload経由・投入後に閉鎖）。社内マニュアル5・事業計画1・出店計画7
+- db: `0041_lesson_os.sql` 適用 — **Lesson OS（WING NOTE代替）の土台**: lsn_students/lsn_videos/lsn_comments/lsn_measurements（Trackman受け口）＋lesson-videosバケット（DECISIONS #49、正典 docs/modules/lesson-os/SYSTEM.md）。アプリP1実装はNEXT_TASKS LSN
+- 検証: esbuild parse green。push後にVercelビルド確認
+
 ## 2026-07-13(5) — 社内連絡ノート・役員共有パック・SaaS化計画
 - db: `0040_gn_messages.sql` 適用 — 社内連絡ノート（役員→経営、status open/done・返信メモ）
 - feat(genesis): **社内連絡 /notes** 新設＋サイドバー追加 — 役員が書き残し、古川さんが未対応一覧で確認→「✓対応済み」＋返信メモ。口頭・LINEで流れる連絡の集約場所

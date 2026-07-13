@@ -2,13 +2,14 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0041` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0042` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
 - ✅ `0034_mon_receipts.sql` — 適用済（2026-07-11、MCP name=mon_receipts。mon_receipts＋バケットmon-receipts #41）
 - ✅ `0035_payroll_allowances.sql` — 適用済（2026-07-11、月給制・手当 #44）
 - ✅ `0036_caddy_os.sql` — 適用済（2026-07-11、Caddy OS #45）
 - ✅ `0037_caddy_invoice_availability.sql` / `0038_caddy_renumber_seq.sql` — 適用済（2026-07-12、Caddy OSフェーズ2 #46）
 - ✅ `0039_staff_portal.sql` — 適用済（2026-07-13、MCP name=staff_portal。sp_tasks/sp_reports/sp_calendar_memos/sp_links #48）
 - ✅ `0040_gn_messages.sql` — 適用済（2026-07-13、MCP name=gn_messages。社内連絡ノート /notes）
+- ✅ `0041_lesson_os.sql` — 適用済（2026-07-13、MCP name=lesson_os。lsn_*＋バケットlesson-videos #49）
 - 追加のみ。既存テーブルの破壊的変更禁止（DROP/型変更/NOT NULL化は要承認）
 - 適用は Supabase MCP `apply_migration`（本番 qrgpblnnhdudigarrtuz）。適用したら本台帳に✅を記す
 - **過去の番号重複（6ペア）はリネームしない**: 全て適用済みで、リネームは適用履歴と乖離するため凍結（AUDIT_2026-07-11）

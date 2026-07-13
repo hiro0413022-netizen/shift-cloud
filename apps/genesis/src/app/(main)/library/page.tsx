@@ -1,5 +1,6 @@
 import { requireGenesisActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
+import { decSeg } from "@/lib/libkey";
 import { LibraryClient, type LibItem } from "./library-client";
 
 /**
@@ -22,8 +23,8 @@ export default async function LibraryPage() {
       if (f.id === null) continue;
       items.push({
         path: `${actor.companyId}/${folder}/${f.name}`,
-        name: f.name.replace(/^\d+_/, ""),
-        category: folder,
+        name: decSeg(f.name.replace(/^\d+_/, "")), // キーはbase64url（lib/libkey.ts）
+        category: decSeg(folder),
         size: (f.metadata as { size?: number } | null)?.size ?? 0,
         createdAt: f.created_at ?? "",
       });
@@ -36,7 +37,7 @@ export default async function LibraryPage() {
       <p className="mb-6 text-sm text-[--color-dim]">
         会社の資料の置き場。ここに上げたファイルはPC・スマホどこからでもダウンロードできます（view_hq保持者のみ）
       </p>
-      <LibraryClient items={items} categories={folders} />
+      <LibraryClient items={items} categories={folders.map(decSeg)} />
     </div>
   );
 }
