@@ -3,28 +3,30 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// タブ名は「何ができるか」が分かる日本語（2026-07-13ユーザー要望）。enはツールチップ用の旧名
 export const NAV = [
-  { href: "/", label: "Cockpit", icon: "◉" },
-  { href: "/network", label: "System Network", icon: "🕸" },
-  { href: "/command", label: "CEO AI Command", icon: "⌘" },
-  { href: "/inbox", label: "CEO Inbox", icon: "📨" },
-  { href: "/finance", label: "Finance", icon: "¥" },
-  { href: "/legal", label: "契約・法務", icon: "📄" },
-  { href: "/events", label: "Company Events", icon: "⚡" },
-  { href: "/memories", label: "Business Memory", icon: "🧠" },
-  { href: "/decisions", label: "Decision Log", icon: "⚖" },
-  { href: "/agents", label: "AI Agents", icon: "🤖" },
-  { href: "/approvals", label: "Approvals", icon: "✓" },
-  { href: "/dev", label: "Development", icon: "🛠" },
-  { href: "/future", label: "Future", icon: "📈" },
-  { href: "/connectors", label: "Connectors", icon: "🔌" },
-  { href: "/vault", label: "Vault", icon: "🔐" },
+  { href: "/", label: "経営ダッシュボード", en: "Cockpit", icon: "◉" },
+  { href: "/command", label: "CEO AI 司令室", en: "CEO AI Command", icon: "⌘" },
+  { href: "/approvals", label: "承認待ち", en: "Approvals", icon: "✓" },
+  { href: "/inbox", label: "問い合わせ受信箱", en: "CEO Inbox", icon: "📨" },
+  { href: "/finance", label: "財務（売上・利益）", en: "Finance", icon: "¥" },
+  { href: "/legal", label: "契約・法務", en: "Legal", icon: "📄" },
+  { href: "/library", label: "資料室", en: "Library", icon: "📁" },
+  { href: "/network", label: "システム相関図", en: "System Network", icon: "🕸" },
+  { href: "/agents", label: "AI社員一覧", en: "AI Agents", icon: "🤖" },
+  { href: "/memories", label: "経営メモ（AIの記憶）", en: "Business Memory", icon: "🧠" },
+  { href: "/decisions", label: "決定事項ログ", en: "Decision Log", icon: "⚖" },
+  { href: "/events", label: "出来事ログ", en: "Company Events", icon: "⚡" },
+  { href: "/dev", label: "開発状況", en: "Development", icon: "🛠" },
+  { href: "/future", label: "未来シミュレーション", en: "Future", icon: "📈" },
+  { href: "/connectors", label: "外部連携", en: "Connectors", icon: "🔌" },
+  { href: "/vault", label: "システム台帳（ID/URL）", en: "Vault", icon: "🔐" },
 ];
 
 export function Sidebar({ userName }: { userName: string }) {
   const pathname = usePathname();
   return (
-    <aside className="hidden w-56 shrink-0 flex-col border-r border-[--color-line] bg-[--color-panel] p-3 md:flex">
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-[--color-line] bg-[--color-panel] p-3 md:flex">
       <div className="mb-6 px-2 pt-2">
         <p className="text-xs tracking-[0.3em] text-[--color-gold]">YOZAN</p>
         <p className="text-lg font-bold tracking-wide">GENESIS</p>
@@ -40,6 +42,7 @@ export function Sidebar({ userName }: { userName: string }) {
             <Link
               key={item.href}
               href={item.href}
+              title={item.en}
               className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                 active
                   ? "bg-[--color-panel-2] text-sky-300 shadow-[inset_2px_0_0_0_#38bdf8]"

@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2026-07-13(4) — GENESIS役員展開: タブ日本語化・マニュアル・資料室・権限
+- feat(genesis): **サイドバーのタブ名を「何ができるか」が分かる日本語に**（Cockpit→経営ダッシュボード等、旧名はツールチップ）。よく使う順に並べ替え（承認待ち・受信箱を上へ）
+- feat(genesis): **役員向けマニュアル** docs/genesis/RUNBOOK.md 新規（毎日見るのは3つだけ/各タブ表/権限管理手順）→ /manual で公開配信＋ログイン画面にリンク（member-os等と同方式）
+- feat(genesis): **資料室 /library** — プライベートバケット`library`（service_role専用）に分類つきアップロード/署名URLダウンロード/削除。**Publicリポジトリに資料を置かないための置き場**。next.config bodySizeLimit 26mb
+- db: 「役員（本部閲覧）」ロール新設（view_hqのみ）、小川うららに付与済み。アカウント発行（初期パスワード）はShift Cloud管理画面から＝権限は古川さんのアカウントで一元管理
+- fix(caddy-os): 3bbd4e8で消えた請求書印刷CSS（@media print）を復元（原因はVMキャッシュ経由の追記事故。以後globals追記はclone側で行う）
+- 検証: esbuild parse green。push後にVercelビルド確認
+
 ## 2026-07-13(3) — マニュアル配信・モバイル全アプリ展開・Tokyoリージョン化（MN/MB/速度）
 - feat(MN): member-os / shift-cloud / legal-os に **/manual**（ログイン不要）— RUNBOOKを画面表示＋⬇ダウンロード＋🖨印刷(PDF保存)。/loginに「📖使い方マニュアル」リンク。middlewareのpublicPrefixesに/manual追加。中身はpublic/manual.md（正典docs/modules/<os>/RUNBOOKのコピー）
 - style(MB): モバイル救済CSS（grid畳み＋table横スクロール）を残り7アプリのglobals.cssへ展開。member-osのTopBarは元からモバイル対応済と確認
