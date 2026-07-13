@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-13(3) — マニュアル配信・モバイル全アプリ展開・Tokyoリージョン化（MN/MB/速度）
+- feat(MN): member-os / shift-cloud / legal-os に **/manual**（ログイン不要）— RUNBOOKを画面表示＋⬇ダウンロード＋🖨印刷(PDF保存)。/loginに「📖使い方マニュアル」リンク。middlewareのpublicPrefixesに/manual追加。中身はpublic/manual.md（正典docs/modules/<os>/RUNBOOKのコピー）
+- style(MB): モバイル救済CSS（grid畳み＋table横スクロール）を残り7アプリのglobals.cssへ展開。member-osのTopBarは元からモバイル対応済と確認
+- perf(速度): **vercel.jsonで全アプリをhnd1(東京)に固定** — shift-cloud/survey-os/reserve-os/caddy-osに新規、genesisはcronsにregions追記（member/legal/moneyは設定済だった）。Supabase(東京)との往復短縮＝体感速度の底上げ。反映は次回デプロイ時
+- 検証: manual/page.tsx esbuild parse green。push後にVercelビルド確認
+
 ## 2026-07-13(2) — Genesisモバイル対応（NEXT_TASKS MB）
 - feat(genesis): **MobileNav新設**（md未満: 上部固定バー＋ハンバーガー→左ドロワー、遷移で自動クローズ）。Sidebarは `hidden md:flex` に、mainは `p-4 md:p-6`
 - style(genesis): globals.cssにモバイル救済 — md未満で grid-cols-2→1列 / 3〜6→2列、テーブルは横スクロール。**新規コードはレスポンシブ指定を書く**（DESIGN_SYSTEM「モバイル対応」節を新設＝全アプリ共通基準）

@@ -26,3 +26,26 @@ body::before {
   pointer-events: none;
   background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(224, 182, 74, 0.06), transparent);
 }
+
+/* ============================================================
+   モバイル対応（NEXT_TASKS MB / 基準: docs/genesis/DESIGN_SYSTEM.md）
+   既存ページの grid-cols-N はPC前提のため、md未満では段組みを畳む。
+   ※新規コードはこの救済に頼らず md:grid-cols-N のレスポンシブ指定を書くこと
+   ============================================================ */
+@media (max-width: 767px) {
+  .grid-cols-2 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

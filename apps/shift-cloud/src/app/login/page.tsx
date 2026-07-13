@@ -28,6 +28,9 @@ export default function LoginPage() {
             {pending ? "ログイン中…" : "ログイン"}
           </Button>
         </form>
+        <p className="mt-4 text-center">
+          <a href="/manual" className="text-sm text-zinc-400 underline underline-offset-2">📖 使い方マニュアル</a>
+        </p>
       </div>
     </main>
   );
