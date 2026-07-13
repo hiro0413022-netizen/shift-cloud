@@ -105,6 +105,21 @@ export const NODES: SystemNode[] = [
     iy: 200,
   },
   {
+    id: "lesson-os",
+    name: "Lesson OS",
+    kind: "app",
+    status: "prod",
+    url: "https://lesson-os.vercel.app",
+    healthUrl: "https://lesson-os.vercel.app",
+    schema: "lsn_",
+    description:
+      "レッスンカルテ（WING NOTE代替）。スイング動画・コーチコメント・★ベストスイング。生徒はSmart Hello会員番号で会員名簿と疎結合。Trackman受け口（lsn_measurements）を装備。",
+    flow: "lesson-os.svg",
+    aliases: ["lesson", "レッスン", "wingnote", "wing note"],
+    ix: 90,
+    iy: 120,
+  },
+  {
     id: "member-os",
     name: "Member OS",
     kind: "app",
@@ -308,6 +323,7 @@ export const EDGES: SystemEdge[] = [
   { from: "survey-os", to: "supabase", label: "svy_", type: "data" },
   { from: "reserve-os", to: "supabase", label: "res_", type: "data" },
   { from: "caddy-os", to: "supabase", label: "cad_", type: "data" },
+  { from: "lesson-os", to: "supabase", label: "lsn_", type: "data" },
   { from: "golfwing", to: "supabase", label: "D1→移行中", type: "data" },
   { from: "sales-os", to: "supabase", label: "sales_os（同居）", type: "data" },
 

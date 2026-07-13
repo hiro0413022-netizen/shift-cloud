@@ -1,7 +1,7 @@
 # RUNBOOK — レッスンカルテ（Lesson OS）現場手順書
 
 対象: レッスンを担当するコーチ。
-URL: （デプロイ後にVaultとここへ記載）
+URL: https://lesson-os.vercel.app （ホーム画面に登録しておくと楽です）
 
 ---
 
