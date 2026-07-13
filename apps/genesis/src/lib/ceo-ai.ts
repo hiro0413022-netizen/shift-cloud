@@ -8,7 +8,8 @@ import {
   logEvent,
   type CockpitData,
 } from "@/lib/kernel";
-import { summarizeInquiriesForReport, getInquiryStats } from "@/lib/secretary";
+import { summarizeInquiriesForReport, getInquiryStats, applyFilterRules, generateMissingDrafts } from "@/lib/secretary";
+import { generateSuggestions, getOpenSuggestions } from "@/lib/suggestions";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { runLegalAiExtraction } from "@/lib/legal-ai";
@@ -188,6 +189,11 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   await admin.rpc("refresh_finance_kpis", { p_company_id: companyId });
   await admin.rpc("refresh_member_kpis", { p_company_id: companyId }); // 0011未適用時はerrorが返るだけで無害
 
+  // 1.4 秘書: 受信フィルタ（リッチメニュー押下を対応要件から外す）→ 未起案の返信案を作る（DECISIONS #51）
+  //     「朝、開いたときには返信案ができていて、承認を押すだけ」の状態を作るのがここ。
+  await applyFilterRules(companyId).catch(() => 0);
+  await generateMissingDrafts(companyId, 8).catch(() => 0);
+
   // 1.5 legal_ai: 未抽出の契約書を1件抽出（APIキー無し/対象無しなら即スキップ。DECISIONS #40）
   await runLegalAiExtraction(companyId).catch(() => null);
   // 1.6 経理AI: 未読取の証憑を最大3件OCR（同上のフォールバック。DECISIONS #42）
@@ -209,6 +215,10 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
 
   // 3. 指示案をAI社員に振る（下書き保存）
   await saveInstructions(companyId, analysis);
+
+  // 3.5 改善提案を生成（DECISIONS #51）。Cockpit/一覧に出て、そのまま実行指示にできる
+  await generateSuggestions(companyId).catch(() => 0);
+  const suggestions = await getOpenSuggestions(companyId, 5).catch(() => []);
 
   // 4. レポート組み立て
   const today = new Date().toLocaleDateString("ja-JP");
@@ -237,6 +247,18 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
     "",
     "## 何をすれば売上が上がるか",
     analysis.sales_actions.length === 0 ? "- （データ不足。KPI接続を進める）" : analysis.sales_actions.map((a) => `- ${a}`).join("\n"),
+    "",
+    "## 改善提案（/suggestions で「指示を出す」を押すとそのまま実行指示になります）",
+    suggestions.length === 0
+      ? "- 提案なし"
+      : suggestions
+          .map(
+            (s) =>
+              `- [${s.severity === "high" ? "最優先" : s.severity === "medium" ? "推奨" : "余力"}] ${s.title}\n    → 実行: ${
+                s.suggested_action ?? "-"
+              }${s.impact ? `（効果: ${s.impact}）` : ""}`
+          )
+          .join("\n"),
     "",
     "## 誰に何を指示すべきか（指示案は生成済み→Command Center）",
     analysis.instructions.length === 0

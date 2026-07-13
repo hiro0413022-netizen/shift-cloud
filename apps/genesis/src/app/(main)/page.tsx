@@ -9,6 +9,8 @@ import {
 } from "@/lib/kernel";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
+import { getOpenSuggestions, SUGGESTION_KIND_LABELS } from "@/lib/suggestions";
+import { countOpenDirectives } from "@/lib/directives";
 import { Panel, Badge, StatusDot, Empty, fmtDate, severityTone, KpiCard } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { BusinessBreakdown } from "@/components/business-breakdown";
@@ -17,9 +19,11 @@ export const dynamic = "force-dynamic";
 
 export default async function CockpitPage() {
   const actor = await requireGenesisActor();
-  const [d, business] = await Promise.all([
+  const [d, business, suggestions, openDirectives] = await Promise.all([
     getCockpitData(actor.companyId),
     getBusinessBreakdown(actor.companyId),
+    getOpenSuggestions(actor.companyId, 5).catch(() => []),
+    countOpenDirectives(actor.companyId).catch(() => 0),
   ]);
   // ダッシュボードも日次レポートと同じ判断リスト/スコアを出す（DECISIONS #43）。
   // 以前はここが buildJudgmentList だけで、整合性・法務の警告がトップ画面に出ず、
@@ -96,6 +100,54 @@ export default async function CockpitPage() {
           )}
         </Panel>
       </div>
+
+      {/* 1.5段目: 改善提案（今週やると効くこと）— 見て終わりにせず、指示にできる（DECISIONS #51） */}
+      <Panel
+        title={`改善提案 — 今週やると効くこと（${suggestions.length}件）`}
+        className="d1"
+        action={
+          <Link href="/suggestions" className="text-xs text-sky-300 hover:underline">
+            すべて見て指示を出す →
+          </Link>
+        }
+      >
+        {suggestions.length === 0 ? (
+          <Empty>提案なし（日次レポート生成で自動作成されます）</Empty>
+        ) : (
+          <ul className="grid gap-2 md:grid-cols-2">
+            {suggestions.map((s) => (
+              <li
+                key={s.id}
+                className={`rounded-lg border bg-(--color-panel-2) p-3 ${
+                  s.severity === "high" ? "border-red-700/50" : s.severity === "medium" ? "border-amber-700/40" : "border-(--color-line)"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Badge tone={s.severity === "high" ? "danger" : s.severity === "medium" ? "warn" : "default"}>
+                    {s.severity === "high" ? "最優先" : s.severity === "medium" ? "推奨" : "余力"}
+                  </Badge>
+                  <Badge tone="accent">{SUGGESTION_KIND_LABELS[s.kind] ?? s.kind}</Badge>
+                  {s.impact && <span className="text-[11px] text-emerald-300">{s.impact}</span>}
+                </div>
+                <Link href="/suggestions" className="mt-1.5 block text-sm font-medium hover:text-sky-300">
+                  {s.title}
+                </Link>
+                {s.suggested_action && (
+                  <p className="mt-1 line-clamp-2 text-xs text-(--color-dim)">{s.suggested_action}</p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-(--color-line) pt-3 text-xs">
+          <Link href="/directives" className="rounded-md border border-sky-800/50 px-2 py-1 text-sky-300 hover:bg-(--color-panel-2)">
+            📣 実行指示を出す（未完了 {openDirectives}件）
+          </Link>
+          <Link href="/inbox" className="rounded-md border border-(--color-line) px-2 py-1 text-(--color-dim) hover:bg-(--color-panel-2)">
+            📨 問い合わせに返信を承認する
+          </Link>
+        </div>
+      </Panel>
 
       {/* 2段目: 経営KPI（会社全体） */}
       <Panel title="経営KPI（会社全体）" className="d1">

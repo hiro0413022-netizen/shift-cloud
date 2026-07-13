@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 export const NAV = [
   { href: "/", label: "経営ダッシュボード", en: "Cockpit", icon: "◉" },
   { href: "/command", label: "CEO AI 司令室", en: "CEO AI Command", icon: "⌘" },
+  { href: "/suggestions", label: "改善提案", en: "Suggestions", icon: "💡" },
+  { href: "/directives", label: "実行指示", en: "Directives", icon: "📣" },
   { href: "/approvals", label: "承認待ち", en: "Approvals", icon: "✓" },
   { href: "/inbox", label: "問い合わせ受信箱", en: "CEO Inbox", icon: "📨" },
   { href: "/notes", label: "社内連絡", en: "Notes", icon: "📝" },
