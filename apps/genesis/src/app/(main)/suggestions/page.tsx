@@ -6,8 +6,8 @@ import { refreshSuggestions, dismissSuggestion, approveSuggestionAndIssue } from
 
 export const dynamic = "force-dynamic";
 
-const SEV_TONE = { high: "danger", medium: "warn", low: "default" } as const;
-const SEV_LABEL = { high: "最優先", medium: "推奨", low: "余力があれば" } as const;
+const SEV_TONE = { critical: "danger", warning: "warn", info: "default" } as const;
+const SEV_LABEL = { critical: "最優先", warning: "推奨", info: "余力があれば" } as const;
 
 export default async function SuggestionsPage() {
   const actor = await requireGenesisActor();
@@ -20,7 +20,7 @@ export default async function SuggestionsPage() {
   const staff = staffRes.data ?? [];
   const agents = agentRes.data ?? [];
 
-  const high = suggestions.filter((s) => s.severity === "high").length;
+  const high = suggestions.filter((s) => s.severity === "critical").length;
 
   return (
     <div className="space-y-4">
@@ -52,7 +52,11 @@ export default async function SuggestionsPage() {
             <li
               key={s.id}
               className={`rounded-xl border bg-(--color-panel) p-4 ${
-                s.severity === "high" ? "border-red-700/50" : s.severity === "medium" ? "border-amber-700/40" : "border-(--color-line)"
+                s.severity === "critical"
+                  ? "border-red-700/50"
+                  : s.severity === "warning"
+                    ? "border-amber-700/40"
+                    : "border-(--color-line)"
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">

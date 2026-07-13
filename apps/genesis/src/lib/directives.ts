@@ -4,7 +4,7 @@ import { logEvent } from "@/lib/kernel";
 import type { GenesisActor } from "@/lib/auth";
 
 /* ============================================================
-   実行指示センター（DECISIONS #51 / 0045）
+   実行指示センター（DECISIONS #52 / 0045）
    「Genesisから実行指示を出せる」ための唯一の入口。
    台帳 = gn_directives。実体は宛先ごとに配る:
      staff    → sp_tasks（スタッフポータルの「やること」に出る）＋ notifications

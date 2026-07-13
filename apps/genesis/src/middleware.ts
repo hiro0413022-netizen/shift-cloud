@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * ログイン不要のパス。
  * /api/cron は Vercel Cron（毎朝6時JST）が Bearer CRON_SECRET で叩く。
  * ここに入れ忘れていたため、cronの呼び出しが /login へ307リダイレクトされ、
- * 日次レポートが「手動で押した日しか出ない」状態になっていた（2026-07-14 発見・DECISIONS #51）。
+ * 日次レポートが「手動で押した日しか出ない」状態になっていた（2026-07-14 発見・DECISIONS #52）。
  * 認証はルート側の CRON_SECRET チェックで担保する（middlewareを通さないだけ）。
  */
 const PUBLIC_PREFIXES = ["/login", "/api/webhooks", "/api/cron", "/manual"];

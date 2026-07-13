@@ -120,7 +120,7 @@ export async function draftAllReplies() {
   revalidatePath("/inbox");
 }
 
-/* ---------- 受信フィルタ（リッチメニュー等を対応要件から外す / 0045） ---------- */
+/* ---------- 受信フィルタ（リッチメニュー等を対応要件から外す / 0045 / DECISIONS #52） ---------- */
 
 export async function addFilterRule(formData: FormData) {
   const actor = await requireGenesisActor();

@@ -189,7 +189,7 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   await admin.rpc("refresh_finance_kpis", { p_company_id: companyId });
   await admin.rpc("refresh_member_kpis", { p_company_id: companyId }); // 0011未適用時はerrorが返るだけで無害
 
-  // 1.4 秘書: 受信フィルタ（リッチメニュー押下を対応要件から外す）→ 未起案の返信案を作る（DECISIONS #51）
+  // 1.4 秘書: 受信フィルタ（リッチメニュー押下を対応要件から外す）→ 未起案の返信案を作る（DECISIONS #52）
   //     「朝、開いたときには返信案ができていて、承認を押すだけ」の状態を作るのがここ。
   await applyFilterRules(companyId).catch(() => 0);
   await generateMissingDrafts(companyId, 8).catch(() => 0);
@@ -216,7 +216,7 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   // 3. 指示案をAI社員に振る（下書き保存）
   await saveInstructions(companyId, analysis);
 
-  // 3.5 改善提案を生成（DECISIONS #51）。Cockpit/一覧に出て、そのまま実行指示にできる
+  // 3.5 改善提案を生成（DECISIONS #52）。Cockpit/一覧に出て、そのまま実行指示にできる
   await generateSuggestions(companyId).catch(() => 0);
   const suggestions = await getOpenSuggestions(companyId, 5).catch(() => []);
 
@@ -254,7 +254,7 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
       : suggestions
           .map(
             (s) =>
-              `- [${s.severity === "high" ? "最優先" : s.severity === "medium" ? "推奨" : "余力"}] ${s.title}\n    → 実行: ${
+              `- [${s.severity === "critical" ? "最優先" : s.severity === "warning" ? "推奨" : "余力"}] ${s.title}\n    → 実行: ${
                 s.suggested_action ?? "-"
               }${s.impact ? `（効果: ${s.impact}）` : ""}`
           )

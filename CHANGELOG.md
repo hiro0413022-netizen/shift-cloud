@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2026-07-14 — Genesisの報告が止まっていた原因の修正＋提案/実行指示の実装（DECISIONS #52）
+- 診断: **日次レポートが自動生成されていなかった原因＝Vercel Cronの `/api/cron/daily` が middleware で /login へ307リダイレクト**（Vercelログで確認。DBのレポートは全て手動生成分だった）→ `PUBLIC_PREFIXES` に `/api/cron` を追加
+- 診断: LINEリッチメニュー押下（「プロの出勤情報」等10件）がCEO Inboxの「未対応」を占拠 / ai_suggestions・approval_requests・gn_messages はすべて0件＝提案と指示の器が空
+- db: `0045_inbox_filter_suggestions_directives.sql` 適用 — `sec_filter_rules`（受信フィルタ）/ `gn_directives`（実行指示台帳）/ ai_suggestions拡張（dedupe_key・impact・effort・href・dismissed_at、suggested_actionをjsonb→text）/ sec_inquiries に filtered_by_rule・draft_generated_at・reply_error
+- feat(genesis /inbox): リッチメニュー文言の**受信フィルタ管理UI**（追加・削除、既存分にも即適用）、**AI返信案の生成**（1件ずつ／まとめて）、**承認＝送信**（メール=秘書タスク、LINE=n8n）。既存7件に返信案を投入済み（承認待ち）
+- feat(genesis /suggestions): **改善提案**を実装（ルールベース＋Claude、重要度順、効果・手間つき）。Cockpitの一等地にも常時表示
+- feat(genesis /directives): **実行指示センター**。宛先=スタッフ（sp_tasks＋通知）／AI社員（prompts指示書）／外部送信（approval_requests）。改善提案から1クリックで指示化
+- feat(n8n): ワークフロー「LINE返信送信 (承認済み→Push)」新設（5分おきに status=approved の LINE返信を Push送信 → replied 更新。要: app_config に LINE_CHANNEL_ACCESS_TOKEN、Activate）
+- 検証: ワークスペースのマウントキャッシュ不整合でローカルtscが不可 → push後のVercelビルドで確認する
+
 ## 2026-07-13(9) — Lesson OS P2: PGA NOTE準拠の大型アップデート（DECISIONS #50）
 - 調査: PGA NOTE公式サイトの機能ページを実機閲覧し、コーチアプリ/ユーザーアプリの全機能とUI（紺×黒×金／青×白）を仕様化
 - db: `0043_lesson_os_p2.sql` 適用 — profile/skill(JSONB)・photo_path・distance_yd・annotations・lsn_progress(+items 9項目シード)・lsn_model_videos・lsn_share_tokens

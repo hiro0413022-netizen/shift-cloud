@@ -101,7 +101,7 @@ export default async function CockpitPage() {
         </Panel>
       </div>
 
-      {/* 1.5段目: 改善提案（今週やると効くこと）— 見て終わりにせず、指示にできる（DECISIONS #51） */}
+      {/* 1.5段目: 改善提案（今週やると効くこと）— 見て終わりにせず、指示にできる（DECISIONS #52） */}
       <Panel
         title={`改善提案 — 今週やると効くこと（${suggestions.length}件）`}
         className="d1"
@@ -119,12 +119,16 @@ export default async function CockpitPage() {
               <li
                 key={s.id}
                 className={`rounded-lg border bg-(--color-panel-2) p-3 ${
-                  s.severity === "high" ? "border-red-700/50" : s.severity === "medium" ? "border-amber-700/40" : "border-(--color-line)"
+                  s.severity === "critical"
+                    ? "border-red-700/50"
+                    : s.severity === "warning"
+                      ? "border-amber-700/40"
+                      : "border-(--color-line)"
                 }`}
               >
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone={s.severity === "high" ? "danger" : s.severity === "medium" ? "warn" : "default"}>
-                    {s.severity === "high" ? "最優先" : s.severity === "medium" ? "推奨" : "余力"}
+                  <Badge tone={s.severity === "critical" ? "danger" : s.severity === "warning" ? "warn" : "default"}>
+                    {s.severity === "critical" ? "最優先" : s.severity === "warning" ? "推奨" : "余力"}
                   </Badge>
                   <Badge tone="accent">{SUGGESTION_KIND_LABELS[s.kind] ?? s.kind}</Badge>
                   {s.impact && <span className="text-[11px] text-emerald-300">{s.impact}</span>}

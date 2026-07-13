@@ -1,4 +1,4 @@
--- 0045: CEO Inbox 受信フィルタ / 改善提案 / 実行指示（DECISIONS #51）
+-- 0045: CEO Inbox 受信フィルタ / 改善提案 / 実行指示（DECISIONS #52）
 -- 背景（2026-07-14 診断）:
 --   1) LINEリッチメニュー押下（「プロの出勤情報」等）が sec_inquiries に message イベントとして入り、
 --      「未対応の問い合わせ」を占拠していた（15件中10件）。→ 受信フィルタで自動的に対応不要へ。
@@ -61,6 +61,12 @@ where r.company_id = q.company_id
 -- ============================================================
 -- 2. 改善提案（ai_suggestions を実際に使う。重複生成の防止キーを追加）
 -- ============================================================
+-- suggested_action は jsonb だったが、実際に入るのは「実行手順の文章」なので text にする（作成時点で0件・安全）
+alter table ai_suggestions alter column suggested_action type text
+  using (case when suggested_action is null then null else suggested_action #>> '{}' end);
+-- severity は enum suggestion_severity（info/warning/critical）、
+-- approval_status は suggestion_approval（pending/approved/rejected）、
+-- execution_status は suggestion_execution（not_executed/executed/failed）。アプリ側もこの値に合わせる。
 alter table ai_suggestions add column if not exists dedupe_key text;
 alter table ai_suggestions add column if not exists impact text;      -- 効果の見立て（例: 体験予約+5件/月）
 alter table ai_suggestions add column if not exists effort text;      -- 手間（すぐ/1日/継続）

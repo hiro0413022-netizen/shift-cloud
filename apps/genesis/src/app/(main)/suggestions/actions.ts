@@ -57,7 +57,7 @@ export async function approveSuggestionAndIssue(formData: FormData) {
     title: String(s.title),
     body: [s.body, s.suggested_action ? `\n【実行手順】\n${s.suggested_action}` : ""].filter(Boolean).join("\n"),
     due_date: due,
-    priority: s.severity === "high" ? "high" : "normal",
+    priority: s.severity === "critical" ? "high" : "normal",
     origin_kind: "suggestion",
     origin_id: id,
   });
@@ -66,7 +66,7 @@ export async function approveSuggestionAndIssue(formData: FormData) {
     .from("ai_suggestions")
     .update({
       approval_status: "approved",
-      execution_status: "in_progress",
+      execution_status: "executed", // 指示として発行済み（実行の完了は gn_directives 側で追う）
       decided_by: actor.staffId,
       decided_at: new Date().toISOString(),
     })
