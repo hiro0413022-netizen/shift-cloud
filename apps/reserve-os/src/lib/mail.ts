@@ -25,6 +25,20 @@ export type SendInput = {
 
 const FROM_DEFAULT = () => process.env.RESERVE_FROM_EMAIL || "info@yozan-inc.jp";
 
+/**
+ * メール本文に載せる自サイトのURL。
+ * NEXT_PUBLIC_SITE_URL を明示していなくても、Vercelが自動で渡す本番ドメインで代替する
+ * （env設定漏れでメールのリンクが消える事故を防ぐ / DECISIONS #34）。
+ *   VERCEL_PROJECT_PRODUCTION_URL … 本番ドメイン（例: shift-cloud-reserve-os.vercel.app）
+ *   VERCEL_URL                    … そのデプロイ固有のURL（プレビュー時のフォールバック）
+ */
+export function siteUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/$/, "");
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+  return host ? `https://${host}` : "";
+}
+
 export async function sendEmail(input: SendInput): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -94,7 +108,8 @@ export async function notifyStaffNewRequest(r: RequestRow): Promise<MailResult> 
   }
   const seq = fmtSeq(r.request_seq as number);
   const svc = esc(r.service_name);
-  const adminUrl = process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/requests/${r.id}` : "";
+  const base = siteUrl();
+  const adminUrl = base ? `${base}/requests/${r.id}` : "";
   const html = `
   <div style="font-family:system-ui,'Hiragino Sans','Noto Sans JP',sans-serif;max-width:640px;margin:0 auto;color:#1a1a17">
     <p style="letter-spacing:.3em;font-size:11px;color:#a9863f;margin:0 0 4px">GOLF WING — 予約申込</p>
