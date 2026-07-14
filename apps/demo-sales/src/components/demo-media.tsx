@@ -12,12 +12,17 @@ import { COLOR_PRESETS } from "@/lib/types";
 import { inputCls } from "./ui";
 
 const MAX_EDGE = 1600;
+const MAX_EDGE_LOGO = 600;
 
-/** 画像を縮小してJPEG化（透過PNGは白背景に載る）。失敗時は元ファイルを返す */
-async function shrink(file: File): Promise<Blob> {
+/**
+ * 画像を縮小。写真はJPEG化（軽い）、ロゴは transparent=true でPNGのまま（透過を保つ）。
+ * 失敗時は元ファイルを返す。
+ */
+async function shrink(file: File, transparent = false): Promise<Blob> {
   try {
     const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
+    const maxEdge = transparent ? MAX_EDGE_LOGO : MAX_EDGE;
+    const scale = Math.min(1, maxEdge / Math.max(bmp.width, bmp.height));
     const w = Math.round(bmp.width * scale);
     const h = Math.round(bmp.height * scale);
     const canvas = document.createElement("canvas");
@@ -25,18 +30,22 @@ async function shrink(file: File): Promise<Blob> {
     canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (!ctx) return file;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, w, h);
+    if (!transparent) {
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, w, h);
+    }
     ctx.drawImage(bmp, 0, 0, w, h);
-    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
+    const blob = transparent
+      ? await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"))
+      : await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.85));
     return blob ?? file;
   } catch {
     return file;
   }
 }
 
-async function upload(prospectId: string, file: File): Promise<{ url?: string; error?: string }> {
-  const blob = await shrink(file);
+async function upload(prospectId: string, file: File, transparent = false): Promise<{ url?: string; error?: string }> {
+  const blob = await shrink(file, transparent);
   const type = blob.type || "image/jpeg";
   const r = await createDemoImageUploadUrl(prospectId, type, blob.size);
   if (!r.url || !r.publicUrl) return { error: r.error ?? "アップロードURLの発行に失敗しました" };
@@ -45,19 +54,22 @@ async function upload(prospectId: string, file: File): Promise<{ url?: string; e
   return { url: r.publicUrl };
 }
 
-/** 単一画像（ヘッダー / 院長写真） */
+/** 単一画像（ロゴ / ヘッダー / 院長写真） */
 export function ImageField({
   prospectId,
   name,
   label,
   hint,
   initial,
+  transparent,
 }: {
   prospectId: string;
   name: string;
   label: string;
   hint?: string;
   initial?: string;
+  /** ロゴ等: PNGの透過を保ったままアップロードする */
+  transparent?: boolean;
 }) {
   const [url, setUrl] = useState(initial ?? "");
   const [busy, setBusy] = useState(false);
@@ -68,7 +80,7 @@ export function ImageField({
     if (!file) return;
     setBusy(true);
     setErr("");
-    const r = await upload(prospectId, file);
+    const r = await upload(prospectId, file, transparent);
     if (r.error) setErr(r.error);
     else setUrl(r.url!);
     setBusy(false);
@@ -82,7 +94,13 @@ export function ImageField({
       <div className="flex items-center gap-3">
         {url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="h-16 w-24 rounded-lg border border-(--color-line) object-cover" />
+          <img
+            src={url}
+            alt=""
+            className={`h-16 w-24 rounded-lg border border-(--color-line) bg-white ${
+              transparent ? "object-contain p-1" : "object-cover"
+            }`}
+          />
         ) : (
           <div className="flex h-16 w-24 items-center justify-center rounded-lg border border-dashed border-(--color-line) text-[10px]">
             なし

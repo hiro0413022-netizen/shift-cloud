@@ -253,6 +253,14 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
             <div className="lg:col-span-2 mt-2 grid gap-3 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3 sm:grid-cols-2">
               <ImageField
                 prospectId={id}
+                name="logoImage"
+                label="ロゴ（ヘッダー院名の左・フッターに表示）"
+                hint="PNG推奨（透過のまま表示）。未設定ならロゴなしで院名テキストのみ"
+                initial={bstr("logoImage")}
+                transparent
+              />
+              <ImageField
+                prospectId={id}
                 name="heroImage"
                 label="ヘッダー（トップの大きな写真）"
                 hint="外観・待合室・スタッフ集合など。未設定なら業種カラーのグラデーション"

@@ -54,6 +54,7 @@ export function renderDemo(brief: DemoBrief): string {
 
   // 画像（アップロード済みのみ。URLは公開バケット）
   const safeImg = (u?: string) => (u && /^https?:\/\//.test(u) ? esc(u) : "");
+  const logo = safeImg(brief.logoImage);
   const hero = safeImg(brief.heroImage);
   const dImg = safeImg(brief.directorImage);
   const gallery = (brief.gallery ?? []).filter((g) => safeImg(g.url)).slice(0, 6);
@@ -89,8 +90,10 @@ body{font-family:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;color:var(-
 .demo-ribbon{position:fixed;top:0;left:0;right:0;z-index:100;background:#111827;color:#fbbf24;font-size:12px;text-align:center;padding:8px;letter-spacing:.05em}
 header{position:sticky;top:36px;z-index:90;background:rgba(255,255,255,.95);backdrop-filter:blur(6px);border-bottom:1px solid var(--line)}
 .hwrap{max-width:1080px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:12px 20px}
-.logo{font-size:20px;font-weight:700;color:var(--pd)}
+.logo{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:700;color:var(--pd)}
 .logo small{display:block;font-size:10px;font-weight:400;color:var(--dim);letter-spacing:.2em}
+.logo img{height:44px;width:auto;max-width:160px;object-fit:contain}
+footer .flogo{height:40px;width:auto;max-width:160px;object-fit:contain;margin-bottom:10px}
 nav a{margin-left:18px;font-size:14px;color:var(--txt);text-decoration:none}
 nav a:hover{color:var(--p)}
 .tel-head{display:flex;align-items:center;gap:10px}
@@ -154,6 +157,8 @@ footer .fn{color:#fff;font-size:15px;font-weight:700;margin-bottom:6px}
 @media(max-width:760px){
   .hero.img::after{background:linear-gradient(180deg,rgba(255,255,255,.9) 0%,rgba(255,255,255,.86) 60%,rgba(255,255,255,.8) 100%)}
   .gal img{height:180px}
+  .logo{font-size:16px;gap:8px}
+  .logo img{height:34px;max-width:110px}
   body{padding-top:32px}
   .demo-ribbon{font-size:10px;padding:7px 4px}
   header{top:32px}
@@ -172,7 +177,10 @@ footer .fn{color:#fff;font-size:15px;font-weight:700;margin-bottom:6px}
 <div class="demo-ribbon">営業提案用デモサイト（非公開・検索対象外）— 仮画像・仮文章（※仮）を含みます。正式制作時に実素材へ差し替えます</div>
 <header>
   <div class="hwrap">
-    <div class="logo">${esc(name)}<small>${esc(t.label)}（デモ）</small></div>
+    <div class="logo">
+      ${logo ? `<img src="${logo}" alt="${esc(name)}">` : ""}
+      <span>${esc(name)}<small>${esc(t.label)}（デモ）</small></span>
+    </div>
     <nav>
       <a href="#services">${esc(t.vocab.services)}</a>
       <a href="#hours">${esc(t.vocab.hours)}</a>
@@ -262,6 +270,7 @@ ${gallerySection}
 </section>
 
 <footer>
+  ${logo ? `<img class="flogo" src="${logo}" alt="${esc(name)}">` : ""}
   <div class="fn">${esc(name)}</div>
   <div>${esc(address)}　📞 ${esc(phone)}</div>
   <div style="margin-top:10px;opacity:.7">このページは営業提案用のデモサイトです。実在の医院の公式サイトではありません。<br>制作: YOZAN（お問い合わせは提案書記載の連絡先へ）</div>

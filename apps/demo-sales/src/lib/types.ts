@@ -85,6 +85,7 @@ export interface DemoBrief {
   recruit?: string; // 採用メッセージ（空なら入口のみ）
   instructions?: string[]; // 修正指示の履歴（面談中の要望等）
   // 写真（demo-assets バケットの公開URL。院提供の写真・フリー素材のみ。既存サイトからの無断転載はしない）
+  logoImage?: string; // ロゴ（ヘッダーの院名の左・フッター。PNG透過のまま保持）
   heroImage?: string; // ヘッダー/ヒーロー背景
   directorImage?: string; // 院長・スタッフ写真
   gallery?: { url: string; caption?: string }[]; // 院内・診察風景（最大6枚）
