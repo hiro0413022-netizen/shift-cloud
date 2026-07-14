@@ -168,6 +168,7 @@ function briefFromForm(fd: FormData, base: Partial<DemoBrief>): DemoBrief {
     // 画像（フォームは常に hidden で現在値を送るため、空文字＝削除）
     logoImage: fd.has("logoImage") ? (s(fd, "logoImage") ?? undefined) : base.logoImage,
     heroImage: fd.has("heroImage") ? (s(fd, "heroImage") ?? undefined) : base.heroImage,
+    heroStyle: (fd.has("heroStyle") ? (s(fd, "heroStyle") ?? undefined) : base.heroStyle) as DemoBrief["heroStyle"],
     directorImage: fd.has("directorImage") ? (s(fd, "directorImage") ?? undefined) : base.directorImage,
     gallery: fd.has("gallery") ? galleryFromForm(String(fd.get("gallery") ?? "")) : base.gallery,
   };

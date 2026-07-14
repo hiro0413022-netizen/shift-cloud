@@ -4,7 +4,7 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { cardCls, inputCls, btnCls } from "@/components/ui";
 import { ColorField, GalleryField, ImageField } from "@/components/demo-media";
-import { INDUSTRIES, STATUSES, LOST_REASONS, type IndustryKey, type StatusKey } from "@/lib/types";
+import { INDUSTRIES, STATUSES, LOST_REASONS, HERO_STYLES, type IndustryKey, type StatusKey } from "@/lib/types";
 import { getTemplate } from "@/lib/templates";
 import { addActivity, generateDemo, generateDocs, setDemoAccess, transferToProject, updateProspect } from "@/app/actions";
 
@@ -266,6 +266,13 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
                 hint="外観・待合室・スタッフ集合など。未設定なら業種カラーのグラデーション"
                 initial={bstr("heroImage")}
               />
+              <label className="text-xs text-(--color-dim)">ヒーロー写真の見せ方（写真がある時のみ）
+                <select name="heroStyle" defaultValue={bstr("heroStyle") || "overlay"} className={inputCls}>
+                  {Object.entries(HERO_STYLES).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </label>
               <ImageField
                 prospectId={id}
                 name="directorImage"

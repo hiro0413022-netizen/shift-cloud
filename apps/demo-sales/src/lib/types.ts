@@ -87,9 +87,18 @@ export interface DemoBrief {
   // 写真（demo-assets バケットの公開URL。院提供の写真・フリー素材のみ。既存サイトからの無断転載はしない）
   logoImage?: string; // ロゴ（ヘッダーの院名の左・フッター。PNG透過のまま保持）
   heroImage?: string; // ヘッダー/ヒーロー背景
+  heroStyle?: HeroStyleKey; // ヒーロー写真の見せ方（既定: overlay）
   directorImage?: string; // 院長・スタッフ写真
   gallery?: { url: string; caption?: string }[]; // 院内・診察風景（最大6枚）
 }
+
+// ヒーロー写真の見せ方（写真が主役の1枚目をきれいに見せるための型）
+export const HERO_STYLES = {
+  overlay: "写真＋暗いスクリム／白文字（写真が主役・最も高級感）",
+  card: "写真＋白いカード／黒文字（文字が最も読みやすい）",
+  light: "写真を薄く敷く／黒文字（やわらかい印象）",
+} as const;
+export type HeroStyleKey = keyof typeof HERO_STYLES;
 
 // 基調色プリセット（管理画面のカラーピッカー横に並べる。HEXを覚えなくてよくする）
 export const COLOR_PRESETS: { label: string; value: string }[] = [

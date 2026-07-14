@@ -56,6 +56,8 @@ export function renderDemo(brief: DemoBrief): string {
   const safeImg = (u?: string) => (u && /^https?:\/\//.test(u) ? esc(u) : "");
   const logo = safeImg(brief.logoImage);
   const hero = safeImg(brief.heroImage);
+  // ヒーローの見せ方: overlay=暗いスクリム＋白文字（既定） / card=白カード＋黒文字 / light=写真を薄く敷く
+  const heroClass = brief.heroStyle === "card" ? "card" : brief.heroStyle === "light" ? "lt" : "ov";
   const dImg = safeImg(brief.directorImage);
   const gallery = (brief.gallery ?? []).filter((g) => safeImg(g.url)).slice(0, 6);
 
@@ -100,10 +102,22 @@ nav a:hover{color:var(--p)}
 .tel-head a{background:var(--p);color:#fff;text-decoration:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:15px}
 .hero{background:linear-gradient(135deg,var(--soft) 0%,#fff 55%,var(--soft) 100%);position:relative;overflow:hidden}
 .hero::after{content:"${t.heroEmoji}";position:absolute;right:-10px;bottom:-30px;font-size:220px;opacity:.12}
-.hero.img::before{content:"";position:absolute;inset:0;background-image:url("${hero}");background-size:cover;background-position:center}
-.hero.img::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,.88) 44%,rgba(255,255,255,.35) 72%,rgba(255,255,255,.05) 100%);font-size:0}
-.hero.img .hero-in{position:relative;z-index:2}
 .hero-in{max-width:1080px;margin:0 auto;padding:72px 20px 64px}
+.hbox{max-width:640px}
+/* 写真あり: 画像は常にcoverで中央 */
+.hero.img{background:#0f172a}
+.hero.img::before{content:"";position:absolute;inset:0;background-image:url("${hero}");background-size:cover;background-position:center;transform:scale(1.02)}
+.hero.img .hero-in{position:relative;z-index:2;padding:104px 20px 112px}
+/* A: 暗いスクリム＋白文字 */
+.hero.ov::after{content:"";position:absolute;inset:0;font-size:0;background:linear-gradient(95deg,rgba(9,14,26,.82) 0%,rgba(9,14,26,.66) 38%,rgba(9,14,26,.3) 72%,rgba(9,14,26,.12) 100%),linear-gradient(180deg,rgba(9,14,26,.35),rgba(9,14,26,.15) 40%,rgba(9,14,26,.45))}
+.hero.ov h1{color:#fff;text-shadow:0 3px 26px rgba(0,0,0,.5)}
+.hero.ov p{color:rgba(255,255,255,.94);text-shadow:0 2px 14px rgba(0,0,0,.5)}
+.hero.ov .btn-sub{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.85);backdrop-filter:blur(6px)}
+/* B: 白いカード＋黒文字 */
+.hero.card::after{content:"";position:absolute;inset:0;font-size:0;background:linear-gradient(180deg,rgba(9,14,26,.12),rgba(9,14,26,.28))}
+.hero.card .hbox{background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-radius:22px;padding:40px 40px 36px;box-shadow:0 24px 60px rgba(9,14,26,.25)}
+/* C: 写真を薄く敷く */
+.hero.lt::after{content:"";position:absolute;inset:0;font-size:0;background:linear-gradient(100deg,rgba(255,255,255,.96) 0%,rgba(255,255,255,.9) 46%,rgba(255,255,255,.5) 76%,rgba(255,255,255,.2) 100%)}
 .gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
 .gal figure{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .gal img{display:block;width:100%;height:220px;object-fit:cover}
@@ -112,9 +126,10 @@ nav a:hover{color:var(--p)}
 .hero h1{font-size:34px;line-height:1.5;color:var(--pd);margin-bottom:16px}
 .hero p{max-width:560px;color:var(--dim);margin-bottom:28px}
 .cta{display:flex;gap:12px;flex-wrap:wrap}
-.btn{display:inline-block;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:16px}
-.btn-tel{background:var(--p);color:#fff;box-shadow:0 4px 14px color-mix(in srgb,var(--p) 40%,transparent)}
-.btn-sub{background:#fff;color:var(--p);border:2px solid var(--p)}
+.btn{display:inline-block;padding:15px 30px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px;transition:transform .15s ease,box-shadow .15s ease}
+.btn:hover{transform:translateY(-2px)}
+.btn-tel{background:var(--p);color:#fff;box-shadow:0 10px 26px color-mix(in srgb,var(--p) 45%,transparent)}
+.btn-sub{background:#fff;color:var(--p);border:2px solid var(--p);box-shadow:0 8px 22px rgba(9,14,26,.12)}
 .newsbar{max-width:1080px;margin:-24px auto 0;padding:0 20px;position:relative;z-index:5}
 .newsbar .in{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 20px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
 .newsbar .row{display:flex;gap:14px;font-size:14px;padding:4px 0}
@@ -155,7 +170,10 @@ footer .fn{color:#fff;font-size:15px;font-weight:700;margin-bottom:6px}
 .mobile-bar a span{display:block;font-size:20px}
 .mobile-bar a.tel{background:var(--p);color:#fff}
 @media(max-width:760px){
-  .hero.img::after{background:linear-gradient(180deg,rgba(255,255,255,.9) 0%,rgba(255,255,255,.86) 60%,rgba(255,255,255,.8) 100%)}
+  .hero.img .hero-in{padding:72px 20px 84px}
+  .hero.ov::after{background:linear-gradient(180deg,rgba(9,14,26,.45) 0%,rgba(9,14,26,.62) 55%,rgba(9,14,26,.78) 100%)}
+  .hero.lt::after{background:linear-gradient(180deg,rgba(255,255,255,.93) 0%,rgba(255,255,255,.9) 60%,rgba(255,255,255,.86) 100%)}
+  .hero.card .hbox{padding:28px 24px 24px;border-radius:18px}
   .gal img{height:180px}
   .logo{font-size:16px;gap:8px}
   .logo img{height:34px;max-width:110px}
@@ -192,14 +210,16 @@ footer .fn{color:#fff;font-size:15px;font-weight:700;margin-bottom:6px}
   </div>
 </header>
 
-<div class="hero${hero ? " img" : ""}">
+<div class="hero${hero ? ` img ${heroClass}` : ""}">
   <div class="hero-in">
-    <h1>${nl2br(tagline)}</h1>
-    <p>${nl2br(intro)}</p>
-    <div class="cta">
-      <a class="btn btn-tel" href="${telHref}">📞 電話で予約・相談する</a>
-      ${webReserveBtn}
-      <a class="btn btn-sub" href="#first">${esc(t.vocab.firstVisit)}</a>
+    <div class="hbox">
+      <h1>${nl2br(tagline)}</h1>
+      <p>${nl2br(intro)}</p>
+      <div class="cta">
+        <a class="btn btn-tel" href="${telHref}">📞 電話で予約・相談する</a>
+        ${webReserveBtn}
+        <a class="btn btn-sub" href="#first">${esc(t.vocab.firstVisit)}</a>
+      </div>
     </div>
   </div>
 </div>
