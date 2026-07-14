@@ -54,7 +54,23 @@
 3. report-os `build-data.mjs` がDBを読み＋Claude APIで文章下書き→ `generate.js` で当月.pptx生成。
 4. 古川さんが承認・修正 → 配布。
 
-## 4. 埋めるべきギャップ（次フェーズのDB作業）
+## 4. データソースのDB整備（migration 0047 で完了）
+
+> **ステータス（2026-07-14 / migration 0047 適用済み）**
+> 4-A2（会員数スナップショット）と 4-B（物販売上）はDB化完了。以降 report-os は **ビュー `v_rpt_monthly` 1本**を読めばよい。
+>
+> | 追加物 | 中身 |
+> |---|---|
+> | `rpt_retail_sales` | 物販売上の月次記録（company_id/store_code/ym/amount税込/source）。売上データxlsx（品目「販売」税込）から 2022-06〜2026-06 の49ヶ月をバックフィル済（source=`sales_xlsx`）|
+> | `rpt_member_snapshots` | 正会員数の月次スナップショット（members/new_joins/leavers/excluded_counts）。2022-06〜2026-06 バックフィル済 |
+> | `report_member_counts(company_id, ym)` | §4-A の正会員ルールの**正典実装**（除外4区分・当月末退会者を除く） |
+> | `snapshot_member_count(company_id, ym)` | 上記をスナップショットに積むRPC（月初のスケジュールタスクが実行） |
+> | `v_rpt_monthly` | 月次集計ビュー: `members / new_joins / leavers / retail_sales / fittings / trials` |
+>
+> **フィッティング用の `rpt_fittings` は作らない**。一時利用者名簿（`mbr_walkin_visits.visit_type='fitting'`）が正ソースとして取込済みのため、二重管理を避けビューで集計する。
+> **既知の限界**: 会員推移・退会率は名簿の join_date/leave_date 再構成のため、名簿から消えた過去の退会者を含まない参考値（過去月の退会率が0になる）。正確な推移は今後 `rpt_member_snapshots` の毎月積み上げで担保される。
+
+### 4-0. 旧・ギャップ一覧（設計時のメモ）
 
 ### 4-A. 会員数のカウントルール（正会員の定義）
 
@@ -147,10 +163,15 @@ rpt_fittings       (company_id, occurred_on date, member_id, staff, club_type, r
 - 出力: `activities[] / problems[] / plans[] / shareInfo[]` のJSON。problems と plans は index対応（問題→解決策）。
 - **AIは下書きまで**。数値の断定・対外配布はしない（AI_RULES.md の権限線引きに準拠）。人の承認を必須にする。
 
-## 7. スケジュール
+## 7. スケジュール（稼働中）
 
-毎月1日朝に「先月分」を自動生成し、CEO Inboxに下書きとして提示（scheduled-task）。
-古川さんは承認/修正するだけ。VISION の「朝、CEO AIが報告する」体験に接続。
+**scheduled-task `report-os-monthly`（毎月1日 8:00 JST）**が「先月分」を自動生成する。
+処理: `snapshot_member_count` 実行 → `v_rpt_monthly` から13ヶ月分取得 → data JSON 組立 → 文章下書き → `generate.js` で
+`apps/report-os/out/GOLFWING_月次報告_<YYYY-MM>_draft.pptx` を出力 → 古川さんに**承認待ち下書き**として提示。
+
+古川さんは承認/修正するだけ。承認まで確定・配布しない（AI_RULES.md の権限線引き）。
+※スケジュールタスクはDBアクセスにSupabase MCPを使うため `SUPABASE_SERVICE_ROLE` を必要としない。
+CLI/CIから回す場合のみ `build-data.mjs`（service_role必要）を使う。
 
 ## 8. 横展開
 
