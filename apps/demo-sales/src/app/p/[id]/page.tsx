@@ -4,6 +4,8 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { cardCls, inputCls, btnCls } from "@/components/ui";
 import { ColorField, GalleryField, ImageField } from "@/components/demo-media";
+import { QuoteBuilder, type OptionRow, type PlanRow } from "@/components/quote-builder";
+import { createQuote, setQuoteStatus } from "@/app/quote-actions";
 import { INDUSTRIES, STATUSES, LOST_REASONS, HERO_STYLES, type IndustryKey, type StatusKey } from "@/lib/types";
 import { getTemplate } from "@/lib/templates";
 import { addActivity, generateDemo, generateDocs, setDemoAccess, transferToProject, updateProspect } from "@/app/actions";
@@ -37,15 +39,24 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
   const { data: p } = await admin.from("dms_prospects").select("*").eq("id", id).eq("company_id", actor.companyId).is("deleted_at", null).single();
   if (!p) notFound();
 
-  const [{ data: demos }, { data: docs }, { data: acts }, { data: plans }, { data: project }] = await Promise.all([
-    admin.from("dms_demos").select("*").eq("prospect_id", id).is("deleted_at", null).order("version", { ascending: false }),
-    admin.from("dms_documents").select("*").eq("prospect_id", id).is("deleted_at", null).order("created_at", { ascending: false }),
-    admin.from("dms_activities").select("*").eq("prospect_id", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
-    admin.from("dms_plans").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("sort"),
-    admin.from("dms_projects").select("*").eq("prospect_id", id).is("deleted_at", null).maybeSingle(),
-  ]);
+  const [{ data: demos }, { data: docs }, { data: acts }, { data: plans }, { data: project }, { data: options }, { data: quotes }, { data: qsettings }] =
+    await Promise.all([
+      admin.from("dms_demos").select("*").eq("prospect_id", id).is("deleted_at", null).order("version", { ascending: false }),
+      admin.from("dms_documents").select("*").eq("prospect_id", id).is("deleted_at", null).order("created_at", { ascending: false }),
+      admin.from("dms_activities").select("*").eq("prospect_id", id).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
+      admin.from("dms_plans").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("sort"),
+      admin.from("dms_projects").select("*").eq("prospect_id", id).is("deleted_at", null).maybeSingle(),
+      admin.from("dms_options").select("*").eq("company_id", actor.companyId).eq("active", true).is("deleted_at", null).order("sort"),
+      admin.from("dms_quotes").select("*").eq("prospect_id", id).is("deleted_at", null).order("version", { ascending: false }),
+      admin.from("dms_quote_settings").select("*").eq("company_id", actor.companyId).maybeSingle(),
+    ]);
 
   const latestDemo = demos?.[0] ?? null;
+  // 前回見積のオプション選択を引き継ぐ（面談中の作り直しを速くする）
+  const lastQuote = quotes?.[0] ?? null;
+  const lastSelected: Record<string, number> | undefined = lastQuote
+    ? Object.fromEntries(((lastQuote.items ?? []) as { key: string; qty: number }[]).map((i) => [i.key, i.qty]))
+    : undefined;
   const tpl = getTemplate(p.industry);
   const brief = (latestDemo?.brief ?? {}) as Record<string, unknown>;
   const bstr = (k: string) => (typeof brief[k] === "string" ? (brief[k] as string) : "");
@@ -290,6 +301,55 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
             </label>
             <button className={`${btnCls} w-fit lg:col-span-2`}>{latestDemo ? "デモを再生成（v" + (latestDemo.version + 1) + "）" : "デモを生成"}</button>
           </form>
+        </details>
+      </section>
+
+      {/* 見積 */}
+      <section className={`${cardCls} mt-6`}>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold">見積（プラン＋オプション）</h2>
+          <Link href="/settings" className="text-xs text-(--color-accent) hover:underline">料金・オプションの設定 →</Link>
+        </div>
+
+        {(quotes ?? []).length > 0 && (
+          <div className="mb-4 space-y-2">
+            {(quotes ?? []).map((qq) => (
+              <div key={qq.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-(--color-panel-2) px-3 py-2 text-sm">
+                <span>
+                  <b>{qq.quote_no}</b>（v{qq.version}）
+                  <span className="ml-2 text-xs text-(--color-dim)">
+                    初期 {Number(qq.total_build).toLocaleString()}円 ／ 月額 {Number(qq.total_monthly).toLocaleString()}円（税込）・{String(qq.issue_date)}
+                  </span>
+                </span>
+                <span className="flex items-center gap-2">
+                  <Link href={`/q/${qq.id}`} className={`${btnCls} px-3 py-1.5`}>見積書を開く（印刷）</Link>
+                  {qq.status !== "sent" && (
+                    <form action={setQuoteStatus.bind(null, qq.id, id, "sent")}>
+                      <button className="text-xs text-(--color-dim) hover:text-(--color-txt)">提出済みにする</button>
+                    </form>
+                  )}
+                  {qq.status === "sent" && <span className="text-xs text-(--color-ok)">提出済み</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <details open={(quotes ?? []).length === 0}>
+          <summary className="cursor-pointer text-sm font-medium text-(--color-accent)">
+            {(quotes ?? []).length ? "新しい見積を作る（面談中の条件変更もここで）" : "見積を作成する"}
+          </summary>
+          <div className="mt-3">
+            <QuoteBuilder
+              action={createQuote.bind(null, id)}
+              plans={(plans ?? []).filter((pl) => pl.active !== false) as PlanRow[]}
+              options={(options ?? []) as OptionRow[]}
+              taxRate={Number(qsettings?.tax_rate ?? 0.1)}
+              validDays={Number(qsettings?.valid_days ?? 30)}
+              defaultPlanKey={p.suggested_plan_key}
+              defaultSelected={lastSelected}
+            />
+          </div>
         </details>
       </section>
 

@@ -87,9 +87,12 @@ export default async function HomePage() {
           <h1 className="text-2xl font-bold tracking-widest">AI DEMO SALES</h1>
           <p className="mt-1 text-sm text-(--color-dim)">営業先専用デモの高速生成 → 完成イメージを見せて営業する</p>
         </div>
-        <form action="/api/logout" method="post">
-          <button className="text-sm text-(--color-dim) hover:text-(--color-txt)">{actor.name} — ログアウト</button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/settings" className="text-sm text-(--color-accent) hover:underline">料金・見積の設定</Link>
+          <form action="/api/logout" method="post">
+            <button className="text-sm text-(--color-dim) hover:text-(--color-txt)">{actor.name} — ログアウト</button>
+          </form>
+        </div>
       </header>
 
       {/* 営業指示（自然言語） */}
