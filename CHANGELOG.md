@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## 2026-07-14 — AI DEMO SALES: 営業デモ高速生成の新アプリ（DECISIONS #54）
+- feat(demo-sales): 独立アプリ `apps/demo-sales` 新設（port 3009・use_demo_sales|view_hq・new-app雛形）— クリニック・動物病院向けHP制作営業の「営業先専用デモを事前に作って見せる」システム
+- db: `0048_demo_sales.sql` — dms_prospects（25段階ファネル・分析・スコア・失注理由）/ dms_demos（token配信・brief・version）/ dms_documents / dms_activities（directive含む）/ dms_plans / dms_projects（成約→正式制作の受け皿）＋営業先13件・プラン2種シード
+- feat: 業種別デモテンプレート10種（lib/templates.ts）×ルールベースレンダラー（lib/render-demo.ts）＝Claude API不要でデモ即時生成（スマホ対応単一HTML・DEMOリボン・noindex・仮素材※仮ラベル）
+- feat: /d/[token] 非公開配信（noindex二重化・60日失効・任意パスコード）/ /p/[id] 営業先詳細（分析・デモ再生成・共有設定）/ /p/[id]/compare 現サイト比較 / 営業司令ダッシュボード（ファネルKPI・本日の活動・営業指示欄）
+- feat: 提案書・電話/訪問トーク・メール・お礼5種・見積書案の一括生成（lib/sales-docs.ts、現サイトを批判しない設計）
+- feat(genesis /network): demo-sales ノード＋フロー図 flows/demo-sales.svg 追加（#47ルール）
+- fix: templates/app-template/src/middleware.ts が349バイトで途切れていた（matcher欠落）のを修正
+- sample: 福本クリニック（宝塚市山本南・自院HPなし＝医師会DB掲載のみ）を実データでデモ生成し営業準備完了状態に
+
 ## 2026-07-14 — Genesisの報告が止まっていた原因の修正＋提案/実行指示の実装（DECISIONS #52）
 - 診断: **日次レポートが自動生成されていなかった原因＝Vercel Cronの `/api/cron/daily` が middleware で /login へ307リダイレクト**（Vercelログで確認。DBのレポートは全て手動生成分だった）→ `PUBLIC_PREFIXES` に `/api/cron` を追加
 - 診断: LINEリッチメニュー押下（「プロの出勤情報」等10件）がCEO Inboxの「未対応」を占拠 / ai_suggestions・approval_requests・gn_messages はすべて0件＝提案と指示の器が空

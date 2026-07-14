@@ -2,7 +2,11 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0044` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0049` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- ✅ `0045_inbox_filter_suggestions_directives.sql` — 適用済（2026-07-14、受信フィルタ・返信承認・改善提案・実行指示 #52）
+- ✅ `0046_kpi_labor_align_payroll.sql` — 適用済（2026-07-14、労務KPI一本化 #53系）
+- ✅ `0047_report_os_sources.sql` — 適用済（2026-07-14、Report OSデータ源 #53）
+- ✅ `0048_demo_sales.sql` — 適用済（2026-07-14、MCP name=demo_sales。AI DEMO SALES dms_*＋シード13件 #54）
 - ✅ `0034_mon_receipts.sql` — 適用済（2026-07-11、MCP name=mon_receipts。mon_receipts＋バケットmon-receipts #41）
 - ✅ `0035_payroll_allowances.sql` — 適用済（2026-07-11、月給制・手当 #44）
 - ✅ `0036_caddy_os.sql` — 適用済（2026-07-11、Caddy OS #45）

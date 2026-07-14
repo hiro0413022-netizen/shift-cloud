@@ -26,6 +26,10 @@ A-5. **営業利益の目標値** — 5大KPIのうち営業利益だけ target 
 
 A-6. **Lesson OS 実機確認**（生徒1件・動画1件のみ＝ほぼ未使用）— スマホで 生徒登録→撮影→描画→進捗→共有リンク(/s/) をLINEで自分に送って確認
 
+A-7. **AI DEMO SALES のenv設定（Vercel: demo-sales）** — 新アプリのデプロイに必要（#54）
+   - Vercelプロジェクト `demo-sales`（Root=apps/demo-sales）に env 3つ: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY（他アプリと同値）＋ NEXT_PUBLIC_SITE_URL（デモURL用・デプロイ後の本番URL）
+   - 権限 `use_demo_sales` を営業担当ロールへ付与（view_hqの古川さんはそのまま入れる）
+
 ## B. 明日の朝に判定すること
 
 B-1. **日次レポートの自動生成** — 停止の主因は cron が middleware で307されていたこと（DECISIONS #52）。修正 `82b3f5d` は本番反映済み。
@@ -53,6 +57,11 @@ C-8. **掃除（軽微）**
    - GolfOrder切替儀式: D1差分同期 → 切替宣言 → 旧Pages `golfwing` 停止 → import関数削除
    - Cloudflareで旧Pagesのカスタムドメイン解除（`yozan-group`／`kallinos`）※`golfwing`は本番稼働中なので触らない
    - Member OS 通しテスト（予約→タブレット受付→/intake自己入力→入会）
+
+C-10. **AI DEMO SALES 後続（#54・正典 docs/modules/demo-sales/SYSTEM.md §6）**
+   - 残り12件の営業先の現サイト分析＋スコア＋デモ生成（サンプル1件=福本クリニックの型を踏襲）
+   - 営業指示（directive）の処理をセッション開始時の定型に組込み / 現サイト自動分析のcron化（#40の1件/日方式）
+   - 成約率KPI画面・dms_plans管理画面（データが貯まってから）
 
 C-9. **Shift Cloud 実運用フィードバック**の収集と改善バックログ化
 

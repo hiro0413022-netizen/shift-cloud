@@ -245,6 +245,19 @@ export const NODES: SystemNode[] = [
     iy: 750,
   },
   {
+    id: "demo-sales",
+    name: "AI DEMO SALES",
+    kind: "app",
+    status: "undeployed",
+    schema: "dms_",
+    description:
+      "クリニック・動物病院向けHP制作の営業デモ高速生成（WEB SALES COMMAND CENTER）。営業先ごとの専用デモ（/d/トークン・noindex）＋提案書・トーク・見積を自動生成。成約でdms_projectsへ移行（0048）。",
+    flow: "demo-sales.svg",
+    aliases: ["demo", "デモ営業", "web sales", "hp営業", "demo-sales"],
+    ix: 900,
+    iy: 900,
+  },
+  {
     id: "corporate",
     name: "YOZANコーポレート",
     kind: "app",
@@ -326,6 +339,9 @@ export const EDGES: SystemEdge[] = [
   { from: "lesson-os", to: "supabase", label: "lsn_", type: "data" },
   { from: "golfwing", to: "supabase", label: "D1→移行中", type: "data" },
   { from: "sales-os", to: "supabase", label: "sales_os（同居）", type: "data" },
+  { from: "demo-sales", to: "supabase", label: "dms_", type: "data" },
+  { from: "ext-web", to: "demo-sales", label: "営業先の現サイト分析", type: "external" },
+  { from: "demo-sales", to: "genesis", label: "営業指示 directive / 正式制作移行", type: "approval" },
 
   { from: "supabase", to: "kernel", label: "実データ", type: "kpi" },
   { from: "shift-cloud", to: "kernel", label: "労務KPI(0008)", type: "kpi" },
