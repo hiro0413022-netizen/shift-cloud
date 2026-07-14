@@ -350,4 +350,23 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
             顧客情報・分析・デモ・要望・見積は dms_projects.handover に引き継ぎ済み。制作タスクはWEB DEVELOPMENT側で開始できます。
           </p>
         ) : (
-          <form action
+          <form action={transferToProject.bind(null, id)} className="flex items-center gap-3">
+            <button className={`${btnCls} bg-(--color-ok)`}>成約 — 正式制作案件を作成</button>
+            <p className="text-xs text-(--color-dim)">顧客情報・現サイト分析・デモ・営業履歴・見積を再入力なしで引き継ぎます。</p>
+          </form>
+        )}
+        {p.status === "lost" && (
+          <form action={upd} className="mt-3 flex items-center gap-2">
+            <select name="lost_reason" defaultValue={p.lost_reason ?? ""} className={inputCls}>
+              <option value="">失注理由を選択…</option>
+              {LOST_REASONS.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+            <button className={btnCls}>保存</button>
+          </form>
+        )}
+      </section>
+    </main>
+  );
+}

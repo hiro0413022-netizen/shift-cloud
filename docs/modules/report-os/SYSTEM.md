@@ -153,4 +153,32 @@ rpt_fittings       (company_id, occurred_on date, member_id, staff, club_type, r
 ```
 
 - **[1]+[2] の実装**: `apps/report-os/build-data.mjs`（雛形あり）。Supabase service_role で読み取り、`ANTHROPIC_API_KEY` でClaude呼び出し。
-- **[3]**: 完成・稼働中。`node generate.js data/<事業所>-<YYYY-M
+- **[3]**: 完成・稼働中。`node generate.js data/<事業所>-<YYYY-MM>.json`
+- **秘密情報**: `ANTHROPIC_API_KEY` は環境変数（Vercel/ローカル .env）。Vaultにシステム登録（vault_systems、キー本体はページ入力。yozan-vault-rule）。
+
+## 6. AI（Claude API）の使い方
+
+- モデル: 文章品質重視のため上位モデル（例 claude-sonnet / opus 系）。月1回・数百トークンなのでコストは軽微。
+- 入力: 当月・前月・前年の全KPI＋前月からの変化＋現場メモ（箇条書き）＋事業所コンテキスト。
+- 出力: `activities[] / problems[] / plans[] / shareInfo[]` のJSON。problems と plans は index対応（問題→解決策）。
+- **AIは下書きまで**。数値の断定・対外配布はしない（AI_RULES.md の権限線引きに準拠）。人の承認を必須にする。
+
+## 7. スケジュール（稼働中）
+
+**scheduled-task `report-os-monthly`（毎月1日 8:00 JST）**が「先月分」を自動生成する。
+処理: `snapshot_member_count` 実行 → `v_rpt_monthly` から13ヶ月分取得 → data JSON 組立 → 文章下書き → `generate.js` で
+`apps/report-os/out/GOLFWING_月次報告_<YYYY-MM>_draft.pptx` を出力 → 古川さんに**承認待ち下書き**として提示。
+
+古川さんは承認/修正するだけ。承認まで確定・配布しない（AI_RULES.md の権限線引き）。
+※スケジュールタスクはDBアクセスにSupabase MCPを使うため `SUPABASE_SERVICE_ROLE` を必要としない。
+CLI/CIから回す場合のみ `build-data.mjs`（service_role必要）を使う。
+
+## 8. 横展開
+
+`generate.js` は事業所非依存（JSON駆動）。事業所ごとに data JSON を作れば同じ資料が出る。
+FRUNK GOLF / KALLINOS は KPI項目が一部異なるため、JSONの `kpi` キーと narrative 見出しを事業所プロファイルで差し替える（将来 `profiles/<business>.json`）。
+
+## 9. 現状のサンプル
+
+`apps/report-os/GOLFWING_月次報告_2026-06_サンプル.pptx`
+会員数229・退会率3.5%・スタッフ7は**実データ**。物販売上・フィッティング・会員推移は4-A/4-B未整備のため代表値。文章はAI下書きの見本。

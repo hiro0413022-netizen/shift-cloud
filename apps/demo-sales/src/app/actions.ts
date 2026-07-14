@@ -354,4 +354,81 @@ export async function addActivity(prospectId: string, fd: FormData) {
     created_by: actor.name,
   });
   const next = s(fd, "next_contact_on");
-  if (next) await admin.from("dms_prospects").update({ next_contact_on: next, last_contact_on: new Date().toIS
+  if (next) await admin.from("dms_prospects").update({ next_contact_on: next, last_contact_on: new Date().toISOString().slice(0, 10) }).eq("id", prospectId);
+  revalidatePath(`/p/${prospectId}`);
+}
+
+// ---- 正式制作へ移行 ----
+
+export async function transferToProject(prospectId: string) {
+  const actor = await requireActor();
+  const admin = createAdmin();
+  const { data: p } = await admin.from("dms_prospects").select("*").eq("id", prospectId).single();
+  if (!p) return;
+  const { data: demos } = await admin
+    .from("dms_demos")
+    .select("id, token, version, brief")
+    .eq("prospect_id", prospectId)
+    .is("deleted_at", null)
+    .order("version", { ascending: false });
+  const { data: docs } = await admin
+    .from("dms_documents")
+    .select("kind, title, content")
+    .eq("prospect_id", prospectId)
+    .is("deleted_at", null);
+  const { data: acts } = await admin
+    .from("dms_activities")
+    .select("kind, content, created_at, created_by")
+    .eq("prospect_id", prospectId)
+    .is("deleted_at", null)
+    .order("created_at");
+
+  await admin.from("dms_projects").upsert(
+    {
+      company_id: actor.companyId,
+      prospect_id: prospectId,
+      plan_key: p.suggested_plan_key ?? "basic",
+      build_price: p.est_build_price,
+      monthly_fee: p.est_monthly_fee,
+      status: "preparing",
+      handover: {
+        customer: { name: p.name, industry: p.industry, city: p.city, address: p.address, phone: p.phone, email: p.email, contact: p.contact_name, website: p.website_url, gmap: p.gmap_url },
+        analysis: p.analysis,
+        good_points: p.good_points,
+        improve_points: p.improve_points,
+        demos,
+        documents: docs,
+        activities: acts,
+        pending_items: ["正式素材（写真・ロゴ・文章）の受領", "ドメイン・サーバーの確認", "公開希望日の確認"],
+      },
+    },
+    { onConflict: "prospect_id" }
+  );
+  await admin.from("dms_prospects").update({ status: "transferred" }).eq("id", prospectId);
+  await admin.from("dms_activities").insert({
+    company_id: actor.companyId,
+    prospect_id: prospectId,
+    kind: "status",
+    content: "成約 → 正式制作案件へ移行（dms_projects）",
+    created_by: actor.name,
+  });
+  revalidatePath(`/p/${prospectId}`);
+  revalidatePath("/");
+}
+
+// ---- 営業指示（自然言語） ----
+
+export async function saveDirective(fd: FormData) {
+  const actor = await requireActor();
+  const content = s(fd, "directive");
+  if (!content) return;
+  const admin = createAdmin();
+  await admin.from("dms_activities").insert({
+    company_id: actor.companyId,
+    prospect_id: null,
+    kind: "directive",
+    content,
+    created_by: actor.name,
+  });
+  revalidatePath("/");
+}

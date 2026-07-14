@@ -164,4 +164,4 @@ select
        and w.visited_on >= mo.ym and w.visited_on < (mo.ym + interval '1 month'))::int      as trials
 from months mo;
 
-comment on view v_rpt_monthly is 'Report OS 月次集計。会員数は正会員ルール(SYSTEM.md §4-A)、体験/フィッティングは一時利用者名簿(mbr_walkin_visits)が正、物販は rpt_retail_
+comment on view v_rpt_monthly is 'Report OS 月次集計。会員数は正会員ルール(SYSTEM.md §4-A)、体験/フィッティングは一時利用者名簿(mbr_walkin_visits)が正、物販は rpt_retail_sales。';

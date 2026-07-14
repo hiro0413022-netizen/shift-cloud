@@ -99,4 +99,35 @@ export const COLOR_PRESETS: { label: string; value: string }[] = [
   { label: "ライトグリーン（動物病院）", value: "#4ca771" },
   { label: "オレンジ（あたたかい）", value: "#d97b3a" },
   { label: "ピンク（美容・小児）", value: "#d4658a" },
-  { label: "パープル
+  { label: "パープル（美容・上質）", value: "#6b5bd2" },
+  { label: "ブラウン（落ち着き）", value: "#8a6a4a" },
+  { label: "グレー（モダン・シンプル）", value: "#4b5563" },
+];
+
+// 分析（=dms_prospects.analysis）。各項目 1-5（5が良い）＋所見
+export const ANALYSIS_ITEMS = {
+  mobile: "スマートフォン対応",
+  design: "デザインの新しさ",
+  updated: "更新状況（最終更新・お知らせ）",
+  hours: "診療時間の見やすさ",
+  cta: "予約・電話導線",
+  first_visit: "初診患者向け案内",
+  staff: "院長・スタッフ紹介",
+  access: "アクセス・駐車場情報",
+  speed: "ページ表示速度",
+  ssl: "SSL対応",
+  recruit: "採用情報",
+  gmap: "Googleマップとの整合性",
+  trust: "サイト全体の安心感",
+  photos: "写真の品質",
+  volume: "競合と比較した情報量",
+} as const;
+export type AnalysisItemKey = keyof typeof ANALYSIS_ITEMS;
+
+export interface Analysis {
+  items?: Partial<Record<AnalysisItemKey, { score?: number; note?: string }>>;
+  summary?: string; // 総評
+  effect?: string; // HP改善による効果の見込み
+  scale?: string; // 事業規模の所感
+  budget?: string; // 予算確保の可能性
+}

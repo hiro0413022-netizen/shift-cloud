@@ -194,4 +194,6 @@ begin
     (v_cid, 'ささき犬猫病院',       'vet',    'https://share.google/DLIpeaonIwWFPB33w', 'https://maps.app.goo.gl/H47RSazFHXfRDmcp6', 'unanalyzed'),
     (v_cid, 'はる動物病院',         'vet',    'https://share.google/hXKeJwmVCM93RkFnV', 'https://maps.app.goo.gl/thsxzeRvG8tRkDJFA', 'unanalyzed'),
     (v_cid, 'アニー動物クリニック', 'vet',    'https://share.google/OPhrKBxVSpWBIwhbI', 'https://maps.app.goo.gl/UJLqmw8TbBxxz9447', 'unanalyzed'),
-    (v_cid, 'はんぞう動物病院',     'vet',    'https://share.google/L2UTIqCodk2pP24zG', 'https://maps.app.g
+    (v_cid, 'はんぞう動物病院',     'vet',    'https://share.google/L2UTIqCodk2pP24zG', 'https://maps.app.goo.gl/skuWYiwdSY4UUWyD7', 'unanalyzed');
+  end if;
+end $$;
