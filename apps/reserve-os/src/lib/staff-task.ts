@@ -46,7 +46,10 @@ export async function createStaffTask(r: RequestRow, siteUrl: string): Promise<{
   const howto = onLine
     ? "日程を確認し、Reserve OSで「確定」してください。確定内容はLINEで自動送信されます。"
     : "日程を確認のうえ、GOLF WINGのメールアドレスからお客様へご返信ください。";
-  const note = `${prefs}\n${contact}\n${howto}\n` + (siteUrl ? `詳細: ${siteUrl}/requests/${r.id}` : "");
+  const menu = r.plan_name
+    ? `メニュー: ${String(r.plan_name)}${r.plan_price ? `（¥${Number(r.plan_price).toLocaleString("ja-JP")}）` : ""}\n`
+    : "";
+  const note = `${menu}${prefs}\n${contact}\n${howto}\n` + (siteUrl ? `詳細: ${siteUrl}/requests/${r.id}` : "");
 
   const { error } = await admin.from("sp_tasks").insert({
     company_id: r.company_id as string,

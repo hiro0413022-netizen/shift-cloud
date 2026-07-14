@@ -84,6 +84,7 @@ export function preferredList(r: {
 
 /** ヒアリング項目のラベル（詳細表示・メール・CSVで共用） */
 export const INTAKE_FIELDS: { key: string; label: string }[] = [
+  { key: "plan_name", label: "ご希望メニュー" },
   { key: "name", label: "氏名" },
   { key: "name_kana", label: "ふりがな" },
   { key: "phone", label: "電話番号" },

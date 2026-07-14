@@ -34,7 +34,25 @@ function L({ label, required, opt, children }: { label: string; required?: boole
   );
 }
 
-export function ReserveForm({ slug, minDateTime, liffId }: { slug: string; minDateTime: string; liffId?: string }) {
+export type PlanOption = {
+  id: string;
+  name: string;
+  summary: string | null;
+  durationMin: number | null;
+  price: number;
+};
+
+export function ReserveForm({
+  slug,
+  minDateTime,
+  liffId,
+  plans,
+}: {
+  slug: string;
+  minDateTime: string;
+  liffId?: string;
+  plans: PlanOption[];
+}) {
   const [state, action, pending] = useActionState<SubmitState, FormData>(submitRequest, {});
   // 公式LINEから開かれた場合のみ userId が取れる（DECISIONS #56）。取れたらメールは任意にする。
   const { profile } = useLiff(liffId);
@@ -55,6 +73,38 @@ export function ReserveForm({ slug, minDateTime, liffId }: { slug: string; minDa
           LINEと連携済みです。受付確認・確定のご連絡は<b>このLINEのトーク</b>にお送りします。
         </p>
       )}
+
+      {/* ご希望メニュー（DECISIONS #57）— 料金はプラン側が正 */}
+      <Group title="ご希望メニュー" desc="ご希望のメニューをお選びください。">
+        <div className="space-y-2">
+          {plans.map((p, i) => (
+            <label
+              key={p.id}
+              className="flex cursor-pointer items-start gap-3 rounded-xl border border-(--color-line) bg-white px-4 py-3.5 text-sm has-[:checked]:border-(--color-accent) has-[:checked]:bg-(--color-accent)/8"
+            >
+              <input
+                type="radio"
+                name="plan_id"
+                value={p.id}
+                required
+                defaultChecked={i === 0}
+                className="mt-1 shrink-0 accent-(--color-accent)"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-semibold">{p.name}</span>
+                  <span className="font-bold text-(--color-accent)">¥{p.price.toLocaleString("ja-JP")}</span>
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-(--color-dim)">
+                  {p.durationMin ? `${p.durationMin}分` : ""}
+                  {p.durationMin && p.summary ? " ・ " : ""}
+                  {p.summary ?? ""}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </Group>
 
       <Group title="お客様情報">
         <L label="お名前" required>

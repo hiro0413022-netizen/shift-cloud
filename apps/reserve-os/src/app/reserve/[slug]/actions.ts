@@ -31,6 +31,19 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
     .maybeSingle();
   if (!service || !service.active) return { error: "現在このメニューはご予約を受け付けていません。" };
 
+  // ご希望メニュー（DECISIONS #57）。料金・所要時間はプランが正。
+  // 金額は改ざん防止のためフォームからは受け取らず、必ずDBから引き直す。
+  const planId = str(formData.get("plan_id"));
+  if (!planId) return { error: "ご希望のメニューをお選びください。" };
+  const { data: plan } = await admin
+    .from("res_plans")
+    .select("id, name, price, active")
+    .eq("id", planId)
+    .eq("service_id", service.id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!plan || !plan.active) return { error: "選択されたメニューは現在ご予約を受け付けていません。" };
+
   // 必須項目
   const name = str(formData.get("name"));
   const nameKana = str(formData.get("name_kana"));
@@ -69,7 +82,11 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
       store_id: service.store_id,
       service_id: service.id,
       service_category: service.category,
-      service_name: service.name,
+      // service_name にはメニュー名を入れる（LINE本文・やることリスト・CSVが「どのメニューか」で読めるように）
+      service_name: plan.name,
+      plan_id: plan.id,
+      plan_name: plan.name,
+      plan_price: plan.price,
       name,
       name_kana: nameKana,
       phone,
