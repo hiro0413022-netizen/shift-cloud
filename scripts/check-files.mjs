@@ -37,8 +37,11 @@ for (const f of files) {
     bad.push({ f, lastLine: lastLine.slice(-60) });
     continue;
   }
-  // 壊れたUTF-8（切断で生じる置換文字）
-  if (text.includes("�")) bad.push({ f, lastLine: "不正なUTF-8（U+FFFD）を含む" });
+  // 壊れたUTF-8（切断で生じる置換文字）。
+  // ただし "…includes(\"�\")" のように文字列リテラルとして意図的に置換文字を書いている箇所は除く
+  // （例: apps/*/src/lib/libkey.ts の復号化け判定）
+  const withoutLiterals = text.replace(/(["'`])�\1/g, "");
+  if (withoutLiterals.includes("�")) bad.push({ f, lastLine: "不正なUTF-8（U+FFFD）を含む" });
 }
 
 if (bad.length === 0) {
