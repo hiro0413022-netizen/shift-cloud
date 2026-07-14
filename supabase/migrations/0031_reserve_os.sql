@@ -1,3 +1,0 @@
--- 0031_reserve_os.sql — 【廃止・SUPERSEDED】
--- このファイルは 0032_reserve_os.sql にリネームされました（DECISIONS #33 が 0031 を Survey seed 用に予約済みのため衝突回避）。
--- 実体は supabase/migrations/0032_reserve_os.sql を参照。ここでは何も実行しない。
