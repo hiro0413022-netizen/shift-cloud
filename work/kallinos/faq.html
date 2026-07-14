@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ | KALLINOS</title>
+  <meta name="description" content="KALLINOSのよくあるご質問。商品・注文・配送・返品など、お客様からよくいただくご質問にお答えします。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .faq-layout {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: var(--spacing-lg);
+      padding: var(--spacing-lg) 0 var(--spacing-xl);
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .faq-layout { grid-template-columns: 1fr; }
+    }
+
+    .faq-sidebar {
+      position: sticky;
+      top: calc(var(--header-height) + 1rem);
+    }
+
+    @media (max-width: 900px) {
+      .faq-sidebar { position: static; }
+    }
+
+    .faq-nav {
+      border-top: var(--border-thin);
+    }
+
+    .faq-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem 0;
+      border-bottom: var(--border-thin);
+      font-family: var(--font-secondary);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: var(--color-grey-3);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      background: none;
+      text-align: left;
+      width: 100%;
+    }
+
+    .faq-nav-item:hover,
+    .faq-nav-item.active {
+      color: var(--color-black);
+    }
+
+    .faq-nav-item i {
+      font-size: 0.85rem;
+      width: 1.2rem;
+      text-align: center;
+      color: var(--color-gold);
+    }
+
+    /* FAQ Sections */
+    .faq-section {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .faq-section-title {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-family: var(--font-secondary);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--color-grey-3);
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: var(--border-thin);
+    }
+
+    .faq-section-title i {
+      color: var(--color-gold);
+    }
+
+    .faq-item {
+      border-bottom: var(--border-thin);
+    }
+
+    .faq-question {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.25rem 0;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--color-black);
+      cursor: pointer;
+      background: none;
+      border: none;
+      text-align: left;
+      line-height: 1.5;
+      transition: var(--transition-fast);
+    }
+
+    .faq-question:hover {
+      color: var(--color-grey-2);
+    }
+
+    .faq-q-icon {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .faq-q-letter {
+      font-family: var(--font-secondary);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--color-gold);
+    }
+
+    .faq-chevron {
+      font-size: 0.7rem;
+      color: var(--color-grey-4);
+      transition: transform 0.3s ease;
+    }
+
+    .faq-item.active .faq-chevron {
+      transform: rotate(180deg);
+    }
+
+    .faq-answer-wrap {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s ease;
+    }
+
+    .faq-item.active .faq-answer-wrap {
+      max-height: 600px;
+    }
+
+    .faq-answer {
+      padding-bottom: 1.25rem;
+      font-size: 0.87rem;
+      color: var(--color-grey-2);
+      line-height: 1.9;
+    }
+
+    .faq-answer a {
+      color: var(--color-gold);
+      text-decoration: underline;
+    }
+
+    .faq-answer strong {
+      color: var(--color-black);
+    }
+
+    .faq-answer ul {
+      list-style: disc;
+      padding-left: 1.5rem;
+      margin: 0.5rem 0;
+    }
+
+    .faq-answer ul li {
+      margin-bottom: 0.3rem;
+    }
+
+    /* Contact CTA */
+    .faq-contact-cta {
+      background: var(--color-beige);
+      padding: var(--spacing-lg);
+      text-align: center;
+      margin-top: var(--spacing-lg);
+    }
+
+    .faq-contact-cta p {
+      font-size: 0.88rem;
+      color: var(--color-grey-3);
+      line-height: 1.8;
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="header-mount"></div>
+
+  <main>
+    <section class="page-header">
+      <div class="container">
+        <span class="page-header-label">Support</span>
+        <h1 class="page-header-title">よくあるご質問</h1>
+        <p class="page-header-desc">お客様からよくいただくご質問をまとめています。ご不明な点はお気軽にお問い合わせください。</p>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="faq-layout">
+        <!-- Sidebar nav -->
+        <aside class="faq-sidebar desktop-only">
+          <div class="faq-nav">
+            <button class="faq-nav-item active" onclick="scrollToSection('order')">
+              <i class="fas fa-shopping-bag"></i> ご注文について
+            </button>
+            <button class="faq-nav-item" onclick="scrollToSection('shipping')">
+              <i class="fas fa-truck"></i> 配送について
+            </button>
+            <button class="faq-nav-item" onclick="scrollToSection('returns')">
+              <i class="fas fa-undo-alt"></i> 返品・交換について
+            </button>
+            <button class="faq-nav-item" onclick="scrollToSection('product')">
+              <i class="fas fa-tshirt"></i> 商品について
+            </button>
+            <button class="faq-nav-item" onclick="scrollToSection('payment')">
+              <i class="fas fa-credit-card"></i> お支払いについて
+            </button>
+            <button class="faq-nav-item" onclick="scrollToSection('account')">
+              <i class="fas fa-user"></i> アカウントについて
+            </button>
+          </div>
+          <div style="margin-top:2rem">
+            <a href="contact.html" class="btn btn-secondary btn-full">お問い合わせはこちら</a>
+          </div>
+        </aside>
+
+        <!-- FAQ Content -->
+        <div>
+          <!-- 注文 -->
+          <section class="faq-section" id="order">
+            <div class="faq-section-title">
+              <i class="fas fa-shopping-bag"></i> ご注文について
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>注文の確認はどこでできますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  ご注文後、登録メールアドレスに注文確認メールをお送りします。また、会員登録をされているお客様は、マイアカウントの「注文履歴」からいつでもご確認いただけます。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>注文後のキャンセルはできますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  発送処理前であればキャンセルが可能な場合があります。ご注文確定後はお早めに<a href="contact.html">お問い合わせフォーム</a>よりご連絡ください。ただし、発送手配が完了した後はキャンセルをお受けできませんのでご了承ください。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>クーポンコードはどこで入力できますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  カートページまたは決済ページに「クーポンコードを入力」という欄があります。そちらにコードを入力し「適用」ボタンをクリックしてください。割引が自動的に反映されます。<br><br>
+                  ※ 1回のご注文につき1枚のクーポンのみご利用いただけます。セール品との併用はできない場合があります。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>在庫がない商品はいつ再入荷しますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  再入荷の予定は商品ページに記載する場合があります。再入荷情報はメールマガジンやInstagramで優先的にご案内していますので、ぜひご登録ください。また、<a href="contact.html">お問い合わせフォーム</a>から再入荷希望のご連絡もお受けしています。
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 配送 -->
+          <section class="faq-section" id="shipping">
+            <div class="faq-section-title">
+              <i class="fas fa-truck"></i> 配送について
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>送料はいくらですか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  全国一律 <strong>¥880（税込）</strong> です。<strong>¥20,000以上のご購入で送料が無料</strong>になります。<br><br>
+                  配送業者はヤマト運輸を使用しており、追跡番号をお知らせします。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>発送までどのくらい時間がかかりますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  ご注文確定後、<strong>通常2〜4営業日以内</strong>に発送いたします。年末年始・大型連休など繁忙期は多少お時間をいただく場合があります。<br><br>
+                  発送完了後、追跡番号を記載したメールをお送りします。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>海外への発送はできますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  現在、日本国内のみの配送となっております。海外発送については今後対応を検討しております。ご希望がございましたら<a href="contact.html">お問い合わせ</a>ください。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>ギフト包装はできますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  はい、ギフト包装に対応しております（有料・<strong>¥550税込</strong>）。カートページにてギフト包装オプションをお選びください。のし・メッセージカードもご用意しています。
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 返品・交換 -->
+          <section class="faq-section" id="returns">
+            <div class="faq-section-title">
+              <i class="fas fa-undo-alt"></i> 返品・交換について
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>返品・交換はできますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  商品到着後<strong>14日以内</strong>、<strong>未使用・タグ付きの状態</strong>であれば返品・交換が可能です。以下の場合はお受けできませんのでご了承ください。
+                  <ul>
+                    <li>14日を超えた場合</li>
+                    <li>一度でも着用された商品</li>
+                    <li>タグが外された商品</li>
+                    <li>洗濯・クリーニングがされた商品</li>
+                    <li>セール品・限定品（原則不可）</li>
+                    <li>お客様の不注意による汚損・破損</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>サイズが合わなかった場合は交換できますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  はい、商品到着後14日以内・未使用・タグ付きの状態であれば、サイズ交換が可能です。ただし、交換先サイズの在庫がない場合は返金対応となります。<br><br>
+                  返送料はお客様のご負担となります（商品の初期不良・誤発送の場合を除く）。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>返品・交換の手続き方法を教えてください。</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  <strong>Step 1.</strong> <a href="contact.html">お問い合わせフォーム</a>から「返品・交換希望」の旨と注文番号をご連絡ください。<br>
+                  <strong>Step 2.</strong> 弊社より返品・交換手続きのご案内メールをお送りします（通常1〜2営業日）。<br>
+                  <strong>Step 3.</strong> 指定の送り先に商品をお送りください。<br>
+                  <strong>Step 4.</strong> 商品到着確認後、交換品の発送または返金処理を行います（3〜7営業日）。
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 商品 -->
+          <section class="faq-section" id="product">
+            <div class="faq-section-title">
+              <i class="fas fa-tshirt"></i> 商品について
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>商品の素材・洗濯方法を教えてください。</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  各商品ページに素材と洗濯方法を記載しています。また、商品のタグにも洗濯絵表示がございます。基本的にネット使用での洗濯機洗い・または手洗いが可能ですが、乾燥機の使用は避けてください。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>商品の色はモニターと実際では違いますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  ご使用のモニターや端末の設定によって、実際の商品色と若干異なって見える場合があります。できる限り実際の色に近い形で撮影・掲載していますが、完全な一致は保証できませんのでご了承ください。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>サイズ選びで迷っています。どうすればいいですか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  <a href="size-guide.html">サイズガイドページ</a>に詳しい採寸表と体型対照表をご用意しています。また、お気軽に<a href="contact.html">お問い合わせ</a>いただければ、専門スタッフがアドバイスいたします。
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- お支払い -->
+          <section class="faq-section" id="payment">
+            <div class="faq-section-title">
+              <i class="fas fa-credit-card"></i> お支払いについて
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>使用できる支払い方法を教えてください。</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  以下のお支払い方法に対応しています。
+                  <ul>
+                    <li>クレジットカード（VISA・Mastercard・JCB・American Express・Diners Club）</li>
+                    <li>PayPay</li>
+                    <li>Apple Pay / Google Pay</li>
+                    <li>コンビニ払い（ローソン・ファミリーマート・セブン-イレブン）</li>
+                    <li>銀行振込</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>分割払い・ボーナス払いはできますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  クレジットカードの分割払い・リボ払いは、各カード会社のサービスに準じてご利用いただけます。詳細はご利用のクレジットカード会社にお問い合わせください。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>領収書は発行できますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  はい、領収書の発行が可能です。<a href="contact.html">お問い合わせフォーム</a>に注文番号・宛名・但し書きをご記入の上ご連絡ください。メールにてPDF形式でお送りします。
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- アカウント -->
+          <section class="faq-section" id="account">
+            <div class="faq-section-title">
+              <i class="fas fa-user"></i> アカウントについて
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>会員登録のメリットは何ですか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  会員登録をいただくと以下の特典がございます。
+                  <ul>
+                    <li>初回ご購入時に使える<strong>¥3,000クーポン</strong>をプレゼント</li>
+                    <li>注文履歴の管理</li>
+                    <li>お気に入りリストの保存</li>
+                    <li>会員限定セールへの参加</li>
+                    <li>新作・再入荷情報の優先案内</li>
+                    <li>お届け先住所の保存</li>
+                  </ul>
+                  <a href="auth.html" style="display:inline-block; margin-top:0.5rem">→ 無料で会員登録する</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>パスワードを忘れました。</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  ログインページの「パスワードをお忘れですか？」リンクより、登録メールアドレスを入力してください。パスワード再設定用のメールをお送りします。メールが届かない場合は迷惑メールフォルダもご確認ください。
+                </div>
+              </div>
+            </div>
+
+            <div class="faq-item">
+              <button class="faq-question" onclick="toggleFaq(this)">
+                <span><span class="faq-q-letter">Q. </span>退会・アカウント削除はできますか？</span>
+                <div class="faq-q-icon"><i class="fas fa-chevron-down faq-chevron"></i></div>
+              </button>
+              <div class="faq-answer-wrap">
+                <div class="faq-answer">
+                  アカウントの削除をご希望の場合は、<a href="contact.html">お問い合わせフォーム</a>よりご連絡ください。退会後は注文履歴・個人情報が削除されます（法令に基づき保持が必要な情報を除く）。
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Contact CTA -->
+          <div class="faq-contact-cta">
+            <i class="fas fa-headset" style="font-size:2rem; color:var(--color-gold); display:block; margin-bottom:1rem"></i>
+            <h3 class="heading-sm" style="color:var(--color-black); margin-bottom:0.75rem">解決しない場合はお問い合わせください</h3>
+            <p>お答えできなかった内容については、専門スタッフが丁寧に対応いたします。<br>お問い合わせから1〜2営業日以内にご返答します。</p>
+            <a href="contact.html" class="btn btn-primary">お問い合わせはこちら</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="footer-mount"></div>
+
+  <script src="js/components.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      injectComponents('faq.html');
+    });
+
+    function toggleFaq(btn) {
+      const item = btn.closest('.faq-item');
+      const isActive = item.classList.contains('active');
+      document.querySelectorAll('.faq-item.active').forEach(i => i.classList.remove('active'));
+      if (!isActive) item.classList.add('active');
+    }
+
+    function scrollToSection(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        const top = el.getBoundingClientRect().top + window.scrollY - 100;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+      document.querySelectorAll('.faq-nav-item').forEach(n => n.classList.remove('active'));
+      event.currentTarget.classList.add('active');
+    }
+
+    window.toggleFaq = toggleFaq;
+    window.scrollToSection = scrollToSection;
+  </script>
+</body>
+</html>
