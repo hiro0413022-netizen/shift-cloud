@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { submitRequest, type SubmitState } from "./actions";
 import { useLiff } from "@/lib/use-liff";
+import { bookableTimes, type BookingHours } from "@/lib/reserve";
 
 function Req() {
   return <span className="ml-1 align-middle text-xs font-bold text-(--color-danger)">必須</span>;
@@ -44,19 +45,27 @@ export type PlanOption = {
 
 export function ReserveForm({
   slug,
-  minDateTime,
   liffId,
   plans,
+  hours,
+  dates,
 }: {
   slug: string;
-  minDateTime: string;
   liffId?: string;
   plans: PlanOption[];
+  hours: BookingHours;
+  dates: { value: string; label: string }[];
 }) {
   const [state, action, pending] = useActionState<SubmitState, FormData>(submitRequest, {});
   // 公式LINEから開かれた場合のみ userId が取れる（DECISIONS #56）。取れたらメールは任意にする。
   const { profile } = useLiff(liffId);
   const onLine = !!profile;
+
+  // 選択中のメニューの所要時間で、選べる開始時刻が変わる（DECISIONS #58）
+  // 例: 110分メニューなら 18:00 に終わるよう 16:00 が最終開始
+  const [planId, setPlanId] = useState(plans[0]?.id ?? "");
+  const selected = plans.find((p) => p.id === planId) ?? plans[0];
+  const times = bookableTimes(hours, selected?.durationMin ?? null);
 
   return (
     <form action={action} className="space-y-5">
@@ -87,7 +96,8 @@ export function ReserveForm({
                 name="plan_id"
                 value={p.id}
                 required
-                defaultChecked={i === 0}
+                checked={planId === p.id}
+                onChange={() => setPlanId(p.id)}
                 className="mt-1 shrink-0 accent-(--color-accent)"
               />
               <span className="min-w-0 flex-1">
@@ -149,13 +159,39 @@ export function ReserveForm({
 
       <Group
         title="ご希望日時（第3希望まで）"
-        desc="ご予約はスタッフが空き状況を確認のうえ、後ほど確定のご連絡を差し上げます。ご希望を第3希望までお選びください（3つとも必須）。"
+        desc={`ご予約はスタッフが空き状況を確認のうえ、後ほど確定のご連絡を差し上げます。ご希望を第3希望までお選びください（3つとも必須）。営業時間 ${hours.openTime}〜${hours.closeTime}／火曜定休。`}
       >
         {[1, 2, 3].map((n) => (
           <L key={n} label={`第${n}希望`} required>
-            <input name={`pref${n}_at`} type="datetime-local" required min={minDateTime} className="field" />
+            <div className="grid grid-cols-2 gap-2">
+              <select name={`pref${n}_date`} required defaultValue="" className="field">
+                <option value="" disabled>
+                  日付を選ぶ
+                </option>
+                {dates.map((d) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+              <select name={`pref${n}_time`} required defaultValue="" className="field">
+                <option value="" disabled>
+                  時間を選ぶ
+                </option>
+                {times.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
           </L>
         ))}
+        {selected?.durationMin ? (
+          <p className="text-xs leading-relaxed text-(--color-dim)">
+            ※ {selected.name}（{selected.durationMin}分）のため、開始時刻は {times[0]}〜{times[times.length - 1]} からお選びいただけます。
+          </p>
+        ) : null}
       </Group>
 
       <Group title="ゴルフについて" desc="当日のフィッティング精度を高めるため、分かる範囲でお聞かせください。">

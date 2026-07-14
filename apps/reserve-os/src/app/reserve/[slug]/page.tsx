@@ -1,17 +1,10 @@
 import { notFound } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { ReserveForm } from "./reserve-form";
+import { bookableDates, hoursText, type BookingHours } from "@/lib/reserve";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
-
-/** 今日(JST)の日付を datetime-local の min 用文字列にする（YYYY-MM-DDT09:00） */
-function jstMinDateTime(): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(new Date());
-  return `${parts}T09:00`;
-}
 
 function Brand() {
   return (
@@ -105,7 +98,17 @@ export default async function ReservePage({
     );
   }
 
-  const minDT = jstMinDateTime();
+  // 受付可能な曜日・時間帯（DECISIONS #58）。ルールはDBが正。
+  const hours: BookingHours = {
+    closedWeekdays: ((service.closed_weekdays ?? [2]) as number[]).map(Number),
+    openTime: String(service.open_time ?? "11:00").slice(0, 5),
+    closeTime: String(service.close_time ?? "18:00").slice(0, 5),
+    slotStepMin: Number(service.slot_step_min ?? 30),
+    windowDays: Number(service.booking_window_days ?? 60),
+    minLeadDays: Number(service.min_lead_days ?? 1),
+  };
+  const dates = bookableDates(hours);
+
   // 所要時間はメニューごとに違うので「55分 / 110分」のように併記する
   const durations = Array.from(new Set(plans.map((p) => Number(p.duration_min)).filter((n) => Number.isFinite(n))));
   const durationText = durations.length ? durations.map((d) => `${d}分`).join(" / ") : null;
@@ -210,8 +213,9 @@ export default async function ReservePage({
         {/* LIFF ID があれば公式LINEから開いたときに userId を拾う（DECISIONS #56） */}
         <ReserveForm
           slug={slug}
-          minDateTime={minDT}
           liffId={process.env.NEXT_PUBLIC_LIFF_ID}
+          hours={hours}
+          dates={dates}
           plans={plans.map((p) => ({
             id: String(p.id),
             name: String(p.name),
@@ -228,6 +232,7 @@ export default async function ReservePage({
           <dl className="space-y-4 text-sm">
             {[
               ["ご予約について", "本フォームはお申し込みです。スタッフが空き状況を確認し、確定のご連絡をもってご予約成立となります。"],
+              ["受付時間", `${hoursText(hours)}。定休日・営業時間外はお選びいただけません。`],
               ["キャンセルについて", "ご都合が悪くなった場合は、確定のご連絡メールへの返信、またはお電話でお早めにご連絡ください。"],
               ["持ち物", "普段お使いのクラブ（あれば）、ゴルフグローブ、動きやすい服装。手ぶらでもご参加いただけます。"],
               ["お支払い方法", "現金・各種クレジットカードがご利用いただけます。詳細は当日ご案内します。"],

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
-import { jstLocalToISO } from "@/lib/reserve";
+import { jstLocalToISO, isBookable, type BookingHours } from "@/lib/reserve";
 import { notifyStaffNewRequest, ackCustomer, notifyLine, siteUrl } from "@/lib/mail";
 import { createStaffTask } from "@/lib/staff-task";
 
@@ -25,7 +25,7 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
   const admin = createAdmin();
   const { data: service } = await admin
     .from("res_services")
-    .select("id, company_id, store_id, name, category, active")
+    .select("id, company_id, store_id, name, category, active, closed_weekdays, open_time, close_time, slot_step_min, booking_window_days, min_lead_days")
     .eq("slug", slug)
     .is("deleted_at", null)
     .maybeSingle();
@@ -37,12 +37,32 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
   if (!planId) return { error: "ご希望のメニューをお選びください。" };
   const { data: plan } = await admin
     .from("res_plans")
-    .select("id, name, price, active")
+    .select("id, name, price, duration_min, active")
     .eq("id", planId)
     .eq("service_id", service.id)
     .is("deleted_at", null)
     .maybeSingle();
   if (!plan || !plan.active) return { error: "選択されたメニューは現在ご予約を受け付けていません。" };
+
+  // 受付可能な曜日・時間帯（DECISIONS #58）。フォームを迂回した送信もここで弾く。
+  const hours: BookingHours = {
+    closedWeekdays: ((service.closed_weekdays ?? [2]) as number[]).map(Number),
+    openTime: String(service.open_time ?? "11:00").slice(0, 5),
+    closeTime: String(service.close_time ?? "18:00").slice(0, 5),
+    slotStepMin: Number(service.slot_step_min ?? 30),
+    windowDays: Number(service.booking_window_days ?? 60),
+    minLeadDays: Number(service.min_lead_days ?? 1),
+  };
+  const duration = plan.duration_min != null ? Number(plan.duration_min) : null;
+
+  /** 日付select + 時刻select → ISO。定休日・営業時間外はnullを返す */
+  function pickPref(n: number): string | null {
+    const ymd = str(formData.get(`pref${n}_date`));
+    const hm = str(formData.get(`pref${n}_time`));
+    if (!ymd || !hm) return null;
+    if (!isBookable(hours, ymd, hm, duration)) return null;
+    return jstLocalToISO(`${ymd}T${hm}`);
+  }
 
   // 必須項目
   const name = str(formData.get("name"));
@@ -52,9 +72,9 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
   const handedness = str(formData.get("handedness"));
   const age = str(formData.get("age"));
   const avgScore = str(formData.get("avg_score"));
-  const pref1 = jstLocalToISO(str(formData.get("pref1_at")));
-  const pref2 = jstLocalToISO(str(formData.get("pref2_at")));
-  const pref3 = jstLocalToISO(str(formData.get("pref3_at")));
+  const pref1 = pickPref(1);
+  const pref2 = pickPref(2);
+  const pref3 = pickPref(3);
   const consent = str(formData.get("consent"));
 
   // LINE（LIFF）から開かれた場合は userId が付く。連絡はLINEで完結するのでメールは任意（DECISIONS #56）
@@ -66,7 +86,9 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
   if (!phone) return { error: "電話番号を入力してください。" };
   if (!email && !lineUserId) return { error: "メールアドレスを入力してください。" };
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "メールアドレスの形式をご確認ください。" };
-  if (!pref1 || !pref2 || !pref3) return { error: "ご希望日時を第3希望まで（3つ）ご入力ください。" };
+  if (!pref1 || !pref2 || !pref3) {
+    return { error: `ご希望日時を第3希望まで（3つ）お選びください。営業時間 ${hours.openTime}〜${hours.closeTime}／火曜定休の範囲でご指定ください。` };
+  }
   if (new Set([pref1, pref2, pref3]).size < 3) return { error: "第1〜第3希望は異なる日時をご指定ください。" };
   if (!handedness) return { error: "利き手をお選びください。" };
   if (!age) return { error: "年齢をご入力ください。" };

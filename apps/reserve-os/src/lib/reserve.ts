@@ -82,6 +82,80 @@ export function preferredList(r: {
     .map((v) => fmtJst(v));
 }
 
+/* ============================================================
+   受付可能な曜日・時間帯（DECISIONS #58）
+   ルールはDB(res_services)が正。ここは「選択肢を作る」「検証する」だけの純関数。
+   クライアント（選択肢生成）とサーバー（改ざん検証）の両方から使う。
+   ============================================================ */
+
+export type BookingHours = {
+  closedWeekdays: number[];   // 0=日 1=月 2=火 …
+  openTime: string;           // "11:00"
+  closeTime: string;          // "18:00"
+  slotStepMin: number;        // 30
+  windowDays: number;         // 60
+  minLeadDays: number;        // 1 = 翌日以降
+};
+
+const DOW = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** "HH:MM" or "HH:MM:SS" → 分 */
+function toMin(hhmm: string): number {
+  const [h, m] = hhmm.split(":");
+  return parseInt(h, 10) * 60 + parseInt(m ?? "0", 10);
+}
+function fromMin(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** 今日(JST)の YYYY-MM-DD */
+export function todayJST(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: JST, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+/** 選択できる日付の一覧（定休日を除外・minLeadDays後から windowDays 先まで） */
+export function bookableDates(h: BookingHours, from: string = todayJST()): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = [];
+  const base = new Date(`${from}T00:00:00+09:00`);
+  for (let i = h.minLeadDays; i <= h.windowDays; i++) {
+    const d = new Date(base.getTime() + i * 86400000);
+    // 日付の判定は必ずJSTで行う（UTCのgetDay()だと日付境界がずれる）
+    const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: JST, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+    const dow = new Date(`${ymd}T00:00:00+09:00`).getUTCDay(); // +09:00指定なのでUTC曜日=JST曜日
+    if (h.closedWeekdays.includes(dow)) continue;
+    const [, mm, dd] = ymd.split("-");
+    out.push({ value: ymd, label: `${Number(mm)}月${Number(dd)}日(${DOW[dow]})` });
+  }
+  return out;
+}
+
+/** 選択できる開始時刻（所要時間ぶん営業時間内に収まるものだけ） */
+export function bookableTimes(h: BookingHours, durationMin: number | null): string[] {
+  const start = toMin(h.openTime);
+  const end = toMin(h.closeTime);
+  const last = end - (durationMin && durationMin > 0 ? durationMin : 0);
+  const out: string[] = [];
+  for (let t = start; t <= last; t += h.slotStepMin) out.push(fromMin(t));
+  return out;
+}
+
+/** サーバー側の検証（フォームを迂回した送信を弾く） */
+export function isBookable(h: BookingHours, ymd: string, hm: string, durationMin: number | null): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^\d{2}:\d{2}$/.test(hm)) return false;
+  const dow = new Date(`${ymd}T00:00:00+09:00`).getUTCDay();
+  if (h.closedWeekdays.includes(dow)) return false;
+  if (!bookableDates(h).some((d) => d.value === ymd)) return false;
+  return bookableTimes(h, durationMin).includes(hm);
+}
+
+/** 営業時間の人が読む表記（注意事項・FAQ用） */
+export function hoursText(h: BookingHours): string {
+  const closed = h.closedWeekdays.map((d) => `${DOW[d]}曜`).join("・");
+  return `${h.openTime}〜${h.closeTime}${closed ? `（${closed}定休）` : ""}`;
+}
+
 /** ヒアリング項目のラベル（詳細表示・メール・CSVで共用） */
 export const INTAKE_FIELDS: { key: string; label: string }[] = [
   { key: "plan_name", label: "ご希望メニュー" },
