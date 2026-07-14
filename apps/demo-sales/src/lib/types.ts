@@ -84,7 +84,25 @@ export interface DemoBrief {
   news?: { date: string; text: string }[];
   recruit?: string; // 採用メッセージ（空なら入口のみ）
   instructions?: string[]; // 修正指示の履歴（面談中の要望等）
+  // 写真（demo-assets バケットの公開URL。院提供の写真・フリー素材のみ。既存サイトからの無断転載はしない）
+  heroImage?: string; // ヘッダー/ヒーロー背景
+  directorImage?: string; // 院長・スタッフ写真
+  gallery?: { url: string; caption?: string }[]; // 院内・診察風景（最大6枚）
 }
+
+// 基調色プリセット（管理画面のカラーピッカー横に並べる。HEXを覚えなくてよくする）
+export const COLOR_PRESETS: { label: string; value: string }[] = [
+  { label: "ブルー（清潔・内科系）", value: "#1d6fb8" },
+  { label: "ネイビー（信頼・重厚）", value: "#24446b" },
+  { label: "ティール（歯科・小児）", value: "#0e9aa7" },
+  { label: "グリーン（安心・自然）", value: "#2f7a4f" },
+  { label: "ライトグリーン（動物病院）", value: "#4ca771" },
+  { label: "オレンジ（あたたかい）", value: "#d97b3a" },
+  { label: "ピンク（美容・小児）", value: "#d4658a" },
+  { label: "パープル（美容・上質）", value: "#6b5bd2" },
+  { label: "ブラウン（落ち着き）", value: "#8a6a4a" },
+  { label: "グレー（モダン・シンプル）", value: "#4b5563" },
+];
 
 // 分析（=dms_prospects.analysis）。各項目 1-5（5が良い）＋所見
 export const ANALYSIS_ITEMS = {

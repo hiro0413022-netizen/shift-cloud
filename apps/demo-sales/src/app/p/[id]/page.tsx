@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { cardCls, inputCls, btnCls } from "@/components/ui";
+import { ColorField, GalleryField, ImageField } from "@/components/demo-media";
 import { INDUSTRIES, STATUSES, LOST_REASONS, type IndustryKey, type StatusKey } from "@/lib/types";
 import { getTemplate } from "@/lib/templates";
 import { addActivity, generateDemo, generateDocs, setDemoAccess, transferToProject, updateProspect } from "@/app/actions";
@@ -197,9 +198,7 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
             <label className="text-xs text-(--color-dim)">院名（デモ表示名）
               <input name="clinicName" defaultValue={bstr("clinicName") || p.name} className={inputCls} />
             </label>
-            <label className="text-xs text-(--color-dim)">基調色（空=業種標準 {tpl.palette.primary}）
-              <input name="colorPrimary" defaultValue={bstr("colorPrimary")} placeholder="#2f7a4f など" className={inputCls} />
-            </label>
+            <ColorField name="colorPrimary" initial={bstr("colorPrimary")} templateColor={tpl.palette.primary} />
             <label className="text-xs text-(--color-dim)">キャッチコピー（空=業種標準）
               <textarea name="tagline" defaultValue={bstr("tagline")} rows={2} className={inputCls} />
             </label>
@@ -251,6 +250,26 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
               <input type="checkbox" name="webReserve" defaultChecked={brief.webReserve === true} />
               Web予約ボタンも見せる（電話中心なら外す）
             </label>
+            <div className="lg:col-span-2 mt-2 grid gap-3 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3 sm:grid-cols-2">
+              <ImageField
+                prospectId={id}
+                name="heroImage"
+                label="ヘッダー（トップの大きな写真）"
+                hint="外観・待合室・スタッフ集合など。未設定なら業種カラーのグラデーション"
+                initial={bstr("heroImage")}
+              />
+              <ImageField
+                prospectId={id}
+                name="directorImage"
+                label="院長・スタッフ写真（ごあいさつ欄）"
+                initial={bstr("directorImage")}
+              />
+              <GalleryField
+                prospectId={id}
+                name="gallery"
+                initial={Array.isArray(brief.gallery) ? (brief.gallery as { url: string; caption?: string }[]) : []}
+              />
+            </div>
             <label className="text-xs text-(--color-dim) lg:col-span-2">修正指示（履歴に残る。例:「院長先生の希望で緑基調に」「猫専用待合室を強調」）
               <input name="instruction" placeholder="今回の変更内容・面談中の要望" className={inputCls} />
             </label>

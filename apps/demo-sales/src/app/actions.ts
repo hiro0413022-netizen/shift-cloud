@@ -88,7 +88,61 @@ export async function updateProspect(id: string, fd: FormData) {
   revalidatePath("/");
 }
 
+// ---- デモ画像（ヘッダー/院内風景/院長写真） ----
+// 署名URLでブラウザから直PUT（サーバーアクションのbody上限を避ける・Lesson OSと同型）。
+// バケットは公開（0049）。デモHTMLは認証なしで配信されるため <img> から直接参照する。
+
+const ASSET_BUCKET = "demo-assets";
+const MAX_IMAGE = 10 * 1024 * 1024;
+const EXT_BY_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export async function createDemoImageUploadUrl(
+  prospectId: string,
+  contentType: string,
+  size: number
+): Promise<{ url?: string; publicUrl?: string; error?: string }> {
+  const actor = await requireActor();
+  const ext = EXT_BY_TYPE[contentType];
+  if (!ext) return { error: "JPEG / PNG / WebP の画像を選んでください" };
+  if (size > MAX_IMAGE) return { error: "10MB以下の画像にしてください" };
+
+  const admin = createAdmin();
+  const { data: p } = await admin
+    .from("dms_prospects")
+    .select("id")
+    .eq("id", prospectId)
+    .eq("company_id", actor.companyId)
+    .maybeSingle();
+  if (!p) return { error: "営業先が見つかりません" };
+
+  // ファイル名は使わない（日本語名対策・推測不可にする）
+  const path = `demos/${actor.companyId}/${prospectId}/${randomBytes(12).toString("base64url")}.${ext}`;
+  const { data, error } = await admin.storage.from(ASSET_BUCKET).createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "アップロードURLの発行に失敗しました" };
+
+  const publicUrl = admin.storage.from(ASSET_BUCKET).getPublicUrl(path).data.publicUrl;
+  return { url: data.signedUrl, publicUrl };
+}
+
 // ---- デモ生成 ----
+
+const galleryFromForm = (raw: string): DemoBrief["gallery"] => {
+  if (!raw.trim()) return undefined;
+  try {
+    const arr = JSON.parse(raw) as { url?: string; caption?: string }[];
+    const items = (Array.isArray(arr) ? arr : [])
+      .filter((x) => typeof x?.url === "string" && x.url.startsWith("http"))
+      .slice(0, 6)
+      .map((x) => ({ url: x.url as string, caption: (x.caption ?? "").trim() || undefined }));
+    return items.length ? items : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 function briefFromForm(fd: FormData, base: Partial<DemoBrief>): DemoBrief {
   const brief: DemoBrief = {
@@ -111,6 +165,10 @@ function briefFromForm(fd: FormData, base: Partial<DemoBrief>): DemoBrief {
     strengths: lines(s(fd, "strengths")) ?? base.strengths,
     firstVisit: lines(s(fd, "firstVisit")) ?? base.firstVisit,
     instructions: base.instructions ?? [],
+    // 画像（フォームは常に hidden で現在値を送るため、空文字＝削除）
+    heroImage: fd.has("heroImage") ? (s(fd, "heroImage") ?? undefined) : base.heroImage,
+    directorImage: fd.has("directorImage") ? (s(fd, "directorImage") ?? undefined) : base.directorImage,
+    gallery: fd.has("gallery") ? galleryFromForm(String(fd.get("gallery") ?? "")) : base.gallery,
   };
   // 診療時間表: 「行ごとに | 区切り」形式（例: 診療時間|月|火|…）
   const hoursRaw = s(fd, "hours");

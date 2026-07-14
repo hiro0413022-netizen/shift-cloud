@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2026-07-14 — AI DEMO SALES: デモに写真を入れられるように＋基調色をピッカー選択に
+- feat(demo-sales): デモ生成フォームに**写真アップロード**を追加 — ヘッダー（ヒーロー背景）・院内/診察風景ギャラリー（最大6枚・キャプション）・院長/スタッフ写真。署名URLでブラウザから直PUT、送信前にcanvasで長辺1600px/JPEG 0.85へ自動縮小（スマホ写真をそのまま選べる）
+- db: `0049_demo_assets.sql` — 公開バケット `demo-assets`（画像のみ・10MB上限・パスはランダムで推測不可）。デモは認証なし配信のため公開バケット、書き込みは service_role の署名URLのみ
+- feat(demo-sales): 基調色をカラーピッカー＋プリセット10色から選択（HEX手入力も可・「業種標準に戻す」あり）。数値を覚える必要をなくした
+- feat(demo-sales): レンダラーがヒーロー背景画像（白グラデーション重ねで文字可読性を確保・スマホは縦グラデ）・「院内のご案内」ギャラリーセクション・院長実写に対応。未設定なら従来のプレースホルダのまま成立
+- 素材ルール: 院提供の写真・フリー素材のみ（既存サイトからの転載はしない）を画面上にも明記
+- fix(demo-sales): ログイン不可の原因は Vercel の `NEXT_PUBLIC_SUPABASE_ANON_KEY` にキーが重複＋改行付きで入っていたこと（Headers.append invalid header value）。値を1行に修正して再デプロイ
+
 ## 2026-07-14 — AI DEMO SALES: 営業デモ高速生成の新アプリ（DECISIONS #54）
 - feat(demo-sales): 独立アプリ `apps/demo-sales` 新設（port 3009・use_demo_sales|view_hq・new-app雛形）— クリニック・動物病院向けHP制作営業の「営業先専用デモを事前に作って見せる」システム
 - db: `0048_demo_sales.sql` — dms_prospects（25段階ファネル・分析・スコア・失注理由）/ dms_demos（token配信・brief・version）/ dms_documents / dms_activities（directive含む）/ dms_plans / dms_projects（成約→正式制作の受け皿）＋営業先13件・プラン2種シード

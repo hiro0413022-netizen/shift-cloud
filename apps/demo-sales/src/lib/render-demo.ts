@@ -1,6 +1,7 @@
 // デモサイトレンダラー — DemoBrief＋業種テンプレート → 単一ファイルHTML。
 // 方針:
-//  - 外部アセットなし（写真・ロゴの無断利用をしない）。ビジュアルはCSSグラデーション＋絵文字
+//  - 写真は「院から提供された写真・フリー素材」を管理画面からアップロードしたもの（demo-assetsバケットの公開URL）のみ。
+//    既存サイトの写真・ロゴは無断利用しない。未設定の箇所はCSSグラデーション＋絵文字のプレースホルダで成立させる
 //  - レスポンシブ1ファイル（PC/スマホ両対応）。スマホは下部固定の電話/予約/アクセスバー
 //  - noindex/nofollow をHTML側にも埋め込む（配信側の X-Robots-Tag と二重化）
 //  - DEMOラベル常時表示。仮データには「※仮」を残す（正式契約後に差し替える前提を隠さない）
@@ -51,6 +52,28 @@ export function renderDemo(brief: DemoBrief): string {
     ? `<a class="btn btn-sub" href="#reserve">Web予約（デモ）</a>`
     : "";
 
+  // 画像（アップロード済みのみ。URLは公開バケット）
+  const safeImg = (u?: string) => (u && /^https?:\/\//.test(u) ? esc(u) : "");
+  const hero = safeImg(brief.heroImage);
+  const dImg = safeImg(brief.directorImage);
+  const gallery = (brief.gallery ?? []).filter((g) => safeImg(g.url)).slice(0, 6);
+
+  const gallerySection = gallery.length
+    ? `
+<section id="gallery">
+  <h2>院内のご案内</h2><span class="h2sub">Gallery</span>
+  <div class="gal">
+    ${gallery
+      .map(
+        (g) => `<figure><img src="${safeImg(g.url)}" alt="${esc(g.caption ?? "院内の様子")}" loading="lazy">${
+          g.caption ? `<figcaption>${esc(g.caption)}</figcaption>` : ""
+        }</figure>`
+      )
+      .join("")}
+  </div>
+</section>`
+    : "";
+
   return `<!doctype html>
 <html lang="ja">
 <head>
@@ -74,7 +97,15 @@ nav a:hover{color:var(--p)}
 .tel-head a{background:var(--p);color:#fff;text-decoration:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:15px}
 .hero{background:linear-gradient(135deg,var(--soft) 0%,#fff 55%,var(--soft) 100%);position:relative;overflow:hidden}
 .hero::after{content:"${t.heroEmoji}";position:absolute;right:-10px;bottom:-30px;font-size:220px;opacity:.12}
+.hero.img::before{content:"";position:absolute;inset:0;background-image:url("${hero}");background-size:cover;background-position:center}
+.hero.img::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,.88) 44%,rgba(255,255,255,.35) 72%,rgba(255,255,255,.05) 100%);font-size:0}
+.hero.img .hero-in{position:relative;z-index:2}
 .hero-in{max-width:1080px;margin:0 auto;padding:72px 20px 64px}
+.gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.gal figure{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.gal img{display:block;width:100%;height:220px;object-fit:cover}
+.gal figcaption{padding:10px 14px;font-size:13px;color:var(--dim)}
+.d-photo img{width:100%;height:100%;object-fit:cover;border-radius:14px}
 .hero h1{font-size:34px;line-height:1.5;color:var(--pd);margin-bottom:16px}
 .hero p{max-width:560px;color:var(--dim);margin-bottom:28px}
 .cta{display:flex;gap:12px;flex-wrap:wrap}
@@ -121,6 +152,8 @@ footer .fn{color:#fff;font-size:15px;font-weight:700;margin-bottom:6px}
 .mobile-bar a span{display:block;font-size:20px}
 .mobile-bar a.tel{background:var(--p);color:#fff}
 @media(max-width:760px){
+  .hero.img::after{background:linear-gradient(180deg,rgba(255,255,255,.9) 0%,rgba(255,255,255,.86) 60%,rgba(255,255,255,.8) 100%)}
+  .gal img{height:180px}
   body{padding-top:32px}
   .demo-ribbon{font-size:10px;padding:7px 4px}
   header{top:32px}
@@ -144,13 +177,14 @@ footer .fn{color:#fff;font-size:15px;font-weight:700;margin-bottom:6px}
       <a href="#services">${esc(t.vocab.services)}</a>
       <a href="#hours">${esc(t.vocab.hours)}</a>
       <a href="#first">${esc(t.vocab.firstVisit)}</a>
+      ${gallery.length ? `<a href="#gallery">院内のご案内</a>` : ""}
       <a href="#access">アクセス</a>
     </nav>
     <div class="tel-head"><a href="${telHref}">📞 ${esc(phone)}</a></div>
   </div>
 </header>
 
-<div class="hero">
+<div class="hero${hero ? " img" : ""}">
   <div class="hero-in">
     <h1>${nl2br(tagline)}</h1>
     <p>${nl2br(intro)}</p>
@@ -194,10 +228,10 @@ ${news.map((n) => `<div class="row"><span class="date">${esc(n.date)}</span><spa
     ${firstVisit.map((f) => `<li>${esc(f)}</li>`).join("")}
   </ol>
 </div></section>
-
+${gallerySection}
 <section>
   <div class="director">
-    <div class="d-photo">${t.heroEmoji}</div>
+    <div class="d-photo">${dImg ? `<img src="${dImg}" alt="${esc(brief.directorName || "院長")}">` : t.heroEmoji}</div>
     <div>
       <h3>ごあいさつ</h3>
       <p class="nm">${esc(brief.directorTitle || "院長")}　${esc(brief.directorName || "（お名前を掲載します ※仮）")}</p>

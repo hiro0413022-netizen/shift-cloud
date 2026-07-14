@@ -157,7 +157,7 @@ create policy dms_activities_read on dms_activities for select to authenticated 
 drop policy if exists dms_projects_read on dms_projects;
 create policy dms_projects_read on dms_projects for select to authenticated using (true);
 
--- updated_at トリガ（既存 app.set_updated_at を流用）
+-- updated_at トリガ（既存 set_updated_at を流用）
 do $$
 declare t text;
 begin
