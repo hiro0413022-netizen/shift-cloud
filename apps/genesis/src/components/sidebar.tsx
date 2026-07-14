@@ -14,6 +14,7 @@ export const NAV = [
   { href: "/notes", label: "社内連絡", en: "Notes", icon: "📝" },
   { href: "/finance", label: "財務（売上・利益）", en: "Finance", icon: "¥" },
   { href: "/legal", label: "契約・法務", en: "Legal", icon: "📄" },
+  { href: "/reserve", label: "予約申込", en: "Reserve", icon: "📅" },
   { href: "/library", label: "資料室", en: "Library", icon: "📁" },
   { href: "/network", label: "システム相関図", en: "System Network", icon: "🕸" },
   { href: "/agents", label: "AI社員一覧", en: "AI Agents", icon: "🤖" },

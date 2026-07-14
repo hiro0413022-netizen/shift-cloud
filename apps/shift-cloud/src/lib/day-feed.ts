@@ -30,6 +30,10 @@ export type FeedTask = {
   title: string;
   status: "open" | "done";
   source: string;
+  /** 予約申込などの補足（希望日時・連絡先）。詳細トグルで表示 */
+  note?: string | null;
+  /** null = 店舗共通タスク（店の誰かが対応する / DECISIONS #55） */
+  staff_id?: string | null;
 };
 
 /** 予約系ソースの共通形。Reserve OS / 体験予約 / Smart Hello をここに正規化して差し込む */

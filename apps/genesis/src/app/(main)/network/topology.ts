@@ -181,10 +181,10 @@ export const NODES: SystemNode[] = [
     id: "reserve-os",
     name: "Reserve OS",
     kind: "app",
-    status: "undeployed",
+    status: "prod",
     schema: "res_",
     description:
-      "ビジター申込型予約（第1弾シャフトフィッティング）。候補日時3つ＋ヒアリング→スタッフ目視確定→確定メール。0032適用済・未デプロイ。",
+      "ビジター申込型予約（第1弾シャフトフィッティング）。候補日時3つ＋ヒアリング→申込がスタッフの「やること」(sp_tasks)に自動で積まれる→スタッフが日程確認しGOLF WINGのメールから返信→Reserve OSで確定。メール/LINE自動通知は次回。",
     flow: "reserve-os.svg",
     aliases: ["reserve", "予約"],
     ix: 930,
@@ -335,6 +335,8 @@ export const EDGES: SystemEdge[] = [
   { from: "legal-os", to: "supabase", label: "leg_ + Storage", type: "data" },
   { from: "survey-os", to: "supabase", label: "svy_", type: "data" },
   { from: "reserve-os", to: "supabase", label: "res_", type: "data" },
+  // 申込 → スタッフの「やること」(sp_tasks 店舗共通タスク)。DECISIONS #55
+  { from: "reserve-os", to: "shift-cloud", label: "申込→やること(sp_tasks)", type: "data" },
   { from: "caddy-os", to: "supabase", label: "cad_", type: "data" },
   { from: "lesson-os", to: "supabase", label: "lsn_", type: "data" },
   { from: "golfwing", to: "supabase", label: "D1→移行中", type: "data" },

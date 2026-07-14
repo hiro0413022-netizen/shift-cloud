@@ -4,6 +4,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { currentYM, addMonths, daysOfMonth, todayJST } from "@/lib/util";
 import { buildMonthFeed, type FeedShift, type FeedEvent, type FeedTask } from "@/lib/day-feed";
 import { CalendarClient } from "./calendar-client";
+import { taskScopeFilter } from "@/lib/task-scope";
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ ym?: string }> }) {
   const actor = await requireActor();
@@ -42,8 +43,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       .lte("date", last),
     admin
       .from("sp_tasks")
-      .select("id, date, title, status, source")
-      .eq("staff_id", actor.staffId)
+      // 自分あて + 店舗共通（予約申込など / DECISIONS #55）
+      .select("id, date, title, note, status, source, staff_id")
+      .eq("company_id", actor.companyId)
+      .or(taskScopeFilter(actor.staffId, actor.storeIds))
       .is("deleted_at", null)
       .gte("date", first)
       .lte("date", last)

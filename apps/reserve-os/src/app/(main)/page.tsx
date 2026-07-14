@@ -3,6 +3,8 @@ import { requireReserveActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Badge, Empty } from "@/components/ui";
 import { STATUS_LABEL, STATUS_TONE, fmtSeq, fmtJstShort, CATEGORY_LABEL } from "@/lib/reserve";
+import { siteUrl } from "@/lib/mail";
+import { PublicLinks, type PublicLink } from "./public-links";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -39,6 +41,21 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
     .eq("status", "pending")
     .is("deleted_at", null);
 
+  // 公開ページのURL（公式LINEに貼る用。スタッフがすぐコピーできるように一覧の上に出す）
+  const { data: services } = await admin
+    .from("res_services")
+    .select("slug, name, active")
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .order("sort_order");
+  const base = siteUrl();
+  const publicLinks: PublicLink[] = (services ?? []).map((s) => ({
+    slug: s.slug as string,
+    name: s.name as string,
+    active: s.active as boolean,
+    url: `${base}/reserve/${s.slug}`,
+  }));
+
   const exportHref = `/api/requests-export${status !== "all" ? `?status=${status}` : ""}`;
 
   return (
@@ -54,6 +71,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
           CSVで書き出す
         </a>
       </div>
+
+      <PublicLinks links={publicLinks} />
 
       <div className="flex gap-2">
         {TABS.map((t) => (

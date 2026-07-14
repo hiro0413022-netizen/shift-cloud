@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { jstLocalToISO } from "@/lib/reserve";
-import { notifyStaffNewRequest, ackCustomer, notifyLine } from "@/lib/mail";
+import { notifyStaffNewRequest, ackCustomer, notifyLine, siteUrl } from "@/lib/mail";
+import { createStaffTask } from "@/lib/staff-task";
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
@@ -96,6 +97,12 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
     console.error("[reserve] insert失敗:", error);
     return { error: "送信に失敗しました。時間をおいて再度お試しください。" };
   }
+
+  // スタッフポータルの「やること」に積む（現状の唯一の一次導線 / DECISIONS #55）。
+  // メール未設定でもここが動けば申込は必ずスタッフの目に入る。
+  await createStaffTask(inserted, siteUrl()).catch((e) => {
+    console.error("[reserve] やること作成に失敗:", e);
+  });
 
   // 通知（メール送信の失敗で申込自体は失敗させない）
   const [staffRes, ackRes] = await Promise.all([

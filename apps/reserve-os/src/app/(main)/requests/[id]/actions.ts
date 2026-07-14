@@ -6,6 +6,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent, logAudit } from "@/lib/kernel";
 import { jstLocalToISO, fmtJst } from "@/lib/reserve";
 import { sendConfirmation } from "@/lib/mail";
+import { closeStaffTask } from "@/lib/staff-task";
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
@@ -63,6 +64,9 @@ export async function confirmRequest(formData: FormData) {
     if (res.ok) await admin.from("res_requests").update({ ack_sent_at: new Date().toISOString() }).eq("id", id);
   }
 
+  // スタッフポータルの「やること」を完了にする（DECISIONS #55）
+  await closeStaffTask(id, actor.staffId);
+
   await logAudit(actor, "reserve.confirm", "res_requests", id, { status: req.status }, { status: "confirmed", confirmed_at: confirmedISO });
   await logEvent(actor.companyId, {
     event_type: "reserve.confirmed",
@@ -83,6 +87,7 @@ export async function declineRequest(formData: FormData) {
 
   const admin = createAdmin();
   await admin.from("res_requests").update({ status: "declined", staff_note: staffNote || null, handled_by: actor.staffId }).eq("id", id);
+  await closeStaffTask(id, actor.staffId);
   await logAudit(actor, "reserve.decline", "res_requests", id, { status: req.status }, { status: "declined" });
   redirect(`/requests/${id}`);
 }
@@ -96,6 +101,7 @@ export async function completeRequest(formData: FormData) {
   if (!req) redirect("/");
   const admin = createAdmin();
   await admin.from("res_requests").update({ status: "completed", handled_by: actor.staffId }).eq("id", id);
+  await closeStaffTask(id, actor.staffId);
   await logAudit(actor, "reserve.complete", "res_requests", id, { status: req.status }, { status: "completed" });
   redirect(`/requests/${id}`);
 }
@@ -109,6 +115,7 @@ export async function cancelRequest(formData: FormData) {
   if (!req) redirect("/");
   const admin = createAdmin();
   await admin.from("res_requests").update({ status: "canceled", handled_by: actor.staffId }).eq("id", id);
+  await closeStaffTask(id, actor.staffId);
   await logAudit(actor, "reserve.cancel", "res_requests", id, { status: req.status }, { status: "canceled" });
   redirect(`/requests/${id}`);
 }

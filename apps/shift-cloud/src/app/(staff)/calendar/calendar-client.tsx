@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import type { MonthFeed } from "@/lib/day-feed";
 import { dowJP, hm, fmtDateJP } from "@/lib/util";
 import { saveMemo, toggleTask, addTask } from "./actions";
+import { TASK_SOURCE_LABEL } from "@/lib/task-scope";
 
 /**
  * 月間カレンダー（DECISIONS #48）
@@ -122,16 +123,25 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
             <p className="text-xs font-medium text-zinc-500">やること</p>
             <div className="mt-1.5 space-y-1.5">
               {day.tasks.map((t) => (
-                <label key={t.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={t.status === "done"}
-                    onChange={() => startTransition(async () => { await toggleTask(t.id); })}
-                    className="h-4 w-4 accent-(--color-brand)"
-                  />
-                  <span className={t.status === "done" ? "text-zinc-300 line-through" : ""}>{t.title}</span>
-                  {t.source !== "manual" && <span className="rounded bg-brand-light px-1 text-[10px] text-brand">{t.source === "manager" ? "店長" : "AI"}</span>}
-                </label>
+                <div key={t.id}>
+                  <div className="flex items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={t.status === "done"}
+                      onChange={() => startTransition(async () => { await toggleTask(t.id); })}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-(--color-brand)"
+                    />
+                    <span className={`min-w-0 flex-1 ${t.status === "done" ? "text-zinc-300 line-through" : ""}`}>{t.title}</span>
+                    {TASK_SOURCE_LABEL[t.source] && (
+                      <span className="shrink-0 rounded bg-brand-light px-1 text-[10px] text-brand">{TASK_SOURCE_LABEL[t.source]}</span>
+                    )}
+                    {/* 店舗共通タスク: 誰か1人が完了にすれば全員から消える */}
+                    {!t.staff_id && <span className="shrink-0 rounded bg-zinc-100 px-1 text-[10px] text-zinc-500">店</span>}
+                  </div>
+                  {t.note && (
+                    <pre className="mt-1 ml-6 whitespace-pre-wrap rounded bg-zinc-50 p-2 text-[12px] leading-relaxed text-zinc-600">{t.note}</pre>
+                  )}
+                </div>
               ))}
               <div className="flex gap-2">
                 <input

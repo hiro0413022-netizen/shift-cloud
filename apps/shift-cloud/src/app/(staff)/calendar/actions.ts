@@ -38,21 +38,35 @@ export async function saveMemo(date: string, memo: string): Promise<{ error?: st
   return {};
 }
 
-/** タスクの完了/未完了切替（本人のタスクのみ） */
+/**
+ * タスクの完了/未完了切替。
+ * 対象は「本人あて」または「自分の所属店舗の店舗共通タスク（staff_id=null）」（DECISIONS #55）。
+ * 共通タスクは誰か1人が完了にすれば全員のリストから消えるため、done_by/done_at で誰が対応したかを残す。
+ */
 export async function toggleTask(taskId: string): Promise<{ error?: string }> {
   const actor = await requireActor();
   const admin = createAdmin();
   const { data: task } = await admin
     .from("sp_tasks")
-    .select("id, status, staff_id")
+    .select("id, status, staff_id, store_id")
     .eq("id", taskId)
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
     .maybeSingle();
-  if (!task || task.staff_id !== actor.staffId) return { error: "タスクが見つかりません" };
+  if (!task) return { error: "タスクが見つかりません" };
+  const mine = task.staff_id === actor.staffId;
+  const sharedInMyStore = !task.staff_id && !!task.store_id && actor.storeIds.includes(task.store_id);
+  if (!mine && !sharedInMyStore) return { error: "タスクが見つかりません" };
+
+  const done = task.status !== "done";
   const { error } = await admin
     .from("sp_tasks")
-    .update({ status: task.status === "done" ? "open" : "done", updated_at: new Date().toISOString() })
+    .update({
+      status: done ? "done" : "open",
+      done_by: done ? actor.staffId : null,
+      done_at: done ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", task.id);
   if (error) return { error: error.message };
   revalidatePath("/calendar");

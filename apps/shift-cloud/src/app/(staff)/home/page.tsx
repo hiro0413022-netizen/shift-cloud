@@ -5,6 +5,7 @@ import { Card, Badge } from "@/components/ui";
 import { todayJST, currentYM, hm, timeJST, fmtMinutes, yen, dowJP } from "@/lib/util";
 import { calcMonthlyPayroll, monthRange, type WageRow, type AllowanceRow } from "@/lib/payroll-calc";
 import { TasksCard, type TaskItem } from "./tasks-card";
+import { taskScopeFilter } from "@/lib/task-scope";
 import Link from "next/link";
 
 export default async function HomePage() {
@@ -43,8 +44,11 @@ export default async function HomePage() {
     supabase.from("store_events").select("title, date, start_time, stores(name)")
       .in("store_id", actor.storeIds.length ? actor.storeIds : ["00000000-0000-0000-0000-000000000000"])
       .is("deleted_at", null).gte("date", today).order("date").limit(5),
-    admin.from("sp_tasks").select("id, title, status, source")
-      .eq("staff_id", actor.staffId).eq("date", today).is("deleted_at", null).order("sort"),
+    // 自分あて + 店舗共通（staff_id null = 予約申込など、店の誰かが対応するもの / DECISIONS #55）
+    admin.from("sp_tasks").select("id, title, note, status, source, staff_id")
+      .eq("company_id", actor.companyId)
+      .or(taskScopeFilter(actor.staffId, actor.storeIds))
+      .eq("date", today).is("deleted_at", null).order("sort"),
     admin.from("sp_links").select("label, url, note, store_id")
       .eq("company_id", actor.companyId).is("deleted_at", null).order("sort"),
     admin.from("companies").select("settings").eq("id", actor.companyId).single(),
