@@ -1,0 +1,17 @@
+{
+  "name": "yozan-genesis",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev -w apps/shift-cloud",
+    "build": "npm run build -w apps/shift-cloud",
+    "start": "npm run start -w apps/shift-cloud",
+    "dev:genesis": "npm run dev -w apps/genesis",
+    "build:genesis": "npm run build -w apps/genesis",
+    "start:genesis": "npm run start -w apps/genesis",
+    "test": "node --test \"tests/**/*.test.ts\"",
+    "check:labor": "node scripts/check-labor-logic.mjs",
+    "import:sales": "node scripts/import-sales-ledger.mjs --file=apps/report-os/source/売上データ.xlsx",
+    "new-app": "node scripts/new-app.mjs"
+  }
+}

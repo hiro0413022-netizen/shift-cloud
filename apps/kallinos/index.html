@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KALLINOS | Luxury Golf & Sports Wear</title>
+  <meta name="description" content="KALLINOS（カリノス）は、シンプルで洗練されたデザインに、ゴルフシーンで求められる機能性を融合したラグジュアリー・スポーツブランドです。">
+  <meta property="og:title" content="KALLINOS | Luxury Golf & Sports Wear">
+  <meta property="og:description" content="静かに伝わる、上質な一着。KALLINOS公式サイト。">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&family=Noto+Serif+JP:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ====== INDEX-SPECIFIC STYLES ====== */
+
+    /* Hero */
+    .hero {
+      position: relative;
+      height: 100svh;
+      min-height: 600px;
+      display: flex;
+      align-items: flex-end;
+      overflow: hidden;
+      background: var(--color-black);
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      background: url('https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=1600&q=80') center/cover no-repeat;
+      transform: scale(1.05);
+      animation: heroZoom 12s ease-out forwards;
+    }
+
+    @keyframes heroZoom {
+      from { transform: scale(1.05); }
+      to   { transform: scale(1.0); }
+    }
+
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to top,
+        rgba(0,0,0,0.75) 0%,
+        rgba(0,0,0,0.35) 50%,
+        rgba(0,0,0,0.15) 100%
+      );
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      padding: 0 var(--spacing-md) var(--spacing-xl);
+      max-width: var(--container-max);
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .hero-label {
+      display: block;
+      font-family: var(--font-secondary);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--color-gold);
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeSlideUp 1s ease 0.5s forwards;
+    }
+
+    .hero-title {
+      font-family: var(--font-secondary);
+      font-size: clamp(2.8rem, 9vw, 7rem);
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-white);
+      line-height: 1;
+      margin-bottom: 1.5rem;
+      opacity: 0;
+      animation: fadeSlideUp 1s ease 0.7s forwards;
+    }
+
+    .hero-subtitle {
+      font-family: var(--font-primary);
+      font-size: clamp(1rem, 2.5vw, 1.35rem);
+      font-weight: 300;
+      color: rgba(255,255,255,0.8);
+      letter-spacing: 0.08em;
+      margin-bottom: 2.5rem;
+      opacity: 0;
+      animation: fadeSlideUp 1s ease 0.9s forwards;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      opacity: 0;
+      animation: fadeSlideUp 1s ease 1.1s forwards;
+    }
+
+    .hero-scroll {
+      position: absolute;
+      bottom: 2rem;
+      right: var(--spacing-md);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(255,255,255,0.5);
+      font-family: var(--font-secondary);
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      writing-mode: vertical-rl;
+    }
+
+    .hero-scroll-line {
+      width: 1px;
+      height: 60px;
+      background: rgba(255,255,255,0.3);
+      position: relative;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+
+    .hero-scroll-line::after {
+      content: '';
+      position: absolute;
+      top: -100%;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255,255,255,0.7);
+      animation: scrollLine 2s ease infinite 1.5s;
+    }
+
+    @keyframes scrollLine {
+      from { top: -100%; }
+      to   { top: 100%; }
+    }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Brand Intro */
+    .brand-intro {
+      padding: var(--spacing-xl) 0;
+      background: var(--color-white);
+    }
+
+    .brand-intro-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--spacing-xl);
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .brand-intro-inner {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+      }
+    }
+
+    .brand-intro-text .section-label {
+      text-align: left;
+    }
+
+    .brand-intro-text .section-title {
+      text-align: left;
+      margin-bottom: 1.5rem;
+    }
+
+    .brand-intro-body {
+      font-size: 0.95rem;
+      line-height: 2;
+      color: var(--color-grey-2);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .brand-intro-image {
+      position: relative;
+    }
+
+    .brand-intro-image img {
+      width: 100%;
+      height: 550px;
+      object-fit: cover;
+    }
+
+    @media (max-width: 768px) {
+      .brand-intro-image img { height: 300px; }
+    }
+
+    .brand-intro-image-accent {
+      position: absolute;
+      bottom: -1.5rem;
+      right: -1.5rem;
+      width: 60%;
+      height: 60%;
+      border: 1px solid var(--color-gold);
+      z-index: -1;
+    }
+
+    @media (max-width: 768px) {
+      .brand-intro-image-accent { display: none; }
+    }
+
+    /* Feature Strip */
+    .features-strip {
+      background: var(--color-beige);
+      padding: var(--spacing-lg) 0;
+      border-top: var(--border-thin);
+      border-bottom: var(--border-thin);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2rem;
+      text-align: center;
+    }
+
+    @media (max-width: 768px) {
+      .features-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+      }
+    }
+
+    .feature-item-icon {
+      font-size: 1.3rem;
+      color: var(--color-gold);
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-item-title {
+      font-family: var(--font-secondary);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+      color: var(--color-black);
+    }
+
+    .feature-item-desc {
+      font-size: 0.78rem;
+      color: var(--color-grey-3);
+      line-height: 1.6;
+    }
+
+    /* Concept Banner */
+    .concept-banner {
+      position: relative;
+      height: 70vh;
+      min-height: 450px;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .concept-banner-bg {
+      position: absolute;
+      inset: 0;
+      background: url('https://images.unsplash.com/photo-1592919505780-303950717480?w=1600&q=80') center/cover no-repeat;
+    }
+
+    .concept-banner-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+    }
+
+    .concept-banner-content {
+      position: relative;
+      z-index: 2;
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 var(--spacing-md);
+      width: 100%;
+      text-align: center;
+    }
+
+    .concept-quote {
+      font-family: var(--font-primary);
+      font-size: clamp(1.6rem, 5vw, 3.5rem);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--color-white);
+      letter-spacing: 0.05em;
+      line-height: 1.4;
+      margin-bottom: 2rem;
+    }
+
+    .concept-quote em {
+      font-style: normal;
+      color: var(--color-gold);
+    }
+
+    /* Instagram Grid */
+    .insta-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0;
+    }
+
+    @media (max-width: 768px) {
+      .insta-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 480px) {
+      .insta-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .insta-item {
+      position: relative;
+      aspect-ratio: 1;
+      overflow: hidden;
+      background: var(--color-grey-6);
+    }
+
+    .insta-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.5s ease;
+    }
+
+    .insta-item:hover img {
+      transform: scale(1.08);
+    }
+
+    .insta-item-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .insta-item:hover .insta-item-overlay {
+      opacity: 1;
+    }
+
+    .insta-item-overlay i {
+      color: var(--color-white);
+      font-size: 1.5rem;
+    }
+
+    /* Category Nav */
+    .category-nav {
+      padding: var(--spacing-lg) 0;
+    }
+
+    .category-scroll {
+      display: flex;
+      gap: 0.75rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .category-scroll::-webkit-scrollbar { display: none; }
+
+    .category-chip {
+      flex-shrink: 0;
+      padding: 0.6rem 1.5rem;
+      border: var(--border-thin);
+      font-family: var(--font-secondary);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--color-grey-3);
+      white-space: nowrap;
+      transition: var(--transition-fast);
+      cursor: pointer;
+    }
+
+    .category-chip:hover,
+    .category-chip.active {
+      background: var(--color-black);
+      color: var(--color-white);
+      border-color: var(--color-black);
+    }
+
+    /* Lookbook */
+    .lookbook-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      .lookbook-grid { grid-template-columns: 1fr; }
+    }
+
+    .lookbook-item {
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .lookbook-item.lookbook-large {
+      grid-row: span 2;
+    }
+
+    .lookbook-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.6s ease;
+      display: block;
+    }
+
+    .lookbook-item.lookbook-large img {
+      height: 600px;
+    }
+
+    .lookbook-item:not(.lookbook-large) img {
+      height: 290px;
+    }
+
+    @media (max-width: 600px) {
+      .lookbook-item.lookbook-large img,
+      .lookbook-item:not(.lookbook-large) img { height: 240px; }
+      .lookbook-item.lookbook-large { grid-row: auto; }
+    }
+
+    .lookbook-item:hover img {
+      transform: scale(1.04);
+    }
+
+    .lookbook-item-info {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 2rem 1.5rem 1.5rem;
+      background: linear-gradient(transparent, rgba(0,0,0,0.6));
+      color: var(--color-white);
+    }
+
+    .lookbook-tag {
+      font-family: var(--font-secondary);
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--color-gold);
+      margin-bottom: 0.35rem;
+    }
+
+    .lookbook-name {
+      font-family: var(--font-primary);
+      font-size: 1.1rem;
+      font-weight: 400;
+      letter-spacing: 0.03em;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header Mount -->
+  <div id="header-mount"></div>
+
+  <main>
+    <!-- ====== HERO ====== -->
+    <section class="hero" aria-label="メインビジュアル">
+      <div class="hero-bg"></div>
+      <div class="hero-overlay"></div>
+
+      <div class="hero-content">
+        <span class="hero-label">Luxury Golf & Sports Wear</span>
+        <h1 class="hero-title">BEYOND THE<br>STANDARD.</h1>
+        <p class="hero-subtitle">日常にも、ゴルフにも、静かに品格を。</p>
+        <div class="hero-actions">
+          <a href="products.html" class="btn btn-white btn-lg">Collection を見る</a>
+          <a href="brand.html" class="btn btn-ghost btn-lg">Brand Story</a>
+        </div>
+      </div>
+
+      <div class="hero-scroll">
+        <div class="hero-scroll-line"></div>
+        <span>SCROLL</span>
+      </div>
+    </section>
+
+    <!-- ====== FEATURES ====== -->
+    <section class="features-strip" aria-label="ブランドの特徴">
+      <div class="container">
+        <div class="features-grid">
+          <div class="feature-item fade-up">
+            <div class="feature-item-icon"><i class="fas fa-gem"></i></div>
+            <div class="feature-item-title">Premium Quality</div>
+            <div class="feature-item-desc">厳選素材と丁寧な縫製で<br>上質な着心地を実現</div>
+          </div>
+          <div class="feature-item fade-up delay-1">
+            <div class="feature-item-icon"><i class="fas fa-wind"></i></div>
+            <div class="feature-item-title">Performance</div>
+            <div class="feature-item-desc">UV・吸汗速乾・ストレッチ<br>ゴルフに求められる機能性</div>
+          </div>
+          <div class="feature-item fade-up delay-2">
+            <div class="feature-item-icon"><i class="fas fa-truck"></i></div>
+            <div class="feature-item-title">Free Shipping</div>
+            <div class="feature-item-desc">¥20,000以上のご購入で<br>送料無料</div>
+          </div>
+          <div class="feature-item fade-up delay-3">
+            <div class="feature-item-icon"><i class="fas fa-undo-alt"></i></div>
+            <div class="feature-item-title">Easy Returns</div>
+            <div class="feature-item-desc">到着から14日以内<br>返品・交換に対応</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== BRAND INTRO ====== -->
+    <section class="brand-intro section" aria-label="ブランド紹介">
+      <div class="container">
+        <div class="brand-intro-inner">
+          <div class="brand-intro-text fade-up">
+            <span class="section-label">About KALLINOS</span>
+            <h2 class="section-title">静かに伝わる、<br>上質な一着。</h2>
+            <div class="divider divider-left"></div>
+            <p class="brand-intro-body">
+              KALLINOSは、シンプルで洗練されたデザインに、ゴルフシーンで求められる機能性を融合したラグジュアリー・スポーツブランドです。
+            </p>
+            <p class="brand-intro-body">
+              派手さではなく、静かに伝わる上質さ。ゴルフ場でも、街でも、自然に馴染みながら品格を感じさせる一着。シンプルなデザインの中に、素材・シルエット・着心地へのこだわりを込めています。
+            </p>
+            <a href="brand.html" class="btn btn-secondary">Brand Story →</a>
+          </div>
+          <div class="brand-intro-image fade-in delay-2">
+            <img
+              src="https://images.unsplash.com/photo-1594938298603-c8148c4b4e48?w=900&q=80"
+              alt="KALLINOS ブランドイメージ"
+              loading="lazy"
+            >
+            <div class="brand-intro-image-accent"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== NEW ARRIVALS ====== -->
+    <section class="section bg-beige" aria-label="新作商品" id="new-arrivals">
+      <div class="container">
+        <div class="section-header fade-up">
+          <span class="section-label">New Arrivals</span>
+          <h2 class="section-title">新作アイテム</h2>
+          <p class="section-subtitle">今シーズンの新しいスタイルをご覧ください</p>
+        </div>
+
+        <!-- Category Filter -->
+        <div class="category-nav">
+          <div class="category-scroll" id="categoryFilter">
+            <button class="category-chip active" data-cat="">ALL</button>
+            <button class="category-chip" data-cat="モックネック">モックネック</button>
+            <button class="category-chip" data-cat="ポロシャツ">ポロシャツ</button>
+            <button class="category-chip" data-cat="パンツ">パンツ</button>
+            <button class="category-chip" data-cat="アウター">アウター</button>
+            <button class="category-chip" data-cat="キャップ">キャップ</button>
+            <button class="category-chip" data-cat="アクセサリー">アクセサリー</button>
+            <button class="category-chip" data-cat="限定コレクション">限定</button>
+          </div>
+        </div>
+
+        <div class="products-grid" id="productsGrid">
+          <!-- JS inject -->
+          <div class="skeleton" style="height:350px; border-radius:0"></div>
+          <div class="skeleton" style="height:350px; border-radius:0"></div>
+          <div class="skeleton" style="height:350px; border-radius:0"></div>
+          <div class="skeleton" style="height:350px; border-radius:0"></div>
+        </div>
+
+        <div class="text-center mt-lg fade-up">
+          <a href="products.html" class="btn btn-secondary">すべての商品を見る →</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== CONCEPT BANNER ====== -->
+    <section class="concept-banner" aria-label="ブランドコンセプト">
+      <div class="concept-banner-bg"></div>
+      <div class="concept-banner-overlay"></div>
+      <div class="concept-banner-content">
+        <p class="concept-quote fade-up">
+          "Style is not about being noticed.<br>It's about being <em>remembered.</em>"
+        </p>
+        <div class="fade-up delay-2">
+          <a href="products.html" class="btn btn-ghost btn-lg">Shop Now</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== LOOKBOOK ====== -->
+    <section class="section" aria-label="ルックブック" id="lookbook">
+      <div class="container">
+        <div class="section-header fade-up">
+          <span class="section-label">Lookbook</span>
+          <h2 class="section-title">着用イメージ</h2>
+          <p class="section-subtitle">フィールドでも、日常でも映えるスタイリングをご提案</p>
+        </div>
+
+        <div class="lookbook-grid fade-up">
+          <div class="lookbook-item lookbook-large">
+            <img src="https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=900&q=80" alt="KALLINOS スタイリング1" loading="lazy">
+            <div class="lookbook-item-info">
+              <div class="lookbook-tag">New Season</div>
+              <div class="lookbook-name">Minimal Golf Style</div>
+            </div>
+          </div>
+          <div class="lookbook-item">
+            <img src="https://images.unsplash.com/photo-1593079831268-3381b0db4a77?w=800&q=80" alt="KALLINOS スタイリング2" loading="lazy">
+            <div class="lookbook-item-info">
+              <div class="lookbook-tag">Collection</div>
+              <div class="lookbook-name">INCEPTION Series</div>
+            </div>
+          </div>
+          <div class="lookbook-item">
+            <img src="https://images.unsplash.com/photo-1580927752452-89d86da3fa0a?w=800&q=80" alt="KALLINOS スタイリング3" loading="lazy">
+            <div class="lookbook-item-info">
+              <div class="lookbook-tag">Premium</div>
+              <div class="lookbook-name">Course to City</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====== INSTAGRAM ====== -->
+    <section aria-label="Instagram">
+      <div class="text-center" style="padding: 3rem 0 1.5rem">
+        <span class="section-label">Instagram</span>
+        <h2 class="section-title" style="font-size:1.5rem">@kallinos_official</h2>
+      </div>
+      <div class="insta-grid">
+        <a href="#" class="insta-item" target="_blank" rel="noopener">
+          <img src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=400&q=80" alt="Instagram" loading="lazy">
+          <div class="insta-item-overlay"><i class="fab fa-instagram"></i></div>
+        </a>
+        <a href="#" class="insta-item" target="_blank" rel="noopener">
+          <img src="https://images.unsplash.com/photo-1614251056798-0a63eda2bb25?w=400&q=80" alt="Instagram" loading="lazy">
+          <div class="insta-item-overlay"><i class="fab fa-instagram"></i></div>
+        </a>
+        <a href="#" class="insta-item" target="_blank" rel="noopener">
+          <img src="https://images.unsplash.com/photo-1625910513581-e3e18dd4cc49?w=400&q=80" alt="Instagram" loading="lazy">
+          <div class="insta-item-overlay"><i class="fab fa-instagram"></i></div>
+        </a>
+        <a href="#" class="insta-item" target="_blank" rel="noopener">
+          <img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80" alt="Instagram" loading="lazy">
+          <div class="insta-item-overlay"><i class="fab fa-instagram"></i></div>
+        </a>
+        <a href="#" class="insta-item" target="_blank" rel="noopener">
+          <img src="https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=400&q=80" alt="Instagram" loading="lazy">
+          <div class="insta-item-overlay"><i class="fab fa-instagram"></i></div>
+        </a>
+        <a href="#" class="insta-item" target="_blank" rel="noopener">
+          <img src="https://images.unsplash.com/photo-1603252109303-2751441dd157?w=400&q=80" alt="Instagram" loading="lazy">
+          <div class="insta-item-overlay"><i class="fab fa-instagram"></i></div>
+        </a>
+      </div>
+      <div class="text-center" style="padding:2rem 0">
+        <a href="https://instagram.com/kallinos_official" class="btn btn-secondary" target="_blank" rel="noopener">
+          <i class="fab fa-instagram"></i>&nbsp; Follow on Instagram
+        </a>
+      </div>
+    </section>
+
+    <!-- ====== NEWSLETTER ====== -->
+    <section class="newsletter-section" aria-label="メールマガジン登録">
+      <div class="container">
+        <span class="newsletter-label">Newsletter</span>
+        <h2 class="newsletter-title">メールマガジン登録</h2>
+        <p class="newsletter-desc">
+          新作情報、限定セール、ブランドストーリーをいち早くお届けします。<br>
+          会員登録で初回ご購入時に使える¥3,000クーポンをプレゼント。
+        </p>
+        <form class="newsletter-form" id="newsletterForm" novalidate>
+          <input
+            type="email"
+            class="newsletter-input"
+            placeholder="メールアドレスを入力"
+            aria-label="メールアドレス"
+            required
+          >
+          <button type="submit" class="newsletter-btn">登録する</button>
+        </form>
+        <p style="margin-top:1rem; font-size:0.72rem; color:rgba(255,255,255,0.3); letter-spacing:0.03em">
+          ご登録はいつでも解除できます。プライバシーポリシーに同意の上ご登録ください。
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer Mount -->
+  <div id="footer-mount"></div>
+
+  <script src="js/components.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    // ページ固有の初期化
+    document.addEventListener('DOMContentLoaded', () => {
+      injectComponents('index.html');
+      loadProducts();
+      initCategoryFilter();
+    });
+
+    let allProducts = [];
+    let currentCategory = '';
+
+    async function loadProducts() {
+      try {
+        const data = await API.getProducts({ limit: 100 });
+        allProducts = (data.data || []).filter(p => p.is_published);
+        renderProducts(allProducts);
+      } catch (e) {
+        console.error(e);
+        document.getElementById('productsGrid').innerHTML = `
+          <div style="grid-column:1/-1; text-align:center; padding:3rem; color:var(--color-grey-4)">
+            <i class="fas fa-exclamation-circle" style="font-size:2rem; display:block; margin-bottom:1rem"></i>
+            商品の読み込みに失敗しました
+          </div>
+        `;
+      }
+    }
+
+    function renderProducts(products) {
+      const grid = document.getElementById('productsGrid');
+      if (!products.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:3rem; color:var(--color-grey-4)">この条件に一致する商品はありません</div>`;
+        return;
+      }
+      // Show max 8 on top page
+      grid.innerHTML = products.slice(0, 8).map(buildProductCard).join('');
+      initScrollAnimations();
+    }
+
+    function initCategoryFilter() {
+      const chips = document.querySelectorAll('.category-chip');
+      chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          chips.forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          currentCategory = chip.dataset.cat;
+          const filtered = currentCategory
+            ? allProducts.filter(p => p.category === currentCategory)
+            : allProducts;
+          renderProducts(filtered);
+        });
+      });
+    }
+
+    function initScrollAnimations() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) entry.target.classList.add('visible');
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+      document.querySelectorAll('.fade-up:not(.visible), .fade-in:not(.visible)').forEach(el => observer.observe(el));
+    }
+  </script>
+</body>
+</html>

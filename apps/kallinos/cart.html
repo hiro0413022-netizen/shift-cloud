@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カート | KALLINOS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .cart-page {
+      padding: calc(var(--header-height) + 2rem) 0 var(--spacing-xl);
+      min-height: 100svh;
+    }
+
+    .cart-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: var(--spacing-lg);
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .cart-layout { grid-template-columns: 1fr; }
+    }
+
+    /* Cart Items */
+    .cart-items-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1rem;
+      border-bottom: var(--border-medium);
+      margin-bottom: 0;
+    }
+
+    .cart-items-count {
+      font-family: var(--font-secondary);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: var(--color-grey-3);
+    }
+
+    .cart-item {
+      display: grid;
+      grid-template-columns: 100px 1fr auto;
+      gap: 1.25rem;
+      padding: 1.5rem 0;
+      border-bottom: var(--border-thin);
+      align-items: start;
+    }
+
+    @media (max-width: 480px) {
+      .cart-item { grid-template-columns: 80px 1fr; }
+    }
+
+    .cart-item-img {
+      width: 100px;
+      height: 130px;
+      object-fit: cover;
+      background: var(--color-grey-6);
+    }
+
+    @media (max-width: 480px) {
+      .cart-item-img { width: 80px; height: 104px; }
+    }
+
+    .cart-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .cart-item-category {
+      font-family: var(--font-secondary);
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--color-gold);
+    }
+
+    .cart-item-name {
+      font-family: var(--font-primary);
+      font-size: 1rem;
+      font-weight: 400;
+      color: var(--color-black);
+      letter-spacing: 0.02em;
+    }
+
+    .cart-item-variant {
+      font-size: 0.78rem;
+      color: var(--color-grey-4);
+      letter-spacing: 0.05em;
+    }
+
+    .cart-item-price {
+      font-family: var(--font-secondary);
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--color-black);
+      margin-top: 0.25rem;
+    }
+
+    .cart-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 0.75rem;
+    }
+
+    .cart-item-remove {
+      font-family: var(--font-secondary);
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-grey-4);
+      cursor: pointer;
+      transition: var(--transition-fast);
+      background: none;
+      border: none;
+      text-decoration: underline;
+    }
+
+    .cart-item-remove:hover { color: #C0392B; }
+
+    .cart-item-subtotal {
+      text-align: right;
+      font-family: var(--font-secondary);
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--color-black);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 480px) {
+      .cart-item-subtotal { display: none; }
+    }
+
+    /* Order Summary */
+    .order-summary {
+      background: var(--color-beige);
+      padding: var(--spacing-md);
+      position: sticky;
+      top: calc(var(--header-height) + 1rem);
+    }
+
+    .order-summary-title {
+      font-family: var(--font-secondary);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--color-grey-3);
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: var(--border-thin);
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 0;
+      font-size: 0.85rem;
+      color: var(--color-grey-2);
+    }
+
+    .summary-row.total {
+      padding-top: 1rem;
+      margin-top: 0.5rem;
+      border-top: var(--border-medium);
+      font-family: var(--font-secondary);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-black);
+    }
+
+    .summary-row.shipping-free span:last-child {
+      color: #27AE60;
+      font-weight: 600;
+    }
+
+    .coupon-section {
+      margin: 1rem 0;
+      padding: 1rem 0;
+      border-top: var(--border-thin);
+      border-bottom: var(--border-thin);
+    }
+
+    .coupon-label {
+      font-family: var(--font-secondary);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--color-grey-3);
+      margin-bottom: 0.75rem;
+    }
+
+    .coupon-input-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .coupon-input {
+      flex: 1;
+      padding: 0.7rem 0.875rem;
+      border: var(--border-thin);
+      font-size: 0.85rem;
+      background: var(--color-white);
+      font-family: var(--font-secondary);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .coupon-apply-btn {
+      padding: 0.7rem 1.25rem;
+      background: var(--color-black);
+      color: var(--color-white);
+      font-family: var(--font-secondary);
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition-fast);
+    }
+
+    .coupon-apply-btn:hover { background: var(--color-grey-1); }
+
+    .coupon-applied {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: #27AE60;
+      margin-top: 0.5rem;
+    }
+
+    .coupon-applied.show { display: flex; }
+
+    /* Empty cart */
+    .cart-empty {
+      text-align: center;
+      padding: 5rem 1rem;
+    }
+
+    .cart-empty i {
+      font-size: 3.5rem;
+      color: var(--color-grey-5);
+      display: block;
+      margin-bottom: 1.5rem;
+    }
+
+    .cart-empty h2 {
+      font-family: var(--font-primary);
+      font-size: 1.5rem;
+      font-weight: 400;
+      color: var(--color-black);
+      margin-bottom: 0.75rem;
+    }
+
+    .cart-empty p {
+      font-size: 0.88rem;
+      color: var(--color-grey-3);
+      line-height: 1.8;
+      margin-bottom: 2rem;
+    }
+
+    /* Features */
+    .cart-features {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: var(--border-thin);
+    }
+
+    .cart-feature-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.78rem;
+      color: var(--color-grey-3);
+    }
+
+    .cart-feature-item i {
+      color: var(--color-gold);
+      font-size: 0.9rem;
+      width: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="header-mount"></div>
+
+  <main class="cart-page">
+    <div class="container">
+      <nav class="breadcrumb">
+        <span class="breadcrumb-item"><a href="index.html">Home</a></span>
+        <span class="breadcrumb-sep"><i class="fas fa-chevron-right"></i></span>
+        <span class="breadcrumb-item active">Cart</span>
+      </nav>
+
+      <div style="margin-bottom:var(--spacing-md)">
+        <h1 style="font-family:var(--font-primary); font-size:clamp(1.8rem,4vw,2.5rem); font-weight:400; letter-spacing:0.04em">ショッピングカート</h1>
+      </div>
+
+      <!-- Cart content -->
+      <div id="cartContent"></div>
+    </div>
+  </main>
+
+  <div id="footer-mount"></div>
+
+  <script src="js/components.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    let appliedCoupon = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      injectComponents('');
+      renderCart();
+      document.addEventListener('cartUpdated', renderCart);
+    });
+
+    function renderCart() {
+      const items = Cart.get();
+      const container = document.getElementById('cartContent');
+
+      if (!items.length) {
+        container.innerHTML = `
+          <div class="cart-empty">
+            <i class="fas fa-shopping-bag"></i>
+            <h2>カートに商品がありません</h2>
+            <p>お気に入りの商品を選んで、カートに追加してください。</p>
+            <a href="products.html" class="btn btn-primary btn-lg">コレクションを見る</a>
+          </div>
+        `;
+        return;
+      }
+
+      const subtotal = Cart.getSubtotal();
+      const shipping = Cart.getShipping();
+      const discount = appliedCoupon ? calcDiscount(appliedCoupon, subtotal) : 0;
+      const total    = subtotal + shipping - discount;
+      const isFreeShipping = shipping === 0;
+      const remainForFree  = CONFIG.shippingFree - subtotal;
+
+      container.innerHTML = `
+        <div class="cart-layout">
+          <!-- Items -->
+          <div>
+            <div class="cart-items-header">
+              <span class="heading-sm" style="font-size:0.75rem">商品一覧（${items.length}点）</span>
+              <button onclick="clearAllCart()" style="font-family:var(--font-secondary); font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-grey-4); text-decoration:underline; cursor:pointer; background:none; border:none">すべて削除</button>
+            </div>
+
+            <div id="cartItemsList">
+              ${items.map(item => renderCartItem(item)).join('')}
+            </div>
+
+            ${!isFreeShipping && remainForFree > 0 ? `
+              <div style="margin-top:1rem; padding:0.875rem 1rem; background:rgba(184,168,138,0.1); border:1px solid var(--color-gold); display:flex; align-items:center; gap:0.75rem">
+                <i class="fas fa-truck" style="color:var(--color-gold)"></i>
+                <span style="font-size:0.82rem; color:var(--color-grey-2)">あと <strong style="color:var(--color-black)">${formatPrice(remainForFree)}</strong> で送料無料！</span>
+              </div>
+            ` : `
+              <div style="margin-top:1rem; padding:0.875rem 1rem; background:rgba(39,174,96,0.08); border:1px solid rgba(39,174,96,0.3); display:flex; align-items:center; gap:0.75rem">
+                <i class="fas fa-check-circle" style="color:#27AE60"></i>
+                <span style="font-size:0.82rem; color:var(--color-grey-2)">送料無料対象です！</span>
+              </div>
+            `}
+
+            <div style="margin-top:2rem; padding-top:1rem">
+              <a href="products.html" style="font-family:var(--font-secondary); font-size:0.72rem; font-weight:600; letter-spacing:0.15em; text-transform:uppercase; color:var(--color-grey-3); display:flex; align-items:center; gap:0.5rem">
+                <i class="fas fa-chevron-left" style="font-size:0.6rem"></i> お買い物を続ける
+              </a>
+            </div>
+          </div>
+
+          <!-- Order Summary -->
+          <div class="order-summary">
+            <div class="order-summary-title">Order Summary</div>
+
+            <div class="summary-row">
+              <span>小計</span>
+              <span>${formatPrice(subtotal)}</span>
+            </div>
+            <div class="summary-row ${isFreeShipping ? 'shipping-free' : ''}">
+              <span>送料</span>
+              <span>${isFreeShipping ? '無料' : formatPrice(shipping)}</span>
+            </div>
+            ${appliedCoupon ? `
+              <div class="summary-row" style="color:#27AE60">
+                <span>クーポン割引</span>
+                <span>−${formatPrice(discount)}</span>
+              </div>
+            ` : ''}
+
+            <!-- Coupon -->
+            <div class="coupon-section">
+              <div class="coupon-label">クーポンコード</div>
+              ${appliedCoupon ? `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0.875rem; background:rgba(39,174,96,0.08); border:1px solid rgba(39,174,96,0.3)">
+                  <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.82rem; color:#27AE60">
+                    <i class="fas fa-tag"></i> ${appliedCoupon.code} 適用中
+                  </div>
+                  <button onclick="removeCoupon()" style="font-size:0.68rem; color:var(--color-grey-4); text-decoration:underline; cursor:pointer; background:none; border:none">削除</button>
+                </div>
+              ` : `
+                <div class="coupon-input-row">
+                  <input type="text" class="coupon-input" id="couponInput" placeholder="KALLINOS10" maxlength="20">
+                  <button class="coupon-apply-btn" onclick="applyCoupon()">適用</button>
+                </div>
+                <div class="coupon-applied" id="couponFeedback"></div>
+              `}
+            </div>
+
+            <div class="summary-row total">
+              <span>合計（税込）</span>
+              <span>${formatPrice(Math.max(0, total))}</span>
+            </div>
+
+            <a href="checkout.html" class="btn btn-primary btn-full btn-lg" style="margin-top:1.5rem; text-align:center">
+              レジに進む
+            </a>
+
+            <div class="cart-features">
+              <div class="cart-feature-item">
+                <i class="fas fa-lock"></i> 安全な決済（SSL暗号化）
+              </div>
+              <div class="cart-feature-item">
+                <i class="fas fa-truck"></i> ¥20,000以上で送料無料
+              </div>
+              <div class="cart-feature-item">
+                <i class="fas fa-undo-alt"></i> 14日以内の返品保証
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCartItem(item) {
+      return `
+        <div class="cart-item">
+          <a href="product-detail.html?id=${item.id}">
+            <img
+              src="${item.image_url || 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80'}"
+              alt="${item.name}"
+              class="cart-item-img"
+              loading="lazy"
+            >
+          </a>
+          <div class="cart-item-info">
+            <span class="cart-item-category">${item.category || ''}</span>
+            <a href="product-detail.html?id=${item.id}" class="cart-item-name">${item.name}</a>
+            <span class="cart-item-variant">
+              ${item.selectedColor ? `カラー: ${item.selectedColor}` : ''}
+              ${item.selectedColor && item.selectedSize ? ' / ' : ''}
+              ${item.selectedSize ? `サイズ: ${item.selectedSize}` : ''}
+            </span>
+            <span class="cart-item-price">${formatPrice(item.price)}</span>
+            <div class="cart-item-actions">
+              <div class="quantity-control" style="width:fit-content">
+                <button class="qty-btn" onclick="changeItemQty('${item.cartId}', ${item.qty - 1})">−</button>
+                <span class="qty-input">${item.qty}</span>
+                <button class="qty-btn" onclick="changeItemQty('${item.cartId}', ${item.qty + 1})">＋</button>
+              </div>
+              <button class="cart-item-remove" onclick="removeItem('${item.cartId}')">削除</button>
+            </div>
+          </div>
+          <div class="cart-item-subtotal">${formatPrice(item.price * item.qty)}</div>
+        </div>
+      `;
+    }
+
+    function changeItemQty(cartId, qty) {
+      Cart.updateQty(cartId, qty);
+      renderCart();
+    }
+
+    function removeItem(cartId) {
+      Cart.remove(cartId);
+      renderCart();
+    }
+
+    function clearAllCart() {
+      if (confirm('カートの商品をすべて削除しますか？')) {
+        Cart.clear();
+        renderCart();
+      }
+    }
+
+    async function applyCoupon() {
+      const code = document.getElementById('couponInput')?.value?.trim().toUpperCase();
+      if (!code) return;
+
+      try {
+        const coupon = await API.getCoupon(code);
+        if (!coupon) {
+          showToast('クーポンコードが無効です', 'error');
+          return;
+        }
+        const sub = Cart.getSubtotal();
+        if (sub < (coupon.min_amount || 0)) {
+          showToast(`このクーポンの最低注文金額は${formatPrice(coupon.min_amount)}です`, 'error');
+          return;
+        }
+        appliedCoupon = coupon;
+        showToast(`クーポン「${code}」を適用しました`, 'success');
+        renderCart();
+      } catch {
+        showToast('クーポンの確認に失敗しました', 'error');
+      }
+    }
+
+    function removeCoupon() {
+      appliedCoupon = null;
+      renderCart();
+      showToast('クーポンを削除しました', 'info');
+    }
+
+    function calcDiscount(coupon, subtotal) {
+      if (coupon.discount_type === 'パーセント') {
+        return Math.floor(subtotal * (coupon.discount_value / 100));
+      }
+      return coupon.discount_value || 0;
+    }
+
+    window.changeItemQty = changeItemQty;
+    window.removeItem    = removeItem;
+    window.clearAllCart  = clearAllCart;
+    window.applyCoupon   = applyCoupon;
+    window.removeCoupon  = removeCoupon;
+  </script>
+</body>
+</html>

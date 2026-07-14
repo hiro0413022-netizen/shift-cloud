@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "golfwing",
+  "compatibility_date": "2026-04-13",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "golfwing-production",
+      "database_id": "eb6484c8-67de-48c0-83ee-b250d95f89ef"
+    }
+  ]
+}
