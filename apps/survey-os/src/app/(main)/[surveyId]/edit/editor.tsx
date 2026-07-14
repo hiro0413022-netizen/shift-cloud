@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Question, QOption, QuestionType } from "@/lib/survey";
 import { inputCls, btnCls, btnGhostCls, Panel, STATUS_LABEL } from "@/components/ui";
-import { updateSurvey, saveQuestion, deleteQuestion, moveQuestion } from "./actions";
+import { updateSurvey, saveQuestion, deleteQuestion, reorderQuestions, restoreQuestion, purgeQuestion } from "./actions";
+
+export type DeletedQuestion = {
+  id: string;
+  code: string;
+  type: QuestionType;
+  title: string;
+  deleted_at: string;
+};
 
 export type SurveyMeta = {
   title: string;
@@ -124,20 +132,11 @@ function QuestionCard({
   function remove() {
     const q = question;
     if (!q?.id) return;
-    if (!confirm(`設問「${q.code}」を削除しますか？（回答データは残りますが集計対象から外れます）`)) return;
+    if (!confirm(`設問「${q.code}」を削除しますか？\n（下部の「削除した設問」欄からいつでも復元できます）`)) return;
     start(async () => {
       const res = await deleteQuestion(surveyId, q.id);
       if (res.error) setErr(res.error);
       else onDone();
-    });
-  }
-
-  function move(dir: "up" | "down") {
-    const q = question;
-    if (!q?.id) return;
-    start(async () => {
-      await moveQuestion(surveyId, q.id, dir);
-      onDone();
     });
   }
 
@@ -152,12 +151,6 @@ function QuestionCard({
           <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} className="h-4 w-4 accent-(--color-accent)" />
           必須
         </label>
-        {!isNew && question?.id && (
-          <span className="ml-auto flex gap-1">
-            <button type="button" onClick={() => move("up")} disabled={pending} className="rounded border border-(--color-line) px-2 py-1 text-xs disabled:opacity-40">▲</button>
-            <button type="button" onClick={() => move("down")} disabled={pending} className="rounded border border-(--color-line) px-2 py-1 text-xs disabled:opacity-40">▼</button>
-          </span>
-        )}
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -227,9 +220,143 @@ function QuestionCard({
 }
 
 // ============================================================
+// 折りたたみ行（ドラッグ&ドロップの単位）
+// ============================================================
+function QuestionRow({
+  surveyId,
+  question,
+  index,
+  multiCodes,
+  open,
+  onToggle,
+  onDone,
+  onMove,
+  dnd,
+}: {
+  surveyId: string;
+  question: Question;
+  index: number;
+  multiCodes: { code: string; title: string }[];
+  open: boolean;
+  onToggle: () => void;
+  onDone: () => void;
+  onMove: (dir: "up" | "down") => void;
+  dnd: {
+    onDragStart: () => void;
+    onDragEnter: () => void;
+    onDragEnd: () => void;
+    dragging: boolean;
+    over: boolean;
+  };
+}) {
+  return (
+    <div
+      draggable
+      onDragStart={dnd.onDragStart}
+      onDragEnter={dnd.onDragEnter}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnd={dnd.onDragEnd}
+      onDrop={(e) => e.preventDefault()}
+      className={`rounded-2xl border bg-(--color-panel) shadow-sm transition ${
+        dnd.dragging ? "opacity-40" : ""
+      } ${dnd.over ? "border-(--color-accent)" : "border-(--color-line)"}`}
+    >
+      <div className="flex items-center gap-2 px-3 py-2">
+        <span className="cursor-grab select-none px-1 text-(--color-dim) active:cursor-grabbing" title="ドラッグで並び替え">⠿</span>
+        <span className="w-6 shrink-0 text-right text-xs tabular-nums text-(--color-dim)">{index + 1}</span>
+        <span className="shrink-0 rounded bg-(--color-panel-2) px-1.5 py-0.5 font-mono text-[11px] text-(--color-dim)">{question.code}</span>
+        <span className="shrink-0 text-[11px] text-(--color-dim)">{TYPE_LABEL[question.type]}</span>
+        {question.required && <span className="shrink-0 text-[11px] text-rose-500">必須</span>}
+        <button type="button" onClick={onToggle} className="min-w-0 flex-1 truncate text-left text-sm hover:underline">
+          {question.title || <span className="text-(--color-dim)">（設問文なし）</span>}
+        </button>
+        <span className="ml-auto flex shrink-0 gap-1">
+          <button type="button" onClick={() => onMove("up")} className="rounded border border-(--color-line) px-2 py-1 text-xs">▲</button>
+          <button type="button" onClick={() => onMove("down")} className="rounded border border-(--color-line) px-2 py-1 text-xs">▼</button>
+          <button type="button" onClick={onToggle} className="rounded border border-(--color-line) px-2 py-1 text-xs">
+            {open ? "閉じる" : "編集"}
+          </button>
+        </span>
+      </div>
+
+      {open && (
+        <div className="border-t border-(--color-line) p-2">
+          <QuestionCard surveyId={surveyId} question={question} multiCodes={multiCodes} onDone={onDone} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// 削除した設問（復元）
+// ============================================================
+function DeletedPanel({ surveyId, items, onDone }: { surveyId: string; items: DeletedQuestion[]; onDone: () => void }) {
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  if (items.length === 0) return null;
+
+  return (
+    <Panel title={`削除した設問（${items.length}）`}>
+      <p className="mb-3 text-xs text-(--color-dim)">
+        削除した設問は残っています。「復元」すると設問リストの末尾に戻ります（回答データも集計対象に戻ります）。
+      </p>
+      <div className="space-y-2">
+        {items.map((d) => (
+          <div key={d.id} className="flex items-center gap-2 rounded-lg border border-(--color-line) px-3 py-2">
+            <span className="shrink-0 rounded bg-(--color-panel-2) px-1.5 py-0.5 font-mono text-[11px] text-(--color-dim)">{d.code}</span>
+            <span className="shrink-0 text-[11px] text-(--color-dim)">{TYPE_LABEL[d.type]}</span>
+            <span className="min-w-0 flex-1 truncate text-sm">{d.title}</span>
+            <span className="shrink-0 text-[11px] text-(--color-dim)">{d.deleted_at.slice(0, 10)}</span>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => start(async () => {
+                const res = await restoreQuestion(surveyId, d.id);
+                if (res.error) setErr(res.error);
+                else { setErr(null); onDone(); }
+              })}
+              className="shrink-0 rounded-lg border border-(--color-line) px-3 py-1.5 text-xs hover:bg-(--color-panel-2) disabled:opacity-40"
+            >
+              復元
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                if (!confirm(`設問「${d.code}」を完全に削除しますか？（回答がある場合は削除できません）`)) return;
+                start(async () => {
+                  const res = await purgeQuestion(surveyId, d.id);
+                  if (res.error) setErr(res.error);
+                  else { setErr(null); onDone(); }
+                });
+              }}
+              className="shrink-0 rounded-lg border border-rose-200 px-3 py-1.5 text-xs text-rose-600 hover:bg-rose-50 disabled:opacity-40"
+            >
+              完全削除
+            </button>
+          </div>
+        ))}
+      </div>
+      {err && <p className="mt-3 text-sm text-rose-600">{err}</p>}
+    </Panel>
+  );
+}
+
+// ============================================================
 // メタ編集 + 設問リスト
 // ============================================================
-export function Editor({ surveyId, meta, questions }: { surveyId: string; meta: SurveyMeta; questions: Question[] }) {
+export function Editor({
+  surveyId,
+  meta,
+  questions,
+  deletedQuestions = [],
+}: {
+  surveyId: string;
+  meta: SurveyMeta;
+  questions: Question[];
+  deletedQuestions?: DeletedQuestion[];
+}) {
   const router = useRouter();
   const refresh = () => router.refresh();
 
@@ -239,7 +366,56 @@ export function Editor({ surveyId, meta, questions }: { surveyId: string; meta: 
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
 
-  const multiCodes = questions.filter((q) => q.type === "multi").map((q) => ({ code: q.code, title: q.title }));
+  // 並び替え用のローカル順序（サーバーの結果で同期）
+  const [list, setList] = useState<Question[]>(questions);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [orderErr, setOrderErr] = useState<string | null>(null);
+  const [orderMsg, setOrderMsg] = useState<string | null>(null);
+
+  useEffect(() => { setList(questions); }, [questions]);
+
+  function persistOrder(next: Question[]) {
+    setList(next);
+    setOrderErr(null);
+    setOrderMsg(null);
+    start(async () => {
+      const res = await reorderQuestions(surveyId, next.map((q) => q.id));
+      if (res.error) { setOrderErr(res.error); setList(questions); }
+      else { setOrderMsg("並び順を保存しました。"); refresh(); }
+    });
+  }
+
+  function moveBy(index: number, dir: "up" | "down") {
+    const to = dir === "up" ? index - 1 : index + 1;
+    if (to < 0 || to >= list.length) return;
+    const next = list.slice();
+    [next[index], next[to]] = [next[to], next[index]];
+    persistOrder(next);
+  }
+
+  function onDragEnter(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    setOverId(targetId);
+    const from = list.findIndex((q) => q.id === dragId);
+    const to = list.findIndex((q) => q.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = list.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setList(next); // 保存はドロップ時
+  }
+
+  function onDragEnd() {
+    setOverId(null);
+    if (!dragId) return;
+    setDragId(null);
+    const changed = list.some((q, i) => q.id !== questions[i]?.id);
+    if (changed) persistOrder(list);
+  }
+
+  const multiCodes = list.filter((q) => q.type === "multi").map((q) => ({ code: q.code, title: q.title }));
 
   function saveMeta() {
     setMetaErr(null);
@@ -318,13 +494,36 @@ export function Editor({ surveyId, meta, questions }: { surveyId: string; meta: 
 
       {/* 設問 */}
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">設問（{questions.length}）</h2>
+        <div>
+          <h2 className="text-sm font-semibold">設問（{list.length}）</h2>
+          <p className="text-[11px] text-(--color-dim)">⠿ をドラッグ、または ▲▼ で並び替え（自動保存）</p>
+        </div>
         {!adding && <button type="button" onClick={() => setAdding(true)} className={btnCls}>＋ 設問を追加</button>}
       </div>
 
-      <div className="space-y-3">
-        {questions.map((q) => (
-          <QuestionCard key={q.id} surveyId={surveyId} question={q} multiCodes={multiCodes} onDone={refresh} />
+      {orderErr && <p className="text-sm text-rose-600">{orderErr}</p>}
+      {orderMsg && <p className="text-sm text-emerald-600">{orderMsg}</p>}
+
+      <div className="space-y-2">
+        {list.map((q, i) => (
+          <QuestionRow
+            key={q.id}
+            surveyId={surveyId}
+            question={q}
+            index={i}
+            multiCodes={multiCodes}
+            open={openId === q.id}
+            onToggle={() => setOpenId(openId === q.id ? null : q.id)}
+            onDone={() => { setOpenId(null); refresh(); }}
+            onMove={(dir) => moveBy(i, dir)}
+            dnd={{
+              onDragStart: () => { setDragId(q.id); setOpenId(null); },
+              onDragEnter: () => onDragEnter(q.id),
+              onDragEnd,
+              dragging: dragId === q.id,
+              over: overId === q.id,
+            }}
+          />
         ))}
 
         {adding && (
@@ -338,6 +537,8 @@ export function Editor({ surveyId, meta, questions }: { surveyId: string; meta: 
           />
         )}
       </div>
+
+      <DeletedPanel surveyId={surveyId} items={deletedQuestions} onDone={refresh} />
     </div>
   );
 }

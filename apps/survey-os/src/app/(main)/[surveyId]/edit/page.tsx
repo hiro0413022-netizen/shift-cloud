@@ -3,7 +3,7 @@ import { requireSurveyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { asOptions, asConfig, type Question, type QuestionType } from "@/lib/survey";
 import { Panel, Empty } from "@/components/ui";
-import { Editor, type SurveyMeta } from "./editor";
+import { Editor, type SurveyMeta, type DeletedQuestion } from "./editor";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +44,21 @@ export default async function EditPage({ params }: { params: Promise<{ surveyId:
     config: asConfig(q.config),
   }));
 
+  const { data: del } = await admin
+    .from("svy_questions")
+    .select("id, code, type, title, deleted_at")
+    .eq("survey_id", surveyId)
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
+
+  const deletedQuestions: DeletedQuestion[] = (del ?? []).map((q) => ({
+    id: q.id as string,
+    code: q.code as string,
+    type: q.type as QuestionType,
+    title: q.title as string,
+    deleted_at: q.deleted_at as string,
+  }));
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
@@ -64,6 +79,7 @@ export default async function EditPage({ params }: { params: Promise<{ surveyId:
           est_minutes: survey.est_minutes,
         }}
         questions={questions}
+        deletedQuestions={deletedQuestions}
       />
     </div>
   );

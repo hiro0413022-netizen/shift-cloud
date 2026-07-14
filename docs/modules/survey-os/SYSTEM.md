@@ -60,13 +60,15 @@ CSV（`/api/export/[surveyId]`）:
 ## 6. アンケートビルダー（項目編集画面）✅実装済
 
 `/[surveyId]/edit`（`editor.tsx` + `edit/actions.ts`）。ログインは管理と同じ `view_hq`/`use_survey`。
-- **設問**: 追加 / 編集（設問文・補足・必須・型・選択肢）/ 削除（論理削除）/ ▲▼で並び替え。
+- **設問**: 追加 / 編集（設問文・補足・必須・型・選択肢）/ 削除（論理削除）。設問は**1行に折りたたみ表示**、クリックで展開して編集。
+- **並び替え**: 行の `⠿` を**ドラッグ&ドロップ**、または ▲▼。ドロップ時に `reorderQuestions` が position を1..n で一括保存（自動保存）。
+- **削除の復元**: 編集画面下部の「削除した設問」欄に削除済み設問を一覧表示。「復元」で末尾に戻る（コード重複時は `_2` を自動付与）。「完全削除」は**回答が1件もない場合のみ**可（`purgeQuestion`）。
 - **型変更**: single/multi/text/textarea/ranking/scale。選択肢は表示名を編集（内部valueは自動採番＝既存回答を壊さない）。
 - **複数選択**: 「その他」自由記述許可 / 「順位付けの母集団にする」フラグ。
 - **順位付け**: 候補（pool）を編集し、連動する複数選択設問（source_code）を選ぶと受講者だけを並び替え対象に。
 - **アンケート設定**: タイトル/説明/slug/公開状態(下書き・公開・終了)/匿名/冒頭文/お礼文/想定時間。
 - **新規作成**: 一覧の「＋新規アンケート」→ 空アンケートを作成し編集画面へ。
-- 変更は `audit_logs`（survey.update/create、question.create/update/delete）に記録。
+- 変更は `audit_logs`（survey.update/create、question.create/update/delete/reorder/restore/purge）に記録。
 
 ## 7. 今後（フェーズ3）
 

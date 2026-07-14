@@ -233,6 +233,108 @@ export async function moveQuestion(surveyId: string, questionId: string, dir: "u
 }
 
 // ============================================================
+// 並び替え（ドラッグ&ドロップ: 並び順を一括保存）
+// ============================================================
+export async function reorderQuestions(surveyId: string, orderedIds: string[]): Promise<ActionResult> {
+  const actor = await requireSurveyActor();
+  const admin = createAdmin();
+  const s = await assertSurvey(admin, surveyId, actor.companyId);
+  if (!s) return { error: "対象のアンケートが見つかりません。" };
+
+  const { data } = await admin
+    .from("svy_questions")
+    .select("id")
+    .eq("survey_id", surveyId)
+    .is("deleted_at", null);
+  const ids = new Set(((data ?? []) as unknown as Array<{ id: string }>).map((r) => r.id));
+  if (orderedIds.length !== ids.size || orderedIds.some((id) => !ids.has(id))) {
+    return { error: "設問リストが変更されています。画面を再読み込みしてください。" };
+  }
+
+  // 一時退避（負値）→ 本番値。position に unique 制約はないが安全側で二段階。
+  for (let i = 0; i < orderedIds.length; i++) {
+    await admin.from("svy_questions").update({ position: -(i + 1) }).eq("id", orderedIds[i]).eq("survey_id", surveyId);
+  }
+  for (let i = 0; i < orderedIds.length; i++) {
+    await admin.from("svy_questions").update({ position: i + 1 }).eq("id", orderedIds[i]).eq("survey_id", surveyId);
+  }
+  await logAudit(actor, "question.reorder", "svy_surveys", surveyId, null, { count: orderedIds.length });
+  revalidatePath(`/${surveyId}/edit`);
+  return { ok: true };
+}
+
+// ============================================================
+// 削除した設問の復元（論理削除の取り消し）
+// ============================================================
+export async function restoreQuestion(surveyId: string, questionId: string): Promise<ActionResult> {
+  const actor = await requireSurveyActor();
+  const admin = createAdmin();
+  const s = await assertSurvey(admin, surveyId, actor.companyId);
+  if (!s) return { error: "対象のアンケートが見つかりません。" };
+
+  const { data: target } = await admin
+    .from("svy_questions")
+    .select("id, code, deleted_at")
+    .eq("id", questionId)
+    .eq("survey_id", surveyId)
+    .maybeSingle();
+  const t = target as unknown as { id: string; code: string; deleted_at: string | null } | null;
+  if (!t) return { error: "設問が見つかりません。" };
+  if (!t.deleted_at) return { ok: true };
+
+  // 生存中の設問を取得（code重複回避 + 末尾position算出）
+  const { data: alive } = await admin
+    .from("svy_questions")
+    .select("code, position")
+    .eq("survey_id", surveyId)
+    .is("deleted_at", null);
+  const rows = (alive ?? []) as unknown as Array<{ code: string; position: number }>;
+
+  // codeが復元先で衝突していたらサフィックスを付ける
+  let code = t.code;
+  if (rows.some((r) => r.code === code)) {
+    for (let i = 2; i < 100; i++) {
+      const cand = `${t.code}_${i}`.slice(0, 20);
+      if (!rows.some((r) => r.code === cand)) { code = cand; break; }
+    }
+    if (code === t.code) return { error: `設問コード「${t.code}」が重複しています。既存設問のコードを変更してください。` };
+  }
+
+  const maxPos = rows.length ? Math.max(...rows.map((r) => r.position)) : 0;
+  const { error } = await admin
+    .from("svy_questions")
+    .update({ deleted_at: null, code, position: maxPos + 1 })
+    .eq("id", questionId)
+    .eq("survey_id", surveyId);
+  if (error) return { error: "復元に失敗しました。" };
+  await logAudit(actor, "question.restore", "svy_questions", questionId, null, { code });
+  revalidatePath(`/${surveyId}/edit`);
+  return { ok: true };
+}
+
+// ============================================================
+// 完全削除（回答が1件でもあれば不可）
+// ============================================================
+export async function purgeQuestion(surveyId: string, questionId: string): Promise<ActionResult> {
+  const actor = await requireSurveyActor();
+  const admin = createAdmin();
+  const s = await assertSurvey(admin, surveyId, actor.companyId);
+  if (!s) return { error: "対象のアンケートが見つかりません。" };
+
+  const { count } = await admin
+    .from("svy_answers")
+    .select("id", { count: "exact", head: true })
+    .eq("question_id", questionId);
+  if ((count ?? 0) > 0) return { error: "この設問には回答があるため完全削除できません（削除済みのまま保持されます）。" };
+
+  const { error } = await admin.from("svy_questions").delete().eq("id", questionId).eq("survey_id", surveyId);
+  if (error) return { error: "完全削除に失敗しました。" };
+  await logAudit(actor, "question.purge", "svy_questions", questionId, null, null);
+  revalidatePath(`/${surveyId}/edit`);
+  return { ok: true };
+}
+
+// ============================================================
 // 新規アンケート作成 → 編集画面へ
 // ============================================================
 export async function createSurvey(title: string): Promise<ActionResult> {
