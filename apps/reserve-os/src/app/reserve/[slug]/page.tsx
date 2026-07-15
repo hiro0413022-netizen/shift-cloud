@@ -84,13 +84,14 @@ export default async function ReservePage({
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-(--color-accent) text-3xl text-white">✓</div>
             <h2 className="mt-5 text-xl font-bold">お申し込みを受け付けました</h2>
             <p className="mt-3 text-sm leading-relaxed text-(--color-dim)">
-              ご入力ありがとうございます。<br />ご希望日時をもとにスタッフが空き状況を確認し、確定のご連絡を差し上げます。
+              ご入力ありがとうございます。<br />スタッフが空き状況を確認のうえ、<b>お電話で折り返しご連絡し、ご予約を確定</b>いたします。
             </p>
             <div className="mt-6 space-y-2 rounded-xl bg-(--color-panel-2) p-4 text-left text-sm">
-              <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">1</span>受付確認メールをお送りしました（届かない場合は迷惑メールをご確認ください）</p>
-              <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">2</span>スタッフが日程を確認し、確定のご連絡をします</p>
-              <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">3</span>公式LINEにも通知が届きます</p>
+              <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">1</span>受付確認をLINE（またはメール）でお送りしました</p>
+              <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">2</span>スタッフが空き状況を確認します</p>
+              <p className="flex items-center gap-2"><span className="step-num !h-6 !w-6 !text-xs">3</span>ご登録のお電話番号に折り返しご連絡し、日時を確定します</p>
             </div>
+            <p className="mt-4 text-xs leading-relaxed text-(--color-dim)">お電話が取れなかった場合は、改めておかけ直しいたします。</p>
             <a href={`/reserve/${slug}`} className="mt-6 inline-block text-sm font-medium text-(--color-accent)">トップへ戻る</a>
           </div>
         </div>
@@ -231,9 +232,10 @@ export default async function ReservePage({
         <div className="hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
           <dl className="space-y-4 text-sm">
             {[
-              ["ご予約について", "本フォームはお申し込みです。スタッフが空き状況を確認し、確定のご連絡をもってご予約成立となります。"],
+              ["ご予約について", "本フォームはお申し込みです。スタッフがお電話で折り返しご連絡し、日時を確定した時点でご予約成立となります。"],
               ["受付時間", `${hoursText(hours)}。定休日・営業時間外はお選びいただけません。`],
-              ["キャンセルについて", "ご都合が悪くなった場合は、確定のご連絡メールへの返信、またはお電話でお早めにご連絡ください。"],
+              ["お電話でのご連絡", "ご登録のお電話番号に、スタッフが折り返しご連絡いたします。お電話が取れなかった場合は改めておかけ直しいたします。"],
+              ["キャンセルについて", "ご都合が悪くなった場合は、お電話でお早めにご連絡ください。"],
               ["持ち物", "普段お使いのクラブ（あれば）、ゴルフグローブ、動きやすい服装。手ぶらでもご参加いただけます。"],
               ["お支払い方法", "現金・各種クレジットカードがご利用いただけます。詳細は当日ご案内します。"],
               ["所要時間", durationText ? `メニューにより ${durationText}。内容により前後します。` : "内容により異なります。"],

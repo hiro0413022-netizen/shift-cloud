@@ -146,14 +146,14 @@ export async function ackCustomer(r: RequestRow): Promise<MailResult> {
     <h2 style="margin:0 0 16px;font-size:18px">${svc} のお申し込みを受け付けました</h2>
     <p style="margin:0 0 12px">${esc(r.name)} 様</p>
     <p style="margin:0 0 12px;line-height:1.8">この度はGOLF WINGへお申し込みいただきありがとうございます。<br>
-    ご希望日時をもとにスタッフが空き状況を確認し、<b>確定のご連絡を改めて差し上げます</b>。今しばらくお待ちください。</p>
+    スタッフが空き状況を確認のうえ、<b>ご登録のお電話番号に折り返しご連絡し、ご予約を確定</b>いたします。今しばらくお待ちください。</p>
     <table style="border-collapse:collapse;font-size:14px;margin:12px 0"><tbody>${preferredRows(r)}</tbody></table>
     <p style="margin:16px 0 0;color:#6b6b63;font-size:13px">受付番号: ${seq}<br>
     ※本メールは送信専用ではありません。ご返信いただくとGOLF WING担当者へ届きます。</p>
   </div>`;
   const text =
     `${String(r.name ?? "")} 様\n\nこの度はGOLF WING ${String(r.service_name ?? "")}へお申し込みいただきありがとうございます。\n` +
-    `スタッフが空き状況を確認し、確定のご連絡を改めて差し上げます。\n受付番号: ${seq}\n`;
+    `スタッフが空き状況を確認のうえ、お電話で折り返しご連絡し、ご予約を確定いたします。\n受付番号: ${seq}\n`;
 
   return sendEmail({
     to,

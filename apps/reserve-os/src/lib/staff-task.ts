@@ -39,13 +39,9 @@ export async function createStaffTask(r: RequestRow, siteUrl: string): Promise<{
     .join("\n");
   // 連絡手段: LINE連携済みなら確定操作でLINEが自動送信される（DECISIONS #56）。
   // 未連携ならメール（＝スタッフが手で返信）。スタッフが「どっちで返すのか」を迷わないよう明記する。
-  const onLine = !!r.line_user_id;
-  const contact = onLine
-    ? `LINE連携済み（${String(r.line_display_name ?? "表示名なし")}）／電話 ${String(r.phone ?? "-")}`
-    : `電話 ${String(r.phone ?? "-")} / メール ${String(r.email ?? "-")}`;
-  const howto = onLine
-    ? "日程を確認し、Reserve OSで「確定」してください。確定内容はLINEで自動送信されます。"
-    : "日程を確認のうえ、GOLF WINGのメールアドレスからお客様へご返信ください。";
+  // 確定は「お客様へ折り返し電話」で行う運用（DECISIONS #59）
+  const contact = `☎ ${String(r.phone ?? "電話番号なし")}`;
+  const howto = "空き状況を確認し、お客様へ折り返しお電話 → 日時が決まったら Reserve OS の詳細画面で「確定」を記録してください（画面に架電台本があります）。";
   const menu = r.plan_name
     ? `メニュー: ${String(r.plan_name)}${r.plan_price ? `（¥${Number(r.plan_price).toLocaleString("ja-JP")}）` : ""}\n`
     : "";

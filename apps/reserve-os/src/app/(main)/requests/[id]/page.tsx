@@ -5,6 +5,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Badge } from "@/components/ui";
 import { STATUS_LABEL, STATUS_TONE, HANDEDNESS_LABEL, INTAKE_FIELDS, fmtSeq, fmtJst } from "@/lib/reserve";
 import { confirmRequest, declineRequest, completeRequest, cancelRequest, saveNote } from "./actions";
+import { CallScript } from "./call-script";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -76,6 +77,18 @@ export default async function RequestDetail({
           {mailto && <a href={mailto} className="rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm">✉ メールで返信</a>}
         </div>
       </div>
+
+      {/* 折り返し電話の台本（未確定のときだけ出す / DECISIONS #59） */}
+      {(status === "pending" || status === "confirmed") && (
+        <CallScript
+          seq={fmtSeq(r.request_seq as number)}
+          name={String(r.name)}
+          nameKana={r.name_kana ? String(r.name_kana) : null}
+          menu={String(r.plan_name ?? r.service_name ?? "フィッティング")}
+          phone={r.phone ? String(r.phone) : null}
+          prefs={prefs.map(([, iso]) => fmtJst(iso))}
+        />
+      )}
 
       {/* 希望日時 */}
       <div className="hud rounded-2xl border border-(--color-line) bg-(--color-panel) p-5">
