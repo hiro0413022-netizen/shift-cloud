@@ -32,6 +32,27 @@ export function roundDailyWork(workMinutes: number, roundingMinutes: number): nu
   return workMinutes;
 }
 
+/**
+ * 残業（分）を算出する。DECISIONS #60
+ *
+ * 残業＝シフト終了超過（docs/modules/workforce-os/BUSINESS.md）。これまでは生の退勤打刻で
+ * 判定していたため、退勤が数分過ぎただけで残業が付いていた（例: 退勤19:54・終了19:45→残業10分）。
+ * 会社設定 rounding_minutes（GOLF WING=15）に合わせ、**退勤打刻を丸め単位に切り下げてから**
+ * シフト終了と比べる。19:54→19:45となり残業0。
+ *
+ * ※丸めは残業判定のみに使う（遅刻・早退・実働は生打刻のまま）。roundingMinutes<=0 なら従来通り生値。
+ * 引数はepochミリ秒。15分は9時間(JST offset)を割り切るため、絶対時刻での切り下げでJSTの:00/:15/:30/:45に揃う。
+ */
+export function calcOvertimeMinutes(
+  clockOutMs: number,
+  shiftEndMs: number,
+  roundingMinutes: number
+): number {
+  const grid = roundingMinutes > 0 ? roundingMinutes * 60000 : 0;
+  const effectiveOut = grid > 0 ? Math.floor(clockOutMs / grid) * grid : clockOutMs;
+  return Math.max(0, Math.round((effectiveOut - shiftEndMs) / 60000));
+}
+
 export type DayAttendance = {
   staff_id: string;
   work_minutes: number;

@@ -5,12 +5,31 @@ import {
   autoBreakMinutes,
   monthRange,
   roundDailyWork,
+  calcOvertimeMinutes,
   aggregateAttendance,
   calcPayrollAmounts,
   wageOnDate,
   calcMonthlyPayroll,
   type WageRow,
 } from "../apps/shift-cloud/src/lib/payroll-calc.ts";
+
+// JSTの日時をepochミリ秒に
+const jst = (date: string, hhmm: string) => new Date(`${date}T${hhmm}:00+09:00`).getTime();
+
+test("calcOvertimeMinutes: 退勤を15分切り下げてから残業判定（DECISIONS #60）", () => {
+  const D = "2026-07-13";
+  // 報告のケース: 退勤19:54・シフト終了19:45 → 生なら残業9分だが、丸めで19:45に切り下げ→残業0
+  assert.equal(calcOvertimeMinutes(jst(D, "19:54"), jst(D, "19:45"), 15), 0);
+  // 秒がある場合も同グリッドに切り下がる
+  assert.equal(calcOvertimeMinutes(jst(D, "19:59"), jst(D, "19:45"), 15), 0);
+  // 15分を超えた分だけ付く（20:05→20:00で残業15分）
+  assert.equal(calcOvertimeMinutes(jst(D, "20:05"), jst(D, "19:45"), 15), 15);
+  assert.equal(calcOvertimeMinutes(jst(D, "20:15"), jst(D, "19:45"), 15), 30);
+  // 早く上がった場合は残業なし
+  assert.equal(calcOvertimeMinutes(jst(D, "19:30"), jst(D, "19:45"), 15), 0);
+  // 丸めなし(0)は従来通り生値（切り下げしない）
+  assert.equal(calcOvertimeMinutes(jst(D, "19:54"), jst(D, "19:45"), 0), 9);
+});
 
 test("autoBreakMinutes: 労基法の段階式（6h超=45分, 8h超=60分）", () => {
   assert.equal(autoBreakMinutes(0), 0);

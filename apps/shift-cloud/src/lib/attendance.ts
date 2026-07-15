@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstDateTime } from "@/lib/util";
-import { autoBreakMinutes } from "@/lib/payroll-calc";
+import { autoBreakMinutes, calcOvertimeMinutes } from "@/lib/payroll-calc";
 
 // 純粋ロジックは payroll-calc.ts へ集約（テスト対象）。既存importの互換のため再export。
 export { autoBreakMinutes };
@@ -39,6 +39,15 @@ export async function recalcAttendance(
   opts: RecalcOpts = {},
 ) {
   const admin = createAdmin();
+
+  // 残業判定の丸め幅（会社設定 rounding_minutes。GOLF WING=15）DECISIONS #60
+  const { data: company } = await admin
+    .from("companies")
+    .select("settings")
+    .eq("id", companyId)
+    .single();
+  const roundingMinutes =
+    ((company?.settings ?? {}) as { rounding_minutes?: number }).rounding_minutes ?? 0;
 
   // JSTの1日ウィンドウ
   const from = `${date}T00:00:00+09:00`;
@@ -127,7 +136,8 @@ export async function recalcAttendance(
     if (clockIn) late = Math.max(0, Math.round((new Date(clockIn).getTime() - s.getTime()) / 60000));
     if (clockOut) {
       early = Math.max(0, Math.round((e.getTime() - new Date(clockOut).getTime()) / 60000));
-      overtime = Math.max(0, Math.round((new Date(clockOut).getTime() - e.getTime()) / 60000));
+      // 残業は退勤を丸め単位に切り下げてから判定（遅刻・早退・実働は生打刻のまま）DECISIONS #60
+      overtime = calcOvertimeMinutes(new Date(clockOut).getTime(), e.getTime(), roundingMinutes);
     }
   }
 
