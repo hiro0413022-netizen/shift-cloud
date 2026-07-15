@@ -14,6 +14,7 @@ import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { runLegalAiExtraction } from "@/lib/legal-ai";
 import { runReceiptAiExtraction } from "@/lib/receipt-ai";
+import { generateDeliverables, type PromptForRun } from "@/lib/agent-runner";
 
 /* ============================================================
    CEO AI — 古川さんの分身（正典: docs/genesis/VISION.md §1/§3/§8）
@@ -140,9 +141,10 @@ async function claudeAnalysis(d: CockpitData): Promise<CeoAnalysis | null> {
   }
 }
 
-/** 指示案をAI社員宛てプロンプト（下書き）として保存し、対象AIの状態を更新 */
-async function saveInstructions(companyId: string, analysis: CeoAnalysis) {
-  if (analysis.instructions.length === 0) return;
+/** 指示案をAI社員宛てプロンプト（下書き）として保存し、対象AIの状態を更新。
+    生成した指示書（成果物生成の入力になる）を返す */
+async function saveInstructions(companyId: string, analysis: CeoAnalysis): Promise<PromptForRun[]> {
+  if (analysis.instructions.length === 0) return [];
   const admin = createAdmin();
   const { data: agents } = await admin
     .from("ai_agents")
@@ -151,25 +153,39 @@ async function saveInstructions(companyId: string, analysis: CeoAnalysis) {
     .is("deleted_at", null);
   const byCode = new Map((agents ?? []).map((a) => [String(a.code), a]));
 
+  const created: PromptForRun[] = [];
   for (const ins of analysis.instructions) {
     const agent = byCode.get(ins.agent_code);
-    await admin.from("prompts").insert({
-      company_id: companyId,
-      target_ai: "claude",
-      title: `【CEO AI→${agent?.name ?? ins.agent_code}】${ins.instruction.slice(0, 60)}`,
-      body: [
-        `## CEO AIからの指示（${new Date().toLocaleDateString("ja-JP")}）`,
-        `宛先: ${agent?.name ?? ins.agent_code}`,
-        "",
-        "## 指示内容",
-        ins.instruction,
-        "",
-        "## 背景",
-        "正典 docs/genesis/VISION.md（North Star）から逆算した本日の打ち手。分析・下書き・案の作成まで。実行（送信・デプロイ・課金・契約）は古川さんの承認必須（VISION §7）。",
-      ].join("\n"),
-      status: "draft",
-      context: { generated_from: "ceo_ai_daily", agent_code: ins.agent_code, engine: analysis.engine },
-    });
+    const { data: inserted } = await admin
+      .from("prompts")
+      .insert({
+        company_id: companyId,
+        target_ai: "claude",
+        title: `【CEO AI→${agent?.name ?? ins.agent_code}】${ins.instruction.slice(0, 60)}`,
+        body: [
+          `## CEO AIからの指示（${new Date().toLocaleDateString("ja-JP")}）`,
+          `宛先: ${agent?.name ?? ins.agent_code}`,
+          "",
+          "## 指示内容",
+          ins.instruction,
+          "",
+          "## 背景",
+          "正典 docs/genesis/VISION.md（North Star）から逆算した本日の打ち手。分析・下書き・案の作成まで。実行（送信・デプロイ・課金・契約）は古川さんの承認必須（VISION §7）。",
+        ].join("\n"),
+        status: "draft",
+        context: { generated_from: "ceo_ai_daily", agent_code: ins.agent_code, engine: analysis.engine },
+      })
+      .select("id")
+      .single();
+    if (inserted?.id) {
+      created.push({
+        id: inserted.id,
+        agent_id: agent?.id ?? null,
+        agent_code: ins.agent_code,
+        agent_name: agent?.name ?? ins.agent_code,
+        instruction: ins.instruction,
+      });
+    }
     if (agent) {
       await admin
         .from("ai_agents")
@@ -177,6 +193,7 @@ async function saveInstructions(companyId: string, analysis: CeoAnalysis) {
         .eq("id", agent.id);
     }
   }
+  return created;
 }
 
 /** 日次レポート本体（VISION §1/§3の型）。actor無しでも実行可（Cron用） */
@@ -213,8 +230,12 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   const startedAt = new Date().toISOString();
   const analysis = (await claudeAnalysis(d)) ?? ruleBasedAnalysis(d);
 
-  // 3. 指示案をAI社員に振る（下書き保存）
-  await saveInstructions(companyId, analysis);
+  // 3. 指示案をAI社員に振る（下書き保存）→ その指示書を入力に成果物まで自動生成（DECISIONS #60）
+  //    「AI社員は動いている（指示は出た）のに成果物が無い」状態を解消する。
+  //    生成物は ai_execution_logs に review_status='pending' で溜まり、/deliverables で承認/却下。
+  //    ANTHROPIC_API_KEY 未設定なら成果物生成はスキップ（指示書は残る）。
+  const createdPrompts = await saveInstructions(companyId, analysis);
+  await generateDeliverables(companyId, createdPrompts).catch(() => 0);
 
   // 3.5 改善提案を生成（DECISIONS #52）。Cockpit/一覧に出て、そのまま実行指示にできる
   await generateSuggestions(companyId).catch(() => 0);

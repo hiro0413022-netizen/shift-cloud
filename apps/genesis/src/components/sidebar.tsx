@@ -20,6 +20,7 @@ export const NAV = [
   { href: "/library", label: "資料室", en: "Library", icon: "📁" },
   { href: "/network", label: "システム相関図", en: "System Network", icon: "🕸" },
   { href: "/agents", label: "AI社員一覧", en: "AI Agents", icon: "🤖" },
+  { href: "/deliverables", label: "成果物レビュー", en: "AI Deliverables", icon: "🎁" },
   { href: "/memories", label: "経営メモ（AIの記憶）", en: "Business Memory", icon: "🧠" },
   { href: "/decisions", label: "決定事項ログ", en: "Decision Log", icon: "⚖" },
   { href: "/events", label: "出来事ログ", en: "Company Events", icon: "⚡" },
