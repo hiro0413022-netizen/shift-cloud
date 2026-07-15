@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { requireGenesisActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { getDirectives, TARGET_LABELS, DIRECTIVE_STATUS_LABELS } from "@/lib/directives";
-import { Panel, Badge, Empty, btnCls, btnGhostCls, inputCls, fmtDate } from "@/components/ui";
-import { createDirective, setDirectiveStatus } from "./actions";
+import { getDirectives, getStepsFor, TARGET_LABELS, DIRECTIVE_STATUS_LABELS, STEP_STATUS_LABELS } from "@/lib/directives";
+import { Panel, Badge, Empty, StatusDot, btnCls, btnGhostCls, inputCls, fmtDate } from "@/components/ui";
+import { createDirective, setDirectiveStatus, setStepStatus } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +21,18 @@ export default async function DirectivesPage() {
   const agents = agentRes.data ?? [];
   const pendingApprovals = (approvalRes.data ?? []).length;
 
+  // キャンペーン（工程つき）指示の工程を取得
+  const stepMap = await getStepsFor(
+    actor.companyId,
+    [...open, ...done].filter((d) => d.target_kind === "campaign").map((d) => d.id)
+  );
+
   return (
     <div className="space-y-4">
       <header>
         <h1 className="text-xl font-bold">実行指示センター</h1>
         <p className="text-sm text-(--color-dim)">
-          Genesisから指示を出す唯一の入口。スタッフには「やることリスト」に届き、AI社員には指示書が渡り、外部送信は承認を経てから実行されます（VISION §7）。
+          Genesisから指示を出す唯一の入口。スタッフには「やることリスト」に届き、AI社員には指示書が渡り、外部送信は承認を経てから実行されます（VISION §7）。改善提案からは「工程（誰が・何を・どの順で）」に分けて配れます。
         </p>
       </header>
 
@@ -102,41 +108,84 @@ export default async function DirectivesPage() {
           <Empty>未完了の指示はありません</Empty>
         ) : (
           <ul className="space-y-3">
-            {open.map((d) => (
-              <li key={d.id} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={d.target_kind === "external" ? "gold" : d.target_kind === "staff" ? "accent" : "ok"}>
-                    {TARGET_LABELS[d.target_kind]}
-                  </Badge>
-                  {d.priority === "high" && <Badge tone="danger">高</Badge>}
-                  <span className="text-sm font-medium">{d.title}</span>
-                  <span className="text-xs text-(--color-dim)">
-                    → {d.staff_name ?? d.agent_name ?? (d.target_kind === "external" ? "承認待ち" : "—")}
-                  </span>
-                  {d.due_date && <span className="text-xs text-amber-300">期限 {d.due_date}</span>}
-                  <span className="ml-auto text-xs text-(--color-dim)">
-                    {DIRECTIVE_STATUS_LABELS[d.status] ?? d.status} / {fmtDate(d.created_at)}
-                  </span>
-                </div>
-                {d.body && <p className="mt-1 whitespace-pre-wrap text-xs text-(--color-dim)">{d.body}</p>}
-                {d.origin_kind === "suggestion" && (
-                  <p className="mt-1 text-xs text-sky-300">改善提案から発行</p>
-                )}
-                <form action={setDirectiveStatus} className="mt-2 flex flex-wrap items-center gap-2">
-                  <input type="hidden" name="id" value={d.id} />
-                  <input name="result" placeholder="結果メモ（任意）" className={`${inputCls} max-w-xs`} />
-                  <button name="status" value="done" className={btnCls}>
-                    完了にする
-                  </button>
-                  <button name="status" value="in_progress" className={btnGhostCls}>
-                    対応中
-                  </button>
-                  <button name="status" value="cancelled" className={btnGhostCls}>
-                    取消
-                  </button>
-                </form>
-              </li>
-            ))}
+            {open.map((d) => {
+              const steps = stepMap.get(d.id) ?? [];
+              const doneCount = steps.filter((s) => s.status === "done" || s.status === "cancelled").length;
+              return (
+                <li key={d.id} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone={d.target_kind === "external" ? "gold" : d.target_kind === "campaign" ? "gold" : d.target_kind === "staff" ? "accent" : "ok"}>
+                      {TARGET_LABELS[d.target_kind]}
+                    </Badge>
+                    {d.priority === "high" && <Badge tone="danger">高</Badge>}
+                    <span className="text-sm font-medium">{d.title}</span>
+                    <span className="text-xs text-(--color-dim)">
+                      → {d.target_kind === "campaign" ? `${steps.length}工程` : d.staff_name ?? d.agent_name ?? (d.target_kind === "external" ? "承認待ち" : "—")}
+                    </span>
+                    {d.due_date && <span className="text-xs text-amber-300">期限 {d.due_date}</span>}
+                    <span className="ml-auto text-xs text-(--color-dim)">
+                      {DIRECTIVE_STATUS_LABELS[d.status] ?? d.status} / {fmtDate(d.created_at)}
+                    </span>
+                  </div>
+                  {d.body && <p className="mt-1 whitespace-pre-wrap text-xs text-(--color-dim)">{d.body}</p>}
+                  {d.origin_kind === "suggestion" && <p className="mt-1 text-xs text-sky-300">改善提案から発行</p>}
+
+                  {steps.length === 0 ? (
+                    <form action={setDirectiveStatus} className="mt-2 flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="id" value={d.id} />
+                      <input name="result" placeholder="結果メモ（任意）" className={`${inputCls} max-w-xs`} />
+                      <button name="status" value="done" className={btnCls}>
+                        完了にする
+                      </button>
+                      <button name="status" value="in_progress" className={btnGhostCls}>
+                        対応中
+                      </button>
+                      <button name="status" value="cancelled" className={btnGhostCls}>
+                        取消
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-xs text-(--color-dim)">
+                        工程 {doneCount}/{steps.length} 完了
+                      </p>
+                      <ol className="space-y-2">
+                        {steps.map((st) => (
+                          <li key={st.id} className="rounded-lg border border-(--color-line) bg-(--color-panel) p-2.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <StatusDot status={st.status} />
+                              <span className="text-xs font-bold text-sky-300">#{st.seq}</span>
+                              <Badge tone={st.target_kind === "staff" ? "accent" : "ok"}>
+                                {st.target_kind === "staff" ? "スタッフ" : "AI社員"}
+                              </Badge>
+                              <span className="text-sm">{st.title}</span>
+                              <span className="text-xs text-(--color-dim)">→ {st.staff_name ?? st.agent_name ?? "未割当"}</span>
+                              {st.due_date && <span className="text-xs text-amber-300">期限 {st.due_date}</span>}
+                              <span className="ml-auto text-xs text-(--color-dim)">{STEP_STATUS_LABELS[st.status] ?? st.status}</span>
+                            </div>
+                            {st.detail && <p className="mt-1 whitespace-pre-wrap text-xs text-(--color-dim)">{st.detail}</p>}
+                            {st.status !== "done" && st.status !== "cancelled" && (
+                              <form action={setStepStatus} className="mt-1.5 flex flex-wrap items-center gap-2">
+                                <input type="hidden" name="step_id" value={st.id} />
+                                <button name="status" value="done" className={btnCls}>
+                                  完了
+                                </button>
+                                <button name="status" value="in_progress" className={btnGhostCls}>
+                                  対応中
+                                </button>
+                                <button name="status" value="cancelled" className={btnGhostCls}>
+                                  取消
+                                </button>
+                              </form>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Panel>
@@ -150,7 +199,7 @@ export default async function DirectivesPage() {
               <li key={d.id} className="flex flex-wrap items-center gap-2">
                 <Badge tone={d.status === "done" ? "ok" : "default"}>{DIRECTIVE_STATUS_LABELS[d.status] ?? d.status}</Badge>
                 <span>{d.title}</span>
-                <span className="text-xs text-(--color-dim)">{d.staff_name ?? d.agent_name ?? ""}</span>
+                <span className="text-xs text-(--color-dim)">{d.staff_name ?? d.agent_name ?? (d.target_kind === "campaign" ? "キャンペーン" : "")}</span>
                 {d.result && <span className="text-xs text-(--color-dim)">／ {d.result}</span>}
                 <span className="ml-auto text-xs text-(--color-dim)">{fmtDate(d.done_at ?? d.created_at)}</span>
               </li>

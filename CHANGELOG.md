@@ -1,6 +1,13 @@
 # CHANGELOG
 
-## 2026-07-14 — AI DEMO SALES: デモに写真を入れられるように＋基調色をピッカー選択に
+## 2026-07-15 — 改善提案を「工程」に分解して現場に配れるように（DECISIONS #59）
+- feat(genesis/suggestions): 提案カードを**編集可能**に — 施策名・背景をその場で書き換え、**工程エディタ**で各工程に担当（スタッフ/AI社員）・やり方/台本・期限を設定（並べ替え/追加/削除）
+- feat(genesis/suggestions): 「**AIに工程を下書きさせる**」— Claudeが実行手順を工程に分解し、スタッフ名簿・AI社員コードから**担当まで割り当てて**下書き。APIキー無し時は ①②③/改行/→ で分割するルールベースにフォールバック（`lib/step-planner.ts`）
+- feat(genesis/directives): **キャンペーン発行**（`issueCampaign`）— 親 `gn_directives(target_kind='campaign')` の下に各工程を配布（スタッフ→やることリスト＋通知／AI社員→指示書prompt）。`/directives` に工程チェックリスト、**全工程完了で親を自動完了**（ロールアップ）
+- db: `0059_directive_steps.sql` — `gn_directive_steps` 新設＋ `gn_directives.target_kind` に `campaign` 追加（RLS deny・service_role経由）
+- chore: この機能はAI社員の権限を分析・下書き・案作成までに限定（VISION §7）。工程の下書きは保存せず画面で確定してから発行
+
+
 - feat(demo-sales): デモ生成フォームに**写真アップロード**を追加 — ヘッダー（ヒーロー背景）・院内/診察風景ギャラリー（最大6枚・キャプション）・院長/スタッフ写真。署名URLでブラウザから直PUT、送信前にcanvasで長辺1600px/JPEG 0.85へ自動縮小（スマホ写真をそのまま選べる）
 - db: `0049_demo_assets.sql` — 公開バケット `demo-assets`（画像のみ・10MB上限・パスはランダムで推測不可）。デモは認証なし配信のため公開バケット、書き込みは service_role の署名URLのみ
 - feat(demo-sales): 基調色をカラーピッカー＋プリセット10色から選択（HEX手入力も可・「業種標準に戻す」あり）。数値を覚える必要をなくした

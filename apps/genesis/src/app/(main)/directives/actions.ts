@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireGenesisActor } from "@/lib/auth";
-import { issueDirective, updateDirectiveStatus, type DirectiveTarget } from "@/lib/directives";
+import { issueDirective, updateDirectiveStatus, updateStepStatus, type DirectiveTarget } from "@/lib/directives";
 import { logAudit } from "@/lib/kernel";
 
 /** 実行指示を新規発行（宛先: スタッフ / AI社員 / 外部送信の承認） */
@@ -42,6 +42,20 @@ export async function setDirectiveStatus(formData: FormData) {
 
   await updateDirectiveStatus(actor, id, status as "in_progress" | "done" | "cancelled", result);
   await logAudit(actor, `directive.${status}`, "gn_directives", id, null, { result });
+  revalidatePath("/directives");
+  revalidatePath("/");
+}
+
+/** 工程（キャンペーンの1ステップ）のステータス変更。全工程完了で親も自動完了。 */
+export async function setStepStatus(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const stepId = String(formData.get("step_id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const result = String(formData.get("result") ?? "") || undefined;
+  if (!stepId || !["in_progress", "done", "cancelled"].includes(status)) return;
+
+  await updateStepStatus(actor, stepId, status as "in_progress" | "done" | "cancelled", result);
+  await logAudit(actor, `directive_step.${status}`, "gn_directive_steps", stepId, null, { result });
   revalidatePath("/directives");
   revalidatePath("/");
 }

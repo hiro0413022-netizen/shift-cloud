@@ -2,7 +2,8 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0049` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0060` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- ✅ `0059_directive_steps.sql` — 適用済（2026-07-15、MCP name=directive_steps。工程台帳 gn_directive_steps＋gn_directives.target_kind に campaign 追加 #59）
 - ✅ `0045_inbox_filter_suggestions_directives.sql` — 適用済（2026-07-14、受信フィルタ・返信承認・改善提案・実行指示 #52）
 - ✅ `0046_kpi_labor_align_payroll.sql` — 適用済（2026-07-14、労務KPI一本化 #53系）
 - ✅ `0047_report_os_sources.sql` — 適用済（2026-07-14、Report OSデータ源 #53）
