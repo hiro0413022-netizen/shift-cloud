@@ -187,7 +187,7 @@ const HANDLERS: Record<string, Handler> = {
   // 日次レポート再生成（内部処理）
   report_generate: async ({ row }) => {
     const { runDailyCeoReport } = await import("@/lib/ceo-ai");
-    const r = await runDailyCeoReport(row.company_id, "auto");
+    const r = await runDailyCeoReport(row.company_id, "cron");
     return { report: r } as Record<string, unknown>;
   },
   // AI社員の成果物生成（レビュー待ちで保存・配信はしない #60）
