@@ -37,11 +37,10 @@ B-1. **日次レポートの自動生成** — 停止の主因は cron が middl
 
 ## C. Claude作業（未着手）
 
-C-0. **【#61の配線】自律実行 executor** — migration 0061 でスキーマ（`ai_execution_policies`・`ai_suggestions.execution_mode/undo_deadline`）は入ったが、まだ**どこも読んでいない＝自動実行は起きていない**。次の実装で初めてリスク階層が効く:
-   - (a) 提案/アクション生成時に `action_type` を付与し、`ai_execution_policies` で `execution_mode` を解決して `ai_suggestions` に保存
-   - (b) executor（cron or n8n or server action）: `auto`=即実行→audit_logs(actor_type='ai')、`auto_undo`=実行＋`undo_deadline=now()+undo_minutes`＝Cockpitに「取消」ボタン、`approval`=従来どおり承認待ち
-   - (c) Cockpit/Command Centerに「自動実行ログ」＋「取消枠内の実行」を表示（事後確認できる形）
-   - (d) `prod_deploy` を Vercel MCP に接続（承認後にClaudeがデプロイ）
+C-0. ~~【#61の配線】自律実行 executor~~ **✅ 実装済み（#62 / migration 0062）**: `lib/ai-execution.ts`（enqueue/runDue/cancel/approve＋ハンドラ登録）・`ai_action_queue`・`/api/cron/execute`(10分)・`/executions` UI。(a)モード解決・(b)auto/auto_undo/approval実行・audit_logs記録・(c)取消/承認UI・(d)は下記で継続。
+   - **残: (a′) 生成側の配線** — 各AI（提案生成 `suggestions.ts`・成果物 `agent-runner.ts`・スタッフ連絡 `staff-notice.ts` 等）から `enqueueAction()` を呼び、実運用で自動発火させる。今は器はあるが自動では何も enqueue されない（テストは /executions の「テスト実行」ボタン）。
+   - **残: (d) `prod_deploy`** を Vercel MCP に接続（承認後にClaudeがデプロイ）。
+   - 動作確認: /executions →「テスト実行を入れる」→2分後に自動実行 or その場で「取消」。「今すぐキューを回す」で即tick。
 C-1. **RUNBOOK未作成**: money-golfwing / survey-os / reserve-os / caddy-os → 作成後 public/manual.md へコピーし /manual 配信（既存: genesis / shift-cloud / member-os / legal-os / lesson-os）
 
 C-2. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI

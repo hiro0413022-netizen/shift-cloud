@@ -10,6 +10,7 @@ export const NAV = [
   { href: "/chat", label: "データに聞く", en: "Ask Data", icon: "💬" },
   { href: "/suggestions", label: "改善提案", en: "Suggestions", icon: "💡" },
   { href: "/directives", label: "実行指示", en: "Directives", icon: "📣" },
+  { href: "/executions", label: "AI自動実行", en: "AI Executor", icon: "⚙" },
   { href: "/approvals", label: "承認待ち", en: "Approvals", icon: "✓" },
   { href: "/inbox", label: "問い合わせ受信箱", en: "CEO Inbox", icon: "📨" },
   { href: "/notes", label: "社内連絡", en: "Notes", icon: "📝" },

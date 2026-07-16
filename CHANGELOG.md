@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2026-07-16 — AI自律度をリスク階層モデル化＋executor実装（DECISIONS #61/#62）
+- feat(genesis): AIアクションを `auto` / `auto_undo` / `approval` の3階層で実行する executor を実装。正典はDBの `ai_execution_policies`（migration 0061）、実行キューは `ai_action_queue`（migration 0062）
+- feat(genesis/lib): `ai-execution.ts` — `enqueueAction`（モード解決→scheduled_at決定）/ `runDueActions`（楽観ロックで実行・`audit_logs(actor_type='ai')`記録）/ `cancelAction`（取消枠内のみ）/ `approveAction`・`rejectAction`。ハンドラ: test_notify / internal_notify / report_generate / deliverable_generate / staff_directive / line_broadcast。未登録action_typeは失敗扱い（安全）
+- feat(genesis): `/executions` 画面（一覧・状態バッジ・取消枠カウントダウン・取消/承認/却下・テスト実行）＋サイドバー導線。`/api/cron/execute`（10分ごと）＋日次cronで tick
+- feat(db): Vaultの秘密をAIが生成・保存可能に（`vault_systems.secret_source/managed_by`・`app.gen_secret()`）。旧「/vault手入力」ルールを廃止
+- chore(rules): 開発速度ルール緩和（DEVELOPMENT_RULES 7・8＝複数機能まとめ実装可・横断的に読む）、新アプリのデプロイはVercel MCP（prod_deployはapproval）
+- 注意: 器は完成だが**生成側（各AI）から enqueueAction を呼ぶ配線は未接続**＝実運用の自動発火はまだ。動作確認は /executions のテスト実行で
+
 ## 2026-07-15 — 改善提案を「工程」に分解して現場に配れるように（DECISIONS #59）
 - feat(genesis/suggestions): 提案カードを**編集可能**に — 施策名・背景をその場で書き換え、**工程エディタ**で各工程に担当（スタッフ/AI社員）・やり方/台本・期限を設定（並べ替え/追加/削除）
 - feat(genesis/suggestions): 「**AIに工程を下書きさせる**」— Claudeが実行手順を工程に分解し、スタッフ名簿・AI社員コードから**担当まで割り当てて**下書き。APIキー無し時は ①②③/改行/→ で分割するルールベースにフォールバック（`lib/step-planner.ts`）

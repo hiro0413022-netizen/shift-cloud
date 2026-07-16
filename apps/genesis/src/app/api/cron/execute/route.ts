@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdmin } from "@/lib/supabase/admin";
-import { runDailyCeoReport } from "@/lib/ceo-ai";
 import { runDueActions } from "@/lib/ai-execution";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * 毎朝のCEO AI自動報告（VISION §1「朝、Cockpitを開くとCEO AIが報告する」）
- * Vercel Cron（vercel.json）から呼ばれる。認証: Authorization: Bearer ${CRON_SECRET}
+ * AI実行キューのtick（DECISIONS #62）。
+ * scheduled_at を過ぎた queued アクションを拾って実行する。
+ * Vercel Cron（vercel.json, 10分ごと）から。認証: Authorization: Bearer ${CRON_SECRET}
  */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -22,10 +22,8 @@ export async function GET(req: NextRequest) {
   const results = [];
   for (const c of companies ?? []) {
     try {
-      const r = await runDailyCeoReport(String(c.id), "cron");
-      // 日次生成のついでに、溜まっているAI実行キューも1回tickする（#62）
-      const exec = await runDueActions(admin, String(c.id));
-      results.push({ company: c.id, ...r, executed: exec });
+      const r = await runDueActions(admin, String(c.id));
+      results.push({ company: c.id, ...r });
     } catch (e) {
       results.push({ company: c.id, error: String(e) });
     }

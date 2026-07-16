@@ -32,7 +32,7 @@
 5. 給与・個人情報に関わる提案・実行は本部/オーナーのみ閲覧可。personal_info系は常に approval。
 6. 提案・実行の生成元（source: rule/ai_agent）と実行モードを必ず記録し、精度と自律度を後から評価できるようにする。
 
-> ⚠️ このポリシーが実際に自動実行を起こすのは、executor（cron/n8n/サーバアクション）が `ai_suggestions.execution_mode` と `ai_execution_policies` を読んで分岐するよう配線してから。配線タスクは NEXT_TASKS 参照。migration 0061 適用時点ではスキーマの土台のみ（既定=approval で現行動作は不変）。
+> ✅ executor 配線済み（#62 / migration 0062）。すべてのAIアクションは `enqueueAction()`（`lib/ai-execution.ts`）→ `ai_action_queue` を関所として通り、`auto`=即 / `auto_undo`=取消枠後 / `approval`=承認待ち。`/api/cron/execute`（10分ごと）と日次cronが `runDueActions()` で実行し、`audit_logs(actor_type='ai')` に記録。画面は Genesis **/executions**（テスト実行・取消・承認）。ハンドラ登録済み: test_notify / internal_notify / report_generate / deliverable_generate / staff_directive / line_broadcast。未登録のaction_typeは失敗扱い（安全）。**まだ自動生成器（提案→enqueue）は各AIに未接続＝実運用で自動発火はしない**。次は生成側から enqueueAction を呼ぶ配線。
 
 ## 将来の提案生成（Phase 6以降）
 
