@@ -29,6 +29,7 @@ export const NAV = [
   { href: "/future", label: "未来シミュレーション", en: "Future", icon: "📈" },
   { href: "/connectors", label: "外部連携", en: "Connectors", icon: "🔌" },
   { href: "/vault", label: "システム台帳（ID/URL）", en: "Vault", icon: "🔐" },
+  { href: "/accounts", label: "アカウント管理", en: "Accounts", icon: "👤" },
 ];
 
 export function Sidebar({ userName }: { userName: string }) {
