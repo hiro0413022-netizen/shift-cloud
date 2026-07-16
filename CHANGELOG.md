@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-16 — 生成側を executor に配線（各AIが自動でenqueue）（DECISIONS #63）
+- feat(genesis/ceo-ai): 日次レポート生成の最後に「スタッフ朝連絡」を `staff_directive` で投入（1日1件・dedupe）。CEO AIの各指示は `agent_directive`(auto) で配布し監査に残す
+- feat(genesis/deliverables): 成果物を承認すると `internal_notify`(auto) を executor に投入（送信チャネル未接続のため現状は「承認済み・手動対応」の記録/可視化。接続後に実送信へ差し替え）
+- feat(genesis/ai-execution): `agent_directive` ハンドラ追加、壊れていた `deliverable_generate` ハンドラ（引数不整合）を撤去
+- db: `0063_ai_generation_wiring.sql` — 外部送信は**承認ゲートで試運転**（staff_directive/line_broadcast/sns_post を approval に退避、信頼後 auto_undo へ）、`agent_directive`=auto を追加
+- 効果: 毎朝、スタッフ向け連絡が /executions に承認待ちで並ぶ→承認で公式LINE配信。AI社員への指示は自動配布・監査化
+
 ## 2026-07-16 — AI自律度をリスク階層モデル化＋executor実装（DECISIONS #61/#62）
 - feat(genesis): AIアクションを `auto` / `auto_undo` / `approval` の3階層で実行する executor を実装。正典はDBの `ai_execution_policies`（migration 0061）、実行キューは `ai_action_queue`（migration 0062）
 - feat(genesis/lib): `ai-execution.ts` — `enqueueAction`（モード解決→scheduled_at決定）/ `runDueActions`（楽観ロックで実行・`audit_logs(actor_type='ai')`記録）/ `cancelAction`（取消枠内のみ）/ `approveAction`・`rejectAction`。ハンドラ: test_notify / internal_notify / report_generate / deliverable_generate / staff_directive / line_broadcast。未登録action_typeは失敗扱い（安全）

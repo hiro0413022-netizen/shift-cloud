@@ -23,8 +23,8 @@
    | モード | 意味 | 例（`action_type`） |
    |--------|------|------|
    | **auto**（緑） | 承認不要で即実行。監査ログのみ | data_analysis / report_generate / kpi_refresh / draft_create / internal_notify / deliverable_generate / issue_create / pr_open / test_run / order_candidate |
-   | **auto_undo**（黄） | 自動実行するが `undo_deadline` まで取消可 | staff_directive(15分) / line_broadcast(15分) / sns_post(30分) |
-   | **approval**（赤） | 古川さんの承認が必須（不可逆・高額・対外重要・個人情報・法務） | prod_deploy / db_change / payment / large_payment / customer_message / personal_info / contract / hiring / price_change / policy_change |
+   | **auto_undo**（黄） | 自動実行するが `undo_deadline` まで取消可 | （#63試運転中は下記が approval に退避）agent_directive は auto |
+   | **approval**（赤） | 古川さんの承認が必須（不可逆・高額・対外重要・個人情報・法務） | prod_deploy / db_change / payment / large_payment / customer_message / personal_info / contract / hiring / price_change / policy_change ／ **#63試運転**: staff_directive・line_broadcast・sns_post もまず approval |
 
 2. どのモードでも**実行は必ず監査ログ（audit_logs, actor_type='ai'）に残す**。auto/auto_undoは事後確認可能に、approvalは承認記録も残す。
 3. 新しい `action_type` の既定は **approval**（`ai_suggestions.execution_mode` の既定も approval）。安全側から始め、実績を見て `ai_execution_policies` で auto に緩める。
@@ -32,7 +32,9 @@
 5. 給与・個人情報に関わる提案・実行は本部/オーナーのみ閲覧可。personal_info系は常に approval。
 6. 提案・実行の生成元（source: rule/ai_agent）と実行モードを必ず記録し、精度と自律度を後から評価できるようにする。
 
-> ✅ executor 配線済み（#62 / migration 0062）。すべてのAIアクションは `enqueueAction()`（`lib/ai-execution.ts`）→ `ai_action_queue` を関所として通り、`auto`=即 / `auto_undo`=取消枠後 / `approval`=承認待ち。`/api/cron/execute`（10分ごと）と日次cronが `runDueActions()` で実行し、`audit_logs(actor_type='ai')` に記録。画面は Genesis **/executions**（テスト実行・取消・承認）。ハンドラ登録済み: test_notify / internal_notify / report_generate / deliverable_generate / staff_directive / line_broadcast。未登録のaction_typeは失敗扱い（安全）。**まだ自動生成器（提案→enqueue）は各AIに未接続＝実運用で自動発火はしない**。次は生成側から enqueueAction を呼ぶ配線。
+> ✅ executor 配線済み（#62 / migration 0062）＋生成側配線済み（#63 / migration 0063）。すべてのAIアクションは `enqueueAction()`（`lib/ai-execution.ts`）→ `ai_action_queue` を関所として通り、`auto`=即 / `auto_undo`=取消枠後 / `approval`=承認待ち。`/api/cron/execute`（10分ごと）と日次cronが `runDueActions()` で実行し、`audit_logs(actor_type='ai')` に記録。画面は Genesis **/executions**（テスト実行・取消・承認）。ハンドラ登録済み: test_notify / internal_notify / report_generate / agent_directive / staff_directive / line_broadcast。未登録のaction_typeは失敗扱い（安全）。
+>
+> **生成側（#63）**: ①CEO AI日次が「スタッフ朝連絡」を staff_directive で投入（試運転=approval→/executionsで承認後にLINE配信）②CEO AIの各指示を agent_directive で配布（auto・内部）③/deliverables で成果物を承認すると internal_notify を投入（送信チャネル未接続のため現状は手動対応の記録・可視化。チャネル接続後に実送信へ差し替え）。試運転として staff_directive/line_broadcast/sns_post は approval に退避中（信頼できたら `ai_execution_policies` で auto_undo に戻す）。
 
 ## 将来の提案生成（Phase 6以降）
 

@@ -15,6 +15,7 @@ import { runLegalChecks } from "@/lib/legal-checks";
 import { runLegalAiExtraction } from "@/lib/legal-ai";
 import { runReceiptAiExtraction } from "@/lib/receipt-ai";
 import { generateDeliverables, type PromptForRun } from "@/lib/agent-runner";
+import { enqueueAction } from "@/lib/ai-execution";
 
 /* ============================================================
    CEO AI — 古川さんの分身（正典: docs/genesis/VISION.md §1/§3/§8）
@@ -185,6 +186,17 @@ async function saveInstructions(companyId: string, analysis: CeoAnalysis): Promi
         agent_name: agent?.name ?? ins.agent_code,
         instruction: ins.instruction,
       });
+      // #63: 指示をexecutorのキュー経由でAI社員へ配布（内部・auto）。承認待ちにしない。
+      await enqueueAction(admin, {
+        companyId,
+        actionType: "agent_directive",
+        title: `${agent?.name ?? ins.agent_code} への指示`,
+        payload: { agent_code: ins.agent_code, instruction: ins.instruction, prompt_id: inserted.id },
+        originKind: "ceo_ai_daily",
+        originId: inserted.id,
+        dedupeKey: `agent-directive-${inserted.id}`,
+        createdBy: null,
+      }).catch(() => null);
     }
     if (agent) {
       await admin
@@ -354,6 +366,33 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
     source: "ceo_ai",
     source_type: "ai",
   });
+
+  // 6. スタッフ向けの朝の要約を executor に投入（#63）。
+  //    試運転ポリシー(#63)により staff_directive は approval＝/executions で承認後にLINE配信。
+  //    dedupeで1日1件。判断すべきことがあれば先頭に添える。
+  try {
+    const ymd = new Date().toISOString().slice(0, 10);
+    const topJudge = judgments[0]?.title;
+    const briefLines = [
+      `おはようございます。本日のポイントです（${today}）。`,
+      analysis.summary,
+      analysis.sales_actions[0] ? `・重点: ${analysis.sales_actions[0]}` : "",
+      topJudge ? `・確認: ${topJudge}` : "",
+      "気になる点があれば店長・本部まで。",
+    ].filter(Boolean);
+    await enqueueAction(admin, {
+      companyId,
+      actionType: "staff_directive",
+      title: `スタッフ朝連絡 ${today}`,
+      payload: { body: briefLines.join("\n") },
+      originKind: "ceo_ai_daily",
+      originId: report?.id ?? null,
+      dedupeKey: `staff-brief-${ymd}`,
+      createdBy: null,
+    });
+  } catch {
+    /* 連絡投入の失敗はレポート生成を止めない */
+  }
 
   return { score, reportId: report?.id ?? null, engine: analysis.engine };
 }

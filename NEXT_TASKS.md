@@ -38,9 +38,10 @@ B-1. **日次レポートの自動生成** — 停止の主因は cron が middl
 ## C. Claude作業（未着手）
 
 C-0. ~~【#61の配線】自律実行 executor~~ **✅ 実装済み（#62 / migration 0062）**: `lib/ai-execution.ts`（enqueue/runDue/cancel/approve＋ハンドラ登録）・`ai_action_queue`・`/api/cron/execute`(10分)・`/executions` UI。(a)モード解決・(b)auto/auto_undo/approval実行・audit_logs記録・(c)取消/承認UI・(d)は下記で継続。
-   - **残: (a′) 生成側の配線** — 各AI（提案生成 `suggestions.ts`・成果物 `agent-runner.ts`・スタッフ連絡 `staff-notice.ts` 等）から `enqueueAction()` を呼び、実運用で自動発火させる。今は器はあるが自動では何も enqueue されない（テストは /executions の「テスト実行」ボタン）。
+   - ~~(a′) 生成側の配線~~ **✅ 実装済み（#63 / migration 0063）**: CEO AI日次→スタッフ朝連絡(staff_directive・試運転approval)、CEO指示→agent_directive(auto)、成果物承認→internal_notify(auto)。
+   - **残: (a″) 実チャネル接続後の実送信化** — 成果物承認の internal_notify を sns_post 等の実送信へ差し替え（要SNS/顧客チャネル）。staff_directive を試運転approvalから auto_undo に緩めるかの判断。
    - **残: (d) `prod_deploy`** を Vercel MCP に接続（承認後にClaudeがデプロイ）。
-   - 動作確認: /executions →「テスト実行を入れる」→2分後に自動実行 or その場で「取消」。「今すぐキューを回す」で即tick。
+   - 動作確認: /executions →「テスト実行を入れる」→2分後に自動実行 or その場で「取消」。日次レポート生成後は「スタッフ朝連絡」が承認待ちで並ぶ→承認でLINE配信。
 C-1. **RUNBOOK未作成**: money-golfwing / survey-os / reserve-os / caddy-os → 作成後 public/manual.md へコピーし /manual 配信（既存: genesis / shift-cloud / member-os / legal-os / lesson-os）
 
 C-2. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI

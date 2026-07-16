@@ -190,13 +190,17 @@ const HANDLERS: Record<string, Handler> = {
     const r = await runDailyCeoReport(row.company_id, "cron");
     return { report: r } as Record<string, unknown>;
   },
-  // AI社員の成果物生成（レビュー待ちで保存・配信はしない #60）
-  deliverable_generate: async ({ row }) => {
-    const mod = await import("@/lib/agent-runner");
-    const gen = (mod as unknown as { generateDeliverables?: (c: string) => Promise<unknown> }).generateDeliverables;
-    if (!gen) throw new Error("generateDeliverables が見つかりません");
-    const r = await gen(row.company_id);
-    return { deliverables: r } as Record<string, unknown>;
+  // CEO AI→AI社員への内部指示の配布（#63）。指示書は既にpromptsへ保存済みなので、
+  // ここでは配布を記録するだけ（内部・低リスク・auto）。
+  agent_directive: async ({ row }) => {
+    await logEvent(row.company_id, {
+      event_type: "ai.agent_directive",
+      title: `AI社員へ指示配布: ${row.title}`.slice(0, 120),
+      description: row.payload.instruction ? String(row.payload.instruction) : undefined,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { distributed: true, agent_code: row.payload.agent_code ?? null };
   },
   // スタッフへ連絡 / 定型LINE一斉配信（auto_undoの猶予後に実送信）
   staff_directive: async ({ admin, row }) => sendStaffLine(admin, row),
