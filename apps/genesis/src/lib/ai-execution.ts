@@ -163,7 +163,7 @@ async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string
 
 const HANDLERS: Record<string, Handler> = {
   // 無害な動作確認用
-  test_notify: async ({ admin, row }) => {
+  test_notify: async ({ row }) => {
     await logEvent(row.company_id, {
       event_type: "ai.test_notify",
       title: `動作確認: ${row.title}`.slice(0, 120),
@@ -174,7 +174,7 @@ const HANDLERS: Record<string, Handler> = {
     return { noted: true };
   },
   // 社内向け通知（company_events に残すだけ・外部送信なし）
-  internal_notify: async ({ admin, row }) => {
+  internal_notify: async ({ row }) => {
     await logEvent(row.company_id, {
       event_type: "ai.internal_notify",
       title: String(row.payload.title ?? row.title).slice(0, 120),
