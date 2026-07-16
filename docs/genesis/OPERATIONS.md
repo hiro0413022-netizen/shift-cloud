@@ -185,9 +185,10 @@ git push origin main
 
 ※ この時点では Webhook URL はまだ空でよい。Claudeがn8nワークフローを作るとURLが決まるので、それを developers.line.biz の Messaging API → **Webhook URL** に貼り、**Webhookの利用=オン**、**応答メッセージ=オフ**（自動応答を切る）に設定する（手順はClaudeが都度案内）。
 
-### Phase 0b — Vault登録（#26）
+### Phase 0b — Vault登録（#26 / 自動化 #61）
 
-- Claudeが `vault_systems` に「LINE公式アカウント（GOLF WING）」の行を作成 → あなたは `/vault` を開き、channel secret / channel access token をページ上のフォームに入力・保存（AIは値を記載しない）
+- Claudeが `vault_systems` に「LINE公式アカウント（GOLF WING）」の行を作成し、**channel secret / channel access token を Claude がMCP経由で直接保存**（`secret_source='external'`, `managed_by='ai'`）。トークンをClaudeに渡せば、`/vault` への手入力は不要。
+  - 値はチャットに残るため、渡した後にトークンを再発行したい場合はLINE Developersで再Issueして差し替え可（`app.gen_secret()` は外部発行値には使わない）。
 
 ### 以降のフェーズ（Claude構築、あなたは確認のみ）
 
@@ -217,7 +218,7 @@ git push origin main
 
 **Claudeの作業（デプロイ後に依頼）:**
 
-5. `vault_systems` にURL・ID行を登録（#26。パスワードはあなたが /vault で入力）
+5. `vault_systems` にURL・ID・**パスワードまで**Claudeが登録（#26/#61）。AIが発行するログイン等は `app.gen_secret()` で自動生成し `secret_source='generated'`・`managed_by='ai'`。外部プロバイダ発行値は渡してくれれば `secret_source='external'` で直接保存。手入力は原則不要
 6. modulesテーブルを `live` に更新、CHANGELOG/NEXT_TASKSを更新
 
 ## 8. 権限の付与手順（use_reception / use_survey / use_legal / view_hq 等）
