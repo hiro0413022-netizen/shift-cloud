@@ -209,7 +209,11 @@ async function saveInstructions(companyId: string, analysis: CeoAnalysis): Promi
 }
 
 /** 日次レポート本体（VISION §1/§3の型）。actor無しでも実行可（Cron用） */
-export async function runDailyCeoReport(companyId: string, triggeredBy: "human" | "cron"): Promise<{ score: number; reportId: string | null; engine: string }> {
+export async function runDailyCeoReport(
+  companyId: string,
+  triggeredBy: "human" | "cron",
+  opts: { afterworkBudgetMs?: number } = {}
+): Promise<{ score: number; reportId: string | null; engine: string }> {
   const admin = createAdmin();
 
   // 1. KPI再集計（労務＋財務＋会員系。会員系はmigration 0011適用後に有効化される — 未適用ならエラーを無視）
@@ -388,17 +392,23 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   // 7. 後工程（DECISIONS #64）: Claudeを何度も呼ぶ重い処理は「レポートを保存し終えた後」にまとめる。
   //    ここで時間切れになっても、朝のレポートだけは必ず残る（2026-07-15〜17に日次が丸ごと欠落した事故の再発防止）。
   //    残り時間の予算を持たせ、超えたら静かに打ち切る（次の実行、または /api/cron/execute の10分tickで拾われる）。
-  await runDailyAfterwork(companyId, createdPrompts);
+  // 予算0（既定）なら後工程はやらない。maxDurationに余裕がある日次cronだけが実際に回す。
+  await runDailyAfterwork(companyId, createdPrompts, opts.afterworkBudgetMs ?? 0);
 
   return { score, reportId: report?.id ?? null, engine: analysis.engine };
 }
 
 /**
  * 日次レポート保存後に回す重い処理。実行時間の予算内で、優先度順に「できるところまで」やる。
- * 呼び出し側（cron）のmaxDurationより短い予算にしておくこと。
+ * budgetMs は呼び出し側の maxDuration より必ず短くすること。超えると関数ごと殺され、
+ * 呼び出し側の後始末（キューのdone更新など）が実行されない。
  */
-async function runDailyAfterwork(companyId: string, createdPrompts: Awaited<ReturnType<typeof saveInstructions>>): Promise<void> {
-  const budgetMs = Number(process.env.DAILY_AFTERWORK_BUDGET_MS ?? 180_000);
+async function runDailyAfterwork(
+  companyId: string,
+  createdPrompts: Awaited<ReturnType<typeof saveInstructions>>,
+  budgetMs: number
+): Promise<void> {
+  if (budgetMs <= 0) return;
   const deadline = Date.now() + budgetMs;
   const left = () => deadline - Date.now();
 

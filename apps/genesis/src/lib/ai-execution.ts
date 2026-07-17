@@ -232,9 +232,26 @@ async function writeAudit(
 
 export type RunSummary = { picked: number; done: number; failed: number };
 
+/** running のまま取り残された行を失敗として回収するまでの時間。
+    実行関数がタイムアウトで殺されると done を書けず、行が永久に running のまま残るため。 */
+const STUCK_RUNNING_MINUTES = 10;
+
 /** scheduled_at を過ぎた queued を拾って実行する（cron / 手動から呼ぶ） */
 export async function runDueActions(admin: Admin, companyId: string, limit = 20): Promise<RunSummary> {
   const nowIso = new Date().toISOString();
+
+  // 実行中のまま固まった行を先に回収する。放置すると永久に running のままキューに残る。
+  const stuckBefore = new Date(Date.now() - STUCK_RUNNING_MINUTES * 60_000).toISOString();
+  await admin
+    .from("ai_action_queue")
+    .update({
+      status: "failed",
+      executed_at: nowIso,
+      error: `${STUCK_RUNNING_MINUTES}分以上runningのまま応答なし（実行関数のタイムアウトの可能性）`,
+    })
+    .eq("company_id", companyId)
+    .eq("status", "running")
+    .lt("updated_at", stuckBefore);
   const { data: rows } = await admin
     .from("ai_action_queue")
     .select("*")

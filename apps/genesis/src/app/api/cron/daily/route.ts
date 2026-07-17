@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
   const results = [];
   for (const c of companies ?? []) {
     try {
-      const r = await runDailyCeoReport(String(c.id), "cron");
+      // 後工程の予算180秒。maxDuration(300秒)より十分短くする（レポート本体は数秒で終わる）。
+      const r = await runDailyCeoReport(String(c.id), "cron", {
+        afterworkBudgetMs: Number(process.env.DAILY_AFTERWORK_BUDGET_MS ?? 180_000),
+      });
       // 日次生成のついでに、溜まっているAI実行キューも1回tickする（#62）
       const exec = await runDueActions(admin, String(c.id));
       results.push({ company: c.id, ...r, executed: exec });
