@@ -4,7 +4,9 @@ import { runDailyCeoReport } from "@/lib/ceo-ai";
 import { runDueActions } from "@/lib/ai-execution";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 60秒だとAI社員の成果物生成が入った時点で504になり、レポートが丸ごと欠落した（2026-07-15〜17）。
+// レポート本体は先に保存する構成（lib/ceo-ai.ts）に変えた上で、後工程のぶんの余裕を持たせる。
+export const maxDuration = 300;
 
 /**
  * 毎朝のCEO AI自動報告（VISION §1「朝、Cockpitを開くとCEO AIが報告する」）

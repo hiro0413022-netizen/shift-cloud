@@ -218,15 +218,9 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   await admin.rpc("refresh_finance_kpis", { p_company_id: companyId });
   await admin.rpc("refresh_member_kpis", { p_company_id: companyId }); // 0011未適用時はerrorが返るだけで無害
 
-  // 1.4 秘書: 受信フィルタ（リッチメニュー押下を対応要件から外す）→ 未起案の返信案を作る（DECISIONS #52）
-  //     「朝、開いたときには返信案ができていて、承認を押すだけ」の状態を作るのがここ。
+  // 1.4 秘書: 受信フィルタ（リッチメニュー押下を対応要件から外す）。ルールベースで速いのでレポート前に実行。
+  //     返信案の下書き生成（Claude）は重いので、レポート保存後の「後工程」へ回す（DECISIONS #64）。
   await applyFilterRules(companyId).catch(() => 0);
-  await generateMissingDrafts(companyId, 8).catch(() => 0);
-
-  // 1.5 legal_ai: 未抽出の契約書を1件抽出（APIキー無し/対象無しなら即スキップ。DECISIONS #40）
-  await runLegalAiExtraction(companyId).catch(() => null);
-  // 1.6 経理AI: 未読取の証憑を最大3件OCR（同上のフォールバック。DECISIONS #42）
-  await runReceiptAiExtraction(companyId).catch(() => null);
 
   // 2. データ収集 → 分析（Claude → フォールバック: ルール）
   const d = await getCockpitData(companyId);
@@ -242,12 +236,9 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
   const startedAt = new Date().toISOString();
   const analysis = (await claudeAnalysis(d)) ?? ruleBasedAnalysis(d);
 
-  // 3. 指示案をAI社員に振る（下書き保存）→ その指示書を入力に成果物まで自動生成（DECISIONS #60）
-  //    「AI社員は動いている（指示は出た）のに成果物が無い」状態を解消する。
-  //    生成物は ai_execution_logs に review_status='pending' で溜まり、/deliverables で承認/却下。
-  //    ANTHROPIC_API_KEY 未設定なら成果物生成はスキップ（指示書は残る）。
+  // 3. 指示案をAI社員に振る（下書き保存）。DBのみなので速い。
+  //    その指示書を入力にした成果物生成（DECISIONS #60・Claude数回）はレポート保存後の後工程へ。
   const createdPrompts = await saveInstructions(companyId, analysis);
-  await generateDeliverables(companyId, createdPrompts).catch(() => 0);
 
   // 3.5 改善提案を生成（DECISIONS #52）。Cockpit/一覧に出て、そのまま実行指示にできる
   await generateSuggestions(companyId).catch(() => 0);
@@ -394,5 +385,42 @@ export async function runDailyCeoReport(companyId: string, triggeredBy: "human" 
     /* 連絡投入の失敗はレポート生成を止めない */
   }
 
+  // 7. 後工程（DECISIONS #64）: Claudeを何度も呼ぶ重い処理は「レポートを保存し終えた後」にまとめる。
+  //    ここで時間切れになっても、朝のレポートだけは必ず残る（2026-07-15〜17に日次が丸ごと欠落した事故の再発防止）。
+  //    残り時間の予算を持たせ、超えたら静かに打ち切る（次の実行、または /api/cron/execute の10分tickで拾われる）。
+  await runDailyAfterwork(companyId, createdPrompts);
+
   return { score, reportId: report?.id ?? null, engine: analysis.engine };
+}
+
+/**
+ * 日次レポート保存後に回す重い処理。実行時間の予算内で、優先度順に「できるところまで」やる。
+ * 呼び出し側（cron）のmaxDurationより短い予算にしておくこと。
+ */
+async function runDailyAfterwork(companyId: string, createdPrompts: Awaited<ReturnType<typeof saveInstructions>>): Promise<void> {
+  const budgetMs = Number(process.env.DAILY_AFTERWORK_BUDGET_MS ?? 180_000);
+  const deadline = Date.now() + budgetMs;
+  const left = () => deadline - Date.now();
+
+  const steps: Array<[string, () => Promise<unknown>]> = [
+    // 成果物（/deliverables で承認）— 「指示は出たのに成果物が無い」を解消する本命なので先頭
+    ["deliverables", () => generateDeliverables(companyId, createdPrompts)],
+    // 朝、承認を押すだけにするための返信下書き
+    ["drafts", () => generateMissingDrafts(companyId, 8)],
+    // 契約書の抽出・証憑OCR（対象が無ければ即終わる）
+    ["legal", () => runLegalAiExtraction(companyId)],
+    ["receipt", () => runReceiptAiExtraction(companyId)],
+  ];
+
+  for (const [name, fn] of steps) {
+    if (left() <= 5_000) break; // 残り僅かなら打ち切り
+    try {
+      await Promise.race([
+        fn(),
+        new Promise((resolve) => setTimeout(() => resolve(`timeout:${name}`), left())),
+      ]);
+    } catch {
+      /* 個々の失敗は無視して次へ。レポートは既に保存済み */
+    }
+  }
 }

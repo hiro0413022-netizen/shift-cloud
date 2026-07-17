@@ -1,0 +1,36 @@
+# 改行コードはLFに統一する（2026-07-17）
+#
+# 理由: gitのblobは元々すべてLFだが、Windowsの作業ツリーだけが core.autocrlf の既定値で
+# CRLFになっていた。この状態だとClaudeのVMマウントがCRLFファイルを「\rの個数ぶん」末尾から
+# 切り落として読むため、gitが844ファイル中803ファイルを「末尾を削除した変更」と誤認する。
+# その状態でcommitすると、切り詰められた中身がそのまま入る（空ツリーpush事故と同じ経路）。
+# デプロイ先はVercel＝Linuxなので、LF統一が本来の姿でもある。
+#
+# 変更後は各自のPCで一度だけ:
+#   git config core.autocrlf false; git rm --cached -r . ; git reset --hard
+# （fix-line-endings.ps1 が上記をやる）
+
+# 既定: テキストと判定したものはリポジトリでも作業ツリーでもLF
+* text=auto eol=lf
+
+# Windowsのバッチだけは CRLF でないと動かない
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# バイナリ（改行変換を絶対にさせない）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.pdf binary
+*.xlsx binary
+*.xls binary
+*.pptx binary
+*.docx binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary

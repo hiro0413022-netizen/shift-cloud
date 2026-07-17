@@ -1,6 +1,9 @@
-# Ask Data / 売上台帳取込 / 売上分析 のコミット＆デプロイ（2026-07-14）
+﻿# 日次レポート停止（60秒タイムアウト）の修正 コミット＆デプロイ（2026-07-17）
 # 実行方法:
 #   cd "C:\Users\hiro0\Claude\Projects\YOZAN GENESIS"; .\commit-and-deploy.ps1
+#
+# 注意: このファイルは必ず「BOM付きUTF-8」で保存すること。
+# Windows PowerShell 5.1 はBOMが無い .ps1 をCP932として読むため、日本語が化けて構文エラーになる。
 
 $ErrorActionPreference = "Stop"
 Set-Location "C:\Users\hiro0\Claude\Projects\YOZAN GENESIS"
@@ -8,8 +11,7 @@ Set-Location "C:\Users\hiro0\Claude\Projects\YOZAN GENESIS"
 Write-Host ""
 Write-Host "[1/5] 壊れたgitインデックスを作り直します..." -ForegroundColor Cyan
 Remove-Item ".git\index.lock" -Force -ErrorAction SilentlyContinue
-Remove-Item ".git\index" -Force -ErrorAction SilentlyContinue
-git reset --mixed | Out-Null
+Remove-Item ".git\HEAD.lock" -Force -ErrorAction SilentlyContinue
 
 Write-Host "[2/5] 途中で切れたファイルが無いか検査..." -ForegroundColor Cyan
 node scripts/check-files.mjs
@@ -20,26 +22,12 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "[3/5] 今回の変更だけをステージします..." -ForegroundColor Cyan
 $paths = @(
-    "supabase/migrations/0053_ask_data.sql",
-    "supabase/migrations/0052_sales_ledger_rollup.sql",
-    "packages/core/src/ask-data.ts",
-    "packages/core/package.json",
-    "apps/genesis/src/app/(main)/chat",
-    "apps/genesis/src/components/sidebar.tsx",
-    "apps/genesis/next.config.ts",
-    "apps/genesis/package.json",
-    "apps/shift-cloud/src/app/(staff)/chat",
-    "apps/shift-cloud/src/components/staff-nav.tsx",
-    "apps/shift-cloud/next.config.ts",
-    "apps/shift-cloud/package.json",
-    "apps/money-golfwing/src/app/(main)/analysis",
-    "apps/money-golfwing/src/lib/analytics.ts",
-    "apps/money-golfwing/src/components/nav.tsx",
-    "scripts/import-sales-ledger.mjs",
-    "package.json",
-    "package-lock.json",
-    "docs/genesis/DECISIONS.md",
-    "docs/modules/ask-data/SYSTEM.md"
+    "apps/genesis/src/lib/ceo-ai.ts",
+    "apps/genesis/src/app/api/cron/daily/route.ts",
+    ".gitattributes",
+    "scripts/check-files.mjs",
+    "commit-and-deploy.ps1",
+    "fix-line-endings.ps1"
 )
 foreach ($p in $paths) { git add -- $p }
 
@@ -54,14 +42,20 @@ if ($ans -ne "y") {
 
 # コミットメッセージはファイル経由（PowerShellのヒアストリングを避ける）
 $msg = @()
-$msg += "feat(ask-data/money): 実データに聞くチャット＋売上台帳の自動取込＋売上分析 (DECISIONS #56/#57/#58)"
+$msg += "fix(genesis/cron): 日次レポートの60秒タイムアウトを解消＝レポートを先に保存する"
 $msg += ""
-$msg += "- Ask Data: LLMはSQLだけを書き、数字はPostgresが計算（生成SQLと件数を出典表示）。"
-$msg += "  権限はDBが強制（gnv_*ビュー＋実体テーブル権限を持たないgn_chat_reader）。"
-$msg += "  Genesis /chat（全社）と スタッフポータル /chat（自店舗のみ）。"
-$msg += "- 売上台帳: npm run import:sales で xlsx→mon_sales_lines→mon_sales→fin_entries を1コマンド化。"
-$msg += "  台帳の月会費は「月会費(窓口)」として保存し、月会費予測の停止トリガー誤爆を防ぐ。"
-$msg += "- Money OS /analysis: 事業別・カテゴリ別・品目別・支払方法別の売上分析。"
+$msg += "2026-07-15朝を最後に日次レポートが欠落。/api/cron/daily が毎回504"
+$msg += "(Vercel Runtime Timeout 60s)。#60で成果物の自動生成が入り、レポートINSERTの前に"
+$msg += "Claude呼び出しが直列で10回以上走るようになったのが原因。INSERTは処理の最後なので"
+$msg += "レポートが丸ごと残らなかった。"
+$msg += ""
+$msg += "- runDailyCeoReport: 返信下書き/法務抽出/証憑OCR/成果物生成をレポート保存後の"
+$msg += "  後工程 runDailyAfterwork() に移動。時間切れでもレポートだけは必ず残る。"
+$msg += "- 後工程は DAILY_AFTERWORK_BUDGET_MS (既定180秒) の予算内で優先度順に実行し、"
+$msg += "  超過分は静かに打ち切り (次回実行や10分tickで拾う)。"
+$msg += "- /api/cron/daily の maxDuration を 60 から 300 秒へ。"
+$msg += "- .gitattributes: 改行コードをLFに統一 (VMマウントのCRLF末尾欠落の根治)。"
+$msg += "- check-files.mjs: 自分自身のコメント内のU+FFFDで誤検知し常にexit 1になっていたのを修正。"
 $msgFile = Join-Path $env:TEMP "yozan_commit_msg.txt"
 Set-Content -Path $msgFile -Value $msg -Encoding UTF8
 
@@ -74,5 +68,4 @@ git push origin main
 
 Write-Host ""
 Write-Host "完了。Vercelが自動ビルドします（1〜2分）" -ForegroundColor Green
-Write-Host "次にやること: Vercelの yozan-genesis / shift-cloud-shift-cloud / money-golfwing に ANTHROPIC_API_KEY があるか確認"
-Write-Host "（apps/reserve-os のLINE LIFF対応は前回セッションの未コミット分のため今回に含めていません）"
+Write-Host "続けて .\fix-line-endings.ps1 を実行してください（毎回の手動デプロイが不要になります）" -ForegroundColor Yellow
