@@ -2,7 +2,14 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0060` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0067` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **関数を作ったら必ず service_role に EXECUTE を付ける**（0065 適用後のルール）:
+  `grant execute on function public.<名前>(<引数型>) to service_role;`
+  0065 で「新関数への PUBLIC 既定 EXECUTE」を止めたため、書かないと service_role から呼べない。
+  逆に anon/authenticated へは付けない（DECISIONS #54/#55: RPCは全てサーバー側 service_role から）
+- ✅ `0066_drop_cad_dms_open_read_policies.sql` — 適用済（2026-07-17、MCP name=drop_cad_dms_open_read_policies。cad_*/dms_* の `USING(true)` SELECTポリシー14本を削除＝service_role専用へ #65）
+- ✅ `0064_revoke_gnv_views_from_anon.sql` — 適用済（2026-07-17、MCP name=revoke_gnv_views_from_anon。gnv_*16本を anon/authenticated/PUBLIC から剥奪、SELECTは gn_chat_reader のみ #64）
+- ✅ `0065_revoke_anon_table_grants.sql` — 適用済（2026-07-17、MCP name=revoke_anon_table_grants。anon のテーブル権限987件を剥奪＋既定付与の停止 #64）。巻き戻しは `rollback_0064_0065.sql`
 - ✅ `0059_directive_steps.sql` — 適用済（2026-07-15、MCP name=directive_steps。工程台帳 gn_directive_steps＋gn_directives.target_kind に campaign 追加 #59）
 - ✅ `0045_inbox_filter_suggestions_directives.sql` — 適用済（2026-07-14、受信フィルタ・返信承認・改善提案・実行指示 #52）
 - ✅ `0046_kpi_labor_align_payroll.sql` — 適用済（2026-07-14、労務KPI一本化 #53系）
