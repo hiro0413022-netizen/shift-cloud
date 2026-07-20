@@ -86,10 +86,11 @@ export async function submitRequest(_prev: SubmitState, formData: FormData): Pro
   if (!phone) return { error: "電話番号を入力してください。" };
   if (!email && !lineUserId) return { error: "メールアドレスを入力してください。" };
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: "メールアドレスの形式をご確認ください。" };
-  if (!pref1 || !pref2 || !pref3) {
-    return { error: `ご希望日時を第3希望まで（3つ）お選びください。営業時間 ${hours.openTime}〜${hours.closeTime}／火曜定休の範囲でご指定ください。` };
+  if (!pref1) {
+    return { error: `ご希望日時（第1希望）をお選びください。営業時間 ${hours.openTime}〜${hours.closeTime}／火曜定休の範囲でご指定ください。` };
   }
-  if (new Set([pref1, pref2, pref3]).size < 3) return { error: "第1〜第3希望は異なる日時をご指定ください。" };
+  const chosenPrefs = [pref1, pref2, pref3].filter(Boolean);
+  if (new Set(chosenPrefs).size < chosenPrefs.length) return { error: "ご希望日時は第1〜第3希望で異なる日時をご指定ください。" };
   if (!handedness) return { error: "利き手をお選びください。" };
   if (!age) return { error: "年齢をご入力ください。" };
   if (!avgScore) return { error: "現在の平均スコアをご入力ください。" };

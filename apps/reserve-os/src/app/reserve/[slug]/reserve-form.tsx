@@ -159,12 +159,12 @@ export function ReserveForm({
 
       <Group
         title="ご希望日時（第3希望まで）"
-        desc={`ご予約はスタッフが空き状況を確認のうえ、後ほど確定のご連絡を差し上げます。ご希望を第3希望までお選びください（3つとも必須）。営業時間 ${hours.openTime}〜${hours.closeTime}／火曜定休。`}
+        desc={`ご予約はスタッフが空き状況を確認のうえ、後ほど確定のご連絡を差し上げます。第1希望は必須です（第2・第3希望は任意）。営業時間 ${hours.openTime}〜${hours.closeTime}／火曜定休。`}
       >
         {[1, 2, 3].map((n) => (
-          <L key={n} label={`第${n}希望`} required>
+          <L key={n} label={`第${n}希望`} required={n === 1} opt={n !== 1}>
             <div className="grid grid-cols-2 gap-2">
-              <select name={`pref${n}_date`} required defaultValue="" className="field">
+              <select name={`pref${n}_date`} required={n === 1} defaultValue="" className="field">
                 <option value="" disabled>
                   日付を選ぶ
                 </option>
@@ -174,7 +174,7 @@ export function ReserveForm({
                   </option>
                 ))}
               </select>
-              <select name={`pref${n}_time`} required defaultValue="" className="field">
+              <select name={`pref${n}_time`} required={n === 1} defaultValue="" className="field">
                 <option value="" disabled>
                   時間を選ぶ
                 </option>
