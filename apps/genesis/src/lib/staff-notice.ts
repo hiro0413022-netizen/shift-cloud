@@ -1,4 +1,5 @@
 import "server-only";
+import { jstYmd } from "@/lib/jst";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import type { GenesisActor } from "@/lib/auth";
@@ -117,7 +118,7 @@ export async function sendStaffNotice(actor: GenesisActor, input: SendNoticeInpu
         company_id: companyId,
         staff_id: null, // 店舗共通（その店の全員に出る / DECISIONS #55）
         store_id: group.store_id,
-        date: new Date().toISOString().slice(0, 10),
+        date: jstYmd(), // JST基準（UTCだと朝6時のcronで前日になる）
         title,
         note: body,
         status: "open",

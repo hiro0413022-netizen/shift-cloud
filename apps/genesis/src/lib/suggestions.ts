@@ -1,4 +1,5 @@
 import "server-only";
+import { jstYmd } from "@/lib/jst";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCockpitData, getBusinessBreakdown, type CockpitData } from "@/lib/kernel";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
@@ -175,7 +176,7 @@ function ruleDrafts(d: CockpitData, ctx: { openInquiries: number; integrity: num
       impact: "顧客満足・退会抑止",
       effort: "すぐ",
       href: "/inbox",
-      dedupe_key: `inbox_backlog_${new Date().toISOString().slice(0, 10)}`,
+      dedupe_key: `inbox_backlog_${jstYmd()}`,
       source: "rules",
     });
   }
@@ -190,7 +191,7 @@ function ruleDrafts(d: CockpitData, ctx: { openInquiries: number; integrity: num
       impact: "全KPIの信頼性",
       effort: "1日",
       href: "/finance",
-      dedupe_key: `integrity_${new Date().toISOString().slice(0, 10)}`,
+      dedupe_key: `integrity_${jstYmd()}`,
       source: "rules",
     });
   }

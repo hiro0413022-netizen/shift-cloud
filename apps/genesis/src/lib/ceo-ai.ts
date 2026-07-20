@@ -16,6 +16,7 @@ import { runLegalAiExtraction } from "@/lib/legal-ai";
 import { runReceiptAiExtraction } from "@/lib/receipt-ai";
 import { generateDeliverables, type PromptForRun } from "@/lib/agent-runner";
 import { enqueueAction } from "@/lib/ai-execution";
+import { jstDateJa, jstYmd } from "@/lib/jst";
 
 /* ============================================================
    CEO AI — 古川さんの分身（正典: docs/genesis/VISION.md §1/§3/§8）
@@ -164,7 +165,7 @@ async function saveInstructions(companyId: string, analysis: CeoAnalysis): Promi
         target_ai: "claude",
         title: `【CEO AI→${agent?.name ?? ins.agent_code}】${ins.instruction.slice(0, 60)}`,
         body: [
-          `## CEO AIからの指示（${new Date().toLocaleDateString("ja-JP")}）`,
+          `## CEO AIからの指示（${jstDateJa()}）`,
           `宛先: ${agent?.name ?? ins.agent_code}`,
           "",
           "## 指示内容",
@@ -249,7 +250,7 @@ export async function runDailyCeoReport(
   const suggestions = await getOpenSuggestions(companyId, 5).catch(() => []);
 
   // 4. レポート組み立て
-  const today = new Date().toLocaleDateString("ja-JP");
+  const today = jstDateJa(); // UTCのままだと6:00 JSTのcronで「前日」の日付になる
   const inquiryLines = await summarizeInquiriesForReport(companyId);
   const lines = [
     `# YOZAN GENESIS 日次レポート（${today}）`,
@@ -366,7 +367,7 @@ export async function runDailyCeoReport(
   //    試運転ポリシー(#63)により staff_directive は approval＝/executions で承認後にLINE配信。
   //    dedupeで1日1件。判断すべきことがあれば先頭に添える。
   try {
-    const ymd = new Date().toISOString().slice(0, 10);
+    const ymd = jstYmd();
     const topJudge = judgments[0]?.title;
     const briefLines = [
       `おはようございます。本日のポイントです（${today}）。`,

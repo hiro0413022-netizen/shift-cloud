@@ -29,6 +29,7 @@ function LoginForm() {
             {pending ? "確認中..." : "ログイン"}
           </button>
         </form>
+        <p className="mt-4 text-center"><a href="/manual" className="text-sm text-(--color-dim) underline underline-offset-2">📖 使い方マニュアル</a></p>
       </div>
     </main>
   );

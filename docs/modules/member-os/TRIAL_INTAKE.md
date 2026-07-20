@@ -51,7 +51,7 @@ company_id / store_id / 予約番号(自動) / 体験メニュー(program) / 予
 ## スコープ確定（2026-07-06, DECISIONS #23/#24）
 - 体験受付は **1a＋1b を一気に構築**（スタッフWeb入力＋タブレット自己入力＋電子サイン）。
 - 次段で **予約サイト/予約システム** を作り、本受付と紐づけて動かす。
-- **予約システムの棲み分け**: 当面 GOLF WING(宝塚) は Smart Hello 継続。**姫路 FRUNK GOLF は本予約システムを導入**。→ member-os はマルチストア前提で設計（company_id/store_id 分離済み・migration 0011）。
+- **予約システムの棲み分け**: 当面 GOLF WING(宝塚) は Smart Hello 継続。**姫路 FRANK GOLF は本予約システムを導入**。→ member-os はマルチストア前提で設計（company_id/store_id 分離済み・migration 0011）。
 - **会員名簿本体も将来 Genesis に移管**（入会後の会員管理・会費・来場）。mbr_guests はその基盤として設計。
 
 ## 実装状況

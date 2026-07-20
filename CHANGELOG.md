@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-07-19 — JST日付統一・現場マニュアル4本・ネットワークマップ同期（DECISIONS #73）
+- fix(genesis): サーバー側の「今日」をJSTに統一（`lib/jst.ts` 新設）。日次レポートのタイトル日付が毎朝1日ズレていたのを解消（6:00 JST cron＝前日21:00 UTC問題）。sp_tasksの日付・提案dedupeキー・KPIチェックの当月判定も同修正。tests/jst-dates.test.ts で固定
+- docs(runbook): money-os / survey-os / reserve-os / caddy-os の現場手順書を新規作成（C-1完了）。各アプリ `/manual`（ログイン不要）で配信、ログイン画面にリンク追加
+- feat(genesis/network): トポロジを実態に同期 — survey-os/caddy-os/demo-sales/reserve-osのURL・本番状態を反映、FRANK GOLF公式サイトのノード＋フロー図(frank-golf.svg)を追加
+
 ## 2026-07-16 — 生成側を executor に配線（各AIが自動でenqueue）（DECISIONS #63）
 - feat(genesis/ceo-ai): 日次レポート生成の最後に「スタッフ朝連絡」を `staff_directive` で投入（1日1件・dedupe）。CEO AIの各指示は `agent_directive`(auto) で配布し監査に残す
 - feat(genesis/deliverables): 成果物を承認すると `internal_notify`(auto) を executor に投入（送信チャネル未接続のため現状は「承認済み・手動対応」の記録/可視化。接続後に実送信へ差し替え）
@@ -219,3 +224,4 @@
 - feat(corporate): 画像11枚をGenspark CDNからapps/corporate/public/imagesへローカル化（GitHub Actions asset-mirror経由）。constants.tsをローカルパスに変更
 - feat: `apps/kallinos` 新規追加 — www.kallinos.jpの静的ミラー（index/products/brand + css/js。残6ページはworkflow再実行で取得予定）
 - feat: `apps/golfwing` 新規追加 — GolfOrder発注管理システムのソースをGensparkから回収（golfwing-srcブランチ経由、Hono+Cloudflare D1、migrations 0001〜0015、docs一式）。デプロイは当面Cloudflare Pages継続、将来Supabase/inventoryモジュールへ移行予定
+                                                                                                                                                                                                                             

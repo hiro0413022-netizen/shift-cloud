@@ -7,7 +7,7 @@ URL: https://yozan-genesis.vercel.app （スマホでも使えます。ホーム
 
 ## 1. GENESISとは
 
-会社全体（GOLF WING・FRUNK GOLF・KALLINOS・キャディ事業）の「今」をひとつの画面で見て、AIの報告を受け、経営の判断をする場所です。**入力作業の場所ではありません**（日々の入力はShift Cloudなど現場アプリが担当）。
+会社全体（GOLF WING・FRANK GOLF・KALLINOS・キャディ事業）の「今」をひとつの画面で見て、AIの報告を受け、経営の判断をする場所です。**入力作業の場所ではありません**（日々の入力はShift Cloudなど現場アプリが担当）。
 
 GENESISでやることは、突き詰めると4つです。
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
+import { jstMonthStart } from "@/lib/jst";
 import type { JudgmentItem } from "@/lib/kernel";
 
 /* ============================================================
@@ -35,9 +36,9 @@ type FinRow = {
 };
 
 function monthStartUTC(offsetMonths: number): string {
-  const now = new Date();
-  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths, 1));
-  return d.toISOString().slice(0, 10);
+  // JST基準の「当月」。UTCのままだと毎月1日の朝6時cron（=前月末日UTC）で
+  // 当月判定が1か月ずれ、完了月チェックが誤検知する。
+  return jstMonthStart(offsetMonths);
 }
 
 function ymLabel(dateStr: string): string {

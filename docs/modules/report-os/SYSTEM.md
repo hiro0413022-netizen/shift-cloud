@@ -7,7 +7,7 @@
 事業所ごとの「月次報告資料（.pptx）」を、**数値は自動・文章はAI下書き**でほぼ自動生成する。
 古川さんは最後に「承認 / 修正」だけ。VISION §3「CEO AIが毎月出すもの」の月次アウトプット層。
 
-第1本丸は **GOLF WING**。型を完成させて FRUNK / KALLINOS / YOZAN 全体へ横展開する。
+第1本丸は **GOLF WING**。型を完成させて FRANK / KALLINOS / YOZAN 全体へ横展開する。
 
 ## 2. 資料の構成（GOLF WING）
 
@@ -176,7 +176,7 @@ CLI/CIから回す場合のみ `build-data.mjs`（service_role必要）を使う
 ## 8. 横展開
 
 `generate.js` は事業所非依存（JSON駆動）。事業所ごとに data JSON を作れば同じ資料が出る。
-FRUNK GOLF / KALLINOS は KPI項目が一部異なるため、JSONの `kpi` キーと narrative 見出しを事業所プロファイルで差し替える（将来 `profiles/<business>.json`）。
+FRANK GOLF / KALLINOS は KPI項目が一部異なるため、JSONの `kpi` キーと narrative 見出しを事業所プロファイルで差し替える（将来 `profiles/<business>.json`）。
 
 ## 9. 現状のサンプル
 

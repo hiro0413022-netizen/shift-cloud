@@ -303,7 +303,8 @@ export type BusinessBreakdown = {
 /** 事業(fin_segment)コード → 配下店舗の判定（DBにマッピングが無いため名称で対応付け） */
 function storesForSegment(code: string, stores: { id: string; name: string }[]) {
   if (code === "golf") return stores.filter((s) => s.name.includes("GOLF WING"));
-  if (code === "himeji") return stores.filter((s) => s.name.includes("FRUNK") || s.name.includes("姫路"));
+  // 姫路店は表記ゆれ（FRANK が正・DB上は FRUNK の旧名が残る場合あり）を両方拾う
+  if (code === "himeji") return stores.filter((s) => s.name.includes("FRANK") || s.name.includes("FRUNK") || s.name.includes("姫路"));
   return [];
 }
 
@@ -314,7 +315,8 @@ function storesForSegment(code: string, stores: { id: string; name: string }[]) 
 function storeIdForMemberStoreName(storeName: string | null, stores: { id: string; name: string }[]): string | null {
   const n = (storeName ?? "").trim();
   const find = (kw: string) => stores.find((s) => s.name.includes(kw))?.id ?? null;
-  if (n.includes("FRUNK") || n.includes("姫路")) return find("FRUNK") ?? find("姫路");
+  if (n.includes("FRANK") || n.includes("FRUNK") || n.includes("姫路"))
+    return find("FRANK") ?? find("FRUNK") ?? find("姫路");
   // 既定はGOLF WING（"ゴルフウィング" / "GOLF WING" / "宝塚" などを宝塚店に集約）
   return find("GOLF WING") ?? find("宝塚");
 }

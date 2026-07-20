@@ -18,6 +18,6 @@ YOZANの出店計画・事業計画の索引。Genesis（資料AI/新規事業AI
 ## Genesisへの組込み方針
 - 本INDEXを起点に、資料AI・新規事業AIが計画を参照・更新する。
 - 数値の変更は各フォルダの `Assumptions`（Excel/`.md`）を唯一の源泉とし、意思決定は `templates/DECISIONS.md` に記録。
-- 正典VISION（`docs/genesis/VISION.md`）の開発順序②FRUNK/新店OSと連動。
+- 正典VISION（`docs/genesis/VISION.md`）の開発順序②FRANK/新店OSと連動。
 
 > アプリ画面からのリンク表示やDB登録が必要な場合は、この索引パスを参照先に設定してください。

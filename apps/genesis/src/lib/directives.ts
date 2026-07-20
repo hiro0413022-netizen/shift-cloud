@@ -1,4 +1,5 @@
 import "server-only";
+import { jstDateJa, jstYmd } from "@/lib/jst";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import type { GenesisActor } from "@/lib/auth";
@@ -140,7 +141,7 @@ export async function issueDirective(actor: GenesisActor, input: IssueInput): Pr
         company_id: companyId,
         staff_id: input.staff_id,
         store_id: input.store_id ?? null,
-        date: input.due_date ?? new Date().toISOString().slice(0, 10),
+        date: input.due_date ?? jstYmd(),
         title,
         note: input.body ?? null,
         status: "open",
@@ -170,7 +171,7 @@ export async function issueDirective(actor: GenesisActor, input: IssueInput): Pr
         target_ai: "claude",
         title: `【指示→${agent?.name ?? "AI社員"}】${title.slice(0, 60)}`,
         body: [
-          `## 指示（${new Date().toLocaleDateString("ja-JP")} 古川さん発行）`,
+          `## 指示（${jstDateJa()} 古川さん発行）`,
           `宛先: ${agent?.name ?? input.agent_id}`,
           "",
           "## 指示内容",
@@ -263,7 +264,7 @@ async function fanOutStep(
         company_id: companyId,
         staff_id: input.staff_id,
         store_id: null,
-        date: input.due_date ?? new Date().toISOString().slice(0, 10),
+        date: input.due_date ?? jstYmd(),
         title: input.title,
         note: input.body ?? null,
         status: "open",
@@ -293,7 +294,7 @@ async function fanOutStep(
         target_ai: "claude",
         title: `【指示→${agent?.name ?? "AI社員"}】${input.title.slice(0, 60)}`,
         body: [
-          `## 指示（${new Date().toLocaleDateString("ja-JP")} 古川さん発行）`,
+          `## 指示（${jstDateJa()} 古川さん発行）`,
           `宛先: ${agent?.name ?? input.agent_id}`,
           "",
           "## 指示内容",

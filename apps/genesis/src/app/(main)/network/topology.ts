@@ -168,10 +168,12 @@ export const NODES: SystemNode[] = [
     id: "survey-os",
     name: "Survey OS",
     kind: "app",
-    status: "undeployed",
+    status: "prod",
+    url: "https://survey-os-mu.vercel.app",
+    healthUrl: "https://survey-os-mu.vercel.app",
     schema: "svy_",
     description:
-      "アンケート/情報収集。匿名公開回答・ドラッグ順位付け・ボルダ+平均順位集計。GOLF WINGコーチ評価（golfwing-2026）投入済・未デプロイ。",
+      "アンケート/情報収集。匿名公開回答・ドラッグ順位付け・ボルダ+平均順位集計。GOLF WINGコーチ評価（golfwing-2026）公開中。",
     flow: "survey-os.svg",
     aliases: ["survey", "アンケート"],
     ix: 990,
@@ -182,6 +184,8 @@ export const NODES: SystemNode[] = [
     name: "Reserve OS",
     kind: "app",
     status: "prod",
+    url: "https://shift-cloud-reserve-os.vercel.app",
+    healthUrl: "https://shift-cloud-reserve-os.vercel.app",
     schema: "res_",
     description:
       "ビジター申込型予約（第1弾シャフトフィッティング）。候補日時3つ＋ヒアリング→申込がスタッフの「やること」(sp_tasks)に自動で積まれる→スタッフが日程確認しGOLF WINGのメールから返信→Reserve OSで確定。メール/LINE自動通知は次回。",
@@ -194,10 +198,12 @@ export const NODES: SystemNode[] = [
     id: "caddy-os",
     name: "Caddy OS",
     kind: "app",
-    status: "undeployed",
+    status: "prod",
+    url: "https://caddy-os-omega.vercel.app",
+    healthUrl: "https://caddy-os-omega.vercel.app",
     schema: "cad_",
     description:
-      "キャディ派遣管理。1派遣=1行で売上と原価を持ち行単位の粗利が出る。社員行は原価0をCHECK制約で強制（交通費二重計上の防止）。272派遣移行済・未デプロイ。",
+      "キャディ派遣管理。1派遣=1行で売上と原価を持ち行単位の粗利が出る。社員行は原価0をCHECK制約で強制（交通費二重計上の防止）。272派遣移行済。",
     flow: "caddy-os.svg",
     aliases: ["caddy", "キャディ"],
     ix: 210,
@@ -248,7 +254,9 @@ export const NODES: SystemNode[] = [
     id: "demo-sales",
     name: "AI DEMO SALES",
     kind: "app",
-    status: "undeployed",
+    status: "prod",
+    url: "https://demo-sales-delta.vercel.app",
+    healthUrl: "https://demo-sales-delta.vercel.app",
     schema: "dms_",
     description:
       "クリニック・動物病院向けHP制作の営業デモ高速生成（WEB SALES COMMAND CENTER）。営業先ごとの専用デモ（/d/トークン・noindex）＋提案書・トーク・見積を自動生成。成約でdms_projectsへ移行（0048）。",
@@ -278,6 +286,19 @@ export const NODES: SystemNode[] = [
     aliases: ["kallinos", "カリノス"],
     ix: 120,
     iy: 640,
+  },
+  {
+    id: "frank-golf-site",
+    name: "FRANK GOLF 公式サイト",
+    kind: "app",
+    status: "undeployed",
+    schema: "DBなし（静的サイト sites/frank-golf）",
+    description:
+      "FRANK GOLF 姫路の公式ホームページ（静的HTML12枚・#66〜#71）。体験申込はmember-os /trial（mbr_trial_requests）へ、会員ログイン/Web予約はmember-osへリンク。Vercel公開はA-0c待ち。",
+    flow: "frank-golf.svg",
+    aliases: ["frank", "フランク", "姫路サイト"],
+    ix: 120,
+    iy: 860,
   },
   {
     id: "ext-smarthello",
@@ -358,6 +379,8 @@ export const EDGES: SystemEdge[] = [
   { from: "report-os", to: "genesis", label: ".pptx 承認", type: "approval" },
 
   { from: "ext-web", to: "corporate", label: "公開サイト", type: "external" },
+  { from: "ext-web", to: "frank-golf-site", label: "公開サイト", type: "external" },
+  { from: "frank-golf-site", to: "member-os", label: "体験申込(/trial)・Web予約リンク", type: "data" },
   { from: "ext-web", to: "kallinos", label: "公開サイト", type: "external" },
 ];
 
@@ -375,6 +398,7 @@ export const FLOW_LIST: { file: string; title: string }[] = [
   { file: "report-os.svg", title: "Report OS（月次資料）" },
   { file: "genesis-secretary.svg", title: "GENESIS — CEO AI秘書 / Inbox" },
   { file: "sales-os.svg", title: "Sales OS（営業サポート）" },
+  { file: "frank-golf.svg", title: "FRANK GOLF 公式サイト（姫路）" },
 ];
 
 /** 死活監視の対象（確認済みURLのみ） */
