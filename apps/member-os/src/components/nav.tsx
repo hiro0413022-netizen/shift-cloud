@@ -7,8 +7,9 @@ const LINKS = [
   { href: "/dashboard", label: "ダッシュボード" },
   { href: "/", label: "受付台帳" },
   { href: "/follow", label: "体験フォロー" },
+  { href: "/trials", label: "体験申込" },
   { href: "/reservations", label: "予約（姫路）" },
-  { href: "/frunk", label: "FRUNK会員" },
+  { href: "/frunk", label: "FRANK会員" },
   { href: "/import", label: "データ取込" },
 ];
 

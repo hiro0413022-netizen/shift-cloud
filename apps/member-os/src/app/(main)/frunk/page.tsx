@@ -34,7 +34,7 @@ export default async function FrunkPage({
   return (
     <div className="space-y-5">
       <header className="reveal">
-        <h1 className="text-2xl font-bold tracking-tight">FRUNK GOLF 姫路 — 会員管理</h1>
+        <h1 className="text-2xl font-bold tracking-tight">FRANK GOLF 姫路 — 会員管理</h1>
         <p className="mt-0.5 text-sm text-(--color-dim)">入会プラン・予約制限の設定、iPad入会申込の承認、会員の休会・退会管理</p>
       </header>
 
@@ -172,7 +172,7 @@ export default async function FrunkPage({
       <Panel title="入会フォームURLの発行" className="d4">
         <p className="mb-3 text-xs text-(--color-dim)">店頭タブレットやHP/QR掲示用の入会フォームURLを発行します（発行すると旧URLは無効化）。</p>
         <form action={issueSignupToken} className="flex flex-wrap items-end gap-2">
-          <Field label="ラベル（任意）"><input name="label" placeholder="FRUNK 入会タブレット" className={inputCls} /></Field>
+          <Field label="ラベル（任意）"><input name="label" placeholder="FRANK 入会タブレット" className={inputCls} /></Field>
           <button className={btnCls}>入会フォームURLを発行</button>
         </form>
       </Panel>

@@ -13,7 +13,7 @@ export default function MemberRegisterPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-10">
       <div className="mb-6 text-center">
-        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
+        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
         <h1 className="text-2xl font-bold tracking-wide">新規登録</h1>
         <p className="mt-2 text-sm text-(--color-dim)">登録後すぐにWeb予約をご利用いただけます</p>
       </div>

@@ -1,4 +1,4 @@
-// 予約システム（姫路 FRUNK GOLF）共通ロジック
+// 予約システム（姫路 FRANK GOLF）共通ロジック
 
 export const SLOT_MINUTES = 60;
 export const HIMEJI_STORE_CODE = "frunk_himeji";

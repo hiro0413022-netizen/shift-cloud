@@ -23,7 +23,7 @@ export type HimejiStore = {
   closeTime: string | null;
 };
 
-/** 姫路 FRUNK GOLF の店舗・会社を解決（会員ポータルは姫路店スコープ） */
+/** 姫路 FRANK GOLF の店舗・会社を解決（会員ポータルは姫路店スコープ） */
 export async function resolveHimeji(): Promise<HimejiStore | null> {
   const admin = createAdmin();
   const { data } = await admin

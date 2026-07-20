@@ -15,7 +15,7 @@ function orNull(v: FormDataEntryValue | null): string | null {
 }
 const GENDERS = ["male", "female", "other", "unknown"];
 
-/** FRUNK GOLF 姫路 入会申込（店頭タブレット・公開ルート、店舗トークン検証、service_role経由） */
+/** FRANK GOLF 姫路 入会申込（店頭タブレット・公開ルート、店舗トークン検証、service_role経由） */
 export async function submitSignup(_prev: SignupState, formData: FormData): Promise<SignupState> {
   const token = str(formData.get("token"));
   if (!token) return { error: "受付情報が見つかりません" };
@@ -61,7 +61,7 @@ export async function submitSignup(_prev: SignupState, formData: FormData): Prom
 
   await logEvent(tok.company_id as string, {
     event_type: "frunk.signup",
-    title: `FRUNK入会申込: ${name} 様`,
+    title: `FRANK入会申込: ${name} 様`,
     source: "tablet",
     source_type: "external",
     severity: "info",

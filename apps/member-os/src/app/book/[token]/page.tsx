@@ -13,7 +13,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-8">
       <div className="mb-6 text-center">
-        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
+        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
         <h1 className="text-2xl font-bold tracking-wide">Web予約</h1>
       </div>
       {children}

@@ -58,7 +58,7 @@ export default async function BoardPage({ params }: { params: Promise<{ token: s
     <main className="min-h-screen bg-black px-4 py-4 text-white">
       <header className="mb-3 flex items-baseline justify-between">
         <div className="flex items-baseline gap-3">
-          <span className="text-xs tracking-[0.4em] text-amber-400">FRUNK GOLF</span>
+          <span className="text-xs tracking-[0.4em] text-amber-400">FRANK GOLF</span>
           <h1 className="text-2xl font-bold">{String(store.name ?? "姫路")} 本日のご予約</h1>
         </div>
         <div className="flex items-baseline gap-3 text-neutral-400">

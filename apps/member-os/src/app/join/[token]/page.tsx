@@ -8,7 +8,7 @@ function Shell({ storeName, children }: { storeName?: string | null; children: R
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-8">
       <div className="mb-6 text-center">
-        <p className="text-xs font-semibold tracking-[0.3em] text-(--color-gold)">FRUNK GOLF</p>
+        <p className="text-xs font-semibold tracking-[0.3em] text-(--color-gold)">FRANK GOLF</p>
         <h1 className="text-2xl font-bold tracking-tight">入会申込</h1>
         <p className="mt-1 text-xs text-(--color-dim)">{storeName ?? "タブレットにご記入をお願いします"}</p>
       </div>

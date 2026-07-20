@@ -48,7 +48,7 @@ export default async function MemberHomePage({
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-8">
       <header className="mb-5 flex items-center justify-between">
         <div>
-          <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
+          <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
           <h1 className="text-xl font-bold tracking-wide">{member.name} 様</h1>
           <p className="text-xs text-(--color-dim)">会員番号 {member.memberNo}{member.isProvisional ? "（仮登録）" : ""}</p>
         </div>

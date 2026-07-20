@@ -1,4 +1,4 @@
-// FRUNK GOLF 姫路 会員制度の選択肢・ラベル（Smart Hello外・member-os管理）
+// FRANK GOLF 姫路 会員制度の選択肢・ラベル（Smart Hello外・member-os管理）
 
 export const FRUNK_STORE_CODE = "frunk_himeji";
 

@@ -119,12 +119,12 @@ async function issueToken(purpose: "book" | "board", label: string, urlPath: str
 
 /** お客様Web予約URL（店舗単位・長期有効）を発行 */
 export async function issueBookingToken() {
-  await issueToken("book", "FRUNK GOLF 姫路 Web予約", "book", "booking_url");
+  await issueToken("book", "FRANK GOLF 姫路 Web予約", "book", "booking_url");
 }
 
 /** 店頭常設カレンダーの表示URLを発行（ロビー掲示・タブレット用） */
 export async function issueBoardToken() {
-  await issueToken("board", "FRUNK GOLF 姫路 店頭カレンダー", "board", "board_url");
+  await issueToken("board", "FRANK GOLF 姫路 店頭カレンダー", "board", "board_url");
 }
 
 const PAY_METHOD_VALUES = ["cash", "card", "e_money", "bank", "other"];

@@ -137,7 +137,7 @@ export async function issueSignupToken(formData: FormData) {
   const raw = generateToken();
   await admin.from("frunk_signup_tokens").insert({
     company_id: actor.companyId, store_id: storeId,
-    token_hash: hashToken(raw), label: orNull(formData.get("label")) ?? "FRUNK 入会タブレット",
+    token_hash: hashToken(raw), label: orNull(formData.get("label")) ?? "FRANK 入会タブレット",
   });
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";

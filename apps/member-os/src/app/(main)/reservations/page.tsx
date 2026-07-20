@@ -35,7 +35,7 @@ export default async function ReservationsPage({
     .eq("company_id", actor.companyId).eq("code", HIMEJI_STORE_CODE).maybeSingle();
 
   if (!store) {
-    return <Empty>FRUNK GOLF 姫路の店舗が見つかりません（migration 0020 の適用をご確認ください）。</Empty>;
+    return <Empty>FRANK GOLF 姫路の店舗が見つかりません（migration 0020 の適用をご確認ください）。</Empty>;
   }
 
   const [{ data: resources }, { data: bookings }, { data: outstandingRows }] = await Promise.all([
@@ -69,7 +69,7 @@ export default async function ReservationsPage({
     <div className="space-y-4">
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">予約管理 — FRUNK GOLF 姫路</h1>
+          <h1 className="text-xl font-bold">予約管理 — FRANK GOLF 姫路</h1>
           <p className="text-sm text-(--color-dim)">打席・レッスンの枠管理、電話/店頭予約、お客様Web予約、入金・未収金の管理</p>
         </div>
         <form className="flex items-center gap-2">
