@@ -19,11 +19,18 @@ export type SendInput = {
   subject: string;
   html: string;
   text?: string;
-  replyTo?: string;
+  replyTo?: string | string[];
   from?: string;
 };
 
 const FROM_DEFAULT = () => process.env.RESERVE_FROM_EMAIL || "info@yozan-inc.jp";
+
+/** 予約通知の宛先。RESERVE_STAFF_EMAIL はカンマ区切りで複数指定可（例: "a@x.jp, b@y.jp"）。 */
+const staffEmails = (): string[] =>
+  (process.env.RESERVE_STAFF_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
 
 /**
  * メール本文に載せる自サイトのURL。
@@ -101,8 +108,8 @@ function preferredRows(r: RequestRow): string {
 
 /** 新規申込 → GOLF WING（スタッフ）へ通知。返信先はお客様のメール。 */
 export async function notifyStaffNewRequest(r: RequestRow): Promise<MailResult> {
-  const to = process.env.RESERVE_STAFF_EMAIL;
-  if (!to) {
+  const to = staffEmails();
+  if (to.length === 0) {
     console.warn("[mail] RESERVE_STAFF_EMAIL 未設定のためスタッフ通知をスキップ");
     return { ok: false, skipped: true };
   }
@@ -160,7 +167,7 @@ export async function ackCustomer(r: RequestRow): Promise<MailResult> {
     subject: `【GOLF WING】お申し込みを受け付けました（${seq}）`,
     html,
     text,
-    replyTo: process.env.RESERVE_STAFF_EMAIL || undefined,
+    replyTo: staffEmails().length ? staffEmails() : undefined,
   });
 }
 
@@ -183,7 +190,7 @@ export async function sendConfirmation(r: RequestRow, slotISO: string, message?:
     to,
     subject: `【GOLF WING】ご予約が確定しました（${fmtJst(slotISO)}）`,
     html,
-    replyTo: process.env.RESERVE_STAFF_EMAIL || undefined,
+    replyTo: staffEmails().length ? staffEmails() : undefined,
   });
 }
 
