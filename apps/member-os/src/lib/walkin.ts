@@ -44,7 +44,7 @@ export const GENDER_LABEL: Record<string, string> = Object.fromEntries(
 
 // お客様入力の選択肢
 export const OCCUPATIONS = [
-  "会社経営者・役員", "会社員", "自営業", "公務員", "専業主婦", "学生", "その他",
+  "会社経営者・役員", "自営業", "公務員", "会社員", "専業主婦", "学生", "その他",
 ];
 export const CONTACT_METHODS = ["電話", "ショートメール", "LINE", "メール"];
 export const REFERRAL_SOURCES = [

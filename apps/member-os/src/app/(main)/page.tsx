@@ -2,7 +2,7 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
-import { VISIT_TYPES, VISIT_TYPE_LABEL, RESULTS, PAYMENT_METHODS, DISCOUNTS, REFERRAL_SOURCES } from "@/lib/walkin";
+import { VISIT_TYPES, VISIT_TYPE_LABEL, RESULTS, PAYMENT_METHODS, DISCOUNTS, REFERRAL_SOURCES, OCCUPATIONS } from "@/lib/walkin";
 import { createVisitManual, updateVisit, deleteVisit, issueStoreToken } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -121,8 +121,23 @@ export default async function LedgerPage({
           <Field label="お名前">
             <input name="name" placeholder="山田 太郎" className={inputCls} />
           </Field>
+          <Field label="フリガナ">
+            <input name="name_kana" placeholder="ヤマダ タロウ" className={inputCls} />
+          </Field>
           <Field label="電話番号">
             <input name="phone" placeholder="090-..." className={inputCls} />
+          </Field>
+          <Field label="メールアドレス">
+            <input name="email" type="email" placeholder="example@mail.com" className={inputCls} />
+          </Field>
+          <Field label="ご住所">
+            <input name="address" placeholder="兵庫県宝塚市〇〇町1-2-3" className={inputCls} />
+          </Field>
+          <Field label="ご職業">
+            <select name="occupation" defaultValue="" className={inputCls}>
+              <option value="">選択</option>
+              {OCCUPATIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
           </Field>
           <Field label="利用料">
             <input name="fee" inputMode="numeric" placeholder="5500" className={inputCls} />

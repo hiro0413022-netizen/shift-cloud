@@ -39,13 +39,26 @@ export async function createVisitManual(formData: FormData) {
   const name = orNull(formData.get("name"));
   const phone = orNull(formData.get("phone"));
   const storeId = orNull(formData.get("store_id"));
+  const nameKana = orNull(formData.get("name_kana"));
+  const email = orNull(formData.get("email"));
+  const address = orNull(formData.get("address"));
+  const occupation = orNull(formData.get("occupation"));
   if (!name && !phone) return; // 空送信ガード
 
   let guestId: string | null = null;
   if (name) {
     const { data: g } = await admin
       .from("mbr_guests")
-      .insert({ company_id: actor.companyId, store_id: storeId, name, phone })
+      .insert({
+        company_id: actor.companyId,
+        store_id: storeId,
+        name,
+        phone,
+        name_kana: nameKana,
+        email,
+        address1: address,
+        occupation,
+      })
       .select("id")
       .single();
     guestId = g?.id ?? null;
