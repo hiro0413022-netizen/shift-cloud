@@ -108,12 +108,14 @@ async function loadSheet(formData: FormData): Promise<ExcelJS.Worksheet | null> 
   const base = Buffer.from(await file.arrayBuffer());
   const wb = new ExcelJS.Workbook();
   try {
-    await wb.xlsx.load(Buffer.from(base));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await wb.xlsx.load(Buffer.from(base) as any);
   } catch (e) {
     // 名前空間接頭辞付き（Smart Hello形式）を正規化して再読込
     const fixed = await normalizeSpreadsheetNamespace(Buffer.from(base));
     if (!fixed) throw e;
-    await wb.xlsx.load(fixed);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await wb.xlsx.load(fixed as any);
   }
   return wb.worksheets[0] ?? null;
 }
