@@ -106,7 +106,7 @@ async function loadSheet(formData: FormData): Promise<ExcelJS.Worksheet | null> 
   const u8 = new Uint8Array(await file.arrayBuffer());
   const sig = Array.from(u8.slice(0, 4)).map((b) => b.toString(16).padStart(2, "0")).join(" ");
   // 診断ログ（Vercelランタイムログに出る）。取込エラー切り分け用。
-  console.error(`[import:loadSheet] name=${file.name} declaredSize=${file.size} readBytes=${u8.length} sig=${sig}`);
+  console.log(`[import:loadSheet] name=${file.name} declaredSize=${file.size} readBytes=${u8.length} sig=${sig}`);
 
   // xlsx は ZIP（先頭 50 4b）。空/別形式（.xls=d0 cf, CSV=テキスト）なら分かりやすいエラーにする。
   if (u8.length < 4 || u8[0] !== 0x50 || u8[1] !== 0x4b) {
@@ -300,131 +300,6 @@ export async function importReservations(_prev: ImportState, formData: FormData)
   await logAudit(actor, "smarthello.reservations_import", "mbr_reservations", null, null, { count: rows.length });
   revalidatePath("/import");
   return { ok: true, message: `予約一覧を取込みました（${rows.length}件・予約番号で重複排除）。` };
-}
-
-/**
- * スマートハロ「予約一覧」から体験・フィッティングだけを抽出して受付一覧(mbr_walkin_visits)へ反映。
- * 打席（練習タイム/スタッフアワー）・パーソナル等は除外。予約番号で冪等化（再取込で重複行を作らない）。
- * 予約者の氏名・連絡先も取り込む（体験→入会の自動照合に使うため）。
- */
-export async function importTrialReservations(_prev: ImportState, formData: FormData): Promise<ImportState> {
-  const actor = await requireReceptionActor();
-  const ws = await loadSheet(formData);
-  if (!ws) return { error: "予約一覧ファイルを選択してください" };
-  const admin = createAdmin();
-  const C = (row: ExcelJS.Row, i: number) => row.getCell(i).value;
-
-  const { data: store } = await admin
-    .from("stores").select("id")
-    .eq("company_id", actor.companyId).eq("code", "takarazuka").maybeSingle();
-  const storeId = (store?.id as string | undefined) ?? null;
-
-  type Cand = {
-    reservationNo: string;
-    visitedOn: string;
-    visitType: "trial" | "fitting";
-    guest: Record<string, unknown>;
-    kindLabel: string | null;
-  };
-  const cands: Cand[] = [];
-  let skippedCancel = 0;
-
-  ws.eachRow((row, n) => {
-    if (n === 1) return;
-    const kind = cellText(C(row, 4)) ?? "";
-    const program = cellText(C(row, 6)) ?? "";
-    const kubun = cellText(C(row, 19)) ?? "";
-    const blob = `${kind}${program}${kubun}`;
-    const isFitting = blob.includes("フィッティング");
-    const isTrial = blob.includes("体験") || kubun === "体験";
-    if (!isFitting && !isTrial) return; // 打席・練習・パーソナル等は対象外
-
-    const reservationNo = cellText(C(row, 18));
-    const name = cellText(C(row, 21));
-    const visitedOn = cellDate(C(row, 15));
-    if (!reservationNo || !name || !visitedOn) return;
-
-    // キャンセルは受付一覧に載せない
-    const status = cellText(C(row, 37)) ?? "";
-    if (status.includes("キャンセル") || cellText(C(row, 38))) {
-      skippedCancel++;
-      return;
-    }
-
-    const pref = cellText(C(row, 27)) ?? "";
-    const city = cellText(C(row, 28)) ?? "";
-    const bldg = cellText(C(row, 29)) ?? "";
-    cands.push({
-      reservationNo,
-      visitedOn,
-      visitType: isFitting ? "fitting" : "trial",
-      kindLabel: kind || null,
-      guest: {
-        company_id: actor.companyId,
-        store_id: storeId,
-        name,
-        name_kana: cellText(C(row, 22)),
-        birth_date: cellDate(C(row, 23)),
-        gender: normGender(cellText(C(row, 25))),
-        postal_code: cellText(C(row, 26)),
-        prefecture: pref || null,
-        address1: `${pref}${city}${bldg}`.trim() || null,
-        phone: cellText(C(row, 30)) ?? cellText(C(row, 31)),
-        email: cellText(C(row, 32)),
-      },
-    });
-  });
-
-  if (cands.length === 0)
-    return { error: "体験・フィッティングの予約が見つかりません（打席/練習のみ、または列が想定と異なる可能性）" };
-
-  // 既に取り込み済みの予約番号（冪等化）
-  const nos = cands.map((c) => c.reservationNo);
-  const existing = new Set<string>();
-  for (let i = 0; i < nos.length; i += 500) {
-    const { data } = await admin
-      .from("mbr_walkin_visits")
-      .select("source_reservation_no")
-      .eq("company_id", actor.companyId)
-      .in("source_reservation_no", nos.slice(i, i + 500));
-    (data ?? []).forEach((r) => r.source_reservation_no && existing.add(String(r.source_reservation_no)));
-  }
-  const fresh = cands.filter((c) => !existing.has(c.reservationNo));
-
-  let added = 0;
-  for (const c of fresh) {
-    const gid = randomUUID();
-    const { error: ge } = await admin.from("mbr_guests").insert({ id: gid, ...c.guest });
-    if (ge) return { error: `ゲスト取込エラー: ${ge.message}` };
-    const { error: ve } = await admin.from("mbr_walkin_visits").insert({
-      company_id: actor.companyId,
-      store_id: storeId,
-      guest_id: gid,
-      visited_on: c.visitedOn,
-      visit_type: c.visitType,
-      source_reservation_no: c.reservationNo,
-      referral_source: "スマートハロ予約",
-      survey: compact({ reservation_kind_label: c.kindLabel }),
-      is_migrated: false,
-    });
-    if (ve) return { error: `受付一覧への反映エラー: ${ve.message}` };
-    added++;
-  }
-
-  await admin.rpc("refresh_member_kpis", { p_company_id: actor.companyId });
-  await logAudit(actor, "smarthello.trial_reservations_import", "mbr_walkin_visits", null, null, {
-    added,
-    skippedExisting: cands.length - fresh.length,
-    skippedCancel,
-  });
-  revalidatePath("/import");
-  revalidatePath("/");
-  return {
-    ok: true,
-    message: `体験・フィッティング予約を受付一覧に反映しました（新規${added}件${
-      cands.length - fresh.length ? `／取込済スキップ${cands.length - fresh.length}件` : ""
-    }${skippedCancel ? `／キャンセル除外${skippedCancel}件` : ""}）。`,
-  };
 }
 
 // ---- 一時利用者名簿（現行Excel台帳）→ mbr_guests / mbr_walkin_visits 移行（Phase D / DECISIONS #28） ----
