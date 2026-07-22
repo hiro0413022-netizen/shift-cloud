@@ -102,21 +102,31 @@ async function normalizeSpreadsheetNamespace(buf: ArrayBuffer | Buffer): Promise
 async function loadSheet(formData: FormData): Promise<ExcelJS.Worksheet | null> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return null;
-  // 元バイト列をNode Bufferで保持。ExcelJSのloadがArrayBufferをdetach/consumeする環境があり、
-  // その状態でフォールバック(JSZip)に同じバッファを渡すと "Can't find end of central directory" で落ちる。
-  // → 各ローダに毎回コピー(Buffer.from)を渡して回避する。
-  const base = Buffer.from(await file.arrayBuffer());
-  const wb = new ExcelJS.Workbook();
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await wb.xlsx.load(Buffer.from(base) as any);
-  } catch (e) {
-    // 名前空間接頭辞付き（Smart Hello形式）を正規化して再読込
-    const fixed = await normalizeSpreadsheetNamespace(Buffer.from(base));
-    if (!fixed) throw e;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await wb.xlsx.load(fixed as any);
+
+  const u8 = new Uint8Array(await file.arrayBuffer());
+  const sig = Array.from(u8.slice(0, 4)).map((b) => b.toString(16).padStart(2, "0")).join(" ");
+  // 診断ログ（Vercelランタイムログに出る）。取込エラー切り分け用。
+  console.error(`[import:loadSheet] name=${file.name} declaredSize=${file.size} readBytes=${u8.length} sig=${sig}`);
+
+  // xlsx は ZIP（先頭 50 4b）。空/別形式（.xls=d0 cf, CSV=テキスト）なら分かりやすいエラーにする。
+  if (u8.length < 4 || u8[0] !== 0x50 || u8[1] !== 0x4b) {
+    throw new Error(
+      `アップロードされたファイルを .xlsx（ZIP形式）として読めませんでした（先頭バイト: ${sig} / サイズ ${u8.length}）。` +
+        `Smart Hello から「.xlsx」でエクスポートし直して選択してください（.xls や CSV は不可）。`
+    );
   }
+
+  const wb = new ExcelJS.Workbook();
+  // Smart Hello は本体名前空間が接頭辞付き（<x:workbook> 等）で ExcelJS が解釈できないため、
+  // 先に JSZip で正規化してから ExcelJS に一度だけ渡す（try/catchの二重読みによるバッファ問題を避ける）。
+  let normalized: Buffer | null = null;
+  try {
+    normalized = await normalizeSpreadsheetNamespace(Buffer.from(u8));
+  } catch (e) {
+    console.error("[import:loadSheet] namespace normalize failed:", e instanceof Error ? e.message : String(e));
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await wb.xlsx.load((normalized ?? Buffer.from(u8)) as any);
   return wb.worksheets[0] ?? null;
 }
 
