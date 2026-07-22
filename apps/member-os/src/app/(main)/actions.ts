@@ -113,6 +113,7 @@ export async function updateVisit(formData: FormData) {
   if (formData.has("reapproach_date")) patch.reapproach_date = orNull(formData.get("reapproach_date"));
   if (formData.has("note")) patch.note = orNull(formData.get("note"));
   if (Object.keys(patch).length === 0) return;
+  patch.updated_at = new Date().toISOString(); // 保存のたびに更新→一覧のインライン欄が最新値で再描画される
 
   await admin
     .from("mbr_walkin_visits")

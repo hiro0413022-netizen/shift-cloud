@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { importMembers, importReservations, importWalkins, type ImportState } from "./actions";
+import { importMembers, importReservations, importTrialReservations, importWalkins, type ImportState } from "./actions";
 import { Panel, inputCls, btnCls } from "@/components/ui";
 
 function UploadCard({
@@ -48,6 +48,13 @@ export default function ImportPage() {
         title="予約一覧の取込（稼働・予約数）"
         desc="Smart Hello →予約一覧を期間指定でエクスポートして選択。予約番号で重複を排除して追記します。打席稼働・パーソナル件数の把握用（体験/フィッティング件数のKPIには使いません）。"
         action={importReservations}
+        accept=".xlsx,.xls"
+      />
+
+      <UploadCard
+        title="体験・フィッティング予約を受付一覧へ反映"
+        desc="Smart Hello →予約一覧を選択すると、体験・フィッティングの予約だけを抽出して受付台帳（受付一覧）に自動で追加します（打席・練習・パーソナルは除外）。予約番号で重複排除するので、同じ期間を何度取込んでも二重登録されません。氏名・連絡先も取り込み、後の「会員名簿の取込」で入会が自動反映されます。"
+        action={importTrialReservations}
         accept=".xlsx,.xls"
       />
 

@@ -47,6 +47,22 @@ function cellNum(v: ExcelJS.CellValue): number | null {
   return m ? parseFloat(m[0]) : null;
 }
 
+/** 氏名を照合用に正規化（全角/半角スペース・記号を除去）。スマートハロと受付一覧の氏名を突合するのに使う。 */
+function normName(s: string | null | undefined): string {
+  return String(s ?? "").replace(/[\s　・,、。]/g, "").trim();
+}
+/** 電話番号を照合用に数字のみへ正規化（末尾10〜11桁）。固定/携帯どちらでも突合できるようにする。 */
+function phoneKey(s: string | null | undefined): string | null {
+  const d = String(s ?? "").replace(/[^\d]/g, "");
+  return d.length >= 10 ? d.slice(-11) : null;
+}
+/** 'YYYY-MM-DD' に日数を加減して 'YYYY-MM-DD' を返す。 */
+function addDays(ymd: string, days: number): string {
+  const d = new Date(`${ymd}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // ExcelJS が「既定名前空間」で来ることを前提にしているパート本体の名前空間。
 // Smart Hello の一部エクスポートはこれらを接頭辞付き（<x:workbook>, <ap:Properties> 等）で出力するため
 // ExcelJS が解釈できず undefined 参照で落ちる（"reading 'sheets'" / "reading 'company'"）。
@@ -110,10 +126,13 @@ export async function importMembers(_prev: ImportState, formData: FormData): Pro
   const C = (row: ExcelJS.Row, i: number) => row.getCell(i).value;
 
   const rows: Record<string, unknown>[] = [];
+  // 体験→入会の自動照合用に、氏名・生年月日・電話（固定/携帯）を控える（mbr_membersには保存しない機微情報）
+  const contactByNo = new Map<string, string[]>();
   ws.eachRow((row, n) => {
     if (n === 1) return;
     const memberNo = cellText(C(row, 1));
     if (!memberNo) return;
+    contactByNo.set(memberNo, [cellText(C(row, 49)), cellText(C(row, 50))].filter(Boolean) as string[]);
     rows.push({
       company_id: actor.companyId,
       member_no: memberNo,
@@ -154,16 +173,75 @@ export async function importMembers(_prev: ImportState, formData: FormData): Pro
     if (error) return { error: `取込エラー: ${error.message}` };
   }
   await admin.rpc("refresh_smart_hello_kpis", { p_company_id: actor.companyId });
+
+  // ── 体験→入会の自動反映 ──────────────────────────────
+  // 会員名簿の入会者と、受付一覧の体験(result未確定)を「氏名＋(生年月日 or 電話)」で突合し、
+  // 入会日が体験日の前後（-60日以降）なら result=入会 を自動セット。
+  type Joiner = { keys: Set<string>; birth: string | null; join: string };
+  const joinerIndex = new Map<string, Joiner[]>();
+  for (const r of deduped) {
+    if (!r.join_date) continue;
+    const nm = normName(r.name as string | null);
+    if (!nm) continue;
+    const phones = (contactByNo.get(String(r.member_no)) ?? [])
+      .map((p) => phoneKey(p))
+      .filter(Boolean) as string[];
+    const j: Joiner = { keys: new Set(phones), birth: r.birth_date ? String(r.birth_date) : null, join: String(r.join_date) };
+    const arr = joinerIndex.get(nm) ?? [];
+    arr.push(j);
+    joinerIndex.set(nm, arr);
+  }
+
+  let joinsMarked = 0;
+  if (joinerIndex.size > 0) {
+    const { data: visits } = await admin
+      .from("mbr_walkin_visits")
+      .select("id, visited_on, result, mbr_guests(name, birth_date, phone)")
+      .eq("company_id", actor.companyId)
+      .eq("visit_type", "trial")
+      .is("deleted_at", null);
+    const toJoin: string[] = [];
+    for (const v of (visits ?? []) as Record<string, unknown>[]) {
+      if (v.result === "join") continue;
+      const g = (v.mbr_guests ?? {}) as Record<string, unknown>;
+      const nm = normName(g.name as string | null);
+      const cands = joinerIndex.get(nm);
+      if (!cands) continue;
+      const gBirth = g.birth_date ? String(g.birth_date) : null;
+      const gPhone = phoneKey(g.phone as string | null);
+      const visitedOn = String(v.visited_on);
+      const minJoin = addDays(visitedOn, -60);
+      const hit = cands.some(
+        (c) =>
+          c.join >= minJoin &&
+          ((gBirth && c.birth && gBirth === c.birth) || (gPhone && c.keys.has(gPhone)))
+      );
+      if (hit) toJoin.push(String(v.id));
+    }
+    for (let i = 0; i < toJoin.length; i += 200) {
+      const { error } = await admin
+        .from("mbr_walkin_visits")
+        .update({ result: "join", updated_at: new Date().toISOString() })
+        .in("id", toJoin.slice(i, i + 200));
+      if (!error) joinsMarked += toJoin.slice(i, i + 200).length;
+    }
+    if (joinsMarked > 0) await admin.rpc("refresh_member_kpis", { p_company_id: actor.companyId });
+  }
+
   await logAudit(actor, "smarthello.members_import", "mbr_members", null, null, {
     count: deduped.length,
     dropped,
+    joinsMarked,
   });
   revalidatePath("/import");
+  revalidatePath("/");
   return {
     ok: true,
     message: `会員名簿を取込みました（${deduped.length}件${
       dropped ? `／会員番号重複${dropped}件を集約` : ""
-    }）。会員数・退会率KPIを更新しました。`,
+    }）。会員数・退会率KPIを更新${
+      joinsMarked ? `／体験→入会を自動反映 ${joinsMarked}件` : ""
+    }しました。`,
   };
 }
 
@@ -209,6 +287,131 @@ export async function importReservations(_prev: ImportState, formData: FormData)
   await logAudit(actor, "smarthello.reservations_import", "mbr_reservations", null, null, { count: rows.length });
   revalidatePath("/import");
   return { ok: true, message: `予約一覧を取込みました（${rows.length}件・予約番号で重複排除）。` };
+}
+
+/**
+ * スマートハロ「予約一覧」から体験・フィッティングだけを抽出して受付一覧(mbr_walkin_visits)へ反映。
+ * 打席（練習タイム/スタッフアワー）・パーソナル等は除外。予約番号で冪等化（再取込で重複行を作らない）。
+ * 予約者の氏名・連絡先も取り込む（体験→入会の自動照合に使うため）。
+ */
+export async function importTrialReservations(_prev: ImportState, formData: FormData): Promise<ImportState> {
+  const actor = await requireReceptionActor();
+  const ws = await loadSheet(formData);
+  if (!ws) return { error: "予約一覧ファイルを選択してください" };
+  const admin = createAdmin();
+  const C = (row: ExcelJS.Row, i: number) => row.getCell(i).value;
+
+  const { data: store } = await admin
+    .from("stores").select("id")
+    .eq("company_id", actor.companyId).eq("code", "takarazuka").maybeSingle();
+  const storeId = (store?.id as string | undefined) ?? null;
+
+  type Cand = {
+    reservationNo: string;
+    visitedOn: string;
+    visitType: "trial" | "fitting";
+    guest: Record<string, unknown>;
+    kindLabel: string | null;
+  };
+  const cands: Cand[] = [];
+  let skippedCancel = 0;
+
+  ws.eachRow((row, n) => {
+    if (n === 1) return;
+    const kind = cellText(C(row, 4)) ?? "";
+    const program = cellText(C(row, 6)) ?? "";
+    const kubun = cellText(C(row, 19)) ?? "";
+    const blob = `${kind}${program}${kubun}`;
+    const isFitting = blob.includes("フィッティング");
+    const isTrial = blob.includes("体験") || kubun === "体験";
+    if (!isFitting && !isTrial) return; // 打席・練習・パーソナル等は対象外
+
+    const reservationNo = cellText(C(row, 18));
+    const name = cellText(C(row, 21));
+    const visitedOn = cellDate(C(row, 15));
+    if (!reservationNo || !name || !visitedOn) return;
+
+    // キャンセルは受付一覧に載せない
+    const status = cellText(C(row, 37)) ?? "";
+    if (status.includes("キャンセル") || cellText(C(row, 38))) {
+      skippedCancel++;
+      return;
+    }
+
+    const pref = cellText(C(row, 27)) ?? "";
+    const city = cellText(C(row, 28)) ?? "";
+    const bldg = cellText(C(row, 29)) ?? "";
+    cands.push({
+      reservationNo,
+      visitedOn,
+      visitType: isFitting ? "fitting" : "trial",
+      kindLabel: kind || null,
+      guest: {
+        company_id: actor.companyId,
+        store_id: storeId,
+        name,
+        name_kana: cellText(C(row, 22)),
+        birth_date: cellDate(C(row, 23)),
+        gender: normGender(cellText(C(row, 25))),
+        postal_code: cellText(C(row, 26)),
+        prefecture: pref || null,
+        address1: `${pref}${city}${bldg}`.trim() || null,
+        phone: cellText(C(row, 30)) ?? cellText(C(row, 31)),
+        email: cellText(C(row, 32)),
+      },
+    });
+  });
+
+  if (cands.length === 0)
+    return { error: "体験・フィッティングの予約が見つかりません（打席/練習のみ、または列が想定と異なる可能性）" };
+
+  // 既に取り込み済みの予約番号（冪等化）
+  const nos = cands.map((c) => c.reservationNo);
+  const existing = new Set<string>();
+  for (let i = 0; i < nos.length; i += 500) {
+    const { data } = await admin
+      .from("mbr_walkin_visits")
+      .select("source_reservation_no")
+      .eq("company_id", actor.companyId)
+      .in("source_reservation_no", nos.slice(i, i + 500));
+    (data ?? []).forEach((r) => r.source_reservation_no && existing.add(String(r.source_reservation_no)));
+  }
+  const fresh = cands.filter((c) => !existing.has(c.reservationNo));
+
+  let added = 0;
+  for (const c of fresh) {
+    const gid = randomUUID();
+    const { error: ge } = await admin.from("mbr_guests").insert({ id: gid, ...c.guest });
+    if (ge) return { error: `ゲスト取込エラー: ${ge.message}` };
+    const { error: ve } = await admin.from("mbr_walkin_visits").insert({
+      company_id: actor.companyId,
+      store_id: storeId,
+      guest_id: gid,
+      visited_on: c.visitedOn,
+      visit_type: c.visitType,
+      source_reservation_no: c.reservationNo,
+      referral_source: "スマートハロ予約",
+      survey: compact({ reservation_kind_label: c.kindLabel }),
+      is_migrated: false,
+    });
+    if (ve) return { error: `受付一覧への反映エラー: ${ve.message}` };
+    added++;
+  }
+
+  await admin.rpc("refresh_member_kpis", { p_company_id: actor.companyId });
+  await logAudit(actor, "smarthello.trial_reservations_import", "mbr_walkin_visits", null, null, {
+    added,
+    skippedExisting: cands.length - fresh.length,
+    skippedCancel,
+  });
+  revalidatePath("/import");
+  revalidatePath("/");
+  return {
+    ok: true,
+    message: `体験・フィッティング予約を受付一覧に反映しました（新規${added}件${
+      cands.length - fresh.length ? `／取込済スキップ${cands.length - fresh.length}件` : ""
+    }${skippedCancel ? `／キャンセル除外${skippedCancel}件` : ""}）。`,
+  };
 }
 
 // ---- 一時利用者名簿（現行Excel台帳）→ mbr_guests / mbr_walkin_visits 移行（Phase D / DECISIONS #28） ----

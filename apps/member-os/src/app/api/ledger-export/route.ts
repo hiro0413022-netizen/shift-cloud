@@ -100,6 +100,10 @@ export async function GET(request: Request) {
   // 列幅の目安
   ws.columns.forEach((col, i) => { col.width = [11, 12, 14, 14, 12, 6, 10, 28, 10, 15, 22, 16, 12][i] ?? 14; });
 
+  // 郵便番号(7列目)・電話番号(10列目)は数値化で先頭0が消える/指数表記になるのを防ぐためテキスト書式に固定
+  ws.getColumn(7).numFmt = "@";
+  ws.getColumn(10).numFmt = "@";
+
   const buf = await wb.xlsx.writeBuffer();
   const fname = `一時利用者名簿_${from}_${to}.xlsx`;
   return new Response(buf, {

@@ -37,7 +37,10 @@ export async function submitReception(
 
   if (!tok || !tok.active) return { error: "無効な受付URLです。スタッフにお声がけください" };
 
-  const name = str(formData.get("name"));
+  // 姓・名を分割入力（Excelで「姓 名」に整形）。旧nameフィールドにもフォールバック。
+  const familyName = str(formData.get("family_name"));
+  const givenName = str(formData.get("given_name"));
+  const name = [familyName, givenName].filter(Boolean).join(" ") || str(formData.get("name"));
   if (!name) return { error: "お名前を入力してください" };
   const visitType = VISIT_TYPES.includes(str(formData.get("visit_type")))
     ? str(formData.get("visit_type"))

@@ -191,8 +191,8 @@ export default async function LedgerPage({
                     </div>
                   </div>
 
-                  {/* スタッフ追記 */}
-                  <form action={updateVisit} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-6">
+                  {/* スタッフ追記（保存のたびにupdated_atで再マウント→編集値が確実に反映される） */}
+                  <form key={`edit-${String(v.id)}-${String(v.updated_at ?? "")}`} action={updateVisit} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-6">
                     <input type="hidden" name="id" value={String(v.id)} />
                     <select name="result" defaultValue={String(v.result ?? "none")} className={`${inputCls} !py-1`}>
                       {RESULTS.map((r) => <option key={r.value} value={r.value}>{r.label === "—" ? "成約なし" : r.label}</option>)}
