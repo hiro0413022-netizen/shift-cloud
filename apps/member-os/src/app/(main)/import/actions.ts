@@ -73,7 +73,7 @@ const DEFAULT_NS_URIS = [
 ];
 
 /** 接頭辞付きの本体名前空間を検出したら、該当接頭辞を外して既定名前空間に正規化し直す。 */
-async function normalizeSpreadsheetNamespace(buf: ArrayBuffer): Promise<Buffer | null> {
+async function normalizeSpreadsheetNamespace(buf: ArrayBuffer | Buffer): Promise<Buffer | null> {
   const zip = await JSZip.loadAsync(buf);
   let changed = false;
   const paths = Object.keys(zip.files).filter((p) => /\.(xml|rels)$/i.test(p) && !zip.files[p].dir);
@@ -102,17 +102,18 @@ async function normalizeSpreadsheetNamespace(buf: ArrayBuffer): Promise<Buffer |
 async function loadSheet(formData: FormData): Promise<ExcelJS.Worksheet | null> {
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return null;
-  const buf = await file.arrayBuffer();
+  // 元バイト列をNode Bufferで保持。ExcelJSのloadがArrayBufferをdetach/consumeする環境があり、
+  // その状態でフォールバック(JSZip)に同じバッファを渡すと "Can't find end of central directory" で落ちる。
+  // → 各ローダに毎回コピー(Buffer.from)を渡して回避する。
+  const base = Buffer.from(await file.arrayBuffer());
   const wb = new ExcelJS.Workbook();
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await wb.xlsx.load(buf as any);
+    await wb.xlsx.load(Buffer.from(base));
   } catch (e) {
     // 名前空間接頭辞付き（Smart Hello形式）を正規化して再読込
-    const fixed = await normalizeSpreadsheetNamespace(buf);
+    const fixed = await normalizeSpreadsheetNamespace(Buffer.from(base));
     if (!fixed) throw e;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await wb.xlsx.load(fixed as any);
+    await wb.xlsx.load(fixed);
   }
   return wb.worksheets[0] ?? null;
 }
