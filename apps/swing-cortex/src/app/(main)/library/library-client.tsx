@@ -15,8 +15,8 @@ export default function LibraryClient({ tree }: { tree: DiagnosisResult[] }) {
 
   return (
     <div className="p-5 pb-8">
-      <h1 className="mb-1 text-xl font-bold text-slate-900">知識ライブラリ</h1>
-      <p className="mb-4 text-xs text-slate-400">現場コメントから構造化した診断辞書。逆引きにも。</p>
+      <h1 className="mb-1 text-xl font-bold text-slate-900">症状別対処法</h1>
+      <p className="mb-4 text-xs text-slate-400">この店のレッスンメソッド。症状を選ぶと原因・対処法・ドリル・生徒への説明が出ます。</p>
       {cats.map((cat) => (
         <div key={cat} className="mb-5">
           <div className="mb-2 text-xs font-semibold text-teal-700">{cat}</div>

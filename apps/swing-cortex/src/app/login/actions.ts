@@ -20,5 +20,5 @@ export async function login(
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "IDまたはパスワードが正しくありません" };
-  redirect("/");
+  redirect("/library");
 }

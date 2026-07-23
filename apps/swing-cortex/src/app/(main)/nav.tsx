@@ -13,8 +13,8 @@ const ICON: Record<string, string> = {
 };
 
 const TABS = [
+  { href: "/library", id: "library", label: "症状別対処法" },
   { href: "/", id: "home", label: "診断" },
-  { href: "/library", id: "library", label: "ライブラリ" },
   { href: "/insights", id: "insights", label: "インサイト" },
   { href: "/settings", id: "settings", label: "設定" },
 ];
