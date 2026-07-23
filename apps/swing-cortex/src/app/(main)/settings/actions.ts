@@ -11,7 +11,10 @@ export type ImportResult = { ok: boolean; message: string; imported?: number; sk
 /** ヘッダ行を探し、必要な列インデックスを特定する */
 function locateColumns(rows: unknown[][]) {
   for (let i = 0; i < Math.min(rows.length, 15); i++) {
-    const row = rows[i].map((c) => String(c ?? "").trim());
+    // sheet_to_json は空セルで疎配列（穴あき）を返すことがある。
+    // .map は穴を残すため、Array.from で密な文字列配列に正規化する（undefined.includes 対策）。
+    const raw = rows[i] ?? [];
+    const row = Array.from({ length: raw.length }, (_, j) => String(raw[j] ?? "").trim());
     const commentIdx = row.findIndex((c) => c === "コメント");
     if (commentIdx >= 0) {
       const find = (names: string[]) => row.findIndex((c) => names.some((n) => c.includes(n)));
@@ -55,7 +58,7 @@ export async function importExcel(_prev: ImportResult | null, formData: FormData
   if (!col) return { ok: false, message: "「コメント」列が見つかりませんでした" };
 
   const dataRows = rows.slice(col.headerRow + 1);
-  const cell = (r: unknown[], idx: number) => (idx >= 0 ? String(r[idx] ?? "").trim() : "");
+  const cell = (r: unknown[], idx: number) => (idx >= 0 && r ? String(r[idx] ?? "").trim() : "");
 
   // 全入れ替え: 既存の取込コメントと集計を消去（この会社のみ）
   if (mode === "replace") {
