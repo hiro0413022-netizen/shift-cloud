@@ -6,3 +6,5 @@
 - 権限: `use_coaching` / `view_hq`
 - env: `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `ANTHROPIC_API_KEY`(任意)
 - 販売版=standard（P1+P2）、自社=pro（+生徒CRM）
+
+<!-- deploy: ANTHROPIC_API_KEY 有効化 (AIコメント生成ON) -->
