@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SWING CORTEX — プロトタイプ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;}
+  .no-scrollbar::-webkit-scrollbar{display:none;}
+  .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
+  @keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sheet-up{animation:sheetUp .28s cubic-bezier(.22,1,.36,1)}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .fade{animation:fade .2s ease}
+</style>
+</head>
+<body class="bg-slate-100">
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+/* ---------- 実データ由来のシード知識 ---------- */
+const SYMPTOMS = [
+  { id:"slice", cat:"球筋", name:"スライス", dir:"右に曲がる", freq:530, tags:["右に曲がる","アウトサイドイン"],
+    checkpoints:[
+      { pr:1, title:"スタンス・アライメント",
+        cause:"オープンスタンスで外から内への軌道（カット軌道）になりフェースが開く",
+        fix:"目標にスクエアに立つ。肩・腰・つま先のラインを平行に",
+        drill:"アライメントスティックを2本置き、足と目標線を平行に確認",
+        client:"今はオープンに立つ癖でボールが右に逃げやすい状態です。まずは目標にまっすぐ立つことから整えていきましょう。" },
+      { pr:2, title:"グリップ",
+        cause:"ウィークグリップでインパクトでフェースが開いて戻る",
+        fix:"左手を少し被せてスクエア〜ややストロングに。左手甲が目標を向く形",
+        drill:"ハーフスイングでフェースの向きをチェックしながら10球",
+        client:"グリップがやや薄く、当たる瞬間にフェースが開きやすいです。握りを少し整えると自然にボールがつかまります。" },
+      { pr:3, title:"スイング軌道",
+        cause:"上体から切り返し、アウトサイドインの軌道になっている",
+        fix:"下半身リードで内側から。切り返しで一瞬“間”をつくる",
+        drill:"8-4ドリル（時計の8時→4時）で三角形をキープ",
+        client:"体が先に開いて外から下りてくる動きです。下半身から動く順番を覚えると軌道が整いスライスが減ります。" },
+    ] },
+  { id:"hook", cat:"球筋", name:"フック", dir:"左に曲がる", freq:152, tags:["左に曲がる","インサイドアウト"],
+    checkpoints:[
+      { pr:1, title:"グリップ", cause:"ストロングすぎてフェースが被る", fix:"左手をやや戻しスクエアへ",
+        drill:"左手甲が正面を向く位置でハーフスイング", client:"握りが強くフェースが被りやすい状態です。少し戻すと左への引っかけが減ります。" },
+      { pr:2, title:"体の開き", cause:"下半身の回転が止まり手を返しすぎる", fix:"回転を止めず体で振り抜く",
+        drill:"フィニッシュまで胸を回すドリル", client:"手先で返しすぎる動きです。体の回転で振り抜くと球が安定します。" },
+    ] },
+  { id:"posture", cat:"体の動き", name:"アドレス姿勢の不良", dir:"アドレス", freq:1885, tags:["アドレス","猫背","前傾"],
+    checkpoints:[
+      { pr:1, title:"猫背",
+        cause:"背中が丸まった猫背のアドレスで重心が高くなりスイング軸が不安定、右肩がインパクトで前に出やすくなる",
+        fix:"胸を張って背筋を伸ばしたアドレスを取り、お尻を少し後ろに引いた姿勢でスイング軸を安定させる",
+        drill:"クラブを背中に当て、頭・背中・お尻の3点を一直線にして前傾",
+        client:"背中が丸まると軸がぶれやすく、右肩が前に出てミスに繋がります。胸を張った姿勢を作ることを優先しましょう。" },
+      { pr:2, title:"骨盤の後傾", cause:"骨盤が寝て前傾が作れず手打ちになる", fix:"お尻を突き出し骨盤から前傾",
+        drill:"壁にお尻をつけて前傾角を確認", client:"骨盤が寝て前傾が浅い状態です。お尻から前傾を作ると体で振れるようになります。" },
+    ] },
+  { id:"tenten", cat:"体の動き", name:"捻転不足", dir:"回転・体重移動", freq:2039, tags:["捻転","軸回転"],
+    checkpoints:[
+      { pr:1, title:"腕引きのテイクバック",
+        cause:"腕でインに引いてしまい正しく軸回転ができず捻転不足になる",
+        fix:"バックスイングは腕と体を同調させ、股関節の内側で肩を捻転させる",
+        drill:"両手クロスドリル・足踏みドリルで同調感を作る",
+        client:"腕だけで上げると体がねじれず力が伝わりません。体と腕を一緒に動かす感覚を優先しましょう。" },
+    ] },
+  { id:"ob", cat:"コースマネジメント", name:"コースでのOBが多い", dir:"スコア", freq:0, tags:["コースマネジメント"],
+    checkpoints:[
+      { pr:1, title:"ターゲット選択",
+        cause:"安全な方向を無視してピンを狙いすぎる、またはリスクのある番手を選択している",
+        fix:"外側のバンカーや林など大きなハザードを避け、広いゾーンを目標にする",
+        drill:"各ホールで“入れてはいけない場所”を先に決めてから狙いを決める",
+        client:"ピンを狙いすぎてOBが増えています。コースは『入れてはいけない場所を避ける』考え方が大切。フェアウェイの広い部分を狙うだけで大きく改善します。" },
+    ] },
+];
+
+const FREQ_CHIPS = ["スライス","捻転不足","アドレス姿勢の不良","フック","コースでのOBが多い"];
+
+const STUDENTS = [
+  { ref:"1316", name:"片庭 秀樹", kana:"かたにわ", last:"テイクバックで見越しをスウェーさせず右股関節で捻転", tags:["捻転","スウェー"], sessions:24 },
+  { ref:"1380", name:"天野 暁史", kana:"あまの", last:"腕でテイクバック→捻転が浅くアウトサイドイン", tags:["アウトサイドイン","捻転"], sessions:12 },
+  { ref:"1298", name:"川上 善之", kana:"かわかみ", last:"バックスイングで腕でインに引き捻転不足", tags:["捻転不足"], sessions:31 },
+];
+
+const INSIGHT_PHASES = [
+  {label:"テイクバック/BS",pct:46},{label:"軸回転・捻転",pct:34},{label:"アドレス/姿勢",pct:31},
+  {label:"同調・三角形",pct:30},{label:"下半身・踏込",pct:30},{label:"ダウン・切返し",pct:29},
+  {label:"インパクト/打点",pct:29},{label:"グリップ/手元",pct:27},{label:"アプローチ/パター",pct:20},
+];
+const COACHES = [{n:"張替コーチ",c:3680},{n:"浅野コーチ",c:1401},{n:"小林コーチ",c:745},{n:"風間コーチ",c:82}];
+
+/* ---------- 小物 ---------- */
+const Icon = ({d,cls="w-6 h-6"})=>(<svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d={d}/></svg>);
+const ICONS={
+  search:"M21 21l-4.3-4.3M17 10a7 7 0 11-14 0 7 7 0 0114 0z",
+  book:"M12 6.25C10.8 5.5 8.7 5 6.5 5 5 5 4 5.2 4 5.4v13C4 18 5 18 6.5 18c2.2 0 4.3.5 5.5 1.25M12 6.25C13.2 5.5 15.3 5 17.5 5c1.5 0 2.5.2 2.5.4v13c0 .2-1 0-2.5 0-2.2 0-4.3.5-5.5 1.25M12 6.25v13",
+  chart:"M3 3v18h18M8 15v3M13 10v8M18 6v12",
+  gear:"M10.3 4.3a1 1 0 011.4 0l.9.9a1 1 0 001 .3l1.2-.3a1 1 0 011.2.8l.3 1.2a1 1 0 00.7.7l1.2.3a1 1 0 01.8 1.2l-.3 1.2a1 1 0 00.3 1l.9.9a1 1 0 010 1.4l-.9.9a1 1 0 00-.3 1l.3 1.2a1 1 0 01-.8 1.2l-1.2.3a1 1 0 00-.7.7l-.3 1.2a1 1 0 01-1.2.8l-1.2-.3a1 1 0 00-1 .3l-.9.9a1 1 0 01-1.4 0l-.9-.9a1 1 0 00-1-.3l-1.2.3a1 1 0 01-1.2-.8l-.3-1.2a1 1 0 00-.7-.7l-1.2-.3a1 1 0 01-.8-1.2l.3-1.2a1 1 0 00-.3-1l-.9-.9a1 1 0 010-1.4l.9-.9a1 1 0 00.3-1l-.3-1.2a1 1 0 01.8-1.2l1.2-.3a1 1 0 00.7-.7l.3-1.2a1 1 0 011.2-.8l1.2.3a1 1 0 001-.3z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
+  line:"M4 5h16v10H12l-4 3v-3H4z",
+  copy:"M9 9h9v11H9zM6 15H4V4h11v2",
+  save:"M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6",
+  spark:"M12 3l1.8 4.9L18 9.7l-4.2 1.8L12 16l-1.8-4.5L6 9.7l4.2-1.8zM19 15l.9 2.4L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.6z",
+  chevron:"M9 6l6 6-6 6", back:"M15 6l-6 6 6 6", plus:"M12 5v14M5 12h14", user:"M16 14a4 4 0 10-8 0M12 7a3 3 0 100 6 3 3 0 000-6M4 20a8 8 0 0116 0",
+  bolt:"M13 3L4 14h7l-1 7 9-11h-7z", check:"M5 13l4 4L19 7"
+};
+
+function Toast({msg}){ if(!msg) return null;
+  return <div className="fixed left-1/2 -translate-x-1/2 bottom-28 z-50 fade"><div className="bg-slate-900 text-white text-sm px-4 py-2.5 rounded-full shadow-lg flex items-center gap-2"><Icon d={ICONS.check} cls="w-4 h-4 text-emerald-400"/>{msg}</div></div>;
+}
+
+/* ---------- 診断結果シート ---------- */
+function DiagnosisSheet({symptom, student, onClose, toast}){
+  const [openIdx,setOpenIdx]=useState(0);
+  const [menu,setMenu]=useState(false);
+  if(!symptom) return null;
+  return (
+    <div className="absolute inset-0 z-40">
+      <div className="absolute inset-0 bg-black/40 fade" onClick={onClose}></div>
+      <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl sheet-up max-h-[88%] flex flex-col shadow-2xl">
+        <div className="pt-3 pb-2 flex justify-center"><div className="w-10 h-1.5 bg-slate-200 rounded-full"></div></div>
+        <div className="px-5 pb-3 flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">{symptom.cat}</span>
+              <span className="text-xs text-slate-400">{symptom.dir}</span>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 mt-1">{symptom.name}</h2>
+            {student && <div className="mt-1 text-xs text-teal-700 flex items-center gap-1"><Icon d={ICONS.user} cls="w-3.5 h-3.5"/>{student.name} さんの傾向を反映</div>}
+          </div>
+          <button onClick={onClose} className="text-slate-400 text-2xl leading-none px-2">×</button>
+        </div>
+        {student && (
+          <div className="mx-5 mb-2 p-3 rounded-xl bg-teal-50/70 border border-teal-100">
+            <div className="text-[11px] font-semibold text-teal-800 mb-1 flex items-center gap-1"><Icon d={ICONS.spark} cls="w-3.5 h-3.5"/>AIパーソナライズ</div>
+            <div className="text-xs text-slate-600 leading-relaxed">前回「{student.last}」。この生徒は<b>{student.tags.join("・")}</b>の課題が継続。下記No.1から確認を推奨。</div>
+          </div>
+        )}
+        <div className="overflow-y-auto no-scrollbar px-5 flex-1">
+          {/* 優先度タブ */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
+            {symptom.checkpoints.map((c,i)=>(
+              <button key={i} onClick={()=>setOpenIdx(i)} className={"shrink-0 px-3 py-2 rounded-xl text-left border transition "+(openIdx===i?"bg-teal-600 border-teal-600 text-white":"bg-white border-slate-200 text-slate-500")}>
+                <div className="text-[10px] opacity-70">No.{c.pr}</div>
+                <div className="text-xs font-semibold">{c.title}</div>
+              </button>
+            ))}
+          </div>
+          {/* 選択チェックポイント */}
+          {(()=>{const c=symptom.checkpoints[openIdx];return(
+            <div className="pb-4 space-y-3 fade" key={openIdx}>
+              <div className="flex items-center gap-2"><span className="text-[11px] font-bold text-white bg-teal-600 rounded-full px-2 py-0.5">確認優先度 {c.pr}</span><h3 className="font-bold text-slate-800">{c.title}</h3></div>
+              <Block label="原因" tone="rose" text={c.cause}/>
+              <Block label="改善・対処法" tone="teal" text={c.fix}/>
+              <Block label="おすすめドリル" tone="indigo" text={c.drill}/>
+              <Block label="お客様への説明（そのまま送れる）" tone="slate" text={c.client} highlight/>
+            </div>
+          )})()}
+        </div>
+        {/* アクション：1つに集約 */}
+        <div className="px-5 py-3 border-t border-slate-100 bg-white relative">
+          {menu && (
+            <div className="absolute bottom-full mb-2 right-5 left-5 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden fade">
+              {[["お客様向け文をコピー",ICONS.copy],["指導メモをコピー",ICONS.copy],["カルテに保存",ICONS.save]].map(([t,d])=>(
+                <button key={t} onClick={()=>{setMenu(false);toast(t.replace("をコピー","をコピーしました").replace("に保存","に保存しました"));}} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-50"><Icon d={d} cls="w-4 h-4 text-slate-400"/>{t}</button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button onClick={()=>toast(student?`${student.name}さんのLINEへ送信しました`:"LINEで送信しました")} className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 shadow-sm"><Icon d={ICONS.line} cls="w-5 h-5"/>LINEで送る</button>
+            <button onClick={()=>setMenu(m=>!m)} className="w-14 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl flex items-center justify-center"><Icon d="M6 12h.01M12 12h.01M18 12h.01"/></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+const toneMap={rose:"bg-rose-50 text-rose-500",teal:"bg-teal-50 text-teal-600",indigo:"bg-indigo-50 text-indigo-500",slate:"bg-slate-100 text-slate-500"};
+function Block({label,text,tone,highlight}){
+  return <div className={"rounded-2xl p-4 "+(highlight?"bg-slate-900 text-white":"bg-slate-50")}>
+    <div className={"inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 "+(highlight?"bg-white/15 text-white":toneMap[tone])}>{label}</div>
+    <p className={"text-sm leading-relaxed "+(highlight?"text-slate-100":"text-slate-700")}>{text}</p>
+  </div>;
+}
+
+/* ---------- 画面: ホーム(診断) ---------- */
+function Home({onPick, student, setStudent, toast}){
+  const [q,setQ]=useState("");
+  const results=useMemo(()=>{
+    if(!q) return [];
+    return SYMPTOMS.filter(s=>s.name.includes(q)||s.tags.some(t=>t.includes(q))||s.cat.includes(q));
+  },[q]);
+  return (
+    <div className="p-5 pb-24">
+      <div className="flex items-center justify-between mb-1">
+        <div><div className="text-xs text-slate-400">こんにちは、張替コーチ</div><h1 className="text-xl font-bold text-slate-900">何を診断しますか？</h1></div>
+        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center text-white font-bold">張</div>
+      </div>
+
+      {/* 生徒コンテキスト */}
+      <div className="mt-4">
+        {student ? (
+          <div className="flex items-center justify-between p-3 rounded-2xl bg-teal-600 text-white shadow-sm">
+            <div className="flex items-center gap-2"><Icon d={ICONS.user} cls="w-4 h-4"/><div><div className="text-sm font-bold">{student.name}</div><div className="text-[11px] opacity-80">カルテ連携中・提案がパーソナライズされます</div></div></div>
+            <button onClick={()=>setStudent(null)} className="text-xs bg-white/20 px-2 py-1 rounded-lg">解除</button>
+          </div>
+        ) : (
+          <button onClick={()=>setStudent(STUDENTS[0])} className="w-full text-left p-3 rounded-2xl bg-white border border-dashed border-slate-200 text-slate-400 text-sm flex items-center gap-2"><Icon d={ICONS.plus} cls="w-4 h-4"/>生徒を選んでカルテ連携（任意）</button>
+        )}
+      </div>
+
+      {/* 検索 */}
+      <div className="mt-4 relative">
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300"><Icon d={ICONS.search} cls="w-5 h-5"/></div>
+        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="症状を入力（例: スライス、猫背）" className="w-full pl-12 pr-4 py-4 rounded-2xl bg-white border border-slate-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none text-slate-800"/>
+      </div>
+
+      {q ? (
+        <div className="mt-3 space-y-2">
+          {results.length? results.map(s=>(
+            <button key={s.id} onClick={()=>onPick(s)} className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 hover:border-teal-200 shadow-sm">
+              <div className="text-left"><div className="font-semibold text-slate-800">{s.name}</div><div className="text-xs text-slate-400">{s.cat}・{s.dir}</div></div>
+              <Icon d={ICONS.chevron} cls="w-5 h-5 text-slate-300"/>
+            </button>
+          )): <div className="text-center text-slate-400 text-sm py-8">該当なし。ライブラリから探せます。</div>}
+        </div>
+      ):(
+        <React.Fragment>
+          <div className="mt-6"><div className="text-xs font-semibold text-slate-400 mb-2">よく使う症状（実績の多い順）</div>
+            <div className="flex flex-wrap gap-2">
+              {FREQ_CHIPS.map(name=>{const s=SYMPTOMS.find(x=>x.name===name);return(
+                <button key={name} onClick={()=>onPick(s)} className="px-3.5 py-2 rounded-full bg-white border border-slate-200 text-sm text-slate-700 hover:border-teal-300 shadow-sm">{name}</button>
+              )})}
+            </div>
+          </div>
+          <div className="mt-6"><div className="text-xs font-semibold text-slate-400 mb-2">最近の診断</div>
+            <div className="space-y-2">
+              {[["天野 暁史","スライス","2時間前"],["川上 善之","捻転不足","昨日"]].map(([n,s,t])=>(
+                <button key={n} onClick={()=>onPick(SYMPTOMS.find(x=>x.name===s))} className="w-full flex items-center justify-between p-3.5 bg-white rounded-2xl border border-slate-100">
+                  <div className="text-left"><div className="text-sm font-semibold text-slate-800">{n}</div><div className="text-xs text-slate-400">{s}</div></div>
+                  <div className="text-[11px] text-slate-300">{t}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+/* ---------- 画面: ライブラリ ---------- */
+function Library({onPick}){
+  const cats=[...new Set(SYMPTOMS.map(s=>s.cat))];
+  return <div className="p-5 pb-24">
+    <h1 className="text-xl font-bold text-slate-900 mb-1">知識ライブラリ</h1>
+    <p className="text-xs text-slate-400 mb-4">現場コメントから構造化した診断辞書。ベテランの逆引きにも。</p>
+    {cats.map(cat=>(
+      <div key={cat} className="mb-5">
+        <div className="text-xs font-semibold text-teal-700 mb-2">{cat}</div>
+        <div className="space-y-2">
+          {SYMPTOMS.filter(s=>s.cat===cat).map(s=>(
+            <button key={s.id} onClick={()=>onPick(s)} className="w-full flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+              <div className="text-left"><div className="font-semibold text-slate-800">{s.name}</div><div className="text-xs text-slate-400">{s.checkpoints.length}件の確認項目・{s.dir}</div></div>
+              <Icon d={ICONS.chevron} cls="w-5 h-5 text-slate-300"/>
+            </button>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>;
+}
+
+/* ---------- 画面: インサイト(本部) ---------- */
+function Insights(){
+  return <div className="p-5 pb-24">
+    <h1 className="text-xl font-bold text-slate-900 mb-1">本部インサイト</h1>
+    <p className="text-xs text-slate-400 mb-4">全店・全コーチの診断が1つの脳に蓄積されます。</p>
+    <div className="grid grid-cols-3 gap-2 mb-5">
+      {[["5,939","蓄積コメント"],["138","生徒"],["1,103","ドリル処方"]].map(([n,l])=>(
+        <div key={l} className="bg-white rounded-2xl p-3 border border-slate-100 text-center"><div className="text-lg font-bold text-slate-900">{n}</div><div className="text-[10px] text-slate-400">{l}</div></div>
+      ))}
+    </div>
+    <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-4">
+      <div className="text-sm font-semibold text-slate-700 mb-3">スイング局面の出現率</div>
+      <div className="space-y-2">
+        {INSIGHT_PHASES.map(p=>(
+          <div key={p.label} className="flex items-center gap-2">
+            <div className="w-24 text-[11px] text-slate-500 text-right shrink-0">{p.label}</div>
+            <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-teal-400 to-emerald-500 rounded-full" style={{width:p.pct+"%"}}></div></div>
+            <div className="w-8 text-[11px] text-slate-400">{p.pct}%</div>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="bg-white rounded-2xl p-4 border border-slate-100">
+      <div className="text-sm font-semibold text-slate-700 mb-3">コーチ別コメント数</div>
+      {COACHES.map(c=>(
+        <div key={c.n} className="flex items-center gap-2 mb-2">
+          <div className="w-20 text-[11px] text-slate-500 shrink-0">{c.n}</div>
+          <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-400 rounded-full" style={{width:(c.c/3680*100)+"%"}}></div></div>
+          <div className="w-10 text-[11px] text-slate-400 text-right">{c.c}</div>
+        </div>
+      ))}
+    </div>
+  </div>;
+}
+
+/* ---------- 画面: 設定 ---------- */
+function Settings({toast}){
+  return <div className="p-5 pb-24">
+    <h1 className="text-xl font-bold text-slate-900 mb-4">設定・データ</h1>
+    <div className="space-y-3">
+      <Card icon={ICONS.spark} title="コメントをAI解析" desc="レッスンコメントを取り込み、症状・原因・処方に自動構造化して知識ベースへ還元" btn="解析を実行" onClick={()=>toast("AI解析をキューに追加しました")} accent/>
+      <Card icon={ICONS.book} title="Excelから取込" desc="WING NOTE書き出し等（.xlsx）を追加/全入れ替えで取込" btn="ファイルを選ぶ" onClick={()=>toast("取込画面（デモ）")}/>
+      <Card icon={ICONS.save} title="JSONで書き出し" desc="現在の知識ベースをエクスポート（顧客の信頼のため常に持ち出し可能）" btn="ダウンロード" onClick={()=>toast("エクスポート（デモ）")}/>
+      <div className="pt-2 text-xs font-semibold text-slate-400">SaaS・テナント</div>
+      <Card icon={ICONS.bolt} title="AI設定コンシェルジュ" desc="「スライスに新しい処方を追加」など、チャットで設定を編集（危険操作は確認画面）" btn="開く" onClick={()=>toast("コンシェルジュ（デモ）")}/>
+      <Card icon={ICONS.user} title="店舗・コーチ・権限" desc="マルチテナント（company_id + RLS）。店舗ごとに知識ベースを分離" btn="管理" onClick={()=>toast("テナント管理（デモ）")}/>
+    </div>
+    <div className="mt-6 text-center text-[11px] text-slate-300">SWING CORTEX prototype · Genesis連携版</div>
+  </div>;
+}
+function Card({icon,title,desc,btn,onClick,accent}){
+  return <div className={"rounded-2xl p-4 border "+(accent?"bg-teal-50 border-teal-100":"bg-white border-slate-100")}>
+    <div className="flex items-start gap-3">
+      <div className={"w-9 h-9 rounded-xl flex items-center justify-center shrink-0 "+(accent?"bg-teal-600 text-white":"bg-slate-100 text-slate-500")}><Icon d={icon} cls="w-5 h-5"/></div>
+      <div className="flex-1"><div className="font-semibold text-slate-800 text-sm">{title}</div><div className="text-xs text-slate-500 mt-0.5 leading-relaxed">{desc}</div>
+        <button onClick={onClick} className={"mt-2 text-xs font-semibold px-3 py-1.5 rounded-lg "+(accent?"bg-teal-600 text-white":"bg-slate-100 text-slate-600")}>{btn}</button>
+      </div>
+    </div>
+  </div>;
+}
+
+/* ---------- シェル ---------- */
+function App(){
+  const [tab,setTab]=useState("home");
+  const [symptom,setSymptom]=useState(null);
+  const [student,setStudent]=useState(null);
+  const [toastMsg,setToastMsg]=useState("");
+  const toast=(m)=>{setToastMsg(m);setTimeout(()=>setToastMsg(""),1900);};
+  const NAV=[["home","診断",ICONS.search],["library","ライブラリ",ICONS.book],["insights","インサイト",ICONS.chart],["settings","設定",ICONS.gear]];
+  return (
+    <div className="min-h-screen flex items-center justify-center p-0 sm:p-6">
+      <div className="w-full sm:max-w-[430px] sm:rounded-[2.2rem] sm:shadow-2xl sm:border-8 sm:border-slate-900 bg-slate-50 overflow-hidden relative" style={{height:"100vh",maxHeight:"900px"}}>
+        {/* トップバー */}
+        <div className="bg-white/80 backdrop-blur border-b border-slate-100 px-5 py-3 flex items-center gap-2 sticky top-0 z-20">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-500 flex items-center justify-center"><Icon d={ICONS.spark} cls="w-4 h-4 text-white"/></div>
+          <div className="font-bold text-slate-900 tracking-tight">SWING <span className="text-teal-600">CORTEX</span></div>
+          <div className="ml-auto text-[10px] text-slate-400 border border-slate-200 rounded-full px-2 py-0.5">デモゴルフスクール</div>
+        </div>
+        {/* コンテンツ */}
+        <div className="overflow-y-auto no-scrollbar" style={{height:"calc(100% - 56px - 68px)"}}>
+          {tab==="home"&&<Home onPick={setSymptom} student={student} setStudent={setStudent} toast={toast}/>}
+          {tab==="library"&&<Library onPick={setSymptom}/>}
+          {tab==="insights"&&<Insights/>}
+          {tab==="settings"&&<Settings toast={toast}/>}
+        </div>
+        {/* 下部タブ */}
+        <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 flex px-2 py-2" style={{height:"68px"}}>
+          {NAV.map(([id,label,d])=>(
+            <button key={id} onClick={()=>setTab(id)} className={"flex-1 flex flex-col items-center justify-center gap-0.5 rounded-xl "+(tab===id?"text-teal-600":"text-slate-400")}>
+              <Icon d={d} cls="w-6 h-6"/><span className="text-[10px] font-medium">{label}</span>
+            </button>
+          ))}
+        </div>
+        {/* 診断シート */}
+        <DiagnosisSheet symptom={symptom} student={student} onClose={()=>setSymptom(null)} toast={toast}/>
+        <Toast msg={toastMsg}/>
+      </div>
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>

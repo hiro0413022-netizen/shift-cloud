@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SWING CORTEX — 生成品質デモ（実データ）</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;}
+  .tab.on{background:#0d9488;color:#fff;}
+</style>
+</head>
+<body class="bg-slate-100 text-slate-900">
+<div class="mx-auto max-w-3xl p-5">
+
+  <div class="mb-5 flex items-center gap-2">
+    <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-emerald-500">
+      <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l1.8 4.9L18 9.7l-4.2 1.8L12 16l-1.8-4.5L6 9.7l4.2-1.8z"/></svg>
+    </div>
+    <div>
+      <div class="font-bold tracking-tight">SWING <span class="text-teal-600">CORTEX</span> — 生成品質デモ</div>
+      <div class="text-xs text-slate-500">ウィナーズゴルフ様の実レッスンコメント5,939件を燃料に生成</div>
+    </div>
+  </div>
+
+  <div class="mb-4 rounded-xl border border-teal-100 bg-teal-50 p-3 text-xs leading-relaxed text-slate-700">
+    <b>これは何？</b> アプリと同じ流れ（症状で診断 → コーチが一言メモ → AIが下書き）を、<b>本物の過去コメントを参照</b>して生成した実例です。
+    「gooドリル」「三角形同調」「8-4」など<b>この学校でしか使われない指導言語</b>が自然に出るのが、他社に真似できない堀です。
+  </div>
+
+  <div id="tabs" class="mb-4 flex flex-wrap gap-2 text-sm"></div>
+  <div id="panel"></div>
+
+  <p class="mt-6 text-center text-[11px] text-slate-400">
+    ※ 下書きはClaude（アプリの ai-actions.ts と同一プロンプト）による生成例。ANTHROPIC_API_KEY未設定時はテンプレートで動作します。
+  </p>
+</div>
+
+<script>
+const DATA = [
+  {
+    sym: "スライス", cat: "球筋 / 右に曲がる", cp: "スイング軌道（確認優先度3）",
+    memo: "アウトサイドイン、切り返しで体が早く開く。8-4ドリルやった。",
+    refs: [
+      "テークバックは腕でスイングしてしまい、ハーフからトップにかけてクラブが寝てしまいます。その為、切り返しではアウトサイドからクラブが下りてきてカット軌道になっています。修正点、ドリル：前回同様に三角形キープで腕と身体の同調が大切。ショルダーターンドリル／ウェイトシフトドリル／gooドリル。",
+      "バックスイングで右腰が右にスライドし、ダウンで左腰が左にスライドするため、インパクトで右肩が下がりアウトサイドインに振ってしまっている。スタンスの幅の中で股関節を使い、背骨を中央にキープしながら回転を。ベタ足ドリル／gooドリル。",
+      "テイクバックで腕とクラブが体から離れ外に上がっています。腕で上げているので切り返しも腕で下ろしクラブが外から入り、重心移動もなくアウトサイドインの軌道に。三角形同調で腕と身体の一体を。",
+    ],
+    karte: "問題点\nテイクバックで腕から上げてクラブが外に上がり、切り返しで上体が早く開くため、アウトサイドインのカット軌道になっています。フェースが開いて当たるためスライスが出やすい状態です。\n\n修正点\n三角形同調で腕と身体を一体にしてバックスイング。切り返しは上体を我慢し、下半身リードで内側からクラブを下ろす。\n\nドリル\n・8-4ドリル（時計の8時→4時で三角形キープ）\n・ショルダーターンドリル\n\n宿題：8-4を反復し、正面インパクトの感覚を定着。",
+    line: "本日はテイクバックで腕から上がってクラブが外に上がり、切り返しで上体が早く開くため、アウトサイドインのカット軌道になっていました。まずは三角形同調で腕と身体を一体にして上げ、切り返しは少し我慢して下半身からクラブを下ろすイメージを持ちましょう。8-4ドリルで正面インパクトの感覚を作っていくと、右への曲がりは自然と減っていきます。",
+  },
+  {
+    sym: "捻転不足", cat: "体の動き / 回転・体重移動", cp: "腕引きのテイクバック（確認優先度1）",
+    memo: "頭が右に動く、腕で引いてる。両手クロスドリルやった。",
+    refs: [
+      "テイクバックではやや右にスライドしています。その為体が回転不足になり、腕でインサイドに振ってしまいます。足踏みドリルで重心移動しながら、腕は三角形キープで左右に大きく振れると良いと思います。",
+      "バックスイングは右にスェイせず、その場の左肩の捻転が大切。切り返しは力んで左サイドが伸び上がらないよう気をつけて。狭めのスタンス、足踏みドリル、三角形同調の正面でのアームローテーションが大切です。",
+      "バックスイングで体と分離しています。身体と腕の一体感が足りないです。三角形同調捻転を心がけ腰の回転始動でスタートし、コンパクトなトップを意識し、トップで少し間をつくりダウンへ。",
+    ],
+    karte: "問題点\nバックスイングで頭が右にスライドし、腕でインに引くため軸回転ができず捻転不足になっています。その反動でダウンが上体始動になりやすい状態です。\n\n修正点\n狭めのスタンスで、右にスウェーせず股関節の内側で左肩を回す。腕と体を三角形同調させ、下半身リードでタイミングをとる。\n\nドリル\n・両手クロスドリル\n・足踏みドリル\n\n宿題：足踏みドリルで重心移動を入れながら、その場での捻転を確認。",
+    line: "本日はバックスイングで頭が右に動き、腕でインに引いてしまうため、体が回りきる前に上げてしまう場面が見られました。狭めのスタンスで右にスウェーせず、股関節の内側で左肩を回すことを意識しましょう。両手クロスドリルと足踏みドリルで、腕と体が一緒に回る感覚と重心移動を作っていくと、捻転が深くなりパワーが伝わりやすくなります。",
+  },
+  {
+    sym: "アドレス姿勢の不良", cat: "体の動き / アドレス", cp: "猫背（確認優先度1）",
+    memo: "猫背で重心が高い、前傾が浅い。",
+    refs: [
+      "前傾が浅く腕が体に近過ぎて振り辛いバックスイングになっています。前傾をしっかりとり股関節を使って軸回転と腕の縦振りを強調しましょう。ウェイトシフトドリルや足踏みドリルで下半身のリズムで振れるように。",
+      "骨盤の回転と三角形同調で腕の縦振りの意識が必要。アドレスでアイアンはクラブヘッドの先ではなくヒールで構えるように。三角形ドリル／Gooドリル／ウェイトシフト。",
+    ],
+    karte: "問題点\n猫背で前傾が浅く、重心が高いため軸が不安定になり、インパクトで右肩が前に出やすい構えになっています。\n\n修正点\n胸を張り背筋を伸ばして、お尻を後ろに引いた前傾を作る。股関節から前傾し、軸回転と腕の縦振りを両立させる。\n\nドリル\n・背中にクラブを当て、頭・背中・お尻の3点を一直線にする前傾チェック\n・ウェイトシフトドリル\n\n宿題：アドレスの前傾角を毎回鏡で確認してからスイング。",
+    line: "本日は構えたときに背中が丸まって前傾が浅く、重心が高くなってスイング軸が不安定になっていました。胸を張って背筋を伸ばし、お尻を少し後ろに引いて股関節から前傾する形を作りましょう。アドレスは毎回の土台になるので、鏡で前傾角を確認してから振る習慣をつけると、軸が安定してミスが減っていきます。",
+  },
+];
+
+function render(i){
+  const d = DATA[i];
+  document.querySelectorAll('#tabs .tab').forEach((t,idx)=>t.classList.toggle('on', idx===i));
+  document.getElementById('panel').innerHTML = `
+    <div class="space-y-3">
+      <!-- 入力 -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <div class="mb-2 text-[11px] font-bold text-slate-400">① 入力（コーチ）</div>
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <span class="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-700">${d.sym}</span>
+          <span class="text-xs text-slate-400">${d.cat}・${d.cp}</span>
+        </div>
+        <div class="mt-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-700"><span class="text-[11px] text-slate-400">所見メモ：</span>${d.memo}</div>
+      </div>
+
+      <!-- 参照 -->
+      <div class="rounded-2xl border border-slate-200 bg-white p-4">
+        <div class="mb-2 text-[11px] font-bold text-slate-400">② AIが裏で参照した“この学校の実コメント”（${d.refs.length}件・生徒には非表示）</div>
+        <div class="space-y-2">
+          ${d.refs.map(r=>`<div class="rounded-lg border border-slate-100 bg-slate-50 p-2.5 text-[12px] leading-relaxed text-slate-500">${r}</div>`).join("")}
+        </div>
+      </div>
+
+      <!-- 出力 -->
+      <div class="rounded-2xl border-2 border-teal-200 bg-white p-4">
+        <div class="mb-2 flex items-center gap-2">
+          <span class="text-[11px] font-bold text-slate-400">③ AIの下書き（編集可）</span>
+          <span class="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold text-teal-700">AI生成・実コメント${d.refs.length}件を参照</span>
+        </div>
+        <div class="mb-1 flex items-center justify-between">
+          <span class="text-[11px] font-semibold text-slate-500">整形（問題点・修正点・ドリル）</span>
+          <button onclick="copyOne(DATA[${i}].karte, this)" class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">コピー</button>
+        </div>
+        <div class="whitespace-pre-wrap rounded-xl bg-slate-900 p-3 text-[13px] leading-relaxed text-slate-100">${d.karte}</div>
+        <div class="mt-3 mb-1 flex items-center justify-between">
+          <span class="text-[11px] font-semibold text-slate-500">自然な文章（そのまま貼れる）</span>
+          <button onclick="copyOne(DATA[${i}].line, this)" class="rounded-lg bg-teal-100 px-2.5 py-1 text-[11px] font-bold text-teal-700">コピー</button>
+        </div>
+        <div class="whitespace-pre-wrap rounded-xl bg-teal-50 p-3 text-[13px] leading-relaxed text-slate-700">${d.line}</div>
+      </div>
+    </div>`;
+}
+
+function copyOne(text, btn){
+  const done = ()=>{ const t=btn.textContent; btn.textContent="コピー済"; setTimeout(()=>btn.textContent=t,1500); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallback(text,done));
+  } else { fallback(text, done); }
+}
+function fallback(text, done){
+  const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); done(); }catch(e){} document.body.removeChild(ta);
+}
+
+const tabs = document.getElementById('tabs');
+DATA.forEach((d,i)=>{
+  const b=document.createElement('button');
+  b.className='tab rounded-full border border-slate-200 bg-white px-3.5 py-1.5';
+  b.textContent=d.sym; b.onclick=()=>render(i); tabs.appendChild(b);
+});
+render(0);
+</script>
+</body>
+</html>

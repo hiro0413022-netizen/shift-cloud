@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  /* SWING CORTEX: 明るいzincベース × ティール/エメラルドのアクセント（新SaaSブランド） */
+  --color-bg: #f1f5f9;         /* slate-100 */
+  --color-panel: #ffffff;
+  --color-panel-2: #f8fafc;    /* slate-50 */
+  --color-line: #e2e8f0;       /* slate-200 */
+  --color-txt: #0f172a;        /* slate-900 */
+  --color-dim: #64748b;        /* slate-500 */
+  --color-faint: #94a3b8;      /* slate-400 */
+  --color-brand: #0d9488;      /* teal-600 */
+  --color-brand-2: #10b981;    /* emerald-500 */
+  --color-line-send: #22c55e;  /* green-500 */
+  --color-ok: #10b981;
+  --color-warn: #f59e0b;
+  --color-danger: #ef4444;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  @apply bg-(--color-bg) text-(--color-txt) antialiased;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-up { animation: sheetUp .28s cubic-bezier(.22,1,.36,1); }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.fade { animation: fade .2s ease; }
+
+.input-lite {
+  @apply w-full rounded-xl border border-(--color-line) bg-(--color-panel) px-4 py-3 text-sm outline-none placeholder:text-(--color-faint);
+}
+.input-lite:focus { @apply border-(--color-brand) ring-2 ring-teal-100; }
