@@ -3,7 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { DiagnosisResult } from "@/lib/coaching";
 import { matchSymptoms } from "@/lib/coaching";
-import { logDiagnosis } from "./actions";
 import { draftComment, saveKarteDraft, type DraftResult } from "./ai-actions";
 import { saveNote, createStudent } from "./student-actions";
 import type { Student } from "@/lib/data";
@@ -226,22 +225,8 @@ export function Sheet({
   toast: (m: string) => void;
 }) {
   const [open, setOpen] = useState(0);
-  const [menu, setMenu] = useState(false);
   const [composing, setComposing] = useState(false);
   const cp = symptom.checkpoints[open];
-
-  const send = async () => {
-    toast("LINEで送信しました");
-    try {
-      await logDiagnosis({
-        symptomId: symptom.symptomId,
-        symptomName: symptom.symptomName,
-        sentLine: true,
-      });
-    } catch {
-      /* ログ失敗は致命ではない */
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-40 mx-auto max-w-[480px]">
@@ -290,7 +275,7 @@ export function Sheet({
               <Block label="原因" tone="rose" text={cp.cause} />
               <Block label="改善・対処法" tone="teal" text={cp.fix} />
               {cp.drill && <Block label="おすすめドリル" tone="indigo" text={cp.drill} />}
-              <Block label="お客様への説明（そのまま送れる）" text={cp.client} highlight />
+              <Block label="お客様への説明" text={cp.client} highlight />
             </div>
           )}
         </div>
@@ -304,43 +289,21 @@ export function Sheet({
             この内容でレッスンコメントを作成
           </button>
         </div>
-        <div className="relative border-t-0 bg-white px-5 py-3">
-          {menu && (
-            <div className="fade absolute bottom-full left-5 right-5 mb-2 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
-              {[
-                ["お客様向け文をコピー", I.copy],
-                ["指導メモをコピー", I.copy],
-                ["文章をコピー", I.copy],
-              ].map(([t, d]) => (
-                <button
-                  key={t as string}
-                  onClick={() => {
-                    setMenu(false);
-                    toast((t as string).replace("をコピー", "をコピーしました").replace("に保存", "に保存しました"));
-                  }}
-                  className="flex w-full items-center gap-3 border-b border-slate-50 px-4 py-3 text-sm text-slate-700"
-                >
-                  <Icon d={d as string} cls="h-4 w-4 text-slate-400" />
-                  {t as string}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button
-              onClick={send}
-              className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3.5 font-bold text-white shadow-sm"
-            >
-              <Icon d={I.line} cls="h-5 w-5" />
-              LINEで送る
-            </button>
-            <button
-              onClick={() => setMenu((m) => !m)}
-              className="flex w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-600"
-            >
-              <Icon d={I.dots} />
-            </button>
-          </div>
+        <div className="border-t-0 bg-white px-5 py-3">
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(cp?.client ?? "");
+              } catch {
+                /* クリップボード不可の環境は無視 */
+              }
+              toast("お客様への説明をコピーしました");
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-600"
+          >
+            <Icon d={I.copy} cls="h-4 w-4" />
+            お客様への説明をコピー
+          </button>
         </div>
         {composing && cp && (
           <Composer symptom={symptom} cp={cp} student={student} onClose={() => setComposing(false)} toast={toast} />
