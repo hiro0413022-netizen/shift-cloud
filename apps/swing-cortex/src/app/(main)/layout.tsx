@@ -4,7 +4,7 @@ import Nav from "./nav";
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireCoachActor();
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-(--color-bg)">
+    <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col bg-(--color-bg)">
       {/* トップバー */}
       <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-(--color-line) bg-(--color-panel)/90 px-5 py-3 backdrop-blur">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-emerald-500">
