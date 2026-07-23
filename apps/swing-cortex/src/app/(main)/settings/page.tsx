@@ -4,6 +4,8 @@ import { loadFeatures } from "@/lib/plan";
 import ImportClient from "./import-client";
 
 export const dynamic = "force-dynamic";
+// Excel数千件取込のServer Actionが時間切れしないよう延長（Vercel Pro）
+export const maxDuration = 60;
 
 export default async function SettingsPage() {
   const actor = await requireCoachActor();
