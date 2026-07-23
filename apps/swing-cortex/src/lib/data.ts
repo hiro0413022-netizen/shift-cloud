@@ -160,7 +160,7 @@ export async function loadFrequentSymptoms(companyId: string): Promise<string[]>
  */
 export async function findSimilarComments(
   companyId: string,
-  opts: { symptomKey?: string | null; studentRef?: string | null; limit?: number }
+  opts: { symptomKey?: string | null; keywords?: string[] | null; studentRef?: string | null; limit?: number }
 ): Promise<string[]> {
   const admin = createAdmin();
   const limit = opts.limit ?? 6;
@@ -184,6 +184,22 @@ export async function findSimilarComments(
       .eq("company_id", companyId)
       .eq("symptom_key", opts.symptomKey)
       .limit(limit);
+    for (const r of (data ?? []) as { body: string }[]) out.push(r.body);
+  }
+
+  // 本文にキーワード（症状名/別名）を含む実コメントをゆるく検索。取込時のタグ付けに依存しない。
+  const kws = (opts.keywords ?? [])
+    .map((k) => k.replace(/[%,()）（・/]/g, " ").trim())
+    .filter((k) => k.length >= 2)
+    .slice(0, 8);
+  if (out.length < limit && kws.length) {
+    const orExpr = kws.map((k) => `body.ilike.*${k}*`).join(",");
+    const { data } = await admin
+      .from("sc_comments")
+      .select("body")
+      .eq("company_id", companyId)
+      .or(orExpr)
+      .limit(limit * 3);
     for (const r of (data ?? []) as { body: string }[]) out.push(r.body);
   }
 

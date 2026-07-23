@@ -96,6 +96,7 @@ function Composer({
         client: cp.client,
         coachMemo: memo,
         symptomKey: symptom.symptomName,
+        tags: symptom.tags,
         studentId: student?.id ?? null,
       });
       setDraft(r);

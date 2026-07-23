@@ -16,6 +16,7 @@ export type DraftInput = {
   client: string;
   coachMemo?: string | null;
   symptomKey?: string | null;
+  tags?: string[] | null;
   studentRef?: string | null;
   studentId?: string | null;
 };
@@ -53,6 +54,7 @@ export async function draftComment(input: DraftInput): Promise<DraftResult> {
 
   const examples = await findSimilarComments(actor.companyId, {
     symptomKey: input.symptomKey ?? input.symptomName,
+    keywords: [input.symptomName, ...(input.tags ?? [])],
     studentRef: input.studentRef,
     limit: 6,
   });
