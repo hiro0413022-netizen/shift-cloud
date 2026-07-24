@@ -36,7 +36,21 @@ DECISIONS #48 / migration 0039。Shift Cloudのスタッフ画面を「スタッ
 - 将来: **Reserve OS（rsv_*）・体験予約（mbr_trial_bookings）・Smart Hallo取込** を `FeedReservation`（date/time/label/source）に正規化して `buildMonthFeed()` に渡すだけ。画面側は対応済（●表示＋詳細行）
 - FKでは結合しない（アプリ独立の原則 DECISIONS #27系と同じ）
 
-## 5. 後続フェーズ（未実装）
+## 5. 店舗ダッシュボード /store/[token]（DECISIONS #75）
+
+店頭タブレット共有表示。認証は **kiosk_devices のデバイストークン**（/kiosk/[token] と同一トークンで開ける・スタッフログイン不要）。middleware の PUBLIC_PREFIXES に `/store` を追加済み。
+
+- 構成: ①月間カレンダー（店舗全員の出勤者名チップ・イベント●・体験予約●・やること●、日タップで詳細）→ ②今月KPIカード4種 → ③業務リンク集（sp_links）
+- やること = **店舗共通タスクのみ**（sp_tasks staff_id null / #55）。追加・完了チェック可。個人タスクは共有画面に出さない
+- KPI（店舗別・今月・すべて既存テーブルから直接集計＝新テーブルなし）:
+  - 体験: GOLF WING=mbr_trial_bookings / FRANK=mbr_trial_requests(#72)
+  - 物販: mon_sales category='販売'（当月なしは最新実績月をフォールバック表示）
+  - 会員: GOLF WING=mbr_members（kernel.tsと同ロジック）/ FRANK=frunk_members
+  - 売上見込: mon_sales当月＋fin_entries source='forecast'（月会費予測 0028）
+- 店舗切替タブ（GOLF WING 宝塚 / FRANK GOLF 姫路）。5分ごと自動リフレッシュ
+- 正典コード: `apps/shift-cloud/src/lib/store-dash.ts`
+
+## 6. 後続フェーズ（未実装）
 
 1. 店長→スタッフへのタスク配信UI（sp_tasks.source='manager'）
 2. Genesis判断リスト/AI指示 → sp_tasks 自動配信（source='genesis'|'ai'、VISION §7=提案・作成まで）
