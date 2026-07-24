@@ -3,6 +3,7 @@ import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
 import { getDispatches, getMasters, summarize, currentYm, yen, dispatchCost } from "@/lib/caddy";
 import { BulkGrid } from "./bulk-grid";
+import { GolfwingGrid } from "./golfwing-grid";
 import { deleteDispatch } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -41,8 +42,17 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
           clients={masters.clients}
           partners={masters.partners}
           staff={masters.staff}
+          transportRates={masters.transportRates}
           defaultDate={`${ym}-01`}
         />
+      </section>
+
+      <section className={`${cardCls} mb-6`}>
+        <h2 className="mb-1 font-semibold">ゴルフウィング勤務（時給）</h2>
+        <p className="mb-3 text-xs text-(--color-dim)">
+          キャディが自社ゴルフウィングに出勤した分。ゴルフウィングへの請求書は作らず、キャディ→YOZAN請求書に合算します
+        </p>
+        <GolfwingGrid partners={masters.partners} defaultDate={`${ym}-01`} />
       </section>
 
       <section className={cardCls}>
@@ -79,10 +89,17 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                   const cost = dispatchCost(r);
                   const gross = r.sales_amount - cost;
                   const isStaff = !!r.staff_id;
+                  const isGw = r.kind === "golfwing";
                   return (
                     <tr key={r.id} className="border-t border-(--color-line)">
                       <td className="py-1.5 whitespace-nowrap">{r.dispatch_date.slice(5)}</td>
-                      <td className="py-1.5">{r.cad_clients?.name ?? <span className="text-(--color-dim)">—</span>}</td>
+                      <td className="py-1.5">
+                        {isGw ? (
+                          <span className="rounded bg-emerald-100 px-1 text-[10px] text-emerald-800">ゴルフウィング</span>
+                        ) : (
+                          (r.cad_clients?.name ?? <span className="text-(--color-dim)">—</span>)
+                        )}
+                      </td>
                       <td className="py-1.5 text-right tabular-nums">
                         {r.sales_amount > 0 ? yen(r.sales_amount) : "—"}
                       </td>
@@ -96,7 +113,12 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                           (r.cad_partners?.name ?? <span className="text-(--color-dim)">—</span>)
                         )}
                       </td>
-                      <td className="py-1.5 text-right tabular-nums">{isStaff ? "—" : yen(r.fee_amount)}</td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {isStaff ? "—" : yen(r.fee_amount)}
+                        {isGw && r.work_hours ? (
+                          <span className="ml-1 text-[10px] text-(--color-dim)">{r.work_hours}h</span>
+                        ) : null}
+                      </td>
                       <td className="py-1.5 text-right tabular-nums">
                         {r.transport_amount > 0 ? yen(r.transport_amount) : "—"}
                         {isStaff && r.transport_amount > 0 ? (
@@ -107,9 +129,9 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                         {r.special_amount > 0 ? yen(r.special_amount) : "—"}
                       </td>
                       <td
-                        className={`py-1.5 text-right font-medium tabular-nums ${gross < 0 ? "text-red-600" : ""}`}
+                        className={`py-1.5 text-right font-medium tabular-nums ${!isGw && gross < 0 ? "text-red-600" : ""}`}
                       >
-                        {yen(gross)}
+                        {isGw ? <span className="text-(--color-dim)">—</span> : yen(gross)}
                       </td>
                       <td className="py-1.5 text-right">
                         <form action={deleteDispatch}>

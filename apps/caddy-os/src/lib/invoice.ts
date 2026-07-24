@@ -117,3 +117,70 @@ export function invoiceNo(ym: string, clientCode: string | null | undefined, cli
 export function yen(n: number): string {
   return Math.round(n).toLocaleString("ja-JP");
 }
+
+/* ============================================================
+   キャディ → YOZAN の請求書（支払 / DECISIONS #62 ①）
+   ※ DBアクセス禁止の純粋関数（tests から直接importする）
+
+   委託先キャディが YOZAN へ月次で上げる請求書。中身は当月の:
+     - 派遣（kind='dispatch'/'training'/'other'）… 委託料 + 交通費 + 特別手当
+     - ゴルフウィング勤務（kind='golfwing'）……… 時間数 × 時給（fee_amount に格納済み）
+   消費税は**なし（免税事業者）**で合計する（ユーザー決定 2026-07-24）。
+   ============================================================ */
+
+export type PayableSource = {
+  dispatch_date: string;
+  kind: string;
+  client_name: string | null;
+  fee_amount: number;
+  transport_amount: number;
+  special_amount: number;
+  work_hours: number | null;
+};
+
+export type PayableLine = {
+  date: string;
+  label: string;      // 例: 「加古川ゴルフ倶楽部 キャディ業務」/「ゴルフウィング 勤務（5.0h）」
+  fee: number;        // 委託料（golfwing は時給×時間）
+  transport: number;
+  special: number;
+  amount: number;     // fee + transport + special
+};
+
+export type PayableInvoice = {
+  lines: PayableLine[];
+  fee: number;
+  transport: number;
+  special: number;
+  total: number;      // 免税のため税額なし
+};
+
+/** 派遣行 → 支払請求書（1日1コース1行）。日付昇順・ゴルフウィングは末尾寄り */
+export function buildPayable(rows: PayableSource[]): PayableInvoice {
+  const lines: PayableLine[] = rows.map((r) => {
+    const isGw = r.kind === "golfwing";
+    const label = isGw
+      ? `ゴルフウィング 勤務${r.work_hours ? `（${r.work_hours}h）` : ""}`
+      : `${r.client_name ?? "業務"} キャディ業務`;
+    const amount = r.fee_amount + r.transport_amount + r.special_amount;
+    return {
+      date: r.dispatch_date,
+      label,
+      fee: r.fee_amount,
+      transport: r.transport_amount,
+      special: r.special_amount,
+      amount,
+    };
+  });
+  lines.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const fee = lines.reduce((s, l) => s + l.fee, 0);
+  const transport = lines.reduce((s, l) => s + l.transport, 0);
+  const special = lines.reduce((s, l) => s + l.special, 0);
+  return { lines, fee, transport, special, total: fee + transport + special };
+}
+
+/** 支払請求番号: 2026-06-P-C001（対象月 + P + 委託先コード） */
+export function payableNo(ym: string, partnerCode: string | null | undefined, partnerName: string): string {
+  const code = (partnerCode ?? "").replace(/-/g, "") || partnerName.slice(0, 4);
+  return `${ym}-P-${code}`;
+}

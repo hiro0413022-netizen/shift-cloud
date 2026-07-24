@@ -30,13 +30,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             派遣台帳
           </Link>
           <Link href="/invoices" className="text-sm underline">
-            請求
+            請求（受取）
+          </Link>
+          <Link href="/invoices/payable" className="text-sm underline">
+            支払
           </Link>
           <Link href="/availability" className="text-sm underline">
             出勤可否
           </Link>
           <Link href="/masters" className="text-sm underline">
-            マスタ
+            設定
           </Link>
           <form action="/api/logout" method="post">
             <button className="text-sm text-(--color-dim) hover:text-(--color-txt)">

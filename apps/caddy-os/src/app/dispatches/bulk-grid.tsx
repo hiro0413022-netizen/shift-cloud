@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { saveDispatchesBulk } from "../actions";
 import { btnCls } from "@/components/ui";
 
-type Client = { id: string; name: string; unit_price: number | null };
+type Client = { id: string; name: string; unit_price: number | null; partner_fee: number | null };
 type Partner = { id: string; name: string; default_fee: number | null; default_transport: number };
 type Staff = { id: string; name: string };
 
@@ -41,11 +41,13 @@ export function BulkGrid({
   clients,
   partners,
   staff,
+  transportRates,
   defaultDate,
 }: {
   clients: Client[];
   partners: Partner[];
   staff: Staff[];
+  transportRates: Record<string, number>; // "clientId__partnerId" → 交通費
   defaultDate: string;
 }) {
   const [rows, setRows] = useState<Row[]>([emptyRow(defaultDate), emptyRow(defaultDate), emptyRow(defaultDate)]);
@@ -56,6 +58,22 @@ export function BulkGrid({
 
   const update = (i: number, patch: Partial<Row>) => {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  };
+
+  /**
+   * 委託料・交通費の自動反映（#62 ②③）。
+   *   委託料 = ゴルフ場ごと（client.partner_fee） → 無ければ 委託先の default_fee
+   *   交通費 = キャディ×ゴルフ場（transportRates） → 無ければ 委託先の default_transport
+   * 自社スタッフ（s:）は委託料なし。
+   */
+  const resolveCost = (clientId: string, assignee: string): { fee: string; transport: string } => {
+    if (!assignee.startsWith("p:")) return { fee: "", transport: "" };
+    const p = partners.find((x) => `p:${x.id}` === assignee);
+    const c = clients.find((x) => x.id === clientId);
+    const fee = c?.partner_fee ?? p?.default_fee ?? 0;
+    const rate = clientId && p ? transportRates[`${clientId}__${p.id}`] : undefined;
+    const transport = rate ?? p?.default_transport ?? 0;
+    return { fee: fee ? String(fee) : "", transport: transport ? String(transport) : "" };
   };
 
   const addRow = (i: number) => {
@@ -163,10 +181,14 @@ export function BulkGrid({
                     <select
                       value={r.clientId}
                       onChange={(e) => {
-                        const c = clients.find((x) => x.id === e.target.value);
+                        const clientId = e.target.value;
+                        const c = clients.find((x) => x.id === clientId);
+                        const cost = resolveCost(clientId, r.assignee);
                         update(i, {
-                          clientId: e.target.value,
-                          sales: c?.unit_price ? String(c.unit_price) : e.target.value ? r.sales : "0",
+                          clientId,
+                          sales: c?.unit_price ? String(c.unit_price) : clientId ? r.sales : "0",
+                          // 委託料・交通費もゴルフ場に合わせて入れ直す（委託先が選択済みのとき）
+                          ...(r.assignee.startsWith("p:") ? { fee: cost.fee, transport: cost.transport } : {}),
                         });
                       }}
                       onKeyDown={(e) => onKeyDown(e, i)}
@@ -196,12 +218,8 @@ export function BulkGrid({
                       onChange={(e) => {
                         const v = e.target.value;
                         if (v.startsWith("p:")) {
-                          const p = partners.find((x) => `p:${x.id}` === v);
-                          update(i, {
-                            assignee: v,
-                            fee: p?.default_fee ? String(p.default_fee) : "",
-                            transport: p?.default_transport ? String(p.default_transport) : "",
-                          });
+                          const cost = resolveCost(r.clientId, v);
+                          update(i, { assignee: v, fee: cost.fee, transport: cost.transport });
                         } else {
                           update(i, { assignee: v, fee: "", special: "" });
                         }

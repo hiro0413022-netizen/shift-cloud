@@ -88,3 +88,37 @@ test("明細ラベルは実物と同じ表記（0埋めしない）", () => {
 test("請求番号は 対象月 + 取引先コード", () => {
   assert.equal(invoiceNo("2026-06", "G-0002", "加古川ゴルフ倶楽部"), "2026-06-G0002");
 });
+
+/* ============================================================
+   支払請求書（キャディ → YOZAN / DECISIONS #62 ①）
+   免税事業者のため消費税は加算しない。ゴルフウィング勤務も合算する。
+   ============================================================ */
+import { buildPayable, payableNo } from "../apps/caddy-os/src/lib/invoice.ts";
+
+test("支払請求書は委託料＋交通費＋手当を合算し、消費税を足さない（免税）", () => {
+  const pay = buildPayable([
+    { dispatch_date: "2026-06-03", kind: "dispatch", client_name: "加古川GC", fee_amount: 8000, transport_amount: 1000, special_amount: 0, work_hours: null },
+    { dispatch_date: "2026-06-05", kind: "dispatch", client_name: "西宮高原GC", fee_amount: 8000, transport_amount: 1500, special_amount: 500, work_hours: null },
+  ]);
+  assert.equal(pay.fee, 16000);
+  assert.equal(pay.transport, 2500);
+  assert.equal(pay.special, 500);
+  assert.equal(pay.total, 19000); // 税を足さない
+  assert.equal(pay.lines.length, 2);
+});
+
+test("ゴルフウィング勤務（時給）も支払請求書に合算される", () => {
+  const pay = buildPayable([
+    { dispatch_date: "2026-06-03", kind: "dispatch", client_name: "加古川GC", fee_amount: 8000, transport_amount: 1000, special_amount: 0, work_hours: null },
+    { dispatch_date: "2026-06-10", kind: "golfwing", client_name: null, fee_amount: 6000, transport_amount: 0, special_amount: 0, work_hours: 5 },
+  ]);
+  assert.equal(pay.total, 15000);
+  const gw = pay.lines.find((l) => l.label.includes("ゴルフウィング"));
+  assert.ok(gw, "ゴルフウィング明細がある");
+  assert.equal(gw?.amount, 6000);
+  assert.ok(gw?.label.includes("5h"));
+});
+
+test("支払請求番号は 対象月 + P + 委託先コード", () => {
+  assert.equal(payableNo("2026-06", "C-001", "山田太郎"), "2026-06-P-C001");
+});

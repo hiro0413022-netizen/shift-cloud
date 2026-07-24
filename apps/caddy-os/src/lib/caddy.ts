@@ -22,6 +22,7 @@ export type DispatchRow = {
   fee_amount: number;
   transport_amount: number;
   special_amount: number;
+  work_hours: number | null;
   memo: string | null;
   client_id: string | null;
   partner_id: string | null;
@@ -73,7 +74,7 @@ export async function getDispatches(companyId: string, ym: string): Promise<Disp
   const { data } = await admin
     .from("cad_dispatches")
     .select(
-      "id, seq, dispatch_date, kind, sales_amount, fee_amount, transport_amount, special_amount, memo, client_id, partner_id, staff_id, cad_clients(name), cad_partners(name), staff(name)"
+      "id, seq, dispatch_date, kind, sales_amount, fee_amount, transport_amount, special_amount, work_hours, memo, client_id, partner_id, staff_id, cad_clients(name), cad_partners(name), staff(name)"
     )
     .eq("company_id", companyId)
     .gte("dispatch_date", from)
@@ -137,30 +138,47 @@ export function byPartner(rows: DispatchRow[]) {
   return [...m.values()].sort((a, b) => b.total - a.total);
 }
 
+/**
+ * 派遣台帳（一括入力）で使うマスタ。
+ * - 委託先は show_in_picker=true のみ（退職・休眠キャディはプルダウンから隠す / #62 ④）
+ * - clients に partner_fee（ゴルフ場ごとの委託料 / #62 ③）を含める
+ * - transportRates は「clientId__partnerId → 交通費」（#62 ②）。ゴルフ場×キャディで自動入力する
+ */
 export async function getMasters(companyId: string) {
   const admin = createAdmin();
-  const [{ data: clients }, { data: partners }, { data: staff }] = await Promise.all([
+  const [{ data: clients }, { data: partners }, { data: staff }, { data: rates }] = await Promise.all([
     admin
       .from("cad_clients")
-      .select("id, name, unit_price, closing_day, payment_day")
+      .select("id, name, unit_price, partner_fee, closing_day, payment_day")
       .eq("company_id", companyId)
       .is("deleted_at", null)
       .eq("status", "active")
       .order("name"),
     admin
       .from("cad_partners")
-      .select("id, name, default_fee, default_transport")
+      .select("id, name, default_fee, default_transport, hourly_wage")
       .eq("company_id", companyId)
       .is("deleted_at", null)
       .eq("status", "active")
+      .eq("show_in_picker", true)
       .order("name"),
     admin.from("staff").select("id, name").eq("company_id", companyId).is("deleted_at", null).order("name"),
+    admin
+      .from("cad_transport_rates")
+      .select("client_id, partner_id, amount")
+      .eq("company_id", companyId)
+      .is("deleted_at", null),
   ]);
+  const transportRates: Record<string, number> = {};
+  for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string; amount: number }>) {
+    transportRates[`${r.client_id}__${r.partner_id}`] = r.amount;
+  }
   return {
     clients: (clients ?? []) as Array<{
       id: string;
       name: string;
       unit_price: number | null;
+      partner_fee: number | null;
       closing_day: string | null;
       payment_day: string | null;
     }>,
@@ -169,8 +187,10 @@ export async function getMasters(companyId: string) {
       name: string;
       default_fee: number | null;
       default_transport: number;
+      hourly_wage: number | null;
     }>,
     staff: (staff ?? []) as Array<{ id: string; name: string }>,
+    transportRates,
   };
 }
 
