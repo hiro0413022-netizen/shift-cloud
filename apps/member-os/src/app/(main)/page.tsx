@@ -1,17 +1,14 @@
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
+import { Panel, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
-import { VISIT_TYPES, VISIT_TYPE_LABEL, RESULTS, PAYMENT_METHODS, DISCOUNTS, REFERRAL_SOURCES, OCCUPATIONS } from "@/lib/walkin";
-import { createVisitManual, updateVisit, deleteVisit, issueStoreToken } from "./actions";
+import { VISIT_TYPES, VISIT_TYPE_LABEL, REFERRAL_SOURCES, OCCUPATIONS } from "@/lib/walkin";
+import { createVisitManual, issueStoreToken } from "./actions";
+import { VisitRow } from "./visit-row";
 
 export const dynamic = "force-dynamic";
 
 type Row = Record<string, unknown>;
-
-const TYPE_TONE: Record<string, "default" | "ok" | "warn" | "danger" | "accent"> = {
-  trial: "accent", fitting: "ok", bay: "default", visitor_bay: "default", other: "default",
-};
 
 function monthStart(): string {
   const d = new Date();
@@ -32,7 +29,7 @@ export default async function LedgerPage({
 
   let q = admin
     .from("mbr_walkin_visits")
-    .select("*, mbr_guests(name, name_kana, phone, email), reception:staff!reception_staff_id(name)")
+    .select("*, mbr_guests(id, name, name_kana, gender, birth_date, postal_code, prefecture, address1, building, phone, mobile, email, occupation, contact_method, note), reception:staff!reception_staff_id(name)")
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
     .gte("visited_on", from)
@@ -168,59 +165,14 @@ export default async function LedgerPage({
           <Empty>この期間の一時利用はありません</Empty>
         ) : (
           <div className="space-y-2">
-            {list.map((v) => {
-              const guest = (v.mbr_guests ?? null) as Row | null;
-              const rec = (v.reception ?? null) as Row | null;
-              const name = guest?.name ? String(guest.name) : "（氏名未入力）";
-              const selfDone = !!v.consent_at;
-              const vtype = String(v.visit_type);
-              return (
-                <div key={String(v.id)} className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Badge tone={TYPE_TONE[vtype] ?? "default"}>{VISIT_TYPE_LABEL[vtype] ?? vtype}</Badge>
-                      <span className="font-semibold">{name}</span>
-                      {guest?.name_kana ? <span className="text-xs text-(--color-dim)">{String(guest.name_kana)}</span> : null}
-                      {v.result === "join" ? <Badge tone="gold">入会</Badge> : null}
-                      {v.result === "purchase" ? <Badge tone="ok">購入</Badge> : null}
-                      {selfDone ? <Badge tone="ok">自己入力済</Badge> : null}
-                    </div>
-                    <div className="text-xs text-(--color-dim)">
-                      {[String(v.visited_on), guest?.phone && String(guest.phone), v.referral_source && `経路 ${String(v.referral_source)}`, rec?.name && `受付 ${String(rec.name)}`]
-                        .filter(Boolean).join("　")}
-                    </div>
-                  </div>
-
-                  {/* スタッフ追記（保存のたびにupdated_atで再マウント→編集値が確実に反映される） */}
-                  <form key={`edit-${String(v.id)}-${String(v.updated_at ?? "")}`} action={updateVisit} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-6">
-                    <input type="hidden" name="id" value={String(v.id)} />
-                    <select name="result" defaultValue={String(v.result ?? "none")} className={`${inputCls} !py-1`}>
-                      {RESULTS.map((r) => <option key={r.value} value={r.value}>{r.label === "—" ? "成約なし" : r.label}</option>)}
-                    </select>
-                    <input name="fee" defaultValue={v.fee != null ? String(v.fee) : ""} inputMode="numeric" placeholder="利用料" className={`${inputCls} !py-1`} />
-                    <select name="discount" defaultValue={v.discount ? String(v.discount) : ""} className={`${inputCls} !py-1`}>
-                      <option value="">割引なし</option>
-                      {DISCOUNTS.map((d) => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                    <select name="payment_method" defaultValue={v.payment_method ? String(v.payment_method) : ""} className={`${inputCls} !py-1`}>
-                      <option value="">支払-</option>
-                      {PAYMENT_METHODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </select>
-                    <input name="pro_staff" defaultValue={v.pro_staff ? String(v.pro_staff) : ""} placeholder="担当プロ" className={`${inputCls} !py-1`} />
-                    <input name="reapproach_date" type="date" defaultValue={v.reapproach_date ? String(v.reapproach_date) : ""} className={`${inputCls} !py-1`} />
-                    <input name="note" defaultValue={v.note ? String(v.note) : ""} placeholder="備考・フォロー状況" className={`${inputCls} !py-1 col-span-2 sm:col-span-5`} />
-                    <button className={btnGhostCls}>保存</button>
-                  </form>
-
-                  <div className="mt-1 flex justify-end">
-                    <form action={deleteVisit}>
-                      <input type="hidden" name="id" value={String(v.id)} />
-                      <button className="text-xs text-(--color-dim) hover:text-red-400">削除</button>
-                    </form>
-                  </div>
-                </div>
-              );
-            })}
+            {list.map((v) => (
+              <VisitRow
+                key={String(v.id)}
+                v={v}
+                guest={(v.mbr_guests ?? null) as Row | null}
+                rec={(v.reception ?? null) as Row | null}
+              />
+            ))}
           </div>
         )}
       </Panel>

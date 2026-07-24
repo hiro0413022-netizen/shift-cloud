@@ -28,6 +28,7 @@ function intOrNull(v: FormDataEntryValue | null): number | null {
 const VISIT_TYPES = ["trial", "fitting", "bay", "visitor_bay", "other"];
 const RESULTS = ["none", "join", "purchase"];
 const PAYMENTS = ["store", "web", "free_campaign", "other"];
+const GENDERS = ["male", "female", "other", "unknown"];
 
 /** スタッフが手動で一時利用を登録（電話・当日の飛び込み等、タブレット未使用時） */
 export async function createVisitManual(formData: FormData) {
@@ -130,6 +131,77 @@ export async function updateVisit(formData: FormData) {
       source: "member-os", source_type: "human", severity: patch.result === "none" ? "info" : "notice",
     });
   }
+  await refreshMemberKpis(actor.companyId);
+  revalidatePath("/");
+}
+
+/** 受付台帳から顧客情報（住所・連絡先・職業など）を後追いで登録/編集。
+ *  visitにguestが未紐付け（電話のみ登録等）の場合は新規guestを作成して紐付ける。 */
+export async function updateGuest(formData: FormData) {
+  const actor = await requireReceptionActor();
+  const admin = createAdmin();
+  const visitId = str(formData.get("visit_id"));
+  if (!visitId) return;
+
+  // 対象visitとguest_idを会社スコープで取得
+  const { data: visit } = await admin
+    .from("mbr_walkin_visits")
+    .select("id, guest_id, store_id")
+    .eq("id", visitId)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!visit) return;
+
+  const gender = str(formData.get("gender"));
+  const fields = {
+    name_kana: orNull(formData.get("name_kana")),
+    gender: GENDERS.includes(gender) ? gender : null,
+    birth_date: orNull(formData.get("birth_date")),
+    postal_code: orNull(formData.get("postal_code")),
+    prefecture: orNull(formData.get("prefecture")),
+    address1: orNull(formData.get("address1")),
+    building: orNull(formData.get("building")),
+    phone: orNull(formData.get("phone")),
+    mobile: orNull(formData.get("mobile")),
+    email: orNull(formData.get("email")),
+    occupation: orNull(formData.get("occupation")),
+    contact_method: orNull(formData.get("contact_method")),
+    guest_note: orNull(formData.get("guest_note")),
+  };
+  const name = orNull(formData.get("name"));
+
+  if (visit.guest_id) {
+    const patch: Record<string, unknown> = {
+      ...fields,
+      note: fields.guest_note,
+      updated_at: new Date().toISOString(),
+    };
+    delete (patch as Record<string, unknown>).guest_note;
+    if (name) patch.name = name; // NOT NULL列を空で潰さない
+    await admin
+      .from("mbr_guests")
+      .update(patch)
+      .eq("id", visit.guest_id)
+      .eq("company_id", actor.companyId);
+  } else {
+    if (!name) return; // 新規作成には氏名が必要
+    const { guest_note, ...rest } = fields;
+    const { data: g } = await admin
+      .from("mbr_guests")
+      .insert({ company_id: actor.companyId, store_id: visit.store_id, name, note: guest_note, ...rest })
+      .select("id")
+      .single();
+    if (g?.id) {
+      await admin
+        .from("mbr_walkin_visits")
+        .update({ guest_id: g.id, updated_at: new Date().toISOString() })
+        .eq("id", visitId)
+        .eq("company_id", actor.companyId);
+    }
+  }
+
+  await logAudit(actor, "guest.upsert", "mbr_guests", visit.guest_id ?? null, null, { visitId, name });
   await refreshMemberKpis(actor.companyId);
   revalidatePath("/");
 }
