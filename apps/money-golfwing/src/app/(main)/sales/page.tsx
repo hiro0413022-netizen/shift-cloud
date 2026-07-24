@@ -2,8 +2,9 @@ import Link from "next/link";
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore, monthRange } from "@/lib/money";
-import { Panel, Empty, yen, inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { addSale, deleteSale } from "./actions";
+import { Panel, Empty, yen, btnGhostCls } from "@/components/ui";
+import { deleteSale } from "./actions";
+import SalesEntry, { type Preset } from "./SalesEntry";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,13 @@ type Sale = {
 
 function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 function shift(y: string, n: number) { const [a, m] = y.split("-").map(Number); return ym(new Date(a, m - 1 + n, 1)); }
+
+/** 出現頻度順にユニーク化して上位n件（サジェスト候補用） */
+function uniqTop(items: string[], n: number): string[] {
+  const count = new Map<string, number>();
+  for (const it of items) count.set(it, (count.get(it) ?? 0) + 1);
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([v]) => v);
+}
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const actor = await requireMoneyActor();
@@ -36,6 +44,38 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   const rows = (data ?? []) as Sale[];
   const total = rows.reduce((a, r) => a + Number(r.amount), 0);
   const today = new Date().toISOString().slice(0, 10);
+
+  // 入力補助：この店舗の直近アプリ入力から品名・お客様名・定番(品名+金額)を作る
+  const { data: recent } = store
+    ? await admin.from("mon_sales")
+        .select("category, customer_name, amount, detail, sold_on")
+        .eq("company_id", actor.companyId).eq("store_id", store.id)
+        .eq("source", "app").is("deleted_at", null)
+        .order("sold_on", { ascending: false }).limit(500)
+    : { data: [] };
+  const recentRows = (recent ?? []) as Pick<Sale, "category" | "customer_name" | "amount" | "detail">[];
+
+  const productSuggestions = uniqTop(
+    recentRows.map((r) => String(r.detail?.product_name ?? "").trim()).filter(Boolean),
+    40,
+  );
+  const customerSuggestions = uniqTop(
+    recentRows.map((r) => String(r.customer_name ?? "").trim()).filter(Boolean),
+    100,
+  );
+  // 定番: (品名+金額)の頻度上位8件
+  const comboCount = new Map<string, { p: Preset; n: number }>();
+  for (const r of recentRows) {
+    const product = String(r.detail?.product_name ?? "").trim();
+    if (!product) continue;
+    const amount = Number(r.amount) || 0;
+    if (amount === 0) continue;
+    const key = `${r.category}|${product}|${amount}`;
+    const cur = comboCount.get(key);
+    if (cur) cur.n += 1;
+    else comboCount.set(key, { p: { label: `${product} ${amount.toLocaleString("ja-JP")}`, category: r.category, productName: product, amount }, n: 1 });
+  }
+  const presets: Preset[] = [...comboCount.values()].sort((a, b) => b.n - a.n).slice(0, 8).map((x) => x.p);
 
   return (
     <div className="space-y-4">
@@ -60,27 +100,14 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         {!store ? (
           <Empty>店舗が選択されていません。上部の店舗切替で選んでください</Empty>
         ) : (
-          <form action={addSale} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <input type="date" name="sold_on" defaultValue={today} className={inputCls} required />
-            <select name="category" className={inputCls} defaultValue="利用料">
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input name="product_name" placeholder="品名・内容" className={inputCls} />
-            <input name="customer_name" placeholder="お客様名" className={inputCls} />
-            <input name="amount" inputMode="numeric" placeholder="金額(税抜)" className={inputCls} required />
-            <input name="tax_included" inputMode="numeric" placeholder="税込(任意)" className={inputCls} />
-            <input name="qty" inputMode="numeric" placeholder="個数(任意)" className={inputCls} />
-            <select name="pay_method" className={inputCls} defaultValue="現金">
-              {PAY_METHODS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-            <select name="member_kind" className={inputCls} defaultValue="">
-              <option value="">会員区分</option>
-              <option value="会員">会員</option>
-              <option value="ビジター">ビジター</option>
-            </select>
-            <input name="memo" placeholder="備考" className={`${inputCls} sm:col-span-2`} />
-            <button className={`${btnCls} justify-center`}>追加</button>
-          </form>
+          <SalesEntry
+            today={today}
+            categories={CATEGORIES}
+            payMethods={PAY_METHODS}
+            productSuggestions={productSuggestions}
+            customerSuggestions={customerSuggestions}
+            presets={presets}
+          />
         )}
       </Panel>
 

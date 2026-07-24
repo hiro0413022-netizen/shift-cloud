@@ -1,29 +1,51 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireMoneyActor } from "@/lib/auth";
+import { requireMoneyActor, type MoneyActor, type AccessibleStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore, canWriteStore, latestCashBalance, toNum } from "@/lib/money";
 
-/** 売上明細を1件追加。支払方法=現金なら現金出納へ入金行を自動連携。 */
-export async function addSale(formData: FormData): Promise<void> {
-  const actor = await requireMoneyActor();
-  const admin = createAdmin();
-  const store = await getCurrentStore(actor);
-  if (!store || !store.segmentId || !canWriteStore(actor, store.id)) return;
+type Admin = ReturnType<typeof createAdmin>;
 
-  const soldOn = String(formData.get("sold_on") ?? "").trim();
-  const category = String(formData.get("category") ?? "").trim();
-  const amount = toNum(formData.get("amount"));
-  if (!soldOn || !category || amount === 0) return;
+/** クライアントから渡す売上明細（1件） */
+export type SaleInput = {
+  soldOn: string;
+  category: string;
+  customerName?: string;
+  memberKind?: string;
+  amount: number;
+  taxIncluded?: number | null;
+  payMethod?: string;
+  productName?: string;
+  qty?: number;
+  memo?: string;
+};
 
-  const taxIncluded = toNum(formData.get("tax_included")) || null;
-  const payMethod = String(formData.get("pay_method") ?? "").trim() || null;
-  const customer = String(formData.get("customer_name") ?? "").trim() || null;
-  const memberKind = String(formData.get("member_kind") ?? "").trim() || null;
-  const memo = String(formData.get("memo") ?? "").trim() || null;
-  const productName = String(formData.get("product_name") ?? "").trim();
-  const qty = toNum(formData.get("qty"));
+/**
+ * 売上を1件挿入。支払方法=現金なら現金出納へ入金行を連携。
+ * 現金残高はbalanceを受け取り累積させる（複数件を1バッチで入れるため）。
+ * @returns 更新後の現金残高
+ */
+async function insertOneSale(
+  admin: Admin,
+  actor: MoneyActor,
+  store: AccessibleStore,
+  input: SaleInput,
+  cashBalance: number,
+): Promise<number> {
+  const soldOn = String(input.soldOn ?? "").trim();
+  const category = String(input.category ?? "").trim();
+  const amount = Number(input.amount) || 0;
+  if (!soldOn || !category || amount === 0) return cashBalance;
+
+  const taxIncluded = input.taxIncluded != null && input.taxIncluded !== 0 ? Number(input.taxIncluded) : null;
+  const payMethod = (input.payMethod ?? "").trim() || null;
+  const customer = (input.customerName ?? "").trim() || null;
+  const memberKind = (input.memberKind ?? "").trim() || null;
+  const memo = (input.memo ?? "").trim() || null;
+  const productName = (input.productName ?? "").trim();
+  const qty = Number(input.qty) || 0;
+
   const detail: Record<string, unknown> = {};
   if (productName) detail.product_name = productName;
   if (qty) detail.qty = qty;
@@ -52,7 +74,7 @@ export async function addSale(formData: FormData): Promise<void> {
   // 現金売上 → 店舗の現金出納に入金として自動反映
   if (payMethod === "現金") {
     const inAmount = taxIncluded ?? amount;
-    const prev = await latestCashBalance(actor.companyId, store.id);
+    const newBalance = cashBalance + inAmount;
     await admin.from("mon_cash_ledger").insert({
       company_id: actor.companyId,
       store_id: store.id,
@@ -63,18 +85,66 @@ export async function addSale(formData: FormData): Promise<void> {
       counterpart: customer,
       in_amount: inAmount,
       out_amount: 0,
-      balance: prev + inAmount,
+      balance: newBalance,
       memo: "売上入力から自動連携",
       entered_by: actor.name,
       source: "sales",
       source_ref: sale?.id ?? null,
     });
+    return newBalance;
+  }
+  return cashBalance;
+}
+
+/** 売上1件を追加（連続入力モード）。 */
+export async function createSale(input: SaleInput): Promise<void> {
+  const actor = await requireMoneyActor();
+  const admin = createAdmin();
+  const store = await getCurrentStore(actor);
+  if (!store || !store.segmentId || !canWriteStore(actor, store.id)) return;
+
+  const prev = await latestCashBalance(actor.companyId, store.id);
+  await insertOneSale(admin, actor, store, input, prev);
+
+  await admin.rpc("refresh_money_to_finance", { p_company_id: actor.companyId });
+  revalidatePath("/sales");
+  revalidatePath("/cash");
+  revalidatePath("/");
+}
+
+/** 複数の売上をまとめて追加（まとめ入力モード）。現金残高は行をまたいで累積。 */
+export async function createSales(inputs: SaleInput[]): Promise<void> {
+  const actor = await requireMoneyActor();
+  const admin = createAdmin();
+  const store = await getCurrentStore(actor);
+  if (!store || !store.segmentId || !canWriteStore(actor, store.id)) return;
+  if (!Array.isArray(inputs) || inputs.length === 0) return;
+
+  let balance = await latestCashBalance(actor.companyId, store.id);
+  for (const input of inputs) {
+    balance = await insertOneSale(admin, actor, store, input, balance);
   }
 
   await admin.rpc("refresh_money_to_finance", { p_company_id: actor.companyId });
   revalidatePath("/sales");
   revalidatePath("/cash");
   revalidatePath("/");
+}
+
+/** 売上明細を1件追加（旧・FormData版。互換のため残置）。 */
+export async function addSale(formData: FormData): Promise<void> {
+  await createSale({
+    soldOn: String(formData.get("sold_on") ?? "").trim(),
+    category: String(formData.get("category") ?? "").trim(),
+    customerName: String(formData.get("customer_name") ?? "").trim() || undefined,
+    memberKind: String(formData.get("member_kind") ?? "").trim() || undefined,
+    amount: toNum(formData.get("amount")),
+    taxIncluded: toNum(formData.get("tax_included")) || null,
+    payMethod: String(formData.get("pay_method") ?? "").trim() || undefined,
+    productName: String(formData.get("product_name") ?? "").trim() || undefined,
+    qty: toNum(formData.get("qty")) || undefined,
+    memo: String(formData.get("memo") ?? "").trim() || undefined,
+  });
 }
 
 export async function deleteSale(formData: FormData): Promise<void> {
