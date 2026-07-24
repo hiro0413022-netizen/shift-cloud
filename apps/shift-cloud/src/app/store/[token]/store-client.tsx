@@ -7,11 +7,10 @@ import type { KpiCard, StoreInfo, StoreLink, StoreMonthFeed } from "@/lib/store-
 import { toggleStoreTask, addStoreTask } from "./actions";
 
 /**
- * 店舗ダッシュボード（店頭タブレット共有表示）
- * 上: 月間カレンダー（出勤者名チップ＋●） / 選択日詳細（出勤者・体験予約・店舗やること）
- * 中: 今月KPIカード4種
- * 下: 業務リンク集
- * 5分ごとに自動リフレッシュ（置きっぱなし運用）
+ * 店舗ダッシュボード（店頭PC共有表示）
+ * PC想定の2カラム: 左=月間カレンダー（出勤者名チップ＋●）/ 右=選択日詳細（出勤者・体験予約・店舗やること）
+ * 上: 今月KPIカード4種 / 下: 業務リンク集
+ * 5分ごとに自動リフレッシュ（置きっぱなし運用）。狭い画面では縦積みに落ちる
  */
 export function StoreDashClient({
   token,
@@ -62,7 +61,7 @@ export function StoreDashClient({
   const shortName = (n: string) => n.replace(/[\s　].*$/, ""); // 姓のみ表示
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5 p-4 pb-10">
+    <div className="mx-auto max-w-7xl space-y-5 p-4 pb-10 lg:p-6">
       {/* ヘッダー: 店舗切替 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">店舗ダッシュボード</h1>
@@ -92,7 +91,9 @@ export function StoreDashClient({
         ))}
       </div>
 
-      {/* カレンダー */}
+      {/* カレンダー＋選択日詳細（PCは2カラム・狭い画面は縦積み） */}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="space-y-3">
       <div className="flex items-center gap-3">
         <button onClick={() => go({ ym: addMonths(ym, -1) })} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-500">←</button>
         <p className="text-lg font-semibold tracking-tight">{ym.replace("-", "年")}月</p>
@@ -108,7 +109,7 @@ export function StoreDashClient({
         </div>
         <div className="grid grid-cols-7">
           {cells.map((d, i) => {
-            if (!d) return <div key={`e${i}`} className="min-h-20 border-b border-r border-zinc-50" />;
+            if (!d) return <div key={`e${i}`} className="min-h-20 border-b border-r border-zinc-50 lg:min-h-24" />;
             const f = feed[d];
             const dow = dowJP(d);
             const isToday = d === today;
@@ -118,7 +119,7 @@ export function StoreDashClient({
               <button
                 key={d}
                 onClick={() => { setSelected(d); setMsg(null); }}
-                className={`min-h-20 border-b border-r border-zinc-50 p-1 text-left align-top transition-colors ${
+                className={`min-h-20 border-b border-r border-zinc-50 lg:min-h-24 p-1 text-left align-top transition-colors ${
                   isSel ? "bg-brand-light" : "bg-white active:bg-zinc-50"
                 }`}
               >
@@ -157,10 +158,11 @@ export function StoreDashClient({
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-red-400" />やること</span>
         </div>
       </div>
+      </div>
 
-      {/* 選択日の詳細 */}
+      {/* 選択日の詳細（PCはカレンダー右に固定表示） */}
       {day && (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm lg:sticky lg:top-4">
           <p className="font-semibold">{fmtDateJP(selected)}</p>
 
           {/* 出勤者 */}
@@ -233,11 +235,12 @@ export function StoreDashClient({
           </div>
         </div>
       )}
+      </div>
 
       {/* 業務リンク集 */}
       <div>
         <p className="mb-2 text-xs font-medium text-zinc-500">業務システム</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {links.map((l) => (
             <a
               key={l.id}
