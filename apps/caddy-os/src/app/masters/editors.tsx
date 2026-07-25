@@ -185,24 +185,32 @@ export function PickerToggle({ partnerId, show }: { partnerId: string; show: boo
   );
 }
 
-/* ── 交通費 単価表（キャディ × ゴルフ場） ── */
+/* ── 交通費 単価表（キャディ/社員 × ゴルフ場） ── */
 export function TransportMatrix({
   clients,
   partners,
+  staff = [],
   rates,
 }: {
   clients: Array<{ id: string; name: string }>;
   partners: Array<{ id: string; name: string; default_transport: number }>;
-  rates: Record<string, number>; // "clientId__partnerId" → 金額
+  staff?: Array<{ id: string; name: string }>;
+  rates: Record<string, number>; // "clientId__(partnerId|staffId)" → 金額
 }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
 
-  const onSave = async (clientId: string, partnerId: string, raw: string) => {
-    const key = `${clientId}__${partnerId}`;
+  // 委託先(p:) と 社員(s:) を1つの行リストにまとめる
+  const rows: Array<{ id: string; name: string; assignee: string; kind: "partner" | "staff"; def: number }> = [
+    ...partners.map((p) => ({ id: p.id, name: p.name, assignee: `p:${p.id}`, kind: "partner" as const, def: p.default_transport })),
+    ...staff.map((s) => ({ id: s.id, name: s.name, assignee: `s:${s.id}`, kind: "staff" as const, def: 0 })),
+  ];
+
+  const onSave = async (clientId: string, assignee: string, raw: string) => {
+    const key = `${clientId}__${assignee}`;
     setSaving(key);
     const amount = raw.trim() === "" ? null : Number(raw);
-    await saveTransportRate(clientId, partnerId, amount);
+    await saveTransportRate(clientId, assignee, amount);
     setSaving(null);
     setSavedKey(key);
     setTimeout(() => setSavedKey((k) => (k === key ? null : k)), 1500);
@@ -211,12 +219,13 @@ export function TransportMatrix({
   return (
     <div className="overflow-x-auto">
       <p className="mb-2 text-xs text-(--color-dim)">
-        セルに入力してフォーカスを外すと保存されます。空欄にすると委託先の「標準交通費」が使われます（プレースホルダで表示）
+        セルに入力してフォーカスを外すと保存されます。空欄にすると委託先の「標準交通費」が使われます（プレースホルダで表示）。
+        社員（青ラベル）の交通費は給与で精算しますが、入力の手間を減らすためここで単価を持てます。
       </p>
       <table className="min-w-[720px] text-sm">
         <thead>
           <tr className="text-left text-xs text-(--color-dim)">
-            <th className="sticky left-0 bg-(--color-panel) p-2">キャディ ＼ ゴルフ場</th>
+            <th className="sticky left-0 bg-(--color-panel) p-2">担当 ＼ ゴルフ場</th>
             {clients.map((c) => (
               <th key={c.id} className="p-2 text-right">
                 {c.name}
@@ -225,18 +234,24 @@ export function TransportMatrix({
           </tr>
         </thead>
         <tbody>
-          {partners.map((p) => (
-            <tr key={p.id} className="border-t border-(--color-line)">
-              <td className="sticky left-0 bg-(--color-panel) p-2 whitespace-nowrap">{p.name}</td>
+          {rows.map((row) => (
+            <tr key={row.assignee} className="border-t border-(--color-line)">
+              <td className="sticky left-0 bg-(--color-panel) p-2 whitespace-nowrap">
+                {row.name}
+                {row.kind === "staff" ? (
+                  <span className="ml-1 rounded bg-sky-100 px-1 text-[10px] text-sky-800">社員</span>
+                ) : null}
+              </td>
               {clients.map((c) => {
-                const key = `${c.id}__${p.id}`;
+                const key = `${c.id}__${row.assignee}`;
+                const rateKey = `${c.id}__${row.id}`;
                 return (
                   <td key={c.id} className="p-1">
                     <input
                       type="number"
-                      defaultValue={rates[key] ?? ""}
-                      placeholder={String(p.default_transport || 0)}
-                      onBlur={(e) => onSave(c.id, p.id, e.target.value)}
+                      defaultValue={rates[rateKey] ?? ""}
+                      placeholder={String(row.def || 0)}
+                      onBlur={(e) => onSave(c.id, row.assignee, e.target.value)}
                       className={`${cell} w-24 text-right tabular-nums ${
                         savedKey === key ? "border-emerald-400" : ""
                       } ${saving === key ? "opacity-50" : ""}`}

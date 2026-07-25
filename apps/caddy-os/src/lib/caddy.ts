@@ -181,13 +181,15 @@ export async function getMasters(companyId: string) {
     admin.from("staff").select("id, name").eq("company_id", companyId).is("deleted_at", null).order("name"),
     admin
       .from("cad_transport_rates")
-      .select("client_id, partner_id, amount")
+      .select("client_id, partner_id, staff_id, amount")
       .eq("company_id", companyId)
       .is("deleted_at", null),
   ]);
+  // 委託先(partner_id)・社員(staff_id) どちらの単価も同じマップに入れる（idはUUIDで衝突しない）
   const transportRates: Record<string, number> = {};
-  for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string; amount: number }>) {
-    transportRates[`${r.client_id}__${r.partner_id}`] = r.amount;
+  for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string | null; staff_id: string | null; amount: number }>) {
+    const ref = r.partner_id ?? r.staff_id;
+    if (ref) transportRates[`${r.client_id}__${ref}`] = r.amount;
   }
   return {
     clients: (clients ?? []) as Array<{
