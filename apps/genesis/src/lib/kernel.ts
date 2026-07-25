@@ -282,6 +282,8 @@ export type StoreMetric = {
   revenue: number | null; // 当月売上（事業→店舗が1:1のとき按分、不明はnull）
 };
 
+export type SegmentLine = { name: string; kind: string; amount: number };
+
 export type SegmentMetric = {
   code: string;
   name: string;
@@ -291,6 +293,8 @@ export type SegmentMetric = {
   profit: number;
   hasFinance: boolean; // 当月に財務入力があるか
   stores: StoreMetric[];
+  /** 収支のカテゴリ別内訳（#83: カードタップでざっくり見える用） */
+  lines: SegmentLine[];
 };
 
 export type BusinessBreakdown = {
@@ -348,7 +352,7 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
 
   const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes] = await Promise.all([
     admin.from("fin_segments").select("id,name,code").eq("company_id", companyId).is("deleted_at", null),
-    admin.from("fin_categories").select("id,kind").eq("company_id", companyId).is("deleted_at", null),
+    admin.from("fin_categories").select("id,kind,name").eq("company_id", companyId).is("deleted_at", null),
     month
       ? admin.from("fin_entries").select("segment_id,category_id,amount").eq("company_id", companyId).eq("target_month", month).is("deleted_at", null)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
@@ -361,7 +365,11 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
 
   const segments = (segRes.data ?? []) as { id: string; name: string; code: string }[];
   const catKind = new Map<string, string>();
-  for (const c of (catRes.data ?? []) as { id: string; kind: string }[]) catKind.set(c.id, c.kind);
+  const catName = new Map<string, string>();
+  for (const c of (catRes.data ?? []) as { id: string; kind: string; name: string }[]) {
+    catKind.set(c.id, c.kind);
+    catName.set(c.id, c.name);
+  }
   const stores = (storeRes.data ?? []) as { id: string; name: string }[];
 
   // 店舗別カウント
@@ -438,8 +446,9 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     };
   };
 
-  // 事業別 財務集計（当月）
+  // 事業別 財務集計（当月）＋カテゴリ別内訳（#83）
   const bySeg = new Map<string, { revenue: number; cogs: number; expense: number }>();
+  const linesBySeg = new Map<string, Map<string, SegmentLine>>();
   for (const e of (entRes.data ?? []) as { segment_id: string; category_id: string; amount: number | string }[]) {
     const kind = catKind.get(e.category_id);
     if (!kind || !e.segment_id) continue;
@@ -449,6 +458,15 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     else if (kind === "cogs") acc.cogs += amt;
     else if (kind === "expense") acc.expense += amt;
     bySeg.set(e.segment_id, acc);
+
+    if (kind === "revenue" || kind === "cogs" || kind === "expense") {
+      const name = catName.get(e.category_id) ?? "その他";
+      const m = linesBySeg.get(e.segment_id) ?? new Map<string, SegmentLine>();
+      const line = m.get(name) ?? { name, kind, amount: 0 };
+      line.amount += amt;
+      m.set(name, line);
+      linesBySeg.set(e.segment_id, m);
+    }
   }
 
   const result: SegmentMetric[] = segments.map((seg) => {
@@ -466,6 +484,11 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
       profit: f.revenue - f.cogs - f.expense,
       hasFinance,
       stores: segStores.map((s) => storeMetric(s, perStoreRevenue)),
+      lines: Array.from(linesBySeg.get(seg.id)?.values() ?? []).sort((a, b) => {
+        const rank = (k: string) => (k === "revenue" ? 0 : k === "cogs" ? 1 : 2);
+        if (rank(a.kind) !== rank(b.kind)) return rank(a.kind) - rank(b.kind);
+        return b.amount - a.amount;
+      }),
     };
   });
 

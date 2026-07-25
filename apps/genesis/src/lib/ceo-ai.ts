@@ -363,23 +363,68 @@ export async function runDailyCeoReport(
     source_type: "ai",
   });
 
-  // 6. スタッフ向けの朝の要約を executor に投入（#63）。
-  //    試運転ポリシー(#63)により staff_directive は approval＝/executions で承認後にLINE配信。
-  //    dedupeで1日1件。判断すべきことがあれば先頭に添える。
+  // 6. スタッフ向けの朝の連絡を executor に投入（#63 → #83で内容刷新）。
+  //    方針（2026-07-25 古川さん指示）: KPIや体験不足の話はスタッフに送らない。
+  //    実務に直結する「今日のやることリスト（sp_tasks）」と「本日の出勤」を中心にする。
+  //    予約状況はSmart HelloにAPIが無く自動取得不可のため載せない（店頭のday-feed/店舗ダッシュボード参照を案内）。
   try {
     const ymd = jstYmd();
-    const topJudge = judgments[0]?.title;
-    const briefLines = [
-      `おはようございます。本日のポイントです（${today}）。`,
-      analysis.summary,
-      analysis.sales_actions[0] ? `・重点: ${analysis.sales_actions[0]}` : "",
-      topJudge ? `・確認: ${topJudge}` : "",
-      "気になる点があれば店長・本部まで。",
-    ].filter(Boolean);
+    const [tasksRes, shiftsRes, storesRes, staffRes] = await Promise.all([
+      admin
+        .from("sp_tasks")
+        .select("title, store_id, staff_id, status")
+        .eq("company_id", companyId)
+        .eq("date", ymd)
+        .neq("status", "done")
+        .is("deleted_at", null)
+        .order("sort", { ascending: true })
+        .limit(15),
+      admin
+        .from("shifts")
+        .select("staff_id, store_id, start_time, end_time, is_day_off")
+        .eq("company_id", companyId)
+        .eq("date", ymd)
+        .eq("is_day_off", false)
+        .is("deleted_at", null),
+      admin.from("stores").select("id, name").eq("company_id", companyId).is("deleted_at", null),
+      admin.from("staff").select("id, name").eq("company_id", companyId).is("deleted_at", null),
+    ]);
+    const storeName = new Map((storesRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
+    const staffName = new Map((staffRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
+
+    const briefLines: string[] = [`おはようございます。${today} の連絡です。`];
+
+    const shifts = shiftsRes.data ?? [];
+    if (shifts.length > 0) {
+      briefLines.push("", "▼本日の出勤");
+      const byStore = new Map<string, string[]>();
+      for (const sh of shifts) {
+        const key = storeName.get(String(sh.store_id)) ?? "その他";
+        const nm = staffName.get(String(sh.staff_id)) ?? "スタッフ";
+        const time = sh.start_time ? `${String(sh.start_time).slice(0, 5)}〜${String(sh.end_time ?? "").slice(0, 5)}` : "";
+        (byStore.get(key) ?? byStore.set(key, []).get(key)!).push(time ? `${nm}(${time})` : nm);
+      }
+      for (const [store, names] of byStore) briefLines.push(`・${store}: ${names.join(" / ")}`);
+    }
+
+    const tasks = tasksRes.data ?? [];
+    if (tasks.length > 0) {
+      briefLines.push("", "▼今日のやることリスト");
+      for (const t of tasks) {
+        const store = t.store_id ? storeName.get(String(t.store_id)) : null;
+        const who = t.staff_id ? staffName.get(String(t.staff_id)) : null;
+        briefLines.push(`・${String(t.title)}${store ? `【${store}】` : ""}${who ? `（${who}さん）` : ""}`);
+      }
+    } else {
+      briefLines.push("", "▼今日のやることリスト", "・登録なし（追加はスタッフポータル/店舗ダッシュボードから）");
+    }
+
+    briefLines.push("", "予約状況は店頭タブレットの店舗ダッシュボードで確認してください。", "気になる点があれば店長・本部まで。");
+
     await enqueueAction(admin, {
       companyId,
       actionType: "staff_directive",
-      title: `スタッフ朝連絡 ${today}`,
+      title: `スタッフ朝連絡 ${today}（出勤${shifts.length}名・タスク${tasks.length}件）`,
       payload: { body: briefLines.join("\n") },
       originKind: "ceo_ai_daily",
       originId: report?.id ?? null,

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-25 — P3後半＋キャディ財務修正＋朝連絡刷新（DECISIONS #83）
+- fix(finance): キャディ6月支出の異常を修正（役員報酬1,100,000の誤分類→本部へ）。銀行明細×台帳の二重計上を0078で恒久修正（caddyは台帳が正典・林さん人件費はcaddy_manualで保持）
+- feat(genesis): スタッフ朝連絡を「本日の出勤＋今日のやることリスト」中心に刷新（KPI・体験不足の話を廃止）
+- feat(genesis): 事業別カードの数字タップで収支のカテゴリ別内訳を表示（SegmentLine追加）
+- feat(genesis): イベント一元化（0079・DBトリガーで体験/入会/予約/アンケート到着をcompany_eventsへ）
+- feat(genesis): AI週次成績表（ai-scorecard.ts・月曜）＋朝の個人LINEダイジェスト（morning-digest.ts・宛先はスタッフOAへの1:1から自動採用）
+
 ## 2026-07-25 — Genesis大改修P3前半: 測定学習＋稼働化プログラム（DECISIONS #82）
 - feat(genesis): 営業ループの自動測定 — 配信7日後の体験申込・LINE体験返信を gn_loop_runs.result に実測保存し「打ち手→結果」をティッカーへ
 - feat(genesis): 稼働化プログラム（activation-loop.ts・毎週月曜）— reserve/survey/lesson/legal の14日利用ゼロを検知し「稼働化 or 凍結」の改善提案を自動起票

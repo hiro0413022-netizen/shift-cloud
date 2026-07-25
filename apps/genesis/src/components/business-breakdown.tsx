@@ -14,6 +14,7 @@ function ProfitTone({ profit }: { profit: number }) {
 
 function SegmentCard({ seg }: { seg: SegmentMetric }) {
   const [open, setOpen] = useState(false);
+  const [openLines, setOpenLines] = useState(false);
   const hasStores = seg.stores.length > 0;
 
   return (
@@ -33,7 +34,13 @@ function SegmentCard({ seg }: { seg: SegmentMetric }) {
       </div>
 
       {seg.hasFinance ? (
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div
+          onClick={() => setOpenLines((v) => !v)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && setOpenLines((v) => !v)}
+          title="タップで収支の内訳を表示"
+          className="mt-3 grid cursor-pointer grid-cols-3 gap-2 rounded-lg text-center transition-colors hover:bg-(--color-panel-2)">
           <div>
             <p className="text-[10px] text-(--color-dim)">売上</p>
             <p className="tabular-nums text-sm font-semibold text-sky-200">{yen(seg.revenue)}</p>
@@ -56,6 +63,26 @@ function SegmentCard({ seg }: { seg: SegmentMetric }) {
             Money OSで入力
           </Link>
         </p>
+      )}
+
+      {/* 収支の内訳（#83: カード数字タップで開閉） */}
+      {openLines && seg.lines.length > 0 && (
+        <div className="mt-2 rounded-lg bg-(--color-panel-2) px-3 py-2">
+          <ul className="space-y-1 text-[12px]">
+            {seg.lines.map((l) => (
+              <li key={`${l.kind}-${l.name}`} className="flex items-center justify-between gap-2">
+                <span className={l.kind === "revenue" ? "text-sky-200" : "text-(--color-dim)"}>
+                  {l.kind === "revenue" ? "＋" : "−"} {l.name}
+                </span>
+                <span className="tabular-nums">{yen(l.amount)}</span>
+              </li>
+            ))}
+            <li className="flex items-center justify-between gap-2 border-t border-(--color-line) pt-1">
+              <span className="font-semibold">差引</span>
+              <ProfitTone profit={seg.profit} />
+            </li>
+          </ul>
+        </div>
       )}
 
       {hasStores && (
