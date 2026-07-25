@@ -144,6 +144,22 @@ export function byPartner(rows: DispatchRow[]) {
  * - clients に partner_fee（ゴルフ場ごとの委託料 / #62 ③）を含める
  * - transportRates は「clientId__partnerId → 交通費」（#62 ②）。ゴルフ場×キャディで自動入力する
  */
+/**
+ * 自社スタッフ別の交通費（給与で精算する分 / #62 林さん対応）。
+ * 社員の交通費は外注費に入れず給与側で精算するため、給与担当へ渡す月次合計をここで出す。
+ */
+export function byStaff(rows: DispatchRow[]) {
+  const m = new Map<string, { name: string; count: number; transport: number }>();
+  for (const r of rows) {
+    if (!r.staff_id) continue;
+    const cur = m.get(r.staff_id) ?? { name: r.staff?.name ?? "（不明）", count: 0, transport: 0 };
+    cur.count += 1;
+    cur.transport += r.transport_amount;
+    m.set(r.staff_id, cur);
+  }
+  return [...m.values()].sort((a, b) => b.transport - a.transport);
+}
+
 export async function getMasters(companyId: string) {
   const admin = createAdmin();
   const [{ data: clients }, { data: partners }, { data: staff }, { data: rates }] = await Promise.all([

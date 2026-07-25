@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
-import { getDispatches, getMasters, summarize, currentYm, yen, dispatchCost } from "@/lib/caddy";
+import { getDispatches, getMasters, summarize, byStaff, currentYm, yen, dispatchCost } from "@/lib/caddy";
 import { BulkGrid } from "./bulk-grid";
 import { GolfwingGrid } from "./golfwing-grid";
 import { deleteDispatch } from "../actions";
@@ -15,6 +15,8 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
 
   const [rows, masters] = await Promise.all([getDispatches(actor.companyId, ym), getMasters(actor.companyId)]);
   const s = summarize(rows, ym);
+  const staffTransport = byStaff(rows).filter((x) => x.transport > 0);
+  const staffTransportTotal = staffTransport.reduce((a, x) => a + x.transport, 0);
 
   return (
     <main className="mx-auto max-w-6xl p-6">
@@ -54,6 +56,38 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
         </p>
         <GolfwingGrid partners={masters.partners} defaultDate={`${ym}-01`} />
       </section>
+
+      {staffTransport.length > 0 ? (
+        <section className={`${cardCls} mb-6`}>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="font-semibold">従業員の交通費（給与で精算）</h2>
+            <p className="text-sm">
+              合計 <b className="tabular-nums">{yen(staffTransportTotal)}</b>
+            </p>
+          </div>
+          <p className="mb-3 text-xs text-(--color-dim)">
+            社員がキャディに入った分の交通費です。外注費には計上せず、この金額を給与（Shift Cloud）側で精算してください（二重計上防止）。
+          </p>
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs text-(--color-dim)">
+              <tr>
+                <th className="pb-2">従業員</th>
+                <th className="pb-2 text-right">回数</th>
+                <th className="pb-2 text-right">交通費</th>
+              </tr>
+            </thead>
+            <tbody>
+              {staffTransport.map((s2) => (
+                <tr key={s2.name} className="border-t border-(--color-line)">
+                  <td className="py-1.5">{s2.name}</td>
+                  <td className="py-1.5 text-right tabular-nums">{s2.count}</td>
+                  <td className="py-1.5 text-right font-medium tabular-nums">{yen(s2.transport)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
 
       <section className={cardCls}>
         <div className="mb-3 flex items-baseline justify-between">
@@ -122,7 +156,7 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                       <td className="py-1.5 text-right tabular-nums">
                         {r.transport_amount > 0 ? yen(r.transport_amount) : "—"}
                         {isStaff && r.transport_amount > 0 ? (
-                          <span className="ml-1 text-[10px] text-(--color-dim)">給与</span>
+                          <span className="ml-1 text-[10px] text-(--color-dim)">給与精算</span>
                         ) : null}
                       </td>
                       <td className="py-1.5 text-right tabular-nums">
