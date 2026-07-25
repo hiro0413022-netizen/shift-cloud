@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-07-26 — FRANK 打席予約v1（DECISIONS #86）
+- feat(frank): 予約DB（0081 frunk_bays/frunk_bookings・二重予約はunique indexで防止）
+- feat(genesis): 公開予約API /api/public/frank/booking（空き照会・予約・キャンセル・プラン上限enforcement）
+- feat(site): booking.html（会員番号+電話下4桁で予約→キャンセルまでWeb完結）
+
 ## 2026-07-26 — FRANK GOLF計画GO＋LINEグループ配信（DECISIONS #85）
 - feat(genesis): スタッフ用OAのグループ参加/発言でgn_line_groupsへ自動登録（名前取得・店舗自動マッピング）
 - feat(genesis): staff_directiveをOAトークン直接pushへ・送信先選択（all/store_id/group_id）・朝連絡は全グループ配信

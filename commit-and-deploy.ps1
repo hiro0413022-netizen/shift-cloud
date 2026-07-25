@@ -15,8 +15,8 @@ git fetch origin
 git pull --rebase origin main
 
 Write-Host "[3/4] コミット..." -ForegroundColor Cyan
-git add "apps/genesis/src/app/api/webhooks/line/[code]/route.ts" apps/genesis/src/lib/ai-execution.ts apps/genesis/src/lib/ceo-ai.ts "apps/genesis/src/app/api/public" "apps/genesis/src/app/(main)/site-admin" apps/genesis/src/components/sidebar.tsx sites/frank-golf supabase/migrations docs/genesis/DECISIONS.md NEXT_TASKS.md CHANGELOG.md FRANK_GOLF_出店計画 docs/modules/frank commit-and-deploy.ps1
-git commit -m "feat: FRANK 3-5 LINEグループ配信 + 3-1 サイトCMS/ギャラリー (#85)"
+git restore --staged package-lock.json 2>$null; git add apps/genesis/src/lib/frank-booking.ts "apps/genesis/src/app/api/public" sites/frank-golf supabase/migrations docs/genesis/DECISIONS.md CHANGELOG.md NEXT_TASKS.md commit-and-deploy.ps1
+git commit -m "feat(frank): 打席予約v1 - 0081 + 公開API + booking.html (#86)"
 
 Write-Host "[4/4] プッシュ（Vercelが自動デプロイ）..." -ForegroundColor Cyan
 git push origin main
