@@ -13,7 +13,7 @@ A-0. **FRANK GOLF ホームページの未確定情報を埋める**（`sites/fr
    - **体験予約URL**（`links.trialBooking`）— member-os →「予約（姫路）」→【お客様Web予約URLを発行】で取得して貼る。**未設定の間は体験予約ボタンが公式LINEへ自動フォールバック**します
    - 決まっていない項目は null のままで問題ありません（勝手な数字は出しません）
 
-A-0e. **member-os をデプロイ**（体験予約・Web入会の公開ページを本番反映）— DB(migration 0068)は適用済・コードは実装済で**あとはデプロイのみ**
+A-0e. ~~member-os をデプロイ~~ **✅ 完了確認（2026-07-24 / #76）**: `/trial` は本番稼働中（体験申込0件の原因は導線でなく集客＝P2営業ループで対応）。以下は参考として残す
    - 新規ルート: `/trial`（体験申込・公開）／`/join-web`（Web入会申込・公開）／スタッフ `/trials`（体験申込一覧・ナビ「体験申込」）
    - デプロイ = member-os のGitに push → Vercel(member-os)が自動ビルド（envは既存のまま／追加不要）
    - デプロイ後: HPの「体験を申し込む」→ `/trial`、「Webで入会」→ `/join-web` が有効化（site-data設定済）
@@ -41,8 +41,9 @@ A-3. **Reserve OS の通しテスト** — `res_requests` **0件**＝一度も�
    - Resend（APIキー・送信ドメイン認証）と env（RESERVE_FROM_EMAIL / RESERVE_STAFF_EMAIL / NEXT_PUBLIC_SITE_URL）が効いているかもここで判明する
    - 通ったら 公式LINEのリッチメニュー/トークに `/reserve/shaft-fitting` を掲出
 
-A-4. **LINE公式アカウント Phase 0** — Vaultに LINE の行なし＝未着手。以降のPhase A〜Dが全部これ待ち
-   - Messaging API を有効化 → channel secret / 長期アクセストークンを発行（OPERATIONS §6 Phase 0）→ Claudeに連絡
+A-4. ~~LINE公式アカウント Phase 0~~ **✅ 送信側 開通（2026-07-25 / #80）**: 長期トークン3本（スタッフ/GWビジター/GW会員）受領→ gn_line_channels(0076) に保存済・line_broadcast実配信化・営業ループが顧客直接配信に切替済
+   - ~~channel secret＋webhook実装~~ **✅ 実装済（#81）**: secret3本受領・`/api/webhooks/line/[code]` 稼働
+   - **残（ユーザー・各1分）: LINE DevelopersコンソールでWebhook URLを設定** — 各チャネルの Messaging API設定 → Webhook URL に `https://yozan-genesis.vercel.app/api/webhooks/line/staff`（スタッフ用）/ `.../gw_visitor`（ビジター用）/ `.../gw_member`（会員用）を貼り「Webhookの利用」をON→「検証」
 
 A-5. **営業利益の目標値** — 5大KPIのうち営業利益だけ target が未設定（会員数/入会率/退会率/月次売上は設定済）
 
@@ -69,7 +70,20 @@ C-0. ~~【#61の配線】自律実行 executor~~ **✅ 実装済み（#62 / migr
    - 動作確認: /executions →「テスト実行を入れる」→2分後に自動実行 or その場で「取消」。日次レポート生成後は「スタッフ朝連絡」が承認待ちで並ぶ→承認でLINE配信。
 C-1. ~~RUNBOOK未作成~~ **✅ 完了（2026-07-19 / #73）**: money-os / survey-os / reserve-os / caddy-os のRUNBOOK作成→各アプリ /manual 配信＋ログイン画面にリンク追加
 
-C-2. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI
+C-2. **Genesis大改修（#76/#77・正典 REDESIGN_2026-07.md・P1＋P2前半実装済）** — 残フェーズ:
+   - ~~P2前半~~ **✅ 完了（2026-07-25 / #77）**: ループ基盤（0075）＋営業AIループv1（sales-loop.ts・日次cron接続）＋ルール改訂（AI_RULES/DEVELOPMENT_RULES）
+   - ~~P2後半~~ **✅ 完了（2026-07-25 / #78）**: Web入会承認のホーム完結・判断SLA・/chatタブ統合・事業別を/financeへ・prod_deployハンドラ（VERCEL_DEPLOY_HOOKS env待ち=任意）・OPERATIONS改訂方針
+   - ~~P3前半~~ **✅ 完了（2026-07-25 / #82）**: 測定学習（配信→7日実測→result保存→ティッカー）＋稼働化プログラム（週次月曜・利用ゼロ検知→稼働化/凍結の提案起票）
+   - ~~P3後半~~ **✅ ほぼ完了（2026-07-25 / #83）**: イベント一元化(0079トリガー)・AI週次成績表・朝の個人LINEダイジェスト（宛先=スタッフ用OAに古川さんが1:1で一言送ると自動設定）・朝連絡の実務化・事業別収支内訳・キャディ財務修正(0078)
+   - ~~残~~ **✅ 完了（2026-07-25 / #84）**: 会員集計の正典を@yozan/core/membersへ・朝連絡に持ち越し（未完了再指示）欄・小川氏1.1Mは貸付返済＝PL対象外に訂正
+
+2. **FRANK GOLF 9/2プレオープン（#85でGO・最優先）** — 正典 `FRANK_GOLF_出店計画/10_プレオープン実行計画_0902.md`
+   - ✅ §3-5 LINEグループ配信（自動捕捉＋直接push＋送信先選択）
+   - 次 = **§3-1 HP画像リッチ化＋CMS（/site-admin）** ← dream house写真の提供待ち
+   - → §3-3 予約システム → §3-2 Stripe課金 → §3-7 Square POS → §3-4 レッスン管理
+   - ユーザー作業: dream house写真アップ／frankgolf.jp取得（お名前.com）／Stripe・Square申請／OAを両グループへ招待（デプロイ後）
+
+C-3. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI
    - 確認事項（ユーザー）: WING NOTEに過去データのエクスポート機能があるか（あれば移行、なければ新規蓄積）
 
 C-3. **SaaS化（正典 docs/genesis/SAAS_PLAN.md）**: Phase S0＝FRUNK GOLF姫路を2店舗目テナントとして発行（ウィザードの要件出し） / AI設定コンシェルジュ試作（/concierge） / **リポジトリPrivate化が販売の前提**

@@ -1,5 +1,61 @@
 # CHANGELOG
 
+## 2026-07-26 — FRANK GOLF計画GO＋LINEグループ配信（DECISIONS #85）
+- feat(genesis): スタッフ用OAのグループ参加/発言でgn_line_groupsへ自動登録（名前取得・店舗自動マッピング）
+- feat(genesis): staff_directiveをOAトークン直接pushへ・送信先選択（all/store_id/group_id）・朝連絡は全グループ配信
+- docs(frank): 9/2実行計画(10_)・小林電工様資料(11_)・運営マニュアル初版・POS設計(§3-7 Square)
+- ops: Shift OSにFRANK5名登録（林/穴田/藤田/小川/古川・初期PW=password）
+
+## 2026-07-25 — 財務訂正＋P3完結（DECISIONS #84）
+- fix(finance): 小川氏1,100,000は貸付金の返済（BS取引）→PL集計から除外（category='loan_repayment'）。#83のwipeで消えた6月役員報酬160,000をhr_manualで復元
+- feat(genesis): 朝のスタッフ連絡に「持ち越し」欄（直近7日の未完了sp_tasksを済まで毎朝再掲）
+- refactor(core): 会員集計の正典を @yozan/core/members に集約（kernel⇔store-dashの重複解消）＋tests 5件
+
+## 2026-07-25 — P3後半＋キャディ財務修正＋朝連絡刷新（DECISIONS #83）
+- fix(finance): キャディ6月支出の異常を修正（役員報酬1,100,000の誤分類→本部へ）。銀行明細×台帳の二重計上を0078で恒久修正（caddyは台帳が正典・林さん人件費はcaddy_manualで保持）
+- feat(genesis): スタッフ朝連絡を「本日の出勤＋今日のやることリスト」中心に刷新（KPI・体験不足の話を廃止）
+- feat(genesis): 事業別カードの数字タップで収支のカテゴリ別内訳を表示（SegmentLine追加）
+- feat(genesis): イベント一元化（0079・DBトリガーで体験/入会/予約/アンケート到着をcompany_eventsへ）
+- feat(genesis): AI週次成績表（ai-scorecard.ts・月曜）＋朝の個人LINEダイジェスト（morning-digest.ts・宛先はスタッフOAへの1:1から自動採用）
+
+## 2026-07-25 — Genesis大改修P3前半: 測定学習＋稼働化プログラム（DECISIONS #82）
+- feat(genesis): 営業ループの自動測定 — 配信7日後の体験申込・LINE体験返信を gn_loop_runs.result に実測保存し「打ち手→結果」をティッカーへ
+- feat(genesis): 稼働化プログラム（activation-loop.ts・毎週月曜）— reserve/survey/lesson/legal の14日利用ゼロを検知し「稼働化 or 凍結」の改善提案を自動起票
+
+## 2026-07-25 — LINE受信webhook＋デプロイフックDB化（A-4完全解消・DECISIONS #81）
+- feat(genesis): `/api/webhooks/line/[code]` — 署名検証つきLINE受信。返信をsec_inquiriesへ取込→ホーム判断フィードに自動合流。「体験」返信はtrial/high扱い＋イベント記録
+- feat(genesis): gn_deploy_hooks（migration 0077・URLはDB直登録）。prod_deployハンドラをDB参照優先に変更（env不要化）
+- chore: channel secret 3本・genesis Deploy Hook をDBに登録（SQL直・git非掲載）
+
+## 2026-07-25 — 顧客LINE直接配信を開通（A-4解消・DECISIONS #80）
+- feat(genesis): gn_line_channels（migration 0076・トークンはDB直seed=gitに載せない）＋lib/line.ts（broadcast/push）
+- feat(genesis): line_broadcastハンドラを実配信化（顧客向けOAへbroadcast・履歴はoutboxにstatus=sentで記録）。営業ループの起案を顧客直接配信（ビジター用・approval維持）へ切替
+- feat(genesis): ホーム判断カードに配信文プレビュー（160字）を表示
+
+## 2026-07-25 — demo-sales: デモサイトv2（6ページ化＋Web予約デモ＋サンプル画像）＋管理フォーム改善（DECISIONS #79）
+- feat(demo-sales): デモを6ページ構成に全面改修（render-demo.ts）— ハッシュルーティング（ホーム/診療案内/初めての方へFAQ/院長・院内紹介/アクセス/Web予約）、スクロール連動アニメ・ヘッダー縮小・モバイルドロワー（prefers-reduced-motion対応）
+- feat(demo-sales): Web予約の完全デモ動作 — カレンダー（休診日は診療時間表から自動判定）→時間枠→入力→確認→完了。送信・保存なし（※デモ表記）
+- feat(demo-sales): サンプル画像 `lib/sample-art.ts` 新規 — 写真未設定箇所（ヒーロー/ギャラリー6枚/院長/地図）にテンプレート配色のSVGイラスト（※仮画像ラベル）を自動差し込み。実写真が常に優先
+- feat(demo-sales): 業種別の症状例(SYMPTOMS)・FAQ(EXTRA_FAQ)をtemplates.tsに追加
+- feat(demo-sales): /p/[id] デモ生成フォームを①基本②文章③診療内容・時間④写真⑤修正指示のセクション構成に再編。空欄時に入る業種標準値をプレースホルダー表示。お知らせ(news)・採用(recruit)欄を追加（actions.tsにnewsパース追加）。webReserveチェックボックスは廃止（予約デモ常時搭載）
+
+## 2026-07-25 — Genesis大改修P2後半: 判断のホーム完結拡大＋開発自律化配線（DECISIONS #78）
+- feat(genesis): Web入会承認をホームで完結（decideJoinRequest=会員番号FR####発行・在籍化）。判断SLA=24時間放置に琥珀バッジ＋最上位昇格
+- feat(genesis): /chatと/commandをタブ統合（chat-tabs.tsx）。事業別パフォーマンスをホーム→/financeへ移設
+- feat(genesis): prod_deployハンドラ（VERCEL_DEPLOY_HOOKS env・承認後にDeploy Hook POST。env未設定時は明示エラー）
+- docs: OPERATIONS改訂方針（ユーザー作業は原則AI実行・残るのは4種のみ）
+
+## 2026-07-25 — Genesis大改修P2前半: 自律ループ基盤＋営業AIループv1（DECISIONS #77）
+- feat(genesis): `gn_loops` / `gn_loop_runs` 新設（migration 0075・適用済）— 観測→判断→生成→実行→測定のサイクル記録
+- feat(genesis): 営業AIループv1 `lib/sales-loop.ts` — 体験予約の日割りペース不足を検知→掘り起こし配信文を生成→staff_directive(approval)で起案→ホームで承認→LINE配信依頼。日次cronに接続
+- docs: AI_RULES（承認UI=ホーム一本化・ループ正典・デプロイ方針）、DEVELOPMENT_RULES（GitHub直クローン・push後ビルド確認義務化）を改訂
+
+## 2026-07-24 — Genesis大改修P1: 画面26→5＋管理・判断フィード統合（DECISIONS #76）
+- feat(genesis): サイドバーを5画面＋「管理」折りたたみに再編（sidebar.tsx: PRIMARY_NAV/ADMIN_NAV分離、mobile-nav追随）。既存URLは全温存
+- feat(genesis): ホーム全面刷新 — 判断フィード統合（`lib/judgment-feed.ts`新設）: 承認・AI実行(承認/取消枠)・成果物・問い合わせ・**体験申込(member-os)**・**Web入会**・**予約申込(reserve-os)** を1本にし、その場でワンタップ承認。体験申込の日程確定は `feed-actions.ts` decideTrialRequest（member-osと同status遷移）
+- style(genesis): ホームからHUD/blink装飾を撤去（REDESIGN §9: 色=状態のみ・1カード=1判断・ゼロ状態表示・取消チップ）。btn-main/btn-subをglobals.cssに追加
+- docs: REDESIGN_2026-07.md（大改修の正典・全システム監査§5e含む）を新規作成
+
 ## 2026-07-19 — JST日付統一・現場マニュアル4本・ネットワークマップ同期（DECISIONS #73）
 - fix(genesis): サーバー側の「今日」をJSTに統一（`lib/jst.ts` 新設）。日次レポートのタイトル日付が毎朝1日ズレていたのを解消（6:00 JST cron＝前日21:00 UTC問題）。sp_tasksの日付・提案dedupeキー・KPIチェックの当月判定も同修正。tests/jst-dates.test.ts で固定
 - docs(runbook): money-os / survey-os / reserve-os / caddy-os の現場手順書を新規作成（C-1完了）。各アプリ `/manual`（ログイン不要）で配信、ログイン画面にリンク追加

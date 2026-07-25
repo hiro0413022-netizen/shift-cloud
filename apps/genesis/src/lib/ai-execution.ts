@@ -119,7 +119,14 @@ type Handler = (ctx: HandlerCtx) => Promise<Record<string, unknown>>;
 async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string, unknown>> {
   const body = String(row.payload.body ?? row.payload.message ?? "").trim();
   if (!body) throw new Error("body が空です");
+  // 送信先選択（#85・FRANK §3-5）:
+  //   payload.target = 'all'        → 登録済み全グループへ
+  //   payload.store_id = <uuid>     → その店舗にひも付くグループへ
+  //   payload.group_id = <line gid> → 特定グループへ
+  //   指定なし                      → is_default のグループ（従来どおり）
   const wantGroup = row.payload.group_id ? String(row.payload.group_id) : null;
+  const wantStore = row.payload.store_id ? String(row.payload.store_id) : null;
+  const wantAll = String(row.payload.target ?? "") === "all";
 
   const { data: groups } = await admin
     .from("gn_line_groups")
@@ -128,10 +135,16 @@ async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string
     .is("deleted_at", null)
     .order("is_default", { ascending: false });
   const list = groups ?? [];
-  const group = wantGroup
-    ? list.find((g) => g.line_group_id === wantGroup)
-    : list.find((g) => g.is_default) ?? list[0];
-  if (!group) throw new Error("LINE配信先グループが未登録です");
+  const targets = wantAll
+    ? list
+    : wantGroup
+      ? list.filter((g) => g.line_group_id === wantGroup)
+      : wantStore
+        ? list.filter((g) => g.store_id === wantStore)
+        : list.filter((g) => g.is_default).slice(0, 1).length > 0
+          ? list.filter((g) => g.is_default).slice(0, 1)
+          : list.slice(0, 1);
+  if (targets.length === 0) throw new Error("LINE配信先グループが未登録です");
 
   const title = body.split("\n")[0].slice(0, 80);
   const { data: dir } = await admin
@@ -149,16 +162,25 @@ async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string
     .select("id")
     .single();
 
-  const { error: outErr } = await admin.from("gn_line_outbox").insert({
-    company_id: row.company_id,
-    to_group_id: group.line_group_id,
-    body,
-    directive_id: dir?.id ?? null,
-    status: "pending", // 取消枠は既に過ぎている＝ここで初めて送信キューへ
-    created_by: null,
-  });
-  if (outErr) throw new Error(outErr.message);
-  return { directive_id: dir?.id ?? null, group: group.line_group_id };
+  // #85: n8n経由をやめ、スタッフ用OAトークンで直接push（複数グループ対応）。
+  // outboxには履歴として status='sent' で残す（n8nは拾わない）。
+  const { getLineChannel, linePush } = await import("@/lib/line");
+  const staffCh = await getLineChannel(admin, row.company_id, "staff");
+  if (!staffCh) throw new Error("LINEチャネル未登録: staff（gn_line_channels）");
+  const sentTo: string[] = [];
+  for (const g of targets) {
+    await linePush(staffCh.access_token, g.line_group_id, body);
+    sentTo.push(g.line_group_id);
+    await admin.from("gn_line_outbox").insert({
+      company_id: row.company_id,
+      to_group_id: g.line_group_id,
+      body,
+      directive_id: dir?.id ?? null,
+      status: "sent",
+      created_by: null,
+    });
+  }
+  return { directive_id: dir?.id ?? null, groups: sentTo };
 }
 
 const HANDLERS: Record<string, Handler> = {
@@ -202,9 +224,70 @@ const HANDLERS: Record<string, Handler> = {
     });
     return { distributed: true, agent_code: row.payload.agent_code ?? null };
   },
-  // スタッフへ連絡 / 定型LINE一斉配信（auto_undoの猶予後に実送信）
+  // スタッフへ連絡（gn_line_outbox→n8n の既存経路）
   staff_directive: async ({ admin, row }) => sendStaffLine(admin, row),
-  line_broadcast: async ({ admin, row }) => sendStaffLine(admin, row),
+  // 顧客向けLINE一斉配信（#80: gn_line_channelsのトークンでLINE APIへ直接broadcast）
+  // payload.channel = 'gw_visitor' | 'gw_member'（既定 gw_visitor）。audience=customer のみ許可。
+  line_broadcast: async ({ admin, row }) => {
+    const { getLineChannel, lineBroadcast } = await import("@/lib/line");
+    const channelCode = String(row.payload.channel ?? "gw_visitor");
+    const body = String(row.payload.body ?? row.payload.message ?? "").trim();
+    if (!body) throw new Error("body が空です");
+    const ch = await getLineChannel(admin, row.company_id, channelCode);
+    if (!ch) throw new Error(`LINEチャネル未登録: ${channelCode}（gn_line_channels）`);
+    if (ch.audience !== "customer") throw new Error(`${channelCode} は顧客向けチャネルではありません`);
+    await lineBroadcast(ch.access_token, body);
+    // 送信履歴を outbox にも残す（status=sent なので n8n は拾わない）
+    await admin.from("gn_line_outbox").insert({
+      company_id: row.company_id,
+      to_group_id: `broadcast:${channelCode}`,
+      body,
+      status: "sent",
+      created_by: null,
+    });
+    await logEvent(row.company_id, {
+      event_type: "ai.line_broadcast",
+      title: `顧客LINE一斉配信を実行（${ch.name}）: ${body.split("\n")[0].slice(0, 60)}`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { channel: channelCode, broadcast: true };
+  },
+  // 本番デプロイ（#78 / REDESIGN §6）: 承認後にVercel Deploy Hookを叩いて再デプロイ。
+  // env VERCEL_DEPLOY_HOOKS = {"yozan-genesis":"https://api.vercel.com/v1/integrations/deploy/..."} 形式。
+  // 未設定プロジェクトは明示エラー（安全側）。通常の新規デプロイは git push で自動なので、
+  // このハンドラは env反映・再デプロイ・ロールバック起点用。
+  prod_deploy: async ({ admin, row }) => {
+    const project = String(row.payload.project ?? "");
+    if (!project) throw new Error("payload.project が未指定です");
+    // 第一候補=DB（gn_deploy_hooks・0077・SQLで登録＝envもgitも触らない）、フォールバック=env
+    let url: string | undefined;
+    const { data: hookRow } = await admin
+      .from("gn_deploy_hooks")
+      .select("hook_url")
+      .eq("company_id", row.company_id)
+      .eq("project", project)
+      .eq("enabled", true)
+      .maybeSingle();
+    url = hookRow?.hook_url ? String(hookRow.hook_url) : undefined;
+    if (!url) {
+      try {
+        url = (JSON.parse(process.env.VERCEL_DEPLOY_HOOKS ?? "{}") as Record<string, string>)[project];
+      } catch {
+        /* env未設定は無視 */
+      }
+    }
+    if (!url) throw new Error(`デプロイフック未登録: ${project}（gn_deploy_hooks にSQLで登録）`);
+    const res = await fetch(url, { method: "POST" });
+    if (!res.ok) throw new Error(`deploy hook 失敗: HTTP ${res.status}`);
+    await logEvent(row.company_id, {
+      event_type: "ai.prod_deploy",
+      title: `本番デプロイを実行: ${project}`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { project, triggered: true };
+  },
 };
 
 export function hasHandler(actionType: string): boolean {
