@@ -369,7 +369,7 @@ export async function runDailyCeoReport(
   //    予約状況はSmart HelloにAPIが無く自動取得不可のため載せない（店頭のday-feed/店舗ダッシュボード参照を案内）。
   try {
     const ymd = jstYmd();
-    const [tasksRes, shiftsRes, storesRes, staffRes] = await Promise.all([
+    const [tasksRes, carryoverRes, shiftsRes, storesRes, staffRes] = await Promise.all([
       admin
         .from("sp_tasks")
         .select("title, store_id, staff_id, status")
@@ -379,6 +379,17 @@ export async function runDailyCeoReport(
         .is("deleted_at", null)
         .order("sort", { ascending: true })
         .limit(15),
+      // 未完了の再指示（#84）: 直近7日の未完了タスクを「持ち越し」として毎朝再掲する
+      admin
+        .from("sp_tasks")
+        .select("title, store_id, date")
+        .eq("company_id", companyId)
+        .lt("date", ymd)
+        .gte("date", jstYmd(new Date(Date.now() - 7 * 24 * 3600_000)))
+        .neq("status", "done")
+        .is("deleted_at", null)
+        .order("date", { ascending: true })
+        .limit(10),
       admin
         .from("shifts")
         .select("staff_id, store_id, start_time, end_time, is_day_off")
@@ -419,12 +430,23 @@ export async function runDailyCeoReport(
       briefLines.push("", "▼今日のやることリスト", "・登録なし（追加はスタッフポータル/店舗ダッシュボードから）");
     }
 
+    // 未完了の再指示（#84）: 済にならない限り毎朝出続ける
+    const carryover = carryoverRes.data ?? [];
+    if (carryover.length > 0) {
+      briefLines.push("", "▼持ち越し（未完了・完了したら済にしてください）");
+      for (const t of carryover) {
+        const store = t.store_id ? storeName.get(String(t.store_id)) : null;
+        const d = String(t.date).slice(5).replace("-", "/");
+        briefLines.push(`・${String(t.title)}${store ? `【${store}】` : ""}（${d}〜）`);
+      }
+    }
+
     briefLines.push("", "予約状況は店頭タブレットの店舗ダッシュボードで確認してください。", "気になる点があれば店長・本部まで。");
 
     await enqueueAction(admin, {
       companyId,
       actionType: "staff_directive",
-      title: `スタッフ朝連絡 ${today}（出勤${shifts.length}名・タスク${tasks.length}件）`,
+      title: `スタッフ朝連絡 ${today}（出勤${shifts.length}名・タスク${tasks.length}件${carryover.length > 0 ? `・持ち越し${carryover.length}件` : ""}）`,
       payload: { body: briefLines.join("\n") },
       originKind: "ceo_ai_daily",
       originId: report?.id ?? null,

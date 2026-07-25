@@ -2,6 +2,7 @@ import "server-only";
 // (経営ダッシュボード: 事業別ブレークダウン追加)
 import { createAdmin } from "@/lib/supabase/admin";
 import type { GenesisActor } from "@/lib/auth";
+import { inDateWindow, isStaffMember, isTrialMember, PLACEHOLDER_LEAVE_REASONS } from "@yozan/core/members";
 
 /** すべての重要操作をCompany Eventに記録する（MASTER_PROMPT 3-5） */
 export async function logEvent(
@@ -389,14 +390,14 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
   // 当月ウィンドウ [月初, 翌月初)。leave_date は月末付の退会予定日なので範囲判定する。
   const from = monthStart(); // "YYYY-MM-01"
   const to = nextMonthStart(); // "翌月-01"（ISO日付なので文字列比較で当月判定可能）
-  const inThisMonth = (d: string | null) => !!d && d >= from && d < to;
+  const inThisMonth = (d: string | null) => inDateWindow(d, from, to);
   const memberByStore = new Map<string, number>();
   const joinByStore = new Map<string, number>();
   const leaveCoreByStore = new Map<string, number>();
   const leaveTrialByStore = new Map<string, number>();
   const reasonsByStore = new Map<string, Set<string>>();
   const bump = (m: Map<string, number>, id: string) => m.set(id, (m.get(id) ?? 0) + 1);
-  const PLACEHOLDER_REASONS = new Set(["選択してください", "その他", ""]);
+  // 会員の分類ルール（スタッフ除外・トライアル区別・退会理由の除外語）の正典は @yozan/core/members（#84）
 
   for (const mem of (memberRes.data ?? []) as {
     store_name: string | null;
@@ -407,9 +408,8 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
   }[]) {
     const sid = storeIdForMemberStoreName(mem.store_name, stores);
     if (!sid) continue;
-    const type = mem.member_type ?? "";
-    if (type === "スタッフ") continue; // スタッフは顧客会員から除外
-    const isTrial = type === "トライアル会員";
+    if (isStaffMember(mem.member_type)) continue; // スタッフは顧客会員から除外
+    const isTrial = isTrialMember(mem.member_type);
 
     if (!mem.leave_date && !isTrial) bump(memberByStore, sid); // 在籍（本会員）
     if (inThisMonth(mem.join_date) && !isTrial) bump(joinByStore, sid); // 今月入会（本会員）
@@ -419,7 +419,7 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
       } else {
         bump(leaveCoreByStore, sid); // 本会員退会（痛い）
         const r = (mem.leave_reason ?? "").trim();
-        if (!PLACEHOLDER_REASONS.has(r)) {
+        if (!PLACEHOLDER_LEAVE_REASONS.has(r)) {
           if (!reasonsByStore.has(sid)) reasonsByStore.set(sid, new Set());
           reasonsByStore.get(sid)!.add(r);
         }

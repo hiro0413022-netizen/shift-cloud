@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-07-25 — 財務訂正＋P3完結（DECISIONS #84）
+- fix(finance): 小川氏1,100,000は貸付金の返済（BS取引）→PL集計から除外（category='loan_repayment'）。#83のwipeで消えた6月役員報酬160,000をhr_manualで復元
+- feat(genesis): 朝のスタッフ連絡に「持ち越し」欄（直近7日の未完了sp_tasksを済まで毎朝再掲）
+- refactor(core): 会員集計の正典を @yozan/core/members に集約（kernel⇔store-dashの重複解消）＋tests 5件
+
 ## 2026-07-25 — P3後半＋キャディ財務修正＋朝連絡刷新（DECISIONS #83）
 - fix(finance): キャディ6月支出の異常を修正（役員報酬1,100,000の誤分類→本部へ）。銀行明細×台帳の二重計上を0078で恒久修正（caddyは台帳が正典・林さん人件費はcaddy_manualで保持）
 - feat(genesis): スタッフ朝連絡を「本日の出勤＋今日のやることリスト」中心に刷新（KPI・体験不足の話を廃止）
