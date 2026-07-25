@@ -1,0 +1,89 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createAdmin } from "@/lib/supabase/admin";
+import { logEvent } from "@/lib/kernel";
+
+const SITE = "frank-golf";
+
+async function getRow(admin: ReturnType<typeof createAdmin>) {
+  const { data } = await admin.from("gn_site_content").select("id, company_id, data, news").eq("site", SITE).single();
+  if (!data) throw new Error("gn_site_content: frank-golf 行がありません（migration 0080）");
+  return data;
+}
+
+/** 基本情報（営業時間・電話・特典など）の保存 */
+export async function saveBasics(formData: FormData): Promise<void> {
+  const admin = createAdmin();
+  const row = await getRow(admin);
+  const data = (row.data ?? {}) as Record<string, Record<string, unknown>>;
+  const put = (section: string, key: string, v: string) => {
+    const val = v.trim();
+    data[section] = data[section] ?? {};
+    if (val === "") delete data[section][key];
+    else data[section][key] = val;
+  };
+  put("store", "hours", String(formData.get("hours") ?? ""));
+  put("store", "holiday", String(formData.get("holiday") ?? ""));
+  put("store", "tel", String(formData.get("tel") ?? ""));
+  put("store", "parking", String(formData.get("parking") ?? ""));
+  const benefits = String(formData.get("benefits") ?? "").trim();
+  data.preopen = data.preopen ?? {};
+  if (benefits === "") delete data.preopen.benefits;
+  else data.preopen.benefits = benefits.split(/[、,]/).map((s) => s.trim()).filter(Boolean);
+
+  await admin.from("gn_site_content").update({ data, updated_at: new Date().toISOString() }).eq("id", row.id);
+  await logEvent(String(row.company_id), {
+    event_type: "site.updated",
+    title: "FRANK GOLF サイト基本情報を更新",
+    source: "site_admin",
+    source_type: "human",
+  });
+  revalidatePath("/site-admin");
+}
+
+/** お知らせ追加 */
+export async function addNews(formData: FormData): Promise<void> {
+  const admin = createAdmin();
+  const row = await getRow(admin);
+  const news = Array.isArray(row.news) ? (row.news as Record<string, unknown>[]) : [];
+  const item = {
+    date: String(formData.get("date") ?? "").trim() || new Date().toISOString().slice(0, 10),
+    tag: String(formData.get("tag") ?? "お知らせ").trim() || "お知らせ",
+    title: String(formData.get("title") ?? "").trim(),
+    url: String(formData.get("url") ?? "").trim() || null,
+  };
+  if (!item.title) return;
+  news.unshift(item);
+  await admin.from("gn_site_content").update({ news: news.slice(0, 20), updated_at: new Date().toISOString() }).eq("id", row.id);
+  revalidatePath("/site-admin");
+}
+
+/** お知らせ削除（index指定） */
+export async function deleteNews(formData: FormData): Promise<void> {
+  const admin = createAdmin();
+  const row = await getRow(admin);
+  const idx = Number(formData.get("index"));
+  const news = Array.isArray(row.news) ? (row.news as Record<string, unknown>[]) : [];
+  if (Number.isInteger(idx) && idx >= 0 && idx < news.length) {
+    news.splice(idx, 1);
+    await admin.from("gn_site_content").update({ news, updated_at: new Date().toISOString() }).eq("id", row.id);
+  }
+  revalidatePath("/site-admin");
+}
+
+/** 上級者向け: dataオーバーライドJSONの直接編集 */
+export async function saveRawJson(formData: FormData): Promise<void> {
+  const admin = createAdmin();
+  const row = await getRow(admin);
+  const raw = String(formData.get("json") ?? "").trim();
+  let parsed: unknown;
+  try {
+    parsed = raw === "" ? {} : JSON.parse(raw);
+  } catch {
+    throw new Error("JSONの形式が正しくありません");
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("JSONオブジェクトを指定してください");
+  await admin.from("gn_site_content").update({ data: parsed, updated_at: new Date().toISOString() }).eq("id", row.id);
+  revalidatePath("/site-admin");
+}

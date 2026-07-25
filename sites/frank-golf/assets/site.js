@@ -330,6 +330,8 @@
     notice();
   }
 
+  window.FRANK_RENDER = init;  /* CMS(cms.js)がマージ後に再描画するため公開 (#85) */
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {

@@ -5,6 +5,7 @@
 - feat(genesis): staff_directiveをOAトークン直接pushへ・送信先選択（all/store_id/group_id）・朝連絡は全グループ配信
 - docs(frank): 9/2実行計画(10_)・小林電工様資料(11_)・運営マニュアル初版・POS設計(§3-7 Square)
 - ops: Shift OSにFRANK5名登録（林/穴田/藤田/小川/古川・初期PW=password）
+- feat(site): FRANKサイトCMS（0080 gn_site_content＋公開API＋cms.js＋Genesis /site-admin）・トップにギャラリー追加
 
 ## 2026-07-25 — 財務訂正＋P3完結（DECISIONS #84）
 - fix(finance): 小川氏1,100,000は貸付金の返済（BS取引）→PL集計から除外（category='loan_repayment'）。#83のwipeで消えた6月役員報酬160,000をhr_manualで復元
