@@ -317,6 +317,48 @@ export async function getStoreMonthFeed(
     const hm = r.start_time ? r.start_time.slice(0, 5) : "";
     feed[r.lesson_date]?.reservations.push({ date: r.lesson_date, label: `体験 ${hm}${r.program ? ` ${r.program}` : ""}`.trim() });
   }
+
+  // FRANK: 打席予約＋レッスン予約も予約欄に合流（#88 §3-3/3-4・店頭タブレットで当日予約を見る）
+  const [bayRes, lessonRes] = await Promise.all([
+    admin
+      .from("frunk_bookings")
+      .select("booked_date, start_time, end_time, status, frunk_members(name), frunk_bays(name)")
+      .eq("store_id", storeId)
+      .eq("status", "confirmed")
+      .is("deleted_at", null)
+      .gte("booked_date", first)
+      .lte("booked_date", last)
+      .order("start_time"),
+    admin
+      .from("frunk_lesson_bookings")
+      .select("status, frunk_members(name), frunk_lesson_slots!inner(slot_date, start_time, staff(name))")
+      .eq("store_id", storeId)
+      .in("status", ["confirmed", "done"])
+      .is("deleted_at", null)
+      .gte("frunk_lesson_slots.slot_date", first)
+      .lte("frunk_lesson_slots.slot_date", last),
+  ]);
+  for (const b of (bayRes.data ?? []) as unknown as {
+    booked_date: string; start_time: string; end_time: string;
+    frunk_members: { name: string } | null; frunk_bays: { name: string } | null;
+  }[]) {
+    feed[b.booked_date]?.reservations.push({
+      date: b.booked_date,
+      label: `打席 ${String(b.start_time).slice(0, 5)} ${b.frunk_members?.name ?? ""}様${b.frunk_bays ? `（${b.frunk_bays.name}）` : ""}`.trim(),
+    });
+  }
+  for (const l of (lessonRes.data ?? []) as unknown as {
+    frunk_members: { name: string } | null;
+    frunk_lesson_slots: { slot_date: string; start_time: string; staff: { name: string } | null };
+  }[]) {
+    const d = l.frunk_lesson_slots.slot_date;
+    feed[d]?.reservations.push({
+      date: d,
+      label: `レッスン ${String(l.frunk_lesson_slots.start_time).slice(0, 5)} ${l.frunk_members?.name ?? ""}様${l.frunk_lesson_slots.staff ? `（${l.frunk_lesson_slots.staff.name}）` : ""}`.trim(),
+    });
+  }
+  const timeOf = (label: string) => /(\d{2}:\d{2})/.exec(label)?.[1] ?? "99:99";
+  for (const d of days) feed[d].reservations.sort((a, b) => timeOf(a.label).localeCompare(timeOf(b.label)));
   return feed;
 }
 

@@ -15,6 +15,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           <nav className="flex items-center gap-1 text-sm">
             <Link href="/" className="rounded-lg px-3 py-1.5 hover:bg-white/10">レッスンノート</Link>
             <Link href="/models" className="rounded-lg px-3 py-1.5 hover:bg-white/10">お手本スイング</Link>
+            <Link href="/frank" className="rounded-lg px-3 py-1.5 hover:bg-white/10">FRANK</Link>
           </nav>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-white/70 sm:inline">担当: {actor.name}</span>

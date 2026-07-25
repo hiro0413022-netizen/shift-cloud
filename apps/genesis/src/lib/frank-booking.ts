@@ -12,18 +12,64 @@ import { logEvent } from "@/lib/kernel";
 type Admin = ReturnType<typeof createAdmin>;
 
 const FRANK_STORE = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
-const SLOT_MIN = 30;
 
-/** 営業時間（JSTの日付文字列から曜日判定。祝日は土日扱いにしないv1） */
-export function businessHours(dateStr: string): { open: string; close: string } | null {
+/** 予約設定（#87: gn_site_content.data.booking で上書き可能＝/site-adminから変更できる汎用設計） */
+export type BookingCfg = {
+  weekday: { open: string; close: string };
+  weekend: { open: string; close: string };
+  closed_dows: number[]; // 定休曜日 0=日〜6=土
+  slot_minutes: number;
+  max_minutes_options: number[];
+  holiday_dates: string[]; // この日付は土日祝営業時間を適用
+  closed_dates: string[]; // この日付は臨時休業
+  advance_days: number; // 何日先まで予約可
+};
+
+export const DEFAULT_BOOKING_CFG: BookingCfg = {
+  weekday: { open: "10:00", close: "21:00" },
+  weekend: { open: "08:00", close: "20:00" },
+  closed_dows: [2], // 火曜定休
+  slot_minutes: 30,
+  max_minutes_options: [30, 60, 90, 120],
+  holiday_dates: [],
+  closed_dates: [],
+  advance_days: 14,
+};
+
+export async function loadBookingCfg(admin: Admin): Promise<BookingCfg> {
+  const { data } = await admin.from("gn_site_content").select("data").eq("site", "frank-golf").maybeSingle();
+  const o = ((data?.data as Record<string, unknown> | null)?.booking ?? {}) as Partial<BookingCfg>;
+  return {
+    ...DEFAULT_BOOKING_CFG,
+    ...o,
+    weekday: { ...DEFAULT_BOOKING_CFG.weekday, ...(o.weekday ?? {}) },
+    weekend: { ...DEFAULT_BOOKING_CFG.weekend, ...(o.weekend ?? {}) },
+  };
+}
+
+/** 営業時間（JSTの日付文字列から曜日判定。祝日・臨時休業は設定で指定） */
+export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING_CFG): { open: string; close: string } | null {
+  if (cfg.closed_dates.includes(dateStr)) return null;
   const dow = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 日付文字列のみ→曜日はUTCでOK
-  if (dow === 2) return null; // 火曜定休
-  if (dow === 0 || dow === 6) return { open: "08:00", close: "20:00" };
-  return { open: "10:00", close: "21:00" };
+  if (cfg.closed_dows.includes(dow)) return null;
+  if (dow === 0 || dow === 6 || cfg.holiday_dates.includes(dateStr)) return cfg.weekend;
+  return cfg.weekday;
 }
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const toTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+/** 打席指定のレッスン枠（open）を打席ブロックとして返す（#88 §3-4） */
+async function lessonBaySlots(admin: Admin, dateStr: string): Promise<{ bay_id: string; start_time: string; end_time: string }[]> {
+  const { data } = await admin
+    .from("frunk_lesson_slots")
+    .select("bay_id, start_time, end_time")
+    .eq("slot_date", dateStr)
+    .eq("status", "open")
+    .not("bay_id", "is", null)
+    .is("deleted_at", null);
+  return (data ?? []).map((s) => ({ bay_id: String(s.bay_id), start_time: String(s.start_time), end_time: String(s.end_time) }));
+}
 
 export async function verifyMember(admin: Admin, memberNo: string, phoneLast4: string) {
   const { data } = await admin
@@ -42,7 +88,8 @@ export async function verifyMember(admin: Admin, memberNo: string, phoneLast4: s
 /** 日別の空き状況 */
 export async function getSlots(dateStr: string) {
   const admin = createAdmin();
-  const hours = businessHours(dateStr);
+  const cfg = await loadBookingCfg(admin);
+  const hours = businessHours(dateStr, cfg);
   const { data: bays } = await admin
     .from("frunk_bays")
     .select("id, code, name, floor, equipment")
@@ -50,6 +97,7 @@ export async function getSlots(dateStr: string) {
     .is("deleted_at", null)
     .order("sort");
   if (!hours) return { date: dateStr, closed: true, bays: bays ?? [], slots: [], taken: {} };
+  const SLOT_MIN = cfg.slot_minutes;
 
   const slots: string[] = [];
   for (let m = toMin(hours.open); m + SLOT_MIN <= toMin(hours.close); m += SLOT_MIN) slots.push(toTime(m));
@@ -61,8 +109,11 @@ export async function getSlots(dateStr: string) {
     .eq("status", "confirmed")
     .is("deleted_at", null);
 
+  // レッスン枠（#88 §3-4）: プロが打席指定で公開した枠は打席予約から除外
+  const lessonSlots = await lessonBaySlots(admin, dateStr);
+
   const taken: Record<string, string[]> = {};
-  for (const b of bookings ?? []) {
+  for (const b of [...(bookings ?? []), ...lessonSlots]) {
     const list = taken[String(b.bay_id)] ?? (taken[String(b.bay_id)] = []);
     for (let m = toMin(String(b.start_time)); m < toMin(String(b.end_time)); m += SLOT_MIN) list.push(toTime(m));
   }
@@ -82,13 +133,17 @@ export async function createBooking(input: {
   const member = await verifyMember(admin, input.memberNo, input.phoneLast4);
   if (!member) return { ok: false, error: "会員番号または電話番号下4桁が一致しません（入会承認前の場合はご利用いただけません）" };
 
-  const hours = businessHours(input.date);
-  if (!hours) return { ok: false, error: "火曜日は定休日です" };
+  const cfg = await loadBookingCfg(admin);
+  const hours = businessHours(input.date, cfg);
+  if (!hours) return { ok: false, error: "この日は休業日です" };
   const startMin = toMin(input.start);
   const endMin = startMin + input.minutes;
   if (startMin < toMin(hours.open) || endMin > toMin(hours.close)) return { ok: false, error: "営業時間外です" };
-  if (![30, 60, 90, 120].includes(input.minutes)) return { ok: false, error: "利用時間が不正です" };
-  if (input.date < new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)) return { ok: false, error: "過去の日付は予約できません" };
+  if (!cfg.max_minutes_options.includes(input.minutes)) return { ok: false, error: "利用時間が不正です" };
+  const todayJst = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  if (input.date < todayJst) return { ok: false, error: "過去の日付は予約できません" };
+  const limitDate = new Date(Date.now() + 9 * 3600_000 + cfg.advance_days * 86400_000).toISOString().slice(0, 10);
+  if (input.date > limitDate) return { ok: false, error: `予約は${cfg.advance_days}日先までです` };
 
   // プラン上限
   const plan = (member as unknown as { frunk_plans: { name: string; max_bookings_per_day: number | null } | null }).frunk_plans;
@@ -129,7 +184,8 @@ export async function createBooking(input: {
     .eq("booked_date", input.date)
     .eq("status", "confirmed")
     .is("deleted_at", null);
-  for (const b of conflict ?? []) {
+  const lessonBlocks = (await lessonBaySlots(admin, input.date)).filter((s) => s.bay_id === String(bay.id));
+  for (const b of [...(conflict ?? []), ...lessonBlocks]) {
     const bs = toMin(String(b.start_time));
     const be = toMin(String(b.end_time));
     if (startMin < be && endMin > bs) return { ok: false, error: "その時間帯はすでに予約が入っています" };

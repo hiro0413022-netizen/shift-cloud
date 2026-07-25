@@ -42,6 +42,34 @@ export async function saveBasics(formData: FormData): Promise<void> {
   revalidatePath("/site-admin");
 }
 
+/** 予約設定（#87: 営業時間・定休日・祝日・臨時休業・予約可能日数） */
+export async function saveBookingCfg(formData: FormData): Promise<void> {
+  const admin = createAdmin();
+  const row = await getRow(admin);
+  const data = (row.data ?? {}) as Record<string, unknown>;
+  const t = (k: string) => String(formData.get(k) ?? "").trim();
+  const dates = (k: string) => t(k).split(/[、,\s]+/).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+  const dows = t("closed_dows").split(/[、,\s]+/).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+  data.booking = {
+    weekday: { open: t("wd_open") || "10:00", close: t("wd_close") || "21:00" },
+    weekend: { open: t("we_open") || "08:00", close: t("we_close") || "20:00" },
+    closed_dows: dows.length > 0 ? dows : [2],
+    slot_minutes: [15, 30, 60].includes(Number(t("slot"))) ? Number(t("slot")) : 30,
+    max_minutes_options: [30, 60, 90, 120],
+    holiday_dates: dates("holiday_dates"),
+    closed_dates: dates("closed_dates"),
+    advance_days: Math.min(60, Math.max(1, Number(t("advance_days")) || 14)),
+  };
+  await admin.from("gn_site_content").update({ data, updated_at: new Date().toISOString() }).eq("id", row.id);
+  await logEvent(String(row.company_id), {
+    event_type: "site.updated",
+    title: "FRANK GOLF 予約設定を更新（営業時間・休業日）",
+    source: "site_admin",
+    source_type: "human",
+  });
+  revalidatePath("/site-admin");
+}
+
 /** お知らせ追加 */
 export async function addNews(formData: FormData): Promise<void> {
   const admin = createAdmin();

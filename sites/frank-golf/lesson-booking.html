@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>打席予約（会員様）｜FRANK GOLF</title>
+<title>レッスン予約（会員様）｜FRANK GOLF</title>
 <meta name="description" content="FRANK GOLF の体験のご予約。2026年9月2日、姫路・土山にプレオープン。公式LINEからのご相談も承ります。">
 <meta name="format-detection" content="telephone=no">
 <meta property="og:site_name" content="FRANK GOLF">
-<meta property="og:title" content="打席予約（会員様）｜FRANK GOLF">
+<meta property="og:title" content="レッスン予約（会員様）｜FRANK GOLF">
 <meta property="og:description" content="FRANK GOLF の体験のご予約。2026年9月2日、姫路・土山にプレオープン。公式LINEからのご相談も承ります。">
 <meta property="og:type" content="website">
 <meta name="keywords" content="姫路 インドアゴルフ,土山 ゴルフ,姫路 ゴルフレッスン,インドアゴルフ 会員制,ゴルフシミュレーター 姫路,ゴルフバー 姫路,FRANK GOLF">
@@ -20,7 +20,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://frankgolf.jp/assets/ogp.png">
 <meta name="theme-color" content="#101210">
-<link rel="canonical" href="https://frankgolf.jp/booking.html">
+<link rel="canonical" href="https://frankgolf.jp/lesson-booking.html">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -30,9 +30,9 @@
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
 <script src="assets/cms.js" defer></script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/index.html"},{"@type":"ListItem","position":2,"name":"打席予約","item":"https://frankgolf.jp/booking.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/index.html"},{"@type":"ListItem","position":2,"name":"レッスン予約","item":"https://frankgolf.jp/lesson-booking.html"}]}</script>
 </head>
-<body data-page="booking">
+<body data-page="lesson-booking">
 
 <a class="skip" href="#main">本文へスキップ</a>
 
@@ -76,28 +76,22 @@
 <section class="sec" style="padding-top:60px">
   <div class="wrap" style="max-width:880px">
     <div class="center rv">
-      <p class="eyebrow">Reservation</p>
-      <h2 class="h-en">BAY BOOKING</h2>
-      <p class="h-jp">打席予約（会員様専用）</p>
-      <p style="margin-top:10px;font-size:13px;opacity:.75">会員番号とお電話番号の下4桁でログイン不要のままご予約いただけます。<br>30分単位・プランの1日上限まで。キャンセルもこのページから。</p>
+      <p class="eyebrow">Lesson Reservation</p>
+      <h2 class="h-en">LESSON BOOKING</h2>
+      <p class="h-jp">レッスン予約（会員様専用）</p>
+      <p style="margin-top:10px;font-size:13px;opacity:.75">会員番号とお電話番号の下4桁で、ログイン不要のままご予約いただけます。<br>コーチが公開している枠から選ぶだけ。キャンセルもこのページから。</p>
     </div>
 
-    <div class="card rv" style="margin-top:30px;padding:22px" id="bk-app">
+    <div class="card rv" style="margin-top:30px;padding:22px" id="ls-app">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <label style="font-size:12px">会員番号<input id="bk-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
-        <label style="font-size:12px">電話番号 下4桁<input id="bk-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
+        <label style="font-size:12px">会員番号<input id="ls-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
+        <label style="font-size:12px">電話番号 下4桁<input id="ls-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-        <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
-        <label style="font-size:12px">利用時間<select id="bk-min" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit">
-          <option value="30">30分</option><option value="60" selected>1時間</option><option value="90">1時間30分</option><option value="120">2時間</option>
-        </select></label>
-      </div>
-      <p id="bk-status" style="margin-top:12px;font-size:13px;opacity:.8">日付を選ぶと空き状況が表示されます。</p>
-      <div id="bk-grid" style="margin-top:10px;overflow-x:auto"></div>
-      <p style="margin-top:14px"><button id="bk-my" class="btn btn--ghost" type="button">自分の予約を確認・キャンセル</button></p>
-      <div id="bk-mylist" style="margin-top:10px"></div>
-      <p style="margin-top:18px;font-size:12px;opacity:.6">レッスンのご予約は<a href="lesson-booking.html" style="text-decoration:underline">レッスン予約ページ</a>から。</p>
+      <p id="ls-status" style="margin-top:12px;font-size:13px;opacity:.8">予約可能な枠を読み込んでいます…</p>
+      <div id="ls-list" style="margin-top:10px"></div>
+      <p style="margin-top:14px"><button id="ls-my" class="btn btn--ghost" type="button">自分の予約を確認・キャンセル</button></p>
+      <div id="ls-mylist" style="margin-top:10px"></div>
+      <p style="margin-top:18px;font-size:12px;opacity:.6">打席のご予約は<a href="booking.html" style="text-decoration:underline">打席予約ページ</a>から。</p>
     </div>
   </div>
 </section>
@@ -172,70 +166,61 @@
 <script src="assets/site.js"></script>
 <script>
 (function(){
-  var API="https://yozan-genesis.vercel.app/api/public/frank/booking";
+  var API="https://yozan-genesis.vercel.app/api/public/frank/lesson";
   var $=function(id){return document.getElementById(id)};
-  var sel=null;
-  function jst(){var d=new Date(Date.now()+9*3600*1000);return d.toISOString().slice(0,10)}
-  $("bk-date").min=jst(); $("bk-date").value=jst();
-  function load(){
-    var date=$("bk-date").value; if(!date) return;
-    $("bk-status").textContent="読み込み中…"; $("bk-grid").innerHTML="";
-    fetch(API+"?date="+date).then(function(r){return r.json()}).then(function(j){
-      if(j.closed){$("bk-status").textContent="この日は定休日（火曜）です。";return}
-      $("bk-status").textContent="○をタップ → 下の「この枠で予約する」を押してください（営業 "+j.hours.open+"〜"+j.hours.close+"）";
-      var h='<table style="border-collapse:collapse;font-size:11px;min-width:640px"><tr><th style="text-align:left;padding:4px 6px">打席</th>';
-      j.slots.forEach(function(t){h+='<th style="padding:4px 2px;font-weight:400;opacity:.7">'+t+"</th>"});
-      h+="</tr>";
-      j.bays.forEach(function(b){
-        h+='<tr><td style="padding:4px 6px;white-space:nowrap">'+b.name+'<br><span style="opacity:.6">'+(b.equipment||"")+"</span></td>";
-        j.slots.forEach(function(t){
-          var used=(j.taken[b.id]||[]).indexOf(t)>=0;
-          h+= used?'<td style="padding:2px;text-align:center;opacity:.25">×</td>'
-                 :'<td style="padding:2px;text-align:center"><button type="button" data-bay="'+b.code+'" data-t="'+t+'" style="cursor:pointer;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;border-radius:6px;padding:2px 6px">○</button></td>';
-        });
-        h+="</tr>";
-      });
-      h+="</table>";
-      $("bk-grid").innerHTML=h;
-      $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(btn){
-        btn.addEventListener("click",function(){
-          $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(b2){b2.style.background="transparent"});
-          btn.style.background="rgba(255,255,255,.25)";
-          sel={bay:btn.getAttribute("data-bay"),t:btn.getAttribute("data-t")};
-          var old=$("bk-go"); if(old) old.remove();
-          var p=document.createElement("p"); p.id="bk-go"; p.style.marginTop="12px";
-          p.innerHTML='<button class="btn" type="button">この枠で予約する（'+sel.t+'〜・'+$("bk-min").value+'分）</button>';
-          $("bk-grid").after(p);
-          p.querySelector("button").addEventListener("click",book);
-        });
-      });
-    }).catch(function(){$("bk-status").textContent="読み込みに失敗しました。時間をおいてお試しください。"});
-  }
   function auth(){
-    var no=$("bk-no").value.trim(), tel=$("bk-tel").value.trim();
+    var no=$("ls-no").value.trim(), tel=$("ls-tel").value.trim();
     if(!no||tel.length!==4){alert("会員番号と電話番号下4桁を入力してください");return null}
     return {no:no,tel:tel};
   }
-  function book(){
-    var a=auth(); if(!a||!sel) return;
-    fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"book",member_no:a.no,phone_last4:a.tel,date:$("bk-date").value,bay_code:sel.bay,start:sel.t,minutes:Number($("bk-min").value)})})
-      .then(function(r){return r.json()}).then(function(j){
-        if(j.ok){alert("予約が完了しました！\n"+$("bk-date").value+" "+sel.t+"〜");load();my()}
-        else alert(j.error||"予約できませんでした");
+  var WD=["日","月","火","水","木","金","土"];
+  function fmt(d){var p=d.split("-");var dt=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));return p[1].replace(/^0/,"")+"/"+p[2].replace(/^0/,"")+"("+WD[dt.getUTCDay()]+")"}
+  function load(){
+    $("ls-status").textContent="予約可能な枠を読み込んでいます…";$("ls-list").innerHTML="";
+    fetch(API).then(function(r){return r.json()}).then(function(j){
+      if(!j.slots||!j.slots.length){$("ls-status").textContent="ただいま予約可能な枠がありません。公式LINEでご相談ください。";return}
+      $("ls-status").textContent="ご希望の枠の「予約する」を押してください（30日先まで表示）";
+      var byDate={};
+      j.slots.forEach(function(s){(byDate[s.date]=byDate[s.date]||[]).push(s)});
+      var h="";
+      Object.keys(byDate).sort().forEach(function(d){
+        h+='<p style="margin-top:14px;font-size:13px;font-weight:600">'+fmt(d)+"</p>";
+        byDate[d].forEach(function(s){
+          h+='<div style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:13px;flex-wrap:wrap">'
+            +'<span>'+s.start+"〜"+s.end+"</span>"
+            +'<span style="opacity:.8">'+s.coach+" コーチ</span>"
+            +(s.bay?'<span style="opacity:.6">'+s.bay+"</span>":"")
+            +(s.note?'<span style="opacity:.6">'+s.note+"</span>":"")
+            +'<button type="button" data-id="'+s.id+'" data-l="'+fmt(d)+" "+s.start+'" style="cursor:pointer;border:1px solid rgba(255,255,255,.3);background:transparent;color:inherit;border-radius:6px;padding:3px 10px;font-size:12px">予約する</button>'
+            +"</div>";
+        });
       });
+      $("ls-list").innerHTML=h;
+      $("ls-list").querySelectorAll("button[data-id]").forEach(function(btn){
+        btn.addEventListener("click",function(){
+          var a=auth(); if(!a) return;
+          if(!confirm(btn.getAttribute("data-l")+"〜 のレッスンを予約しますか？"))return;
+          fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"book",member_no:a.no,phone_last4:a.tel,slot_id:btn.getAttribute("data-id")})})
+            .then(function(r){return r.json()}).then(function(j2){
+              if(j2.ok){alert("レッスン予約が完了しました！");load();my()}
+              else alert(j2.error||"予約できませんでした");
+            });
+        });
+      });
+    }).catch(function(){$("ls-status").textContent="読み込みに失敗しました。時間をおいてお試しください。"});
   }
   function my(){
     var a=auth(); if(!a) return;
     fetch(API+"?my=1&member_no="+encodeURIComponent(a.no)+"&phone_last4="+a.tel).then(function(r){return r.json()}).then(function(j){
-      if(j.error){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
-      if(!j.bookings.length){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後の予約はありません。</p>';return}
-      var h='<p style="font-size:13px">'+j.name+"様の予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
-      j.bookings.forEach(function(b){h+='<li style="margin-top:6px">'+b.booked_date+" "+String(b.start_time).slice(0,5)+"〜"+String(b.end_time).slice(0,5)+"（"+(b.frunk_bays?b.frunk_bays.name:"")+'） <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>'});
+      if(j.error){$("ls-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
+      if(!j.lessons.length){$("ls-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後のレッスン予約はありません。</p>';return}
+      var h='<p style="font-size:13px">'+j.name+"様のレッスン予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
+      j.lessons.forEach(function(b){h+='<li style="margin-top:6px">'+fmt(b.date)+" "+b.start+"〜"+b.end+"（"+b.coach+" コーチ"+(b.bay?"・"+b.bay:"")+'） <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>'});
       h+="</ul>";
-      $("bk-mylist").innerHTML=h;
-      $("bk-mylist").querySelectorAll("button[data-id]").forEach(function(btn){
+      $("ls-mylist").innerHTML=h;
+      $("ls-mylist").querySelectorAll("button[data-id]").forEach(function(btn){
         btn.addEventListener("click",function(){
-          if(!confirm("この予約をキャンセルしますか？"))return;
+          if(!confirm("このレッスン予約をキャンセルしますか？"))return;
           var a2=auth(); if(!a2)return;
           fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cancel",member_no:a2.no,phone_last4:a2.tel,booking_id:btn.getAttribute("data-id")})})
             .then(function(r){return r.json()}).then(function(j2){ if(j2.ok){my();load()} else alert(j2.error||"キャンセルできませんでした") });
@@ -243,9 +228,7 @@
       });
     });
   }
-  $("bk-date").addEventListener("change",load);
-  $("bk-min").addEventListener("change",function(){var old=document.getElementById("bk-go");if(old)old.remove();sel=null});
-  $("bk-my").addEventListener("click",my);
+  $("ls-my").addEventListener("click",my);
   load();
 })();
 </script>

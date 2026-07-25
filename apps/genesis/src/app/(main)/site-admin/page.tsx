@@ -1,5 +1,6 @@
 import { createAdmin } from "@/lib/supabase/admin";
-import { saveBasics, addNews, deleteNews, saveRawJson } from "./actions";
+import { DEFAULT_BOOKING_CFG, type BookingCfg } from "@/lib/frank-booking";
+import { saveBasics, saveBookingCfg, addNews, deleteNews, saveRawJson } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +56,8 @@ export default async function SiteAdminPage() {
         <button type="submit" className={btn}>基本情報を保存</button>
       </form>
 
+      <BookingSection d={d as Record<string, unknown>} input={input} label={label} btn={btn} />
+
       <div className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
         <h2 className="text-sm font-semibold">お知らせ（サイトのNEWS欄）</h2>
         <form action={addNews} className="grid grid-cols-[110px_110px_1fr_auto] gap-2">
@@ -81,6 +84,7 @@ export default async function SiteAdminPage() {
         </ul>
       </div>
 
+      {/* 上級者向けJSON */}
       <details className="rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
         <summary className="cursor-pointer text-sm font-semibold text-(--color-dim)">上級者向け: 全項目をJSONで直接編集</summary>
         <form action={saveRawJson} className="mt-4 space-y-3">
@@ -92,5 +96,51 @@ export default async function SiteAdminPage() {
         </form>
       </details>
     </div>
+  );
+}
+
+/** 予約設定フォーム（#87: 営業時間・定休日・祝日・臨時休業を設定で変更） */
+function BookingSection({ d, input, label, btn }: { d: Record<string, unknown>; input: string; label: string; btn: string }) {
+  const cfg: BookingCfg = {
+    ...DEFAULT_BOOKING_CFG,
+    ...((d.booking ?? {}) as Partial<BookingCfg>),
+    weekday: { ...DEFAULT_BOOKING_CFG.weekday, ...((d.booking as Partial<BookingCfg> | undefined)?.weekday ?? {}) },
+    weekend: { ...DEFAULT_BOOKING_CFG.weekend, ...((d.booking as Partial<BookingCfg> | undefined)?.weekend ?? {}) },
+  };
+  return (
+    <form action={saveBookingCfg} className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
+      <h2 className="text-sm font-semibold">予約設定（打席予約の営業時間・休業日）</h2>
+      <div className="grid grid-cols-4 gap-3">
+        <div><label className={label}>平日 開店</label><input name="wd_open" defaultValue={cfg.weekday.open} className={input} /></div>
+        <div><label className={label}>平日 閉店</label><input name="wd_close" defaultValue={cfg.weekday.close} className={input} /></div>
+        <div><label className={label}>土日祝 開店</label><input name="we_open" defaultValue={cfg.weekend.open} className={input} /></div>
+        <div><label className={label}>土日祝 閉店</label><input name="we_close" defaultValue={cfg.weekend.close} className={input} /></div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className={label}>定休曜日（0=日〜6=土、複数は「,」区切り）</label>
+          <input name="closed_dows" defaultValue={cfg.closed_dows.join(",")} placeholder="2" className={input} />
+        </div>
+        <div>
+          <label className={label}>予約枠の単位（分）</label>
+          <input name="slot" defaultValue={String(cfg.slot_minutes)} placeholder="30" className={input} />
+        </div>
+        <div>
+          <label className={label}>何日先まで予約可</label>
+          <input name="advance_days" defaultValue={String(cfg.advance_days)} className={input} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={label}>祝日（土日祝営業時間を適用・YYYY-MM-DDを「,」区切り）</label>
+          <input name="holiday_dates" defaultValue={cfg.holiday_dates.join(", ")} placeholder="2026-09-21, 2026-09-23" className={input} />
+        </div>
+        <div>
+          <label className={label}>臨時休業日（YYYY-MM-DDを「,」区切り）</label>
+          <input name="closed_dates" defaultValue={cfg.closed_dates.join(", ")} placeholder="2026-12-31" className={input} />
+        </div>
+      </div>
+      <button type="submit" className={btn}>予約設定を保存</button>
+    </form>
   );
 }
