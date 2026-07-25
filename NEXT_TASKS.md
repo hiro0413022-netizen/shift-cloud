@@ -41,7 +41,7 @@ A-3. **Reserve OS の通しテスト** — `res_requests` **0件**＝一度も�
    - Resend（APIキー・送信ドメイン認証）と env（RESERVE_FROM_EMAIL / RESERVE_STAFF_EMAIL / NEXT_PUBLIC_SITE_URL）が効いているかもここで判明する
    - 通ったら 公式LINEのリッチメニュー/トークに `/reserve/shaft-fitting` を掲出
 
-A-4. ~~LINE公式アカウント Phase 0~~ **✅ 送信側 開通（2026-07-25 / #79）**: 長期トークン3本（スタッフ/GWビジター/GW会員）受領→ gn_line_channels(0076) に保存済・line_broadcast実配信化・営業ループが顧客直接配信に切替済
+A-4. ~~LINE公式アカウント Phase 0~~ **✅ 送信側 開通（2026-07-25 / #80）**: 長期トークン3本（スタッフ/GWビジター/GW会員）受領→ gn_line_channels(0076) に保存済・line_broadcast実配信化・営業ループが顧客直接配信に切替済
    - **残: channel secret の発行＋webhook設定**（「体験希望」等の返信を自動で受け取る受信側。LINE Developersコンソール→各チャネル→Messaging API→channel secret をClaudeへ）
 
 A-5. **営業利益の目標値** — 5大KPIのうち営業利益だけ target が未設定（会員数/入会率/退会率/月次売上は設定済）

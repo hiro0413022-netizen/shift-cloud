@@ -115,7 +115,7 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
   for (const r of (queueRes.data ?? []) as Row[]) {
     const type = s(r.action_type) ?? "";
     const isUndo = s(r.status) === "queued";
-    // 外部送信系は承認前に文面をカード上で確認できるようにする（#79）
+    // 外部送信系は承認前に文面をカード上で確認できるようにする（#80）
     const payload = (r.payload ?? {}) as Record<string, unknown>;
     const bodyPreview = String(payload.body ?? payload.message ?? "").trim().slice(0, 160) || null;
     items.push({

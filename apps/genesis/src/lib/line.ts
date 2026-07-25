@@ -3,7 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 type Admin = ReturnType<typeof createAdmin>;
 
 /**
- * LINE Messaging API 直接送信（#79 / A-4解消）
+ * LINE Messaging API 直接送信（#80 / A-4解消）
  * トークンは gn_line_channels（0076・RLSポリシー無し=service_role専用）にのみ保存。
  * 公開リポジトリのため、トークンをコード・migration・envサンプルに書くことは禁止。
  * チャネル: staff=YOZANスタッフ連絡用 / gw_visitor=ビジター用 / gw_member=会員様用

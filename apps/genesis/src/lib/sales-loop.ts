@@ -12,7 +12,7 @@ type Admin = ReturnType<typeof createAdmin>;
  *        vs kpis.trial_bookings の月次目標の日割りペース
  * 判断: 不足が config.min_shortfall 以上 かつ 直近 config.cooldown_days 日以内に act していない
  * 生成: 掘り起こし配信文（テンプレート。スタッフが配信前に調整できる前提の下書き）
- * 実行: line_broadcast（approval）で顧客向け公式LINE（ビジター用）へ直接一斉配信（#79でA-4解消）
+ * 実行: line_broadcast（approval）で顧客向け公式LINE（ビジター用）へ直接一斉配信（#80でA-4解消）
  *        ホームで承認 → LINE API broadcast が即実行される。文面はカードで確認・却下可能。
  * 記録: gn_loop_runs（1日1回・観測値と文面を保存。P3で結果測定を追記）
  */

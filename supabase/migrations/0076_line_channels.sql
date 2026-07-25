@@ -1,4 +1,4 @@
--- 0076: LINE Messaging API チャネル（#79・A-4送信側解消）
+-- 0076: LINE Messaging API チャネル（#80・A-4送信側解消）
 -- トークン等の秘密は本ファイルに書かない（公開リポジトリ）。seedはMCP経由のSQLで直接投入する。
 -- code: 'staff'(YOZANスタッフ連絡用) / 'gw_visitor'(GWビジター用) / 'gw_member'(GW会員様用)
 

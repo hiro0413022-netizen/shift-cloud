@@ -204,7 +204,7 @@ const HANDLERS: Record<string, Handler> = {
   },
   // スタッフへ連絡（gn_line_outbox→n8n の既存経路）
   staff_directive: async ({ admin, row }) => sendStaffLine(admin, row),
-  // 顧客向けLINE一斉配信（#79: gn_line_channelsのトークンでLINE APIへ直接broadcast）
+  // 顧客向けLINE一斉配信（#80: gn_line_channelsのトークンでLINE APIへ直接broadcast）
   // payload.channel = 'gw_visitor' | 'gw_member'（既定 gw_visitor）。audience=customer のみ許可。
   line_broadcast: async ({ admin, row }) => {
     const { getLineChannel, lineBroadcast } = await import("@/lib/line");
