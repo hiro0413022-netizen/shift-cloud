@@ -202,9 +202,35 @@ const HANDLERS: Record<string, Handler> = {
     });
     return { distributed: true, agent_code: row.payload.agent_code ?? null };
   },
-  // スタッフへ連絡 / 定型LINE一斉配信（auto_undoの猶予後に実送信）
+  // スタッフへ連絡（gn_line_outbox→n8n の既存経路）
   staff_directive: async ({ admin, row }) => sendStaffLine(admin, row),
-  line_broadcast: async ({ admin, row }) => sendStaffLine(admin, row),
+  // 顧客向けLINE一斉配信（#79: gn_line_channelsのトークンでLINE APIへ直接broadcast）
+  // payload.channel = 'gw_visitor' | 'gw_member'（既定 gw_visitor）。audience=customer のみ許可。
+  line_broadcast: async ({ admin, row }) => {
+    const { getLineChannel, lineBroadcast } = await import("@/lib/line");
+    const channelCode = String(row.payload.channel ?? "gw_visitor");
+    const body = String(row.payload.body ?? row.payload.message ?? "").trim();
+    if (!body) throw new Error("body が空です");
+    const ch = await getLineChannel(admin, row.company_id, channelCode);
+    if (!ch) throw new Error(`LINEチャネル未登録: ${channelCode}（gn_line_channels）`);
+    if (ch.audience !== "customer") throw new Error(`${channelCode} は顧客向けチャネルではありません`);
+    await lineBroadcast(ch.access_token, body);
+    // 送信履歴を outbox にも残す（status=sent なので n8n は拾わない）
+    await admin.from("gn_line_outbox").insert({
+      company_id: row.company_id,
+      to_group_id: `broadcast:${channelCode}`,
+      body,
+      status: "sent",
+      created_by: null,
+    });
+    await logEvent(row.company_id, {
+      event_type: "ai.line_broadcast",
+      title: `顧客LINE一斉配信を実行（${ch.name}）: ${body.split("\n")[0].slice(0, 60)}`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { channel: channelCode, broadcast: true };
+  },
   // 本番デプロイ（#78 / REDESIGN §6）: 承認後にVercel Deploy Hookを叩いて再デプロイ。
   // env VERCEL_DEPLOY_HOOKS = {"yozan-genesis":"https://api.vercel.com/v1/integrations/deploy/..."} 形式。
   // 未設定プロジェクトは明示エラー（安全側）。通常の新規デプロイは git push で自動なので、

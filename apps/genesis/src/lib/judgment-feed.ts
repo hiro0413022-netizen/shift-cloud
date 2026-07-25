@@ -66,7 +66,7 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
   const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes] = await Promise.all([
     admin
       .from("ai_action_queue")
-      .select("id, title, action_type, status, created_at, scheduled_at")
+      .select("id, title, action_type, status, created_at, scheduled_at, payload")
       .eq("company_id", companyId)
       .in("status", ["awaiting_approval", "queued"])
       .order("created_at", { ascending: false })
@@ -115,12 +115,15 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
   for (const r of (queueRes.data ?? []) as Row[]) {
     const type = s(r.action_type) ?? "";
     const isUndo = s(r.status) === "queued";
+    // 外部送信系は承認前に文面をカード上で確認できるようにする（#79）
+    const payload = (r.payload ?? {}) as Record<string, unknown>;
+    const bodyPreview = String(payload.body ?? payload.message ?? "").trim().slice(0, 160) || null;
     items.push({
       id: String(r.id),
       source: isUndo ? "undo" : "queue",
       tag: ACTION_TYPE_LABEL[type] ?? "AI実行",
       title: s(r.title) ?? type,
-      detail: isUndo ? "実行予定（取消可）" : null,
+      detail: isUndo ? "実行予定（取消可）" : bodyPreview,
       createdAt: s(r.created_at),
       href: "/executions",
       scheduledAt: s(r.scheduled_at),

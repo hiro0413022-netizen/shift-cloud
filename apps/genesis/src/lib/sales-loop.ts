@@ -12,9 +12,8 @@ type Admin = ReturnType<typeof createAdmin>;
  *        vs kpis.trial_bookings の月次目標の日割りペース
  * 判断: 不足が config.min_shortfall 以上 かつ 直近 config.cooldown_days 日以内に act していない
  * 生成: 掘り起こし配信文（テンプレート。スタッフが配信前に調整できる前提の下書き）
- * 実行: staff_directive（approval）で「公式LINEでの配信依頼」をスタッフへ
- *        ※顧客LINEへの直接配信は実チャネル未接続（NEXT_TASKS A-4）のため、
- *          v1は「配信文を作って依頼する」まで。チャネル開通後に line_broadcast 直送へ切替。
+ * 実行: line_broadcast（approval）で顧客向け公式LINE（ビジター用）へ直接一斉配信（#79でA-4解消）
+ *        ホームで承認 → LINE API broadcast が即実行される。文面はカードで確認・却下可能。
  * 記録: gn_loop_runs（1日1回・観測値と文面を保存。P3で結果測定を追記）
  */
 
@@ -47,14 +46,9 @@ async function ensureLoop(admin: Admin, companyId: string): Promise<LoopRow | nu
   return (inserted as LoopRow) ?? null;
 }
 
-function buildMessage(shortfall: number, actual: number, target: number): string {
+function buildMessage(): string {
+  // 顧客（ビジター用OAの友だち）に直接届く文面。数字や社内事情は書かない。
   return [
-    `【営業AI】体験予約リカバリー配信のお願い`,
-    ``,
-    `今月の体験予約が目標ペース比 ${shortfall}件不足しています（実績${actual}件 / 月間目標${target}件・本日時点）。`,
-    `以下の下書きを調整のうえ、GOLF WING公式LINEでの配信をお願いします。`,
-    ``,
-    `――― 配信文（下書き） ―――`,
     `⛳ GOLF WINGで体験レッスン受付中！`,
     ``,
     `8月から料金が新しくなります。現行条件でスタートできるのは今だけ。`,
@@ -62,7 +56,6 @@ function buildMessage(shortfall: number, actual: number, target: number): string
     ``,
     `▼体験のご予約・お問い合わせ`,
     `このLINEに「体験希望」と返信してください。`,
-    `――――――――――――――`,
   ].join("\n");
 }
 
@@ -160,13 +153,13 @@ export async function runSalesLoop(companyId: string): Promise<Record<string, un
     return { decision: "skip", reason: "cooldown", observed };
   }
 
-  // ---- 生成 → 実行（approval: ホームの判断フィードに乗る） ----
-  const body = buildMessage(shortfall, actual, target);
+  // ---- 生成 → 実行（approval: ホームの判断フィードで文面確認→承認で即配信） ----
+  const body = buildMessage();
   const enq = await enqueueAction(admin, {
     companyId,
-    actionType: "staff_directive",
-    title: `営業AI: 体験リカバリー配信の依頼（不足${shortfall}件）`,
-    payload: { body },
+    actionType: "line_broadcast",
+    title: `営業AI: 体験掘り起こしLINE配信（ビジター向け・不足${shortfall}件）`,
+    payload: { channel: "gw_visitor", body },
     originKind: "sales_loop",
     dedupeKey: `sales-trial-recovery-${today}`,
     createdBy: null,
