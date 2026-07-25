@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-07-25 — Genesis大改修P2前半: 自律ループ基盤＋営業AIループv1（DECISIONS #77）
+- feat(genesis): `gn_loops` / `gn_loop_runs` 新設（migration 0075・適用済）— 観測→判断→生成→実行→測定のサイクル記録
+- feat(genesis): 営業AIループv1 `lib/sales-loop.ts` — 体験予約の日割りペース不足を検知→掘り起こし配信文を生成→staff_directive(approval)で起案→ホームで承認→LINE配信依頼。日次cronに接続
+- docs: AI_RULES（承認UI=ホーム一本化・ループ正典・デプロイ方針）、DEVELOPMENT_RULES（GitHub直クローン・push後ビルド確認義務化）を改訂
+
 ## 2026-07-24 — Genesis大改修P1: 画面26→5＋管理・判断フィード統合（DECISIONS #76）
 - feat(genesis): サイドバーを5画面＋「管理」折りたたみに再編（sidebar.tsx: PRIMARY_NAV/ADMIN_NAV分離、mobile-nav追随）。既存URLは全温存
 - feat(genesis): ホーム全面刷新 — 判断フィード統合（`lib/judgment-feed.ts`新設）: 承認・AI実行(承認/取消枠)・成果物・問い合わせ・**体験申込(member-os)**・**Web入会**・**予約申込(reserve-os)** を1本にし、その場でワンタップ承認。体験申込の日程確定は `feed-actions.ts` decideTrialRequest（member-osと同status遷移）

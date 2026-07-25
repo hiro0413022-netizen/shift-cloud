@@ -69,8 +69,9 @@ C-0. ~~【#61の配線】自律実行 executor~~ **✅ 実装済み（#62 / migr
    - 動作確認: /executions →「テスト実行を入れる」→2分後に自動実行 or その場で「取消」。日次レポート生成後は「スタッフ朝連絡」が承認待ちで並ぶ→承認でLINE配信。
 C-1. ~~RUNBOOK未作成~~ **✅ 完了（2026-07-19 / #73）**: money-os / survey-os / reserve-os / caddy-os のRUNBOOK作成→各アプリ /manual 配信＋ログイン画面にリンク追加
 
-C-2. **Genesis大改修（#76・正典 REDESIGN_2026-07.md・P1実装済）** — 残フェーズ:
-   - **P2**: ループ基盤（gn_loops/gn_loop_runs・migration1本）＋営業AIループ（体験不足検知→掘り起こしLINE生成→承認→gn_line_outbox→n8n）＋開発自律化（prod_deployハンドラ=CIゲート→デプロイ承認カード→push＋Vercel MCP→ヘルスチェック→自動ロールバック）＋member-os/reserve-os承認ロジック共有関数化＋ルール文書改訂（§7）＋/chatと/commandの統合＋事業別を/financeへ移設＋朝の個人LINEダイジェスト・判断SLA（§10）
+C-2. **Genesis大改修（#76/#77・正典 REDESIGN_2026-07.md・P1＋P2前半実装済）** — 残フェーズ:
+   - ~~P2前半~~ **✅ 完了（2026-07-25 / #77）**: ループ基盤（0075）＋営業AIループv1（sales-loop.ts・日次cron接続）＋ルール改訂（AI_RULES/DEVELOPMENT_RULES）
+   - **P2後半**: 開発自律化（prod_deployハンドラ=CIゲート→デプロイ承認カード→ヘルスチェック→自動ロールバック。**要: Vercelトークン or デプロイフックURLのenv設定**）＋member-os/reserve-os承認ロジック共有関数化＋/chatと/commandの統合＋事業別を/financeへ移設＋OPERATIONS全面改訂＋朝の個人LINEダイジェスト・判断SLA（§10）
    - **P3**: 測定学習（配信→7日結果紐付け・CEO AI日次注入・未完了再指示）＋gn_eventsイベント一元化＋集計正典の共通lib化＋稼働化プログラム（週次利用数観測→2週ゼロで稼働化/凍結カード）＋AI週次成績表
 
 C-2. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI
