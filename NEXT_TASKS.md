@@ -71,10 +71,10 @@ C-1. ~~RUNBOOK未作成~~ **✅ 完了（2026-07-19 / #73）**: money-os / surve
 
 C-2. **Genesis大改修（#76/#77・正典 REDESIGN_2026-07.md・P1＋P2前半実装済）** — 残フェーズ:
    - ~~P2前半~~ **✅ 完了（2026-07-25 / #77）**: ループ基盤（0075）＋営業AIループv1（sales-loop.ts・日次cron接続）＋ルール改訂（AI_RULES/DEVELOPMENT_RULES）
-   - **P2後半**: 開発自律化（prod_deployハンドラ=CIゲート→デプロイ承認カード→ヘルスチェック→自動ロールバック。**要: Vercelトークン or デプロイフックURLのenv設定**）＋member-os/reserve-os承認ロジック共有関数化＋/chatと/commandの統合＋事業別を/financeへ移設＋OPERATIONS全面改訂＋朝の個人LINEダイジェスト・判断SLA（§10）
-   - **P3**: 測定学習（配信→7日結果紐付け・CEO AI日次注入・未完了再指示）＋gn_eventsイベント一元化＋集計正典の共通lib化＋稼働化プログラム（週次利用数観測→2週ゼロで稼働化/凍結カード）＋AI週次成績表
+   - ~~P2後半~~ **✅ 完了（2026-07-25 / #78）**: Web入会承認のホーム完結・判断SLA・/chatタブ統合・事業別を/financeへ・prod_deployハンドラ（VERCEL_DEPLOY_HOOKS env待ち=任意）・OPERATIONS改訂方針
+   - **P3**（次）: 測定学習（配信→7日結果紐付け・CEO AI日次注入・未完了再指示）＋gn_eventsイベント一元化＋集計正典の共通lib化＋稼働化プログラム（週次利用数観測→2週ゼロで稼働化/凍結カード）＋AI週次成績表＋朝の個人LINEダイジェスト（要A-4 LINEチャネル）
 
-C-2. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI
+C-3. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI
    - 確認事項（ユーザー）: WING NOTEに過去データのエクスポート機能があるか（あれば移行、なければ新規蓄積）
 
 C-3. **SaaS化（正典 docs/genesis/SAAS_PLAN.md）**: Phase S0＝FRUNK GOLF姫路を2店舗目テナントとして発行（ウィザードの要件出し） / AI設定コンシェルジュ試作（/concierge） / **リポジトリPrivate化が販売の前提**
@@ -164,4 +164,3 @@ C-9. **Shift Cloud 実運用フィードバック**の収集と改善バック�
 - ✅ Storage上限200MB・CRON_SECRET: ユーザー設定済み（実効性はB-1で最終判定）
 - ✅ 基盤アップグレード（2026-07-11）: packages/core移行・RUNBOOK・時給の月中変更（日付按分 #39）・KPIチェッカー・CI
 - ✅ Legal OS 本番稼働 + legal_ai 日次チェック（#40）／Money OS `mon_receipts` フェーズ1＋OCR（#41,#42）／Caddy OS（#46）／社内連絡 /notes（0040）
-                                                                                       

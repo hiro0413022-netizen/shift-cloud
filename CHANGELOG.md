@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-25 — Genesis大改修P2後半: 判断のホーム完結拡大＋開発自律化配線（DECISIONS #78）
+- feat(genesis): Web入会承認をホームで完結（decideJoinRequest=会員番号FR####発行・在籍化）。判断SLA=24時間放置に琥珀バッジ＋最上位昇格
+- feat(genesis): /chatと/commandをタブ統合（chat-tabs.tsx）。事業別パフォーマンスをホーム→/financeへ移設
+- feat(genesis): prod_deployハンドラ（VERCEL_DEPLOY_HOOKS env・承認後にDeploy Hook POST。env未設定時は明示エラー）
+- docs: OPERATIONS改訂方針（ユーザー作業は原則AI実行・残るのは4種のみ）
+
 ## 2026-07-25 — Genesis大改修P2前半: 自律ループ基盤＋営業AIループv1（DECISIONS #77）
 - feat(genesis): `gn_loops` / `gn_loop_runs` 新設（migration 0075・適用済）— 観測→判断→生成→実行→測定のサイクル記録
 - feat(genesis): 営業AIループv1 `lib/sales-loop.ts` — 体験予約の日割りペース不足を検知→掘り起こし配信文を生成→staff_directive(approval)で起案→ホームで承認→LINE配信依頼。日次cronに接続

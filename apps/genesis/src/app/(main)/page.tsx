@@ -1,34 +1,26 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireGenesisActor } from "@/lib/auth";
-import {
-  getCockpitData,
-  computeGenesisScore,
-  applyJudgmentPenalties,
-  buildJudgmentList,
-  getBusinessBreakdown,
-} from "@/lib/kernel";
+import { getCockpitData, computeGenesisScore, applyJudgmentPenalties, buildJudgmentList } from "@/lib/kernel";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { getOpenSuggestions } from "@/lib/suggestions";
 import { getJudgmentFeed, type JudgmentItem } from "@/lib/judgment-feed";
 import { Panel, Badge, Empty, fmtDate, KpiCard } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
-import { BusinessBreakdown } from "@/components/business-breakdown";
 import { decideApproval } from "./approvals/actions";
 import { approveActionForm, rejectActionForm, cancelActionForm } from "./executions/actions";
 import { reviewDeliverable } from "./deliverables/actions";
 import { approveInquiry } from "./inbox/actions";
-import { decideTrialRequest } from "./feed-actions";
+import { decideTrialRequest, decideJoinRequest } from "./feed-actions";
 
 export const dynamic = "force-dynamic";
 
 // REDESIGN_2026-07 §3-1: ホーム = スコア＋一言 / 判断フィード（その場で完結） / 5大KPI / AI活動ティッカー
 export default async function HomePage() {
   const actor = await requireGenesisActor();
-  const [d, business, suggestions, feed] = await Promise.all([
+  const [d, suggestions, feed] = await Promise.all([
     getCockpitData(actor.companyId),
-    getBusinessBreakdown(actor.companyId),
     getOpenSuggestions(actor.companyId, 3).catch(() => []),
     getJudgmentFeed(actor.companyId).catch(() => [] as JudgmentItem[]),
   ]);
@@ -128,7 +120,7 @@ export default async function HomePage() {
 
             {/* 統合フィード */}
             {decisionItems.map((f) => (
-              <FeedCard key={`${f.source}-${f.id}`} tag={f.tag} title={f.title} detail={f.detail} href={f.href}>
+              <FeedCard key={`${f.source}-${f.id}`} tag={f.tag} title={f.title} detail={f.detail} href={f.href} stale={f.stale}>
                 {f.source === "queue" && (
                   <div className="flex gap-2">
                     <form action={rejectActionForm}>
@@ -164,7 +156,14 @@ export default async function HomePage() {
                     <button name="decision" value="confirmed" className="btn-main">日程を確定</button>
                   </form>
                 )}
-                {(f.source === "join" || f.source === "reserve") && f.href && (
+                {f.source === "join" && (
+                  <form action={decideJoinRequest} className="flex gap-2">
+                    <input type="hidden" name="id" value={f.id} />
+                    <button name="decision" value="rejected" className="btn-sub">却下</button>
+                    <button name="decision" value="approved" className="btn-main">承認して会員番号発行</button>
+                  </form>
+                )}
+                {f.source === "reserve" && f.href && (
                   <a href={f.href} target="_blank" rel="noreferrer" className="btn-sub">
                     開いて対応 →
                   </a>
@@ -204,16 +203,6 @@ export default async function HomePage() {
         ))}
       </div>
 
-      {/* 事業別（P2で「数字」へ移設予定） */}
-      <Panel title="事業別パフォーマンス">
-        <BusinessBreakdown
-          segments={business.segments}
-          monthLabel={business.monthLabel}
-          forecastMonthLabel={business.forecastMonthLabel}
-          forecastTotal={business.forecastTotal}
-        />
-      </Panel>
-
       {/* AI活動ティッカー */}
       <Panel title="AIの動き" action={<Link href="/agents" className="text-xs text-sky-300 hover:underline">AI社員を見る →</Link>}>
         {ticker.length === 0 ? (
@@ -238,17 +227,24 @@ function FeedCard({
   title,
   detail,
   href,
+  stale,
   children,
 }: {
   tag: string;
   title: string;
   detail: string | null;
   href: string | null;
+  stale?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3">
+    <div
+      className={`flex flex-wrap items-center gap-3 rounded-xl border px-4 py-3 ${
+        stale ? "border-amber-700/50 bg-(--color-panel-2)" : "border-(--color-line) bg-(--color-panel-2)"
+      }`}
+    >
       <Badge tone="accent">{tag}</Badge>
+      {stale && <Badge tone="warn">24時間経過</Badge>}
       <div className="min-w-[180px] flex-1">
         <p className="text-sm">{title}</p>
         {detail && <p className="mt-0.5 line-clamp-2 text-xs text-(--color-dim)">{detail}</p>}

@@ -41,7 +41,10 @@ export const ADMIN_NAV = [
 export const NAV = [...PRIMARY_NAV, ...ADMIN_NAV];
 
 function itemActive(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  if (href === "/") return pathname === "/";
+  // チャット(/chat)は /command（CEO AI司令室タブ）でもアクティブ扱い（#78 §3-2統合）
+  if (href === "/chat") return pathname.startsWith("/chat") || pathname.startsWith("/command");
+  return pathname.startsWith(href);
 }
 
 function NavLink({ item, active }: { item: (typeof NAV)[number]; active: boolean }) {

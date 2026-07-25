@@ -205,6 +205,32 @@ const HANDLERS: Record<string, Handler> = {
   // スタッフへ連絡 / 定型LINE一斉配信（auto_undoの猶予後に実送信）
   staff_directive: async ({ admin, row }) => sendStaffLine(admin, row),
   line_broadcast: async ({ admin, row }) => sendStaffLine(admin, row),
+  // 本番デプロイ（#78 / REDESIGN §6）: 承認後にVercel Deploy Hookを叩いて再デプロイ。
+  // env VERCEL_DEPLOY_HOOKS = {"yozan-genesis":"https://api.vercel.com/v1/integrations/deploy/..."} 形式。
+  // 未設定プロジェクトは明示エラー（安全側）。通常の新規デプロイは git push で自動なので、
+  // このハンドラは env反映・再デプロイ・ロールバック起点用。
+  prod_deploy: async ({ row }) => {
+    const raw = process.env.VERCEL_DEPLOY_HOOKS ?? "{}";
+    let hooks: Record<string, string> = {};
+    try {
+      hooks = JSON.parse(raw) as Record<string, string>;
+    } catch {
+      throw new Error("VERCEL_DEPLOY_HOOKS のJSONが不正です");
+    }
+    const project = String(row.payload.project ?? "");
+    const url = hooks[project];
+    if (!project) throw new Error("payload.project が未指定です");
+    if (!url) throw new Error(`デプロイフック未設定: ${project}（Vercel→Settings→Git→Deploy Hooks でURLを作成し、env VERCEL_DEPLOY_HOOKS に追加）`);
+    const res = await fetch(url, { method: "POST" });
+    if (!res.ok) throw new Error(`deploy hook 失敗: HTTP ${res.status}`);
+    await logEvent(row.company_id, {
+      event_type: "ai.prod_deploy",
+      title: `本番デプロイを実行: ${project}`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { project, triggered: true };
+  },
 };
 
 export function hasHandler(actionType: string): boolean {

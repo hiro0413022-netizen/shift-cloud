@@ -31,6 +31,8 @@ export type JudgmentItem = {
   scheduledAt: string | null;
   /** inquiry: AI下書きがあり、その場で承認送信できるか */
   hasDraft?: boolean;
+  /** 判断SLA（#78・REDESIGN §10-2）: 24時間以上放置されている */
+  stale?: boolean;
 };
 
 const AGENT_LABEL: Record<string, string> = {
@@ -171,7 +173,7 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       source: "join",
       tag: "Web入会",
       title: `${s(r.name) ?? "お客様"} 様の入会申込（FRANK）`,
-      detail: "承認＝会員番号発行はmember-osで実行",
+      detail: "承認すると会員番号を発行して在籍化します",
       createdAt: s(r.created_at),
       href: `${MEMBER_OS_URL}/frunk`,
       scheduledAt: null,
@@ -191,9 +193,15 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
     });
   }
 
-  // 古い順（待たせている順）に。undoは実行が近い順で先頭へ。
+  // 判断SLA（#78）: 24時間以上放置は stale フラグ＋最上位へ昇格
+  const staleLine = new Date(Date.now() - 24 * 3600_000).toISOString();
+  for (const it of items) {
+    if (it.source !== "undo" && it.createdAt && it.createdAt < staleLine) it.stale = true;
+  }
+  // undo（実行予定）→ stale（放置）→ 古い順
   items.sort((a, b) => {
     if ((a.source === "undo") !== (b.source === "undo")) return a.source === "undo" ? -1 : 1;
+    if (Boolean(a.stale) !== Boolean(b.stale)) return a.stale ? -1 : 1;
     return (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
   });
   return items;
