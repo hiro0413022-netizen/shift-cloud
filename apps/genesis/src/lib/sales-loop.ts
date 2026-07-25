@@ -59,11 +59,73 @@ function buildMessage(): string {
   ].join("\n");
 }
 
+/**
+ * 測定（P3 / #82）: act から7日経過した run の結果を実測して result に書き、
+ * CEO AI・ホームのティッカーに「打ち手→結果」を流す。学習の材料。
+ */
+async function measurePastRuns(admin: Admin, companyId: string): Promise<number> {
+  const cutoff = jstYmd(new Date(Date.now() - 7 * 24 * 3600_000));
+  const { data: runs } = await admin
+    .from("gn_loop_runs")
+    .select("id, run_date")
+    .eq("company_id", companyId)
+    .eq("decision", "act")
+    .is("result", null)
+    .lte("run_date", cutoff)
+    .limit(5);
+  let measured = 0;
+  for (const run of runs ?? []) {
+    const start = `${String(run.run_date)}T00:00:00+09:00`;
+    const endDate = new Date(new Date(`${String(run.run_date)}T00:00:00+09:00`).getTime() + 7 * 24 * 3600_000);
+    const end = endDate.toISOString();
+    const [bk, rq, rep] = await Promise.all([
+      admin
+        .from("mbr_trial_bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .gte("created_at", start)
+        .lt("created_at", end),
+      admin
+        .from("mbr_trial_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .gte("created_at", start)
+        .lt("created_at", end),
+      admin
+        .from("sec_inquiries")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .eq("source", "line")
+        .eq("inquiry_type", "trial")
+        .gte("received_at", start)
+        .lt("received_at", end),
+    ]);
+    const trials = (bk.count ?? 0) + (rq.count ?? 0);
+    const replies = rep.count ?? 0;
+    await admin
+      .from("gn_loop_runs")
+      .update({ result: { trials_7d: trials, line_trial_replies_7d: replies, measured_at: new Date().toISOString() } })
+      .eq("id", run.id);
+    await logEvent(companyId, {
+      event_type: "ai.sales_loop_result",
+      title: `営業AI測定: ${String(run.run_date)}配信の7日間で体験申込${trials}件・LINE体験返信${replies}件`,
+      source: "sales_loop",
+      source_type: "ai",
+    });
+    measured += 1;
+  }
+  return measured;
+}
+
 export async function runSalesLoop(companyId: string): Promise<Record<string, unknown>> {
   const admin = createAdmin();
   const loop = await ensureLoop(admin, companyId);
   if (!loop) return { skipped: "loop_init_failed" };
   if (loop.enabled === false) return { skipped: "disabled" };
+
+  // 先に過去の打ち手を測定（P3: 実行→測定→学習のループを閉じる）
+  const measured = await measurePastRuns(admin, companyId).catch(() => 0);
+  void measured;
 
   const today = jstYmd();
   const { data: existing } = await admin

@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## 2026-07-25 — Genesis大改修P3前半: 測定学習＋稼働化プログラム（DECISIONS #82）
+- feat(genesis): 営業ループの自動測定 — 配信7日後の体験申込・LINE体験返信を gn_loop_runs.result に実測保存し「打ち手→結果」をティッカーへ
+- feat(genesis): 稼働化プログラム（activation-loop.ts・毎週月曜）— reserve/survey/lesson/legal の14日利用ゼロを検知し「稼働化 or 凍結」の改善提案を自動起票
+
 ## 2026-07-25 — LINE受信webhook＋デプロイフックDB化（A-4完全解消・DECISIONS #81）
 - feat(genesis): `/api/webhooks/line/[code]` — 署名検証つきLINE受信。返信をsec_inquiriesへ取込→ホーム判断フィードに自動合流。「体験」返信はtrial/high扱い＋イベント記録
 - feat(genesis): gn_deploy_hooks（migration 0077・URLはDB直登録）。prod_deployハンドラをDB参照優先に変更（env不要化）
