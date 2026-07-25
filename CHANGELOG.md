@@ -1,6 +1,7 @@
 # CHANGELOG
 
-## 2026-07-26 — FRANK 打席予約v1（DECISIONS #86）
+## 2026-07-26 — FRANK 打席予約v1＋設定汎用化（DECISIONS #86/#87）
+- feat(genesis): /site-adminに「予約設定」（営業時間・定休曜日・祝日・臨時休業・枠単位・予約可能日数を保存→即反映）
 - feat(frank): 予約DB（0081 frunk_bays/frunk_bookings・二重予約はunique indexで防止）
 - feat(genesis): 公開予約API /api/public/frank/booking（空き照会・予約・キャンセル・プラン上限enforcement）
 - feat(site): booking.html（会員番号+電話下4桁で予約→キャンセルまでWeb完結）
