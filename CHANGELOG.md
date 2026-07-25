@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 2026-07-25 — LINE受信webhook＋デプロイフックDB化（A-4完全解消・DECISIONS #81）
+- feat(genesis): `/api/webhooks/line/[code]` — 署名検証つきLINE受信。返信をsec_inquiriesへ取込→ホーム判断フィードに自動合流。「体験」返信はtrial/high扱い＋イベント記録
+- feat(genesis): gn_deploy_hooks（migration 0077・URLはDB直登録）。prod_deployハンドラをDB参照優先に変更（env不要化）
+- chore: channel secret 3本・genesis Deploy Hook をDBに登録（SQL直・git非掲載）
+
 ## 2026-07-25 — 顧客LINE直接配信を開通（A-4解消・DECISIONS #80）
 - feat(genesis): gn_line_channels（migration 0076・トークンはDB直seed=gitに載せない）＋lib/line.ts（broadcast/push）
 - feat(genesis): line_broadcastハンドラを実配信化（顧客向けOAへbroadcast・履歴はoutboxにstatus=sentで記録）。営業ループの起案を顧客直接配信（ビジター用・approval維持）へ切替

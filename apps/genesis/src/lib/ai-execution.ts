@@ -235,18 +235,27 @@ const HANDLERS: Record<string, Handler> = {
   // env VERCEL_DEPLOY_HOOKS = {"yozan-genesis":"https://api.vercel.com/v1/integrations/deploy/..."} 形式。
   // 未設定プロジェクトは明示エラー（安全側）。通常の新規デプロイは git push で自動なので、
   // このハンドラは env反映・再デプロイ・ロールバック起点用。
-  prod_deploy: async ({ row }) => {
-    const raw = process.env.VERCEL_DEPLOY_HOOKS ?? "{}";
-    let hooks: Record<string, string> = {};
-    try {
-      hooks = JSON.parse(raw) as Record<string, string>;
-    } catch {
-      throw new Error("VERCEL_DEPLOY_HOOKS のJSONが不正です");
-    }
+  prod_deploy: async ({ admin, row }) => {
     const project = String(row.payload.project ?? "");
-    const url = hooks[project];
     if (!project) throw new Error("payload.project が未指定です");
-    if (!url) throw new Error(`デプロイフック未設定: ${project}（Vercel→Settings→Git→Deploy Hooks でURLを作成し、env VERCEL_DEPLOY_HOOKS に追加）`);
+    // 第一候補=DB（gn_deploy_hooks・0077・SQLで登録＝envもgitも触らない）、フォールバック=env
+    let url: string | undefined;
+    const { data: hookRow } = await admin
+      .from("gn_deploy_hooks")
+      .select("hook_url")
+      .eq("company_id", row.company_id)
+      .eq("project", project)
+      .eq("enabled", true)
+      .maybeSingle();
+    url = hookRow?.hook_url ? String(hookRow.hook_url) : undefined;
+    if (!url) {
+      try {
+        url = (JSON.parse(process.env.VERCEL_DEPLOY_HOOKS ?? "{}") as Record<string, string>)[project];
+      } catch {
+        /* env未設定は無視 */
+      }
+    }
+    if (!url) throw new Error(`デプロイフック未登録: ${project}（gn_deploy_hooks にSQLで登録）`);
     const res = await fetch(url, { method: "POST" });
     if (!res.ok) throw new Error(`deploy hook 失敗: HTTP ${res.status}`);
     await logEvent(row.company_id, {

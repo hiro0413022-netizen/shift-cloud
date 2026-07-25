@@ -42,7 +42,8 @@ A-3. **Reserve OS の通しテスト** — `res_requests` **0件**＝一度も�
    - 通ったら 公式LINEのリッチメニュー/トークに `/reserve/shaft-fitting` を掲出
 
 A-4. ~~LINE公式アカウント Phase 0~~ **✅ 送信側 開通（2026-07-25 / #80）**: 長期トークン3本（スタッフ/GWビジター/GW会員）受領→ gn_line_channels(0076) に保存済・line_broadcast実配信化・営業ループが顧客直接配信に切替済
-   - **残: channel secret の発行＋webhook設定**（「体験希望」等の返信を自動で受け取る受信側。LINE Developersコンソール→各チャネル→Messaging API→channel secret をClaudeへ）
+   - ~~channel secret＋webhook実装~~ **✅ 実装済（#81）**: secret3本受領・`/api/webhooks/line/[code]` 稼働
+   - **残（ユーザー・各1分）: LINE DevelopersコンソールでWebhook URLを設定** — 各チャネルの Messaging API設定 → Webhook URL に `https://yozan-genesis.vercel.app/api/webhooks/line/staff`（スタッフ用）/ `.../gw_visitor`（ビジター用）/ `.../gw_member`（会員用）を貼り「Webhookの利用」をON→「検証」
 
 A-5. **営業利益の目標値** — 5大KPIのうち営業利益だけ target が未設定（会員数/入会率/退会率/月次売上は設定済）
 
