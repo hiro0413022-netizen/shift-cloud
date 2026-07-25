@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-24 — Genesis大改修P1: 画面26→5＋管理・判断フィード統合（DECISIONS #76）
+- feat(genesis): サイドバーを5画面＋「管理」折りたたみに再編（sidebar.tsx: PRIMARY_NAV/ADMIN_NAV分離、mobile-nav追随）。既存URLは全温存
+- feat(genesis): ホーム全面刷新 — 判断フィード統合（`lib/judgment-feed.ts`新設）: 承認・AI実行(承認/取消枠)・成果物・問い合わせ・**体験申込(member-os)**・**Web入会**・**予約申込(reserve-os)** を1本にし、その場でワンタップ承認。体験申込の日程確定は `feed-actions.ts` decideTrialRequest（member-osと同status遷移）
+- style(genesis): ホームからHUD/blink装飾を撤去（REDESIGN §9: 色=状態のみ・1カード=1判断・ゼロ状態表示・取消チップ）。btn-main/btn-subをglobals.cssに追加
+- docs: REDESIGN_2026-07.md（大改修の正典・全システム監査§5e含む）を新規作成
+
 ## 2026-07-19 — JST日付統一・現場マニュアル4本・ネットワークマップ同期（DECISIONS #73）
 - fix(genesis): サーバー側の「今日」をJSTに統一（`lib/jst.ts` 新設）。日次レポートのタイトル日付が毎朝1日ズレていたのを解消（6:00 JST cron＝前日21:00 UTC問題）。sp_tasksの日付・提案dedupeキー・KPIチェックの当月判定も同修正。tests/jst-dates.test.ts で固定
 - docs(runbook): money-os / survey-os / reserve-os / caddy-os の現場手順書を新規作成（C-1完了）。各アプリ `/manual`（ログイン不要）で配信、ログイン画面にリンク追加

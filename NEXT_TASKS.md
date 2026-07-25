@@ -13,7 +13,7 @@ A-0. **FRANK GOLF ホームページの未確定情報を埋める**（`sites/fr
    - **体験予約URL**（`links.trialBooking`）— member-os →「予約（姫路）」→【お客様Web予約URLを発行】で取得して貼る。**未設定の間は体験予約ボタンが公式LINEへ自動フォールバック**します
    - 決まっていない項目は null のままで問題ありません（勝手な数字は出しません）
 
-A-0e. **member-os をデプロイ**（体験予約・Web入会の公開ページを本番反映）— DB(migration 0068)は適用済・コードは実装済で**あとはデプロイのみ**
+A-0e. ~~member-os をデプロイ~~ **✅ 完了確認（2026-07-24 / #76）**: `/trial` は本番稼働中（体験申込0件の原因は導線でなく集客＝P2営業ループで対応）。以下は参考として残す
    - 新規ルート: `/trial`（体験申込・公開）／`/join-web`（Web入会申込・公開）／スタッフ `/trials`（体験申込一覧・ナビ「体験申込」）
    - デプロイ = member-os のGitに push → Vercel(member-os)が自動ビルド（envは既存のまま／追加不要）
    - デプロイ後: HPの「体験を申し込む」→ `/trial`、「Webで入会」→ `/join-web` が有効化（site-data設定済）
@@ -68,6 +68,10 @@ C-0. ~~【#61の配線】自律実行 executor~~ **✅ 実装済み（#62 / migr
    - **残: (d) `prod_deploy`** を Vercel MCP に接続（承認後にClaudeがデプロイ）。
    - 動作確認: /executions →「テスト実行を入れる」→2分後に自動実行 or その場で「取消」。日次レポート生成後は「スタッフ朝連絡」が承認待ちで並ぶ→承認でLINE配信。
 C-1. ~~RUNBOOK未作成~~ **✅ 完了（2026-07-19 / #73）**: money-os / survey-os / reserve-os / caddy-os のRUNBOOK作成→各アプリ /manual 配信＋ログイン画面にリンク追加
+
+C-2. **Genesis大改修（#76・正典 REDESIGN_2026-07.md・P1実装済）** — 残フェーズ:
+   - **P2**: ループ基盤（gn_loops/gn_loop_runs・migration1本）＋営業AIループ（体験不足検知→掘り起こしLINE生成→承認→gn_line_outbox→n8n）＋開発自律化（prod_deployハンドラ=CIゲート→デプロイ承認カード→push＋Vercel MCP→ヘルスチェック→自動ロールバック）＋member-os/reserve-os承認ロジック共有関数化＋ルール文書改訂（§7）＋/chatと/commandの統合＋事業別を/financeへ移設＋朝の個人LINEダイジェスト・判断SLA（§10）
+   - **P3**: 測定学習（配信→7日結果紐付け・CEO AI日次注入・未完了再指示）＋gn_eventsイベント一元化＋集計正典の共通lib化＋稼働化プログラム（週次利用数観測→2週ゼロで稼働化/凍結カード）＋AI週次成績表
 
 C-2. **Lesson OS 後続**: P2b＝GOLF WING Finder連携（コメントに診断ナレッジ）・会員名簿突合・KPI接続 / P3＝Trackman CSV取込・レッスンAI
    - 確認事項（ユーザー）: WING NOTEに過去データのエクスポート機能があるか（あれば移行、なければ新規蓄積）

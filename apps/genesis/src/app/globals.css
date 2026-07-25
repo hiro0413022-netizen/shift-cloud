@@ -159,6 +159,37 @@ body::before {
 }
 
 /* ============================================================
+   判断フィードのボタン（REDESIGN_2026-07 §9-1: 1カード=1判断・大きな承認ボタン）
+   ============================================================ */
+.btn-main {
+  border-radius: 0.5rem;
+  background: var(--color-accent);
+  color: #07090f;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.45rem 0.9rem;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+.btn-main:hover {
+  opacity: 0.85;
+}
+.btn-sub {
+  border-radius: 0.5rem;
+  border: 1px solid var(--color-line);
+  color: var(--color-dim);
+  font-size: 0.8rem;
+  padding: 0.45rem 0.9rem;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+  display: inline-block;
+}
+.btn-sub:hover {
+  background: var(--color-panel-2);
+  color: var(--color-txt);
+}
+
+/* ============================================================
    アクセシビリティ: 動きを減らす設定を尊重
    ============================================================ */
 @media (prefers-reduced-motion: reduce) {
