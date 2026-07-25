@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "crypto";
+import { memberStats } from "@yozan/core/members";
 import { createAdmin } from "@/lib/supabase/admin";
 
 /**
@@ -153,20 +154,15 @@ export async function getStoreKpis(companyId: string, store: StoreInfo, ym: stri
   // --- 会員（在籍・今月入会/退会） ---
   let memberCard: KpiCard;
   if (gw) {
-    // kernel.ts getBusinessBreakdown と同ロジック（スタッフ除外・トライアル区別）
+    // 会員集計の正典は @yozan/core/members（#84・kernel.tsと共通）
     const { data: rows } = await admin
       .from("mbr_members")
       .select("member_type, join_date, leave_date");
-    const inMonth = (d: string | null) => !!d && d >= from && d < to;
-    let active = 0, joins = 0, leavesCore = 0, leavesTrial = 0;
-    for (const m of (rows ?? []) as { member_type: string | null; join_date: string | null; leave_date: string | null }[]) {
-      const type = m.member_type ?? "";
-      if (type === "スタッフ") continue;
-      const isTrial = type === "トライアル会員";
-      if (!m.leave_date && !isTrial) active++;
-      if (inMonth(m.join_date) && !isTrial) joins++;
-      if (inMonth(m.leave_date)) isTrial ? leavesTrial++ : leavesCore++;
-    }
+    const { active, joins, leavesCore, leavesTrial } = memberStats(
+      (rows ?? []) as { member_type: string | null; join_date: string | null; leave_date: string | null }[],
+      from,
+      to,
+    );
     memberCard = { title: "会員（本会員）", value: `${active}人`, sub: `${monthLabel}入会 ${joins}・退会 ${leavesCore}（ﾄﾗｲｱﾙ退会 ${leavesTrial}）` };
   } else {
     const { data: rows } = await admin

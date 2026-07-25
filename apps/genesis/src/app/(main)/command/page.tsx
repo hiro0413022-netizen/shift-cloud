@@ -5,6 +5,7 @@ import { getInquiryStats } from "@/lib/secretary";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, StatusDot, Empty, Field, inputCls, btnCls, severityTone, fmtDate } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
+import { ChatTabs } from "@/components/chat-tabs";
 import { generatePrompt, generateDailyReport, refreshKpis, updateKpiManual } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function CommandPage() {
 
   return (
     <div className="space-y-4">
+      <ChatTabs active="command" />
       <header className="reveal flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">CEO AI Command Center</h1>

@@ -36,6 +36,12 @@
 >
 > **生成側（#63）**: ①CEO AI日次が「スタッフ朝連絡」を staff_directive で投入（試運転=approval→/executionsで承認後にLINE配信）②CEO AIの各指示を agent_directive で配布（auto・内部）③/deliverables で成果物を承認すると internal_notify を投入（送信チャネル未接続のため現状は手動対応の記録・可視化。チャネル接続後に実送信へ差し替え）。試運転として staff_directive/line_broadcast/sns_post は approval に退避中（信頼できたら `ai_execution_policies` で auto_undo に戻す）。
 
+> **承認UIの一本化（#76 / REDESIGN_2026-07）**: approvalの承認・却下は**ホーム（/）の判断フィードでワンタップ**が正。/executions・/approvals等の個別画面は「管理」配下の詳細用として残置。
+>
+> **自律ループ（#77）**: `gn_loops` / `gn_loop_runs`（0075）が観測→判断→生成→実行→測定の記録単位。第一弾=営業ループ `sales_trial_recovery`（`lib/sales-loop.ts`・日次cron）: 体験不足を検知→配信文を生成→ staff_directive(approval) で起案→ホームで承認→gn_line_outbox→n8n。顧客LINE直送はチャネル開通（A-4）後に line_broadcast へ切替。
+>
+> **デプロイ（REDESIGN §6・実装はP2続き）**: `prod_deploy` は approval 維持のまま**承認をホームのデプロイ承認カードに一本化**する方針。CIゲート（tsc/tests通過）を承認カードの前提とし、デプロイ後ヘルスチェック失敗時は自動ロールバック。安定稼働1か月後に auto_undo(30分) への緩和を再検討。
+
 ## 将来の提案生成（Phase 6以降）
 
 - ルールベース（SQL集計 + n8n cron）から開始 → LLM分析は後段

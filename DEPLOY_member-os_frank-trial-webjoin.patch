@@ -1,0 +1,1140 @@
+From 940da95ca8214025d00a97ee6f980f33f5d379c9 Mon Sep 17 00:00:00 2001
+From: "Hiro (YOZAN)" <hiro0413022@gmail.com>
+Date: Tue, 21 Jul 2026 00:50:36 +0900
+Subject: [PATCH] =?UTF-8?q?feat(member-os):=20=E4=BD=93=E9=A8=93=E4=BA=88?=
+ =?UTF-8?q?=E7=B4=84(/trial)=E3=83=BBWeb=E5=85=A5=E4=BC=9A(/join-web)?=
+ =?UTF-8?q?=E3=82=92=E8=BF=BD=E5=8A=A0=EF=BC=8BFRANK=20GOLF=E8=A1=A8?=
+ =?UTF-8?q?=E8=A8=98=E7=B5=B1=E4=B8=80?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- 公開ページ /trial（体験申込・トークン不要）＋スタッフ /trials（申込一覧）
+- 公開ページ /join-web（Web入会申込・プラン選択・既存frunk承認フローに合流）
+- 会員規約/プライバシー同意リンク（lib/site.ts の SITE_URL で制御）
+- 表示ブランドを FRUNK GOLF → FRANK GOLF に統一（識別子は据え置き）
+- migration 0067(店舗名rename)/0068(体験テーブル＋料金プラン投入)
+
+DECISIONS #66-73 / DB適用済
+---
+ apps/member-os/public/manual.md               |  12 +-
+ .../member-os/src/app/(main)/frunk/actions.ts |   2 +-
+ apps/member-os/src/app/(main)/frunk/page.tsx  |   4 +-
+ .../src/app/(main)/reservations/actions.ts    |   4 +-
+ .../src/app/(main)/reservations/page.tsx      |   4 +-
+ .../src/app/(main)/trials/actions.ts          |  42 +++++
+ apps/member-os/src/app/(main)/trials/page.tsx | 111 +++++++++++++
+ apps/member-os/src/app/board/[token]/page.tsx |   2 +-
+ apps/member-os/src/app/book/[token]/page.tsx  |   2 +-
+ apps/member-os/src/app/join-web/actions.ts    |  79 ++++++++++
+ apps/member-os/src/app/join-web/page.tsx      |  41 +++++
+ .../src/app/join-web/web-join-form.tsx        | 146 ++++++++++++++++++
+ .../member-os/src/app/join/[token]/actions.ts |   4 +-
+ apps/member-os/src/app/join/[token]/page.tsx  |   2 +-
+ apps/member-os/src/app/member/login/page.tsx  |   2 +-
+ apps/member-os/src/app/member/page.tsx        |   2 +-
+ .../src/app/member/register/page.tsx          |   2 +-
+ apps/member-os/src/app/trial/actions.ts       |  58 +++++++
+ apps/member-os/src/app/trial/page.tsx         |  30 ++++
+ apps/member-os/src/app/trial/trial-form.tsx   | 105 +++++++++++++
+ apps/member-os/src/components/nav.tsx         |   3 +-
+ apps/member-os/src/lib/frunk.ts               |   2 +-
+ apps/member-os/src/lib/member.ts              |   2 +-
+ apps/member-os/src/lib/reservation.ts         |   2 +-
+ apps/member-os/src/lib/site.ts                |  13 ++
+ apps/member-os/src/lib/trial.ts               |  23 +++
+ .../migrations/0067_frank_golf_rename.sql     |  27 ++++
+ .../0068_trial_requests_and_frank_plans.sql   |  63 ++++++++
+ 28 files changed, 764 insertions(+), 25 deletions(-)
+ create mode 100644 apps/member-os/src/app/(main)/trials/actions.ts
+ create mode 100644 apps/member-os/src/app/(main)/trials/page.tsx
+ create mode 100644 apps/member-os/src/app/join-web/actions.ts
+ create mode 100644 apps/member-os/src/app/join-web/page.tsx
+ create mode 100644 apps/member-os/src/app/join-web/web-join-form.tsx
+ create mode 100644 apps/member-os/src/app/trial/actions.ts
+ create mode 100644 apps/member-os/src/app/trial/page.tsx
+ create mode 100644 apps/member-os/src/app/trial/trial-form.tsx
+ create mode 100644 apps/member-os/src/lib/site.ts
+ create mode 100644 apps/member-os/src/lib/trial.ts
+ create mode 100755 supabase/migrations/0067_frank_golf_rename.sql
+ create mode 100755 supabase/migrations/0068_trial_requests_and_frank_plans.sql
+
+diff --git a/apps/member-os/public/manual.md b/apps/member-os/public/manual.md
+index 890bced..ca11b42 100755
+--- a/apps/member-os/public/manual.md
++++ b/apps/member-os/public/manual.md
+@@ -1,6 +1,6 @@
+ # RUNBOOK — 体験受付・会員（member-os）現場手順書
+ 
+-対象: GOLF WING 受付スタッフ（PCに詳しくなくてOK）。FRUNK GOLF 姫路の担当者は §7・§8 も。
++対象: GOLF WING 受付スタッフ（PCに詳しくなくてOK）。FRANK GOLF 姫路の担当者は §7・§8 も。
+ URL: https://member-os-tau.vercel.app （ホーム画面にアイコン登録しておくと楽です）
+ 
+ ---
+@@ -12,8 +12,8 @@ URL: https://member-os-tau.vercel.app （ホーム画面にアイコン登録し
+ | 受付台帳 | GOLF WING 受付 | 来店したお客様の受付・追記・入会チェック（→ §2〜§5） |
+ | ダッシュボード | 受付・本部 | 体験→入会率・フィッティング→購入率・会員数の当月実績（→ §6） |
+ | 体験フォロー | GOLF WING 受付 | 体験から約1週間後のフォロー漏れを防ぐ（→ §6.5） |
+-| 予約（姫路） | FRUNK GOLF | 予約の作成・一覧・お客様Web予約URLの発行（→ §7） |
+-| FRUNK会員 | FRUNK GOLF | 会員一覧とプラン管理（→ §8） |
++| 予約（姫路） | FRANK GOLF | 予約の作成・一覧・お客様Web予約URLの発行（→ §7） |
++| FRANK会員 | FRANK GOLF | 会員一覧とプラン管理（→ §8） |
+ | データ取込 | 本部（古川さん） | Smart Hello のExcelを取り込んでKPIを更新（→ §9） |
+ 
+ ## 1. ログインする
+@@ -62,15 +62,15 @@ URL: https://member-os-tau.vercel.app （ホーム画面にアイコン登録し
+ 3. 連絡したら**フォロー内容を書いて保存**（例:「公式LINEで再来案内・入会検討中」）
+ 4. 「フォロー対象はありません 🎉」になればその日は完了
+ 
+-## 7. 予約（FRUNK GOLF 姫路）
++## 7. 予約（FRANK GOLF 姫路）
+ 
+ 1. 「予約（姫路）」を開く → 日付を選ぶ
+ 2. 電話・店頭の予約は【予約を作成】から入力
+ 3. お客様に自分で取ってもらう場合は【お客様Web予約URLを発行】→ **URLは一度しか表示されません**。QRにして掲示 or HPに載せる（発行し直しは何度でも可）
+ 
+-## 8. FRUNK会員
++## 8. FRANK会員
+ 
+-- 「FRUNK会員」で会員一覧（レギュラー / 休会 など）とプラン管理
++- 「FRANK会員」で会員一覧（レギュラー / 休会 など）とプラン管理
+ - プランが未登録だと会員に紐付けられません。先に【プランを追加】
+ 
+ ## 9. データ取込（本部・古川さん）
+diff --git a/apps/member-os/src/app/(main)/frunk/actions.ts b/apps/member-os/src/app/(main)/frunk/actions.ts
+index b6674a9..8f10ecb 100644
+--- a/apps/member-os/src/app/(main)/frunk/actions.ts
++++ b/apps/member-os/src/app/(main)/frunk/actions.ts
+@@ -137,7 +137,7 @@ export async function issueSignupToken(formData: FormData) {
+   const raw = generateToken();
+   await admin.from("frunk_signup_tokens").insert({
+     company_id: actor.companyId, store_id: storeId,
+-    token_hash: hashToken(raw), label: orNull(formData.get("label")) ?? "FRUNK 入会タブレット",
++    token_hash: hashToken(raw), label: orNull(formData.get("label")) ?? "FRANK 入会タブレット",
+   });
+   const h = await headers();
+   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+diff --git a/apps/member-os/src/app/(main)/frunk/page.tsx b/apps/member-os/src/app/(main)/frunk/page.tsx
+index 21eda5a..30a9e44 100644
+--- a/apps/member-os/src/app/(main)/frunk/page.tsx
++++ b/apps/member-os/src/app/(main)/frunk/page.tsx
+@@ -34,7 +34,7 @@ export default async function FrunkPage({
+   return (
+     <div className="space-y-5">
+       <header className="reveal">
+-        <h1 className="text-2xl font-bold tracking-tight">FRUNK GOLF 姫路 — 会員管理</h1>
++        <h1 className="text-2xl font-bold tracking-tight">FRANK GOLF 姫路 — 会員管理</h1>
+         <p className="mt-0.5 text-sm text-(--color-dim)">入会プラン・予約制限の設定、iPad入会申込の承認、会員の休会・退会管理</p>
+       </header>
+ 
+@@ -172,7 +172,7 @@ export default async function FrunkPage({
+       <Panel title="入会フォームURLの発行" className="d4">
+         <p className="mb-3 text-xs text-(--color-dim)">店頭タブレットやHP/QR掲示用の入会フォームURLを発行します（発行すると旧URLは無効化）。</p>
+         <form action={issueSignupToken} className="flex flex-wrap items-end gap-2">
+-          <Field label="ラベル（任意）"><input name="label" placeholder="FRUNK 入会タブレット" className={inputCls} /></Field>
++          <Field label="ラベル（任意）"><input name="label" placeholder="FRANK 入会タブレット" className={inputCls} /></Field>
+           <button className={btnCls}>入会フォームURLを発行</button>
+         </form>
+       </Panel>
+diff --git a/apps/member-os/src/app/(main)/reservations/actions.ts b/apps/member-os/src/app/(main)/reservations/actions.ts
+index 62babea..4c7d882 100755
+--- a/apps/member-os/src/app/(main)/reservations/actions.ts
++++ b/apps/member-os/src/app/(main)/reservations/actions.ts
+@@ -119,12 +119,12 @@ async function issueToken(purpose: "book" | "board", label: string, urlPath: str
+ 
+ /** お客様Web予約URL（店舗単位・長期有効）を発行 */
+ export async function issueBookingToken() {
+-  await issueToken("book", "FRUNK GOLF 姫路 Web予約", "book", "booking_url");
++  await issueToken("book", "FRANK GOLF 姫路 Web予約", "book", "booking_url");
+ }
+ 
+ /** 店頭常設カレンダーの表示URLを発行（ロビー掲示・タブレット用） */
+ export async function issueBoardToken() {
+-  await issueToken("board", "FRUNK GOLF 姫路 店頭カレンダー", "board", "board_url");
++  await issueToken("board", "FRANK GOLF 姫路 店頭カレンダー", "board", "board_url");
+ }
+ 
+ const PAY_METHOD_VALUES = ["cash", "card", "e_money", "bank", "other"];
+diff --git a/apps/member-os/src/app/(main)/reservations/page.tsx b/apps/member-os/src/app/(main)/reservations/page.tsx
+index eb2d283..96b788f 100755
+--- a/apps/member-os/src/app/(main)/reservations/page.tsx
++++ b/apps/member-os/src/app/(main)/reservations/page.tsx
+@@ -35,7 +35,7 @@ export default async function ReservationsPage({
+     .eq("company_id", actor.companyId).eq("code", HIMEJI_STORE_CODE).maybeSingle();
+ 
+   if (!store) {
+-    return <Empty>FRUNK GOLF 姫路の店舗が見つかりません（migration 0020 の適用をご確認ください）。</Empty>;
++    return <Empty>FRANK GOLF 姫路の店舗が見つかりません（migration 0020 の適用をご確認ください）。</Empty>;
+   }
+ 
+   const [{ data: resources }, { data: bookings }, { data: outstandingRows }] = await Promise.all([
+@@ -69,7 +69,7 @@ export default async function ReservationsPage({
+     <div className="space-y-4">
+       <header className="reveal flex flex-wrap items-center justify-between gap-3">
+         <div>
+-          <h1 className="text-xl font-bold">予約管理 — FRUNK GOLF 姫路</h1>
++          <h1 className="text-xl font-bold">予約管理 — FRANK GOLF 姫路</h1>
+           <p className="text-sm text-(--color-dim)">打席・レッスンの枠管理、電話/店頭予約、お客様Web予約、入金・未収金の管理</p>
+         </div>
+         <form className="flex items-center gap-2">
+diff --git a/apps/member-os/src/app/(main)/trials/actions.ts b/apps/member-os/src/app/(main)/trials/actions.ts
+new file mode 100644
+index 0000000..d1300df
+--- /dev/null
++++ b/apps/member-os/src/app/(main)/trials/actions.ts
+@@ -0,0 +1,42 @@
++"use server";
++
++import { revalidatePath } from "next/cache";
++import { requireReceptionActor } from "@/lib/auth";
++import { createAdmin } from "@/lib/supabase/admin";
++import { logAudit } from "@/lib/kernel";
++
++function str(v: FormDataEntryValue | null): string {
++  return typeof v === "string" ? v.trim() : "";
++}
++
++const STATUSES = ["pending", "confirmed", "done", "canceled"];
++
++/** 体験申込のステータス変更（未対応/日程確定/来店済/キャンセル） */
++export async function setTrialStatus(formData: FormData) {
++  const actor = await requireReceptionActor();
++  const admin = createAdmin();
++  const id = str(formData.get("id"));
++  const to = str(formData.get("to"));
++  if (!id || !STATUSES.includes(to)) return;
++  await admin
++    .from("mbr_trial_requests")
++    .update({ status: to, reviewed_by: actor.staffId, reviewed_at: new Date().toISOString() })
++    .eq("id", id)
++    .eq("company_id", actor.companyId);
++  await logAudit(actor, "trial.status", "mbr_trial_requests", id, null, { status: to });
++  revalidatePath("/trials");
++}
++
++/** スタッフメモの保存 */
++export async function saveTrialNote(formData: FormData) {
++  const actor = await requireReceptionActor();
++  const admin = createAdmin();
++  const id = str(formData.get("id"));
++  if (!id) return;
++  await admin
++    .from("mbr_trial_requests")
++    .update({ staff_note: str(formData.get("staff_note")) || null })
++    .eq("id", id)
++    .eq("company_id", actor.companyId);
++  revalidatePath("/trials");
++}
+diff --git a/apps/member-os/src/app/(main)/trials/page.tsx b/apps/member-os/src/app/(main)/trials/page.tsx
+new file mode 100644
+index 0000000..2671eb3
+--- /dev/null
++++ b/apps/member-os/src/app/(main)/trials/page.tsx
+@@ -0,0 +1,111 @@
++import { requireReceptionActor } from "@/lib/auth";
++import { createAdmin } from "@/lib/supabase/admin";
++import { Badge, Empty, fmtDate } from "@/components/ui";
++import { TRIAL_STATUS_LABEL, TRIAL_STATUS_TONE } from "@/lib/trial";
++import { setTrialStatus, saveTrialNote } from "./actions";
++
++export const dynamic = "force-dynamic";
++type Row = Record<string, unknown>;
++
++export default async function TrialsPage() {
++  const actor = await requireReceptionActor();
++  const admin = createAdmin();
++  const { data } = await admin
++    .from("mbr_trial_requests")
++    .select("*")
++    .eq("company_id", actor.companyId)
++    .is("deleted_at", null)
++    .order("created_at", { ascending: false })
++    .limit(300);
++
++  const rows = (data ?? []) as Row[];
++  const pending = rows.filter((r) => r.status === "pending").length;
++
++  return (
++    <div className="space-y-5">
++      <div className="flex flex-wrap items-end justify-between gap-3">
++        <div>
++          <h1 className="text-xl font-bold tracking-tight">体験申込 — FRANK GOLF 姫路</h1>
++          <p className="mt-1 text-sm text-(--color-dim)">公式サイトの体験フォームからの申込です。未対応 {pending} 件。</p>
++        </div>
++      </div>
++
++      {rows.length === 0 ? (
++        <Empty>まだ体験申込はありません。公式サイトの体験フォーム（/trial）から届きます。</Empty>
++      ) : (
++        <div className="space-y-3">
++          {rows.map((r) => {
++            const st = String(r.status);
++            const id = String(r.id);
++            return (
++              <div key={id} className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-5">
++                <div className="flex flex-wrap items-start justify-between gap-3">
++                  <div className="min-w-0">
++                    <div className="flex items-center gap-2">
++                      <span className="text-base font-bold text-(--color-txt)">{String(r.name)}</span>
++                      {r.name_kana ? <span className="text-xs text-(--color-dim)">{String(r.name_kana)}</span> : null}
++                      <Badge tone={TRIAL_STATUS_TONE[st] ?? "default"}>{TRIAL_STATUS_LABEL[st] ?? st}</Badge>
++                    </div>
++                    <div className="mt-1 text-sm text-(--color-dim)">
++                      {[r.phone && `TEL ${String(r.phone)}`, r.email && String(r.email), r.experience && String(r.experience)]
++                        .filter(Boolean)
++                        .join("　")}
++                    </div>
++                  </div>
++                  <div className="text-right text-xs text-(--color-dim)">
++                    受付 {fmtDate(String(r.created_at))}
++                  </div>
++                </div>
++
++                <div className="mt-3 grid gap-2 rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 text-sm sm:grid-cols-3">
++                  <div><span className="text-xs text-(--color-dim)">第1希望</span><div>{r.pref1 ? String(r.pref1) : "—"}</div></div>
++                  <div><span className="text-xs text-(--color-dim)">第2希望</span><div>{r.pref2 ? String(r.pref2) : "—"}</div></div>
++                  <div><span className="text-xs text-(--color-dim)">第3希望</span><div>{r.pref3 ? String(r.pref3) : "—"}</div></div>
++                </div>
++
++                {r.message ? (
++                  <p className="mt-2 rounded-lg bg-(--color-panel-2) px-3 py-2 text-sm text-(--color-txt)">{String(r.message)}</p>
++                ) : null}
++
++                <div className="mt-3 flex flex-wrap items-center gap-2">
++                  {st !== "confirmed" && (
++                    <StatusButton id={id} to="confirmed" label="日程確定" />
++                  )}
++                  {st !== "done" && <StatusButton id={id} to="done" label="来店済にする" />}
++                  {st !== "canceled" && <StatusButton id={id} to="canceled" label="キャンセル" danger />}
++                  {st !== "pending" && <StatusButton id={id} to="pending" label="未対応に戻す" ghost />}
++                </div>
++
++                <form action={saveTrialNote} className="mt-3 flex items-center gap-2">
++                  <input type="hidden" name="id" value={id} />
++                  <input
++                    name="staff_note"
++                    defaultValue={r.staff_note ? String(r.staff_note) : ""}
++                    placeholder="スタッフメモ（対応状況など）"
++                    className="flex-1 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm text-(--color-txt) focus:border-accent focus:outline-none"
++                  />
++                  <button className="rounded-lg border border-(--color-line) px-3 py-2 text-xs text-(--color-dim) hover:text-(--color-txt)">保存</button>
++                </form>
++              </div>
++            );
++          })}
++        </div>
++      )}
++    </div>
++  );
++}
++
++function StatusButton({ id, to, label, danger, ghost }: { id: string; to: string; label: string; danger?: boolean; ghost?: boolean }) {
++  const cls = danger
++    ? "border border-rose-500/40 text-rose-300 hover:bg-rose-500/10"
++    : ghost
++      ? "border border-(--color-line) text-(--color-dim) hover:text-(--color-txt)"
++      : "bg-accent text-white hover:bg-accent/90";
++  return (
++    <form action={setTrialStatus}>
++      <input type="hidden" name="id" value={id} />
++      <input type="hidden" name="to" value={to} />
++      <button className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${cls}`}>{label}</button>
++    </form>
++  );
++}
+diff --git a/apps/member-os/src/app/board/[token]/page.tsx b/apps/member-os/src/app/board/[token]/page.tsx
+index 6c2df7a..6c3c812 100755
+--- a/apps/member-os/src/app/board/[token]/page.tsx
++++ b/apps/member-os/src/app/board/[token]/page.tsx
+@@ -58,7 +58,7 @@ export default async function BoardPage({ params }: { params: Promise<{ token: s
+     <main className="min-h-screen bg-black px-4 py-4 text-white">
+       <header className="mb-3 flex items-baseline justify-between">
+         <div className="flex items-baseline gap-3">
+-          <span className="text-xs tracking-[0.4em] text-amber-400">FRUNK GOLF</span>
++          <span className="text-xs tracking-[0.4em] text-amber-400">FRANK GOLF</span>
+           <h1 className="text-2xl font-bold">{String(store.name ?? "姫路")} 本日のご予約</h1>
+         </div>
+         <div className="flex items-baseline gap-3 text-neutral-400">
+diff --git a/apps/member-os/src/app/book/[token]/page.tsx b/apps/member-os/src/app/book/[token]/page.tsx
+index f104c94..7ab028b 100755
+--- a/apps/member-os/src/app/book/[token]/page.tsx
++++ b/apps/member-os/src/app/book/[token]/page.tsx
+@@ -13,7 +13,7 @@ function Shell({ children }: { children: React.ReactNode }) {
+   return (
+     <main className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-8">
+       <div className="mb-6 text-center">
+-        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
++        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
+         <h1 className="text-2xl font-bold tracking-wide">Web予約</h1>
+       </div>
+       {children}
+diff --git a/apps/member-os/src/app/join-web/actions.ts b/apps/member-os/src/app/join-web/actions.ts
+new file mode 100644
+index 0000000..2753b6c
+--- /dev/null
++++ b/apps/member-os/src/app/join-web/actions.ts
+@@ -0,0 +1,79 @@
++"use server";
++
++import { createAdmin } from "@/lib/supabase/admin";
++import { resolveHimeji } from "@/lib/member";
++import { logEvent } from "@/lib/kernel";
++
++export type WebSignupState = { ok?: boolean; error?: string };
++
++function str(v: FormDataEntryValue | null): string {
++  return typeof v === "string" ? v.trim() : "";
++}
++function orNull(v: FormDataEntryValue | null): string | null {
++  const s = str(v);
++  return s === "" ? null : s;
++}
++const GENDERS = ["male", "female", "other", "unknown"];
++
++/**
++ * FRANK GOLF 姫路 Web入会申込（公開フォーム・トークン不要・service_role経由）。
++ * 署名は取らず、同意チェックで受付。status='pending' で登録し、
++ * スタッフが /frunk（FRANK会員）で承認 → 会員番号発行 → 在籍(active) となる。
++ * （既存の店頭タブレット入会 /join/[token] と同じ承認フローに合流）
++ */
++export async function submitWebSignup(_prev: WebSignupState, formData: FormData): Promise<WebSignupState> {
++  const store = await resolveHimeji();
++  if (!store) return { error: "店舗情報が見つかりません。時間をおいて再度お試しください。" };
++
++  const name = str(formData.get("name"));
++  if (!name) return { error: "お名前を入力してください" };
++  if (!str(formData.get("plan_id"))) return { error: "ご希望のプランをお選びください" };
++  const phone = str(formData.get("phone"));
++  const email = str(formData.get("email"));
++  if (!phone && !email) return { error: "電話番号またはメールアドレスのいずれかをご入力ください" };
++  if (str(formData.get("consent_privacy")) !== "1") return { error: "個人情報の取扱いへの同意が必要です" };
++  if (str(formData.get("consent_terms")) !== "1")
++    return { error: "会員規約（休会・退会規定を含む）への同意が必要です" };
++
++  const admin = createAdmin();
++
++  // プランが当該会社のものか検証
++  const { data: plan } = await admin
++    .from("frunk_plans")
++    .select("id")
++    .eq("id", str(formData.get("plan_id")))
++    .eq("company_id", store.companyId)
++    .is("deleted_at", null)
++    .maybeSingle();
++  if (!plan) return { error: "選択されたプランが無効です。画面を更新して再度お試しください。" };
++
++  const { error } = await admin.from("frunk_members").insert({
++    company_id: store.companyId,
++    store_id: store.storeId,
++    plan_id: plan.id,
++    name,
++    name_kana: orNull(formData.get("name_kana")),
++    birth_date: orNull(formData.get("birth_date")),
++    gender: GENDERS.includes(str(formData.get("gender"))) ? str(formData.get("gender")) : null,
++    postal_code: orNull(formData.get("postal_code")),
++    address1: orNull(formData.get("address")),
++    phone: phone || null,
++    email: email || null,
++    payment_method: orNull(formData.get("payment_method")),
++    start_date: orNull(formData.get("start_date")),
++    consent_privacy: true,
++    consent_terms: true,
++    note: "Web入会申込（公式サイト）",
++    status: "pending",
++  });
++  if (error) return { error: `送信に失敗しました: ${error.message}` };
++
++  await logEvent(store.companyId, {
++    event_type: "frunk.signup",
++    title: `Web入会申込: ${name} 様`,
++    source: "web",
++    source_type: "external",
++    severity: "info",
++  });
++  return { ok: true };
++}
+diff --git a/apps/member-os/src/app/join-web/page.tsx b/apps/member-os/src/app/join-web/page.tsx
+new file mode 100644
+index 0000000..4797bb8
+--- /dev/null
++++ b/apps/member-os/src/app/join-web/page.tsx
+@@ -0,0 +1,41 @@
++import { createAdmin } from "@/lib/supabase/admin";
++import { resolveHimeji } from "@/lib/member";
++import { WebJoinForm } from "./web-join-form";
++
++export const dynamic = "force-dynamic";
++
++export const metadata = {
++  title: "Web入会申込｜FRANK GOLF 姫路",
++  description: "FRANK GOLF 姫路・土山のWeb入会申込フォーム。プランをお選びのうえお申し込みください。",
++};
++
++export default async function JoinWebPage() {
++  const store = await resolveHimeji();
++  const admin = createAdmin();
++
++  const { data: plans } = store
++    ? await admin
++        .from("frunk_plans")
++        .select("id, name, monthly_price, joining_fee, max_bookings_per_day, note")
++        .eq("company_id", store.companyId)
++        .eq("active", true)
++        .is("deleted_at", null)
++        .order("sort_order", { ascending: true })
++    : { data: [] };
++
++  return (
++    <main className="mx-auto flex min-h-screen max-w-lg flex-col px-5 py-10">
++      <div className="mb-6 text-center">
++        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路・土山</p>
++        <h1 className="mt-1 text-2xl font-bold tracking-wide">Web入会申込</h1>
++        <p className="mt-2 text-sm text-(--color-dim)">
++          プランをお選びのうえ、お申し込みください。スタッフ確認後、折り返しご連絡いたします。
++        </p>
++      </div>
++      <WebJoinForm plans={(plans ?? []) as never} />
++      <p className="mt-6 text-center text-xs text-(--color-dim)">
++        まずは体験から、という方は <a href="/trial" className="text-(--color-gold) underline">体験のお申し込み</a> へ。
++      </p>
++    </main>
++  );
++}
+diff --git a/apps/member-os/src/app/join-web/web-join-form.tsx b/apps/member-os/src/app/join-web/web-join-form.tsx
+new file mode 100644
+index 0000000..49895b6
+--- /dev/null
++++ b/apps/member-os/src/app/join-web/web-join-form.tsx
+@@ -0,0 +1,146 @@
++"use client";
++
++import { useActionState, useState } from "react";
++import { submitWebSignup, type WebSignupState } from "./actions";
++import { FRUNK_PAYMENT_METHODS, yen } from "@/lib/frunk";
++import { termsUrl, privacyUrl } from "@/lib/site";
++
++function Doc({ href, children }: { href: string | null; children: React.ReactNode }) {
++  if (!href) return <span className="font-medium text-(--color-txt)">{children}</span>;
++  return (
++    <a href={href} target="_blank" rel="noopener" className="font-medium text-(--color-gold) underline">
++      {children}
++    </a>
++  );
++}
++
++type Plan = {
++  id: string;
++  name: string;
++  monthly_price: number | null;
++  joining_fee: number | null;
++  max_bookings_per_day: number | null;
++  note: string | null;
++};
++
++const field =
++  "w-full rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
++const label = "mb-1 block text-sm font-medium text-(--color-dim)";
++const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5";
++
++export function WebJoinForm({ plans }: { plans: Plan[] }) {
++  const [state, action, pending] = useActionState<WebSignupState, FormData>(submitWebSignup, {});
++  const [planId, setPlanId] = useState(plans.find((p) => p.name.includes("レギュラー"))?.id ?? plans[0]?.id ?? "");
++
++  if (state.ok) {
++    return (
++      <div className="rounded-2xl border border-emerald-500/40 bg-(--color-panel) p-8 text-center">
++        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-3xl text-emerald-400">✓</div>
++        <p className="mt-3 text-lg font-semibold">入会のお申し込みありがとうございました</p>
++        <p className="mt-2 text-sm text-(--color-dim)">
++          内容をスタッフが確認し、折り返しご連絡いたします。<br />確定後、会員としてWeb予約をご利用いただけます。
++        </p>
++      </div>
++    );
++  }
++
++  return (
++    <form action={action} className="space-y-4">
++      {/* プラン選択 */}
++      <div className={`${cardCls} space-y-3`}>
++        <p className="text-sm font-semibold text-(--color-txt)">ご希望のプラン <span className="text-rose-400">*</span></p>
++        {plans.length === 0 ? (
++          <p className="text-sm text-(--color-dim)">現在ご案内できるプランがありません。お手数ですが店舗にお問い合わせください。</p>
++        ) : (
++          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
++            {plans.map((p) => (
++              <label
++                key={p.id}
++                className={`cursor-pointer rounded-xl border p-3 transition-colors ${
++                  planId === p.id ? "border-accent bg-accent/10" : "border-(--color-line) bg-(--color-panel-2)"
++                }`}
++              >
++                <input type="radio" name="plan_id" value={p.id} className="sr-only" required
++                  checked={planId === p.id} onChange={() => setPlanId(p.id)} />
++                <div className="flex items-center justify-between">
++                  <span className="font-semibold text-(--color-txt)">{p.name}</span>
++                  {p.monthly_price != null && (
++                    <span className="text-sm font-bold text-accent">{yen(p.monthly_price)}<span className="text-xs font-normal text-(--color-dim)">/月</span></span>
++                  )}
++                </div>
++                <div className="mt-1 space-y-0.5 text-xs text-(--color-dim)">
++                  {p.joining_fee != null && <div>入会金 {yen(p.joining_fee)}</div>}
++                  {p.note && <div>{p.note}</div>}
++                </div>
++              </label>
++            ))}
++          </div>
++        )}
++        <p className="text-xs text-(--color-dim)">※ 表示金額はすべて税抜（月額）です。</p>
++      </div>
++
++      {/* お客様情報 */}
++      <div className={`${cardCls} space-y-4`}>
++        <p className="text-sm font-semibold text-(--color-txt)">お客様情報</p>
++        <div className="grid grid-cols-2 gap-3">
++          <div><label className={label}>お名前 <span className="text-rose-400">*</span></label><input name="name" required placeholder="山田 太郎" className={field} /></div>
++          <div><label className={label}>フリガナ</label><input name="name_kana" placeholder="ヤマダ タロウ" className={field} /></div>
++        </div>
++        <div className="grid grid-cols-2 gap-3">
++          <div><label className={label}>生年月日</label><input type="date" name="birth_date" className={field} /></div>
++          <div>
++            <label className={label}>性別</label>
++            <select name="gender" defaultValue="" className={field}>
++              <option value="">選択</option>
++              <option value="male">男</option>
++              <option value="female">女</option>
++              <option value="other">その他</option>
++              <option value="unknown">無回答</option>
++            </select>
++          </div>
++        </div>
++        <div className="grid grid-cols-2 gap-3">
++          <div><label className={label}>電話番号</label><input name="phone" type="tel" placeholder="090-1234-5678" className={field} /></div>
++          <div><label className={label}>メールアドレス</label><input name="email" type="email" placeholder="example@mail.com" className={field} /></div>
++        </div>
++        <p className="text-xs text-(--color-dim)">※ 電話・メールのいずれかは必須です</p>
++        <div className="grid grid-cols-3 gap-3">
++          <div><label className={label}>郵便番号</label><input name="postal_code" placeholder="670-0000" className={field} /></div>
++          <div className="col-span-2"><label className={label}>ご住所</label><input name="address" placeholder="兵庫県姫路市〇〇町1-2-3" className={field} /></div>
++        </div>
++        <div className="grid grid-cols-2 gap-3">
++          <div>
++            <label className={label}>お支払い方法</label>
++            <select name="payment_method" defaultValue="" className={field}>
++              <option value="">選択</option>
++              {FRUNK_PAYMENT_METHODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
++            </select>
++          </div>
++          <div><label className={label}>ご利用開始希望日</label><input type="date" name="start_date" className={field} /></div>
++        </div>
++      </div>
++
++      {/* 同意 */}
++      <div className={`${cardCls} space-y-3`}>
++        <p className="text-sm font-semibold text-(--color-txt)">ご確認・同意</p>
++        <label className="flex items-start gap-3 text-sm text-(--color-dim)">
++          <input type="checkbox" name="consent_privacy" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
++          <span><Doc href={privacyUrl()}>プライバシーポリシー</Doc>に同意し、個人情報を入会手続き・サービス提供の目的で利用することに同意します。<span className="text-rose-400">*</span></span>
++        </label>
++        <label className="flex items-start gap-3 text-sm text-(--color-dim)">
++          <input type="checkbox" name="consent_terms" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
++          <span><Doc href={termsUrl()}>会員規約</Doc>（休会・退会の規定を含む）を確認し、同意します。<span className="text-rose-400">*</span></span>
++        </label>
++      </div>
++
++      {state.error && (
++        <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-center text-sm text-rose-300">{state.error}</p>
++      )}
++
++      <button disabled={pending} className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50">
++        {pending ? "送信中..." : "この内容で入会を申し込む"}
++      </button>
++      <p className="text-center text-xs text-(--color-dim)">お申し込み後、スタッフが確認し折り返しご連絡します。確定をもって入会となります（オンライン決済はありません）。</p>
++    </form>
++  );
++}
+diff --git a/apps/member-os/src/app/join/[token]/actions.ts b/apps/member-os/src/app/join/[token]/actions.ts
+index 0bb9e2b..68cbc41 100644
+--- a/apps/member-os/src/app/join/[token]/actions.ts
++++ b/apps/member-os/src/app/join/[token]/actions.ts
+@@ -15,7 +15,7 @@ function orNull(v: FormDataEntryValue | null): string | null {
+ }
+ const GENDERS = ["male", "female", "other", "unknown"];
+ 
+-/** FRUNK GOLF 姫路 入会申込（店頭タブレット・公開ルート、店舗トークン検証、service_role経由） */
++/** FRANK GOLF 姫路 入会申込（店頭タブレット・公開ルート、店舗トークン検証、service_role経由） */
+ export async function submitSignup(_prev: SignupState, formData: FormData): Promise<SignupState> {
+   const token = str(formData.get("token"));
+   if (!token) return { error: "受付情報が見つかりません" };
+@@ -61,7 +61,7 @@ export async function submitSignup(_prev: SignupState, formData: FormData): Prom
+ 
+   await logEvent(tok.company_id as string, {
+     event_type: "frunk.signup",
+-    title: `FRUNK入会申込: ${name} 様`,
++    title: `FRANK入会申込: ${name} 様`,
+     source: "tablet",
+     source_type: "external",
+     severity: "info",
+diff --git a/apps/member-os/src/app/join/[token]/page.tsx b/apps/member-os/src/app/join/[token]/page.tsx
+index 0f79ae4..556bd3a 100644
+--- a/apps/member-os/src/app/join/[token]/page.tsx
++++ b/apps/member-os/src/app/join/[token]/page.tsx
+@@ -8,7 +8,7 @@ function Shell({ storeName, children }: { storeName?: string | null; children: R
+   return (
+     <main className="mx-auto flex min-h-screen max-w-xl flex-col px-5 py-8">
+       <div className="mb-6 text-center">
+-        <p className="text-xs font-semibold tracking-[0.3em] text-(--color-gold)">FRUNK GOLF</p>
++        <p className="text-xs font-semibold tracking-[0.3em] text-(--color-gold)">FRANK GOLF</p>
+         <h1 className="text-2xl font-bold tracking-tight">入会申込</h1>
+         <p className="mt-1 text-xs text-(--color-dim)">{storeName ?? "タブレットにご記入をお願いします"}</p>
+       </div>
+diff --git a/apps/member-os/src/app/member/login/page.tsx b/apps/member-os/src/app/member/login/page.tsx
+index 1745965..5b61b8a 100755
+--- a/apps/member-os/src/app/member/login/page.tsx
++++ b/apps/member-os/src/app/member/login/page.tsx
+@@ -13,7 +13,7 @@ export default function MemberLoginPage() {
+   return (
+     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-10">
+       <div className="mb-6 text-center">
+-        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
++        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
+         <h1 className="text-2xl font-bold tracking-wide">会員ログイン</h1>
+         <p className="mt-2 text-sm text-(--color-dim)">会員番号と生年月日でログインできます</p>
+       </div>
+diff --git a/apps/member-os/src/app/member/page.tsx b/apps/member-os/src/app/member/page.tsx
+index ea21d12..9a98abd 100755
+--- a/apps/member-os/src/app/member/page.tsx
++++ b/apps/member-os/src/app/member/page.tsx
+@@ -48,7 +48,7 @@ export default async function MemberHomePage({
+     <main className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-8">
+       <header className="mb-5 flex items-center justify-between">
+         <div>
+-          <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
++          <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
+           <h1 className="text-xl font-bold tracking-wide">{member.name} 様</h1>
+           <p className="text-xs text-(--color-dim)">会員番号 {member.memberNo}{member.isProvisional ? "（仮登録）" : ""}</p>
+         </div>
+diff --git a/apps/member-os/src/app/member/register/page.tsx b/apps/member-os/src/app/member/register/page.tsx
+index 162bffa..2a808e3 100755
+--- a/apps/member-os/src/app/member/register/page.tsx
++++ b/apps/member-os/src/app/member/register/page.tsx
+@@ -13,7 +13,7 @@ export default function MemberRegisterPage() {
+   return (
+     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-5 py-10">
+       <div className="mb-6 text-center">
+-        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRUNK GOLF 姫路</p>
++        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
+         <h1 className="text-2xl font-bold tracking-wide">新規登録</h1>
+         <p className="mt-2 text-sm text-(--color-dim)">登録後すぐにWeb予約をご利用いただけます</p>
+       </div>
+diff --git a/apps/member-os/src/app/trial/actions.ts b/apps/member-os/src/app/trial/actions.ts
+new file mode 100644
+index 0000000..5a5d398
+--- /dev/null
++++ b/apps/member-os/src/app/trial/actions.ts
+@@ -0,0 +1,58 @@
++"use server";
++
++import { createAdmin } from "@/lib/supabase/admin";
++import { resolveHimeji } from "@/lib/member";
++import { logEvent } from "@/lib/kernel";
++
++export type TrialState = { ok?: boolean; error?: string };
++
++function str(v: FormDataEntryValue | null): string {
++  return typeof v === "string" ? v.trim() : "";
++}
++function orNull(v: FormDataEntryValue | null): string | null {
++  const s = str(v);
++  return s === "" ? null : s;
++}
++
++/** FRANK GOLF 姫路 体験申込（公開フォーム・トークン不要・service_role経由） */
++export async function submitTrial(_prev: TrialState, formData: FormData): Promise<TrialState> {
++  const store = await resolveHimeji();
++  if (!store) return { error: "店舗情報が見つかりません。時間をおいて再度お試しください。" };
++
++  const name = str(formData.get("name"));
++  if (!name) return { error: "お名前を入力してください" };
++  const phone = str(formData.get("phone"));
++  const email = str(formData.get("email"));
++  if (!phone && !email) return { error: "電話番号またはメールアドレスのいずれかをご入力ください" };
++  if (!str(formData.get("pref1"))) return { error: "第1希望日時をご入力ください" };
++  if (str(formData.get("consent_privacy")) !== "1")
++    return { error: "個人情報の取扱いへの同意が必要です" };
++
++  const admin = createAdmin();
++  const { error } = await admin.from("mbr_trial_requests").insert({
++    company_id: store.companyId,
++    store_id: store.storeId,
++    name,
++    name_kana: orNull(formData.get("name_kana")),
++    phone: phone || null,
++    email: email || null,
++    pref1: orNull(formData.get("pref1")),
++    pref2: orNull(formData.get("pref2")),
++    pref3: orNull(formData.get("pref3")),
++    experience: orNull(formData.get("experience")),
++    message: orNull(formData.get("message")),
++    consent_privacy: true,
++    source: "web",
++    status: "pending",
++  });
++  if (error) return { error: `送信に失敗しました: ${error.message}` };
++
++  await logEvent(store.companyId, {
++    event_type: "trial.request",
++    title: `体験申込: ${name} 様（第1希望 ${str(formData.get("pref1"))}）`,
++    source: "web",
++    source_type: "external",
++    severity: "info",
++  });
++  return { ok: true };
++}
+diff --git a/apps/member-os/src/app/trial/page.tsx b/apps/member-os/src/app/trial/page.tsx
+new file mode 100644
+index 0000000..87f9275
+--- /dev/null
++++ b/apps/member-os/src/app/trial/page.tsx
+@@ -0,0 +1,30 @@
++import { resolveHimeji } from "@/lib/member";
++import { TrialForm } from "./trial-form";
++
++export const dynamic = "force-dynamic";
++
++export const metadata = {
++  title: "体験のお申し込み｜FRANK GOLF 姫路",
++  description: "FRANK GOLF 姫路・土山の体験のお申し込みフォーム。ご希望の日時をお送りください。",
++};
++
++export default async function TrialPage() {
++  const store = await resolveHimeji();
++
++  return (
++    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-10">
++      <div className="mb-6 text-center">
++        <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路・土山</p>
++        <h1 className="mt-1 text-2xl font-bold tracking-wide">体験のお申し込み</h1>
++        <p className="mt-2 text-sm text-(--color-dim)">
++          {store?.name ? "" : ""}
++          ご希望の日時をお送りください。担当より折り返し、日程確定のご連絡を差し上げます。
++        </p>
++      </div>
++      <TrialForm />
++      <p className="mt-6 text-center text-xs text-(--color-dim)">
++        すでに会員の方は <a href="/member/book" className="text-(--color-gold) underline">こちらから打席をWeb予約</a> いただけます。
++      </p>
++    </main>
++  );
++}
+diff --git a/apps/member-os/src/app/trial/trial-form.tsx b/apps/member-os/src/app/trial/trial-form.tsx
+new file mode 100644
+index 0000000..7f33800
+--- /dev/null
++++ b/apps/member-os/src/app/trial/trial-form.tsx
+@@ -0,0 +1,105 @@
++"use client";
++
++import { useActionState } from "react";
++import { submitTrial, type TrialState } from "./actions";
++import { TRIAL_EXPERIENCE } from "@/lib/trial";
++import { privacyUrl } from "@/lib/site";
++
++const field =
++  "w-full rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
++const label = "mb-1 block text-sm font-medium text-(--color-dim)";
++
++export function TrialForm() {
++  const [state, action, pending] = useActionState<TrialState, FormData>(submitTrial, {});
++
++  if (state.ok) {
++    return (
++      <div className="rounded-2xl border border-emerald-500/40 bg-(--color-panel) p-8 text-center">
++        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-3xl text-emerald-400">✓</div>
++        <p className="mt-3 text-lg font-semibold">体験のお申し込みを受け付けました</p>
++        <p className="mt-2 text-sm text-(--color-dim)">
++          担当より、日程確定のご連絡を差し上げます。<br />プレオープン日に向けて順次ご対応いたします。
++        </p>
++      </div>
++    );
++  }
++
++  return (
++    <form action={action} className="space-y-4 rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
++      <div className="grid grid-cols-2 gap-3">
++        <div>
++          <label className={label}>お名前 <span className="text-rose-400">*</span></label>
++          <input name="name" required placeholder="山田 太郎" className={field} />
++        </div>
++        <div>
++          <label className={label}>フリガナ</label>
++          <input name="name_kana" placeholder="ヤマダ タロウ" className={field} />
++        </div>
++      </div>
++      <div className="grid grid-cols-2 gap-3">
++        <div>
++          <label className={label}>電話番号</label>
++          <input name="phone" type="tel" placeholder="090-1234-5678" className={field} />
++        </div>
++        <div>
++          <label className={label}>メールアドレス</label>
++          <input name="email" type="email" placeholder="example@mail.com" className={field} />
++        </div>
++      </div>
++      <p className="text-xs text-(--color-dim)">※ 電話・メールのいずれかは必須です（日程確定のご連絡に使用します）</p>
++
++      <div>
++        <label className={label}>第1希望日時 <span className="text-rose-400">*</span></label>
++        <input name="pref1" required placeholder="例）9/6(土) 14時ごろ" className={field} />
++      </div>
++      <div className="grid grid-cols-2 gap-3">
++        <div>
++          <label className={label}>第2希望日時</label>
++          <input name="pref2" placeholder="例）9/7(日) 午前" className={field} />
++        </div>
++        <div>
++          <label className={label}>第3希望日時</label>
++          <input name="pref3" placeholder="例）平日夜でも可" className={field} />
++        </div>
++      </div>
++
++      <div>
++        <label className={label}>ゴルフ経験</label>
++        <select name="experience" defaultValue="" className={field}>
++          <option value="">選択してください</option>
++          {TRIAL_EXPERIENCE.map((e) => (
++            <option key={e} value={e}>{e}</option>
++          ))}
++        </select>
++      </div>
++      <div>
++        <label className={label}>ご質問・ご要望</label>
++        <textarea name="message" rows={3} placeholder="レフティ希望、当日クラブを借りたい、見学だけ希望 など" className={field} />
++      </div>
++
++      <label className="flex items-start gap-3 text-sm text-(--color-dim)">
++        <input type="checkbox" name="consent_privacy" value="1" required className="mt-1 h-5 w-5 accent-(--color-accent)" />
++        <span>
++          {privacyUrl() ? (
++            <a href={privacyUrl() as string} target="_blank" rel="noopener" className="font-medium text-(--color-gold) underline">プライバシーポリシー</a>
++          ) : (
++            <span className="font-medium text-(--color-txt)">プライバシーポリシー</span>
++          )}
++          に同意し、個人情報を体験受付・ご連絡の目的で利用することに同意します。<span className="text-rose-400">*</span>
++        </span>
++      </label>
++
++      {state.error && (
++        <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{state.error}</p>
++      )}
++
++      <button
++        disabled={pending}
++        className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
++      >
++        {pending ? "送信中..." : "この内容で体験を申し込む"}
++      </button>
++      <p className="text-center text-xs text-(--color-dim)">送信後、担当より折り返しご連絡します。確定をもって予約成立となります。</p>
++    </form>
++  );
++}
+diff --git a/apps/member-os/src/components/nav.tsx b/apps/member-os/src/components/nav.tsx
+index ee0edbd..3edd5d3 100644
+--- a/apps/member-os/src/components/nav.tsx
++++ b/apps/member-os/src/components/nav.tsx
+@@ -7,8 +7,9 @@ const LINKS = [
+   { href: "/dashboard", label: "ダッシュボード" },
+   { href: "/", label: "受付台帳" },
+   { href: "/follow", label: "体験フォロー" },
++  { href: "/trials", label: "体験申込" },
+   { href: "/reservations", label: "予約（姫路）" },
+-  { href: "/frunk", label: "FRUNK会員" },
++  { href: "/frunk", label: "FRANK会員" },
+   { href: "/import", label: "データ取込" },
+ ];
+ 
+diff --git a/apps/member-os/src/lib/frunk.ts b/apps/member-os/src/lib/frunk.ts
+index 5dcd2fc..5e8bdc2 100644
+--- a/apps/member-os/src/lib/frunk.ts
++++ b/apps/member-os/src/lib/frunk.ts
+@@ -1,4 +1,4 @@
+-// FRUNK GOLF 姫路 会員制度の選択肢・ラベル（Smart Hello外・member-os管理）
++// FRANK GOLF 姫路 会員制度の選択肢・ラベル（Smart Hello外・member-os管理）
+ 
+ export const FRUNK_STORE_CODE = "frunk_himeji";
+ 
+diff --git a/apps/member-os/src/lib/member.ts b/apps/member-os/src/lib/member.ts
+index 270355d..c323f83 100755
+--- a/apps/member-os/src/lib/member.ts
++++ b/apps/member-os/src/lib/member.ts
+@@ -23,7 +23,7 @@ export type HimejiStore = {
+   closeTime: string | null;
+ };
+ 
+-/** 姫路 FRUNK GOLF の店舗・会社を解決（会員ポータルは姫路店スコープ） */
++/** 姫路 FRANK GOLF の店舗・会社を解決（会員ポータルは姫路店スコープ） */
+ export async function resolveHimeji(): Promise<HimejiStore | null> {
+   const admin = createAdmin();
+   const { data } = await admin
+diff --git a/apps/member-os/src/lib/reservation.ts b/apps/member-os/src/lib/reservation.ts
+index 484b314..fa1f760 100755
+--- a/apps/member-os/src/lib/reservation.ts
++++ b/apps/member-os/src/lib/reservation.ts
+@@ -1,4 +1,4 @@
+-// 予約システム（姫路 FRUNK GOLF）共通ロジック
++// 予約システム（姫路 FRANK GOLF）共通ロジック
+ 
+ export const SLOT_MINUTES = 60;
+ export const HIMEJI_STORE_CODE = "frunk_himeji";
+diff --git a/apps/member-os/src/lib/site.ts b/apps/member-os/src/lib/site.ts
+new file mode 100644
+index 0000000..c8ce1d5
+--- /dev/null
++++ b/apps/member-os/src/lib/site.ts
+@@ -0,0 +1,13 @@
++// 公式サイト（sites/frank-golf）へのリンク解決。
++// HPの本番ドメインが決まったら SITE_URL に入れると、
++// Web入会フォーム等の「会員規約」「プライバシーポリシー」リンクが有効になる。
++// 空の間はリンクなしのテキスト表示（同意文言は表示される）。
++export const SITE_URL: string = ""; // 例: "https://frank-golf.jp"
++
++export function siteLink(path: string): string | null {
++  if (!SITE_URL) return null;
++  return `${SITE_URL.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
++}
++
++export const termsUrl = (): string | null => siteLink("terms.html");
++export const privacyUrl = (): string | null => siteLink("privacy.html");
+diff --git a/apps/member-os/src/lib/trial.ts b/apps/member-os/src/lib/trial.ts
+new file mode 100644
+index 0000000..ae79bf6
+--- /dev/null
++++ b/apps/member-os/src/lib/trial.ts
+@@ -0,0 +1,23 @@
++// 体験申込（公開Web・mbr_trial_requests）共通ロジック
++
++export const TRIAL_STATUSES = [
++  { value: "pending", label: "未対応", tone: "warn" as const },
++  { value: "confirmed", label: "日程確定", tone: "ok" as const },
++  { value: "done", label: "来店済", tone: "default" as const },
++  { value: "canceled", label: "キャンセル", tone: "danger" as const },
++];
++export const TRIAL_STATUS_LABEL: Record<string, string> = Object.fromEntries(
++  TRIAL_STATUSES.map((s) => [s.value, s.label])
++);
++export const TRIAL_STATUS_TONE: Record<string, "default" | "ok" | "warn" | "danger"> =
++  Object.fromEntries(TRIAL_STATUSES.map((s) => [s.value, s.tone])) as Record<
++    string,
++    "default" | "ok" | "warn" | "danger"
++  >;
++
++export const TRIAL_EXPERIENCE = [
++  "未経験・これから始めたい",
++  "初心者（100切りを目指したい）",
++  "中級者",
++  "上級者・シングル",
++] as const;
+diff --git a/supabase/migrations/0067_frank_golf_rename.sql b/supabase/migrations/0067_frank_golf_rename.sql
+new file mode 100755
+index 0000000..56128cf
+--- /dev/null
++++ b/supabase/migrations/0067_frank_golf_rename.sql
+@@ -0,0 +1,27 @@
++-- ブランド表記の統一: FRUNK GOLF → FRANK GOLF（DECISIONS #66）
++-- 公式ホームページ（sites/frank-golf）の制作にあたり、正式表記を「FRANK GOLF」に確定。
++--
++-- ■ 変更するもの
++--   stores.name  'FRUNK GOLF 姫路' → 'FRANK GOLF 姫路'（画面に出る表示名のみ）
++--
++-- ■ 変更しないもの（意図的）
++--   stores.code = 'frunk_himeji'  … アプリ側の識別子（FRUNK_STORE_CODE / HIMEJI_STORE_CODE）と
++--                                    一致している必要があるため据え置き。表示には使われない。
++--   frunk_members / frunk_plans / frunk_signup_tokens … テーブル名は識別子。改名は影響範囲が広く益が薄い。
++--
++-- ■ 安全性の確認（適用前に検証済み）
++--   1) apps/genesis kernel.ts storesForSegment('himeji') … name.includes("FRANK"|"FRUNK"|"姫路")
++--      → 「姫路」が残るため改名後も一致する（かつ本コミットで FRANK も明示対応済み）。
++--   2) 0028 の月会費予測関数の除外条件 not ilike '%FRUNK%' は mbr_members.store_name
++--      （Smart Hello由来の外部テキスト）に対するもので、stores.name とは別物 → 影響なし。
++--      ※ Smart Hello 側の表記が変わらない限り、この除外条件は現状のまま有効。
++--   3) 0023_money_store_scope の like '%FRUNK%' は適用済みの一度きりのUPDATE → 再実行されない。
++
++update stores
++   set name = 'FRANK GOLF 姫路',
++       updated_at = now()
++ where code = 'frunk_himeji'
++   and name = 'FRUNK GOLF 姫路';
++
++-- 確認用（適用後に手動で実行）
++-- select id, name, code from stores where code = 'frunk_himeji';
+diff --git a/supabase/migrations/0068_trial_requests_and_frank_plans.sql b/supabase/migrations/0068_trial_requests_and_frank_plans.sql
+new file mode 100755
+index 0000000..07c4415
+--- /dev/null
++++ b/supabase/migrations/0068_trial_requests_and_frank_plans.sql
+@@ -0,0 +1,63 @@
++-- 体験申込（公開Web） ＋ FRANK GOLF 姫路 料金プラン投入（DECISIONS #72）
++-- 公式サイト（sites/frank-golf）の「体験予約」「Web入会」を member-os で受けるための土台。
++--
++-- ■ 1. mbr_trial_requests … 体験申込（公開フォーム・トークン不要）
++--     申込(pending) → スタッフ確認(confirmed) → 対応済(done) / キャンセル(canceled)
++--     入会(frunk_members)とは別テーブル（体験は「人が対応する申込型」）
++-- ■ 2. frunk_plans … 出資資料の実プラン5件を投入（Web入会のプラン選択に使用）
++--     price は税抜・月額。入会金/1日上限は未確定のため null（確定後にUIから編集）
++--
++-- RLS: 既存 frunk_* と同様、enableのみ（ポリシー無し＝service_role[adminクライアント]専用）。
++-- 公開フォームは service_role 経由のサーバーアクションで insert する（RLSをバイパス）。
++
++-- ============ 1. 体験申込テーブル ============
++create table if not exists mbr_trial_requests (
++  id uuid primary key default gen_random_uuid(),
++  company_id uuid not null references companies(id),
++  store_id uuid references stores(id),
++  name text not null,
++  name_kana text,
++  phone text,
++  email text,
++  pref1 text,                 -- 第1希望日時（自由記述）
++  pref2 text,                 -- 第2希望
++  pref3 text,                 -- 第3希望
++  experience text,            -- ゴルフ経験
++  message text,               -- ご質問・ご要望
++  status text not null default 'pending'
++    check (status in ('pending','confirmed','done','canceled')),
++  staff_note text,
++  source text not null default 'web',
++  consent_privacy boolean not null default false,
++  reviewed_by uuid references staff(id),
++  reviewed_at timestamptz,
++  created_at timestamptz not null default now(),
++  updated_at timestamptz not null default now(),
++  deleted_at timestamptz
++);
++create index if not exists idx_mbr_trial_requests_company_status
++  on mbr_trial_requests (company_id, status);
++
++alter table mbr_trial_requests enable row level security;
++
++drop trigger if exists set_updated_at on mbr_trial_requests;
++create trigger set_updated_at before update on mbr_trial_requests
++  for each row execute function app.set_updated_at();
++
++-- ============ 2. FRANK GOLF 姫路 料金プラン投入 ============
++-- company_id / store_id は frunk_himeji 店舗のもの（存在すれば投入）。
++insert into frunk_plans (company_id, store_id, name, monthly_price, joining_fee, max_bookings_per_day, sort_order, active, note)
++select s.company_id, s.id, v.name, v.monthly_price, null, v.max_day, v.sort_order, true, v.note
++from stores s
++cross join (values
++  ('ライト会員',           9800,  1, 1, '平日昼間の利用中心（月8回まで）※表示は税抜'),
++  ('レギュラー会員',      13800,  1, 2, '全営業日・1日1時間通い放題（一番人気）※表示は税抜'),
++  ('マスター会員',        19800,  2, 3, '全営業日・1日最大2時間まで ※表示は税抜'),
++  ('法人ライトプラン',    39800,  1, 4, '最大2名様登録・福利厚生/接待前の調整に ※表示は税抜'),
++  ('法人プレミアムプラン',59800,  2, 5, '最大4名様登録・同伴ビジター無料枠つき ※表示は税抜')
++) as v(name, monthly_price, max_day, sort_order, note)
++where s.code = 'frunk_himeji'
++  and not exists (
++    select 1 from frunk_plans p
++    where p.company_id = s.company_id and p.name = v.name and p.deleted_at is null
++  );
+-- 
+2.34.1
+

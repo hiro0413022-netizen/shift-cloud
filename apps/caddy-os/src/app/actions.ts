@@ -376,27 +376,35 @@ export async function togglePartnerPicker(partnerId: string, show: boolean): Pro
    ============================================================ */
 export async function saveTransportRate(
   clientId: string,
-  partnerId: string,
+  assignee: string, // "p:<partnerId>" | "s:<staffId>"（委託先 or 社員）
   amount: number | null
 ): Promise<{ error?: string }> {
   const actor = await requireActor();
   const admin = createAdmin();
 
-  // 空欄 = 単価を消す（default_transport にフォールバックさせる）
+  const isPartner = assignee.startsWith("p:");
+  const isStaff = assignee.startsWith("s:");
+  if (!isPartner && !isStaff) return { error: "担当種別が不正です" };
+  const refId = assignee.slice(2);
+  const col = isPartner ? "partner_id" : "staff_id";
+
+  // まず既存の単価行を消す（空欄=単価削除＝default_transportにフォールバック）
+  await admin
+    .from("cad_transport_rates")
+    .delete()
+    .eq("company_id", actor.companyId)
+    .eq("client_id", clientId)
+    .eq(col, refId);
+
   if (amount === null || Number.isNaN(amount)) {
-    await admin
-      .from("cad_transport_rates")
-      .delete()
-      .eq("company_id", actor.companyId)
-      .eq("client_id", clientId)
-      .eq("partner_id", partnerId);
     revalidatePath("/masters");
+    revalidatePath("/dispatches");
     return {};
   }
-  const { error } = await admin.from("cad_transport_rates").upsert(
-    { company_id: actor.companyId, client_id: clientId, partner_id: partnerId, amount, deleted_at: null },
-    { onConflict: "company_id,client_id,partner_id" }
-  );
+
+  const row: Record<string, unknown> = { company_id: actor.companyId, client_id: clientId, amount };
+  row[col] = refId;
+  const { error } = await admin.from("cad_transport_rates").insert(row);
   if (error) return { error: error.message };
   revalidatePath("/masters");
   revalidatePath("/dispatches");

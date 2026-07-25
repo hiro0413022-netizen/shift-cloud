@@ -2,6 +2,7 @@ import "server-only";
 // (経営ダッシュボード: 事業別ブレークダウン追加)
 import { createAdmin } from "@/lib/supabase/admin";
 import type { GenesisActor } from "@/lib/auth";
+import { inDateWindow, isStaffMember, isTrialMember, PLACEHOLDER_LEAVE_REASONS } from "@yozan/core/members";
 
 /** すべての重要操作をCompany Eventに記録する（MASTER_PROMPT 3-5） */
 export async function logEvent(
@@ -282,6 +283,8 @@ export type StoreMetric = {
   revenue: number | null; // 当月売上（事業→店舗が1:1のとき按分、不明はnull）
 };
 
+export type SegmentLine = { name: string; kind: string; amount: number };
+
 export type SegmentMetric = {
   code: string;
   name: string;
@@ -291,6 +294,8 @@ export type SegmentMetric = {
   profit: number;
   hasFinance: boolean; // 当月に財務入力があるか
   stores: StoreMetric[];
+  /** 収支のカテゴリ別内訳（#83: カードタップでざっくり見える用） */
+  lines: SegmentLine[];
 };
 
 export type BusinessBreakdown = {
@@ -348,7 +353,7 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
 
   const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes] = await Promise.all([
     admin.from("fin_segments").select("id,name,code").eq("company_id", companyId).is("deleted_at", null),
-    admin.from("fin_categories").select("id,kind").eq("company_id", companyId).is("deleted_at", null),
+    admin.from("fin_categories").select("id,kind,name").eq("company_id", companyId).is("deleted_at", null),
     month
       ? admin.from("fin_entries").select("segment_id,category_id,amount").eq("company_id", companyId).eq("target_month", month).is("deleted_at", null)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
@@ -361,7 +366,11 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
 
   const segments = (segRes.data ?? []) as { id: string; name: string; code: string }[];
   const catKind = new Map<string, string>();
-  for (const c of (catRes.data ?? []) as { id: string; kind: string }[]) catKind.set(c.id, c.kind);
+  const catName = new Map<string, string>();
+  for (const c of (catRes.data ?? []) as { id: string; kind: string; name: string }[]) {
+    catKind.set(c.id, c.kind);
+    catName.set(c.id, c.name);
+  }
   const stores = (storeRes.data ?? []) as { id: string; name: string }[];
 
   // 店舗別カウント
@@ -381,14 +390,14 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
   // 当月ウィンドウ [月初, 翌月初)。leave_date は月末付の退会予定日なので範囲判定する。
   const from = monthStart(); // "YYYY-MM-01"
   const to = nextMonthStart(); // "翌月-01"（ISO日付なので文字列比較で当月判定可能）
-  const inThisMonth = (d: string | null) => !!d && d >= from && d < to;
+  const inThisMonth = (d: string | null) => inDateWindow(d, from, to);
   const memberByStore = new Map<string, number>();
   const joinByStore = new Map<string, number>();
   const leaveCoreByStore = new Map<string, number>();
   const leaveTrialByStore = new Map<string, number>();
   const reasonsByStore = new Map<string, Set<string>>();
   const bump = (m: Map<string, number>, id: string) => m.set(id, (m.get(id) ?? 0) + 1);
-  const PLACEHOLDER_REASONS = new Set(["選択してください", "その他", ""]);
+  // 会員の分類ルール（スタッフ除外・トライアル区別・退会理由の除外語）の正典は @yozan/core/members（#84）
 
   for (const mem of (memberRes.data ?? []) as {
     store_name: string | null;
@@ -399,9 +408,8 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
   }[]) {
     const sid = storeIdForMemberStoreName(mem.store_name, stores);
     if (!sid) continue;
-    const type = mem.member_type ?? "";
-    if (type === "スタッフ") continue; // スタッフは顧客会員から除外
-    const isTrial = type === "トライアル会員";
+    if (isStaffMember(mem.member_type)) continue; // スタッフは顧客会員から除外
+    const isTrial = isTrialMember(mem.member_type);
 
     if (!mem.leave_date && !isTrial) bump(memberByStore, sid); // 在籍（本会員）
     if (inThisMonth(mem.join_date) && !isTrial) bump(joinByStore, sid); // 今月入会（本会員）
@@ -411,7 +419,7 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
       } else {
         bump(leaveCoreByStore, sid); // 本会員退会（痛い）
         const r = (mem.leave_reason ?? "").trim();
-        if (!PLACEHOLDER_REASONS.has(r)) {
+        if (!PLACEHOLDER_LEAVE_REASONS.has(r)) {
           if (!reasonsByStore.has(sid)) reasonsByStore.set(sid, new Set());
           reasonsByStore.get(sid)!.add(r);
         }
@@ -438,8 +446,9 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     };
   };
 
-  // 事業別 財務集計（当月）
+  // 事業別 財務集計（当月）＋カテゴリ別内訳（#83）
   const bySeg = new Map<string, { revenue: number; cogs: number; expense: number }>();
+  const linesBySeg = new Map<string, Map<string, SegmentLine>>();
   for (const e of (entRes.data ?? []) as { segment_id: string; category_id: string; amount: number | string }[]) {
     const kind = catKind.get(e.category_id);
     if (!kind || !e.segment_id) continue;
@@ -449,6 +458,15 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     else if (kind === "cogs") acc.cogs += amt;
     else if (kind === "expense") acc.expense += amt;
     bySeg.set(e.segment_id, acc);
+
+    if (kind === "revenue" || kind === "cogs" || kind === "expense") {
+      const name = catName.get(e.category_id) ?? "その他";
+      const m = linesBySeg.get(e.segment_id) ?? new Map<string, SegmentLine>();
+      const line = m.get(name) ?? { name, kind, amount: 0 };
+      line.amount += amt;
+      m.set(name, line);
+      linesBySeg.set(e.segment_id, m);
+    }
   }
 
   const result: SegmentMetric[] = segments.map((seg) => {
@@ -466,6 +484,11 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
       profit: f.revenue - f.cogs - f.expense,
       hasFinance,
       stores: segStores.map((s) => storeMetric(s, perStoreRevenue)),
+      lines: Array.from(linesBySeg.get(seg.id)?.values() ?? []).sort((a, b) => {
+        const rank = (k: string) => (k === "revenue" ? 0 : k === "cogs" ? 1 : 2);
+        if (rank(a.kind) !== rank(b.kind)) return rank(a.kind) - rank(b.kind);
+        return b.amount - a.amount;
+      }),
     };
   });
 

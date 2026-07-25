@@ -144,6 +144,22 @@ export function byPartner(rows: DispatchRow[]) {
  * - clients に partner_fee（ゴルフ場ごとの委託料 / #62 ③）を含める
  * - transportRates は「clientId__partnerId → 交通費」（#62 ②）。ゴルフ場×キャディで自動入力する
  */
+/**
+ * 自社スタッフ別の交通費（給与で精算する分 / #62 林さん対応）。
+ * 社員の交通費は外注費に入れず給与側で精算するため、給与担当へ渡す月次合計をここで出す。
+ */
+export function byStaff(rows: DispatchRow[]) {
+  const m = new Map<string, { name: string; count: number; transport: number }>();
+  for (const r of rows) {
+    if (!r.staff_id) continue;
+    const cur = m.get(r.staff_id) ?? { name: r.staff?.name ?? "（不明）", count: 0, transport: 0 };
+    cur.count += 1;
+    cur.transport += r.transport_amount;
+    m.set(r.staff_id, cur);
+  }
+  return [...m.values()].sort((a, b) => b.transport - a.transport);
+}
+
 export async function getMasters(companyId: string) {
   const admin = createAdmin();
   const [{ data: clients }, { data: partners }, { data: staff }, { data: rates }] = await Promise.all([
@@ -165,13 +181,15 @@ export async function getMasters(companyId: string) {
     admin.from("staff").select("id, name").eq("company_id", companyId).is("deleted_at", null).order("name"),
     admin
       .from("cad_transport_rates")
-      .select("client_id, partner_id, amount")
+      .select("client_id, partner_id, staff_id, amount")
       .eq("company_id", companyId)
       .is("deleted_at", null),
   ]);
+  // 委託先(partner_id)・社員(staff_id) どちらの単価も同じマップに入れる（idはUUIDで衝突しない）
   const transportRates: Record<string, number> = {};
-  for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string; amount: number }>) {
-    transportRates[`${r.client_id}__${r.partner_id}`] = r.amount;
+  for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string | null; staff_id: string | null; amount: number }>) {
+    const ref = r.partner_id ?? r.staff_id;
+    if (ref) transportRates[`${r.client_id}__${ref}`] = r.amount;
   }
   return {
     clients: (clients ?? []) as Array<{

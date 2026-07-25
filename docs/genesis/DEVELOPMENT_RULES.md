@@ -71,6 +71,12 @@ git push origin main
 
 `git reset` 後にマウント側で大量の `M` が残るのは**VM陳腐化ビューのアーティファクト**。ユーザーPCでは clean なので無視してよい。
 
+### 補足（#77 2026-07-25・ルール改変全権付与に基づく）
+
+- **mountからの `git clone` は45秒でタイムアウトする** → クローンは**GitHubから直接**（`.git/gh_token.txt` のPATで `git clone --depth 1`）。tsc/tests/commit/push は全て /tmp クローンで完結し、GitHubへ直push（Vercelが自動デプロイ）。
+- **デプロイの起点はGenesisホームの承認カードに一本化する**（REDESIGN §6）。チャット/ユーザーPC起点は障害時フォールバック。
+- **教訓（#76）**: #73で新規ファイル（jst.ts・テスト）のコミット漏れ→本番ビルドが5日間ERRORで誰も気づかず。**push後は必ずVercelのビルド結果（READY/ERROR）を確認する**。deployments一覧のERROR放置は禁止。
+
 ## 新アプリのデプロイ自動化（#61 2026-07-16）
 
 **「ユーザーがVercelでプロジェクトを作る」は廃止方向。** Vercel MCP（`deploy_to_vercel` 等）が使えるので、新アプリの本番投入はClaudeがMCP経由で実行する（Root Directory・env投入まで）。`prod_deploy` は AI_RULES で **approval**＝古川さんの承認後に実行。これで OPERATIONS §7 のユーザー手作業（A項ブロッカーの実体）が消える。手作業手順はフォールバックとして OPERATIONS §2/§7 に残す。

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NAV } from "./sidebar";
+import { PRIMARY_NAV, ADMIN_NAV } from "./sidebar";
 
 /**
  * モバイル用ナビ（NEXT_TASKS MB / DESIGN_SYSTEM「モバイル対応」）
@@ -52,7 +52,14 @@ export function MobileNav({ userName }: { userName: string }) {
               </button>
             </div>
             <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-              {NAV.map((item) => {
+              {[...PRIMARY_NAV, { href: "__divider__", label: "管理", icon: "" }, ...ADMIN_NAV].map((item) => {
+                if (item.href === "__divider__") {
+                  return (
+                    <p key="divider" className="mt-3 px-3 pb-1 text-[10px] tracking-[0.2em] text-(--color-dim)">
+                      管理
+                    </p>
+                  );
+                }
                 const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
                 return (
                   <Link

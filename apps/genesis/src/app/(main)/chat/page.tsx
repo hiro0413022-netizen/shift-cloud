@@ -1,6 +1,7 @@
 import { requireGenesisActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { ChatClient } from "./chat-client";
+import { ChatTabs } from "@/components/chat-tabs";
 
 /**
  * データに聞く（Ask Data / migration 0053・DECISIONS #56）
@@ -20,6 +21,7 @@ export default async function ChatPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
+      <ChatTabs active="ask" />
       <h1 className="mb-1 text-xl font-semibold tracking-tight">データに聞く</h1>
       <p className="mb-6 text-sm text-(--color-dim)">
         売上・会員・体験予約・勤怠・給与・経理・契約に、日本語で直接質問できます。

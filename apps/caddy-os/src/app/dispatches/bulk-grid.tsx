@@ -67,6 +67,12 @@ export function BulkGrid({
    * 自社スタッフ（s:）は委託料なし。
    */
   const resolveCost = (clientId: string, assignee: string): { fee: string; transport: string } => {
+    // 社員（自社スタッフ）: 委託料なし。交通費だけ単価表（社員×ゴルフ場）から自動反映
+    if (assignee.startsWith("s:")) {
+      const staffId = assignee.slice(2);
+      const rate = clientId ? transportRates[`${clientId}__${staffId}`] : undefined;
+      return { fee: "", transport: rate ? String(rate) : "" };
+    }
     if (!assignee.startsWith("p:")) return { fee: "", transport: "" };
     const p = partners.find((x) => `p:${x.id}` === assignee);
     const c = clients.find((x) => x.id === clientId);
@@ -187,8 +193,12 @@ export function BulkGrid({
                         update(i, {
                           clientId,
                           sales: c?.unit_price ? String(c.unit_price) : clientId ? r.sales : "0",
-                          // 委託料・交通費もゴルフ場に合わせて入れ直す（委託先が選択済みのとき）
-                          ...(r.assignee.startsWith("p:") ? { fee: cost.fee, transport: cost.transport } : {}),
+                          // 委託料・交通費もゴルフ場に合わせて入れ直す（担当が選択済みのとき）
+                          ...(r.assignee.startsWith("p:")
+                            ? { fee: cost.fee, transport: cost.transport }
+                            : r.assignee.startsWith("s:") && cost.transport
+                              ? { transport: cost.transport }
+                              : {}),
                         });
                       }}
                       onKeyDown={(e) => onKeyDown(e, i)}
@@ -220,6 +230,10 @@ export function BulkGrid({
                         if (v.startsWith("p:")) {
                           const cost = resolveCost(r.clientId, v);
                           update(i, { assignee: v, fee: cost.fee, transport: cost.transport });
+                        } else if (v.startsWith("s:")) {
+                          // 社員: 委託料・手当は封鎖。交通費は単価表にあれば自動、なければ手入力を残す
+                          const cost = resolveCost(r.clientId, v);
+                          update(i, { assignee: v, fee: "", special: "", ...(cost.transport ? { transport: cost.transport } : {}) });
                         } else {
                           update(i, { assignee: v, fee: "", special: "" });
                         }
