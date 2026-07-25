@@ -11,7 +11,7 @@ export default async function MastersPage() {
   const actor = await requireActor();
   const admin = createAdmin();
 
-  const [{ data: clients }, { data: partners }, { data: rates }] = await Promise.all([
+  const [{ data: clients }, { data: partners }, { data: rates }, { data: caddyStaff }] = await Promise.all([
     admin
       .from("cad_clients")
       .select("id, code, name, unit_price, partner_fee, closing_day, payment_day, postal_code, address, has_contract, status")
@@ -26,21 +26,36 @@ export default async function MastersPage() {
       .order("code"),
     admin
       .from("cad_transport_rates")
-      .select("client_id, partner_id, amount")
+      .select("client_id, partner_id, staff_id, amount")
       .eq("company_id", actor.companyId)
+      .is("deleted_at", null),
+    // 交通費単価表に出す社員 = これまでキャディに入った社員（林さん等）
+    admin
+      .from("cad_dispatches")
+      .select("staff_id, staff(name)")
+      .eq("company_id", actor.companyId)
+      .not("staff_id", "is", null)
       .is("deleted_at", null),
   ]);
 
   const cs = (clients ?? []) as Parameters<typeof ClientEditor>[0]["clients"];
   const ps = (partners ?? []) as Parameters<typeof PartnerEditor>[0]["partners"];
   const rateMap: Record<string, number> = {};
-  for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string; amount: number }>) {
-    rateMap[`${r.client_id}__${r.partner_id}`] = r.amount;
+  for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string | null; staff_id: string | null; amount: number }>) {
+    const ref = r.partner_id ?? r.staff_id;
+    if (ref) rateMap[`${r.client_id}__${ref}`] = r.amount;
   }
 
   // 単価表は「有効な取引先」×「台帳表示のキャディ」で作る（列・行を絞って見やすく）
   const activeClients = cs.filter((c) => c.status === "active");
   const pickerPartners = ps.filter((p) => p.status === "active" && p.show_in_picker);
+
+  // キャディに入る社員（重複排除）
+  const staffMap = new Map<string, string>();
+  for (const d of (caddyStaff ?? []) as Array<{ staff_id: string | null; staff: { name: string } | null }>) {
+    if (d.staff_id && !staffMap.has(d.staff_id)) staffMap.set(d.staff_id, d.staff?.name ?? "（社員）");
+  }
+  const caddyStaffList = [...staffMap.entries()].map(([id, name]) => ({ id, name }));
 
   return (
     <main className="mx-auto max-w-7xl p-6">
@@ -74,10 +89,10 @@ export default async function MastersPage() {
 
       <section className={cardCls}>
         <h2 className="mb-3 font-semibold">交通費 単価表（キャディ × ゴルフ場・#62 ②）</h2>
-        {activeClients.length === 0 || pickerPartners.length === 0 ? (
+        {activeClients.length === 0 || (pickerPartners.length === 0 && caddyStaffList.length === 0) ? (
           <p className="text-sm text-(--color-dim)">取引先と委託先を登録すると単価表が使えます</p>
         ) : (
-          <TransportMatrix clients={activeClients} partners={pickerPartners} rates={rateMap} />
+          <TransportMatrix clients={activeClients} partners={pickerPartners} staff={caddyStaffList} rates={rateMap} />
         )}
       </section>
     </main>
