@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-07-25 — demo-sales: デモサイトv2（6ページ化＋Web予約デモ＋サンプル画像）＋管理フォーム改善（DECISIONS #79）
+- feat(demo-sales): デモを6ページ構成に全面改修（render-demo.ts）— ハッシュルーティング（ホーム/診療案内/初めての方へFAQ/院長・院内紹介/アクセス/Web予約）、スクロール連動アニメ・ヘッダー縮小・モバイルドロワー（prefers-reduced-motion対応）
+- feat(demo-sales): Web予約の完全デモ動作 — カレンダー（休診日は診療時間表から自動判定）→時間枠→入力→確認→完了。送信・保存なし（※デモ表記）
+- feat(demo-sales): サンプル画像 `lib/sample-art.ts` 新規 — 写真未設定箇所（ヒーロー/ギャラリー6枚/院長/地図）にテンプレート配色のSVGイラスト（※仮画像ラベル）を自動差し込み。実写真が常に優先
+- feat(demo-sales): 業種別の症状例(SYMPTOMS)・FAQ(EXTRA_FAQ)をtemplates.tsに追加
+- feat(demo-sales): /p/[id] デモ生成フォームを①基本②文章③診療内容・時間④写真⑤修正指示のセクション構成に再編。空欄時に入る業種標準値をプレースホルダー表示。お知らせ(news)・採用(recruit)欄を追加（actions.tsにnewsパース追加）。webReserveチェックボックスは廃止（予約デモ常時搭載）
+
 ## 2026-07-25 — Genesis大改修P2後半: 判断のホーム完結拡大＋開発自律化配線（DECISIONS #78）
 - feat(genesis): Web入会承認をホームで完結（decideJoinRequest=会員番号FR####発行・在籍化）。判断SLA=24時間放置に琥珀バッジ＋最上位昇格
 - feat(genesis): /chatと/commandをタブ統合（chat-tabs.tsx）。事業別パフォーマンスをホーム→/financeへ移設

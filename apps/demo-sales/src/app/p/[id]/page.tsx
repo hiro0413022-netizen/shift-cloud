@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
@@ -30,6 +31,20 @@ const ACT_LABELS: Record<string, string> = {
   note: "メモ",
   directive: "指示",
 };
+
+/** デモ生成フォームのセクション枠（番号バッジ＋タイトル＋補足） */
+function FormSec({ no, title, hint, children }: { no: string; title: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-(--color-line) p-3">
+      <div className="mb-2 flex flex-wrap items-baseline gap-2">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent) text-xs font-bold text-white">{no}</span>
+        <span className="text-sm font-semibold">{title}</span>
+        {hint && <span className="text-xs text-(--color-dim)">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default async function ProspectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -203,103 +218,140 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
           <summary className="cursor-pointer text-sm font-medium text-(--color-accent)">
             {latestDemo ? "デモを修正して再生成（面談中の要望はここに入力）" : "デモを生成する"}
           </summary>
-          <form action={gen} className="mt-3 grid gap-2 text-sm lg:grid-cols-2">
+          <form action={gen} className="mt-4 grid gap-5 text-sm">
             <input type="hidden" name="mode" value={latestDemo ? "update" : "create"} />
             <input type="hidden" name="industry" value={p.industry} />
-            <label className="text-xs text-(--color-dim)">院名（デモ表示名）
-              <input name="clinicName" defaultValue={bstr("clinicName") || p.name} className={inputCls} />
-            </label>
-            <ColorField name="colorPrimary" initial={bstr("colorPrimary")} templateColor={tpl.palette.primary} />
-            <label className="text-xs text-(--color-dim)">キャッチコピー（空=業種標準）
-              <textarea name="tagline" defaultValue={bstr("tagline")} rows={2} className={inputCls} />
-            </label>
-            <label className="text-xs text-(--color-dim)">導入文
-              <textarea name="intro" defaultValue={bstr("intro")} rows={2} className={inputCls} />
-            </label>
-            <label className="text-xs text-(--color-dim)">電話番号
-              <input name="phone" defaultValue={bstr("phone") || (p.phone ?? "")} className={inputCls} />
-            </label>
-            <label className="text-xs text-(--color-dim)">住所
-              <input name="address" defaultValue={bstr("address") || (p.address ?? "")} className={inputCls} />
-            </label>
-            <label className="text-xs text-(--color-dim)">交通アクセス
-              <input name="access" defaultValue={bstr("access")} className={inputCls} />
-            </label>
-            <label className="text-xs text-(--color-dim)">駐車場
-              <input name="parking" defaultValue={bstr("parking")} className={inputCls} />
-            </label>
-            <label className="text-xs text-(--color-dim)">診療時間表（1行=1段・セルは | 区切り。1行目=曜日ヘッダ）
-              <textarea name="hours" rows={3} placeholder={"|月|火|水|木|金|土|日祝\n9:00〜12:00|●|●|●|●|●|●|休"} className={inputCls} defaultValue={Array.isArray(brief.hoursRows) ? (brief.hoursRows as string[][]).map((r) => r.join("|")).join("\n") : ""} />
-            </label>
-            <label className="text-xs text-(--color-dim)">休診日等の注記
-              <input name="hoursNote" defaultValue={bstr("hoursNote")} className={inputCls} />
-            </label>
-            <label className="text-xs text-(--color-dim)">診療・サービス（1行1件「名前: 説明」）
-              <textarea name="services" rows={3} className={inputCls} defaultValue={Array.isArray(brief.services) ? (brief.services as { name: string; desc: string }[]).map((s) => `${s.name}: ${s.desc}`).join("\n") : ""} />
-            </label>
-            <label className="text-xs text-(--color-dim)">強み（1行1件）
-              <textarea name="strengths" rows={3} className={inputCls} defaultValue={Array.isArray(brief.strengths) ? (brief.strengths as string[]).join("\n") : ""} />
-            </label>
-            <label className="text-xs text-(--color-dim)">初診案内（1行1件）
-              <textarea name="firstVisit" rows={3} className={inputCls} defaultValue={Array.isArray(brief.firstVisit) ? (brief.firstVisit as string[]).join("\n") : ""} />
-            </label>
-            <label className="text-xs text-(--color-dim)">予約方法の説明
-              <input name="reserveNote" defaultValue={bstr("reserveNote")} className={inputCls} />
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-(--color-dim)">院長肩書
-                <input name="directorTitle" defaultValue={bstr("directorTitle") || "院長"} className={inputCls} />
+
+            <p className="rounded-lg bg-(--color-panel-2) px-3 py-2 text-xs text-(--color-dim)">
+              6ページ構成（ホーム／{tpl.vocab.services}／{tpl.vocab.firstVisit}／院長・院内紹介／アクセス／Web予約デモ）で生成されます。
+              <b>空欄はうすい文字の内容（業種標準・※仮）で自動補完</b>。写真未設定の箇所はサンプルイラスト（※仮画像ラベル付き）が入ります。
+            </p>
+
+            {/* ① 基本設定 */}
+            <FormSec no="1" title="基本設定" hint="院名・色・連絡先">
+              <div className="grid gap-2 lg:grid-cols-2">
+                <label className="text-xs text-(--color-dim)">院名（デモ表示名）
+                  <input name="clinicName" defaultValue={bstr("clinicName") || p.name} className={inputCls} />
+                </label>
+                <ColorField name="colorPrimary" initial={bstr("colorPrimary")} templateColor={tpl.palette.primary} />
+                <label className="text-xs text-(--color-dim)">電話番号
+                  <input name="phone" defaultValue={bstr("phone") || (p.phone ?? "")} placeholder="00-0000-0000（空=仮表記）" className={inputCls} />
+                </label>
+                <label className="text-xs text-(--color-dim)">住所
+                  <input name="address" defaultValue={bstr("address") || (p.address ?? "")} placeholder="住所を掲載します（空=仮表記）" className={inputCls} />
+                </label>
+                <label className="text-xs text-(--color-dim)">交通アクセス
+                  <input name="access" defaultValue={bstr("access")} placeholder="例: ○○駅から徒歩5分" className={inputCls} />
+                </label>
+                <label className="text-xs text-(--color-dim)">駐車場
+                  <input name="parking" defaultValue={bstr("parking")} placeholder="例: 医院前に5台分あり" className={inputCls} />
+                </label>
+              </div>
+            </FormSec>
+
+            {/* ② 文章 */}
+            <FormSec no="2" title="文章" hint="キャッチコピー・ごあいさつ・採用">
+              <div className="grid gap-2 lg:grid-cols-2">
+                <label className="text-xs text-(--color-dim)">キャッチコピー
+                  <textarea name="tagline" defaultValue={bstr("tagline")} rows={2} placeholder={tpl.defaults.tagline.replace(/\n/g, "")} className={inputCls} />
+                </label>
+                <label className="text-xs text-(--color-dim)">導入文
+                  <textarea name="intro" defaultValue={bstr("intro")} rows={2} placeholder={tpl.defaults.intro} className={inputCls} />
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-(--color-dim)">院長肩書
+                    <input name="directorTitle" defaultValue={bstr("directorTitle") || "院長"} className={inputCls} />
+                  </label>
+                  <label className="text-xs text-(--color-dim)">院長名
+                    <input name="directorName" defaultValue={bstr("directorName")} placeholder="空=仮表記" className={inputCls} />
+                  </label>
+                </div>
+                <label className="text-xs text-(--color-dim)">院長メッセージ（院長・院内紹介ページに全文掲載）
+                  <textarea name="directorMessage" defaultValue={bstr("directorMessage")} rows={2} placeholder="空=仮文章（院長先生のお考えを伺って作成します）" className={inputCls} />
+                </label>
+                <label className="text-xs text-(--color-dim)">採用メッセージ
+                  <input name="recruit" defaultValue={bstr("recruit")} placeholder="例: 受付スタッフ・看護師を募集しています（空=仮文章）" className={inputCls} />
+                </label>
+                <label className="text-xs text-(--color-dim)">お知らせ（1行1件「日付|内容」）
+                  <textarea name="news" rows={2} placeholder={"2026.07|ホームページをリニューアルしました\n2026.07|Web予約を開始しました"} className={inputCls} defaultValue={Array.isArray(brief.news) ? (brief.news as { date: string; text: string }[]).map((n) => `${n.date}|${n.text}`).join("\n") : ""} />
+                </label>
+              </div>
+            </FormSec>
+
+            {/* ③ 診療内容・診療時間 */}
+            <FormSec no="3" title={`${tpl.vocab.services}・${tpl.vocab.hours}`} hint="Web予約デモの休診日はこの時間表から自動判定">
+              <div className="grid gap-2 lg:grid-cols-2">
+                <label className="text-xs text-(--color-dim)">診療・サービス（1行1件「名前: 説明」）
+                  <textarea name="services" rows={3} placeholder={tpl.defaults.services.map((sv) => `${sv.name}: ${sv.desc}`).join("\n")} className={inputCls} defaultValue={Array.isArray(brief.services) ? (brief.services as { name: string; desc: string }[]).map((sv) => `${sv.name}: ${sv.desc}`).join("\n") : ""} />
+                </label>
+                <label className="text-xs text-(--color-dim)">強み（1行1件・「選ばれる理由」に表示）
+                  <textarea name="strengths" rows={3} placeholder={tpl.defaults.strengths.join("\n")} className={inputCls} defaultValue={Array.isArray(brief.strengths) ? (brief.strengths as string[]).join("\n") : ""} />
+                </label>
+                <label className="text-xs text-(--color-dim)">初診案内（1行1件・「{tpl.vocab.firstVisit}」ページに表示）
+                  <textarea name="firstVisit" rows={3} placeholder={tpl.defaults.firstVisit.join("\n")} className={inputCls} defaultValue={Array.isArray(brief.firstVisit) ? (brief.firstVisit as string[]).join("\n") : ""} />
+                </label>
+                <label className="text-xs text-(--color-dim)">診療時間表（1行=1段・セルは | 区切り。1行目=曜日ヘッダ。●=診療 休=休診）
+                  <textarea name="hours" rows={3} placeholder={tpl.defaults.hoursRows.map((r) => r.join("|")).join("\n")} className={inputCls} defaultValue={Array.isArray(brief.hoursRows) ? (brief.hoursRows as string[][]).map((r) => r.join("|")).join("\n") : ""} />
+                </label>
+                <label className="text-xs text-(--color-dim)">休診日等の注記
+                  <input name="hoursNote" defaultValue={bstr("hoursNote")} placeholder={tpl.defaults.hoursNote} className={inputCls} />
+                </label>
+                <label className="text-xs text-(--color-dim)">予約方法の説明
+                  <input name="reserveNote" defaultValue={bstr("reserveNote")} placeholder={tpl.defaults.reserveNote} className={inputCls} />
+                </label>
+              </div>
+            </FormSec>
+
+            {/* ④ 写真 */}
+            <FormSec no="4" title="写真" hint="未設定の箇所はサンプルイラスト（※仮画像）で自動補完・アップロードすれば実写真が優先">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <ImageField
+                  prospectId={id}
+                  name="logoImage"
+                  label="ロゴ（ヘッダー院名の左・フッターに表示）"
+                  hint="PNG推奨（透過のまま表示）。未設定ならロゴなしで院名テキストのみ"
+                  initial={bstr("logoImage")}
+                  transparent
+                />
+                <ImageField
+                  prospectId={id}
+                  name="heroImage"
+                  label="ヘッダー（トップの大きな写真）"
+                  hint="外観・待合室・スタッフ集合など。未設定ならサンプルイラスト（※仮画像）"
+                  initial={bstr("heroImage")}
+                />
+                <label className="text-xs text-(--color-dim)">ヒーロー写真の見せ方（実写真がある時のみ有効）
+                  <select name="heroStyle" defaultValue={bstr("heroStyle") || "overlay"} className={inputCls}>
+                    {Object.entries(HERO_STYLES).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+                <ImageField
+                  prospectId={id}
+                  name="directorImage"
+                  label="院長・スタッフ写真（ごあいさつ欄）"
+                  hint="未設定ならシルエットのサンプル画像"
+                  initial={bstr("directorImage")}
+                />
+                <GalleryField
+                  prospectId={id}
+                  name="gallery"
+                  initial={Array.isArray(brief.gallery) ? (brief.gallery as { url: string; caption?: string }[]) : []}
+                />
+              </div>
+            </FormSec>
+
+            {/* ⑤ 生成 */}
+            <div className="rounded-lg border border-(--color-accent) bg-(--color-panel-2) p-3">
+              <label className="text-xs text-(--color-dim)">修正指示（履歴に残る。例:「院長先生の希望で緑基調に」「猫専用待合室を強調」）
+                <input name="instruction" placeholder="今回の変更内容・面談中の要望" className={inputCls} />
               </label>
-              <label className="text-xs text-(--color-dim)">院長名
-                <input name="directorName" defaultValue={bstr("directorName")} className={inputCls} />
-              </label>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button className={btnCls}>{latestDemo ? `デモを再生成（v${latestDemo.version + 1}）` : "デモを生成"}</button>
+                <span className="text-xs text-(--color-dim)">生成は即時（数秒）。面談中のその場修正にも使えます。</span>
+              </div>
             </div>
-            <label className="text-xs text-(--color-dim)">院長メッセージ
-              <textarea name="directorMessage" defaultValue={bstr("directorMessage")} rows={2} className={inputCls} />
-            </label>
-            <label className="flex items-center gap-2 text-xs text-(--color-dim)">
-              <input type="checkbox" name="webReserve" defaultChecked={brief.webReserve === true} />
-              Web予約ボタンも見せる（電話中心なら外す）
-            </label>
-            <div className="lg:col-span-2 mt-2 grid gap-3 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3 sm:grid-cols-2">
-              <ImageField
-                prospectId={id}
-                name="logoImage"
-                label="ロゴ（ヘッダー院名の左・フッターに表示）"
-                hint="PNG推奨（透過のまま表示）。未設定ならロゴなしで院名テキストのみ"
-                initial={bstr("logoImage")}
-                transparent
-              />
-              <ImageField
-                prospectId={id}
-                name="heroImage"
-                label="ヘッダー（トップの大きな写真）"
-                hint="外観・待合室・スタッフ集合など。未設定なら業種カラーのグラデーション"
-                initial={bstr("heroImage")}
-              />
-              <label className="text-xs text-(--color-dim)">ヒーロー写真の見せ方（写真がある時のみ）
-                <select name="heroStyle" defaultValue={bstr("heroStyle") || "overlay"} className={inputCls}>
-                  {Object.entries(HERO_STYLES).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
-              </label>
-              <ImageField
-                prospectId={id}
-                name="directorImage"
-                label="院長・スタッフ写真（ごあいさつ欄）"
-                initial={bstr("directorImage")}
-              />
-              <GalleryField
-                prospectId={id}
-                name="gallery"
-                initial={Array.isArray(brief.gallery) ? (brief.gallery as { url: string; caption?: string }[]) : []}
-              />
-            </div>
-            <label className="text-xs text-(--color-dim) lg:col-span-2">修正指示（履歴に残る。例:「院長先生の希望で緑基調に」「猫専用待合室を強調」）
-              <input name="instruction" placeholder="今回の変更内容・面談中の要望" className={inputCls} />
-            </label>
-            <button className={`${btnCls} w-fit lg:col-span-2`}>{latestDemo ? "デモを再生成（v" + (latestDemo.version + 1) + "）" : "デモを生成"}</button>
           </form>
         </details>
       </section>

@@ -187,6 +187,17 @@ function briefFromForm(fd: FormData, base: Partial<DemoBrief>): DemoBrief {
       })
       .filter((x) => x.name);
   else if (base.services) brief.services = base.services;
+  // お知らせ: 「日付|内容」形式（1行1件）
+  const newsRaw = s(fd, "news");
+  if (newsRaw)
+    brief.news = newsRaw
+      .split("\n")
+      .map((r) => {
+        const [dt, ...rest] = r.split("|");
+        return { date: dt.trim(), text: rest.join("|").trim() };
+      })
+      .filter((x) => x.date && x.text);
+  else if (base.news) brief.news = base.news;
 
   const instruction = s(fd, "instruction");
   if (instruction) brief.instructions = [...(brief.instructions ?? []), `${new Date().toISOString().slice(0, 10)}: ${instruction}`];
