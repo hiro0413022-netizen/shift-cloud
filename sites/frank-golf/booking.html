@@ -19,7 +19,7 @@
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://frankgolf.jp/assets/ogp.png">
-<meta name="theme-color" content="#101210">
+<meta name="theme-color" content="#FFFDF8">
 <link rel="canonical" href="https://frankgolf.jp/booking.html">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
@@ -84,12 +84,12 @@
 
     <div class="card rv" style="margin-top:30px;padding:22px" id="bk-app">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <label style="font-size:12px">会員番号<input id="bk-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
-        <label style="font-size:12px">電話番号 下4桁<input id="bk-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
+        <label style="font-size:12px">会員番号<input id="bk-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
+        <label style="font-size:12px">電話番号 下4桁<input id="bk-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-        <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
-        <label style="font-size:12px">利用時間<select id="bk-min" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit">
+        <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
+        <label style="font-size:12px">利用時間<select id="bk-min" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit">
           <option value="30">30分</option><option value="60" selected>1時間</option><option value="90">1時間30分</option><option value="120">2時間</option>
         </select></label>
       </div>
@@ -191,7 +191,7 @@
         j.slots.forEach(function(t){
           var used=(j.taken[b.id]||[]).indexOf(t)>=0;
           h+= used?'<td style="padding:2px;text-align:center;opacity:.25">×</td>'
-                 :'<td style="padding:2px;text-align:center"><button type="button" data-bay="'+b.code+'" data-t="'+t+'" style="cursor:pointer;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;border-radius:6px;padding:2px 6px">○</button></td>';
+                 :'<td style="padding:2px;text-align:center"><button type="button" data-bay="'+b.code+'" data-t="'+t+'" style="cursor:pointer;border:1px solid rgba(43,50,41,.3);background:transparent;color:inherit;border-radius:6px;padding:2px 6px">○</button></td>';
         });
         h+="</tr>";
       });
@@ -200,7 +200,7 @@
       $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(btn){
         btn.addEventListener("click",function(){
           $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(b2){b2.style.background="transparent"});
-          btn.style.background="rgba(255,255,255,.25)";
+          btn.style.background="rgba(53,132,90,.25)";
           sel={bay:btn.getAttribute("data-bay"),t:btn.getAttribute("data-t")};
           var old=$("bk-go"); if(old) old.remove();
           var p=document.createElement("p"); p.id="bk-go"; p.style.marginTop="12px";
@@ -230,7 +230,7 @@
       if(j.error){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
       if(!j.bookings.length){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後の予約はありません。</p>';return}
       var h='<p style="font-size:13px">'+j.name+"様の予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
-      j.bookings.forEach(function(b){h+='<li style="margin-top:6px">'+b.booked_date+" "+String(b.start_time).slice(0,5)+"〜"+String(b.end_time).slice(0,5)+"（"+(b.frunk_bays?b.frunk_bays.name:"")+'） <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>'});
+      j.bookings.forEach(function(b){h+='<li style="margin-top:6px">'+b.booked_date+" "+String(b.start_time).slice(0,5)+"〜"+String(b.end_time).slice(0,5)+"（"+(b.frunk_bays?b.frunk_bays.name:"")+'） <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(43,50,41,.35);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>'});
       h+="</ul>";
       $("bk-mylist").innerHTML=h;
       $("bk-mylist").querySelectorAll("button[data-id]").forEach(function(btn){

@@ -1,4 +1,4 @@
-﻿# FRANK #90修正＋実写写真の反映（2026-07-26）
+﻿# FRANK #90修正＋#91白ベースリニューアル＋実写写真（2026-07-26）
 # 内容: ①/api/public公開パス修正（予約API復旧） ②DREAM HOUSE写真をダウンロードしてサイトに配置（許諾済）
 # 実行方法:
 #   cd "C:\Users\hiro0\Claude\Projects\YOZAN GENESIS"; .\commit-and-deploy.ps1
@@ -31,7 +31,7 @@ Write-Host "[3/6] コミット（先にローカルを確定＝ローカルが�
 git restore --staged package-lock.json 2>$null
 git restore package-lock.json 2>$null
 git add apps/genesis/src apps/lesson-os/src apps/shift-cloud/src sites/frank-golf supabase/migrations docs/genesis/DECISIONS.md commit-and-deploy.ps1
-git commit -m "fix(genesis): /api/publicを公開パスに追加(#90) + feat(site): DREAM HOUSE実写写真6枚を反映（許諾済）"
+git commit -m "fix(genesis): /api/public公開パス(#90) + feat(site): 白ベースにリニューアル(#91)・ロゴ・実写写真反映"
 
 Write-Host "[4/6] リモートと統合（衝突はローカル優先）..." -ForegroundColor Cyan
 git pull --no-rebase --no-edit -X ours origin main

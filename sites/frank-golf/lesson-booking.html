@@ -19,7 +19,7 @@
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://frankgolf.jp/assets/ogp.png">
-<meta name="theme-color" content="#101210">
+<meta name="theme-color" content="#FFFDF8">
 <link rel="canonical" href="https://frankgolf.jp/lesson-booking.html">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
@@ -84,8 +84,8 @@
 
     <div class="card rv" style="margin-top:30px;padding:22px" id="ls-app">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <label style="font-size:12px">会員番号<input id="ls-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
-        <label style="font-size:12px">電話番号 下4桁<input id="ls-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit"></label>
+        <label style="font-size:12px">会員番号<input id="ls-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
+        <label style="font-size:12px">電話番号 下4桁<input id="ls-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
       </div>
       <p id="ls-status" style="margin-top:12px;font-size:13px;opacity:.8">予約可能な枠を読み込んでいます…</p>
       <div id="ls-list" style="margin-top:10px"></div>
@@ -191,7 +191,7 @@
             +'<span style="opacity:.8">'+s.coach+" コーチ</span>"
             +(s.bay?'<span style="opacity:.6">'+s.bay+"</span>":"")
             +(s.note?'<span style="opacity:.6">'+s.note+"</span>":"")
-            +'<button type="button" data-id="'+s.id+'" data-l="'+fmt(d)+" "+s.start+'" style="cursor:pointer;border:1px solid rgba(255,255,255,.3);background:transparent;color:inherit;border-radius:6px;padding:3px 10px;font-size:12px">予約する</button>'
+            +'<button type="button" data-id="'+s.id+'" data-l="'+fmt(d)+" "+s.start+'" style="cursor:pointer;border:1px solid rgba(43,50,41,.35);background:transparent;color:inherit;border-radius:6px;padding:3px 10px;font-size:12px">予約する</button>'
             +"</div>";
         });
       });
@@ -215,7 +215,7 @@
       if(j.error){$("ls-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
       if(!j.lessons.length){$("ls-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後のレッスン予約はありません。</p>';return}
       var h='<p style="font-size:13px">'+j.name+"様のレッスン予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
-      j.lessons.forEach(function(b){h+='<li style="margin-top:6px">'+fmt(b.date)+" "+b.start+"〜"+b.end+"（"+b.coach+" コーチ"+(b.bay?"・"+b.bay:"")+'） <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>'});
+      j.lessons.forEach(function(b){h+='<li style="margin-top:6px">'+fmt(b.date)+" "+b.start+"〜"+b.end+"（"+b.coach+" コーチ"+(b.bay?"・"+b.bay:"")+'） <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(43,50,41,.35);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>'});
       h+="</ul>";
       $("ls-mylist").innerHTML=h;
       $("ls-mylist").querySelectorAll("button[data-id]").forEach(function(btn){

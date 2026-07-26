@@ -6,27 +6,27 @@
    ============================================================ */
 
 :root {
-  /* --- 面 --- */
-  --ink:        #101210;   /* ベース: 少し緑を含む温かい黒 */
-  --ink-2:      #171A17;   /* セクション交互背景 */
-  --panel:      #1D211D;   /* カード */
-  --panel-2:    #242924;   /* カード(明) */
+  /* --- 面（白ベース×ベージュ 2026-07 リニューアル・ロゴ準拠） --- */
+  --ink:        #FFFDF8;   /* ベース: 温かみのある白 */
+  --ink-2:      #F6F1E4;   /* セクション交互背景: ベージュ */
+  --panel:      #FFFFFF;   /* カード */
+  --panel-2:    #FBF8F0;   /* カード(ベージュ寄り) */
   --line:       #33393300; /* 使用しない(placeholder) */
-  --border:     rgba(232, 226, 212, 0.12);
-  --border-str: rgba(232, 226, 212, 0.22);
+  --border:     rgba(43, 50, 41, 0.12);
+  --border-str: rgba(43, 50, 41, 0.24);
 
   /* --- 文字 --- */
-  --txt:        #E8E2D4;   /* 本文: 純白でなくウォームアイボリー */
-  --txt-str:    #F7F3E9;
-  --dim:        #9C978A;
+  --txt:        #3A4237;   /* 本文: 緑を含むチャコール */
+  --txt-str:    #232B21;
+  --dim:        #7B8175;
 
   /* --- アクセント --- */
-  --green:      #3E8E63;   /* ディープモスグリーン */
+  --green:      #35845A;   /* ディープモスグリーン */
   --green-2:    #2A6244;
-  --green-glow: rgba(62, 142, 99, 0.18);
-  --brass:      #C9A24C;   /* ブラス: ラウンジの間接照明 */
-  --brass-2:    #E3C177;
-  --brass-glow: rgba(201, 162, 76, 0.16);
+  --green-glow: rgba(53, 132, 90, 0.14);
+  --brass:      #D99A2B;   /* ロゴのスマイルイエロー */
+  --brass-2:    #A8771B;   /* 濃いブラス（白地の文字用） */
+  --brass-glow: rgba(217, 154, 43, 0.16);
 
   /* --- タイポ --- */
   --f-en: "Outfit", "Helvetica Neue", Arial, sans-serif;
@@ -152,15 +152,17 @@ ul { margin: 0; padding: 0; list-style: none; }
   position: fixed; inset: var(--bar-h) 0 auto 0; z-index: 50;
   height: var(--nav-h);
   display: flex; align-items: center;
-  background: rgba(16, 18, 16, 0.72);
+  background: rgba(255, 253, 248, 0.82);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border-bottom: 1px solid transparent;
   transition: background .3s var(--ease), border-color .3s var(--ease);
 }
-.nav.is-stuck { background: rgba(16, 18, 16, 0.95); border-bottom-color: var(--border); }
+.nav.is-stuck { background: rgba(255, 253, 248, 0.96); border-bottom-color: var(--border); box-shadow: 0 6px 24px -18px rgba(43,50,41,.35); }
 .nav__in { width: min(100% - 32px, 1280px); margin-inline: auto; display: flex; align-items: center; gap: 20px; }
 
+/* ロゴ画像（ヒーロー・フッター用） */
+.logo-img { display: block; width: min(220px, 42vw); height: auto; }
 /* ロゴ（画像なしで成立するロゴタイプ） */
 .logo { display: flex; align-items: baseline; gap: 8px; flex: none; }
 .logo__mark {
@@ -282,11 +284,10 @@ ul { margin: 0; padding: 0; list-style: none; }
   position: absolute; inset: 0; z-index: 0;
   background-color: var(--ink);
   background-image:
+    linear-gradient(180deg, rgba(255,253,248,.9), rgba(255,253,248,.68) 46%, var(--ink)),
     radial-gradient(120% 90% at 78% 18%, var(--brass-glow), transparent 55%),
-    radial-gradient(100% 80% at 12% 82%, var(--green-glow), transparent 58%),
-    linear-gradient(180deg, rgba(11,13,11,.72), rgba(16,18,16,.86) 60%, var(--ink)),
     var(--hero-img, none);
-  background-size: cover, cover, cover, cover;
+  background-size: cover, cover, cover;
   background-position: center;
   background-repeat: no-repeat;
 }
@@ -295,7 +296,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   content: "";
   position: absolute; inset: 0;
   background-image:
-    linear-gradient(90deg, rgba(232,226,212,.045) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(43,50,41,.05) 1px, transparent 1px);
   background-size: 96px 100%;
   mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
@@ -307,7 +308,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   font-size: 11px; font-weight: 600; letter-spacing: 0.28em;
   color: var(--brass);
   border: 1px solid var(--brass-glow);
-  background: rgba(201,162,76,.07);
+  background: rgba(217,154,43,.1);
   border-radius: 999px; padding: 7px 16px;
   margin-bottom: 30px;
 }
@@ -318,16 +319,16 @@ ul { margin: 0; padding: 0; list-style: none; }
   line-height: 1.32;
   letter-spacing: 0.045em;
   color: var(--txt-str);
-  text-shadow: 0 2px 40px rgba(0,0,0,.5);
+
 }
 .hero__copy span { display: block; }
-.hero__copy .l2 { color: var(--brass-2); }
+.hero__copy .l2 { color: var(--green-2); }
 .hero__sub {
   margin-top: 30px;
   max-width: 60ch;
   font-size: clamp(14px, 1.5vw, 16px);
   line-height: 2.15;
-  color: rgba(232, 226, 212, 0.82);
+  color: var(--txt);
 }
 .hero__cta { margin-top: 40px; display: flex; flex-wrap: wrap; gap: 14px; }
 .hero__meta {
@@ -360,7 +361,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   position: relative;
   background:
     radial-gradient(90% 120% at 84% 0%, var(--brass-glow), transparent 60%),
-    linear-gradient(180deg, #0B0D0B, var(--ink));
+    linear-gradient(180deg, var(--ink-2), var(--ink));
   border-bottom: 1px solid var(--border);
 }
 .crumb { font-size: 12px; color: var(--dim); margin-bottom: 22px; letter-spacing: .05em; }
@@ -386,13 +387,13 @@ ul { margin: 0; padding: 0; list-style: none; }
 .media-frame:hover img { transform: scale(1.03); }
 .media-frame::after {
   content: ""; position: absolute; inset: 0;
-  background: linear-gradient(180deg, transparent 55%, rgba(9,11,9,.55));
+  background: linear-gradient(180deg, transparent 55%, rgba(20,26,20,.5));
   pointer-events: none;
 }
 .media-cap {
   position: absolute; left: 18px; bottom: 14px; z-index: 1;
   font-family: var(--f-en); font-size: 11px; letter-spacing: .18em;
-  color: var(--brass-2);
+  color: #F7F3E9; text-shadow: 0 1px 8px rgba(0,0,0,.55);
 }
 .media-tall .media-frame img { aspect-ratio: 4 / 5; }
 
@@ -403,9 +404,10 @@ ul { margin: 0; padding: 0; list-style: none; }
 .grid--4 { grid-template-columns: repeat(4, 1fr); }
 
 .card {
-  background: linear-gradient(180deg, var(--panel), rgba(29,33,29,.55));
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 18px;
+  box-shadow: 0 18px 40px -30px rgba(43,50,41,.28);
   padding: 32px 28px;
   position: relative;
   overflow: hidden;
@@ -476,10 +478,10 @@ ul { margin: 0; padding: 0; list-style: none; }
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 36px 30px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: var(--panel);
   display: flex; flex-direction: column;
 }
-.plan--feat { border-color: var(--brass); box-shadow: 0 24px 60px -34px var(--brass); }
+.plan--feat { border-color: var(--brass); box-shadow: 0 24px 60px -34px rgba(217,154,43,.7); }
 .plan__badge {
   align-self: flex-start;
   font-family: var(--f-en); font-size: 10px; letter-spacing: .2em; font-weight: 600;
@@ -557,7 +559,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   position: relative; overflow: hidden;
   background:
     radial-gradient(80% 130% at 50% 0%, var(--green-glow), transparent 60%),
-    linear-gradient(180deg, var(--ink-2), #0B0D0B);
+    linear-gradient(180deg, var(--ink-2), #EFE8D8);
   border-top: 1px solid var(--border);
 }
 .cta__box { display: grid; gap: 18px; justify-items: center; }
@@ -565,7 +567,13 @@ ul { margin: 0; padding: 0; list-style: none; }
 .cta__note { font-size: 12.5px; color: var(--dim); margin-top: 14px; }
 
 /* ============================ フッター ============================ */
-.foot { background: #0A0C0A; border-top: 1px solid var(--border); padding: 72px 0 32px; }
+.foot { background: #22301F; border-top: 1px solid var(--border); padding: 72px 0 32px; color: #D8D2C2; }
+.foot .logo__mark { color: #F7F3E9; }
+.foot .logo__sub { color: rgba(232,226,212,.6); }
+.foot__top { border-color: rgba(232,226,212,.16) !important; }
+.foot .foot__about, .foot .foot__nav a, .foot .foot__bottom { color: rgba(232,226,212,.72); }
+.foot .foot__nav a:hover { color: #FFFFFF; }
+.foot .foot__h { color: var(--brass); }
 .foot__top { display: grid; grid-template-columns: 1.2fr 2fr; gap: 48px; padding-bottom: 44px; border-bottom: 1px solid var(--border); }
 .foot__about { font-size: 13px; color: var(--dim); line-height: 2; margin-top: 20px; max-width: 34ch; }
 .foot__nav { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
@@ -646,7 +654,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 
 /* ============================ フロア見取り図 ============================ */
-.floorplan { position: relative; border: 1px solid var(--border); border-radius: 18px; padding: 26px; background: linear-gradient(180deg, var(--panel), rgba(29,33,29,.5)); }
+.floorplan { position: relative; border: 1px solid var(--border); border-radius: 18px; padding: 26px; background: var(--panel); }
 .floorplan svg { width: 100%; height: auto; display: block; }
 .floorplan__badge {
   position: absolute; top: 16px; right: 16px; z-index: 1;
@@ -667,10 +675,10 @@ ul { margin: 0; padding: 0; list-style: none; }
 .gallery__i:hover img { transform: scale(1.04); }
 .gallery__cap {
   position: absolute; left: 12px; bottom: 10px; z-index: 1;
-  font-size: 12px; color: var(--txt-str); letter-spacing: .06em;
-  text-shadow: 0 1px 8px rgba(0,0,0,.7);
+  font-size: 12px; color: #F7F3E9; letter-spacing: .06em;
+  text-shadow: 0 1px 8px rgba(0,0,0,.6);
 }
-.gallery__i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(9,11,9,.6)); pointer-events: none; }
+.gallery__i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(20,26,20,.55)); pointer-events: none; }
 
 /* ============================ 設備アイコン ============================ */
 .feats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
@@ -684,7 +692,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .promo { padding: 0; }
 .promo__in { position: relative; border-radius: 20px; overflow: hidden; border: 1px solid var(--border-str); }
 .promo__in img { width: 100%; height: auto; display: block; }
-.promo__over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; background: linear-gradient(90deg, rgba(9,11,9,.5), transparent 40%, transparent 60%, rgba(9,11,9,.5)); }
+.promo__over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; background: linear-gradient(90deg, rgba(20,26,20,.45), transparent 40%, transparent 60%, rgba(20,26,20,.45)); }
 .promo__btns { position: absolute; right: 5%; bottom: 12%; display: flex; gap: 12px; flex-wrap: wrap; }
 
 @media (max-width: 860px) {
@@ -760,7 +768,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   .nav__menu.is-open {
     display: flex; flex-direction: column; align-items: stretch; gap: 0;
     position: fixed; inset: calc(var(--bar-h) + var(--nav-h)) 0 auto 0;
-    background: rgba(11, 13, 11, .985);
+    background: rgba(255, 253, 248, .99);
     backdrop-filter: blur(18px);
     padding: 12px 22px 30px;
     border-bottom: 1px solid var(--border);
