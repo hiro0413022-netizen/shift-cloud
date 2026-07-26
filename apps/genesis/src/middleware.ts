@@ -8,7 +8,9 @@ import { NextResponse, type NextRequest } from "next/server";
  * 日次レポートが「手動で押した日しか出ない」状態になっていた（2026-07-14 発見・DECISIONS #52）。
  * 認証はルート側の CRON_SECRET チェックで担保する（middlewareを通さないだけ）。
  */
-const PUBLIC_PREFIXES = ["/login", "/api/webhooks", "/api/cron", "/manual"];
+// /api/public は認証不要の公開API群（FRANKサイトのCMS/打席予約/レッスン予約 #85〜#88）。
+// 入れ忘れると全APIが/loginへ307し、サイト側は「読み込みに失敗」になる（#90でE2Eテストにより発見）。
+const PUBLIC_PREFIXES = ["/login", "/api/webhooks", "/api/cron", "/api/public", "/manual"];
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 

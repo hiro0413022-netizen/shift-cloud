@@ -1,5 +1,5 @@
-﻿# FRANK GOLF #88/#89 のコミット＆プッシュ（2026-07-26）
-# 内容: レッスン管理v1（枠公開・予約・申し送り・カルテ連携）＋店舗ダッシュボードFRANK予約表示
+﻿# FRANK #90 緊急修正のコミット＆プッシュ（2026-07-26）
+# 内容: /api/public がログインへリダイレクトされFRANK予約API全滅→middleware公開パスに追加
 # 実行方法:
 #   cd "C:\Users\hiro0\Claude\Projects\YOZAN GENESIS"; .\commit-and-deploy.ps1
 
@@ -12,7 +12,7 @@ Write-Host "[2/5] コミット（先にローカルを確定＝ローカルが�
 git restore --staged package-lock.json 2>$null
 git restore package-lock.json 2>$null
 git add apps/genesis/src apps/lesson-os/src apps/shift-cloud/src sites/frank-golf supabase/migrations docs/genesis/DECISIONS.md commit-and-deploy.ps1
-git commit -m "feat(frank): レッスン管理v1 + 店舗ダッシュボードFRANK予約 (#88/#89)"
+git commit -m "fix(genesis): /api/public をmiddleware公開パスに追加 - FRANK予約/CMS API復旧 (#90)"
 
 Write-Host "[3/5] リモートと統合（衝突はローカル優先）..." -ForegroundColor Cyan
 git pull --no-rebase --no-edit -X ours origin main
