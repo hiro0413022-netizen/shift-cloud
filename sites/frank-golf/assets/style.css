@@ -283,14 +283,54 @@ ul { margin: 0; padding: 0; list-style: none; }
 .hero__bg {
   position: absolute; inset: 0; z-index: 0;
   background-color: var(--ink);
+  overflow: hidden;
+}
+
+/* --- スライドショー（クロスフェード＋ゆっくりズーム / Ken Burns） --- */
+.hero__slides { position: absolute; inset: 0; }
+.hero__slide {
+  position: absolute; inset: 0;
+  background-image: var(--hero-img, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  will-change: opacity, transform;
+  animation: heroKenBurns var(--hero-cycle, 21s) infinite;
+  animation-timing-function: linear;
+}
+/* 3枚を1/3ずつずらして再生（1枚あたり約7秒・クロスフェード約1.3秒） */
+/* 縦長ビューポート（スマホ）でも主題が切れないよう、写真ごとに寄せ位置を調整 */
+.hero__slide:nth-child(1) { animation-delay: 0s; transform-origin: 50% 55%; background-position: 50% 42%; }
+.hero__slide:nth-child(2) { animation-delay: calc(var(--hero-cycle, 21s) / -3); transform-origin: 62% 48%; background-position: 50% 52%; }
+.hero__slide:nth-child(3) { animation-delay: calc(var(--hero-cycle, 21s) / -1.5); transform-origin: 40% 52%; background-position: 42% 50%; }
+
+@keyframes heroKenBurns {
+  0%      { opacity: 1; transform: scale(1.035); }
+  27.33%  { opacity: 1; transform: scale(1.105); }
+  33.33%  { opacity: 0; transform: scale(1.12); }
+  33.34%  { opacity: 0; transform: scale(1.0); }
+  94%     { opacity: 0; transform: scale(1.0); }
+  100%    { opacity: 1; transform: scale(1.035); }
+}
+
+/* 文字の可読性を担保するベール（画像の上・コピーの下） */
+.hero__veil {
+  position: absolute; inset: 0;
   background-image:
-    linear-gradient(180deg, rgba(255,253,248,.9), rgba(255,253,248,.68) 46%, var(--ink)),
-    radial-gradient(120% 90% at 78% 18%, var(--brass-glow), transparent 55%),
-    var(--hero-img, none);
-  background-size: cover, cover, cover;
+    linear-gradient(180deg, rgba(255,253,248,.88), rgba(255,253,248,.62) 46%, var(--ink)),
+    radial-gradient(120% 90% at 78% 18%, var(--brass-glow), transparent 55%);
+  background-size: cover, cover;
   background-position: center;
   background-repeat: no-repeat;
 }
+
+/* 動きを減らす設定の端末では静止（1枚目のみ表示） */
+@media (prefers-reduced-motion: reduce) {
+  .hero__slide { animation: none; opacity: 0; transform: none; }
+  .hero__slide:nth-child(1) { opacity: 1; }
+}
+
 /* 打席の光 → ラウンジの灯り、を抽象化した縦のライン */
 .hero__bg::after {
   content: "";

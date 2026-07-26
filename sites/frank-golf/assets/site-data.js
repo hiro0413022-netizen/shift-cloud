@@ -95,7 +95,10 @@ window.FRANK = {
      assets/img/ 内のJPGを上書きすればOK。別名にするならここのパスを変更してください。
      すべて「差し替え前提のサンプル画像」です（抽象アトモスフィア）。 */
   images: {
-    hero:      "assets/img/hero.jpg",       // メインビジュアル背景（1920x1200 目安）
+    // メインビジュアル背景（1600x900 目安）— 3枚をクロスフェード＋ゆっくりズームで再生
+    hero:      "assets/img/hero-1.jpg",     // 1枚目：店舗外観（実写）
+    hero2:     "assets/img/hero-2.jpg",     // 2枚目：打席・シミュレーター
+    hero3:     "assets/img/hero-3.jpg",     // 3枚目：レッスン風景
     concept:   "assets/img/concept.jpg",    // コンセプト
     play:      "assets/img/play.jpg",       // 施設・打席
     lesson:    "assets/img/lesson.jpg",     // レッスン

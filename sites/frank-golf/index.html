@@ -28,6 +28,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
+<link rel="preload" as="image" href="assets/img/hero-1.jpg" fetchpriority="high">
 <script src="assets/site-data.js"></script>
 <script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/index.html"}]}</script>
@@ -77,7 +78,14 @@
 
 <!-- 3. メインビジュアル -->
 <section class="hero">
-  <div class="hero__bg" aria-hidden="true" data-img="hero" style="--hero-img:url(&quot;assets/img/hero.jpg&quot;)"></div>
+  <div class="hero__bg" aria-hidden="true">
+    <div class="hero__slides">
+      <div class="hero__slide" data-img="hero"  style="--hero-img:url(&quot;assets/img/hero-1.jpg&quot;)"></div>
+      <div class="hero__slide" data-img="hero2" style="--hero-img:url(&quot;assets/img/hero-2.jpg&quot;)"></div>
+      <div class="hero__slide" data-img="hero3" style="--hero-img:url(&quot;assets/img/hero-3.jpg&quot;)"></div>
+    </div>
+    <div class="hero__veil"></div>
+  </div>
   <div class="wrap hero__in">
     <img class="logo-img rv" src="assets/img/logo-t.png" alt="FRANK GOLF HIMEJI ロゴ" width="800" height="716" style="margin-bottom:26px">
     <p class="hero__tag"><span data-preopen>2026年9月2日</span> PRE-OPEN ／ 姫路・土山</p>
