@@ -34,7 +34,7 @@ export default async function HomePage() {
       .gte("recorded_at", `${today}T00:00:00+09:00`).order("recorded_at"),
     supabase.from("attendance_days").select("staff_id, date, work_minutes, overtime_minutes")
       .eq("staff_id", actor.staffId).gte("date", monthRange(ym).from).lte("date", monthRange(ym).to),
-    supabase.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary")
+    supabase.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary, created_at")
       .eq("staff_id", actor.staffId).is("deleted_at", null),
     supabase.from("announcements").select("id, title, body, created_at")
       .is("deleted_at", null)

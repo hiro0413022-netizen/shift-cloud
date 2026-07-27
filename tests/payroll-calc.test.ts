@@ -115,6 +115,19 @@ test("wageOnDate: 賃金開始日より前の勤務日は最古の賃金へフ�
   assert.equal(wageOnDate(WAGES, "zzz", "2026-06-01"), null); // 賃金未登録スタッフ
 });
 
+test("wageOnDate: 同じ日に2回変更した場合は後から保存した行を使う（2026-07-27の反映されない事故）", () => {
+  // 同じ effective_from が並ぶと、タイブレークが無いと配列順で決まってしまい
+  // 「時給を変えたのに古い値で計算される」状態になっていた
+  const sameDay = [
+    { staff_id: "a", hourly_wage: 1800, commute_allowance: 300, effective_from: "2026-07-27", created_at: "2026-07-27T08:27:15Z" },
+    { staff_id: "a", hourly_wage: 2000, commute_allowance: 400, effective_from: "2026-07-27", created_at: "2026-07-27T09:11:34Z" },
+  ];
+  assert.equal(wageOnDate(sameDay, "a", "2026-07-27")?.hourly_wage, 2000);
+  assert.equal(wageOnDate(sameDay, "a", "2026-07-31")?.commute_allowance, 400);
+  // 配列順が逆でも結果は同じ（DBの返却順に依存しない）
+  assert.equal(wageOnDate([...sameDay].reverse(), "a", "2026-07-27")?.hourly_wage, 2000);
+});
+
 test("calcMonthlyPayroll: 月中の時給変更を日付で按分（変更前後で別レート計算）", () => {
   const days = [
     { staff_id: "a", date: "2026-06-10", work_minutes: 480, overtime_minutes: 0 }, // 1000円期

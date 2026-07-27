@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireActor, authEmailFor } from "@/lib/auth";
+import { todayJST } from "@/lib/util";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 
@@ -137,27 +138,43 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
     scope_type: "company",
   });
 
-  // 時給: 現在値と異なれば履歴追加
+  // 時給: 現在値と異なれば履歴追加。
+  // ・「最新」の判定は effective_from だけでなく created_at でもタイブレークする
+  //   （同じ日に2回変えると effective_from が並び、どちらが最新か決まらず
+  //     「変更しても反映されない」事故になっていた / 2026-07-27）
+  // ・同じ日の変更は履歴を増やさず、その日の行を上書きする
+  // ・日付はJST（lib/util todayJST）。UTCだと朝9時前が前日になる
   if (d.hourly_wage !== undefined) {
-    const { data: cur } = await admin
+    const today = todayJST();
+    const { data: rows } = await admin
       .from("staff_wages")
-      .select("hourly_wage, commute_allowance")
+      .select("id, hourly_wage, commute_allowance, effective_from, created_at")
       .eq("staff_id", staffId)
       .is("deleted_at", null)
       .order("effective_from", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const cur = rows?.[0] ?? null;
     if (!cur || cur.hourly_wage !== d.hourly_wage || cur.commute_allowance !== d.commute_allowance) {
-      await admin.from("staff_wages").insert({
-        company_id: actor.companyId,
-        staff_id: staffId,
-        hourly_wage: d.hourly_wage,
-        commute_allowance: d.commute_allowance,
-        effective_from: new Date().toISOString().slice(0, 10),
-      });
+      const sameDay = cur && cur.effective_from === today ? cur : null;
+      const { error: wageErr } = sameDay
+        ? await admin
+            .from("staff_wages")
+            .update({ hourly_wage: d.hourly_wage, commute_allowance: d.commute_allowance })
+            .eq("id", sameDay.id)
+        : await admin.from("staff_wages").insert({
+            company_id: actor.companyId,
+            staff_id: staffId,
+            hourly_wage: d.hourly_wage,
+            commute_allowance: d.commute_allowance,
+            effective_from: today,
+          });
+      if (wageErr) return { error: `時給の保存に失敗しました: ${wageErr.message}` };
       await logAudit(actor, "staff.wage_change", "staff_wages", staffId, cur, {
         hourly_wage: d.hourly_wage,
         commute_allowance: d.commute_allowance,
+        effective_from: today,
+        mode: sameDay ? "update" : "insert",
       });
     }
   }

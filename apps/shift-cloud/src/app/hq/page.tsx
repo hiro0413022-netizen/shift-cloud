@@ -25,7 +25,7 @@ export default async function HqDashboard() {
       admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
       admin.from("attendance_days").select("store_id, staff_id, date, work_minutes, overtime_minutes, is_missing_clock")
         .eq("company_id", actor.companyId).gte("date", from).lte("date", to),
-      admin.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary")
+      admin.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary, created_at")
         .eq("company_id", actor.companyId).is("deleted_at", null).order("effective_from", { ascending: false }),
       admin.from("companies").select("settings").eq("id", actor.companyId).single(),
       admin.from("staff").select("id, status").eq("company_id", actor.companyId).is("deleted_at", null),

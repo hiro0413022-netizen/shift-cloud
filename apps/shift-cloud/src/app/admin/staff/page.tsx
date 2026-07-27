@@ -27,7 +27,9 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         admin.from("staff").select("*").eq("id", sp.edit).eq("company_id", actor.companyId).single(),
         admin.from("staff_store_assignments").select("store_id, is_primary").eq("staff_id", sp.edit).is("deleted_at", null),
         admin.from("staff_roles").select("role_id").eq("staff_id", sp.edit).is("deleted_at", null).maybeSingle(),
-        admin.from("staff_wages").select("hourly_wage, commute_allowance").eq("staff_id", sp.edit).is("deleted_at", null).order("effective_from", { ascending: false }).limit(1).maybeSingle(),
+        // 最新の賃金行: 同じ日に複数あるときは created_at で決着させる（タイブレーク無しだと古い値が出る）
+        admin.from("staff_wages").select("hourly_wage, commute_allowance").eq("staff_id", sp.edit).is("deleted_at", null)
+          .order("effective_from", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
       if (s) {
         edit = {
@@ -51,7 +53,7 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
 
   const { data: staffList } = await admin
     .from("staff")
-    .select("id, name, email, login_id, employment_type, position, status, staff_store_assignments(store_id, is_primary, stores(name)), staff_roles(roles(name)), staff_wages(hourly_wage, effective_from)")
+    .select("id, name, email, login_id, employment_type, position, status, staff_store_assignments(store_id, is_primary, stores(name)), staff_roles(roles(name)), staff_wages(hourly_wage, effective_from, created_at)")
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
     .order("name");
@@ -67,8 +69,11 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         <Table headers={["氏名", "主店舗", "雇用形態", "役職", "ロール", "時給", "状態", ""]}>
           {staffList.map((s) => {
             const primary = (s.staff_store_assignments as unknown as { is_primary: boolean; stores: { name: string } | null }[])?.find((a) => a.is_primary);
-            const wages = (s.staff_wages as unknown as { hourly_wage: number | null; effective_from: string }[]) ?? [];
-            const wage = wages.sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
+            const wages = (s.staff_wages as unknown as { hourly_wage: number | null; effective_from: string; created_at: string }[]) ?? [];
+            // 同じ effective_from が並ぶことがあるので created_at でタイブレーク（最後に保存した値を表示）
+            const wage = wages.sort(
+              (a, b) => b.effective_from.localeCompare(a.effective_from) || b.created_at.localeCompare(a.created_at)
+            )[0];
             return (
               <tr key={s.id} className="hover:bg-zinc-50">
                 <Td className="font-medium">

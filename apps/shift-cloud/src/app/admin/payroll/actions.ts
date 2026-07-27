@@ -51,7 +51,7 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
     admin.from("attendance_days").select("staff_id, date, work_minutes, overtime_minutes")
       .eq("company_id", actor.companyId).gte("date", from).lte("date", to),
     admin.from("staff_wages")
-      .select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary")
+      .select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary, created_at")
       .eq("company_id", actor.companyId).is("deleted_at", null).order("effective_from", { ascending: false }),
     admin.from("companies").select("settings").eq("id", actor.companyId).single(),
     // 月次の手当（パーソナル/紹介料/コンペ/RL/交通費実費 — DECISIONS #44）

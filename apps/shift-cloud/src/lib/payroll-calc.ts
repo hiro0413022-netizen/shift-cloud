@@ -97,6 +97,8 @@ export type WageRow = {
   hourly_wage: number;
   commute_allowance: number | null;
   effective_from: string; // YYYY-MM-DD
+  /** 同じ effective_from が複数あるときの決着用（後に保存した行を採用） */
+  created_at?: string;
   /** 'monthly' なら monthly_salary を固定支給し、実労働時間は金額に影響しない（DECISIONS #44） */
   wage_type?: "hourly" | "monthly";
   monthly_salary?: number | null;
@@ -148,13 +150,20 @@ export function sumAllowances(
  * 「時給登録が勤務より後日だった」ケースで突然0円にならないようにする安全策。
  */
 export function wageOnDate(wages: WageRow[], staffId: string, date: string): WageRow | null {
+  // 同じ effective_from が並ぶ場合は created_at が後の行を採用する。
+  // （タイブレークが無いと配列順＝DBの返却順で決まり、古い時給が使われて
+  //   「時給を変えたのに反映されない」事故になる / 2026-07-27）
+  const newer = (a: WageRow, b: WageRow) =>
+    a.effective_from > b.effective_from ||
+    (a.effective_from === b.effective_from && (a.created_at ?? "") > (b.created_at ?? ""));
+
   let best: WageRow | null = null;
   let earliest: WageRow | null = null;
   for (const w of wages) {
     if (w.staff_id !== staffId) continue;
     if (!earliest || w.effective_from < earliest.effective_from) earliest = w;
     if (w.effective_from > date) continue;
-    if (!best || w.effective_from > best.effective_from) best = w;
+    if (!best || newer(w, best)) best = w;
   }
   return best ?? earliest;
 }
