@@ -1,9 +1,13 @@
 import { createAdmin } from "@yozan/core/supabase/admin";
+import { injectTracking } from "@yozan/track/beacon";
+import { registerLink } from "@yozan/track/server";
 
 // 営業デモの非公開配信。
 //  - 推測不能トークンで特定（RLSはservice_role経由・トークン検証がゲート #12/#23と同型）
 //  - X-Robots-Tag: noindex（HTML内のmetaと二重化）・キャッシュなし
 //  - 有効期限切れは案内ページ、パスコード設定時は ?key= 照合（簡易フォーム表示）
+//  - 閲覧計測（@yozan/track #95）は配信時にビーコンを差し込む＝保存済みHTMLは書き換えない。
+//    既存デモも再生成なしで計測対象になる。?preview=1 で開くと社内プレビュー扱い（集計から除外）
 
 const page = (title: string, body: string) => `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -28,7 +32,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
   const { data: demo } = await admin
     .from("dms_demos")
-    .select("html, passcode, expires_on, status")
+    .select("id, company_id, prospect_id, html, passcode, expires_on, status, prospect:dms_prospects(name)")
     .eq("token", token)
     .is("deleted_at", null)
     .maybeSingle();
@@ -40,7 +44,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  // 「今日」はJST基準（サーバーはUTC。#73のルール）
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   if (demo.expires_on && demo.expires_on < today) {
     return new Response(
       page("公開期間終了", "<h2>このデモの公開期間は終了しました</h2><p>ご覧になりたい場合は、担当者までご連絡ください。</p>"),
@@ -62,5 +67,28 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
     }
   }
 
-  return new Response(demo.html, { status: 200, headers: headers() });
+  // 計測リンクの登録（冪等）。失敗しても配信は続ける
+  const prospect = Array.isArray(demo.prospect) ? demo.prospect[0] : demo.prospect;
+  try {
+    await registerLink(admin, {
+      companyId: String(demo.company_id),
+      app: "demo-sales",
+      resourceType: "demo",
+      resourceId: String(demo.id),
+      token,
+      label: (prospect as { name?: string } | null)?.name ?? null,
+      href: `/p/${demo.prospect_id}`,
+    });
+  } catch {
+    // 計測の失敗でデモを止めない
+  }
+
+  const html = injectTracking(demo.html, {
+    endpoint: "/api/track",
+    token,
+    // 営業担当が管理画面から開いた分は集計に混ぜない
+    internal: url.searchParams.get("preview") === "1",
+  });
+
+  return new Response(html, { status: 200, headers: headers() });
 }

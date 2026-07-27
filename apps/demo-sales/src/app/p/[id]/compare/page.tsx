@@ -74,9 +74,9 @@ export default async function ComparePage({
         <section className={`${cardCls} border-(--color-ok)`}>
           <div className="mb-2 flex items-center justify-between">
             <h2 className="font-semibold text-(--color-ok)">改善案デモ</h2>
-            {demo && <a href={`/d/${demo.token}`} target="_blank" className="text-xs text-(--color-accent) hover:underline">別タブで開く ↗</a>}
+            {demo && <a href={`/d/${demo.token}?preview=1`} target="_blank" className="text-xs text-(--color-accent) hover:underline">別タブで開く ↗</a>}
           </div>
-          {demo ? <iframe src={`/d/${demo.token}`} className={frameCls} /> : <p className="text-sm text-(--color-dim)">デモ未生成（詳細ページで生成してください）</p>}
+          {demo ? <iframe src={`/d/${demo.token}?preview=1`} className={frameCls} /> : <p className="text-sm text-(--color-dim)">デモ未生成（詳細ページで生成してください）</p>}
         </section>
       </div>
 

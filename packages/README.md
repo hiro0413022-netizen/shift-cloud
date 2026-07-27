@@ -19,3 +19,18 @@ YOZAN GENESIS 共通パッケージ（DECISIONS #35 — #10の「packages化」�
 | `@yozan/core/supabase/server` | RLSクライアント（@supabase/ssr） |
 
 TSソースのまま提供するため、利用側の `next.config.ts` に `transpilePackages: ["@yozan/core"]` が必要（テンプレートは設定済み）。
+
+## packages/track
+
+配布したトークン付きURLの**閲覧計測**（migration 0085・#95）。正典 `docs/modules/track/SYSTEM.md`。
+
+| モジュール | 内容 |
+|---|---|
+| `@yozan/track/server` | `registerLink` / `recordView` / `getLinkByResource` / `listSessions` / `getHotLinks` / `markNotified` / `formatDuration` |
+| `@yozan/track/beacon` | `injectTracking(html, opts)` — 配信HTMLに計測スクリプトを差し込む（保存済みHTMLは書き換えない） |
+| `@yozan/track/route` | `createTrackHandler(getAdmin)` — 受信POSTルート。⚠ middlewareの公開パスに `/api/track` を追加すること（#90） |
+| `@yozan/track/types` | 型定義 |
+
+`app` / `resource_type` / `resource_id` で任意のシステムから使える。
+第一号は demo-sales の営業デモだが、予約リンク・アンケート・月次資料も同じ形で乗る。
+Supabaseクライアントは**引数で受け取る**（アプリ非依存）ので、利用側は `createAdmin()` を渡すだけ。

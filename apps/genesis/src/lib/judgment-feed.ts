@@ -16,7 +16,8 @@ export type JudgmentSource =
   | "inquiry" // sec_inquiries pending
   | "trial" // mbr_trial_requests pending（member-os）
   | "join" // frunk_members pending（member-os Web入会）
-  | "reserve"; // res_requests pending（reserve-os）
+  | "reserve" // res_requests pending（reserve-os）
+  | "hotlead"; // trk_links 初回開封・未対応（@yozan/track #95）
 
 export type JudgmentItem = {
   id: string;
@@ -56,6 +57,12 @@ const ACTION_TYPE_LABEL: Record<string, string> = {
 // 外部アプリの深リンク（vault_systems が正典だが、フィード表示用に既知URLを保持）
 const MEMBER_OS_URL = "https://member-os-tau.vercel.app";
 const RESERVE_OS_URL = "https://shift-cloud-reserve-os.vercel.app";
+const DEMO_SALES_URL = "https://demo-sales-delta.vercel.app";
+
+// 計測アプリごとの表示（@yozan/track は汎用なので、ラベルと戻り先だけここで解決する）
+const TRACK_APP: Record<string, { tag: string; verb: string; base: string }> = {
+  "demo-sales": { tag: "デモ開封", verb: "が営業デモを開きました", base: DEMO_SALES_URL },
+};
 
 type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => (v == null ? null : String(v));
@@ -63,7 +70,7 @@ const s = (v: unknown): string | null => (v == null ? null : String(v));
 export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]> {
   const admin = createAdmin();
 
-  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes] = await Promise.all([
+  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes, hotRes] = await Promise.all([
     admin
       .from("ai_action_queue")
       .select("id, title, action_type, status, created_at, scheduled_at, payload")
@@ -107,6 +114,16 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       .eq("status", "pending")
       .is("deleted_at", null)
       .order("created_at", { ascending: true })
+      .limit(10),
+    // ホットリード: 配った資料が開かれ、まだ対応していないもの（#95）
+    admin
+      .from("trk_links")
+      .select("id, app, label, href, first_viewed_at, last_viewed_at, view_count, total_seconds")
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .is("notified_at", null)
+      .not("first_viewed_at", "is", null)
+      .order("last_viewed_at", { ascending: false })
       .limit(10),
   ]);
 
@@ -196,14 +213,37 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
     });
   }
 
+  for (const r of (hotRes.data ?? []) as Row[]) {
+    const app = TRACK_APP[s(r.app) ?? ""] ?? { tag: "開封", verb: "が資料を開きました", base: "" };
+    const href = s(r.href);
+    const seconds = Number(r.total_seconds ?? 0);
+    const mins = seconds >= 60 ? `${Math.floor(seconds / 60)}分${seconds % 60}秒` : `${seconds}秒`;
+    items.push({
+      id: String(r.id),
+      source: "hotlead",
+      tag: app.tag,
+      title: `${s(r.label) ?? "先方"}${app.verb}`,
+      detail: `${Number(r.view_count ?? 0)}回・合計${mins}閲覧。開封直後の架電がもっとも繋がります`,
+      // last_viewed_at を時刻とする（開封からの経過＝鮮度）
+      createdAt: s(r.last_viewed_at) ?? s(r.first_viewed_at),
+      href: href ? `${app.base}${href}` : null,
+      scheduledAt: null,
+    });
+  }
+
   // 判断SLA（#78）: 24時間以上放置は stale フラグ＋最上位へ昇格
   const staleLine = new Date(Date.now() - 24 * 3600_000).toISOString();
   for (const it of items) {
     if (it.source !== "undo" && it.createdAt && it.createdAt < staleLine) it.stale = true;
   }
-  // undo（実行予定）→ stale（放置）→ 古い順
+  // undo（実行予定・時間切れが近い）→ hotlead（鮮度が命）→ その他
+  // hotlead だけは「新しい順」。開封直後ほど架電が繋がるため（#95）
+  const rank = (it: JudgmentItem) => (it.source === "undo" ? 0 : it.source === "hotlead" ? 1 : 2);
   items.sort((a, b) => {
-    if ((a.source === "undo") !== (b.source === "undo")) return a.source === "undo" ? -1 : 1;
+    const ra = rank(a);
+    const rb = rank(b);
+    if (ra !== rb) return ra - rb;
+    if (ra === 1) return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
     if (Boolean(a.stale) !== Boolean(b.stale)) return a.stale ? -1 : 1;
     return (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
   });

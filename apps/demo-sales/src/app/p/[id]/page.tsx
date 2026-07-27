@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { createAdmin } from "@yozan/core/supabase/admin";
+import { formatDuration, getLinkByResource, listSessions } from "@yozan/track/server";
 import { requireActor } from "@/lib/auth";
 import { cardCls, inputCls, btnCls } from "@/components/ui";
 import { ColorField, GalleryField, ImageField } from "@/components/demo-media";
@@ -31,6 +32,18 @@ const ACT_LABELS: Record<string, string> = {
   note: "メモ",
   directive: "指示",
 };
+
+/** 日時をJSTで「7/27 14:05」表示（サーバーはUTC・#73） */
+const jstAt = (iso: string | null) =>
+  iso
+    ? new Intl.DateTimeFormat("ja-JP", {
+        timeZone: "Asia/Tokyo",
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(iso))
+    : "—";
 
 /** デモ生成フォームのセクション枠（番号バッジ＋タイトル＋補足） */
 function FormSec({ no, title, hint, children }: { no: string; title: string; hint?: string; children: ReactNode }) {
@@ -67,6 +80,10 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
     ]);
 
   const latestDemo = demos?.[0] ?? null;
+
+  // 閲覧計測（@yozan/track #95）。デモが未生成なら何も出さない
+  const trackLink = latestDemo ? await getLinkByResource(admin, "demo-sales", "demo", latestDemo.id) : null;
+  const trackSessions = trackLink ? await listSessions(admin, trackLink.id, { limit: 10 }) : [];
   // 前回見積のオプション選択を引き継ぐ（面談中の作り直しを速くする）
   const lastQuote = quotes?.[0] ?? null;
   const lastSelected: Record<string, number> | undefined = lastQuote
@@ -193,7 +210,8 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
           <h2 className="font-semibold">営業デモサイト</h2>
           {latestDemo && (
             <div className="flex gap-3 text-sm">
-              <a href={`/d/${latestDemo.token}`} target="_blank" className={btnCls}>デモを開く（v{latestDemo.version}）</a>
+              {/* preview=1 … 社内プレビュー扱い（閲覧計測の集計から除外される） */}
+              <a href={`/d/${latestDemo.token}?preview=1`} target="_blank" className={btnCls}>デモを開く（v{latestDemo.version}）</a>
               <Link href={`/p/${id}/compare`} className={`${btnCls} bg-(--color-ok)`}>現サイトと比較</Link>
             </div>
           )}
@@ -211,6 +229,44 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
               <input name="expires_on" type="date" defaultValue={latestDemo.expires_on ?? ""} className={`${inputCls} max-w-44`} />
               <button className={`${btnCls} px-3 py-1.5`}>共有設定を保存</button>
             </form>
+          </div>
+        )}
+
+        {/* 閲覧状況（#95）— 「見てくれた先にだけ電話する」ための材料 */}
+        {latestDemo && (
+          <div
+            className={`mb-4 rounded-lg p-3 text-sm ${
+              trackLink?.firstViewedAt ? "bg-(--color-ok)/10 border border-(--color-ok)" : "bg-(--color-panel-2)"
+            }`}
+          >
+            {trackLink?.firstViewedAt ? (
+              <>
+                <p className="font-semibold text-(--color-ok)">
+                  先方が閲覧しました（{trackLink.viewCount}回・合計{formatDuration(trackLink.totalSeconds)}）
+                </p>
+                <p className="mt-1 text-xs text-(--color-dim)">
+                  初回 {jstAt(trackLink.firstViewedAt)} ／ 最終 {jstAt(trackLink.lastViewedAt)}
+                  ・開封直後の架電がもっとも繋がります
+                </p>
+                {trackSessions.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs">
+                    {trackSessions.map((sv) => (
+                      <li key={sv.id} className="flex flex-wrap gap-x-3 text-(--color-dim)">
+                        <span className="text-(--color-fg)">{jstAt(sv.startedAt)}</span>
+                        <span>{sv.device === "mobile" ? "スマホ" : "PC"}</span>
+                        <span>{formatDuration(sv.seconds)}</span>
+                        <span>{sv.pageViews + 1}ページ</span>
+                        {sv.pages.length > 0 && <span className="truncate">{sv.pages.join(" → ")}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-(--color-dim)">
+                まだ閲覧されていません。開かれるとここに日時・滞在時間・見たページが出ます（社内プレビューは除外）。
+              </p>
+            )}
           </div>
         )}
 

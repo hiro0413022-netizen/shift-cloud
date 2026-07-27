@@ -12,7 +12,7 @@ import { decideApproval } from "./approvals/actions";
 import { approveActionForm, rejectActionForm, cancelActionForm } from "./executions/actions";
 import { reviewDeliverable } from "./deliverables/actions";
 import { approveInquiry } from "./inbox/actions";
-import { decideTrialRequest, decideJoinRequest } from "./feed-actions";
+import { decideTrialRequest, decideJoinRequest, dismissHotLead } from "./feed-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +162,19 @@ export default async function HomePage() {
                     <button name="decision" value="rejected" className="btn-sub">却下</button>
                     <button name="decision" value="approved" className="btn-main">承認して会員番号発行</button>
                   </form>
+                )}
+                {f.source === "hotlead" && (
+                  <div className="flex gap-2">
+                    <form action={dismissHotLead}>
+                      <input type="hidden" name="id" value={f.id} />
+                      <button className="btn-sub">対応した</button>
+                    </form>
+                    {f.href && (
+                      <a href={f.href} target="_blank" rel="noreferrer" className="btn-main">
+                        営業先を開いて架電 →
+                      </a>
+                    )}
+                  </div>
                 )}
                 {f.source === "reserve" && f.href && (
                   <a href={f.href} target="_blank" rel="noreferrer" className="btn-sub">

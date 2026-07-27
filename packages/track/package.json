@@ -1,0 +1,16 @@
+{
+  "name": "@yozan/track",
+  "version": "0.1.0",
+  "private": true,
+  "description": "トークン付きURLの閲覧計測（trk_* / migration 0085 / DECISIONS #95）。TSソースのまま提供 — 利用側next.config.tsで transpilePackages: ['@yozan/track'] を指定",
+  "exports": {
+    "./beacon": "./src/beacon.ts",
+    "./route": "./src/route.ts",
+    "./server": "./src/server.ts",
+    "./types": "./src/types.ts"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "next": "^15.0.0"
+  }
+}

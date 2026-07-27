@@ -2,11 +2,12 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0067` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0086` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
 - **関数を作ったら必ず service_role に EXECUTE を付ける**（0065 適用後のルール）:
   `grant execute on function public.<名前>(<引数型>) to service_role;`
   0065 で「新関数への PUBLIC 既定 EXECUTE」を止めたため、書かないと service_role から呼べない。
   逆に anon/authenticated へは付けない（DECISIONS #54/#55: RPCは全てサーバー側 service_role から）
+- ✅ `0085_track_link_views.sql` — 適用済（2026-07-27、MCP name=track_link_views。汎用リンク閲覧計測 trk_links/trk_sessions/trk_events＋RPC `trk_record` #95）
 - ✅ `0066_drop_cad_dms_open_read_policies.sql` — 適用済（2026-07-17、MCP name=drop_cad_dms_open_read_policies。cad_*/dms_* の `USING(true)` SELECTポリシー14本を削除＝service_role専用へ #65）
 - ✅ `0064_revoke_gnv_views_from_anon.sql` — 適用済（2026-07-17、MCP name=revoke_gnv_views_from_anon。gnv_*16本を anon/authenticated/PUBLIC から剥奪、SELECTは gn_chat_reader のみ #64）
 - ✅ `0065_revoke_anon_table_grants.sql` — 適用済（2026-07-17、MCP name=revoke_anon_table_grants。anon のテーブル権限987件を剥奪＋既定付与の停止 #64）。巻き戻しは `rollback_0064_0065.sql`

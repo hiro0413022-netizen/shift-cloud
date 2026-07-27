@@ -96,3 +96,38 @@ export async function decideTrialRequest(formData: FormData) {
   });
   revalidatePath("/");
 }
+
+/**
+ * ホットリード（配った資料が開かれた）の対応済み化（#95）。
+ * trk_links.notified_at を立てるとフィードから消える。判断そのものは架電＝画面外なので、
+ * ここは「対応した」という人間の宣言を記録するだけ。
+ */
+export async function dismissHotLead(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const admin = createAdmin();
+  const { data: before } = await admin
+    .from("trk_links")
+    .select("id, label, app, notified_at")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .maybeSingle();
+  if (!before || before.notified_at) return;
+
+  await admin
+    .from("trk_links")
+    .update({ notified_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+
+  await logAudit(actor, "track.hotlead_handled", "trk_links", id, before, { notified_at: "now" });
+  await logEvent(actor.companyId, {
+    event_type: "track.handled",
+    title: `開封フォローを対応済みに: ${String(before.label ?? "（無題）")}`,
+    source: "manual",
+    source_type: "human",
+  });
+  revalidatePath("/");
+}

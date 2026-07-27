@@ -190,7 +190,7 @@ export default async function HomePage() {
                   <td className="py-2 pr-3">{r.score ?? "—"}</td>
                   <td className="py-2 pr-3">
                     {demoByProspect.has(r.id) ? (
-                      <a href={`/d/${demoByProspect.get(r.id)}`} target="_blank" className="text-(--color-ok) hover:underline">表示</a>
+                      <a href={`/d/${demoByProspect.get(r.id)}?preview=1`} target="_blank" className="text-(--color-ok) hover:underline">表示</a>
                     ) : (
                       <span className="text-(--color-dim)">未作成</span>
                     )}
