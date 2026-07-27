@@ -168,7 +168,8 @@ FOOT_NAV = [
         ("terms.html", "会員規約"),
     ]),
     ("MEMBER", [
-        ("trial.html", "体験のご予約"),
+        ("trial-booking.html", "体験レッスンを予約"),
+        ("trial.html", "体験の内容"),
         ("@links.memberLogin", "会員ログイン"),
         ("@links.memberBooking", "会員Web予約"),
         ("@links.memberRegister", "Web会員登録"),
@@ -244,8 +245,12 @@ def head(title, desc, page, jsonld=""):
         <a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a>
       </div>
     </nav>
+    <div class="nav__tel">
+      <a data-tel>近日公開</a>
+      <small>受付 <span data-frank="store.hours" data-frank-fallback="営業時間内">営業時間内</span></small>
+    </div>
     <div class="nav__cta">
-      <a class="nav__member" data-link="links.memberLogin">MEMBER LOGIN</a>
+      <a class="nav__member" data-link="links.memberLogin">MEMBER</a>
       <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約（無料）</a>
     </div>
     <button class="burger" aria-label="メニュー" aria-expanded="false"><span></span></button>
@@ -257,25 +262,20 @@ def head(title, desc, page, jsonld=""):
 
 
 def cta_block():
-    """16. 体験予約・公式LINE"""
-    return f"""
-<!-- 16. 体験予約・公式LINE -->
-<section class="sec cta" id="contact">
-  <div class="wrap center cta__box rv">
-    <p class="eyebrow">Visit Us</p>
-    <h2 class="h-en">COME AND SEE</h2>
-    <p class="h-jp">まずは、一度打ちに来てください。</p>
-    <p class="lead">
-      {PREOPEN}、姫路・土山にプレオープンいたします。<br>
-      施設を見て、打って、少し話して。合いそうだと思っていただけたら、それがいちばんです。<br>
-      体験レッスンは約55分。当日いただく費用はありません（通常3,300円が無料）。
+    """最終CTA（黄色い帯）。全ページ共通で最後に置く。"""
+    return """
+<!-- 最終CTA -->
+<section class="band" id="contact">
+  <div class="wrap rv">
+    <p class="band__t">まずは、無料の体験レッスンから。</p>
+    <p class="band__s">
+      受付 → カウンセリング → 打席のご案内 → 体験レッスン → ご入会のご案内（約55分）<br>
+      強引な勧誘はいたしません。手ぶらでお越しください。
     </p>
-    {offer_badge()}
     <div class="cta__btns">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験レッスンを予約する</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談する</a>
     </div>
-    <p class="cta__note">受付 → カウンセリング → 打席のご案内 → 体験レッスン → ご入会のご案内（約55分）／ 強引な勧誘はいたしません</p>
   </div>
 </section>
 """
@@ -329,6 +329,13 @@ def foot():
 <!-- 17. フッター -->
 <footer class="foot">
   <div class="wrap">
+    <div class="line-band" data-line-band hidden>
+      <div>
+        <p class="line-band__t">LINEで、かんたんご相談</p>
+        <p class="line-band__s">体験のご予約・持ち物・道順など、お気軽にどうぞ。</p>
+      </div>
+      <a class="btn" href="#" data-cta="line">公式LINEを友だち追加</a>
+    </div>
     <div class="foot__top">
       <div>
         <a class="logo" href="index.html">
@@ -470,522 +477,311 @@ def write(name, body):
 # ==================================================================
 
 def build_index():
+    """トップページ（ポップ版）
+
+    方針: 初心者向けスクールのトップページに寄せた構成。
+      ヒーロー → キャンペーン2枚 → リード → レッスン紹介 → 魅力3つ →
+      料金 → 体験CTA帯 → 施設 → こんな方へ → 新着情報
+    ★ 各ブロックの文章は2〜4行まで。詳しい話は下層ページに逃がすこと。
+    """
     b = head(
-        "FRANK GOLF｜打って、教わって、語れる。姫路・土山のフランクなゴルフ基地。",
-        "練習・レッスン・交流がひとつになった、大人のための会員制インドアゴルフラウンジ。2026年9月2日、姫路・土山にプレオープン。",
+        "FRANK GOLF｜姫路・土山のインドアゴルフ｜体験レッスン無料",
+        "姫路・土山のインドアゴルフスクール。ツアープロのマンツーマンレッスンと最新シミュレーター。体験レッスン（約55分）は通常3,300円のところ無料。2026年9月2日プレオープン。",
         "home",
         jsonld=jsonld_business(),
     )
 
-    # 3. メインビジュアル
+    # ---------- 1. ヒーロー ----------
     b += f"""
-<!-- 3. メインビジュアル -->
-<section class="hero">
-  <div class="hero__bg" aria-hidden="true">
-    <div class="hero__slides">
-      <div class="hero__slide" data-img="hero"  style="background-image:url(&quot;assets/img/hero-1.jpg&quot;)"></div>
-      <div class="hero__slide" data-img="hero2" style="background-image:url(&quot;assets/img/hero-2.jpg&quot;)"></div>
-      <div class="hero__slide" data-img="hero3" style="background-image:url(&quot;assets/img/hero-3.jpg&quot;)"></div>
+<!-- 1. ヒーロー -->
+<section class="phero">
+  <div class="wrap phero__in">
+    <div>
+      <p class="pill pill--green"><span data-preopen>{PREOPEN}</span> プレオープン ／ 姫路・土山</p>
+      <h1 class="phero__copy">
+        <span class="s1">ゴルフは、</span>
+        <span class="s2">教わると<span class="hl">面白い</span>。</span>
+      </h1>
+      <p class="phero__lead">
+        クラブを握ったことがなくても大丈夫。<br>
+        ツアープロがマンツーマンで、あなたの一球を見ます。
+      </p>
+      <div class="phero__cta">
+        <a class="btn btn--brass" href="#" data-cta="trial">体験レッスンを予約（無料）</a>
+        <a class="btn btn--ghost" href="trial.html">体験の内容を見る</a>
+      </div>
     </div>
-    <div class="hero__veil"></div>
+    <div class="phero__pic">
+      <div class="phero__stamp"><b>無料</b><span>TRIAL LESSON</span></div>
+      <img data-img-src="hero" src="assets/img/hero-1.jpg" width="1600" height="900"
+           alt="FRANK GOLF 姫路・土山の店舗外観。インドアゴルフ練習場＆ゴルフスクール">
+    </div>
   </div>
-  <div class="wrap hero__in">
-    <p class="hero__tag"><span data-preopen>{PREOPEN}</span> PRE-OPEN ／ 姫路・土山</p>
-    <h1 class="hero__copy">
-      <span class="l1">打って、教わって、語れる。</span>
-      <span class="l2">姫路・土山のフランクなゴルフ基地。</span>
-    </h1>
-    <p class="hero__sub">
-      ただボールを打つだけではない。ゴルフが上手くなり、会話が生まれ、仲間ができる。<br>
-      FRANK GOLFは、練習・レッスン・交流がひとつになった、大人のための会員制インドアゴルフラウンジです。
-    </p>
-    <div style="margin-top:30px">{offer_badge()}</div>
-    <div class="hero__cta">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
-      <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
-      <a class="btn btn--ghost" href="trial.html">体験の内容を見る</a>
-    </div>
-    <dl class="hero__meta">
-      <div><dt>PRE-OPEN</dt><dd data-preopen>{PREOPEN}</dd></div>
-      <div><dt>AREA</dt><dd>姫路・土山</dd></div>
-      <div><dt>OPEN HOURS</dt><dd data-frank="store.hours">近日公開</dd></div>
-      <div><dt>BAYS</dt><dd data-frank="store.bays">近日公開</dd></div>
+  <div class="wrap">
+    <dl class="stats">
+      <div><dt>体験レッスン</dt><dd>無料<small>／約55分</small></dd></div>
+      <div><dt>打席</dt><dd>4<small>打席</small></dd></div>
+      <div><dt>コーチ</dt><dd>ツアープロ<small>常駐</small></dd></div>
+      <div><dt>駐車場</dt><dd>20<small>台・無料</small></dd></div>
     </dl>
   </div>
-  <p class="scroll-hint">SCROLL</p>
 </section>
 
-<!-- 3b. プレオープン告知バナー帯 -->
-<section class="sec promo" style="padding:clamp(40px,6vw,72px) 0">
+<!-- 2. キャンペーン -->
+<section class="sec" style="padding-top:clamp(36px,5vw,56px)">
   <div class="wrap">
-    <a class="promo__in rv" href="#" data-cta="trial" aria-label="2026年9月2日プレオープン｜体験予約はこちら">
-      <img data-img-src="bannerWide" src="assets/banner-wide.jpg"
-           alt="FRANK GOLF 姫路・土山 2026年9月2日プレオープン。打って、教わって、語れる。体験予約・公式LINE受付中"
-           loading="lazy" width="1200" height="420">
-    </a>
-    <div class="cta__btns" style="justify-content:center;margin-top:20px">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
+    <div class="bnr2 rv">
+      <a class="bnr bnr--y" href="#" data-cta="trial">
+        <span class="bnr__lbl">FIRST TIME</span>
+        <span class="bnr__big">体験レッスン<br>無料</span>
+        <span class="bnr__note"><del>通常 3,300円（税込）</del> ／ 約55分・手ぶらでOK</span>
+      </a>
+      <a class="bnr bnr--g" href="plan.html">
+        <span class="bnr__lbl">MEMBERSHIP</span>
+        <span class="bnr__big">月額 9,800円〜</span>
+        <span class="bnr__note">通い放題プランあり ／ 全営業日ご利用OK</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- 3. リード -->
+<section class="sec sec--alt">
+  <div class="wrap center rv" style="max-width:760px">
+    <p class="pill">CONCEPT</p>
+    <h2 class="ph">上手くなるほど、<br>ゴルフは<span class="mk">楽しくなる</span>。</h2>
+    <p class="ph-sub">
+      自己流だと「何が悪いのか分からない」ままになりがちです。<br>
+      プロが見て、データで確かめる。だから、変化がその日に分かります。
+    </p>
+  </div>
+</section>
+
+<!-- 4. レッスン紹介 -->
+<section class="sec">
+  <div class="wrap">
+    <div class="split rv">
+      <div class="split__pic">
+        <img data-img-src="lessonPic" src="assets/img/hero-3.jpg" width="1600" height="900"
+             alt="FRANK GOLF 姫路のゴルフレッスン。プロがグリップから丁寧に指導">
+      </div>
+      <div>
+        <p class="pill">LESSON</p>
+        <h2 class="ph">ツアープロが、<br>マンツーマンで。</h2>
+        <p class="ph-sub">
+          JGTOツアーメンバーの藤田プロが常駐。<br>
+          握り方から、スコアを縮める一点まで。<br>
+          「今日はここだけ」に絞って教えます。
+        </p>
+        <p style="margin-top:26px"><a class="btn btn--ghost" href="lesson.html">レッスンの詳細</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. FRANK GOLFの魅力 -->
+<section class="sec sec--alt">
+  <div class="wrap">
+    <div class="center rv">
+      <p class="pill">FEATURES</p>
+      <h2 class="ph">FRANK GOLFの<span class="mk">3つの魅力</span></h2>
+    </div>
+    <div class="merits rv" style="margin-top:44px">
+      <article class="merit">
+        <div class="merit__pic">
+          <span class="merit__no">01</span>
+          <img data-img-src="bay" src="assets/img/play.jpg" width="760" height="500"
+               alt="FRANK GOLF 姫路の完全予約制インドアゴルフ打席">
+        </div>
+        <div class="merit__body">
+          <h3 class="merit__t">周りを気にせず打てる</h3>
+          <p class="merit__b">完全予約制の4打席。順番待ちも人目もありません。左打ちの方専用の打席もあります。</p>
+        </div>
+      </article>
+      <article class="merit">
+        <div class="merit__pic">
+          <span class="merit__no">02</span>
+          <img data-img-src="sim" src="assets/img/hero-2.jpg" width="1600" height="900"
+               alt="最新シミュレーターでコースデビュー対策ができるFRANK GOLF 姫路">
+        </div>
+        <div class="merit__body">
+          <h3 class="merit__t">数字で上達が分かる</h3>
+          <p class="merit__b">TrackManほか最新シミュレーターを完備。感覚ではなく弾道データで、直す一点がはっきりします。</p>
+        </div>
+      </article>
+      <article class="merit">
+        <div class="merit__pic">
+          <span class="merit__no">03</span>
+          <img data-img-src="lounge" src="assets/img/lounge.jpg" width="760" height="500"
+               alt="打席とひと続きのバーラウンジ。ゴルフ仲間ができるFRANK GOLF 姫路">
+        </div>
+        <div class="merit__body">
+          <h3 class="merit__t">ゴルフ仲間ができる</h3>
+          <p class="merit__b">打ち終わったらそのままラウンジへ。一緒に回る仲間が自然に見つかります。一人で帰る日ももちろんOK。</p>
+        </div>
+      </article>
+    </div>
+    <p class="center rv" style="margin-top:36px"><a class="btn btn--ghost" href="concept.html">FRANK GOLFの魅力を詳しく</a></p>
+  </div>
+</section>
+
+<!-- 6. 料金 -->
+<section class="sec">
+  <div class="wrap price-hero" style="max-width:900px">
+    <div class="rv">
+      <p class="pill">PRICE</p>
+      <h2 class="ph">料金は、シンプルに<span class="mk">3プラン</span>。</h2>
+    </div>
+    <div class="rv" style="margin-top:32px">
+      <div class="price-join">
+        <span>入会金</span><b data-frank="price.joinFee" data-frank-fallback="近日公開">近日公開</b>
+      </div>
+      <p class="price-plus">＋ お好きなプランの月額</p>
+      <div class="price-list">
+        <div class="price-card">
+          <p class="price-card__n">LIGHT</p>
+          <p class="price-card__jp">ライト</p>
+          <p class="price-card__p">9,800<small>円／月</small></p>
+        </div>
+        <div class="price-card price-card--feat">
+          <span class="price-card__tag">いちばん人気</span>
+          <p class="price-card__n">REGULAR</p>
+          <p class="price-card__jp">レギュラー</p>
+          <p class="price-card__p">13,800<small>円／月</small></p>
+        </div>
+        <div class="price-card">
+          <p class="price-card__n">MASTER</p>
+          <p class="price-card__jp">マスター</p>
+          <p class="price-card__p">19,800<small>円／月</small></p>
+        </div>
+      </div>
+      <p class="price-note">表示は税抜・月額です。法人プラン、レッスンチケットもご用意しています。</p>
+      <p style="margin-top:26px"><a class="btn btn--ghost" href="plan.html">プラン・料金の詳細はこちら</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- 7. 体験CTA帯 -->
+<section class="band">
+  <div class="wrap rv">
+    <p class="band__t">まずは、無料の体験レッスンから。</p>
+    <p class="band__s">日時を選ぶだけ、その場で予約が確定します（約55分・手ぶらでOK）</p>
+    <div class="cta__btns">
+      <a class="btn btn--brass" href="#" data-cta="trial">体験レッスンを予約する</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
     </div>
   </div>
 </section>
 
-<!-- 4. ブランドコンセプト -->
-<section class="sec sec--alt" id="concept">
+<!-- 8. 施設 -->
+<section class="sec">
   <div class="wrap">
-    <div class="rv" style="max-width:52ch">
-      <p class="eyebrow">Concept</p>
-      <h2 class="h-en">MORE THAN<br>A DRIVING RANGE</h2>
-      <p class="h-jp">ただの練習場ではなく、<br>ゴルフが上手くなり、仲間ができる場所。</p>
-    </div>
-    <div class="rv" style="margin-top:56px">
-      <p class="quote">
-        いい球が出た日に、<em>それを話せる相手がいる</em>。<br>
-        うまくいかない日に、<em>笑い飛ばしてくれる誰かがいる</em>。<br>
-        ゴルフが面白くなるのは、たぶん、そこからです。
-      </p>
-      <p class="lead" style="max-width:64ch">
-        FRANK GOLFは、練習打席・プロによるレッスン・データ分析・バーラウンジでの交流を、
-        ひとつの空間で提供する会員制インドアゴルフラウンジです。<br><br>
-        打席で黙々とスイングを固める時間も、ラウンジでその日の一球について語り合う時間も、
-        どちらもゴルフの一部だと考えています。上達と、その先にある人とのつながり。
-        その両方が自然に生まれる場所を、姫路・土山につくります。
-      </p>
-      <div style="margin-top:34px">
-        <a class="btn btn--ghost" href="concept.html">コンセプトを詳しく見る</a>
+    <div class="split split--rev rv">
+      <div class="split__pic">
+        <img data-img-src="sim" src="assets/img/hero-2.jpg" width="1600" height="900"
+             alt="FRANK GOLF 姫路のシミュレーションゴルフ打席。コースラウンドも体験できる">
+      </div>
+      <div>
+        <p class="pill">FACILITY</p>
+        <h2 class="ph">コースデビューの<br>準備も、ここで。</h2>
+        <p class="ph-sub">
+          シミュレーターで実際のコースを回れます。<br>
+          打席のとなりはバーラウンジ。<br>
+          練習のあとに、その日の一球を語れる場所です。
+        </p>
+        <p style="margin-top:26px"><a class="btn btn--ghost" href="facility.html">施設を詳しく見る</a></p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- 5. PLAY・LEARN・CONNECT -->
-<section class="sec" id="experience">
-  <div class="wrap">
+<!-- 9. こんな方へ -->
+<section class="sec sec--alt">
+  <div class="wrap" style="max-width:900px">
     <div class="center rv">
-      <p class="eyebrow">Three Experiences</p>
-      <h2 class="h-en">PLAY / LEARN / CONNECT</h2>
-      <p class="h-jp">3つの体験が、ひとつの空間で完結する。</p>
+      <p class="pill">FOR YOU</p>
+      <h2 class="ph">こんな方に、<br>来ていただきたい。</h2>
     </div>
-    <div class="grid grid--3" style="margin-top:56px">
-      <article class="card xp rv">
-        <p class="card__no">01</p>
-        <h3 class="card__t">PLAY</h3>
-        <p class="card__t-jp">打つ</p>
-        <p class="card__b">
-          完全予約制の打席で、待ち時間なく練習に入れます。スマート入退室により、
-          思い立ったその時間に。落ち着いた少人数制の環境で、
-          自分の一球にじっくり向き合えます。
-        </p>
-      </article>
-      <article class="card xp rv">
-        <p class="card__no">02</p>
-        <h3 class="card__t">LEARN</h3>
-        <p class="card__t-jp">教わる</p>
-        <p class="card__b">
-          プロによるレッスンと、シミュレーターの弾道・スイングデータ。
-          感覚だけに頼らず、数字で自分のスイングを知る。
-          「なんとなく良くなった」で終わらせません。
-        </p>
-      </article>
-      <article class="card xp rv">
-        <p class="card__no">03</p>
-        <h3 class="card__t">CONNECT</h3>
-        <p class="card__t-jp">語る</p>
-        <p class="card__b">
-          打ち終わったら、そのままラウンジへ。同じ日に同じ場所で打った人と、
-          自然に会話が生まれます。コンペやラウンドイベントを通じて、
-          一緒に回る仲間が見つかる。
-        </p>
-      </article>
+    <div class="checks rv" style="margin-top:36px">
+      <p class="check">クラブを握ったことがない、これから始める方</p>
+      <p class="check">自己流で伸び悩んでいる方</p>
+      <p class="check">練習ではできるのに、コースだと崩れる方</p>
+      <p class="check">一緒にラウンドする仲間を見つけたい方</p>
+      <p class="check">仕事帰りに、天気を気にせず打ちたい方</p>
     </div>
-
     <div class="note-solo rv">
-      <p class="note-solo__t">もちろん、一人で集中したい日も歓迎です。</p>
-      <p class="note-solo__b">
-        交流を目的にした施設ではありますが、交流を強制する施設ではありません。
-        黙々と打ち込みたい日は、そのまま打って帰っていただいて構いません。
-        ラウンジに寄るかどうかは、いつでもあなたのペースで決められます。
-      </p>
+      <p class="note-solo__t">一人で黙々と打ちたい日も、もちろん歓迎です。</p>
+      <p class="note-solo__b">交流は「あってもいいもの」。ラウンジを素通りして帰っていただいて構いません。</p>
     </div>
   </div>
 </section>
 
-<!-- 6. FRANKというブランド名に込めた意味 -->
-<section class="sec sec--alt" id="name">
-  <div class="wrap">
-    <div class="grid grid--2" style="gap:56px;align-items:center">
-      <div class="rv">
-        <p class="eyebrow">The Name</p>
-        <h2 class="h-en">WHY “FRANK”</h2>
-        <p class="h-jp">FRANKに込めた意味。</p>
-        <p class="lead">
-          frank ── 率直な。飾らない。気取らない。<br><br>
-          スコアを盛らない。知ったかぶりをしない。初心者だからと気後れしない。
-          うまい人が偉いわけでもない。<br><br>
-          「フランクに話せる」の、あのフランクです。
-          ゴルフはときに堅苦しくなりがちですが、ここではその鎧を置いていってください。
-          率直に教わり、率直に語れる。それがFRANK GOLFの名前の由来であり、
-          この場所で守りたい唯一のルールです。
-        </p>
-      </div>
-      <div class="rv">
-        <div class="card" style="padding:44px 38px">
-          <p class="quote" style="font-size:1.5rem">
-            うまくなりたい。<br>
-            でも、<em>気を張りたくはない</em>。<br><br>
-            その両方を、<br>
-            叶えられる場所にします。
-          </p>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 7. 施設・設備紹介 -->
-<section class="sec" id="facility">
-  <div class="wrap">
-    <div class="rv" style="max-width:56ch">
-      <p class="eyebrow">Facility</p>
-      <h2 class="h-en">A PLACE TO<br>STAY A WHILE</h2>
-      <p class="h-jp">打って、終わりじゃない。</p>
-      <p class="lead">
-        FRANK GOLFの施設は、「打席」と「ラウンジ」がひと続きになっています。
-        設備の一覧ではなく、ここでの過ごし方でご紹介します。
-      </p>
-    </div>
-
-    <div style="margin-top:44px">"""+ media("play", "assets/img/play.jpg", "FRANK GOLF 姫路・土山のインドアゴルフ練習打席とシミュレーターのイメージ", "PLAY / 打席") +"""</div>
-
-    <div style="margin-top:24px">"""+ floorplan() +"""</div>
-
-    <div class="flow rv" style="margin-top:52px">
-      <div class="flow__i">
-        <p class="flow__n">STEP 01</p>
-        <div>
-          <h3 class="flow__t">スマート入退室で、そのまま打席へ</h3>
-          <p class="flow__b">
-            完全予約制なので、順番待ちはありません。予約した時間にお越しいただき、
-            そのまま打席へ。受付での手続きに時間を取られることなく、
-            club in hand の状態まで最短で。
-          </p>
-        </div>
-      </div>
-      <div class="flow__i">
-        <p class="flow__n">STEP 02</p>
-        <div>
-          <h3 class="flow__t">落ち着いた少人数制の打席で、集中して打つ</h3>
-          <p class="flow__b">
-            打席数：<span data-frank="store.bays">近日公開</span>／
-            シミュレーター：<span data-frank="store.simulator">近日公開</span><br>
-            隣を気にせず、自分のリズムで。弾道とスイングのデータは、その場で確認できます。
-          </p>
-        </div>
-      </div>
-      <div class="flow__i">
-        <p class="flow__n">STEP 03</p>
-        <div>
-          <h3 class="flow__t">プロに、その場で一言もらう</h3>
-          <p class="flow__b">
-            気になったことを、打ったその場で聞ける。
-            レッスンの内容は <span data-frank="lesson.style">近日公開</span> です。
-          </p>
-        </div>
-      </div>
-      <div class="flow__i">
-        <p class="flow__n">STEP 04</p>
-        <div>
-          <h3 class="flow__t">ラウンジで、その一球について語る</h3>
-          <p class="flow__b">
-            打ち終わったら、クラブを置いてラウンジへ。今日の当たり、次のラウンド、
-            新しいドライバーの話。ゴルフの話が、いちばん面白くなる時間です。
-            一杯だけ飲んで帰る人も、そのまま打席に戻る人もいます。
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:40px" class="rv">
-      <a class="btn btn--ghost" href="facility.html">施設について詳しく見る</a>
-    </div>
-  </div>
-</section>
-
-<!-- 8. レッスン紹介 -->
-<section class="sec sec--alt" id="lesson">
-  <div class="wrap">
-    <div class="grid grid--2" style="gap:56px">
-      <div class="rv">
-        <p class="eyebrow">Lesson</p>
-        <h2 class="h-en">LEARN</h2>
-        <p class="h-jp" data-frank-badge="lesson.style">プロに教わる。データで確かめる。</p>
-        <p class="lead">
-          自己流の限界は、たいてい「何が悪いか分からない」ところから来ます。
-          FRANK GOLFでは、プロによるレッスンとシミュレーターの計測データを組み合わせ、
-          いま直すべき一点をはっきりさせます。<br><br>
-          そして、教わったことをラウンジで話してみる。
-          言葉にすると、自分でも分かっていなかったことが整理されます。
-          それも上達の一部だと考えています。
-        </p>
-      </div>
-      <div class="rv">
-        <div class="spec">
-          <div class="spec__row"><p class="spec__k">レッスン形式</p><p class="spec__v" data-frank="lesson.style">近日公開</p></div>
-          <div class="spec__row"><p class="spec__k">レッスンメニュー</p><p class="spec__v" data-frank="lesson.menu">近日公開</p></div>
-          <div class="spec__row"><p class="spec__k">コーチ</p><p class="spec__v" data-frank="lesson.coaches">近日公開</p></div>
-          <div class="spec__row"><p class="spec__k">初心者プログラム</p><p class="spec__v" data-frank="lesson.beginnerProgram">近日公開</p></div>
-          <div class="spec__row"><p class="spec__k">使用シミュレーター</p><p class="spec__v" data-frank="store.simulator">近日公開</p></div>
-        </div>
-        <p style="margin-top:22px"><a class="btn btn--ghost btn--sm" href="lesson.html">レッスンを詳しく見る</a></p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 9. バー・ラウンジ紹介 -->
-<section class="sec" id="lounge" style="background:radial-gradient(90% 70% at 80% 30%, rgba(201,162,76,.09), transparent 60%), var(--ink)">
-  <div class="wrap">
-    <div class="rv" style="max-width:56ch">
-      <p class="eyebrow">Bar &amp; Lounge</p>
-      <h2 class="h-en">THE 19TH HOLE</h2>
-      <p class="h-jp">ここが、FRANK GOLFの中心です。</p>
-      <p class="lead">
-        バー・ラウンジは、打席のついでにある休憩スペースではありません。
-        FRANK GOLFがつくりたかったものの、ほとんど本体です。<br><br>
-        ゴルフの上達は打席で起きますが、ゴルフが「好きで仕方なくなる」のは、
-        たいていラウンドの後の一杯や、誰かとのくだらない話の中です。
-        その時間を、練習場の中に持ち込みました。
-      </p>
-    </div>
-    <div style="margin-top:44px">"""+ media("lounge", "assets/img/lounge.jpg", "FRANK GOLF 姫路のバー・ラウンジの間接照明のイメージ。打席とひと続きの大人の社交場", "BAR & LOUNGE") +"""</div>
-    <div class="grid grid--3 rv" style="margin-top:52px">
-      <article class="card">
-        <p class="card__no">01</p>
-        <h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">打ってすぐ、語れる距離に</h3>
-        <p class="card__b">打席とラウンジが同じフロアにあります。着替えて移動する必要も、店を変える必要もありません。今の一球の話が、熱いうちにできます。</p>
-      </article>
-      <article class="card">
-        <p class="card__no">02</p>
-        <h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">一人でも、入りやすい</h3>
-        <p class="card__b">カウンター中心の設計です。一人で来て、静かに一杯やって帰ってもいい。誰かと話したい気分の日は、隣の会員と自然に話が始まります。</p>
-      </article>
-      <article class="card">
-        <p class="card__no">03</p>
-        <h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">気取らない大人の社交場</h3>
-        <p class="card__b">ドレスコードはありません。練習着のままで結構です。スコアの上手い下手で席が決まることもありません。</p>
-      </article>
-    </div>
-    <div class="spec rv" style="margin-top:44px">
-      <div class="spec__row"><p class="spec__k">ドリンク</p><p class="spec__v" data-frank="lounge.drink">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">フード</p><p class="spec__v" data-frank="lounge.food">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">席数</p><p class="spec__v" data-frank="lounge.seats">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">ご利用時間</p><p class="spec__v" data-frank="lounge.hours">近日公開</p></div>
-    </div>
-    <p style="margin-top:28px" class="rv"><a class="btn btn--ghost" href="lounge.html">ラウンジを詳しく見る</a></p>
-  </div>
-</section>
-
-<!-- 10. 会員コミュニティー・イベント -->
-<section class="sec sec--alt" id="community">
-  <div class="wrap">
+<!-- 10. 新着情報（0件なら自動で非表示） -->
+<section class="sec" id="news" data-news-section hidden>
+  <div class="wrap" style="max-width:880px">
     <div class="center rv">
-      <p class="eyebrow">Community</p>
-      <h2 class="h-en">GOLF FRIENDS</h2>
-      <p class="h-jp">練習仲間ができると、ゴルフはもっと面白い。</p>
-      <p class="lead">
-        「一緒に回る人がいない」。インドア練習場に通う方から、いちばんよく聞く言葉です。
-        FRANK GOLFでは、その一言が出ないように、会員同士がつながるきっかけを用意します。
-      </p>
+      <p class="pill">NEWS</p>
+      <h2 class="ph">新着情報</h2>
     </div>
-    <div style="margin-top:44px">"""+ media("community", "assets/img/community.jpg", "FRANK GOLF 姫路の会員コンペ・ラウンドイベントで一緒に回るゴルフ仲間のイメージ", "COMMUNITY") +"""</div>
-    <div class="grid grid--3 rv" style="margin-top:52px">
-      <article class="card"><p class="card__no">01</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">会員限定コンペ</h3><p class="card__b">腕前で気後れしないよう、ハンデ戦を基本に。まずは「出てみる」ところから。</p></article>
-      <article class="card"><p class="card__no">02</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">ラウンドイベント</h3><p class="card__b">一人参加が前提のラウンド会。当日その場で組み合わせが決まるので、誘う相手を探す必要がありません。</p></article>
-      <article class="card"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">初心者向け交流会</h3><p class="card__b">まだコースに出たことがない方だけの会。同じ立場の人と一緒なら、最初の一歩は軽くなります。</p></article>
-      <article class="card"><p class="card__no">04</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">ゴルフ観戦イベント</h3><p class="card__b">ラウンジのモニターでツアー中継を。誰かの応援に文句を言いながら見るのが、いちばん面白い。</p></article>
-      <article class="card"><p class="card__no">05</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">法人交流</h3><p class="card__b">姫路の経営者・ビジネスパーソンが集まります。ゴルフを介した、自然なつながりの場として。</p></article>
-      <article class="card"><p class="card__no">06</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">ゴルフ仲間との出会い</h3><p class="card__b">イベントに出なくても大丈夫。ラウンジで隣に座った人と話が合えば、それがいちばん自然な出会いです。</p></article>
-    </div>
-
-    <div class="note-solo rv">
-      <p class="note-solo__t">交流は、あくまで「あってもいいもの」です。</p>
-      <p class="note-solo__b">
-        イベントへの参加は自由です。声をかけられたくない日は、そのまま打席で集中していただいて構いませんし、
-        ラウンジを素通りして帰っていただいても構いません。
-        一人で黙々と打ち込みたい人にとっても、快適に使える施設であることを大切にしています。
-      </p>
-    </div>
-    <p style="margin-top:30px" class="rv"><a class="btn btn--ghost" href="community.html">コミュニティを詳しく見る</a></p>
+    <ul class="news-pop rv" data-news style="margin-top:32px"></ul>
   </div>
 </section>
 
-<!-- 11. 料金・会員プラン -->
-<section class="sec" id="plan">
-  <div class="wrap">
-    <div class="center rv">
-      <p class="eyebrow">Plan &amp; Price</p>
-      <h2 class="h-en">MEMBERSHIP</h2>
-      <p class="h-jp" data-frank-badge="price.plans.0.price">会員プラン</p>
-      <p class="lead">
-        料金・プラン内容は現在準備中です。決まり次第、本ページと公式LINEでお知らせいたします。
-      </p>
-    </div>
-    <div class="grid grid--3 rv" style="margin-top:52px">
-      <div class="plan">
-        <p class="plan__n">LIGHT</p>
-        <p class="plan__n-jp">ライト会員</p>
-        <p class="plan__p"><span data-frank="price.plans.0.price">近日公開</span></p>
-        <ul class="plan__f" data-frank="price.plans.0.features"><li>平日昼間の利用中心（月8回まで）</li><li>日中ゆったり練習したい方に</li></ul>
-      </div>
-      <div class="plan plan--feat">
-        <span class="plan__badge">一番人気</span>
-        <p class="plan__n">REGULAR</p>
-        <p class="plan__n-jp">レギュラー会員</p>
-        <p class="plan__p"><span data-frank="price.plans.1.price">近日公開</span></p>
-        <ul class="plan__f" data-frank="price.plans.1.features"><li>全営業日ご利用可能</li><li>1日1時間 通い放題</li><li>毎日練習して上達したい方に</li></ul>
-      </div>
-      <div class="plan">
-        <p class="plan__n">MASTER</p>
-        <p class="plan__n-jp">マスター会員</p>
-        <p class="plan__p"><span data-frank="price.plans.2.price">近日公開</span></p>
-        <ul class="plan__f" data-frank="price.plans.2.features"><li>全営業日ご利用可能</li><li>1日最大2時間まで</li><li>たっぷり練習したい方に</li></ul>
-      </div>
-    </div>
-    <div class="spec rv" style="margin-top:44px">
-      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">入会金</p><p class="spec__v" data-frank="price.joinFee">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
-    </div>
-    <p style="margin-top:30px" class="rv"><a class="btn btn--ghost" href="plan.html">料金・入会の流れを見る</a></p>
-  </div>
-</section>
-
-<!-- 12. 初心者向け案内 -->
-<section class="sec sec--alt" id="beginner">
-  <div class="wrap">
-    <div class="grid grid--2" style="gap:56px;align-items:center">
-      <div class="rv">
-        <p class="eyebrow">For Beginners</p>
-        <h2 class="h-en">START HERE</h2>
-        <p class="h-jp">はじめての方こそ、フランクに。</p>
-        <p class="lead">
-          クラブを持ったことがなくても大丈夫です。むしろ、いちばん歓迎したいのは、
-          これから始める方です。<br><br>
-          インドアなので、周りの視線も天候も気になりません。
-          プロが最初の握り方から教えます。そして何より、
-          ラウンジには「1年前は同じところにいた」会員がいます。
-          分からないことを、分からないまま聞ける空気が、ここにはあります。
-        </p>
-        <p style="margin-top:30px"><a class="btn btn--ghost" href="beginner.html">はじめての方へ</a></p>
-      </div>
-      <div class="rv">
-        <div class="card" style="padding:38px 34px">
-          <ul class="plan__f" style="font-size:14.5px">
-            <li>クラブをお持ちでなくても始められます</li>
-            <li>屋内なので、天候・季節・人目を気にせず練習できます</li>
-            <li>プロが基本の握り方・構え方からお伝えします</li>
-            <li>初心者向けの交流会・ラウンド会があります</li>
-            <li>「上手い人ばかりで気まずい」を作らないのが、FRANKの方針です</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 13. 法人利用 -->
-<section class="sec" id="corporate">
-  <div class="wrap">
-    <div class="rv" style="max-width:56ch">
-      <p class="eyebrow">For Business</p>
-      <h2 class="h-en">CORPORATE USE</h2>
-      <p class="h-jp">接待の前に、まずここで一度。</p>
-      <p class="lead">
-        打席とラウンジがひと続きになっているという構造は、法人利用と相性がよいと考えています。
-        一緒に打って、そのまま座って話す。ゴルフ場に出る前の関係づくりが、姫路市内で完結します。
-      </p>
-    </div>
-    <div class="grid grid--3 rv" style="margin-top:44px">
-      <article class="card"><p class="card__no">01</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">接待・商談で</h3><p class="card__b">ラウンジでそのままお話まで。ゴルフの話から入れるので、堅い空気になりません。</p></article>
-      <article class="card"><p class="card__no">02</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">福利厚生として</h3><p class="card__b">社員の方が個々にご利用いただけます。ゴルフを始める社員の受け皿としても。</p></article>
-      <article class="card"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">法人同士の交流</h3><p class="card__b">姫路の経営者・ビジネスパーソンが集まる場として、交流イベントを企画します。</p></article>
-    </div>
-    <div class="spec rv" style="margin-top:40px">
-      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">貸切利用</p><p class="spec__v" data-frank="lounge.note">近日公開</p></div>
-    </div>
-    <p style="margin-top:30px" class="rv"><a class="btn btn--ghost" href="corporate.html">法人利用について</a></p>
-  </div>
-</section>
-
-<!-- 14. アクセス -->
+<!-- 11. アクセス -->
 <section class="sec sec--alt" id="access">
   <div class="wrap">
-    <div class="grid grid--2" style="gap:48px">
-      <div class="rv">
-        <p class="eyebrow">Access</p>
-        <h2 class="h-en">HIMEJI<br>TSUCHIYAMA</h2>
-        <p class="h-jp">姫路・土山</p>
-        <div class="spec" style="margin-top:34px">
-          <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide></span><span data-frank="store.address">近日公開</span></p></div>
-          <div class="spec__row"><p class="spec__k">電話番号</p><p class="spec__v"><a data-tel>近日公開</a></p></div>
+    <div class="split rv">
+      <div class="split__pic" style="align-self:stretch">
+        <div class="card map-frame map-frame--tall" data-map style="height:100%">
+          <p class="tbd map-frame__tbd">地図は近日公開いたします</p>
+        </div>
+      </div>
+      <div>
+        <p class="pill">ACCESS</p>
+        <h2 class="ph">姫路・土山。<br>駐車場20台。</h2>
+        <div class="spec" style="margin-top:26px">
+          <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v" data-frank="store.address">近日公開</p></div>
           <div class="spec__row"><p class="spec__k">営業時間</p><p class="spec__v" data-frank="store.hours">近日公開</p></div>
           <div class="spec__row"><p class="spec__k">定休日</p><p class="spec__v" data-frank="store.holiday">近日公開</p></div>
           <div class="spec__row"><p class="spec__k">駐車場</p><p class="spec__v" data-frank="store.parking">近日公開</p></div>
-          <div class="spec__row"><p class="spec__k">アクセス</p><p class="spec__v" data-frank="store.access">近日公開</p></div>
         </div>
-      </div>
-      <div class="rv">
-        <div class="card map-frame" data-map>
-          <p class="tbd map-frame__tbd">地図は近日公開いたします<br><span>2026年9月2日プレオープン／姫路・土山</span></p>
-        </div>
-        <p class="map-note"><a data-link="store.mapUrl" target="_blank" rel="noopener">Googleマップで開く ↗</a></p>
+        <p style="margin-top:26px"><a class="btn btn--ghost" href="access.html">アクセスの詳細</a></p>
       </div>
     </div>
-    <p style="margin-top:30px" class="rv"><a class="btn btn--ghost" href="access.html">アクセスの詳細</a></p>
   </div>
 </section>
 
-<!-- 15b. お知らせ（site-data.js の news が0件なら自動で非表示） -->
-<section class="sec sec--alt" id="news" data-news-section hidden>
-  <div class="wrap" style="max-width:880px">
-    <div class="rv">
-      <p class="eyebrow">News</p>
-      <h2 class="h-en">NEWS</h2>
-      <p class="h-jp">お知らせ</p>
-    </div>
-    <ul class="news rv" data-news style="margin-top:36px"></ul>
-  </div>
-</section>
-
-<!-- 15. よくある質問 -->
-<section class="sec" id="faq">
-  <div class="wrap" style="max-width:880px">
+<!-- 12. よくあるご質問（3件だけ） -->
+<section class="sec">
+  <div class="wrap" style="max-width:820px">
     <div class="center rv">
-      <p class="eyebrow">FAQ</p>
-      <h2 class="h-en">QUESTIONS</h2>
-      <p class="h-jp">よくあるご質問</p>
+      <p class="pill">FAQ</p>
+      <h2 class="ph">よくあるご質問</h2>
     </div>
-    <div class="faq rv" style="margin-top:44px">
-""" + faq_items(HOME_FAQ) + """
+    <div class="faq rv" style="margin-top:32px">
+      <details>
+        <summary>まったくの初心者ですが、大丈夫でしょうか。</summary>
+        <div class="faq__a">はい。クラブの握り方からプロがお伝えします。屋内なので人目も気になりません。</div>
+      </details>
+      <details>
+        <summary>体験には何を持っていけばいいですか。</summary>
+        <div class="faq__a">手ぶらで大丈夫です。動きやすい服装でお越しください。当日いただく費用もありません。</div>
+      </details>
+      <details>
+        <summary>体験のあと、その場で入会しないといけませんか。</summary>
+        <div class="faq__a">いいえ。強引な勧誘はいたしません。持ち帰ってご検討いただいて構いません。</div>
+      </details>
     </div>
-    <p style="margin-top:30px" class="center rv"><a class="btn btn--ghost" href="faq.html">すべてのご質問を見る</a></p>
+    <p class="center rv" style="margin-top:28px"><a class="btn btn--ghost" href="faq.html">すべてのご質問を見る</a></p>
   </div>
 </section>
 """
+
     b += cta_block()
     b += foot()
     write("index.html", b)
 
 
-# ------------------------------------------------------------------
-# FAQ
-# ------------------------------------------------------------------
 def faq_items(items):
     out = ""
     for q, a in items:

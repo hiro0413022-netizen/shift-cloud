@@ -98,6 +98,11 @@
       }
     });
 
+    // フッターのLINE帯は、公式LINEが開設されるまで出さない
+    document.querySelectorAll("[data-line-band]").forEach(function (el) {
+      el.hidden = !line;
+    });
+
     document.querySelectorAll("[data-cta='line']").forEach(function (a) {
       if (line) {
         a.href = line;
@@ -139,6 +144,11 @@
         a.removeAttribute("href");
         a.innerHTML = '<span class="tbd">近日公開</span>';
       }
+    });
+
+    // ヘッダーの電話ブロックは、番号が決まるまで出さない（「近日公開」が並ぶと窮屈なため）
+    document.querySelectorAll(".nav__tel").forEach(function (el) {
+      el.hidden = !tel;
     });
 
     // 地図

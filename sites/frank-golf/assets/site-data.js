@@ -107,19 +107,25 @@ window.FRANK = {
      assets/img/ 内のJPGを上書きすればOK。別名にするならここのパスを変更してください。
      すべて「差し替え前提のサンプル画像」です（抽象アトモスフィア）。 */
   images: {
-    // メインビジュアル背景（1600x900 目安）— 3枚をクロスフェード＋ゆっくりズームで再生
-    hero:      "assets/img/hero-1.jpg",     // 1枚目：店舗外観（実写）
-    hero2:     "assets/img/hero-2.jpg",     // 2枚目：打席・シミュレーター
-    hero3:     "assets/img/hero-3.jpg",     // 3枚目：レッスン風景
-    concept:   "assets/img/concept.jpg",    // コンセプト
-    play:      "assets/img/play.jpg",       // 施設・打席
-    lesson:    "assets/img/lesson.jpg",     // レッスン
-    lounge:    "assets/img/lounge.jpg",     // バー・ラウンジ
-    community: "assets/img/community.jpg",  // コミュニティ
-    // プレオープン告知バナー（トップの帯・SNS・LINE配布用）
-    bannerWide:   "assets/banner-wide.jpg",   // Web横長 1200x420
-    bannerSquare: "assets/banner-square.jpg", // Instagram 1080x1080
-    bannerLine:   "assets/banner-line.jpg",   // LINEリッチメニュー 2500x843
+    /* ★実写の中身に合わせた割り当て（ファイル名は歴史的経緯でズレているので、
+       「どの写真か」はここで決めます。差し替えるときは同じファイル名で上書き） */
+    hero:      "assets/img/hero-1.jpg",   // 店舗外観（看板つき・実写）
+    hero2:     "assets/img/hero-2.jpg",   // 打席＋シミュレーター
+    hero3:     "assets/img/hero-3.jpg",   // レッスン風景
+    exterior:  "assets/img/hero-1.jpg",   // 外観
+    bay:       "assets/img/play.jpg",     // 打席（テーブル・ワイン付き）
+    sim:       "assets/img/hero-2.jpg",   // シミュレーター
+    lessonPic: "assets/img/hero-3.jpg",   // レッスン（★lesson.jpg は料理写真なので使わない）
+    lounge:    "assets/img/lounge.jpg",   // バーカウンター
+    food:      "assets/img/lesson.jpg",   // ラウンジのフード（実体は料理写真）
+    community: "assets/img/community.jpg",// ソファ席・パーティースペース
+    concept:   "assets/img/play.jpg",     // コンセプト
+    play:      "assets/img/play.jpg",
+    lesson:    "assets/img/hero-3.jpg",
+    // プレオープン告知バナー（SNS・LINE配布用。トップでは使わなくなりました）
+    bannerWide:   "assets/banner-wide.jpg",
+    bannerSquare: "assets/banner-square.jpg",
+    bannerLine:   "assets/banner-line.jpg",
   },
 
   /* ---------- 予約・会員システム（Genesis / member-os） ---------- */

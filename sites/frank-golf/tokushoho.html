@@ -63,8 +63,12 @@
         <a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a>
       </div>
     </nav>
+    <div class="nav__tel">
+      <a data-tel>近日公開</a>
+      <small>受付 <span data-frank="store.hours" data-frank-fallback="営業時間内">営業時間内</span></small>
+    </div>
     <div class="nav__cta">
-      <a class="nav__member" data-link="links.memberLogin">MEMBER LOGIN</a>
+      <a class="nav__member" data-link="links.memberLogin">MEMBER</a>
       <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約（無料）</a>
     </div>
     <button class="burger" aria-label="メニュー" aria-expanded="false"><span></span></button>
@@ -125,6 +129,13 @@
 <!-- 17. フッター -->
 <footer class="foot">
   <div class="wrap">
+    <div class="line-band" data-line-band hidden>
+      <div>
+        <p class="line-band__t">LINEで、かんたんご相談</p>
+        <p class="line-band__s">体験のご予約・持ち物・道順など、お気軽にどうぞ。</p>
+      </div>
+      <a class="btn" href="#" data-cta="line">公式LINEを友だち追加</a>
+    </div>
     <div class="foot__top">
       <div>
         <a class="logo" href="index.html">
@@ -167,7 +178,8 @@
       <div>
         <p class="foot__h">MEMBER</p>
         <ul>
-        <li><a href="trial.html">体験のご予約</a></li>
+        <li><a href="trial-booking.html">体験レッスンを予約</a></li>
+        <li><a href="trial.html">体験の内容</a></li>
         <li><a data-link="links.memberLogin">会員ログイン</a></li>
         <li><a data-link="links.memberBooking">会員Web予約</a></li>
         <li><a data-link="links.memberRegister">Web会員登録</a></li>
