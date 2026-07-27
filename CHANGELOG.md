@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-07-27 — SWING CORTEX: あいまい症状検索＋コメント短文化＋Gemini対応
+- feat(swing-cortex): 日本語あいまい検索 `lib/jp-search.ts`（正規化＋読み寄せ＋語幹化＋2-gram）。「伸びあがり/伸びあがる/伸び上がる/のびあがり」等の表記ゆれ・活用違いで同じ症状に着地。`/`診断と`/library`の両方に適用、同義語辞書を29グループへ拡張
+- feat(swing-cortex): 自然文コメントを短文化（2〜3文・120字以内。`NATURAL_MAX_CHARS`＋`trimNatural()`で長さをコード側でも担保）。整形版（structured）の分量は従来どおり
+- feat(swing-cortex): AI層を Claude / Gemini 両対応に（`callAi`＋`CORTEX_AI_PROVIDER`で切替・自動フェイルオーバー。Gemini既定 gemini-3.5-flash・思考トークンでの本文欠落対策済み）
+- test: tests/swing-cortex-search.test.ts（8件）追加＝計80件通過
+
 ## 2026-07-26 — FRANK 打席予約v1＋設定汎用化（DECISIONS #86/#87）
 - feat(genesis): /site-adminに「予約設定」（営業時間・定休曜日・祝日・臨時休業・枠単位・予約可能日数を保存→即反映）
 - feat(frank): 予約DB（0081 frunk_bays/frunk_bookings・二重予約はunique indexで防止）

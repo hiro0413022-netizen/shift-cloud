@@ -6,6 +6,9 @@
  * すべて依存なしの純関数（サーバー/クライアント両用）。
  */
 
+// 相対＋拡張子つき: Next（webpack/turbopack）と node --test の両方から同じ形で解決できる
+import { similarity, bestSimilarity } from "./jp-search.ts";
+
 export type DiagnosisResult = {
   symptomId: string;
   symptomName: string;
@@ -71,56 +74,113 @@ export function guessSymptom(body: string): string | null {
 }
 
 /**
- * 口語・見たまま表現 → 症状名 の同義語辞書。
- * コーチが症状名を知らなくても「見たまま」で正解に届くための最小セット。
- * P2でこの写像はコメント資産＋Claude APIに置換・拡張する。
+ * 口語・見たまま表現 → 症状キーワード の同義語辞書。
+ * コーチが症状名を知らなくても「見たまま」で正解に届くためのもの。
+ * `symptom` は症状名/タグに“含まれていれば当たり”とみなすキーワード（あいまい一致）。
+ * words 側も正規化＋あいまい一致で照合するので、活用・送り仮名・かな/漢字の違いは自動で吸収される。
  */
 export const SYNONYMS: { symptom: string; words: string[] }[] = [
-  { symptom: "スライス", words: ["右に曲が", "右に出て曲", "右にすっぽ", "こすり球", "カット", "アウトサイドイン", "フェースが開", "つかまらない", "プッシュスライス"] },
-  { symptom: "フック", words: ["左に曲が", "左に巻", "チーピン", "引っかけて曲", "被り", "インサイドアウト", "つかまりすぎ"] },
-  { symptom: "アドレス姿勢の不良", words: ["猫背", "前傾", "姿勢", "構え", "重心が高", "アドレスが"] },
-  { symptom: "捻転不足", words: ["回らない", "捻転", "軸回転", "浅い", "手打ち", "体が回", "腕で上げ", "テイクバックが"] },
-  { symptom: "コースでのOBが多い", words: ["OB", "オービー", "曲げてはいけない", "コースで崩", "狙いすぎ", "大たたき"] },
+  { symptom: "スライス", words: ["右に曲がる", "右に出て曲がる", "右にすっぽ抜ける", "こすり球", "こする", "カット", "アウトサイドイン", "フェースが開く", "つかまらない", "プッシュスライス", "右にしか行かない"] },
+  { symptom: "フック", words: ["左に曲がる", "左に巻く", "チーピン", "引っかける", "引っかかる", "被る", "インサイドアウト", "つかまりすぎ", "左に飛ぶ"] },
+  { symptom: "プッシュ", words: ["右へまっすぐ", "押し出し", "右に出る"] },
+  { symptom: "ダフリ", words: ["手前を叩く", "ザックリ", "地面を叩く", "ダフる", "土が飛ぶ"] },
+  { symptom: "トップ", words: ["上を叩く", "薄い当たり", "こすり", "球が上がらない", "チョロ"] },
+  { symptom: "シャンク", words: ["ネックに当たる", "右前に飛ぶ", "クラブが寝る", "シャフトが寝る", "寝る"] },
+  { symptom: "アドレス", words: ["猫背", "前傾", "姿勢", "構え", "重心が高い", "アドレスが崩れる", "スタンス", "ボール位置", "向きがずれる"] },
+  { symptom: "捻転", words: ["回らない", "捻転が浅い", "軸回転", "肩が回らない", "腕で上げる", "テイクバックが浅い", "体が回らない"] },
+  { symptom: "手打ち", words: ["手先で打つ", "小手先", "こねる", "リストを返す", "腕だけで振る"] },
+  { symptom: "伸び上がり", words: ["起き上がる", "伸びあがる", "立ち上がる", "体が浮く", "手元が浮く", "前傾がほどける", "背筋が伸びる"] },
+  { symptom: "突っ込み", words: ["頭が動く", "頭が突っ込む", "前に出る", "ビハインドザボールができない"] },
+  { symptom: "スウェー", words: ["右にずれる", "流れる", "スエー", "体が横に動く", "軸がぶれる"] },
+  { symptom: "体重移動", words: ["乗らない", "右足体重", "踏み込めない", "体重が残る"] },
+  { symptom: "下半身", words: ["下半身が使えない", "上半身に頼る", "地面反力", "足を使えない"] },
+  { symptom: "同調", words: ["バラバラ", "三角形が崩れる", "一体感がない", "腕と体が合わない"] },
+  { symptom: "早解け", words: ["アーリーリリース", "タメがない", "キャスティング", "力が逃げる", "ほどけるのが早い"] },
+  { symptom: "オーバースイング", words: ["トップが大きい", "クロスする", "上げすぎ", "緩む"] },
+  { symptom: "切り返し", words: ["上から下りる", "上体が先に動く", "被る", "打ち急ぐ"] },
+  { symptom: "フォロー", words: ["振り抜けない", "止まる", "当てにいく", "フィニッシュが崩れる"] },
+  { symptom: "リズム", words: ["振りが速い", "間がない", "タイミングが合わない", "テンポ", "打ち急ぐ"] },
+  { symptom: "飛距離", words: ["飛ばない", "パワーが伝わらない", "飛ばしたい", "距離が出ない"] },
+  { symptom: "方向性", words: ["散らばる", "曲がりが読めない", "まっすぐ飛ばない", "安定しない"] },
+  { symptom: "ミート", words: ["芯を外す", "当たりが薄い", "当たらない", "空振り"] },
+  { symptom: "グリップ", words: ["握り", "ウィーク", "ストロング", "右手が強い", "握りが強い"] },
+  { symptom: "OB", words: ["オービー", "曲げてはいけない", "コースで崩れる", "狙いすぎ", "大たたき"] },
+  { symptom: "バンカー", words: ["砂", "エクスプロージョン", "出ない", "苦手"] },
+  { symptom: "アプローチ", words: ["寄らない", "距離感", "寄せ", "ザックリ"] },
+  { symptom: "パター", words: ["3パット", "ストローク", "入らない", "距離感が合わない"] },
+  { symptom: "力み", words: ["力む", "緊張", "リラックスできない", "1番ホール", "硬くなる"] },
 ];
 
-/** クエリ→症状名候補（同義語辞書ベース。ヒットしたものを返す） */
+/** クエリ→症状キーワード候補（同義語辞書ベース。あいまい一致でヒットしたものを返す） */
 export function synonymHits(query: string): string[] {
-  const t = query ?? "";
-  return SYNONYMS.filter((s) => s.words.some((w) => t.includes(w))).map((s) => s.symptom);
+  const q = query ?? "";
+  return SYNONYMS.filter((s) => s.words.some((w) => similarity(q, w) >= 0.6)).map((s) => s.symptom);
 }
+
+/** スコア付き検索結果（デバッグ・UI表示用に score も返す） */
+export type ScoredSymptom = { symptom: DiagnosisResult; score: number };
 
 /**
  * フリーテキスト（短文・音声）→ 症状候補をスコア順に返す。
- * 症状名・タグ・球筋方向・同義語・カテゴリ・局面キーワードを加点。
- * 「右に曲がる」「頭が動く」など、症状名を知らない入力でも当てにいく。
+ *
+ * すべての照合を `lib/jp-search` の正規化＋2-gram あいまい一致で行うため、
+ * 「伸びあがり / 伸びあがる / 伸び上がる / のびあがり / 起き上がる」のような
+ * 活用・送り仮名・漢字かなの違いを吸収して同じ症状に着地する。
  */
-export function matchSymptoms(query: string, tree: DiagnosisResult[]): DiagnosisResult[] {
+export function matchSymptomsScored(query: string, tree: DiagnosisResult[]): ScoredSymptom[] {
   const q = (query ?? "").trim();
   if (!q) return [];
-  const hits = new Set(synonymHits(q));
+  const hits = synonymHits(q);
   const phaseLabels = classifyPhases(q);
 
-  const scored = tree.map((s) => {
+  const scored = tree.map((symptom) => {
     let score = 0;
-    if (s.symptomName.includes(q) || q.includes(s.symptomName)) score += 6;
-    if (hits.has(s.symptomName)) score += 5;
-    for (const tag of s.tags) if (q.includes(tag)) score += 3;
-    if (s.flightDir && q.includes(s.flightDir)) score += 3;
-    if (q.includes(s.category)) score += 2;
-    for (const ch of new Set(q.replace(/\s/g, "").split(""))) {
-      if (ch.length && s.symptomName.includes(ch)) score += 0.2;
+
+    // 症状名（最重要）
+    score += 6 * similarity(q, symptom.symptomName);
+
+    // タグ（最大1件＋追加ヒットは少しだけ加点。タグ数の多い症状が有利になりすぎないように）
+    const tagSims = symptom.tags.map((t) => similarity(q, t)).filter((v) => v > 0).sort((a, b) => b - a);
+    if (tagSims.length) score += 3.5 * tagSims[0] + 0.6 * (tagSims.length - 1);
+
+    // 球筋方向・カテゴリ
+    if (symptom.flightDir) score += 3 * similarity(q, symptom.flightDir);
+    score += 1.5 * similarity(q, symptom.category);
+
+    // 同義語辞書（見たまま表現 → 症状キーワード）
+    for (const key of hits) {
+      if (similarity(symptom.symptomName, key) >= 0.6 || symptom.tags.some((t) => similarity(t, key) >= 0.6)) {
+        score += 5;
+        break;
+      }
     }
+
+    // 確認項目・原因・対処・ドリルの本文（弱い加点＝取りこぼし防止）
+    let bodyBest = 0;
+    for (const cp of symptom.checkpoints) {
+      bodyBest = Math.max(bodyBest, bestSimilarity(q, [cp.title, cp.cause, cp.fix, cp.drill]));
+      if (bodyBest >= 1) break;
+    }
+    score += 1.6 * bodyBest;
+
+    // 局面キーワード
     if (phaseLabels.length) {
-      const titles = s.checkpoints.map((c) => c.title).join("");
+      const titles = symptom.checkpoints.map((c) => c.title).join("");
       for (const p of phaseLabels) if (titles.includes(p.replace(/\/.*/, ""))) score += 1;
     }
-    return { s, score };
+
+    return { symptom, score };
   });
 
-  return scored
-    .filter((x) => x.score >= 1)
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.s);
+  const ranked = scored.filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
+  const strong = ranked.filter((x) => x.score >= 1.2);
+  // 強い候補が無いときは、弱い候補でも上位3件は見せる（「見つかりません」で止めない）
+  return (strong.length ? strong : ranked.slice(0, 3)).slice(0, 15);
+}
+
+/** 検索結果（症状のみ）。既存の呼び出し互換。 */
+export function matchSymptoms(query: string, tree: DiagnosisResult[]): DiagnosisResult[] {
+  return matchSymptomsScored(query, tree).map((x) => x.symptom);
 }
 
 /** 取込集計の1行（phase×symptom） */

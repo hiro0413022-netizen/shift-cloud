@@ -174,8 +174,8 @@ function Composer({
         {draft && (
           <div className="space-y-3 fade">
             <div className="flex items-center gap-2 text-[10px]">
-              <span className={"rounded-full px-2 py-0.5 font-bold " + (draft.engine === "claude" ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500")}>
-                {draft.engine === "claude" ? "AI生成" : "テンプレ生成"}
+              <span className={"rounded-full px-2 py-0.5 font-bold " + (draft.engine !== "template" ? "bg-teal-50 text-teal-700" : "bg-slate-100 text-slate-500")}>
+                {draft.engine !== "template" ? "AI生成" : "テンプレ生成"}
               </span>
               <span className="text-slate-400">参照した過去コメント {draft.examplesUsed}件</span>
             </div>
@@ -190,12 +190,12 @@ function Composer({
             </div>
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-slate-500">自然な文章（そのまま貼れる）</span>
+                <span className="text-[11px] font-semibold text-slate-500">自然な文章（短文・そのまま貼れる）</span>
                 <button onClick={() => copyField(natural)} className="rounded-lg bg-teal-100 px-2.5 py-1 text-[11px] font-bold text-teal-700">
                   コピー
                 </button>
               </div>
-              <textarea value={natural} onChange={(e) => setNatural(e.target.value)} rows={4} className="input-lite" />
+              <textarea value={natural} onChange={(e) => setNatural(e.target.value)} rows={3} className="input-lite" />
             </div>
             {student && (
               <button

@@ -215,11 +215,17 @@ AI解析（Claude API）: 症状・スイング局面・原因・処方・ドリ
 
 堀「レッスンコメント資産×AI」の中核。Genesis既存（ceo-ai/legal-ai）と同型のClaude API配線。
 
-- **`lib/ai.ts`**: `callClaude({system,user})`（`fetch https://api.anthropic.com/v1/messages`・`ANTHROPIC_API_KEY`・モデル`CORTEX_AI_MODEL`>`CEO_AI_MODEL`>`claude-haiku-4-5-20251001`）＋`extractJson`。キー無しは`null`→呼び出し側がテンプレにフォールバック（**必ず出力は返る**）。
+- **`lib/ai.ts`**: `callAi({system,user,json})` が唯一の呼び出し口。**Claude / Gemini 両対応**で、失敗時は`null`→呼び出し側がテンプレにフォールバック（**必ず出力は返る**）。＋`extractJson`。
+  - プロバイダ決定 `resolveProvider()`: `CORTEX_AI_PROVIDER`（`claude`|`gemini`）＞ キーの有無で自動判定。片方が落ちたら、もう一方のキーがあれば自動フェイルオーバー。
+  - Claude: `POST https://api.anthropic.com/v1/messages`・`ANTHROPIC_API_KEY`・モデル`CORTEX_AI_MODEL`>`CEO_AI_MODEL`>`claude-haiku-4-5-20251001`。
+  - Gemini: `POST https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`（`x-goog-api-key`）・`GEMINI_API_KEY`|`GOOGLE_API_KEY`・モデル`CORTEX_GEMINI_MODEL`>`gemini-3.5-flash`。`system`は`system_instruction`へ、`json:true`で`responseMimeType: application/json`。
+  - **Geminiの落とし穴**: 3系/2.5系は思考が既定ON＝**思考トークンも`maxOutputTokens`を消費し、足りないと本文が空で返る**。対策として上限を3倍（最低4096）で送り、思考は既定で最小（3系`thinkingLevel:"low"` / 2.5系`thinkingBudget:0`、`CORTEX_GEMINI_THINKING`で上書き可）。レスポンスの`parts[].thought=true`は本文から除外。
+  - 旧`callClaude`/`hasClaudeKey`は`callAi`/`hasAiKey`への別名として残置（互換）。
 - **`lib/data.ts` `findSimilarComments`**: 過去コメント（`sc_comments`）から症状キー・生徒refで近いものを取得（RAG-lite・埋め込みはP3）。**その学校の文体・ドリル名のお手本**をAIに与える源泉。
-- **`(main)/ai-actions.ts` `draftComment`**: 診断内容＋コーチ所見＋過去コメント例 → **2種の下書き**をJSONで生成。`structured`＝整形した指導記録（問題点→修正点→ドリル）、`natural`＝自然な話し言葉の文章コメント（LINE・カルテ・メール等どこにでも貼れる汎用文）。**過去コメントの文体を踏襲**が最重要指示。AI失敗/キー無しは決定的テンプレ。`saveKarteDraft`で`sc_diagnoses.result_json`に保存（`lsn_comments`全面連携はP3）。
+- **`(main)/ai-actions.ts` `draftComment`**: 診断内容＋コーチ所見＋過去コメント例 → **2種の下書き**をJSONで生成。`structured`＝整形した指導記録（問題点→修正点→ドリル・**詳しめ150〜300字**）、`natural`＝自然な話し言葉の**短いひとこと（2〜3文・120字以内）**。naturalは「今日の状態」と「次に意識すること」だけに絞り、あいさつ・締めの一文は書かない。長さは`NATURAL_MAX_CHARS`＋`trimNatural()`（文の切れ目で丸める安全弁）でコード側でも担保。**過去コメントの文体を踏襲**が最重要指示。AI失敗/キー無しは決定的テンプレ。`saveKarteDraft`で`sc_diagnoses.result_json`に保存（`lsn_comments`全面連携はP3）。
 - **UI**: 診断シートに「この内容でレッスンコメントを作成」→ 所見を口語入力→「AIで下書き」→ **整形版／自然文版を各自に付いたコピーボタンで別々にコピー**（編集可）。特定媒体（LINE等）に縛らず汎用的にコピペ運用。生成エンジン（AI/テンプレ）と参照件数を表示。
-- **環境変数（追加）**: `ANTHROPIC_API_KEY`（必須で本領発揮）、任意`CORTEX_AI_MODEL`。未設定でもテンプレで動作。
+- **環境変数（追加）**: `ANTHROPIC_API_KEY` または `GEMINI_API_KEY`（どちらか1つで本領発揮）。任意で`CORTEX_AI_PROVIDER`（`claude`|`gemini`）・`CORTEX_AI_MODEL`・`CORTEX_GEMINI_MODEL`。未設定でもテンプレで動作。
+  - Geminiへ切り替えるとき: Vercelのenvに`GEMINI_API_KEY`を追加し、`CORTEX_AI_PROVIDER=gemini`を設定して再デプロイ。コード変更は不要。
 - **検証**: 新規`ai.ts`/`ai-actions.ts`は構文OK（bashで確認）。編集済ファイルはリポのマウント陳腐化でbashが古い内容を返すためReadツールで実体確認済（完全・整合）。最終ゲートはユーザーPCの`npm run build`。
 
 ### P2の使いどころ（現場）
@@ -266,6 +272,20 @@ AI解析（Claude API）: 症状・スイング局面・原因・処方・ドリ
 - **Excelの位置づけ変更**: `SWING_CORTEX_項目マスタ.xlsx` は「編集して取り込む台帳」ではなく「seedの元データ／確認用の書き出し」。編集の正はDB。
 - **アプリ内編集UI（実装済み 2026-07-22）**: `/manage`（設定→「項目マスタを編集」）。症状（大分類・名前・別名/検索語）と確認項目（優先度・チェック項目・原因・対処・ドリル・説明＝チェック＋知識の1組）をDBで直接**追加・編集・削除**。`(main)/manage/manage-actions.ts`（createSymptom/updateSymptom/deleteSymptom/saveCheckpoint/deleteCheckpoint、company_idスコープ・source='manual'・カスケード削除）＋`loadManageTree`（ID付きツリー）＋`manage-client.tsx`（インライン編集）。全エディションで利用可（standardも自校の項目を編集できる）。**これでDB管理→必要時Excel書き出しが完結**。
 - 取込は原文コメント(sc_comments)用と、将来の構造化マスタ取込を分離。
+
+## 14. あいまい症状検索（2026-07-27 実装済み）
+
+**課題**: コーチの入力は表記が揺れる。「伸びあがり／伸びあがる／伸び上がる／のびあがり／起き上がる」は全部同じ症状なのに、完全一致検索では当たらなかった。
+
+**方式**: 形態素解析なしの決定的マッチャ `apps/swing-cortex/src/lib/jp-search.ts`（依存なし・純関数・サーバー/クライアント両用）。
+
+1. **正規化 `normalize()`** … NFKC → カタカナ→ひらがな → 頻出語の**読み寄せ表**（`伸び上が`→`のびあが`、`猫背`→`ねこぜ` 等 約100語）→ 小書き仮名・記号・促音「っ」を吸収。**長音「ー」は残す**（消すと「コース」→「こす」で「こすり球」と衝突するため）。
+2. **語幹化 `stem()`** … 活用語尾（`る/り/った/ている/ます/ない` 等）を落とす。`のびあがり` と `のびあがる` が同じ `のびあが` になる。
+3. **`similarity()`（0〜1）** … 完全含有=1 → 語幹一致=0.9 → 2-gram の重なり率（overlap coefficient、分母は短い方＝長文クエリでも埋もれない）×0.85。しきい値未満は0。短い語幹が長語にたまたま含まれるだけ（`はや`⊂`はやほどけ`）は誤爆源なので、語幹3文字以上または相手の6割以上のときだけ採用。
+
+**使用箇所**: `coaching.ts` の `matchSymptomsScored/matchSymptoms`（症状名6・タグ3.5・球筋方向3・同義語辞書5・カテゴリ1.5・確認項目本文1.6 の加重和。強い候補が無くても上位3件は返し「見つかりません」で止めない）と、`/library` の絞り込み。同義語辞書 `SYNONYMS` は29グループに拡張し、語側もあいまい一致で照合する。
+
+**回帰テスト**: `tests/swing-cortex-search.test.ts`（`npm test`）。伸びあがり系7表記・話し言葉・誤爆防止（長音／短語幹）を固定。**辞書やスコアを触ったらここが壊れないか必ず確認**。
 
 ## 付録A. 命名の最終確認事項
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { DiagnosisResult } from "@/lib/coaching";
+import { bestSimilarity } from "@/lib/jp-search";
 import { Sheet } from "../diagnosis-client";
 
 export default function LibraryClient({ tree }: { tree: DiagnosisResult[] }) {
@@ -21,8 +22,9 @@ export default function LibraryClient({ tree }: { tree: DiagnosisResult[] }) {
     return tree.filter((s) => {
       if (cat !== "すべて" && s.category !== cat) return false;
       if (!query) return true;
-      const hay = [s.symptomName, s.category, ...(s.tags ?? []), ...s.checkpoints.map((c) => c.title)].join(" ");
-      return hay.includes(query);
+      // あいまい一致（活用・送り仮名・かな/漢字のゆれを吸収）
+      const terms = [s.symptomName, s.category, ...(s.tags ?? []), ...s.checkpoints.map((c) => c.title)];
+      return bestSimilarity(query, terms) >= 0.6;
     });
   }, [tree, q, cat]);
 
