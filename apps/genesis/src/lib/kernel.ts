@@ -274,7 +274,7 @@ export type StoreMetric = {
   operating: boolean; // 当月シフトがあれば稼働中、無ければ準備中扱い
   staff: number;
   shifts: number; // 当月シフト数
-  trials: number; // 体験予約（累計）
+  trials: number; // 当月体験（一時利用者名簿 visit_type='trial'）
   members: number; // 在籍会員数（スタッフ除外・leave_date無し）
   joins: number; // 今月入会数（本会員・スタッフ除外）
   leavesCore: number; // 今月退会（本会員＝トライアル・スタッフ除く）痛い退会
@@ -360,7 +360,14 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     admin.from("stores").select("id,name,brand_id").eq("company_id", companyId).is("deleted_at", null),
     admin.from("staff_store_assignments").select("store_id").eq("company_id", companyId),
     admin.from("shifts").select("store_id,date").eq("company_id", companyId).gte("date", monthStart()),
-    admin.from("mbr_trial_bookings").select("store_id").eq("company_id", companyId),
+    // 体験は一時利用者名簿（0018で mbr_trial_bookings から移行済・#93）。当月来店分のみ
+    admin
+      .from("mbr_walkin_visits")
+      .select("store_id")
+      .eq("company_id", companyId)
+      .eq("visit_type", "trial")
+      .is("deleted_at", null)
+      .gte("visited_on", monthStart()),
     admin.from("mbr_members").select("store_name,member_type,join_date,leave_date,leave_reason").eq("company_id", companyId),
   ]);
 

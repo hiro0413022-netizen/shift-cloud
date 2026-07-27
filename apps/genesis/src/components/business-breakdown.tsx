@@ -136,7 +136,7 @@ function SegmentCard({ seg }: { seg: SegmentMetric }) {
                   <div className="mt-1.5 flex justify-between text-[10px] text-(--color-dim)">
                     <span>スタッフ {st.staff}</span>
                     <span>当月シフト {st.shifts}</span>
-                    <span>体験予約 {st.trials}</span>
+                    <span>当月体験 {st.trials}</span>
                   </div>
                 </li>
               ))}

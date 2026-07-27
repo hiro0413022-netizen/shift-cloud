@@ -80,9 +80,11 @@ async function measurePastRuns(admin: Admin, companyId: string): Promise<number>
     const end = endDate.toISOString();
     const [bk, rq, rep] = await Promise.all([
       admin
-        .from("mbr_trial_bookings")
+        .from("mbr_walkin_visits")
         .select("id", { count: "exact", head: true })
         .eq("company_id", companyId)
+        .eq("visit_type", "trial")
+        .is("deleted_at", null)
         .gte("created_at", start)
         .lt("created_at", end),
       admin
@@ -139,11 +141,13 @@ export async function runSalesLoop(companyId: string): Promise<Record<string, un
   // ---- 観測 ----
   const monthStart = jstMonthStart(0);
   const [gwRes, frRes, kpiRes] = await Promise.all([
+    // GW: 一時利用者名簿の体験（旧 mbr_trial_bookings は空・#93）
     admin
-      .from("mbr_trial_bookings")
+      .from("mbr_walkin_visits")
       .select("id", { count: "exact", head: true })
       .eq("company_id", companyId)
-      .gte("lesson_date", monthStart)
+      .eq("visit_type", "trial")
+      .gte("visited_on", monthStart)
       .is("deleted_at", null),
     admin
       .from("mbr_trial_requests")
