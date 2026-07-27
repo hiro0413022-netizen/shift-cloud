@@ -52,6 +52,73 @@ function esc(s: unknown): string {
 }
 
 // ============================================================
+// mailto ヘルパー（CC が Outlook / Gmail で確実に認識されるように）
+//
+// ・区切りは「;」に統一する
+//     Outlook デスクトップは既定で「,」を区切りと認識せず、
+//     複数アドレスをまとめて 1 つの不正アドレスとして扱ってしまう。
+//     「;」は Outlook / Gmail / Thunderbird いずれでも区切りとして通る。
+// ・区切り文字は percent-encode しない
+//     encodeURIComponent は ; を %3B、, を %2C に変換するため、
+//     クライアントによっては区切りとして解釈されない。
+//     アドレス本体は英数記号のみなのでエンコード不要。
+// ============================================================
+
+/** 「,」「;」「/」全角カンマ・読点・空白 いずれ区切りでも受け取り、正規のアドレス配列に正規化 */
+export function parseAddrList(raw: unknown): string[] {
+  return String(raw ?? '')
+    .split(/[,;/、，；／\s]+/)
+    .map(s => s.trim())
+    .filter(s => /^[^\s@,;/／]+@[^\s@,;/／]+\.[^\s@,;/／]+$/.test(s))
+}
+
+/** 表示・入力欄用の文字列（区切り「; 」） */
+export function formatAddrList(list: string[]): string {
+  return [...new Set(list)].join('; ')
+}
+
+/** mailto の宛先ヘッダー値（区切り「;」・エンコードしない） */
+export function mailtoAddrHeader(raw: unknown): string {
+  return [...new Set(parseAddrList(raw))].join(';')
+}
+
+/** mailto URL を組み立てる。cc が空なら cc= 自体を付けない */
+export function buildMailtoUrl(to: unknown, cc: unknown, subject: string, body: string): string {
+  const toHeader = mailtoAddrHeader(to)
+  if (!toHeader) return ''
+  const ccHeader = mailtoAddrHeader(cc)
+  const params: string[] = []
+  if (ccHeader) params.push('cc=' + ccHeader)
+  params.push('subject=' + encodeURIComponent(subject))
+  params.push('body=' + encodeURIComponent(body))
+  return 'mailto:' + toHeader + '?' + params.join('&')
+}
+
+/** ブラウザ側で同じ処理をするための JS スニペット（インラインスクリプトに埋め込む） */
+const MAILTO_JS_HELPERS = `
+// mailto ヘルパー（サーバ側 parseAddrList / buildMailtoUrl と同じ仕様）
+function gwParseAddrList(raw){
+  return String(raw == null ? '' : raw)
+    .split(/[,;/、，；／\\s]+/)
+    .map(function(s){ return s.trim(); })
+    .filter(function(s){ return /^[^\\s@,;/／]+@[^\\s@,;/／]+\\.[^\\s@,;/／]+$/.test(s); });
+}
+function gwUniq(a){ var o=[],seen={}; for(var i=0;i<a.length;i++){ if(!seen[a[i]]){ seen[a[i]]=1; o.push(a[i]); } } return o; }
+function gwAddrHeader(raw){ return gwUniq(gwParseAddrList(raw)).join(';'); }
+function gwFormatAddrList(raw){ return gwUniq(gwParseAddrList(raw)).join('; '); }
+function gwBuildMailto(to, cc, subject, body){
+  var toH = gwAddrHeader(to);
+  if(!toH) return '';
+  var ccH = gwAddrHeader(cc);
+  var qs = [];
+  if(ccH) qs.push('cc=' + ccH);
+  qs.push('subject=' + encodeURIComponent(subject || ''));
+  qs.push('body=' + encodeURIComponent(body || ''));
+  return 'mailto:' + toH + '?' + qs.join('&');
+}
+`
+
+// ============================================================
 // セッション・レイアウトヘルパー（各ルートで使い回す）
 // ============================================================
 type LayoutCtx = { env: Bindings; get: (k: 'sessionUser') => SessionUser | undefined }
@@ -1533,8 +1600,8 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
               <input class="form-control" name="email" type="email" placeholder="order@example.com">
             </div>
             <div class="col-12" id="row-cc-emails">
-              <label class="form-label fw-semibold"><i class="fas fa-user-plus text-secondary me-1"></i>CCアドレス <span class="fw-normal text-muted small">(複数指定時はカンマ区切り)</span></label>
-              <input class="form-control" name="cc_emails" placeholder="cc1@example.com, cc2@example.com">
+              <label class="form-label fw-semibold"><i class="fas fa-user-plus text-secondary me-1"></i>CCアドレス <span class="fw-normal text-muted small">(複数指定時は「;」または「,」区切り)</span></label>
+              <input class="form-control" name="cc_emails" placeholder="cc1@example.com; cc2@example.com">
               <div class="form-text"><i class="fas fa-info-circle me-1"></i>発注メール作成時にCC候補として表示されます</div>
             </div>
             <!-- LINE -->
@@ -2414,21 +2481,13 @@ ${sig ? '\n' + sig : ''}`
       allItems
     )
     const supplierEmail = group.supplierEmail
-    // CC候補: 仕入先設定のcc_emailsをカンマ分割してリスト化
-    const ccCandidates: string[] = [
-      ...(BATCH_DEFAULT_CC ? [BATCH_DEFAULT_CC] : []),
-      ...(group.supplierCcEmails
-        ? group.supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean)
-        : []
-      ),
-    ]
-    // 重複除去
-    const ccUniq = [...new Set(ccCandidates)]
-    // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）。区切りは「/」
-    const initialCC = [...new Set([
-      ...(BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
-      ...(group.supplierCcEmails ? group.supplierCcEmails.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
-    ])].join('/')
+    // CC候補: デフォルトCC(自社)＋仕入先設定のcc_emails を1件ずつに分解して重複除去
+    const ccUniq = [...new Set([
+      ...parseAddrList(BATCH_DEFAULT_CC),
+      ...parseAddrList(group.supplierCcEmails),
+    ])]
+    // 初期CC値: 上記を全部入れる。区切りは「; 」（Outlook/Gmail 両対応）
+    const initialCC = formatAddrList(ccUniq)
 
     // CC候補ボタン群HTML
     const ccCandidateHtml = ccUniq.length > 0
@@ -2452,11 +2511,7 @@ ${sig ? '\n' + sig : ''}`
     const bodyEscaped = emailBody.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     const bodyJson = JSON.stringify(emailBody)
 
-    const mailtoHref = supplierEmail
-      ? 'mailto:' + supplierEmail + '?' +
-        (initialCC ? 'cc=' + encodeURIComponent(initialCC) + '&' : '') +
-        'subject=' + encodeURIComponent(emailSubject) + '&body=' + encodeURIComponent(emailBody)
-      : ''
+    const mailtoHref = buildMailtoUrl(supplierEmail, initialCC, emailSubject, emailBody)
 
     const isMerged = group.orders.length > 1
 
@@ -2486,7 +2541,7 @@ ${sig ? '\n' + sig : ''}`
               data-subject="${esc(emailSubject)}"
               data-body="${esc(emailBody)}"
               value="${esc(initialCC)}"
-              autocomplete="off" placeholder="cc@example.com, cc2@example.com">
+              autocomplete="off" placeholder="cc@example.com; cc2@example.com">
             ${ccCandidateHtml}
           </div>
           <div class="col-12">
@@ -2529,6 +2584,7 @@ ${sig ? '\n' + sig : ''}`
   }
 
   const scripts = `<script>
+${MAILTO_JS_HELPERS}
 function copyBody(btn, text){
   navigator.clipboard.writeText(text).then(function(){
     var orig = btn.innerHTML;
@@ -2545,8 +2601,7 @@ document.querySelectorAll('.batch-cc-candidate').forEach(function(btn){
     var ccInp = card ? card.querySelector('.batch-cc-input') : null;
     if(!ccInp) return;
     var addr = btn.dataset.addr || '';
-    var cur = ccInp.value.trim();
-    var addrs = cur ? cur.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+    var addrs = gwParseAddrList(ccInp.value);
     var idx = addrs.indexOf(addr);
     if(idx >= 0){
       // すでに追加済み → 削除
@@ -2559,7 +2614,7 @@ document.querySelectorAll('.batch-cc-candidate').forEach(function(btn){
       btn.classList.remove('btn-outline-secondary');
       btn.classList.add('btn-secondary');
     }
-    ccInp.value = addrs.join(', ');
+    ccInp.value = gwFormatAddrList(addrs.join(';'));
     ccInp.dispatchEvent(new Event('input'));
   });
   // 初期状態でCC欄に含まれていればアクティブ表示
@@ -2577,13 +2632,12 @@ document.querySelectorAll('.batch-cc-input').forEach(function(ccInp){
   var mailtoBtn = card ? card.querySelector('.batch-mailto-btn') : null;
   if(!mailtoBtn) return;
   function rebuild(){
-    var email   = ccInp.dataset.email;
-    var subject = ccInp.dataset.subject;
-    var body    = ccInp.dataset.body;
-    var cc      = ccInp.value.trim();
-    var qs = 'subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    if(cc) qs += '&cc=' + encodeURIComponent(cc);
-    mailtoBtn.href = 'mailto:' + email + '?' + qs;
+    mailtoBtn.href = gwBuildMailto(
+      ccInp.dataset.email,
+      ccInp.value,
+      ccInp.dataset.subject,
+      ccInp.dataset.body
+    );
   }
   ccInp.addEventListener('input', rebuild);
   rebuild(); // 初期化
@@ -2990,26 +3044,15 @@ app.get('/orders/:id', async (c) => {
 
   // メールパネル
   const DEFAULT_CC = c.env.APP_DEFAULT_CC || 'h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idoo@golfwing.jp;a_tanigawa@golfwing.jp;u_furukawa@golfwing.jp'
-  // CC候補: 仕入先のcc_emails + APP_DEFAULT_CC を合わせて重複除去
+  // CC候補: デフォルトCC(自社)＋仕入先のcc_emails を1件ずつに分解して重複除去
   const supplierCcEmails = String(order['supplier_cc_emails'] ?? '')
-  const detailCcCandidates: string[] = [
-    ...(DEFAULT_CC ? [DEFAULT_CC] : []),
-    ...(supplierCcEmails
-      ? supplierCcEmails.split(',').map((s: string) => s.trim()).filter(Boolean)
-      : []
-    ),
-  ]
-  const detailCcUniq = [...new Set(detailCcCandidates)]
-  // 初期CC値: デフォルトCC(自社)＋仕入先固有CCを常に統合（重複除去）。区切りは「/」
-  const initialDetailCC = [...new Set([
-    ...(DEFAULT_CC ? DEFAULT_CC.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
-    ...(supplierCcEmails ? supplierCcEmails.split(/[,;/]/).map((s: string) => s.trim()).filter(Boolean) : []),
-  ])].join('/')
-  const mailtoWithCC = supplierEmail
-    ? 'mailto:' + supplierEmail + '?' +
-      (initialDetailCC ? 'cc=' + encodeURIComponent(initialDetailCC) + '&' : '') +
-      'subject=' + encodeURIComponent(emailSubject) + '&body=' + encodeURIComponent(emailBody)
-    : ''
+  const detailCcUniq = [...new Set([
+    ...parseAddrList(DEFAULT_CC),
+    ...parseAddrList(supplierCcEmails),
+  ])]
+  // 初期CC値: 上記を全部入れる。区切りは「; 」（Outlook/Gmail 両対応）
+  const initialDetailCC = formatAddrList(detailCcUniq)
+  const mailtoWithCC = buildMailtoUrl(supplierEmail, initialDetailCC, emailSubject, emailBody)
   // CC候補ボタン
   const detailCcCandidateHtml = detailCcUniq.length > 0
     ? `<div class="mt-1 d-flex flex-wrap gap-1">
@@ -3032,7 +3075,7 @@ ${emailBody ? '' : noBodyBlock}
   <input type="text" id="email-cc-input" class="form-control form-control-sm"
     style="max-width:480px"
     value="${esc(initialDetailCC)}"
-    placeholder="cc@example.com, cc2@example.com"
+    placeholder="cc@example.com; cc2@example.com"
     autocomplete="off">
   ${detailCcCandidateHtml}
 </div>
@@ -3292,6 +3335,7 @@ ${webMissingList}
 </div>` : ''
 
   const scripts = `<script>
+${MAILTO_JS_HELPERS}
 // ============================================================
 // 納品履歴・入荷済数をAjaxで即時更新
 // ============================================================
@@ -3402,8 +3446,7 @@ document.querySelectorAll('.detail-cc-candidate').forEach(function(btn){
     var ccInp = document.getElementById('email-cc-input');
     if(!ccInp) return;
     var addr = btn.dataset.addr || '';
-    var cur = ccInp.value.trim();
-    var addrs = cur ? cur.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+    var addrs = gwParseAddrList(ccInp.value);
     var idx = addrs.indexOf(addr);
     if(idx >= 0){
       addrs.splice(idx, 1);
@@ -3414,7 +3457,7 @@ document.querySelectorAll('.detail-cc-candidate').forEach(function(btn){
       btn.classList.remove('btn-outline-secondary');
       btn.classList.add('btn-secondary');
     }
-    ccInp.value = addrs.join(', ');
+    ccInp.value = gwFormatAddrList(addrs.join(';'));
     ccInp.dispatchEvent(new Event('input'));
   });
 });
@@ -3429,12 +3472,12 @@ document.querySelectorAll('.detail-cc-candidate').forEach(function(btn){
   if (!ccInput || !mailto || !SUPPLIER_EMAIL) return;
 
   function rebuildMailto() {
-    var cc      = ccInput.value.trim();
-    var subject = subjSpan ? subjSpan.textContent : '';
-    var body    = bodyTa   ? bodyTa.value         : '';
-    var qs = 'subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    if (cc) qs += '&cc=' + encodeURIComponent(cc);
-    mailto.href = 'mailto:' + SUPPLIER_EMAIL + '?' + qs;
+    mailto.href = gwBuildMailto(
+      SUPPLIER_EMAIL,
+      ccInput.value,
+      subjSpan ? subjSpan.textContent : '',
+      bodyTa   ? bodyTa.value         : ''
+    );
   }
 
   ccInput.addEventListener('input', rebuildMailto);
@@ -3512,10 +3555,7 @@ bindStatus('btn-s-cancelled','cancelled','キャンセル');
         var mailto = document.getElementById('btn-mailto');
         if (mailto && '${supplierEmail}') {
           var ccInp = document.getElementById('email-cc-input');
-          var cc = ccInp ? ccInp.value.trim() : '';
-          var qs2 = 'subject=' + encodeURIComponent(d.subject||'') + '&body=' + encodeURIComponent(d.body||'');
-          if (cc) qs2 += '&cc=' + encodeURIComponent(cc);
-          mailto.href = 'mailto:${esc(supplierEmail)}?' + qs2;
+          mailto.href = gwBuildMailto('${esc(supplierEmail)}', ccInp ? ccInp.value : '', d.subject || '', d.body || '');
         }
         // アラートを非表示
         var alert = document.getElementById('no-body-alert');

@@ -1,6 +1,6 @@
 import { createRequire } from 'module'; const require = createRequire(import.meta.url);
 
-// node_modules/hono/dist/compose.js
+// ../../node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -44,21 +44,40 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// node_modules/hono/dist/request/constants.js
+// ../../node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// node_modules/hono/dist/utils/body.js
+// ../../node_modules/hono/dist/utils/buffer.js
+var bufferToFormData = (arrayBuffer, contentType) => {
+  const response = new Response(arrayBuffer, {
+    headers: {
+      // Normalize the media type (case-insensitive) while keeping parameters like the boundary
+      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
+    }
+  });
+  return response.formData();
+};
+
+// ../../node_modules/hono/dist/utils/body.js
+var isRawRequest = (request) => "headers" in request;
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
-  const headers = request instanceof HonoRequest ? request.raw.headers : request.headers;
+  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
   const contentType = headers.get("Content-Type");
-  if (contentType?.startsWith("multipart/form-data") || contentType?.startsWith("application/x-www-form-urlencoded")) {
+  const mediaType = contentType?.split(";")[0].trim().toLowerCase();
+  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded") {
     return parseFormData(request, { all, dot });
   }
   return {};
 };
 async function parseFormData(request, options) {
-  const formData = await request.formData();
+  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
+  const arrayBuffer = await request.arrayBuffer();
+  const formDataPromise = bufferToFormData(arrayBuffer, headers.get("Content-Type") || "");
+  if (!isRawRequest(request)) {
+    request.bodyCache.formData = formDataPromise;
+  }
+  const formData = await formDataPromise;
   if (formData) {
     return convertFormDataToBodyData(formData, options);
   }
@@ -119,7 +138,7 @@ var handleParsingNestedValues = (form, key, value) => {
   });
 };
 
-// node_modules/hono/dist/utils/url.js
+// ../../node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -323,7 +342,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// node_modules/hono/dist/request.js
+// ../../node_modules/hono/dist/request.js
 var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
 var HonoRequest = class {
   /**
@@ -469,6 +488,21 @@ var HonoRequest = class {
     return this.#cachedBody("arrayBuffer");
   }
   /**
+   * `.bytes()` parses the request body as a `Uint8Array`.
+   *
+   * @see {@link https://hono.dev/docs/api/request#bytes}
+   *
+   * @example
+   * ```ts
+   * app.post('/entry', async (c) => {
+   *   const body = await c.req.bytes()
+   * })
+   * ```
+   */
+  bytes() {
+    return this.#cachedBody("arrayBuffer").then((buffer2) => new Uint8Array(buffer2));
+  }
+  /**
    * Parses the request body as a `Blob`.
    * @example
    * ```ts
@@ -591,7 +625,7 @@ var HonoRequest = class {
   }
 };
 
-// node_modules/hono/dist/utils/html.js
+// ../../node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -633,7 +667,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer2) =>
   }
 };
 
-// node_modules/hono/dist/context.js
+// ../../node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -1040,7 +1074,7 @@ var Context = class {
   };
 };
 
-// node_modules/hono/dist/router.js
+// ../../node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch"];
@@ -1048,10 +1082,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// node_modules/hono/dist/utils/constants.js
+// ../../node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// node_modules/hono/dist/hono-base.js
+// ../../node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -1166,7 +1200,7 @@ var Hono = class _Hono {
         handler2 = async (c, next) => (await compose([], app4.errorHandler)(c, () => r.handler(c, next))).res;
         handler2[COMPOSED_HANDLER] = r.handler;
       }
-      subApp.#addRoute(r.method, r.path, handler2);
+      subApp.#addRoute(r.method, r.path, handler2, r.basePath);
     });
     return this;
   }
@@ -1290,7 +1324,7 @@ var Hono = class _Hono {
       const pathPrefixLength = mergedPath === "/" ? 0 : mergedPath.length;
       return (request) => {
         const url = new URL(request.url);
-        url.pathname = url.pathname.slice(pathPrefixLength) || "/";
+        url.pathname = this.getPath(request).slice(pathPrefixLength) || "/";
         return new Request(url, request);
       };
     })();
@@ -1304,10 +1338,15 @@ var Hono = class _Hono {
     this.#addRoute(METHOD_NAME_ALL, mergePath(path, "*"), handler2);
     return this;
   }
-  #addRoute(method, path, handler2) {
+  #addRoute(method, path, handler2, baseRoutePath) {
     method = method.toUpperCase();
     path = mergePath(this._basePath, path);
-    const r = { basePath: this._basePath, path, method, handler: handler2 };
+    const r = {
+      basePath: baseRoutePath !== void 0 ? mergePath(this._basePath, baseRoutePath) : this._basePath,
+      path,
+      method,
+      handler: handler2
+    };
     this.router.add(method, path, [handler2, r]);
     this.routes.push(r);
   }
@@ -1422,7 +1461,7 @@ var Hono = class _Hono {
   };
 };
 
-// node_modules/hono/dist/router/reg-exp-router/matcher.js
+// ../../node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -1443,7 +1482,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// node_modules/hono/dist/router/reg-exp-router/node.js
+// ../../node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -1551,7 +1590,7 @@ var Node = class _Node {
   }
 };
 
-// node_modules/hono/dist/router/reg-exp-router/trie.js
+// ../../node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node();
@@ -1607,7 +1646,7 @@ var Trie = class {
   }
 };
 
-// node_modules/hono/dist/router/reg-exp-router/router.js
+// ../../node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
 function buildWildcardRegExp(path) {
@@ -1786,7 +1825,7 @@ var RegExpRouter = class {
   }
 };
 
-// node_modules/hono/dist/router/smart-router/router.js
+// ../../node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1841,7 +1880,7 @@ var SmartRouter = class {
   }
 };
 
-// node_modules/hono/dist/router/trie-router/node.js
+// ../../node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = /* @__PURE__ */ Object.create(null);
 var hasChildren = (children) => {
   for (const _ in children) {
@@ -1975,6 +2014,15 @@ var Node2 = class _Node2 {
             if (m) {
               params[name] = m[0];
               this.#pushHandlerSets(handlerSets, child, method, node.#params, params);
+              if (m[0].length === restPathString.length && child.#children["*"]) {
+                this.#pushHandlerSets(
+                  handlerSets,
+                  child.#children["*"],
+                  method,
+                  node.#params,
+                  params
+                );
+              }
               if (hasChildren(child.#children)) {
                 child.#params = params;
                 const componentCount = m[0].match(/\//)?.length ?? 0;
@@ -2016,7 +2064,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// node_modules/hono/dist/router/trie-router/router.js
+// ../../node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node;
@@ -2038,7 +2086,7 @@ var TrieRouter = class {
   }
 };
 
-// node_modules/hono/dist/hono.js
+// ../../node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   /**
    * Creates an instance of the Hono class.
@@ -2053,24 +2101,18 @@ var Hono2 = class extends Hono {
   }
 };
 
-// node_modules/hono/dist/middleware/cors/index.js
+// ../../node_modules/hono/dist/middleware/cors/index.js
 var cors = (options) => {
-  const defaults = {
+  const opts = {
     origin: "*",
     allowMethods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH"],
     allowHeaders: [],
-    exposeHeaders: []
-  };
-  const opts = {
-    ...defaults,
+    exposeHeaders: [],
     ...options
   };
   const findAllowOrigin = ((optsOrigin) => {
     if (typeof optsOrigin === "string") {
       if (optsOrigin === "*") {
-        if (opts.credentials) {
-          return (origin) => origin || null;
-        }
         return () => optsOrigin;
       } else {
         return (origin) => optsOrigin === origin ? origin : null;
@@ -2105,7 +2147,7 @@ var cors = (options) => {
       set("Access-Control-Expose-Headers", opts.exposeHeaders.join(","));
     }
     if (c.req.method === "OPTIONS") {
-      if (opts.origin !== "*" || opts.credentials) {
+      if (opts.origin !== "*") {
         set("Vary", "Origin");
       }
       if (opts.maxAge != null) {
@@ -2135,27 +2177,23 @@ var cors = (options) => {
       });
     }
     await next();
-    if (opts.origin !== "*" || opts.credentials) {
+    if (opts.origin !== "*") {
       c.header("Vary", "Origin", { append: true });
     }
   };
 };
 
-// node_modules/hono/dist/utils/compress.js
-var COMPRESSIBLE_CONTENT_TYPE_REGEX = /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|wasm|x-httpd-php|x-javascript|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml))(?:[;\s]|$)/i;
+// ../../node_modules/hono/dist/utils/compress.js
+var COMPRESSIBLE_CONTENT_TYPE_REGEX = /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|msgpack|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|vnd\.msgpack|wasm|x-httpd-php|x-javascript|x-msgpack|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml|msgpack))(?:[;\s]|$)/i;
 
-// node_modules/hono/dist/utils/mime.js
+// ../../node_modules/hono/dist/utils/mime.js
 var getMimeType = (filename, mimes = baseMimes) => {
   const regexp = /\.([a-zA-Z0-9]+?)$/;
   const match2 = filename.match(regexp);
   if (!match2) {
     return;
   }
-  let mimeType = mimes[match2[1].toLowerCase()];
-  if (mimeType && mimeType.startsWith("text")) {
-    mimeType += "; charset=utf-8";
-  }
-  return mimeType;
+  return mimes[match2[1].toLowerCase()];
 };
 var _baseMimes = {
   aac: "audio/aac",
@@ -2164,25 +2202,25 @@ var _baseMimes = {
   av1: "video/av1",
   bin: "application/octet-stream",
   bmp: "image/bmp",
-  css: "text/css",
-  csv: "text/csv",
+  css: "text/css; charset=utf-8",
+  csv: "text/csv; charset=utf-8",
   eot: "application/vnd.ms-fontobject",
   epub: "application/epub+zip",
   gif: "image/gif",
   gz: "application/gzip",
-  htm: "text/html",
-  html: "text/html",
+  htm: "text/html; charset=utf-8",
+  html: "text/html; charset=utf-8",
   ico: "image/x-icon",
-  ics: "text/calendar",
+  ics: "text/calendar; charset=utf-8",
   jpeg: "image/jpeg",
   jpg: "image/jpeg",
-  js: "text/javascript",
+  js: "text/javascript; charset=utf-8",
   json: "application/json",
   jsonld: "application/ld+json",
   map: "application/json",
   mid: "audio/x-midi",
   midi: "audio/x-midi",
-  mjs: "text/javascript",
+  mjs: "text/javascript; charset=utf-8",
   mp3: "audio/mpeg",
   mp4: "video/mp4",
   mpeg: "video/mpeg",
@@ -2194,12 +2232,12 @@ var _baseMimes = {
   pdf: "application/pdf",
   png: "image/png",
   rtf: "application/rtf",
-  svg: "image/svg+xml",
+  svg: "image/svg+xml; charset=utf-8",
   tif: "image/tiff",
   tiff: "image/tiff",
   ts: "video/mp2t",
   ttf: "font/ttf",
-  txt: "text/plain",
+  txt: "text/plain; charset=utf-8",
   wasm: "application/wasm",
   webm: "video/webm",
   weba: "audio/webm",
@@ -2207,8 +2245,8 @@ var _baseMimes = {
   webp: "image/webp",
   woff: "font/woff",
   woff2: "font/woff2",
-  xhtml: "application/xhtml+xml",
-  xml: "application/xml",
+  xhtml: "application/xhtml+xml; charset=utf-8",
+  xml: "application/xml; charset=utf-8",
   zip: "application/zip",
   "3gp": "video/3gpp",
   "3g2": "video/3gpp2",
@@ -2217,7 +2255,7 @@ var _baseMimes = {
 };
 var baseMimes = _baseMimes;
 
-// node_modules/hono/dist/middleware/serve-static/path.js
+// ../../node_modules/hono/dist/middleware/serve-static/path.js
 var defaultJoin = (...paths) => {
   let result = paths.filter((p) => p !== "").join("/");
   result = result.replace(/(?<=\/)\/+/g, "");
@@ -2233,7 +2271,7 @@ var defaultJoin = (...paths) => {
   return resolved.join("/") || ".";
 };
 
-// node_modules/hono/dist/middleware/serve-static/index.js
+// ../../node_modules/hono/dist/middleware/serve-static/index.js
 var ENCODINGS = {
   br: ".br",
   zstd: ".zst",
@@ -2255,7 +2293,7 @@ var serveStatic = (options) => {
     } else {
       try {
         filename = tryDecodeURI(c.req.path);
-        if (/(?:^|[\/\\])\.{1,2}(?:$|[\/\\])|[\/\\]{2,}/.test(filename)) {
+        if (/(?:^|[\/\\])\.{1,2}(?:$|[\/\\])|[\/\\]{2,}|\\/.test(filename)) {
           throw new Error();
         }
       } catch {
@@ -2275,7 +2313,7 @@ var serveStatic = (options) => {
     if (content instanceof Response) {
       return c.newResponse(content.body, content);
     }
-    if (content) {
+    if (content != null) {
       const mimeType = options.mimes && getMimeType(path, options.mimes) || getMimeType(path);
       c.header("Content-Type", mimeType || "application/octet-stream");
       if (options.precompressed && (!mimeType || COMPRESSIBLE_CONTENT_TYPE_REGEX.test(mimeType))) {
@@ -2304,7 +2342,7 @@ var serveStatic = (options) => {
   };
 };
 
-// node_modules/hono/dist/adapter/cloudflare-workers/utils.js
+// ../../node_modules/hono/dist/adapter/cloudflare-workers/utils.js
 var getContentFromKVAsset = async (path, options) => {
   let ASSET_MANIFEST;
   if (options && options.manifest) {
@@ -2337,8 +2375,8 @@ var getContentFromKVAsset = async (path, options) => {
   return content;
 };
 
-// node_modules/hono/dist/adapter/cloudflare-workers/serve-static.js
-var serveStatic2 = (options) => {
+// ../../node_modules/hono/dist/adapter/cloudflare-workers/serve-static.js
+var serveStatic2 = (options = {}) => {
   return async function serveStatic22(c, next) {
     const getContent = async (path) => {
       return getContentFromKVAsset(path, {
@@ -2355,12 +2393,12 @@ var serveStatic2 = (options) => {
   };
 };
 
-// node_modules/hono/dist/adapter/cloudflare-workers/serve-static-module.js
+// ../../node_modules/hono/dist/adapter/cloudflare-workers/serve-static-module.js
 var module = (options) => {
   return serveStatic2(options);
 };
 
-// node_modules/hono/dist/helper/websocket/index.js
+// ../../node_modules/hono/dist/helper/websocket/index.js
 var WSContext = class {
   #init;
   constructor(init) {
@@ -2408,7 +2446,7 @@ var defineWebSocketHelper = (handler2) => {
   };
 };
 
-// node_modules/hono/dist/adapter/cloudflare-workers/websocket.js
+// ../../node_modules/hono/dist/adapter/cloudflare-workers/websocket.js
 var upgradeWebSocket = defineWebSocketHelper(async (c, events) => {
   const upgradeHeader = c.req.header("Upgrade");
   if (upgradeHeader !== "websocket") {
@@ -4206,8 +4244,8 @@ app.post("/products", async (c) => {
   const r = await db2.prepare(`
     INSERT INTO products
       (product_code, barcode, item_category, manufacturer, name, spec, color, club_type,
-       list_price, default_rate, default_supplier_id, unit, source, is_active, tenant_id)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
+       list_price, default_rate, default_supplier_id, unit, source, supplier_item_code, is_active, tenant_id)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,true,?)
   `).bind(
     normalize(b2["product_code"]),
     normalize(b2["barcode"]),
@@ -4222,6 +4260,7 @@ app.post("/products", async (c) => {
     b2["default_supplier_id"] ? Number(b2["default_supplier_id"]) : null,
     normalize(b2["unit"]) || "\u672C",
     normalize(b2["source"]),
+    normalize(b2["supplier_item_code"]),
     tenantId
   ).run();
   return c.json({ ok: true, id: r.meta.last_row_id });
@@ -4246,7 +4285,7 @@ app.put("/products/:id", async (c) => {
   await db2.prepare(`
     UPDATE products SET
       product_code=?, barcode=?, item_category=?, manufacturer=?, name=?, spec=?, color=?, club_type=?,
-      list_price=?, default_rate=?, default_supplier_id=?, unit=?, source=?
+      list_price=?, default_rate=?, default_supplier_id=?, unit=?, source=?, supplier_item_code=?
     WHERE id=? AND tenant_id=?
   `).bind(
     normalize(b2["product_code"]),
@@ -4262,6 +4301,7 @@ app.put("/products/:id", async (c) => {
     b2["default_supplier_id"] ? Number(b2["default_supplier_id"]) : null,
     normalize(b2["unit"]) || "\u672C",
     normalize(b2["source"]),
+    normalize(b2["supplier_item_code"]),
     id,
     tenantId
   ).run();
@@ -5056,6 +5096,47 @@ function todayStr() {
 function esc(s) {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
+function parseAddrList(raw2) {
+  return String(raw2 ?? "").split(/[,;/、，；／\s]+/).map((s) => s.trim()).filter((s) => /^[^\s@,;/／]+@[^\s@,;/／]+\.[^\s@,;/／]+$/.test(s));
+}
+function formatAddrList(list) {
+  return [...new Set(list)].join("; ");
+}
+function mailtoAddrHeader(raw2) {
+  return [...new Set(parseAddrList(raw2))].join(";");
+}
+function buildMailtoUrl(to, cc, subject, body) {
+  const toHeader = mailtoAddrHeader(to);
+  if (!toHeader) return "";
+  const ccHeader = mailtoAddrHeader(cc);
+  const params = [];
+  if (ccHeader) params.push("cc=" + ccHeader);
+  params.push("subject=" + encodeURIComponent(subject));
+  params.push("body=" + encodeURIComponent(body));
+  return "mailto:" + toHeader + "?" + params.join("&");
+}
+var MAILTO_JS_HELPERS = `
+// mailto \u30D8\u30EB\u30D1\u30FC\uFF08\u30B5\u30FC\u30D0\u5074 parseAddrList / buildMailtoUrl \u3068\u540C\u3058\u4ED5\u69D8\uFF09
+function gwParseAddrList(raw){
+  return String(raw == null ? '' : raw)
+    .split(/[,;/\u3001\uFF0C\uFF1B\uFF0F\\s]+/)
+    .map(function(s){ return s.trim(); })
+    .filter(function(s){ return /^[^\\s@,;/\uFF0F]+@[^\\s@,;/\uFF0F]+\\.[^\\s@,;/\uFF0F]+$/.test(s); });
+}
+function gwUniq(a){ var o=[],seen={}; for(var i=0;i<a.length;i++){ if(!seen[a[i]]){ seen[a[i]]=1; o.push(a[i]); } } return o; }
+function gwAddrHeader(raw){ return gwUniq(gwParseAddrList(raw)).join(';'); }
+function gwFormatAddrList(raw){ return gwUniq(gwParseAddrList(raw)).join('; '); }
+function gwBuildMailto(to, cc, subject, body){
+  var toH = gwAddrHeader(to);
+  if(!toH) return '';
+  var ccH = gwAddrHeader(cc);
+  var qs = [];
+  if(ccH) qs.push('cc=' + ccH);
+  qs.push('subject=' + encodeURIComponent(subject || ''));
+  qs.push('body=' + encodeURIComponent(body || ''));
+  return 'mailto:' + toH + '?' + qs.join('&');
+}
+`;
 function getSession(c) {
   return c.get("sessionUser") ?? {
     username: "unknown",
@@ -6167,7 +6248,12 @@ ${buildPager()}
               <label class="form-label fw-semibold">\u54C1\u756A (product_code)</label>
               <input class="form-control" name="product_code">
             </div>
-            <div class="col-md-8">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">\u30EF\u30FC\u30AF\u30B9\u5546\u54C1\u30B3\u30FC\u30C9</label>
+              <input class="form-control" name="supplier_item_code" placeholder="\u30C0\u30A4\u30EC\u30AF\u30C8\u6CE8\u6587CSV\u7528">
+              <div class="form-text">\u30A6\u30A7\u30D6\u767A\u6CE8\uFF08\u30EF\u30FC\u30AF\u30B9\uFF09\u306E\u30C0\u30A4\u30EC\u30AF\u30C8\u6CE8\u6587\u3067\u4F7F\u3046\u5546\u54C1\u30B3\u30FC\u30C9</div>
+            </div>
+            <div class="col-md-4">
               <label class="form-label fw-semibold">\u51FA\u5178 / \u30E1\u30E2</label>
               <input class="form-control" name="source">
             </div>
@@ -6421,8 +6507,8 @@ document.getElementById('supForm').addEventListener('submit', async function(e){
               <input class="form-control" name="email" type="email" placeholder="order@example.com">
             </div>
             <div class="col-12" id="row-cc-emails">
-              <label class="form-label fw-semibold"><i class="fas fa-user-plus text-secondary me-1"></i>CC\u30A2\u30C9\u30EC\u30B9 <span class="fw-normal text-muted small">(\u8907\u6570\u6307\u5B9A\u6642\u306F\u30AB\u30F3\u30DE\u533A\u5207\u308A)</span></label>
-              <input class="form-control" name="cc_emails" placeholder="cc1@example.com, cc2@example.com">
+              <label class="form-label fw-semibold"><i class="fas fa-user-plus text-secondary me-1"></i>CC\u30A2\u30C9\u30EC\u30B9 <span class="fw-normal text-muted small">(\u8907\u6570\u6307\u5B9A\u6642\u306F\u300C;\u300D\u307E\u305F\u306F\u300C,\u300D\u533A\u5207\u308A)</span></label>
+              <input class="form-control" name="cc_emails" placeholder="cc1@example.com; cc2@example.com">
               <div class="form-text"><i class="fas fa-info-circle me-1"></i>\u767A\u6CE8\u30E1\u30FC\u30EB\u4F5C\u6210\u6642\u306BCC\u5019\u88DC\u3068\u3057\u3066\u8868\u793A\u3055\u308C\u307E\u3059</div>
             </div>
             <!-- LINE -->
@@ -7221,15 +7307,11 @@ ${sig ? "\n" + sig : ""}`;
       allItems
     );
     const supplierEmail = group.supplierEmail;
-    const ccCandidates = [
-      ...BATCH_DEFAULT_CC ? [BATCH_DEFAULT_CC] : [],
-      ...group.supplierCcEmails ? group.supplierCcEmails.split(",").map((s) => s.trim()).filter(Boolean) : []
-    ];
-    const ccUniq = [...new Set(ccCandidates)];
-    const initialCC = [.../* @__PURE__ */ new Set([
-      ...BATCH_DEFAULT_CC ? BATCH_DEFAULT_CC.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : [],
-      ...group.supplierCcEmails ? group.supplierCcEmails.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : []
-    ])].join("/");
+    const ccUniq = [.../* @__PURE__ */ new Set([
+      ...parseAddrList(BATCH_DEFAULT_CC),
+      ...parseAddrList(group.supplierCcEmails)
+    ])];
+    const initialCC = formatAddrList(ccUniq);
     const ccCandidateHtml = ccUniq.length > 0 ? `<div class="mt-1 d-flex flex-wrap gap-1">
           <span class="small text-muted me-1">CC\u5019\u88DC:</span>
           ${ccUniq.map(
@@ -7245,7 +7327,7 @@ ${sig ? "\n" + sig : ""}`;
     ).join("");
     const bodyEscaped = emailBody.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const bodyJson = JSON.stringify(emailBody);
-    const mailtoHref = supplierEmail ? "mailto:" + supplierEmail + "?" + (initialCC ? "cc=" + encodeURIComponent(initialCC) + "&" : "") + "subject=" + encodeURIComponent(emailSubject) + "&body=" + encodeURIComponent(emailBody) : "";
+    const mailtoHref = buildMailtoUrl(supplierEmail, initialCC, emailSubject, emailBody);
     const isMerged = group.orders.length > 1;
     cards.push(`
     <div class="card mb-4">
@@ -7270,7 +7352,7 @@ ${sig ? "\n" + sig : ""}`;
               data-subject="${esc(emailSubject)}"
               data-body="${esc(emailBody)}"
               value="${esc(initialCC)}"
-              autocomplete="off" placeholder="cc@example.com, cc2@example.com">
+              autocomplete="off" placeholder="cc@example.com; cc2@example.com">
             ${ccCandidateHtml}
           </div>
           <div class="col-12">
@@ -7312,6 +7394,7 @@ ${sig ? "\n" + sig : ""}`;
     </div>`);
   }
   const scripts = `<script>
+${MAILTO_JS_HELPERS}
 function copyBody(btn, text){
   navigator.clipboard.writeText(text).then(function(){
     var orig = btn.innerHTML;
@@ -7328,8 +7411,7 @@ document.querySelectorAll('.batch-cc-candidate').forEach(function(btn){
     var ccInp = card ? card.querySelector('.batch-cc-input') : null;
     if(!ccInp) return;
     var addr = btn.dataset.addr || '';
-    var cur = ccInp.value.trim();
-    var addrs = cur ? cur.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+    var addrs = gwParseAddrList(ccInp.value);
     var idx = addrs.indexOf(addr);
     if(idx >= 0){
       // \u3059\u3067\u306B\u8FFD\u52A0\u6E08\u307F \u2192 \u524A\u9664
@@ -7342,7 +7424,7 @@ document.querySelectorAll('.batch-cc-candidate').forEach(function(btn){
       btn.classList.remove('btn-outline-secondary');
       btn.classList.add('btn-secondary');
     }
-    ccInp.value = addrs.join(', ');
+    ccInp.value = gwFormatAddrList(addrs.join(';'));
     ccInp.dispatchEvent(new Event('input'));
   });
   // \u521D\u671F\u72B6\u614B\u3067CC\u6B04\u306B\u542B\u307E\u308C\u3066\u3044\u308C\u3070\u30A2\u30AF\u30C6\u30A3\u30D6\u8868\u793A
@@ -7360,13 +7442,12 @@ document.querySelectorAll('.batch-cc-input').forEach(function(ccInp){
   var mailtoBtn = card ? card.querySelector('.batch-mailto-btn') : null;
   if(!mailtoBtn) return;
   function rebuild(){
-    var email   = ccInp.dataset.email;
-    var subject = ccInp.dataset.subject;
-    var body    = ccInp.dataset.body;
-    var cc      = ccInp.value.trim();
-    var qs = 'subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    if(cc) qs += '&cc=' + encodeURIComponent(cc);
-    mailtoBtn.href = 'mailto:' + email + '?' + qs;
+    mailtoBtn.href = gwBuildMailto(
+      ccInp.dataset.email,
+      ccInp.value,
+      ccInp.dataset.subject,
+      ccInp.dataset.body
+    );
   }
   ccInp.addEventListener('input', rebuild);
   rebuild(); // \u521D\u671F\u5316
@@ -7585,6 +7666,73 @@ app2.get("/orders/:id/edit", async (c) => {
   const o8 = getLayoutOpts(c);
   return layout(`\u767A\u6CE8\u60C5\u5831\u7DE8\u96C6 ${esc(order["order_no"])}`, content, scripts, o8.username, o8);
 });
+app2.get("/orders/:id/works-csv", async (c) => {
+  const db2 = c.env.DB;
+  const { tenantId } = getLayoutOpts(c);
+  const id = parseInt(c.req.param("id"));
+  if (isNaN(id)) return c.text("\u4E0D\u6B63\u306AID\u3067\u3059\u3002", 400);
+  const order = await db2.prepare(
+    "SELECT order_no FROM purchase_orders WHERE id=? AND tenant_id=?"
+  ).bind(id, tenantId).first();
+  if (!order) return c.text("\u767A\u6CE8\u30C7\u30FC\u30BF\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002", 404);
+  const itemsRes = await db2.prepare(`
+    SELECT poi.quantity,
+           (SELECT p.supplier_item_code FROM products p WHERE p.id=poi.product_id) AS supplier_item_code
+    FROM purchase_order_items poi
+    WHERE poi.purchase_order_id=? ORDER BY poi.id
+  `).bind(id).all();
+  const bytes = [
+    143,
+    164,
+    149,
+    105,
+    131,
+    82,
+    129,
+    91,
+    131,
+    104,
+    // 商品コード
+    44,
+    146,
+    141,
+    149,
+    182,
+    144,
+    148,
+    // 注文数
+    44,
+    131,
+    80,
+    129,
+    91,
+    131,
+    88,
+    146,
+    141,
+    149,
+    182,
+    // ケース注文
+    13,
+    10
+  ];
+  const enc = new TextEncoder();
+  for (const it of itemsRes.results) {
+    const code = String(it.supplier_item_code ?? "").trim();
+    if (!code) continue;
+    const qty = Number(it.quantity) || 0;
+    for (const b2 of enc.encode(`${code},${qty},0\r
+`)) bytes.push(b2 < 128 ? b2 : 63);
+  }
+  const filename = `works_order_${String(order.order_no || id).replace(/[^A-Za-z0-9_\-]/g, "_")}.csv`;
+  return new Response(new Uint8Array(bytes), {
+    headers: {
+      "Content-Type": "text/csv; charset=Shift_JIS",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Cache-Control": "no-store"
+    }
+  });
+});
 app2.get("/orders/:id", async (c) => {
   const db2 = c.env.DB;
   const { tenantId } = getLayoutOpts(c);
@@ -7604,7 +7752,8 @@ app2.get("/orders/:id", async (c) => {
   const [items, receipts, productRes, supplierRes] = await Promise.all([
     db2.prepare(`
       SELECT poi.*,
-        COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+        COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty,
+        (SELECT p.supplier_item_code FROM products p WHERE p.id=poi.product_id) AS supplier_item_code
       FROM purchase_order_items poi WHERE poi.purchase_order_id=? ORDER BY poi.id
     `).bind(id).all(),
     db2.prepare("SELECT * FROM receipts WHERE purchase_order_id=? ORDER BY id DESC").bind(id).all(),
@@ -7689,16 +7838,12 @@ app2.get("/orders/:id", async (c) => {
 </div>`;
   const DEFAULT_CC = c.env.APP_DEFAULT_CC || "h_furukawa@golfwing.jp;s_furukawa@golfwing.jp;y_idoo@golfwing.jp;a_tanigawa@golfwing.jp;u_furukawa@golfwing.jp";
   const supplierCcEmails = String(order["supplier_cc_emails"] ?? "");
-  const detailCcCandidates = [
-    ...DEFAULT_CC ? [DEFAULT_CC] : [],
-    ...supplierCcEmails ? supplierCcEmails.split(",").map((s) => s.trim()).filter(Boolean) : []
-  ];
-  const detailCcUniq = [...new Set(detailCcCandidates)];
-  const initialDetailCC = [.../* @__PURE__ */ new Set([
-    ...DEFAULT_CC ? DEFAULT_CC.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : [],
-    ...supplierCcEmails ? supplierCcEmails.split(/[,;/]/).map((s) => s.trim()).filter(Boolean) : []
-  ])].join("/");
-  const mailtoWithCC = supplierEmail ? "mailto:" + supplierEmail + "?" + (initialDetailCC ? "cc=" + encodeURIComponent(initialDetailCC) + "&" : "") + "subject=" + encodeURIComponent(emailSubject) + "&body=" + encodeURIComponent(emailBody) : "";
+  const detailCcUniq = [.../* @__PURE__ */ new Set([
+    ...parseAddrList(DEFAULT_CC),
+    ...parseAddrList(supplierCcEmails)
+  ])];
+  const initialDetailCC = formatAddrList(detailCcUniq);
+  const mailtoWithCC = buildMailtoUrl(supplierEmail, initialDetailCC, emailSubject, emailBody);
   const detailCcCandidateHtml = detailCcUniq.length > 0 ? `<div class="mt-1 d-flex flex-wrap gap-1">
         <span class="small text-muted me-1">CC\u5019\u88DC:</span>
         ${detailCcUniq.map(
@@ -7717,7 +7862,7 @@ ${emailBody ? "" : noBodyBlock}
   <input type="text" id="email-cc-input" class="form-control form-control-sm"
     style="max-width:480px"
     value="${esc(initialDetailCC)}"
-    placeholder="cc@example.com, cc2@example.com"
+    placeholder="cc@example.com; cc2@example.com"
     autocomplete="off">
   ${detailCcCandidateHtml}
 </div>
@@ -7761,6 +7906,33 @@ ${emailBody ? "" : noBodyBlock}
   <button class="btn btn-secondary btn-sm" onclick="window.print()"><i class="fas fa-print me-1"></i>\u5370\u5237</button>
   <button class="btn btn-outline-secondary btn-sm" id="btn-copy-fax"><i class="fas fa-copy me-1"></i>\u672C\u6587\u3092\u30B3\u30D4\u30FC</button>
 </div>`;
+  const webOrderUrl = /^https?:\/\//i.test(String(order["order_method_detail"] ?? "")) ? String(order["order_method_detail"]) : "https://webedi-sv.worksweb-jp.com/websys/orderlogin/login/";
+  const webItems = items.results;
+  const webMissing = webItems.filter((i) => !String(i["supplier_item_code"] ?? "").trim());
+  const webReadyCount = webItems.length - webMissing.length;
+  const webMissingList = webMissing.length ? `<div class="alert alert-warning py-2 mb-2">
+        <i class="fas fa-exclamation-triangle me-1"></i>
+        ${webMissing.length}\u4EF6\u306E\u5546\u54C1\u306B\u30EF\u30FC\u30AF\u30B9\u5546\u54C1\u30B3\u30FC\u30C9\u304C\u672A\u767B\u9332\u3067\u3059\u3002CSV\u306B\u306F\u542B\u307E\u308C\u307E\u305B\u3093\u3002\u5546\u54C1\u30DE\u30B9\u30BF\u3067\u30B3\u30FC\u30C9\u3092\u767B\u9332\u3057\u3066\u304F\u3060\u3055\u3044\u3002
+        <ul class="mb-0 mt-1 small">${webMissing.map((i) => `<li>${esc(i["product_name"])}${i["spec"] ? " " + esc(i["spec"]) : ""}</li>`).join("")}</ul>
+      </div>` : "";
+  const webPanel = `
+<div class="alert alert-info py-2 mb-2">
+  <i class="fas fa-globe me-1"></i>
+  \u30EF\u30FC\u30AF\u30B9\u306E\u30C0\u30A4\u30EC\u30AF\u30C8\u6CE8\u6587\uFF08CSV\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9\uFF09\u3067\u767A\u6CE8\u3057\u307E\u3059\u3002
+  <a class="btn btn-sm btn-outline-primary ms-2" href="${esc(webOrderUrl)}" target="_blank" rel="noopener">
+    <i class="fas fa-external-link-alt me-1"></i>\u6CE8\u6587\u30B5\u30A4\u30C8\u3092\u958B\u304F
+  </a>
+</div>
+${webMissingList}
+<div class="d-flex gap-2 flex-wrap align-items-center mb-2">
+  ${webReadyCount > 0 ? `<a class="btn btn-success btn-sm" href="/orders/${id}/works-csv" download>
+         <i class="fas fa-file-csv me-1"></i>\u30EF\u30FC\u30AF\u30B9\u767A\u6CE8CSV\u3092\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\uFF08${webReadyCount}\u4EF6\uFF09
+       </a>` : `<button class="btn btn-success btn-sm" disabled><i class="fas fa-file-csv me-1"></i>\u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3067\u304D\u308B\u5546\u54C1\u304C\u3042\u308A\u307E\u305B\u3093</button>`}
+</div>
+<p class="small text-muted mb-0">
+  \u30C0\u30A6\u30F3\u30ED\u30FC\u30C9\u3057\u305FCSV\u3092\u6CE8\u6587\u30B5\u30A4\u30C8\u306E\u300C\u30C0\u30A4\u30EC\u30AF\u30C8\u6CE8\u6587\u300D\u3067\u30A2\u30C3\u30D7\u30ED\u30FC\u30C9\u3057\u3066\u304F\u3060\u3055\u3044\u3002
+  \u5F62\u5F0F: <code>\u5546\u54C1\u30B3\u30FC\u30C9, \u6CE8\u6587\u6570, \u30B1\u30FC\u30B9\u6CE8\u6587</code>\uFF08Shift-JIS\uFF09\u3002
+</p>`;
   let orderPanel;
   let orderPanelTitle;
   let orderPanelIcon;
@@ -7772,6 +7944,10 @@ ${emailBody ? "" : noBodyBlock}
     orderPanel = faxPanel;
     orderPanelTitle = "FAX\u9001\u4FE1";
     orderPanelIcon = "fas fa-fax text-secondary";
+  } else if (omDetail === "web" || omDetail.includes("\u30A6\u30A7\u30D6") || omDetail.includes("web") || omDetail.includes("\u30C0\u30A4\u30EC\u30AF\u30C8")) {
+    orderPanel = webPanel;
+    orderPanelTitle = "\u30A6\u30A7\u30D6\u767A\u6CE8\uFF08CSV\uFF09";
+    orderPanelIcon = "fas fa-globe text-info";
   } else {
     orderPanel = emailPanel;
     orderPanelTitle = "\u30E1\u30FC\u30EB\u4E0B\u66F8\u304D";
@@ -7926,6 +8102,7 @@ ${emailBody ? "" : noBodyBlock}
   </div>
 </div>` : "";
   const scripts = `<script>
+${MAILTO_JS_HELPERS}
 // ============================================================
 // \u7D0D\u54C1\u5C65\u6B74\u30FB\u5165\u8377\u6E08\u6570\u3092Ajax\u3067\u5373\u6642\u66F4\u65B0
 // ============================================================
@@ -8036,8 +8213,7 @@ document.querySelectorAll('.detail-cc-candidate').forEach(function(btn){
     var ccInp = document.getElementById('email-cc-input');
     if(!ccInp) return;
     var addr = btn.dataset.addr || '';
-    var cur = ccInp.value.trim();
-    var addrs = cur ? cur.split(',').map(function(s){ return s.trim(); }).filter(Boolean) : [];
+    var addrs = gwParseAddrList(ccInp.value);
     var idx = addrs.indexOf(addr);
     if(idx >= 0){
       addrs.splice(idx, 1);
@@ -8048,7 +8224,7 @@ document.querySelectorAll('.detail-cc-candidate').forEach(function(btn){
       btn.classList.remove('btn-outline-secondary');
       btn.classList.add('btn-secondary');
     }
-    ccInp.value = addrs.join(', ');
+    ccInp.value = gwFormatAddrList(addrs.join(';'));
     ccInp.dispatchEvent(new Event('input'));
   });
 });
@@ -8063,12 +8239,12 @@ document.querySelectorAll('.detail-cc-candidate').forEach(function(btn){
   if (!ccInput || !mailto || !SUPPLIER_EMAIL) return;
 
   function rebuildMailto() {
-    var cc      = ccInput.value.trim();
-    var subject = subjSpan ? subjSpan.textContent : '';
-    var body    = bodyTa   ? bodyTa.value         : '';
-    var qs = 'subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    if (cc) qs += '&cc=' + encodeURIComponent(cc);
-    mailto.href = 'mailto:' + SUPPLIER_EMAIL + '?' + qs;
+    mailto.href = gwBuildMailto(
+      SUPPLIER_EMAIL,
+      ccInput.value,
+      subjSpan ? subjSpan.textContent : '',
+      bodyTa   ? bodyTa.value         : ''
+    );
   }
 
   ccInput.addEventListener('input', rebuildMailto);
@@ -8146,10 +8322,7 @@ bindStatus('btn-s-cancelled','cancelled','\u30AD\u30E3\u30F3\u30BB\u30EB');
         var mailto = document.getElementById('btn-mailto');
         if (mailto && '${supplierEmail}') {
           var ccInp = document.getElementById('email-cc-input');
-          var cc = ccInp ? ccInp.value.trim() : '';
-          var qs2 = 'subject=' + encodeURIComponent(d.subject||'') + '&body=' + encodeURIComponent(d.body||'');
-          if (cc) qs2 += '&cc=' + encodeURIComponent(cc);
-          mailto.href = 'mailto:${esc(supplierEmail)}?' + qs2;
+          mailto.href = gwBuildMailto('${esc(supplierEmail)}', ccInp ? ccInp.value : '', d.subject || '', d.body || '');
         }
         // \u30A2\u30E9\u30FC\u30C8\u3092\u975E\u8868\u793A
         var alert = document.getElementById('no-body-alert');
@@ -11689,11 +11862,11 @@ var src_default = {
   }
 };
 
-// node_modules/postgres/src/index.js
+// ../../node_modules/postgres/src/index.js
 import os from "os";
 import fs from "fs";
 
-// node_modules/postgres/src/query.js
+// ../../node_modules/postgres/src/query.js
 var originCache = /* @__PURE__ */ new Map();
 var originStackCache = /* @__PURE__ */ new Map();
 var originError = Symbol("OriginError");
@@ -11830,7 +12003,7 @@ function cachedError(xs) {
   return originCache.get(xs);
 }
 
-// node_modules/postgres/src/errors.js
+// ../../node_modules/postgres/src/errors.js
 var PostgresError = class extends Error {
   constructor(x) {
     super(x.message);
@@ -11880,7 +12053,7 @@ function notSupported(x) {
   return error;
 }
 
-// node_modules/postgres/src/types.js
+// ../../node_modules/postgres/src/types.js
 var types = {
   string: {
     to: 25,
@@ -12166,14 +12339,14 @@ fromKebab.column = { to: fromKebab };
 var kebab = { ...toKebab };
 kebab.column.to = fromKebab;
 
-// node_modules/postgres/src/connection.js
+// ../../node_modules/postgres/src/connection.js
 import net from "net";
 import tls from "tls";
 import crypto2 from "crypto";
 import Stream from "stream";
 import { performance } from "perf_hooks";
 
-// node_modules/postgres/src/result.js
+// ../../node_modules/postgres/src/result.js
 var Result = class extends Array {
   constructor() {
     super();
@@ -12190,7 +12363,7 @@ var Result = class extends Array {
   }
 };
 
-// node_modules/postgres/src/queue.js
+// ../../node_modules/postgres/src/queue.js
 var queue_default = Queue;
 function Queue(initial = []) {
   let xs = initial.slice();
@@ -12217,7 +12390,7 @@ function Queue(initial = []) {
   };
 }
 
-// node_modules/postgres/src/bytes.js
+// ../../node_modules/postgres/src/bytes.js
 var size = 256;
 var buffer = Buffer.allocUnsafe(size);
 var messages = "BCcDdEFfHPpQSX".split("").reduce((acc, x) => {
@@ -12290,7 +12463,7 @@ function reset() {
   return b;
 }
 
-// node_modules/postgres/src/connection.js
+// ../../node_modules/postgres/src/connection.js
 var connection_default = Connection;
 var uid = 1;
 var Sync = bytes_default().S().end();
@@ -12345,6 +12518,7 @@ var errorFields = {
 };
 function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
   const {
+    sslnegotiation,
     ssl,
     max,
     user,
@@ -12362,12 +12536,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     target_session_attrs
   } = options;
   const sent = queue_default(), id = uid++, backend = { pid: null, secret: null }, idleTimer = timer(end, options.idle_timeout), lifeTimer = timer(end, options.max_lifetime), connectTimer = timer(connectTimedOut, options.connect_timeout);
-  let socket = null, cancelMessage, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedDate = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream = null, chunk = null, ended = null, nonce = null, query = null, final = null;
+  let socket = null, cancelMessage, errorResponse = null, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedTime = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream = null, chunk = null, ended = null, nonce = null, query = null, final = null;
   const connection2 = {
     queue: queues.closed,
     idleTimer,
     connect(query2) {
-      initial = query2 || true;
+      initial = query2;
       reconnect();
     },
     terminate,
@@ -12405,6 +12579,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function execute(q) {
     if (terminated)
       return queryError(q, Errors.connection("CONNECTION_DESTROYED", options));
+    if (stream)
+      return queryError(q, Errors.generic("COPY_IN_PROGRESS", "You cannot execute queries during copy"));
     if (q.cancelled)
       return;
     try {
@@ -12474,16 +12650,24 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.destroy();
   }
   async function secure() {
-    write(SSLRequest);
-    const canSSL = await new Promise((r) => socket.once("data", (x) => r(x[0] === 83)));
-    if (!canSSL && ssl === "prefer")
-      return connected();
-    socket.removeAllListeners();
-    socket = tls.connect({
+    if (sslnegotiation !== "direct") {
+      write(SSLRequest);
+      const canSSL = await new Promise((r) => socket.once("data", (x) => r(x[0] === 83)));
+      if (!canSSL && ssl === "prefer")
+        return connected();
+    }
+    const options2 = {
       socket,
-      servername: net.isIP(socket.host) ? void 0 : socket.host,
-      ...ssl === "require" || ssl === "allow" || ssl === "prefer" ? { rejectUnauthorized: false } : ssl === "verify-full" ? {} : typeof ssl === "object" ? ssl : {}
-    });
+      servername: net.isIP(socket.host) ? void 0 : socket.host
+    };
+    if (sslnegotiation === "direct")
+      options2.ALPNProtocols = ["postgresql"];
+    if (ssl === "require" || ssl === "allow" || ssl === "prefer")
+      options2.rejectUnauthorized = false;
+    else if (typeof ssl === "object")
+      Object.assign(options2, ssl);
+    socket.removeAllListeners();
+    socket = tls.connect(options2);
     socket.on("secureConnect", connected);
     socket.on("error", error);
     socket.on("close", closed);
@@ -12496,7 +12680,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (incomings) {
       incomings.push(x);
       remaining -= x.length;
-      if (remaining >= 0)
+      if (remaining > 0)
         return;
     }
     incoming = incomings ? Buffer.concat(incomings, length - remaining) : incoming.length === 0 ? x : Buffer.concat([incoming, x], incoming.length + x.length);
@@ -12537,7 +12721,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     hostIndex = (hostIndex + 1) % port.length;
   }
   function reconnect() {
-    setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0);
+    setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0);
   }
   function connected() {
     try {
@@ -12567,7 +12751,11 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     initial && (queryError(initial, err), initial = null);
   }
   function queryError(query2, err) {
-    Object.defineProperties(err, {
+    if (query2.reserve)
+      return query2.reject(err);
+    if (!err || typeof err !== "object")
+      err = new Error(err);
+    "query" in err || "parameters" in err || Object.defineProperties(err, {
       stack: { value: err.stack + query2.origin.replace(/.*\n/, "\n"), enumerable: options.debug },
       query: { value: query2.string, enumerable: options.debug },
       parameters: { value: query2.parameters, enumerable: options.debug },
@@ -12606,7 +12794,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (initial)
       return reconnect();
     !hadError && (query || sent.length) && error(Errors.connection("CONNECTION_CLOSED", options, socket));
-    closedDate = performance.now();
+    closedTime = performance.now();
     hadError && options.shared.retries++;
     delay = (typeof backoff2 === "function" ? backoff2(options.shared.retries) : backoff2) * 1e3;
     onclose(connection2, Errors.connection("CONNECTION_CLOSED", options, socket));
@@ -12711,8 +12899,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     }
   }
   function ReadyForQuery(x) {
-    query && query.options.simple && query.resolve(results || result);
-    query = results = null;
+    if (query) {
+      if (errorResponse) {
+        query.retried ? errored(query.retried) : query.prepared && retryRoutines.has(errorResponse.routine) ? retry(query, errorResponse) : errored(errorResponse);
+      } else {
+        query.resolve(results || result);
+      }
+    } else if (errorResponse) {
+      errored(errorResponse);
+    }
+    query = results = errorResponse = null;
     result = new Result();
     connectTimer.cancel();
     if (initial) {
@@ -12723,10 +12919,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
           return terminate();
       }
       if (needsTypes) {
-        initial === true && (initial = null);
+        initial.reserve && (initial = null);
         return fetchArrayTypes();
       }
-      initial !== true && execute(initial);
+      initial && !initial.reserve && execute(initial);
       options.shared.retries = retries = 0;
       initial = null;
       return;
@@ -12757,7 +12953,6 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       result.count && query.cursorFn(result);
       write(Sync);
     }
-    query.resolve(result);
   }
   function ParseComplete() {
     query.parsing = false;
@@ -12843,7 +13038,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     serverSignature = (await hmac(await hmac(saltedPassword, "Server Key"), auth)).toString("base64");
     const payload = "c=biws,r=" + res.r + ",p=" + xor(
       clientKey,
-      Buffer.from(await hmac(await sha256(clientKey), auth))
+      Buffer.from(await hmac(await sha2562(clientKey), auth))
     ).toString("base64");
     write(
       bytes_default().p().str(payload).end()
@@ -12905,9 +13100,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     query2.execute();
   }
   function ErrorResponse(x) {
-    query && (query.cursorFn || query.describeFirst) && write(Sync);
-    const error2 = Errors.postgres(parseError(x));
-    query && query.retried ? errored(query.retried) : query && query.prepared && retryRoutines.has(error2.routine) ? retry(query, error2) : errored(error2);
+    if (query) {
+      (query.cursorFn || query.describeFirst) && write(Sync);
+      errorResponse = Errors.postgres(parseError(x));
+    } else {
+      errored(Errors.postgres(parseError(x)));
+    }
   }
   function retry(q, error2) {
     delete statements[q.signature];
@@ -12952,6 +13150,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       final(callback) {
         socket.write(bytes_default().c().end());
         final = callback;
+        stream = null;
       }
     });
     query.resolve(stream);
@@ -13074,7 +13273,7 @@ function md5(x) {
 function hmac(key, x) {
   return crypto2.createHmac("sha256", key).update(x).digest();
 }
-function sha256(x) {
+function sha2562(x) {
   return crypto2.createHash("sha256").update(x).digest();
 }
 function xor(a, b2) {
@@ -13104,7 +13303,7 @@ function timer(fn, seconds) {
   }
 }
 
-// node_modules/postgres/src/subscribe.js
+// ../../node_modules/postgres/src/subscribe.js
 var noop2 = () => {
 };
 function Subscribe(postgres2, options) {
@@ -13316,7 +13515,7 @@ function parseEvent(x) {
   return (command || "*") + (path ? ":" + (path.indexOf(".") === -1 ? "public." + path : path) : "") + (key ? "=" + key : "");
 }
 
-// node_modules/postgres/src/large.js
+// ../../node_modules/postgres/src/large.js
 import Stream2 from "stream";
 function largeObject(sql, oid, mode = 131072 | 262144) {
   return new Promise(async (resolve, reject) => {
@@ -13382,7 +13581,7 @@ function largeObject(sql, oid, mode = 131072 | 262144) {
   });
 }
 
-// node_modules/postgres/src/index.js
+// ../../node_modules/postgres/src/index.js
 Object.assign(Postgres, {
   PostgresError,
   toPascal,
@@ -13519,9 +13718,10 @@ function Postgres(a, b2) {
   }
   async function reserve() {
     const queue = queue_default();
-    const c = open.length ? open.shift() : await new Promise((r) => {
-      queries.push({ reserve: r });
-      closed.length && connect(closed.shift());
+    const c = open.length ? open.shift() : await new Promise((resolve, reject) => {
+      const query = { reserve: resolve, reject };
+      queries.push(query);
+      closed.length && connect(closed.shift(), query);
     });
     move(c, reserved);
     c.reserved = () => queue.length ? c.execute(queue.shift()) : move(c, reserved);
@@ -13679,8 +13879,9 @@ function parseOptions(a, b2) {
   query.sslrootcert === "system" && (query.ssl = "verify-full");
   const ints = ["idle_timeout", "connect_timeout", "max_lifetime", "max_pipeline", "backoff", "keep_alive"];
   const defaults = {
-    max: 10,
+    max: globalThis.Cloudflare ? 3 : 10,
     ssl: false,
+    sslnegotiation: null,
     idle_timeout: null,
     connect_timeout: 30,
     max_lifetime,
@@ -13709,7 +13910,7 @@ function parseOptions(a, b2) {
       {}
     ),
     connection: {
-      application_name: "postgres.js",
+      application_name: env.PGAPPNAME || "postgres.js",
       ...o.connection,
       ...Object.entries(query).reduce((acc, [k, v]) => (k in defaults || (acc[k] = v), acc), {})
     },
