@@ -26,7 +26,7 @@ type Admin = ReturnType<typeof createAdmin>;
 const FRANK_STORE = FRANK_STORE_ID;
 
 export async function loadBookingCfg(admin: Admin): Promise<BookingCfg> {
-  return loadCfg(admin as unknown as Parameters<typeof loadCfg>[0]);
+  return loadCfg(admin);
 }
 
 /** 営業時間（定休日・臨時休業なら null）。判定ロジックは @yozan/core に集約 */

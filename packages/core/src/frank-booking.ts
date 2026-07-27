@@ -41,18 +41,26 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   advance_days: 14,
 };
 
-/** Supabase の admin クライアント（型はアプリ側の実装に依存しないよう最小限で受ける） */
-type MinimalAdmin = {
-  from: (table: string) => {
-    select: (cols: string) => {
-      eq: (col: string, val: unknown) => { maybeSingle: () => Promise<{ data: { data?: unknown } | null }> };
+/** Supabase の admin クライアント。
+ *
+ *  ★ SupabaseClient の型は非常に大きく、構造的に照合させると
+ *    TS2589「型のインスタンス化が深すぎる」でビルドが落ちる。
+ *    そのため受け取るときは検査せず、使う直前に必要な形へキャストする。 */
+type SupabaseAdminLike = object;
+
+type SiteContentQuery = {
+  from(table: string): {
+    select(cols: string): {
+      eq(col: string, val: string): { maybeSingle(): PromiseLike<{ data: unknown }> };
     };
   };
 };
 
-export async function loadBookingCfg(admin: MinimalAdmin): Promise<BookingCfg> {
-  const { data } = await admin.from("gn_site_content").select("data").eq("site", "frank-golf").maybeSingle();
-  const o = ((data?.data as Record<string, unknown> | null)?.booking ?? {}) as Partial<BookingCfg>;
+export async function loadBookingCfg(admin: SupabaseAdminLike): Promise<BookingCfg> {
+  const q = admin as SiteContentQuery;
+  const res = await q.from("gn_site_content").select("data").eq("site", "frank-golf").maybeSingle();
+  const row = res?.data as { data?: unknown } | null;
+  const o = ((row?.data as Record<string, unknown> | null)?.booking ?? {}) as Partial<BookingCfg>;
   return {
     ...DEFAULT_BOOKING_CFG,
     ...o,
