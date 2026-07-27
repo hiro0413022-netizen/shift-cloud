@@ -123,9 +123,9 @@ window.FRANK = {
 
   /* ---------- 予約・会員システム（Genesis / member-os） ---------- */
   links: {
-    // ★体験予約：member-os の体験申込フォームに接続（公開・トークン不要）。
-    //   member-os をデプロイすると有効になります（/trial ルート）。
-    trialBooking: "https://member-os-tau.vercel.app/trial",
+    // ★体験予約：サイト内のセルフ予約ページ（日時を選ぶだけで即確定・打席は自動割当／0083）。
+    //   旧「member-osの申込フォーム（スタッフ折り返し）」は https://member-os-tau.vercel.app/trial に残っています。
+    trialBooking: "trial-booking.html",
 
     // ★Web入会：member-os のWeb入会申込フォーム（公開・プラン選択つき）。
     joinWeb: "https://member-os-tau.vercel.app/join-web",

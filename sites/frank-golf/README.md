@@ -44,6 +44,36 @@ trial: {
 現在の設定（2026-07-27 確定）: **通常3,300円（税込）→ プレオープン記念で無料 / 約55分**
 （受付 → カウンセリング → 打席のご案内 → 体験レッスン → ご入会のご案内）
 
+### 予約の仕組みはどこに書いてある？
+
+予約は **サイト＝お客様の入口 / member-os＝スタッフの管理** という分担になっています（2026-07-27に統合）。
+台帳・打席マスタ・設定の変え方は `docs/modules/frank/RESERVATION_SYSTEM.md` が正典です。
+
+| ページ | 役割 |
+|---|---|
+| `trial-booking.html` | 体験（無料・約55分）。日時を選ぶだけで即確定・打席は自動割当 |
+| `booking.html` | 会員の打席予約 |
+| `lesson-booking.html` | レッスン予約 |
+
+### 体験予約の「予約できる時間」を変えたい → Genesis の `/site-admin`
+
+体験予約のカレンダーは、会員の打席予約と**同じ設定**（`gn_site_content.data.booking`）で動いています。
+営業時間・定休曜日・祝日・臨時休業・何日先まで予約可か、は Genesis の **`/site-admin` → 予約設定**から変更でき、
+保存すると即反映されます（デプロイ不要）。
+
+体験だけの固有ルール（コード側・`apps/genesis/src/lib/frank-trial.ts`）:
+
+| ルール | 値 |
+|---|---|
+| 枠の長さ | 60分確保・案内は「約55分」 |
+| 当日の受付 | いまから**2時間後以降**のみ表示 |
+| 打席の割当 | A → B → C の順に自動（`frunk_bays.trial_priority`） |
+| レフティ | 左右打席のみ（`frunk_bays.is_lefty`） |
+| 二重申込 | 同じ電話/メールで未来の体験があると拒否 |
+
+打席そのもの（名前・レフティ可否・割当順・クローズ）は `frunk_bays` テーブルで変更します。
+**D打席は未設営のため `active=false`** にしてあり、設営が済んだら `active=true` と `trial_priority=4` にしてください。
+
 ### お知らせを追加する → `assets/site-data.js` の `news`
 
 ```js
@@ -151,14 +181,15 @@ sites/frank-golf/
 
 ## 4. 予約・会員ログイン・Web入会（Genesis / member-os 連携）
 
-**このサイトには予約機能を作っていません。** 既存の member-os にすべて揃っているためです。
+**体験予約だけはサイト内にあります**（`trial-booking.html`・カレンダーで日時を選ぶと即確定）。
+会員向けの機能は member-os 側に揃っています。
 
 | 導線 | 飛び先 |
 |---|---|
 | 会員ログイン | `https://member-os-tau.vercel.app/member/login` |
 | 会員Web予約 | `/member/book` |
 | Web会員登録（既存会員のWeb予約用） | `/member/register` |
-| **体験予約（公開フォーム）** | `/trial`（`links.trialBooking`） |
+| **体験予約（公開・即確定）** | サイト内 `trial-booking.html`（`links.trialBooking`）※旧: member-os `/trial` は折り返し方式で残置 |
 | **Web入会申込（公開・プラン選択）** | `/join-web`（`links.joinWeb`） |
 
 ### 体験申込フォームの送信先を設定する（★体験予約の受け方）

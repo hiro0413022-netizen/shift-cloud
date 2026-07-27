@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { hashToken, generateToken } from "@/lib/intake";
-import { HIMEJI_STORE_CODE } from "@/lib/reservation";
+import { FRANK_STORE_CODE as HIMEJI_STORE_CODE } from "@yozan/core/frank-booking";
 
 export const MEMBER_COOKIE = "mos_member";
 const SESSION_DAYS = 60;

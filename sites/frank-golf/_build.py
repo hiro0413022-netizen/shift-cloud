@@ -34,6 +34,7 @@ PAGE_FILE = {
     "lesson": "lesson.html", "lounge": "lounge.html", "community": "community.html",
     "plan": "plan.html", "beginner": "beginner.html", "corporate": "corporate.html",
     "access": "access.html", "faq": "faq.html", "trial": "trial.html",
+    "trial-booking": "trial-booking.html",
     "tokushoho": "tokushoho.html", "privacy": "privacy.html", "terms": "terms.html", "404": "404.html",
 }
 
@@ -46,7 +47,7 @@ PAGE_LABEL = {
     "concept": "コンセプト", "facility": "施設・設備", "lesson": "レッスン",
     "lounge": "バー・ラウンジ", "community": "コミュニティ", "plan": "料金・会員プラン",
     "beginner": "はじめての方へ", "corporate": "法人でのご利用", "access": "アクセス",
-    "faq": "よくあるご質問", "trial": "体験のご予約",
+    "faq": "よくあるご質問", "trial": "体験のご予約", "trial-booking": "体験予約フォーム",
     "tokushoho": "特定商取引法に基づく表記", "privacy": "プライバシーポリシー", "terms": "会員規約",
 }
 
@@ -1001,9 +1002,9 @@ HOME_FAQ = [
     ("一人で黙々と練習したいのですが、交流は必須ですか。",
      "いいえ。イベントへの参加もラウンジのご利用も、すべて任意です。打席で集中して打って、そのままお帰りいただいて構いません。交流は「あってもいいもの」であって、義務ではありません。"),
     ("会員でなくても利用できますか。",
-     "体験利用をご用意しています。詳細・料金は近日公開いたします。ビジター利用の可否についても、決まり次第お知らせいたします。"),
+     "はい。体験レッスン（約55分）をご用意しています。通常3,300円（税込）のところ、いまなら無料です。サイトのカレンダーからその場でご予約いただけます。ビジター利用の可否については、決まり次第お知らせいたします。"),
     ("予約はどのように取りますか。",
-     "会員の方は、Web予約（会員ログイン後）からお取りいただけます。体験のご予約は、本サイトの「体験予約」ボタン、または公式LINEから承ります。"),
+     "体験のご予約は、本サイトの「体験予約」ボタンから、カレンダーで日時を選ぶだけでその場で確定します（会員登録・ログイン不要）。会員の方の打席予約は、会員ログイン後のWeb予約からお取りいただけます。"),
     ("お酒が飲めなくてもラウンジは使えますか。",
      "もちろんです。ソフトドリンクもご用意します。ラウンジは、お酒を飲む場所というより、ゴルフの話をする場所だと考えています。"),
     ("プレオープンはいつですか。",
@@ -1830,9 +1831,9 @@ def build_trial():
     <div class="rv" style="margin-top:28px">
       <p class="card__t-jp" style="font-size:15px;color:var(--brass-2);margin-bottom:6px">ご予約から体験までの3ステップ</p>
       <div class="flow">
-        <div class="flow__i"><p class="flow__n">STEP 01</p><div><h3 class="flow__t">フォームで申し込む（1分）</h3><p class="flow__b">お名前・ご連絡先・ご希望日時（第1〜第3希望）だけ。会員登録は不要です。</p></div></div>
-        <div class="flow__i"><p class="flow__n">STEP 02</p><div><h3 class="flow__t">日程確定のご連絡</h3><p class="flow__b">担当より折り返しご連絡し、日時を確定します（プレオープン日に向けて順次対応）。</p></div></div>
-        <div class="flow__i"><p class="flow__n">STEP 03</p><div><h3 class="flow__t">当日、手ぶらでご来店</h3><p class="flow__b">当日いただく費用はありません。体験レッスンは<span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>です。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 01</p><div><h3 class="flow__t">空いている日時を選ぶ（30秒）</h3><p class="flow__b">カレンダーから、ご都合の良い日と開始時間をタップするだけ。会員登録もログインも不要です。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 02</p><div><h3 class="flow__t">その場で予約確定</h3><p class="flow__b">お名前とご連絡先をご入力いただくと、その場で確定します。折り返しのご連絡をお待ちいただく必要はありません。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 03</p><div><h3 class="flow__t">当日、手ぶらでご来店</h3><p class="flow__b">当日いただく費用はありません。体験レッスンは<span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>です。ご都合が変わったら、確定画面のリンクからキャンセルできます。</p></div></div>
       </div>
     </div>
 
@@ -1850,7 +1851,7 @@ def build_trial():
     <div class="rv" style="margin-top:56px">
       <p class="eyebrow">Trial Booking</p>
       <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">体験のお申し込み</h2>
-      <p class="lead">お申し込みフォームで、お名前・ご連絡先・ご希望日時（第1〜第3希望）をお送りください。折り返し担当より、日程確定のご連絡を差し上げます（プレオープン日に向けて順次対応）。</p>
+      <p class="lead">カレンダーから空いている日時を選び、お名前とご連絡先をご入力ください。<strong>その場でご予約が確定します</strong>（折り返しのご連絡をお待たせしません）。打席は当日いちばん良い席をこちらでご用意します。</p>
     </div>
 
     <div class="grid grid--2 rv" style="margin-top:36px;gap:24px;align-items:stretch">
@@ -1858,7 +1859,7 @@ def build_trial():
         <p class="card__no">01</p>
         <h3 class="card__t">BOOK</h3>
         <p class="card__t-jp">体験を申し込む</p>
-        <p class="card__b" style="margin:12px 0 26px;flex:1">フォームからご希望日時をお送りください。当日は約55分。カウンセリング → 打席のご案内 → プロのマンツーマン体験レッスンまで、無料でご体験いただけます。</p>
+        <p class="card__b" style="margin:12px 0 26px;flex:1">カレンダーから日時を選ぶだけ、その場で確定します。当日は約55分。カウンセリング → 打席のご案内 → プロのマンツーマン体験レッスンまで、無料でご体験いただけます。</p>
         <a class="btn btn--brass" href="#" data-cta="trial">体験を申し込む</a>
       </article>
       <article class="card" style="padding:38px 34px;display:flex;flex-direction:column">
@@ -1911,6 +1912,306 @@ def build_trial():
     b += foot()
     write("trial.html", b)
 
+
+
+def build_trial_booking():
+    """体験予約フォーム（セルフ予約・0083）
+    日時を選ぶだけで即確定。打席はサーバー側で A→B→C の優先順に自動割当するので、
+    お客様には打席を選ばせない（初めての方に打席の違いは判断できないため）。"""
+    b = head("体験を予約する（無料・約55分）｜FRANK GOLF",
+             "FRANK GOLF 姫路・土山の体験レッスン予約。ご希望の日時を選ぶだけでその場で確定します。通常3,300円（税込）が無料・約55分・手ぶらでOK。",
+             "trial-booking")
+    b += page_head("体験を予約する", "BOOK A TRIAL", "ご希望の日時を選ぶだけ。その場で確定します。",
+                   "折り返しのご連絡をお待たせしません。空いている時間から選んでいただけます。")
+    b += """
+<section class="sec">
+  <div class="wrap" style="max-width:780px">
+
+    <div class="rv">""" + offer_badge() + """</div>
+
+    <!-- 予約ウィザード -->
+    <div class="tb rv" id="tb" style="margin-top:40px">
+
+      <!-- STEP 1: 日付 -->
+      <div class="tb__step" id="tb-step-date">
+        <p class="tb__h"><span class="tb__n">1</span>ご希望の日を選ぶ</p>
+        <div class="tb__dates" id="tb-dates"></div>
+      </div>
+
+      <!-- STEP 2: 時間 -->
+      <div class="tb__step" id="tb-step-time" hidden>
+        <p class="tb__h"><span class="tb__n">2</span>開始時間を選ぶ</p>
+        <label class="tb__lefty">
+          <input type="checkbox" id="tb-lefty">
+          <span>左打ち（レフティ）です　<em>※ 左右打席のみのご案内になります</em></span>
+        </label>
+        <p class="tb__note" id="tb-time-note">読み込み中…</p>
+        <div class="tb__times" id="tb-times"></div>
+      </div>
+
+      <!-- STEP 3: お客様情報 -->
+      <div class="tb__step" id="tb-step-form" hidden>
+        <p class="tb__h"><span class="tb__n">3</span>お客様情報をご入力</p>
+        <p class="tb__pick" id="tb-pick"></p>
+        <div class="form">
+          <div class="form__grid">
+            <div class="form__row">
+              <label class="form__label" for="tb-name">お名前 <span class="req">必須</span></label>
+              <input id="tb-name" type="text" autocomplete="name" placeholder="山田 太郎">
+            </div>
+            <div class="form__row">
+              <label class="form__label" for="tb-kana">フリガナ</label>
+              <input id="tb-kana" type="text" placeholder="ヤマダ タロウ">
+            </div>
+            <div class="form__row">
+              <label class="form__label" for="tb-phone">電話番号 <span class="req">必須</span></label>
+              <input id="tb-phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="090-1234-5678">
+            </div>
+            <div class="form__row">
+              <label class="form__label" for="tb-email">メールアドレス</label>
+              <input id="tb-email" type="email" autocomplete="email" inputmode="email" placeholder="example@mail.com">
+            </div>
+            <div class="form__row form__row--full">
+              <label class="form__label" for="tb-exp">ゴルフ経験</label>
+              <select id="tb-exp">
+                <option value="">選択してください</option>
+                <option>まったくの初心者（クラブを握ったことがない）</option>
+                <option>打ちっぱなしの経験がある</option>
+                <option>コースに出たことがある</option>
+                <option>定期的にラウンドしている</option>
+              </select>
+            </div>
+            <div class="form__row form__row--full">
+              <label class="form__label" for="tb-msg">ご質問・ご要望</label>
+              <textarea id="tb-msg" rows="3" placeholder="当日クラブを借りたい、見学だけ希望、駐車場について など"></textarea>
+            </div>
+          </div>
+          <label class="form__consent">
+            <input type="checkbox" id="tb-consent">
+            <span><a href="privacy.html" target="_blank" rel="noopener">個人情報の取扱い</a>に同意します</span>
+          </label>
+          <div class="form__submit">
+            <button class="btn btn--brass" type="button" id="tb-submit">この日時で予約を確定する</button>
+            <span class="form__status" id="tb-status"></span>
+          </div>
+          <p class="form-note">当日いただく費用はありません（通常3,300円 税込が無料）。強引な勧誘はいたしません。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 確定 -->
+    <div class="tb-done rv" id="tb-done" hidden>
+      <p class="tb-done__badge">ご予約が確定しました</p>
+      <p class="tb-done__when" id="tb-done-when"></p>
+      <div class="spec" style="margin-top:26px">
+        <div class="spec__row"><p class="spec__k">体験レッスン</p><p class="spec__v">無料（通常 3,300円 税込）・約55分</p></div>
+        <div class="spec__row"><p class="spec__k">打席</p><p class="spec__v" id="tb-done-bay"></p></div>
+        <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v"><span data-frank="store.address">近日公開</span><br><a data-link="store.mapUrl" style="color:var(--brass-2);text-decoration:underline">Googleマップで見る</a></p></div>
+        <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+        <div class="spec__row"><p class="spec__k">当日の流れ</p><p class="spec__v" data-frank="trial.content">近日公開</p></div>
+      </div>
+      <div class="tb-done__line" id="tb-done-line" hidden>
+        <p class="tb-done__line-t">公式LINEを友だち追加してください</p>
+        <p class="tb-done__line-b">当日のご案内・道順のご連絡、日程変更のご相談をLINEで承ります。</p>
+        <a class="btn btn--line" href="#" data-cta="line">公式LINEを友だち追加</a>
+      </div>
+      <p class="tb-done__cancel">
+        ご都合が悪くなった場合は、こちらからキャンセルできます（このページをブックマークしてください）。<br>
+        <a id="tb-done-cancel-url" href="#">キャンセル・日程変更はこちら</a>
+        <span class="tb-done__url" id="tb-done-cancel-raw"></span>
+      </p>
+      <p class="tb-done__note">この画面をスクリーンショットで保存しておくと安心です。</p>
+    </div>
+
+    <!-- キャンセル画面（?cancel=トークン） -->
+    <div class="tb-cancel rv" id="tb-cancel" hidden>
+      <p class="eyebrow">Cancel</p>
+      <h2 class="h-en" style="font-size:clamp(1.6rem,4vw,2.3rem)">ご予約のキャンセル</h2>
+      <p class="lead" id="tb-cancel-info">読み込み中…</p>
+      <div class="cta__btns" style="justify-content:flex-start;margin-top:20px">
+        <button class="btn btn--ghost" type="button" id="tb-cancel-go">このご予約をキャンセルする</button>
+        <a class="btn btn--brass" href="trial-booking.html">別の日時で予約し直す</a>
+      </div>
+      <p class="form__status" id="tb-cancel-status" style="margin-top:14px"></p>
+    </div>
+
+    <p class="lead" style="font-size:13.5px;margin-top:44px">
+      会員の方の打席予約は <a href="booking.html" style="color:var(--brass-2);text-decoration:underline">打席予約ページ</a> から。
+      体験の内容は <a href="trial.html" style="color:var(--brass-2);text-decoration:underline">体験のご案内</a> をご覧ください。
+    </p>
+  </div>
+</section>
+
+<script>
+(function(){
+  var API = "https://yozan-genesis.vercel.app/api/public/frank/trial";
+  var $ = function(id){ return document.getElementById(id) };
+  var WD = ["日","月","火","水","木","金","土"];
+  var state = { date:null, start:null, lefty:false, slots:null };
+
+  function jstNow(){ return new Date(Date.now() + 9*3600*1000) }
+  function ymd(d){ return d.toISOString().slice(0,10) }
+
+  /* ---------- キャンセル画面 ---------- */
+  var token = (location.search.match(/[?&]cancel=([0-9a-f]+)/) || [])[1];
+  if (token) {
+    $("tb").hidden = true;
+    $("tb-cancel").hidden = false;
+    fetch(API + "?token=" + token).then(function(r){ return r.json() }).then(function(j){
+      if (j.error) { $("tb-cancel-info").textContent = j.error; $("tb-cancel-go").disabled = true; return }
+      if (j.status === "canceled") {
+        $("tb-cancel-info").textContent = "このご予約はキャンセル済みです。";
+        $("tb-cancel-go").disabled = true; return;
+      }
+      var d = new Date(j.date + "T00:00:00+09:00");
+      $("tb-cancel-info").textContent = j.name + " 様 ／ " + j.date.replace(/-/g,"/") + "（" + WD[d.getUTCDay()] + "）"
+        + j.start + "〜" + j.end + " ／ " + j.bayName;
+    });
+    $("tb-cancel-go").addEventListener("click", function(){
+      if (!confirm("このご予約をキャンセルしますか？")) return;
+      $("tb-cancel-go").disabled = true;
+      fetch(API, { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ action:"cancel", token: token }) })
+        .then(function(r){ return r.json() }).then(function(j){
+          var el = $("tb-cancel-status");
+          if (j.ok) { el.className = "form__status is-ok"; el.textContent = "キャンセルが完了しました。またのご利用をお待ちしております。"; $("tb-cancel-info").textContent = ""; }
+          else { el.className = "form__status is-err"; el.textContent = j.error || "キャンセルできませんでした"; $("tb-cancel-go").disabled = false; }
+        });
+    });
+    return;
+  }
+
+  /* ---------- STEP 1: 日付（今日から14日ぶん） ---------- */
+  var dates = [];
+  (function(){
+    var base = jstNow();
+    for (var i = 0; i < 14; i++) {
+      var d = new Date(base.getTime() + i*86400000);
+      dates.push({ v: ymd(d), m: d.getUTCMonth()+1, d: d.getUTCDate(), w: WD[d.getUTCDay()], dow: d.getUTCDay() });
+    }
+    var h = "";
+    dates.forEach(function(x, i){
+      var cls = "tb__date" + (x.dow===0 ? " is-sun" : x.dow===6 ? " is-sat" : "");
+      h += '<button type="button" class="' + cls + '" data-date="' + x.v + '">'
+         + '<span class="tb__date-w">' + x.w + '</span>'
+         + '<span class="tb__date-d">' + x.d + '</span>'
+         + '<span class="tb__date-m">' + (i===0 ? "今日" : x.m + "月") + '</span>'
+         + '</button>';
+    });
+    $("tb-dates").innerHTML = h;
+    $("tb-dates").querySelectorAll("button[data-date]").forEach(function(btn){
+      btn.addEventListener("click", function(){ selectDate(btn.getAttribute("data-date"), btn) });
+    });
+    // 定休日は最初からグレーにする（選んでから「定休日です」と言われるのは体験が悪い）
+    fetch(API + "?date=" + dates[0].v).then(function(r){ return r.json() }).then(function(cfg){
+      var dows = cfg.closedDows || [], closed = cfg.closedDates || [];
+      var n = Math.min(dates.length, (cfg.advanceDays || 14));
+      $("tb-dates").querySelectorAll("button[data-date]").forEach(function(btn, i){
+        var x = dates[i];
+        var off = dows.indexOf(x.dow) >= 0 || closed.indexOf(x.v) >= 0 || i >= n;
+        if (off) { btn.disabled = true; btn.classList.add("is-off"); btn.title = "この日はご予約いただけません"; }
+      });
+    }).catch(function(){ /* 取れなくても選んだ時点で判定されるので致命的ではない */ });
+  })();
+
+  function selectDate(date, btn){
+    state.date = date; state.start = null;
+    $("tb-dates").querySelectorAll("button").forEach(function(b){ b.classList.remove("is-on") });
+    if (btn) btn.classList.add("is-on");
+    $("tb-step-time").hidden = false;
+    $("tb-step-form").hidden = true;
+    $("tb-times").innerHTML = "";
+    $("tb-time-note").textContent = "空き状況を読み込み中…";
+    fetch(API + "?date=" + date).then(function(r){ return r.json() }).then(function(j){
+      state.slots = j;
+      renderTimes();
+      $("tb-step-time").scrollIntoView({ behavior:"smooth", block:"center" });
+    }).catch(function(){ $("tb-time-note").textContent = "読み込みに失敗しました。時間をおいてお試しください。" });
+  }
+
+  function renderTimes(){
+    var j = state.slots; if (!j) return;
+    if (j.closed) {
+      $("tb-time-note").textContent = "この日は定休日です。別の日をお選びください。";
+      $("tb-times").innerHTML = ""; return;
+    }
+    var list = state.lefty ? (j.leftySlots || []) : (j.slots || []);
+    if (!list.length) {
+      $("tb-time-note").textContent = state.lefty
+        ? "この日の左右打席は満席です。別の日をお選びください。"
+        : "この日は満席です。別の日をお選びください。";
+      $("tb-times").innerHTML = ""; return;
+    }
+    $("tb-time-note").textContent = "所要 約" + j.labelMinutes + "分。ご希望の開始時間をお選びください。";
+    var h = "";
+    list.forEach(function(t){ h += '<button type="button" class="tb__time" data-t="' + t + '">' + t + '</button>' });
+    $("tb-times").innerHTML = h;
+    $("tb-times").querySelectorAll("button[data-t]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        state.start = btn.getAttribute("data-t");
+        $("tb-times").querySelectorAll("button").forEach(function(b){ b.classList.remove("is-on") });
+        btn.classList.add("is-on");
+        var d = new Date(state.date + "T00:00:00+09:00");
+        $("tb-pick").textContent = state.date.replace(/-/g,"/") + "（" + WD[d.getUTCDay()] + "） "
+          + state.start + "〜　体験レッスン 無料・約" + j.labelMinutes + "分"
+          + (state.lefty ? "　／　左右打席" : "");
+        $("tb-step-form").hidden = false;
+        $("tb-step-form").scrollIntoView({ behavior:"smooth", block:"start" });
+      });
+    });
+  }
+
+  $("tb-lefty").addEventListener("change", function(){
+    state.lefty = this.checked; state.start = null;
+    $("tb-step-form").hidden = true;
+    renderTimes();
+  });
+
+  /* ---------- STEP 3: 確定 ---------- */
+  $("tb-submit").addEventListener("click", function(){
+    var el = $("tb-status"); el.className = "form__status"; el.textContent = "";
+    if (!state.date || !state.start) { el.className = "form__status is-err"; el.textContent = "日時をお選びください"; return }
+    var name = $("tb-name").value.trim();
+    var phone = $("tb-phone").value.trim();
+    if (!name)  { el.className = "form__status is-err"; el.textContent = "お名前をご入力ください"; $("tb-name").focus(); return }
+    if (!phone) { el.className = "form__status is-err"; el.textContent = "電話番号をご入力ください"; $("tb-phone").focus(); return }
+    if (!$("tb-consent").checked) { el.className = "form__status is-err"; el.textContent = "個人情報の取扱いへの同意が必要です"; return }
+
+    var btn = $("tb-submit"); btn.disabled = true; el.textContent = "確定しています…";
+    fetch(API, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({
+      action:"book", name:name, name_kana:$("tb-kana").value.trim(), phone:phone,
+      email:$("tb-email").value.trim(), date:state.date, start:state.start,
+      lefty:state.lefty, experience:$("tb-exp").value, message:$("tb-msg").value.trim(), consent:true
+    })}).then(function(r){ return r.json() }).then(function(j){
+      btn.disabled = false;
+      if (!j.ok) {
+        el.className = "form__status is-err";
+        el.textContent = j.error || "予約できませんでした";
+        if (state.date) selectDate(state.date, $("tb-dates").querySelector('button[data-date="' + state.date + '"]'));
+        return;
+      }
+      var d = new Date(j.date + "T00:00:00+09:00");
+      $("tb").hidden = true;
+      $("tb-done").hidden = false;
+      $("tb-done-when").textContent = j.date.replace(/-/g,"/") + "（" + WD[d.getUTCDay()] + "） " + j.start + "〜" + j.end;
+      $("tb-done-bay").textContent = j.bayName + "（当日ご案内します）";
+      var url = location.origin + location.pathname + "?cancel=" + j.cancelToken;
+      var a = $("tb-done-cancel-url"); a.href = url;
+      var raw = $("tb-done-cancel-raw"); if (raw) raw.textContent = url;
+      var line = (window.FRANK && window.FRANK.links && window.FRANK.links.line) || null;
+      if (line) $("tb-done-line").hidden = false;
+      if (window.FRANK_RENDER) window.FRANK_RENDER();
+      $("tb-done").scrollIntoView({ behavior:"smooth", block:"start" });
+    }).catch(function(){
+      btn.disabled = false;
+      el.className = "form__status is-err"; el.textContent = "通信に失敗しました。時間をおいてお試しください。";
+    });
+  });
+})();
+</script>
+"""
+    b += foot()
+    write("trial-booking.html", b)
 
 
 def build_tokushoho():
@@ -2133,7 +2434,8 @@ def build_sitemap():
         return
     urls = ["index.html", "concept.html", "facility.html", "lesson.html", "lounge.html",
             "community.html", "plan.html", "beginner.html", "corporate.html",
-            "access.html", "faq.html", "trial.html", "tokushoho.html", "privacy.html", "terms.html"]
+            "access.html", "faq.html", "trial.html", "trial-booking.html",
+            "tokushoho.html", "privacy.html", "terms.html"]
     body = "\n".join(
         f"  <url><loc>{abs_url(u)}</loc><priority>{'1.0' if u == 'index.html' else '0.7'}</priority></url>"
         for u in urls
@@ -2162,6 +2464,7 @@ if __name__ == "__main__":
     build_access()
     build_faq()
     build_trial()
+    build_trial_booking()
     build_tokushoho()
     build_privacy()
     build_terms()

@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
-import { slotEnd } from "@/lib/reservation";
 import {
   createMemberSession, clearMemberSession, requireMember, resolveHimeji,
 } from "@/lib/member";
@@ -94,43 +93,11 @@ export async function memberLogout() {
   redirect("/member/login");
 }
 
-/** ログイン会員が自分で予約を作成（姫路店・打席/レッスン枠） */
-export async function bookAsMember(formData: FormData) {
-  const member = await requireMember();
-  const store = await resolveHimeji();
-  if (!store) redirect("/member?err=" + encodeURIComponent("店舗情報を取得できませんでした"));
-
-  const date = str(formData.get("date"));
-  const slot = str(formData.get("slot")); // "resourceId|HH:MM"
-  if (!DATE_RE.test(date) || !slot) redirect("/member/book?err=" + encodeURIComponent("日付と時間枠を選択してください"));
-  const [resourceId, start] = slot.split("|");
-  if (!resourceId || !start) redirect("/member/book?err=" + encodeURIComponent("時間枠が不正です"));
-
-  const admin = createAdmin();
-  const { error } = await admin.from("res_bookings").insert({
-    company_id: member.companyId,
-    store_id: store!.storeId,
-    resource_id: resourceId,
-    booking_date: date,
-    start_time: start,
-    end_time: slotEnd(start),
-    customer_kind: "member",
-    member_no: member.memberNo,
-    guest_name: member.name,
-    party_size: parseInt(str(formData.get("party_size")) || "1", 10) || 1,
-    source: "web",
-    status: "reserved",
-  });
-  if (error) redirect("/member/book?date=" + date + "&err=" + encodeURIComponent("その枠は満席になりました。別の時間をお選びください"));
-
-  await logEvent(member.companyId, {
-    event_type: "reservation.member_booked",
-    title: `会員Web予約: ${member.name} 様 / ${date} ${start}`,
-    source: "web", source_type: "external", severity: "info",
-  });
-  revalidatePath("/member");
-  redirect("/member?booked=1");
-}
+/*
+ * 会員のWeb予約（bookAsMember）は削除しました（#93）。
+ * お客様の予約は公式サイト frankgolf.jp/booking.html に一本化し、
+ * member-os はスタッフの管理と会員マイページ（確認・キャンセル）に専念します。
+ */
 
 /** 会員が自分の予約をキャンセル */
 export async function cancelMyBooking(formData: FormData) {
@@ -138,12 +105,17 @@ export async function cancelMyBooking(formData: FormData) {
   const id = str(formData.get("id"));
   if (!id) return;
   const admin = createAdmin();
+  // 台帳は frunk_bookings 一本（#93）。他人の予約を消せないよう member_id で縛る
+  const { data: me } = await admin
+    .from("frunk_members").select("id")
+    .eq("company_id", member.companyId).eq("member_no", member.memberNo)
+    .is("deleted_at", null).maybeSingle();
+  if (!me) redirect("/member");
   await admin
-    .from("res_bookings")
-    .update({ status: "canceled" })
+    .from("frunk_bookings")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("company_id", member.companyId)
-    .eq("member_no", member.memberNo)
+    .eq("member_id", me.id)
     .is("deleted_at", null);
   await logEvent(member.companyId, {
     event_type: "reservation.member_canceled",

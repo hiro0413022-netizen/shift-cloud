@@ -1,59 +1,37 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
+import {
+  FRANK_STORE_ID,
+  DEFAULT_BOOKING_CFG,
+  loadBookingCfg as loadCfg,
+  businessHours as hoursOf,
+  type BookingCfg,
+} from "@yozan/core/frank-booking";
 
 /**
- * FRANK GOLF 打席予約 v1（#86 §3-3）
- * - 30分単位。営業時間: 平日10-21／土日祝8-20／火曜定休（CMS gn_site_content の store.hours では上書きしない=確定値）
+ * FRANK GOLF 打席予約（#86 §3-3・台帳一本化 #93）
+ * - 30分単位。営業時間・定休日は @yozan/core/frank-booking（gn_site_content で上書き可）
  * - 会員認証: 会員番号＋電話番号下4桁（Web完結・パスワードレス）
- * - プラン上限: レギュラー=1日60分／マスター=1日120分／ライト=1日60分+月8日まで／法人=1日60分(ライト)・120分(プレミアム)
+ * - プラン上限: レギュラー=1日60分／マスター=1日120分／ライト=1日60分+月8日まで
+ * ★ 設定と営業時間の判定はスタッフ画面(member-os)と共通。ここで独自定義しないこと。
  */
+
+// 既存の import 先を壊さないための再export（member-os も同じ定義を使う）
+export { DEFAULT_BOOKING_CFG };
+export type { BookingCfg };
 
 type Admin = ReturnType<typeof createAdmin>;
 
-const FRANK_STORE = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
-
-/** 予約設定（#87: gn_site_content.data.booking で上書き可能＝/site-adminから変更できる汎用設計） */
-export type BookingCfg = {
-  weekday: { open: string; close: string };
-  weekend: { open: string; close: string };
-  closed_dows: number[]; // 定休曜日 0=日〜6=土
-  slot_minutes: number;
-  max_minutes_options: number[];
-  holiday_dates: string[]; // この日付は土日祝営業時間を適用
-  closed_dates: string[]; // この日付は臨時休業
-  advance_days: number; // 何日先まで予約可
-};
-
-export const DEFAULT_BOOKING_CFG: BookingCfg = {
-  weekday: { open: "10:00", close: "21:00" },
-  weekend: { open: "08:00", close: "20:00" },
-  closed_dows: [2], // 火曜定休
-  slot_minutes: 30,
-  max_minutes_options: [30, 60, 90, 120],
-  holiday_dates: [],
-  closed_dates: [],
-  advance_days: 14,
-};
+const FRANK_STORE = FRANK_STORE_ID;
 
 export async function loadBookingCfg(admin: Admin): Promise<BookingCfg> {
-  const { data } = await admin.from("gn_site_content").select("data").eq("site", "frank-golf").maybeSingle();
-  const o = ((data?.data as Record<string, unknown> | null)?.booking ?? {}) as Partial<BookingCfg>;
-  return {
-    ...DEFAULT_BOOKING_CFG,
-    ...o,
-    weekday: { ...DEFAULT_BOOKING_CFG.weekday, ...(o.weekday ?? {}) },
-    weekend: { ...DEFAULT_BOOKING_CFG.weekend, ...(o.weekend ?? {}) },
-  };
+  return loadCfg(admin as unknown as Parameters<typeof loadCfg>[0]);
 }
 
-/** 営業時間（JSTの日付文字列から曜日判定。祝日・臨時休業は設定で指定） */
-export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING_CFG): { open: string; close: string } | null {
-  if (cfg.closed_dates.includes(dateStr)) return null;
-  const dow = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 日付文字列のみ→曜日はUTCでOK
-  if (cfg.closed_dows.includes(dow)) return null;
-  if (dow === 0 || dow === 6 || cfg.holiday_dates.includes(dateStr)) return cfg.weekend;
-  return cfg.weekday;
+/** 営業時間（定休日・臨時休業なら null）。判定ロジックは @yozan/core に集約 */
+export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING_CFG) {
+  return hoursOf(dateStr, cfg);
 }
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
@@ -106,7 +84,8 @@ export async function getSlots(dateStr: string) {
     .from("frunk_bookings")
     .select("bay_id, start_time, end_time")
     .eq("booked_date", dateStr)
-    .eq("status", "confirmed")
+    // 来店済み・無断欠も枠は使われている。空くのは cancelled だけ（0084）
+    .neq("status", "cancelled")
     .is("deleted_at", null);
 
   // レッスン枠（#88 §3-4）: プロが打席指定で公開した枠は打席予約から除外
@@ -153,7 +132,7 @@ export async function createBooking(input: {
     .select("start_time, end_time")
     .eq("member_id", member.id)
     .eq("booked_date", input.date)
-    .eq("status", "confirmed")
+    .neq("status", "cancelled")
     .is("deleted_at", null);
   const usedMin = (sameDay ?? []).reduce((s, b) => s + (toMin(String(b.end_time)) - toMin(String(b.start_time))), 0);
   if (usedMin + input.minutes > dailyMax) {
@@ -167,7 +146,7 @@ export async function createBooking(input: {
       .eq("member_id", member.id)
       .gte("booked_date", monthStart)
       .lte("booked_date", `${input.date.slice(0, 7)}-31`)
-      .eq("status", "confirmed")
+      .neq("status", "cancelled")
       .is("deleted_at", null);
     const days = new Set((monthRows ?? []).map((r) => String(r.booked_date)));
     if (!days.has(input.date) && days.size >= 8) return { ok: false, error: "ライト会員は月8日までのご利用です" };
@@ -182,7 +161,7 @@ export async function createBooking(input: {
     .select("id, start_time, end_time")
     .eq("bay_id", bay.id)
     .eq("booked_date", input.date)
-    .eq("status", "confirmed")
+    .neq("status", "cancelled")
     .is("deleted_at", null);
   const lessonBlocks = (await lessonBaySlots(admin, input.date)).filter((s) => s.bay_id === String(bay.id));
   for (const b of [...(conflict ?? []), ...lessonBlocks]) {
@@ -197,6 +176,7 @@ export async function createBooking(input: {
       company_id: member.company_id,
       store_id: FRANK_STORE,
       member_id: member.id,
+      customer_kind: "member",
       bay_id: bay.id,
       booked_date: input.date,
       start_time: input.start,

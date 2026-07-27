@@ -23,7 +23,7 @@ export default async function TrialPage() {
       </div>
       <TrialForm />
       <p className="mt-6 text-center text-xs text-(--color-dim)">
-        すでに会員の方は <a href="/member/book" className="text-(--color-gold) underline">こちらから打席をWeb予約</a> いただけます。
+        すでに会員の方は <a href="https://frankgolf.jp/booking.html" className="text-(--color-gold) underline">こちらから打席をWeb予約</a> いただけます。
       </p>
     </main>
   );

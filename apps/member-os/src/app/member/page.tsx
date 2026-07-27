@@ -1,15 +1,11 @@
 import Link from "next/link";
 import { requireMember, resolveHimeji } from "@/lib/member";
 import { createAdmin } from "@/lib/supabase/admin";
-import { BOOKING_STATUS_LABEL } from "@/lib/reservation";
+import { BOOKING_STATUS_LABEL, jstToday } from "@yozan/core/frank-booking";
 import { memberLogout, cancelMyBooking } from "./actions";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 const notices: Record<string, { text: string; ok?: boolean }> = {
   booked: { text: "ご予約を受け付けました。", ok: true },
@@ -27,20 +23,27 @@ export default async function MemberHomePage({
   const admin = createAdmin();
   const sp = await searchParams;
 
-  const [{ data: bookings }, { data: resources }] = await Promise.all([
-    admin.from("res_bookings")
-      .select("id, resource_id, booking_date, start_time, status, customer_kind, party_size")
-      .eq("company_id", member.companyId).eq("member_no", member.memberNo)
-      .is("deleted_at", null)
-      .order("booking_date", { ascending: false }).order("start_time", { ascending: false }),
-    admin.from("res_resources").select("id, name").eq("store_id", store?.storeId ?? "").is("deleted_at", null),
-  ]);
+  // 台帳は frunk_bookings 一本（#93）。会員は member_no → frunk_members.id で引く
+  const { data: me } = await admin
+    .from("frunk_members").select("id")
+    .eq("company_id", member.companyId).eq("member_no", member.memberNo)
+    .is("deleted_at", null).maybeSingle();
 
-  const resName = new Map((resources ?? []).map((r) => [String((r as Row).id), String((r as Row).name)]));
+  const { data: bookings } = me
+    ? await admin
+        .from("frunk_bookings")
+        .select("id, booked_date, start_time, end_time, status, party_size, frunk_bays(name)")
+        .eq("member_id", me.id)
+        .is("deleted_at", null)
+        .order("booked_date", { ascending: false })
+        .order("start_time", { ascending: false })
+    : { data: [] };
+
   const all = (bookings ?? []) as Row[];
-  const t = today();
-  const upcoming = all.filter((b) => String(b.booking_date) >= t && b.status !== "canceled");
-  const past = all.filter((b) => String(b.booking_date) < t || b.status === "canceled").slice(0, 20);
+  const t = jstToday();
+  const bayName = (b: Row) => (b.frunk_bays as { name?: string } | null)?.name ?? "打席";
+  const upcoming = all.filter((b) => String(b.booked_date) >= t && b.status !== "cancelled");
+  const past = all.filter((b) => String(b.booked_date) < t || b.status === "cancelled").slice(0, 20);
 
   const notice = sp.booked ? notices.booked : sp.canceled ? notices.canceled : sp.registered ? notices.registered : null;
 
@@ -60,9 +63,9 @@ export default async function MemberHomePage({
       {notice && <p className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{notice.text}</p>}
       {sp.err && <p className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{sp.err}</p>}
 
-      <Link href="/member/book" className="mb-6 block w-full rounded-xl bg-sky-600 py-4 text-center text-lg font-semibold text-white transition-all hover:bg-sky-500">
+      <a href="https://frankgolf.jp/booking.html" className="mb-6 block w-full rounded-xl bg-sky-600 py-4 text-center text-lg font-semibold text-white transition-all hover:bg-sky-500">
         ＋ Web予約する
-      </Link>
+      </a>
 
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold text-(--color-dim)">これからのご予約</h2>
@@ -73,8 +76,8 @@ export default async function MemberHomePage({
             {upcoming.map((b) => (
               <div key={String(b.id)} className="flex items-center justify-between gap-2 rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
                 <div>
-                  <p className="font-semibold">{String(b.booking_date)} {String(b.start_time).slice(0, 5)}</p>
-                  <p className="text-xs text-(--color-dim)">{resName.get(String(b.resource_id)) ?? "枠"}{b.party_size ? ` ・ ${String(b.party_size)}名` : ""}</p>
+                  <p className="font-semibold">{String(b.booked_date)} {String(b.start_time).slice(0, 5)}〜{String(b.end_time).slice(0, 5)}</p>
+                  <p className="text-xs text-(--color-dim)">{bayName(b)}{b.party_size && Number(b.party_size) > 1 ? ` ・ ${String(b.party_size)}名` : ""}</p>
                 </div>
                 <form action={cancelMyBooking}>
                   <input type="hidden" name="id" value={String(b.id)} />
@@ -94,7 +97,7 @@ export default async function MemberHomePage({
           <div className="space-y-1.5">
             {past.map((b) => (
               <div key={String(b.id)} className="flex items-center justify-between rounded-lg border border-(--color-line) bg-(--color-panel-2) px-4 py-2.5 text-sm">
-                <span>{String(b.booking_date)} {String(b.start_time).slice(0, 5)} ・ {resName.get(String(b.resource_id)) ?? "枠"}</span>
+                <span>{String(b.booked_date)} {String(b.start_time).slice(0, 5)} ・ {bayName(b)}</span>
                 <span className="text-xs text-(--color-dim)">{BOOKING_STATUS_LABEL[String(b.status)] ?? String(b.status)}</span>
               </div>
             ))}

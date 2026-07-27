@@ -9,7 +9,7 @@ import { createAdmin } from "@/lib/supabase/admin";
  * 認証: kiosk_devices のデバイストークン（sha256ハッシュ照合・打刻キオスクと同一方式）。
  *       店頭タブレット共有表示のためスタッフログイン不要。
  * KPI:  すべて既存テーブルから直接集計（新テーブル・ビューなし）。
- *   - 体験       … mbr_trial_bookings（GOLF WING）/ mbr_trial_requests（FRANK・#72）
+ *   - 体験       … mbr_walkin_visits visit_type='trial'（GOLF WING・#93）/ mbr_trial_requests（FRANK・#72）
  *   - 物販売上   … mon_sales category='販売'（税抜・月次サマリ）
  *   - 会員       … mbr_members（GOLF WING・kernel.tsと同ロジック）/ frunk_members（FRANK）
  *   - 売上見込   … mon_sales当月合計 + fin_entries source='forecast'（月会費予測 0028）
@@ -92,22 +92,21 @@ export async function getStoreKpis(companyId: string, store: StoreInfo, ym: stri
   // --- 体験（今月） ---
   let trialCard: KpiCard;
   if (gw) {
-    // GOLF WING: 体験受付（mbr_trial_bookings）。当月 = lesson_date（未確定は desired_at）
+    // GOLF WING: 一時利用者名簿（mbr_walkin_visits・visit_type='trial'）。
+    // 体験の実績はここに入る（旧 mbr_trial_bookings は 0018 で台帳へ移行済＝常に空・#93）。
     const { data: rows } = await admin
-      .from("mbr_trial_bookings")
-      .select("status, joined, lesson_date, desired_at")
+      .from("mbr_walkin_visits")
+      .select("result, visited_on")
       .eq("company_id", companyId)
       .eq("store_id", store.id)
-      .is("deleted_at", null);
-    const inMonth = (b: { lesson_date: string | null; desired_at: string | null }) => {
-      const d = b.lesson_date ?? (b.desired_at ? b.desired_at.slice(0, 10) : null);
-      return !!d && d >= from && d < to;
-    };
-    const list = ((rows ?? []) as { status: string; joined: boolean; lesson_date: string | null; desired_at: string | null }[])
-      .filter((b) => b.status !== "canceled" && inMonth(b));
-    const visited = list.filter((b) => b.status === "visited").length;
-    const joined = list.filter((b) => b.joined).length;
-    trialCard = { title: `体験（${monthLabel}）`, value: `${list.length}件`, sub: `来店 ${visited}・入会 ${joined}` };
+      .eq("visit_type", "trial")
+      .is("deleted_at", null)
+      .gte("visited_on", from)
+      .lt("visited_on", to);
+    const list = (rows ?? []) as { result: string | null }[];
+    const joined = list.filter((b) => b.result === "join").length;
+    const rate = list.length > 0 ? Math.round((joined / list.length) * 100) : 0;
+    trialCard = { title: `体験（${monthLabel}）`, value: `${list.length}件`, sub: `入会 ${joined}・入会率 ${rate}%` };
   } else {
     // FRANK: 体験申込（mbr_trial_requests / #72）。当月 = 申込日（created_at・JSTはDB側timestamptzで十分近似）
     const { data: rows } = await admin
@@ -282,16 +281,16 @@ export async function getStoreMonthFeed(
       .gte("date", first)
       .lte("date", last)
       .order("sort"),
-    // 体験予約（確定日ベース・キャンセル除く）→ 予約●として合流
+    // 体験（一時利用者名簿の実績・#93）→ 予約●として合流。GW は予約テーブルを持たないため来店日ベース
     admin
-      .from("mbr_trial_bookings")
-      .select("lesson_date, start_time, program, status")
+      .from("mbr_walkin_visits")
+      .select("visited_on, visit_type")
       .eq("company_id", companyId)
       .eq("store_id", storeId)
+      .eq("visit_type", "trial")
       .is("deleted_at", null)
-      .not("lesson_date", "is", null)
-      .gte("lesson_date", first)
-      .lte("lesson_date", last),
+      .gte("visited_on", first)
+      .lte("visited_on", last),
   ]);
 
   const feed: StoreMonthFeed = {};
@@ -312,19 +311,18 @@ export async function getStoreMonthFeed(
   }
   for (const e of (eventRes.data ?? []) as StoreEvent[]) feed[e.date]?.events.push(e);
   for (const t of (taskRes.data ?? []) as StoreTask[]) feed[t.date]?.tasks.push(t);
-  for (const r of (trialRes.data ?? []) as { lesson_date: string; start_time: string | null; program: string | null; status: string }[]) {
-    if (r.status === "canceled") continue;
-    const hm = r.start_time ? r.start_time.slice(0, 5) : "";
-    feed[r.lesson_date]?.reservations.push({ date: r.lesson_date, label: `体験 ${hm}${r.program ? ` ${r.program}` : ""}`.trim() });
+  for (const r of (trialRes.data ?? []) as { visited_on: string }[]) {
+    feed[r.visited_on]?.reservations.push({ date: r.visited_on, label: "体験" });
   }
 
   // FRANK: 打席予約＋レッスン予約も予約欄に合流（#88 §3-3/3-4・店頭タブレットで当日予約を見る）
   const [bayRes, lessonRes] = await Promise.all([
     admin
       .from("frunk_bookings")
-      .select("booked_date, start_time, end_time, status, frunk_members(name), frunk_bays(name)")
+      .select("booked_date, start_time, end_time, status, customer_kind, guest_name, frunk_members(name), frunk_bays(name), mbr_trial_requests(name)")
       .eq("store_id", storeId)
-      .eq("status", "confirmed")
+      // 来店済み・無断欠も当日の予定として出す。消えるのはキャンセルだけ（0084）
+      .neq("status", "cancelled")
       .is("deleted_at", null)
       .gte("booked_date", first)
       .lte("booked_date", last)
@@ -339,12 +337,16 @@ export async function getStoreMonthFeed(
       .lte("frunk_lesson_slots.slot_date", last),
   ]);
   for (const b of (bayRes.data ?? []) as unknown as {
-    booked_date: string; start_time: string; end_time: string;
+    booked_date: string; start_time: string; end_time: string; customer_kind: string; guest_name: string | null;
     frunk_members: { name: string } | null; frunk_bays: { name: string } | null;
+    mbr_trial_requests: { name: string } | null;
   }[]) {
+    // 会員・体験・都度で呼び名が違う（0084で台帳を一本化）
+    const who = b.frunk_members?.name ?? b.mbr_trial_requests?.name ?? b.guest_name ?? "";
+    const kind = b.customer_kind === "trial" ? "体験" : b.customer_kind === "dropin" ? "都度" : "打席";
     feed[b.booked_date]?.reservations.push({
       date: b.booked_date,
-      label: `打席 ${String(b.start_time).slice(0, 5)} ${b.frunk_members?.name ?? ""}様${b.frunk_bays ? `（${b.frunk_bays.name}）` : ""}`.trim(),
+      label: `${kind} ${String(b.start_time).slice(0, 5)} ${who}${who ? "様" : ""}${b.frunk_bays ? `（${b.frunk_bays.name}）` : ""}`.trim(),
     });
   }
   for (const l of (lessonRes.data ?? []) as unknown as {

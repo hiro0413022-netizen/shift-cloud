@@ -76,8 +76,15 @@
     document.querySelectorAll("[data-cta='trial']").forEach(function (a) {
       if (trial) {
         a.href = trial;
-        a.target = "_blank";
-        a.rel = "noopener";
+        // サイト内のページ（trial-booking.html）は同じタブで開く。
+        // 別タブにすると戻る導線が無くなり、予約途中の離脱が増えるため。
+        if (/^https?:/.test(trial)) {
+          a.target = "_blank";
+          a.rel = "noopener";
+        } else {
+          a.removeAttribute("target");
+          a.removeAttribute("rel");
+        }
       } else if (line) {
         a.href = line;
         a.target = "_blank";
@@ -332,6 +339,8 @@
   function stickyCta() {
     var bar = document.querySelector("[data-sticky-cta]");
     if (!bar) return;
+    // 予約ページ自身では出さない（入力欄・確定ボタンを覆ってしまう）
+    if (document.body.getAttribute("data-page") === "trial-booking") { bar.remove(); return; }
 
     // 中身の値（体験料・所要時間）を流し込む
     var fee = pick("trial.fee");
