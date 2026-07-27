@@ -118,6 +118,27 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
             ))}
           </div>
 
+          {/* この日の出勤（店舗全体）— 他のスタッフのシフトもここで確認できる */}
+          <div className="mt-3 border-t border-zinc-100 pt-3">
+            <p className="text-xs font-medium text-zinc-500">この日の出勤（店舗全体）</p>
+            <div className="mt-1.5 space-y-1 text-sm">
+              {day.coworkers.filter((c) => !c.is_day_off).length === 0 ? (
+                <p className="text-zinc-400">確定した出勤はまだありません</p>
+              ) : (
+                day.coworkers
+                  .filter((c) => !c.is_day_off)
+                  .map((c, i) => (
+                    <p key={`cw${i}`} className="flex items-baseline gap-2">
+                      <span className={`min-w-0 flex-1 truncate ${c.is_self ? "font-semibold text-brand" : ""}`}>
+                        {c.staff_name}{c.is_self ? "（自分）" : ""}
+                      </span>
+                      <span className="shrink-0 text-zinc-600">{hm(c.start_time)}〜{hm(c.end_time)}</span>
+                    </p>
+                  ))
+              )}
+            </div>
+          </div>
+
           {/* やること */}
           <div className="mt-3 border-t border-zinc-100 pt-3">
             <p className="text-xs font-medium text-zinc-500">やること</p>

@@ -17,6 +17,22 @@ export type FeedShift = {
   template_color: string | null;
 };
 
+/**
+ * その日の店舗全体の出勤者（自分以外も含む）。
+ * スタッフが「今日は誰が入っているか」を見るためのソース。
+ * 旧: 下部ナビ「📅 シフト」→ /shifts?view=all で見られていたが、
+ * ナビがカレンダーに置き換わって導線が消えていたため、カレンダーに合流させた。
+ */
+export type FeedCoworker = {
+  date: string;
+  staff_name: string;
+  start_time: string | null;
+  end_time: string | null;
+  is_day_off: boolean;
+  store_name: string | null;
+  is_self: boolean;
+};
+
 export type FeedEvent = {
   date: string;
   title: string;
@@ -46,6 +62,7 @@ export type FeedReservation = {
 
 export type DayFeed = {
   shifts: FeedShift[];
+  coworkers: FeedCoworker[];
   events: FeedEvent[];
   tasks: FeedTask[];
   reservations: FeedReservation[];
@@ -58,6 +75,7 @@ export function buildMonthFeed(
   days: string[],
   sources: {
     shifts?: FeedShift[];
+    coworkers?: FeedCoworker[];
     events?: FeedEvent[];
     tasks?: FeedTask[];
     reservations?: FeedReservation[];
@@ -65,8 +83,9 @@ export function buildMonthFeed(
   }
 ): MonthFeed {
   const feed: MonthFeed = {};
-  for (const d of days) feed[d] = { shifts: [], events: [], tasks: [], reservations: [], memo: null };
+  for (const d of days) feed[d] = { shifts: [], coworkers: [], events: [], tasks: [], reservations: [], memo: null };
   for (const s of sources.shifts ?? []) feed[s.date]?.shifts.push(s);
+  for (const c of sources.coworkers ?? []) feed[c.date]?.coworkers.push(c);
   for (const e of sources.events ?? []) feed[e.date]?.events.push(e);
   for (const t of sources.tasks ?? []) feed[t.date]?.tasks.push(t);
   for (const r of sources.reservations ?? []) feed[r.date]?.reservations.push(r);
