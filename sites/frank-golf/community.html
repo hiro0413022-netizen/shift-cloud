@@ -19,7 +19,7 @@
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://frankgolf.jp/assets/ogp.png">
-<meta name="theme-color" content="#FFFDF8">
+<meta name="theme-color" content="#101210">
 <link rel="canonical" href="https://frankgolf.jp/community.html">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
@@ -29,7 +29,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
-<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/index.html"},{"@type":"ListItem","position":2,"name":"コミュニティ","item":"https://frankgolf.jp/community.html"}]}</script>
 </head>
 <body data-page="community">
@@ -39,7 +38,7 @@
 <!-- 1. プレオープン告知バー -->
 <div class="notice-bar" role="status">
   <span class="notice-bar__tag">PRE-OPEN</span>
-  <span><b data-preopen>2026年9月2日</b>、姫路・土山にプレオープン。体験のご予約を受付中です。</span>
+  <span><b data-preopen>2026年9月2日</b> 姫路・土山にプレオープン。いま<b>体験レッスン無料</b>（通常3,300円）</span>
 </div>
 
 <!-- 2. ヘッダー -->
@@ -66,7 +65,7 @@
     </nav>
     <div class="nav__cta">
       <a class="nav__member" data-link="links.memberLogin">MEMBER LOGIN</a>
-      <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約</a>
+      <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約（無料）</a>
     </div>
     <button class="burger" aria-label="メニュー" aria-expanded="false"><span></span></button>
   </div>
@@ -146,17 +145,34 @@
     <p class="lead">
       2026年9月2日、姫路・土山にプレオープンいたします。<br>
       施設を見て、打って、少し話して。合いそうだと思っていただけたら、それがいちばんです。<br>
-      ご不明な点は公式LINEからお気軽にどうぞ。
+      体験レッスンは約55分。当日いただく費用はありません（通常3,300円が無料）。
     </p>
+    <div class="offer rv">
+      <span class="offer__badge">TRIAL</span>
+      <span class="offer__t">体験レッスン <b data-frank="trial.fee" data-frank-fallback="無料">無料</b></span>
+      <span class="offer__s"><del>通常 3,300円 税込</del> ／ <span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>・手ぶらでOK</span>
+    </div>
     <div class="cta__btns">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験のご予約</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談する</a>
     </div>
-    <p class="cta__note">体験内容・体験料は <span data-frank="price.trialFee">近日公開</span> ／ ご予約はプレオープン日に向けて順次受付いたします</p>
+    <p class="cta__note">受付 → カウンセリング → 打席のご案内 → 体験レッスン → ご入会のご案内（約55分）／ 強引な勧誘はいたしません</p>
   </div>
 </section>
 
 </main>
+
+<!-- 固定CTAバー（スマホ） -->
+<div class="sticky-cta" data-sticky-cta hidden>
+  <div class="sticky-cta__in">
+    <p class="sticky-cta__txt">
+      <span class="sticky-cta__main" data-sticky-main>体験レッスン 無料</span>
+      <span class="sticky-cta__sub" data-sticky-sub>通常 3,300円 税込 ／ 約55分</span>
+    </p>
+    <a class="btn btn--brass" href="#" data-cta="trial">体験を予約</a>
+    <a class="btn btn--line" href="#" data-cta="line" aria-label="公式LINEで相談">LINE</a>
+  </div>
+</div>
 
 <!-- 17. フッター -->
 <footer class="foot">

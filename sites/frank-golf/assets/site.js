@@ -96,11 +96,13 @@
         a.href = line;
         a.target = "_blank";
         a.rel = "noopener";
+        a.hidden = false;
       } else {
-        a.removeAttribute("href");
-        a.classList.add("is-disabled");
-        a.setAttribute("aria-disabled", "true");
-        a.textContent = "公式LINE（近日公開）";
+        // 公式LINE未開設のあいだは、押せないグレーのボタンを出さずに丸ごと隠す。
+        // CTAを「体験予約」1本に絞って迷いをなくすため（2026-07-27）。
+        a.hidden = true;
+        a.setAttribute("aria-hidden", "true");
+        a.tabIndex = -1;
       }
     });
 
@@ -191,7 +193,12 @@
     document.querySelectorAll("[data-img]").forEach(function (el) {
       var key = el.getAttribute("data-img");
       var url = imgs[key];
-      if (url) el.style.setProperty("--hero-img", 'url("' + url + '")');
+      if (!url) return;
+      // ★ CSS変数経由で url() を渡すと、相対パスが style.css(=assets/) 基準で
+      //    解決されて assets/assets/... になり画像が出ない（既存バグ・2026-07-27修正）。
+      //    インラインの background-image は文書基準で解決されるので、こちらで指定する。
+      el.style.setProperty("--hero-img", 'url("' + url + '")');
+      el.style.backgroundImage = 'url("' + url + '")';
     });
     document.querySelectorAll("img[data-img-src]").forEach(function (el) {
       var key = el.getAttribute("data-img-src");
@@ -318,6 +325,67 @@
     });
   }
 
+
+  /* ---------- 8) スマホ固定CTAバー ----------
+     ヒーローを少しスクロールしたら下から出す。
+     体験予約は最短1タップで届く位置に常時置く（体験導線の主動線）。 */
+  function stickyCta() {
+    var bar = document.querySelector("[data-sticky-cta]");
+    if (!bar) return;
+
+    // 中身の値（体験料・所要時間）を流し込む
+    var fee = pick("trial.fee");
+    var dur = pick("trial.duration");
+    var sub = bar.querySelector("[data-sticky-sub]");
+    if (sub) {
+      var parts = [];
+      if (pick("price.trialFee")) parts.push("通常 3,300円 税込");
+      if (dur) parts.push(dur);
+      sub.textContent = parts.join(" ／ ");
+    }
+    var main = bar.querySelector("[data-sticky-main]");
+    if (main && fee) main.textContent = "体験レッスン " + fee;
+
+    bar.hidden = false;
+
+    var show = false;
+    var onScroll = function () {
+      var y = window.pageYOffset || document.documentElement.scrollTop;
+      var next = y > 320;
+      if (next !== show) {
+        show = next;
+        bar.classList.toggle("is-on", show);
+        document.body.classList.toggle("has-sticky-cta", show);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+
+
+  /* ---------- 9) 体験当日の流れ（trial.steps） ---------- */
+  function trialSteps() {
+    var box = document.querySelector("[data-trial-steps]");
+    if (!box) return;
+    var items = pick("trial.steps") || [];
+    if (!items.length) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = items
+      .map(function (st, i) {
+        var no = "STEP " + ("0" + (i + 1)).slice(-2);
+        var min = st.m ? ' <span style="color:var(--dim);font-size:12px">（' + esc(st.m) + "）</span>" : "";
+        return (
+          '<div class="flow__i">' +
+          '<p class="flow__n">' + no + "</p>" +
+          "<div>" +
+          '<h3 class="flow__t">' + esc(st.t) + min + "</h3>" +
+          '<p class="flow__b">' + esc(st.b || "") + "</p>" +
+          "</div></div>"
+        );
+      })
+      .join("");
+  }
+
   function init() {
     fillValues();
     markSections();
@@ -328,6 +396,8 @@
     news();
     reveal();
     notice();
+    trialSteps();
+    stickyCta();
   }
 
   window.FRANK_RENDER = init;  /* CMS(cms.js)がマージ後に再描画するため公開 (#85) */

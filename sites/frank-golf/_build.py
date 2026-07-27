@@ -223,7 +223,7 @@ def head(title, desc, page, jsonld=""):
 <!-- 1. プレオープン告知バー -->
 <div class="notice-bar" role="status">
   <span class="notice-bar__tag">PRE-OPEN</span>
-  <span><b data-preopen>{PREOPEN}</b>、姫路・土山にプレオープン。体験のご予約を受付中です。</span>
+  <span><b data-preopen>{PREOPEN}</b> 姫路・土山にプレオープン。いま<b>体験レッスン無料</b>（通常3,300円）</span>
 </div>
 
 <!-- 2. ヘッダー -->
@@ -245,7 +245,7 @@ def head(title, desc, page, jsonld=""):
     </nav>
     <div class="nav__cta">
       <a class="nav__member" data-link="links.memberLogin">MEMBER LOGIN</a>
-      <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約</a>
+      <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約（無料）</a>
     </div>
     <button class="burger" aria-label="メニュー" aria-expanded="false"><span></span></button>
   </div>
@@ -267,15 +267,42 @@ def cta_block():
     <p class="lead">
       {PREOPEN}、姫路・土山にプレオープンいたします。<br>
       施設を見て、打って、少し話して。合いそうだと思っていただけたら、それがいちばんです。<br>
-      ご不明な点は公式LINEからお気軽にどうぞ。
+      体験レッスンは約55分。当日いただく費用はありません（通常3,300円が無料）。
     </p>
+    {offer_badge()}
     <div class="cta__btns">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験のご予約</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談する</a>
     </div>
-    <p class="cta__note">体験内容・体験料は <span data-frank="price.trialFee">近日公開</span> ／ ご予約はプレオープン日に向けて順次受付いたします</p>
+    <p class="cta__note">受付 → カウンセリング → 打席のご案内 → 体験レッスン → ご入会のご案内（約55分）／ 強引な勧誘はいたしません</p>
   </div>
 </section>
+"""
+
+
+def offer_badge():
+    """体験オファー（無料）の共通バッジ。値は site-data.js から流し込む。"""
+    return """<div class="offer rv">
+      <span class="offer__badge">TRIAL</span>
+      <span class="offer__t">体験レッスン <b data-frank="trial.fee" data-frank-fallback="無料">無料</b></span>
+      <span class="offer__s"><del>通常 3,300円 税込</del> ／ <span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>・手ぶらでOK</span>
+    </div>"""
+
+
+def sticky_cta():
+    """スマホ下部の固定CTAバー（体験導線の主動線・全ページ共通）"""
+    return """
+<!-- 固定CTAバー（スマホ） -->
+<div class="sticky-cta" data-sticky-cta hidden>
+  <div class="sticky-cta__in">
+    <p class="sticky-cta__txt">
+      <span class="sticky-cta__main" data-sticky-main>体験レッスン 無料</span>
+      <span class="sticky-cta__sub" data-sticky-sub>通常 3,300円 税込 ／ 約55分</span>
+    </p>
+    <a class="btn btn--brass" href="#" data-cta="trial">体験を予約</a>
+    <a class="btn btn--line" href="#" data-cta="line" aria-label="公式LINEで相談">LINE</a>
+  </div>
+</div>
 """
 
 
@@ -297,7 +324,7 @@ def foot():
 """
     return f"""
 </main>
-
+{sticky_cta()}
 <!-- 17. フッター -->
 <footer class="foot">
   <div class="wrap">
@@ -453,7 +480,14 @@ def build_index():
     b += f"""
 <!-- 3. メインビジュアル -->
 <section class="hero">
-  <div class="hero__bg" aria-hidden="true" data-img="hero" style="--hero-img:url(&quot;assets/img/hero.jpg&quot;)"></div>
+  <div class="hero__bg" aria-hidden="true">
+    <div class="hero__slides">
+      <div class="hero__slide" data-img="hero"  style="background-image:url(&quot;assets/img/hero-1.jpg&quot;)"></div>
+      <div class="hero__slide" data-img="hero2" style="background-image:url(&quot;assets/img/hero-2.jpg&quot;)"></div>
+      <div class="hero__slide" data-img="hero3" style="background-image:url(&quot;assets/img/hero-3.jpg&quot;)"></div>
+    </div>
+    <div class="hero__veil"></div>
+  </div>
   <div class="wrap hero__in">
     <p class="hero__tag"><span data-preopen>{PREOPEN}</span> PRE-OPEN ／ 姫路・土山</p>
     <h1 class="hero__copy">
@@ -464,9 +498,11 @@ def build_index():
       ただボールを打つだけではない。ゴルフが上手くなり、会話が生まれ、仲間ができる。<br>
       FRANK GOLFは、練習・レッスン・交流がひとつになった、大人のための会員制インドアゴルフラウンジです。
     </p>
+    <div style="margin-top:30px">{offer_badge()}</div>
     <div class="hero__cta">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験予約</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
+      <a class="btn btn--ghost" href="trial.html">体験の内容を見る</a>
     </div>
     <dl class="hero__meta">
       <div><dt>PRE-OPEN</dt><dd data-preopen>{PREOPEN}</dd></div>
@@ -487,7 +523,7 @@ def build_index():
            loading="lazy" width="1200" height="420">
     </a>
     <div class="cta__btns" style="justify-content:center;margin-top:20px">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験予約</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
     </div>
   </div>
@@ -1754,21 +1790,35 @@ def build_faq():
 
 
 def build_trial():
-    b = head("体験のご予約｜FRANK GOLF",
-             "FRANK GOLF の体験のご予約。2026年9月2日、姫路・土山にプレオープン。公式LINEからのご相談も承ります。",
+    b = head("体験レッスン無料｜体験のご予約｜FRANK GOLF",
+             "FRANK GOLF の体験レッスンは約55分・通常3,300円のところ無料。プロのマンツーマン指導つき。2026年9月2日、姫路・土山にプレオープン。",
              "trial")
     b += page_head("体験のご予約", "TRIAL", "まずは、一度打ちに来てください。",
-                   "合うかどうかは、来てみるのがいちばん早いと思います。")
+                   "体験レッスンは約55分。通常3,300円（税込）のところ、いまなら無料です。")
     b += f"""
 <section class="sec">
   <div class="wrap" style="max-width:820px">
     <div class="rv">
-      <p class="lead" style="max-width:none">
+      {offer_badge()}
+      <p class="lead" style="max-width:none;margin-top:26px">
         ホームページでどれだけ言葉を尽くしても、伝わらないものがあります。
         打席の広さ、ボールの音、ラウンジの照明の感じ、そこにいる人たちの空気。<br><br>
         {PREOPEN}、姫路・土山にプレオープンいたします。
         まずは一度、打ちに来てください。少し話して、合いそうだと思っていただけたら、それがいちばんです。
       </p>
+      <div class="cta__btns" style="justify-content:flex-start;margin-top:26px">
+        <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
+        <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
+      </div>
+    </div>
+
+    <!-- 体験当日の流れ（約55分） -->
+    <div class="rv" style="margin-top:64px">
+      <p class="eyebrow">Trial Program</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">体験当日の流れ</h2>
+      <p class="h-jp">受付から入会のご案内まで、<span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>。</p>
+      <div class="flow" style="margin-top:28px" data-trial-steps></div>
+      <p class="lead" style="font-size:13.5px;margin-top:16px" data-frank="trial.note" data-frank-hide></p>
     </div>
 
     <!-- ご予約の流れ -->
@@ -1778,12 +1828,11 @@ def build_trial():
     </div>
 
     <div class="rv" style="margin-top:28px">
-      <p class="card__t-jp" style="font-size:15px;color:var(--brass-2);margin-bottom:6px">はじめての方（体験）</p>
+      <p class="card__t-jp" style="font-size:15px;color:var(--brass-2);margin-bottom:6px">ご予約から体験までの3ステップ</p>
       <div class="flow">
-        <div class="flow__i"><p class="flow__n">STEP 01</p><div><h3 class="flow__t">体験を予約する</h3><p class="flow__b">下の「体験予約」または「公式LINEで相談」から。ご希望の日時をお知らせください。プレオープン日に向けて順次受付いたします。</p></div></div>
-        <div class="flow__i"><p class="flow__n">STEP 02</p><div><h3 class="flow__t">ご来店・受付</h3><p class="flow__b">姫路・土山の店舗へ。手ぶらでも大丈夫です（クラブレンタルの有無は近日公開）。</p></div></div>
-        <div class="flow__i"><p class="flow__n">STEP 03</p><div><h3 class="flow__t">体験＆プロのワンポイント</h3><p class="flow__b">実際に打って、シミュレーターのデータを見ながら、常駐プロが5〜10分のワンポイント。上達の手ごたえをその場で。</p></div></div>
-        <div class="flow__i"><p class="flow__n">STEP 04</p><div><h3 class="flow__t">フランクに入会のご案内</h3><p class="flow__b">強引な勧誘はしません。合いそうだと思っていただけたら、その場でご入会いただけます（持ち帰り検討も歓迎）。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 01</p><div><h3 class="flow__t">フォームで申し込む（1分）</h3><p class="flow__b">お名前・ご連絡先・ご希望日時（第1〜第3希望）だけ。会員登録は不要です。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 02</p><div><h3 class="flow__t">日程確定のご連絡</h3><p class="flow__b">担当より折り返しご連絡し、日時を確定します（プレオープン日に向けて順次対応）。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 03</p><div><h3 class="flow__t">当日、手ぶらでご来店</h3><p class="flow__b">当日いただく費用はありません。体験レッスンは<span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>です。</p></div></div>
       </div>
     </div>
 
@@ -1809,26 +1858,28 @@ def build_trial():
         <p class="card__no">01</p>
         <h3 class="card__t">BOOK</h3>
         <p class="card__t-jp">体験を申し込む</p>
-        <p class="card__b" style="margin:12px 0 26px;flex:1">フォームからご希望日時をお送りください。当日は打席での練習＋常駐プロのワンポイント（5〜10分）をご体験いただけます。</p>
+        <p class="card__b" style="margin:12px 0 26px;flex:1">フォームからご希望日時をお送りください。当日は約55分。カウンセリング → 打席のご案内 → プロのマンツーマン体験レッスンまで、無料でご体験いただけます。</p>
         <a class="btn btn--brass" href="#" data-cta="trial">体験を申し込む</a>
       </article>
       <article class="card" style="padding:38px 34px;display:flex;flex-direction:column">
         <p class="card__no">02</p>
         <h3 class="card__t">ASK</h3>
         <p class="card__t-jp">迷ったら、まず相談でも</p>
-        <p class="card__b" style="margin:12px 0 26px;flex:1">料金は？　初心者でも大丈夫？　見学だけでも？　なんでもお気軽に。公式LINEでお答えします。</p>
-        <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
+        <p class="card__b" style="margin:12px 0 26px;flex:1">料金は？　初心者でも大丈夫？　見学だけでも？　よくあるご質問にまとめています。公式LINEでもお答えします。</p>
+        <div class="cta__btns" style="justify-content:flex-start;margin:0;gap:10px">
+          <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
+          <a class="btn btn--ghost" href="faq.html">よくあるご質問</a>
+        </div>
       </article>
     </div>
 
     <div class="spec rv" style="margin-top:44px">
       <div class="spec__row"><p class="spec__k">体験利用料</p><p class="spec__v" data-frank="price.trialFee">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">体験の内容</p><p class="spec__v" data-frank="trial.content" data-frank-fallback="打席での練習＋常駐プロのワンポイント（5〜10分）">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
-    </div>
-
-    <div class="spec rv" style="margin-top:48px">
       <div class="spec__row"><p class="spec__k">所要時間</p><p class="spec__v" data-frank="trial.duration">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">体験の内容</p><p class="spec__v" data-frank="trial.content" data-frank-fallback="打席での練習＋プロのマンツーマン指導">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">担当</p><p class="spec__v" data-frank="lesson.coaches">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v" data-frank="store.address">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
     </div>
 

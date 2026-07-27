@@ -19,7 +19,7 @@
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://frankgolf.jp/assets/ogp.png">
-<meta name="theme-color" content="#FFFDF8">
+<meta name="theme-color" content="#101210">
 <link rel="canonical" href="https://frankgolf.jp/index.html">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/favicon-32.png" sizes="32x32">
@@ -28,9 +28,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
-<link rel="preload" as="image" href="assets/img/hero-1.jpg" fetchpriority="high">
 <script src="assets/site-data.js"></script>
-<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/index.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"GolfCourse","additionalType":"SportsActivityLocation","name":"FRANK GOLF","alternateName":["フランクゴルフ","FRANK GOLF 姫路"],"description":"姫路・土山の会員制インドアゴルフラウンジ。練習打席・プロによるレッスン・シミュレーターでのデータ分析・バーラウンジでの交流がひとつになった大人のためのゴルフ基地。2026年9月2日プレオープン。","slogan":"打って、教わって、語れる。姫路・土山のフランクなゴルフ基地。","knowsAbout":["インドアゴルフ","ゴルフレッスン","ゴルフシミュレーター","スイング分析","ゴルフバー"],"address":{"@type":"PostalAddress","streetAddress":"土山6-6-1","addressRegion":"兵庫県","addressLocality":"姫路市","addressCountry":"JP"},"employee":{"@type":"Person","name":"藤田 晃規","jobTitle":"ゴルフコーチ / ツアープロ","sameAs":"https://www.jgto.org/player/15674/profile"},"areaServed":[{"@type":"City","name":"姫路市"},{"@type":"City","name":"たつの市"},{"@type":"City","name":"太子町"},{"@type":"City","name":"揖保郡"},{"@type":"City","name":"高砂市"},{"@type":"City","name":"加古川市"}],"parentOrganization":{"@type":"Organization","name":"株式会社YOZAN"},"openingHoursSpecification":[{"@type":"OpeningHoursSpecification","dayOfWeek":["Monday","Wednesday","Thursday","Friday"],"opens":"11:00","closes":"22:00"},{"@type":"OpeningHoursSpecification","dayOfWeek":["Saturday","Sunday"],"opens":"09:00","closes":"20:00"}],"priceRange":"¥¥","amenityFeature":[{"@type":"LocationFeatureSpecification","name":"駐車場20台（無料）","value":true},{"@type":"LocationFeatureSpecification","name":"バーカウンター併設","value":true},{"@type":"LocationFeatureSpecification","name":"ゴルフシミュレーター（全4打席）","value":true},{"@type":"LocationFeatureSpecification","name":"レフティ左右打席対応","value":true}],"url":"https://frankgolf.jp","image":"https://frankgolf.jp/assets/ogp.png"}</script>
 </head>
@@ -41,7 +39,7 @@
 <!-- 1. プレオープン告知バー -->
 <div class="notice-bar" role="status">
   <span class="notice-bar__tag">PRE-OPEN</span>
-  <span><b data-preopen>2026年9月2日</b>、姫路・土山にプレオープン。体験のご予約を受付中です。</span>
+  <span><b data-preopen>2026年9月2日</b> 姫路・土山にプレオープン。いま<b>体験レッスン無料</b>（通常3,300円）</span>
 </div>
 
 <!-- 2. ヘッダー -->
@@ -68,7 +66,7 @@
     </nav>
     <div class="nav__cta">
       <a class="nav__member" data-link="links.memberLogin">MEMBER LOGIN</a>
-      <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約</a>
+      <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約（無料）</a>
     </div>
     <button class="burger" aria-label="メニュー" aria-expanded="false"><span></span></button>
   </div>
@@ -80,25 +78,31 @@
 <section class="hero">
   <div class="hero__bg" aria-hidden="true">
     <div class="hero__slides">
-      <div class="hero__slide" data-img="hero"  style="--hero-img:url(&quot;assets/img/hero-1.jpg&quot;)"></div>
-      <div class="hero__slide" data-img="hero2" style="--hero-img:url(&quot;assets/img/hero-2.jpg&quot;)"></div>
-      <div class="hero__slide" data-img="hero3" style="--hero-img:url(&quot;assets/img/hero-3.jpg&quot;)"></div>
+      <div class="hero__slide" data-img="hero"  style="background-image:url(&quot;assets/img/hero-1.jpg&quot;)"></div>
+      <div class="hero__slide" data-img="hero2" style="background-image:url(&quot;assets/img/hero-2.jpg&quot;)"></div>
+      <div class="hero__slide" data-img="hero3" style="background-image:url(&quot;assets/img/hero-3.jpg&quot;)"></div>
     </div>
     <div class="hero__veil"></div>
   </div>
   <div class="wrap hero__in">
-    <img class="logo-img rv" src="assets/img/logo-t.png" alt="FRANK GOLF HIMEJI ロゴ" width="800" height="716" style="margin-bottom:26px">
     <p class="hero__tag"><span data-preopen>2026年9月2日</span> PRE-OPEN ／ 姫路・土山</p>
     <h1 class="hero__copy">
       <span class="l1">打って、教わって、語れる。</span>
       <span class="l2">姫路・土山のフランクなゴルフ基地。</span>
     </h1>
     <p class="hero__sub">
-      練習・レッスン・交流がひとつになった、大人のための会員制インドアゴルフラウンジ。
+      ただボールを打つだけではない。ゴルフが上手くなり、会話が生まれ、仲間ができる。<br>
+      FRANK GOLFは、練習・レッスン・交流がひとつになった、大人のための会員制インドアゴルフラウンジです。
     </p>
+    <div style="margin-top:30px"><div class="offer rv">
+      <span class="offer__badge">TRIAL</span>
+      <span class="offer__t">体験レッスン <b data-frank="trial.fee" data-frank-fallback="無料">無料</b></span>
+      <span class="offer__s"><del>通常 3,300円 税込</del> ／ <span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>・手ぶらでOK</span>
+    </div></div>
     <div class="hero__cta">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験予約</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
+      <a class="btn btn--ghost" href="trial.html">体験の内容を見る</a>
     </div>
     <dl class="hero__meta">
       <div><dt>PRE-OPEN</dt><dd data-preopen>2026年9月2日</dd></div>
@@ -119,7 +123,7 @@
            loading="lazy" width="1200" height="420">
     </a>
     <div class="cta__btns" style="justify-content:center;margin-top:20px">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験予約</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
     </div>
   </div>
@@ -140,31 +144,16 @@
         ゴルフが面白くなるのは、たぶん、そこからです。
       </p>
       <p class="lead" style="max-width:64ch">
-        練習打席・プロのレッスン・データ分析・バーラウンジ。上達と、人とのつながり。
+        FRANK GOLFは、練習打席・プロによるレッスン・データ分析・バーラウンジでの交流を、
+        ひとつの空間で提供する会員制インドアゴルフラウンジです。<br><br>
+        打席で黙々とスイングを固める時間も、ラウンジでその日の一球について語り合う時間も、
+        どちらもゴルフの一部だと考えています。上達と、その先にある人とのつながり。
         その両方が自然に生まれる場所を、姫路・土山につくります。
       </p>
       <div style="margin-top:34px">
         <a class="btn btn--ghost" href="concept.html">コンセプトを詳しく見る</a>
       </div>
     </div>
-  </div>
-</section>
-
-<section class="sec" id="gallery">
-  <div class="wrap">
-    <div class="center rv">
-      <p class="eyebrow">Gallery</p>
-      <h2 class="h-en">THE SPACE</h2>
-      <p class="h-jp">洗練された、大人のための空間</p>
-    </div>
-    <div class="rv" style="margin-top:40px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
-      <figure style="margin:0;grid-column:span 2;min-width:280px"><img src="assets/img/hero.jpg" alt="FRANK GOLF 店内ラウンジ" loading="lazy" style="width:100%;height:340px;object-fit:cover;border-radius:14px"></figure>
-      <figure style="margin:0"><img src="assets/img/play.jpg" alt="シミュレーションゴルフルーム" loading="lazy" style="width:100%;height:340px;object-fit:cover;border-radius:14px"></figure>
-      <figure style="margin:0"><img src="assets/img/lounge.jpg" alt="バーラウンジ" loading="lazy" style="width:100%;height:260px;object-fit:cover;border-radius:14px"></figure>
-      <figure style="margin:0"><img src="assets/img/lesson.jpg" alt="レッスン風景" loading="lazy" style="width:100%;height:260px;object-fit:cover;border-radius:14px"></figure>
-      <figure style="margin:0"><img src="assets/img/community.jpg" alt="パーティースペース" loading="lazy" style="width:100%;height:260px;object-fit:cover;border-radius:14px"></figure>
-    </div>
-    <p class="center rv" style="margin-top:18px"><a class="btn" href="booking.html">会員の方の打席予約</a>　<a class="btn btn--ghost" href="facility.html">施設の詳細を見る</a></p>
   </div>
 </section>
 
@@ -177,39 +166,44 @@
       <p class="h-jp">3つの体験が、ひとつの空間で完結する。</p>
     </div>
     <div class="grid grid--3" style="margin-top:56px">
-      <article class="card xp rv" style="padding:0;overflow:hidden">
-        <img src="assets/img/play.jpg" alt="TrackMan 4を備えたFRANK GOLFのシミュレーションゴルフ打席（姫路・土山）" loading="lazy" style="width:100%;aspect-ratio:16/10;object-fit:cover">
-        <div style="padding:24px 26px 30px">
+      <article class="card xp rv">
         <p class="card__no">01</p>
         <h3 class="card__t">PLAY</h3>
         <p class="card__t-jp">打つ</p>
-        <p class="card__b">完全予約制・待ち時間ゼロ。落ち着いた環境で、自分の一球に向き合えます。</p>
-        </div>
+        <p class="card__b">
+          完全予約制の打席で、待ち時間なく練習に入れます。スマート入退室により、
+          思い立ったその時間に。落ち着いた少人数制の環境で、
+          自分の一球にじっくり向き合えます。
+        </p>
       </article>
-      <article class="card xp rv" style="padding:0;overflow:hidden">
-        <img src="assets/img/lesson.jpg" alt="プロコーチによるゴルフレッスン風景（FRANK GOLF 姫路）" loading="lazy" style="width:100%;aspect-ratio:16/10;object-fit:cover">
-        <div style="padding:24px 26px 30px">
+      <article class="card xp rv">
         <p class="card__no">02</p>
         <h3 class="card__t">LEARN</h3>
         <p class="card__t-jp">教わる</p>
-        <p class="card__b">プロのレッスン×弾道データ。感覚ではなく数字で上達します。</p>
-        </div>
+        <p class="card__b">
+          プロによるレッスンと、シミュレーターの弾道・スイングデータ。
+          感覚だけに頼らず、数字で自分のスイングを知る。
+          「なんとなく良くなった」で終わらせません。
+        </p>
       </article>
-      <article class="card xp rv" style="padding:0;overflow:hidden">
-        <img src="assets/img/lounge.jpg" alt="バーカウンターのあるFRANK GOLFのラウンジ空間（会員制インドアゴルフ 姫路・土山）" loading="lazy" style="width:100%;aspect-ratio:16/10;object-fit:cover">
-        <div style="padding:24px 26px 30px">
+      <article class="card xp rv">
         <p class="card__no">03</p>
         <h3 class="card__t">CONNECT</h3>
         <p class="card__t-jp">語る</p>
-        <p class="card__b">打ち終わったらラウンジへ。仲間が自然にできる場所です。</p>
-        </div>
+        <p class="card__b">
+          打ち終わったら、そのままラウンジへ。同じ日に同じ場所で打った人と、
+          自然に会話が生まれます。コンペやラウンドイベントを通じて、
+          一緒に回る仲間が見つかる。
+        </p>
       </article>
     </div>
 
     <div class="note-solo rv">
       <p class="note-solo__t">もちろん、一人で集中したい日も歓迎です。</p>
       <p class="note-solo__b">
-        交流は強制しません。黙々と打って帰る日も歓迎。ラウンジに寄るかは、あなたのペースで。
+        交流を目的にした施設ではありますが、交流を強制する施設ではありません。
+        黙々と打ち込みたい日は、そのまま打って帰っていただいて構いません。
+        ラウンジに寄るかどうかは、いつでもあなたのペースで決められます。
       </p>
     </div>
   </div>
@@ -225,8 +219,12 @@
         <p class="h-jp">FRANKに込めた意味。</p>
         <p class="lead">
           frank ── 率直な。飾らない。気取らない。<br><br>
-          スコアを盛らない。初心者だからと気後れしない。
-          率直に教わり、率直に語れる。それがこの場所で守りたい唯一のルールです。
+          スコアを盛らない。知ったかぶりをしない。初心者だからと気後れしない。
+          うまい人が偉いわけでもない。<br><br>
+          「フランクに話せる」の、あのフランクです。
+          ゴルフはときに堅苦しくなりがちですが、ここではその鎧を置いていってください。
+          率直に教わり、率直に語れる。それがFRANK GOLFの名前の由来であり、
+          この場所で守りたい唯一のルールです。
         </p>
       </div>
       <div class="rv">
@@ -595,8 +593,6 @@
   </div>
 </section>
 
-<!-- 14b. ギャラリー（#85: 実写に差し替わる。assets/img/*.jpg を上書きするだけ） -->
-
 <!-- 15b. お知らせ（site-data.js の news が0件なら自動で非表示） -->
 <section class="sec sec--alt" id="news" data-news-section hidden>
   <div class="wrap" style="max-width:880px">
@@ -657,17 +653,34 @@
     <p class="lead">
       2026年9月2日、姫路・土山にプレオープンいたします。<br>
       施設を見て、打って、少し話して。合いそうだと思っていただけたら、それがいちばんです。<br>
-      ご不明な点は公式LINEからお気軽にどうぞ。
+      体験レッスンは約55分。当日いただく費用はありません（通常3,300円が無料）。
     </p>
+    <div class="offer rv">
+      <span class="offer__badge">TRIAL</span>
+      <span class="offer__t">体験レッスン <b data-frank="trial.fee" data-frank-fallback="無料">無料</b></span>
+      <span class="offer__s"><del>通常 3,300円 税込</del> ／ <span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>・手ぶらでOK</span>
+    </div>
     <div class="cta__btns">
-      <a class="btn btn--brass" href="#" data-cta="trial">体験のご予約</a>
+      <a class="btn btn--brass" href="#" data-cta="trial">体験を予約する（無料）</a>
       <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談する</a>
     </div>
-    <p class="cta__note">体験内容・体験料は <span data-frank="price.trialFee">近日公開</span> ／ ご予約はプレオープン日に向けて順次受付いたします</p>
+    <p class="cta__note">受付 → カウンセリング → 打席のご案内 → 体験レッスン → ご入会のご案内（約55分）／ 強引な勧誘はいたしません</p>
   </div>
 </section>
 
 </main>
+
+<!-- 固定CTAバー（スマホ） -->
+<div class="sticky-cta" data-sticky-cta hidden>
+  <div class="sticky-cta__in">
+    <p class="sticky-cta__txt">
+      <span class="sticky-cta__main" data-sticky-main>体験レッスン 無料</span>
+      <span class="sticky-cta__sub" data-sticky-sub>通常 3,300円 税込 ／ 約55分</span>
+    </p>
+    <a class="btn btn--brass" href="#" data-cta="trial">体験を予約</a>
+    <a class="btn btn--line" href="#" data-cta="line" aria-label="公式LINEで相談">LINE</a>
+  </div>
+</div>
 
 <!-- 17. フッター -->
 <footer class="foot">
