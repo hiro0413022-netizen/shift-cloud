@@ -56,12 +56,13 @@ export function StaffForm({ stores, roles, edit }: { stores: Store[]; roles: Rol
           <Input name="name_kana" defaultValue={edit?.name_kana ?? ""} />
         </div>
         <div>
-          <Label>メールアドレス</Label>
-          <Input name="email" type="email" defaultValue={edit?.email ?? ""} placeholder="メールなしの場合はログインIDを設定" />
+          <Label>メールアドレス（連絡先）</Label>
+          <Input name="email" type="email" defaultValue={edit?.email ?? ""} placeholder="連絡用。ログインIDが空のときはこれでログイン" />
         </div>
         <div>
-          <Label>ログインID（メールなしスタッフ用）</Label>
-          <Input name="login_id" defaultValue={edit?.login_id ?? ""} />
+          <Label>ログインID</Label>
+          <Input name="login_id" defaultValue={edit?.login_id ?? ""} placeholder="例: fujita（半角英数）" />
+          <p className="mt-1 text-[11px] text-zinc-400">ここに入れたIDが実際のログインIDになります（空ならメールアドレスでログイン）。変更すると次回から新しいIDでログインします。</p>
         </div>
         <div>
           <Label>{edit ? "パスワード再設定（変更時のみ）" : "初期パスワード *（8文字以上）"}</Label>

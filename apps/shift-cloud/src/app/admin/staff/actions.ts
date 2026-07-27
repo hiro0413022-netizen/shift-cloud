@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireActor, loginIdToEmail } from "@/lib/auth";
+import { requireActor, authEmailFor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 
@@ -51,7 +51,8 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
   if (!staffId) {
     // 新規: Authユーザー作成
     if (!d.password || d.password.length < 8) return { error: "初期パスワード（8文字以上）が必要です" };
-    const authEmail = d.email || loginIdToEmail(d.login_id!);
+    // ログインIDが入っていればそれを認証IDに（lib/auth authEmailFor が正典・ログイン画面と同じルール）
+    const authEmail = authEmailFor(d.email, d.login_id)!;
     const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
       email: authEmail,
       password: d.password,
@@ -91,8 +92,24 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
       .eq("id", staffId)
       .eq("company_id", actor.companyId);
     if (error) return { error: error.message };
-    if (d.password && d.password.length >= 8 && before?.auth_user_id) {
-      await admin.auth.admin.updateUserById(before.auth_user_id, { password: d.password });
+
+    // 認証ID（Auth側のemail）を staff の設定に合わせて同期する。
+    // これが無いと「管理画面でログインIDを変えたのに、そのIDでは入れない」事故になる（2026-07-27）
+    if (before?.auth_user_id) {
+      const wanted = authEmailFor(d.email, d.login_id);
+      const { data: authNow } = await admin.auth.admin.getUserById(before.auth_user_id);
+      const current = authNow?.user?.email?.toLowerCase() ?? null;
+      if (wanted && current !== wanted) {
+        const { error: mailErr } = await admin.auth.admin.updateUserById(before.auth_user_id, {
+          email: wanted,
+          email_confirm: true, // 内部IDなので確認メールは送らない
+        });
+        if (mailErr) return { error: `ログインIDの変更に失敗しました: ${mailErr.message}` };
+      }
+      if (d.password && d.password.length >= 8) {
+        const { error: pwErr } = await admin.auth.admin.updateUserById(before.auth_user_id, { password: d.password });
+        if (pwErr) return { error: `パスワードの変更に失敗しました: ${pwErr.message}` };
+      }
     }
     await logAudit(actor, "staff.update", "staff", staffId, before, d);
   }

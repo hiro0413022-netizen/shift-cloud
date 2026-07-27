@@ -34,6 +34,19 @@ export function loginIdToEmail(loginId: string) {
   return `${loginId.toLowerCase()}@staff.yozan.internal`;
 }
 
+/**
+ * 認証に使うメール（Auth側のemail）を決める正典。
+ * ログイン画面 login/actions.ts と同じルール:
+ *   ログインIDが入っていればそれ（@付きならそのままメール扱い）、無ければメールアドレス。
+ * ※ここが staff テーブルと auth.users でズレると「設定したIDで入れない」事故になる。
+ */
+export function authEmailFor(email?: string | null, loginId?: string | null): string | null {
+  const id = (loginId ?? "").trim();
+  if (id) return id.includes("@") ? id.toLowerCase() : loginIdToEmail(id);
+  const e = (email ?? "").trim();
+  return e ? e.toLowerCase() : null;
+}
+
 export async function getActor(): Promise<Actor | null> {
   const supabase = await createClient();
   const {

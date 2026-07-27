@@ -73,7 +73,9 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
               <tr key={s.id} className="hover:bg-zinc-50">
                 <Td className="font-medium">
                   {s.name}
-                  <span className="ml-2 text-xs text-zinc-400">{s.email ?? s.login_id}</span>
+                  {/* 実際にログインに使うID（ログインID優先）。メールは連絡先なので後ろに小さく */}
+                  <span className="ml-2 text-xs text-zinc-500">ID: {s.login_id || s.email || "—"}</span>
+                  {s.login_id && s.email && <span className="ml-1 text-[10px] text-zinc-300">{s.email}</span>}
                 </Td>
                 <Td>{primary?.stores?.name ?? "—"}</Td>
                 <Td>{EMP_LABEL[s.employment_type]}</Td>
