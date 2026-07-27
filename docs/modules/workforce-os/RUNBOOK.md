@@ -73,3 +73,30 @@ URL: https://shift-cloud-shift-cloud.vercel.app （スマホのホーム画面�
 | 時給が月の途中で変わった | 何もしなくてOK。**変更日から自動で新時給**で計算されます（変更前の日は旧時給のまま） |
 | 「やること」が急に消えた | 店舗共通タスクを他の人が完了した可能性。カレンダー or 店長に確認 |
 | 「聞く」で給与のことを聞いても答えが出ない | 仕様です。スタッフからは給与・経理・契約は見えません（本部のみ） |
+| 全体のシフトが見えない（自分のは見える） | カレンダーで日付をタップ→「この日の出勤（店舗全体）」。月まとめは右上「全員のシフト」（fa48be5） |
+| 未確定のシフトは出ません | スタッフ画面は**確定（published）分のみ**。責任者が「期間内ドラフトを確定・通知」を押すまで空欄です |
+
+### 管理者向け: ログイン周りのトラブル（2026-07-27）
+
+| 症状 | 原因と対処 |
+|------|-----------|
+| スタッフ編集で「ログインIDの変更に失敗しました」 | Auth側のユーザー行が壊れている。**SQLで auth.users に直接INSERTしたユーザーはトークン列がNULLになり、認証APIが500**（`converting NULL to string is unsupported`）。下記SQLで復旧 |
+| 設定したログインIDで入れない | 認証IDの正典は `auth.users.email`。`staff.login_id` だけ変えても入れない（d2dcff0で同期するよう修正済）。照合は `select s.name, s.login_id, u.email from staff s join auth.users u on u.id=s.auth_user_id` |
+
+```sql
+-- NULLトークン列の復旧（GoTrueは空文字を期待する）
+update auth.users set
+  confirmation_token = coalesce(confirmation_token,''),
+  recovery_token = coalesce(recovery_token,''),
+  email_change_token_new = coalesce(email_change_token_new,''),
+  email_change_token_current = coalesce(email_change_token_current,''),
+  email_change = coalesce(email_change,''),
+  phone_change = coalesce(phone_change,''),
+  phone_change_token = coalesce(phone_change_token,''),
+  reauthentication_token = coalesce(reauthentication_token,'')
+where confirmation_token is null or recovery_token is null or email_change_token_new is null
+   or email_change_token_current is null or email_change is null or phone_change is null
+   or phone_change_token is null or reauthentication_token is null;
+```
+
+**再発防止ルール: スタッフの認証ユーザーをSQLで作らない。** 必ず管理画面（`admin.auth.admin.createUser`）で作成する。移行でどうしてもSQLを使う場合は上記の列を `''` で埋める。
