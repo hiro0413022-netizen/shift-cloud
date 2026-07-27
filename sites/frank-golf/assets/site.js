@@ -143,17 +143,20 @@
 
     // 地図
     var embed = pick("store.mapEmbed");
-    var frame = document.querySelector("[data-map]");
-    if (frame && embed) {
-      var f = document.createElement("iframe");
-      f.src = embed;
-      f.loading = "lazy";
-      f.title = "FRANK GOLF アクセスマップ";
-      f.style.cssText =
-        "width:100%;height:100%;border:0;filter:grayscale(.5) contrast(1.1) brightness(.85);";
-      f.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
-      frame.innerHTML = "";
-      frame.appendChild(f);
+    if (embed) {
+      // ページ内に複数あっても全部に入れる（querySelector だと1つ目だけになる）
+      document.querySelectorAll("[data-map]").forEach(function (frame) {
+        var f = document.createElement("iframe");
+        f.src = embed;
+        f.loading = "lazy";
+        f.title = "FRANK GOLF アクセスマップ";
+        f.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
+        f.setAttribute("allowfullscreen", "");
+        frame.innerHTML = "";
+        frame.appendChild(f);
+        // プレースホルダ用の中央寄せを解除する（残すと iframe の高さが潰れる）
+        frame.classList.add("is-live");
+      });
     }
   }
 

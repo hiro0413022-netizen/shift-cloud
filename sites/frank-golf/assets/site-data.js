@@ -29,7 +29,8 @@ window.FRANK = {
     postal: null,                  // 例: "〒670-0000"（番地まで確定したら記入）
     address: "兵庫県姫路市土山6-6-1",  // ★確定
     mapUrl: "https://www.google.com/maps/search/?api=1&query=%E5%85%B5%E5%BA%AB%E7%9C%8C%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1",  // ★Googleマップ
-    mapEmbed: "https://maps.google.com/maps?q=%E5%85%B5%E5%BA%AB%E7%9C%8C%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1&z=16&output=embed",  // ★埋め込み地図
+    // ★埋め込み地図。hl=ja を付けないと地名がローマ字（Tsuchiyama / 6 CHOME）で出る
+    mapEmbed: "https://maps.google.com/maps?q=%E5%85%B5%E5%BA%AB%E7%9C%8C%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1&hl=ja&z=16&output=embed",
     tel: null,                     // 例: "079-000-0000"（確定後）
     email: null,
     hours: "平日 11:00〜22:00 ／ 土日祝 9:00〜20:00",  // ★確定

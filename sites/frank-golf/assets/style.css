@@ -1052,3 +1052,39 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
   .tb__dates { gap: 8px; }
   .tb__date { width: 58px; }
 }
+
+/* ============================ 地図 ============================
+   iframe は position:absolute で枠いっぱいに。
+   （親を flex + align-items:center にしたまま height:100% の iframe を入れると
+     高さが解決できず潰れ、上下に白い帯が出る） */
+.map-frame {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  min-height: 340px;
+  /* 地図が入るまではプレースホルダを中央に置く */
+  display: flex; align-items: center; justify-content: center;
+}
+.map-frame--tall { min-height: 420px; }
+.map-frame.is-live { display: block; }
+.map-frame iframe {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  border: 0; display: block;
+  /* 白ベースの紙面に合わせて軽く彩度を落とすだけ（暗くしない） */
+  filter: grayscale(.22) contrast(1.03);
+}
+.map-frame__tbd { padding: 30px; text-align: center; }
+.map-frame__tbd span { font-size: 12px; opacity: .7; }
+
+.map-note {
+  margin-top: 14px;
+  display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline;
+  font-size: 13px; color: var(--dim);
+}
+.map-note a { color: var(--brass-2); text-decoration: underline; }
+
+@media (max-width: 860px) {
+  .map-frame { min-height: 280px; }
+  .map-frame--tall { min-height: 320px; }
+}

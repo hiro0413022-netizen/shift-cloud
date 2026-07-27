@@ -941,9 +941,10 @@ def build_index():
         </div>
       </div>
       <div class="rv">
-        <div class="card" data-map style="padding:0;min-height:360px;display:flex;align-items:center;justify-content:center">
-          <p class="tbd" style="padding:30px;text-align:center">地図は近日公開いたします<br><span style="font-size:12px;opacity:.7">2026年9月2日プレオープン／姫路・土山</span></p>
+        <div class="card map-frame" data-map>
+          <p class="tbd map-frame__tbd">地図は近日公開いたします<br><span>2026年9月2日プレオープン／姫路・土山</span></p>
         </div>
+        <p class="map-note"><a data-link="store.mapUrl" target="_blank" rel="noopener">Googleマップで開く ↗</a></p>
       </div>
     </div>
     <p style="margin-top:30px" class="rv"><a class="btn btn--ghost" href="access.html">アクセスの詳細</a></p>
@@ -1734,11 +1735,12 @@ def build_access():
         </div>
       </div>
       <div class="rv">
-        <div class="card" data-map style="padding:0;min-height:420px;display:flex;align-items:center;justify-content:center">
-          <p class="tbd" style="padding:30px;text-align:center">地図は近日公開いたします<br><span style="font-size:12px;opacity:.7">2026年9月2日プレオープン／姫路・土山</span></p>
+        <div class="card map-frame map-frame--tall" data-map>
+          <p class="tbd map-frame__tbd">地図は近日公開いたします<br><span>2026年9月2日プレオープン／姫路・土山</span></p>
         </div>
-        <p class="lead" style="margin-top:18px;font-size:13px">
-          正確な所在地・アクセス方法が決まり次第、こちらに掲載いたします。公式LINEでもお知らせいたします。
+        <p class="map-note">
+          <a data-link="store.mapUrl" target="_blank" rel="noopener">Googleマップで開く ↗</a>
+          <span data-frank="store.address">近日公開</span>
         </p>
       </div>
     </div>
