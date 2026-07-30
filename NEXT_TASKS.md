@@ -182,7 +182,8 @@ C-9. **Shift Cloud 実運用フィードバック**の収集と改善バック�
                                                                                        
 ## Inventory OS（在庫・棚卸 / #96）
 
-- [ ] **IV-1 Vercelデプロイ** — 新プロジェクト root=`apps/inventory-os`（手順は docs/genesis/OPERATIONS.md §デプロイ）。env は `.env.example` 参照。`INVENTORY_API_TOKEN` を発行して Vault に登録
+- [x] **IV-1 Vercelデプロイ**（2026-07-30）— https://inventory-os-seven.vercel.app / Root Directory `apps/inventory-os` / `INVENTORY_API_TOKEN` は Vault に発行済み
+- [ ] **IV-1b env の残り2つ** — Vercel `inventory-os` → Settings → Environment Variables に `NEXT_PUBLIC_SUPABASE_ANON_KEY` と `SUPABASE_SERVICE_ROLE_KEY`（Sensitive）を追加して Redeploy。`NEXT_PUBLIC_SUPABASE_URL` は設定済み
 - [ ] **IV-2 適正在庫の初期設定** — `reorder_point` が全品番 null なので発注候補が出ない。グリップ・グローブ・ボールなど回転の速いものから設定する
 - [ ] **IV-3 保管場所の穴埋め** — 95件（26%）が未設定。埋めると棚卸が「歩く順」に並ぶ
 - [ ] **IV-4 廃番の整理** — 在庫ゼロが続く58品番を `discontinued` に落として棚卸対象から外す

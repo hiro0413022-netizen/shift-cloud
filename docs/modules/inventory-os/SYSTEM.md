@@ -79,6 +79,8 @@ DB関数 `inv_next_code` / `inv_close_count` は service_role に EXECUTE を付
 
 ## 4. 画面（apps/inventory-os・port 3012）
 
+本番: https://inventory-os-seven.vercel.app （Vercelプロジェクト `inventory-os` / Root Directory `apps/inventory-os`）
+
 | パス | 内容 | 権限 |
 |---|---|---|
 | `/` | 在庫状況。品番数・点数・在庫金額・発注候補・保管場所別・在庫ゼロ品番 | 全員 |
@@ -220,5 +222,5 @@ migration 0006 で `inventory_ai`（在庫監視・発注提案 / medium権限 /
 3. report-os の物販セクション（在庫回転日数・死蔵在庫）
 4. `inventory_ai` の配線（適正在庫割れ → 発注候補 → `ai_suggestions`）
 5. shift-cloud `/store` からの棚卸導線
-6. Vercel へのデプロイ（新プロジェクト root=`apps/inventory-os`）＋ `INVENTORY_API_TOKEN` の設定
+6. ~~Vercel へのデプロイ~~（2026-07-30 完了）。`INVENTORY_API_TOKEN` は Vault に発行済み、golfwing連携を有効化するときに Vercel env へ設定する
 7. 適正在庫（`reorder_point`）の初期設定 — 現在は全品番 null なので発注候補が出ない
