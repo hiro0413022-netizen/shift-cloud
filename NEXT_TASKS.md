@@ -180,3 +180,15 @@ C-9. **Shift Cloud 実運用フィードバック**の収集と改善バック�
 - ✅ 基盤アップグレード（2026-07-11）: packages/core移行・RUNBOOK・時給の月中変更（日付按分 #39）・KPIチェッカー・CI
 - ✅ Legal OS 本番稼働 + legal_ai 日次チェック（#40）／Money OS `mon_receipts` フェーズ1＋OCR（#41,#42）／Caddy OS（#46）／社内連絡 /notes（0040）
                                                                                        
+## Inventory OS（在庫・棚卸 / #96）
+
+- [ ] **IV-1 Vercelデプロイ** — 新プロジェクト root=`apps/inventory-os`（手順は docs/genesis/OPERATIONS.md §デプロイ）。env は `.env.example` 参照。`INVENTORY_API_TOKEN` を発行して Vault に登録
+- [ ] **IV-2 適正在庫の初期設定** — `reorder_point` が全品番 null なので発注候補が出ない。グリップ・グローブ・ボールなど回転の速いものから設定する
+- [ ] **IV-3 保管場所の穴埋め** — 95件（26%）が未設定。埋めると棚卸が「歩く順」に並ぶ
+- [ ] **IV-4 廃番の整理** — 在庫ゼロが続く58品番を `discontinued` に落として棚卸対象から外す
+- [ ] **IV-5 golfwing 商品コードマスタ整備 → `/api/v1/movements` 連携の有効化**（ワークス発注が止まっているのと同じ前提。ROADMAP LP-001）
+- [ ] **IV-6 money-os に粗利画面** — `inv_monthly_valuation`（期首/期末/仕入/売上原価）を読む
+- [ ] **IV-7 report-os の物販セクション** — 在庫回転日数・死蔵在庫（SYSTEM.md §4 の宿題）
+- [ ] **IV-8 inventory_ai の配線** — 適正在庫割れ → 発注候補 → `ai_suggestions`（migration 0006 で planned 済、0012 に duties 定義あり）
+- [ ] **IV-9 shift-cloud /store からの棚卸導線**
+- [ ] **IV-10 FRANK GOLF の物販在庫** — 9/2プレオープン。品番を FRANK の store_id で登録すれば同じ仕組みに乗る

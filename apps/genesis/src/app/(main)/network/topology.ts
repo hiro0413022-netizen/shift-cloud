@@ -165,6 +165,18 @@ export const NODES: SystemNode[] = [
     iy: 250,
   },
   {
+    id: "inventory-os",
+    name: "Inventory OS",
+    kind: "app",
+    status: "undeployed",
+    schema: "inv_",
+    description:
+      "物販在庫の棚卸と入出庫。エクセル（202606_ゴルフウィング在庫リスト.xlsm・362品番）から移行。iPadで保管場所ごとに数える。理論在庫＝直近の確定棚卸＋その後の入出庫。月次の棚卸資産と売上原価をmoney-os / report-osへ渡す。",
+    aliases: ["inventory", "在庫", "棚卸"],
+    ix: 950,
+    iy: 370,
+  },
+  {
     id: "survey-os",
     name: "Survey OS",
     kind: "app",
@@ -355,6 +367,11 @@ export const EDGES: SystemEdge[] = [
   { from: "money-golfwing", to: "supabase", label: "mon_", type: "data" },
   { from: "legal-os", to: "supabase", label: "leg_ + Storage", type: "data" },
   { from: "survey-os", to: "supabase", label: "svy_", type: "data" },
+  { from: "inventory-os", to: "supabase", label: "inv_", type: "data" },
+  // golfwing は別DBのため、入荷確定時に Inventory OS の /api/v1/movements を叩く（#96）
+  { from: "golfwing", to: "inventory-os", label: "入荷→入庫(API)", type: "data" },
+  { from: "inventory-os", to: "money-golfwing", label: "棚卸資産・売上原価(inv_monthly_valuation)", type: "kpi" },
+  { from: "inventory-os", to: "report-os", label: "物販の在庫回転・粗利", type: "kpi" },
   { from: "reserve-os", to: "supabase", label: "res_", type: "data" },
   // 申込 → スタッフの「やること」(sp_tasks 店舗共通タスク)。DECISIONS #55
   { from: "reserve-os", to: "shift-cloud", label: "申込→やること(sp_tasks)", type: "data" },
