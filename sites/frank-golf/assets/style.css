@@ -1387,3 +1387,14 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
   :root { --wrap: 1200px; }
   .sec { padding: 104px 0; }
 }
+
+/* ---- 税込価格の小さな併記（site.js が data-tax の要素に自動で挿入） ---- */
+.tax {
+  font-size: .72em;
+  font-weight: 600;
+  color: var(--dim);
+  letter-spacing: .02em;
+  margin-left: .3em;
+  white-space: nowrap;
+}
+.price-card__tax { font-size: 11.5px; font-weight: 600; color: var(--dim); margin-top: 5px; letter-spacing: .02em; }

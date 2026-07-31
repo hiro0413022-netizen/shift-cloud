@@ -538,7 +538,7 @@ def build_index():
       </a>
       <a class="bnr bnr--g" href="plan.html">
         <span class="bnr__lbl">MEMBERSHIP</span>
-        <span class="bnr__big">月額 9,800円〜</span>
+        <span class="bnr__big">月額 9,800円〜<small class="tax">（税込 10,780円〜）</small></span>
         <span class="bnr__note">通い放題プランあり ／ 全営業日ご利用OK</span>
       </a>
     </div>
@@ -642,20 +642,23 @@ def build_index():
           <p class="price-card__n">LIGHT</p>
           <p class="price-card__jp">ライト</p>
           <p class="price-card__p">9,800<small>円／月</small></p>
+          <p class="price-card__tax">税込 10,780円</p>
         </div>
         <div class="price-card price-card--feat">
           <span class="price-card__tag">いちばん人気</span>
           <p class="price-card__n">REGULAR</p>
           <p class="price-card__jp">レギュラー</p>
           <p class="price-card__p">13,800<small>円／月</small></p>
+          <p class="price-card__tax">税込 15,180円</p>
         </div>
         <div class="price-card">
           <p class="price-card__n">MASTER</p>
           <p class="price-card__jp">マスター</p>
           <p class="price-card__p">19,800<small>円／月</small></p>
+          <p class="price-card__tax">税込 21,780円</p>
         </div>
       </div>
-      <p class="price-note">表示は税抜・月額です。法人プラン、レッスンチケットもご用意しています。</p>
+      <p class="price-note">表示は月額・税抜です（カッコ内は税込／消費税10%）。法人プラン、レッスンチケットもご用意しています。</p>
       <p style="margin-top:26px"><a class="btn btn--ghost" href="plan.html">プラン・料金の詳細はこちら</a></p>
     </div>
   </div>
@@ -1138,7 +1141,7 @@ def build_lesson():
       <div class="spec__row"><p class="spec__k">コーチ紹介</p><p class="spec__v" data-frank="lesson.coaches">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">初心者プログラム</p><p class="spec__v" data-frank="lesson.beginnerProgram">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">使用シミュレーター</p><p class="spec__v" data-frank="store.simulator">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice" data-tax>近日公開</p></div>
     </div>
   </div>
 </section>
@@ -1297,30 +1300,30 @@ def build_plan():
       <div class="plan">
         <p class="plan__n">LIGHT</p>
         <p class="plan__n-jp">ライト会員</p>
-        <p class="plan__p"><span data-frank="price.plans.0.price">近日公開</span></p>
+        <p class="plan__p"><span data-frank="price.plans.0.price" data-tax>近日公開</span></p>
         <ul class="plan__f" data-frank="price.plans.0.features"><li>平日昼間の利用中心（月4回まで）</li><li>日中ゆったり練習したい方に</li></ul>
       </div>
       <div class="plan plan--feat">
         <span class="plan__badge">一番人気</span>
         <p class="plan__n">REGULAR</p>
         <p class="plan__n-jp">レギュラー会員</p>
-        <p class="plan__p"><span data-frank="price.plans.1.price">近日公開</span></p>
+        <p class="plan__p"><span data-frank="price.plans.1.price" data-tax>近日公開</span></p>
         <ul class="plan__f" data-frank="price.plans.1.features"><li>全営業日ご利用可能</li><li>1日1時間 通い放題</li><li>毎日練習して上達したい方に</li></ul>
       </div>
       <div class="plan">
         <p class="plan__n">MASTER</p>
         <p class="plan__n-jp">マスター会員</p>
-        <p class="plan__p"><span data-frank="price.plans.2.price">近日公開</span></p>
+        <p class="plan__p"><span data-frank="price.plans.2.price" data-tax>近日公開</span></p>
         <ul class="plan__f" data-frank="price.plans.2.features"><li>全営業日ご利用可能</li><li>1日最大2時間まで</li><li>たっぷり練習したい方に</li></ul>
       </div>
     </div>
     <div class="spec rv" style="margin-top:44px">
-      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">入会金</p><p class="spec__v" data-frank="price.joinFee">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price" data-tax>近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price" data-tax>近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice" data-tax>近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">入会金</p><p class="spec__v" data-frank="price.joinFee" data-tax>近日公開</p></div>
       <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee" data-tax>近日公開</p></div>
       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">備考</p><p class="spec__v" data-frank="price.note">近日公開</p></div>
     </div>
@@ -1488,8 +1491,8 @@ def build_corporate():
       <article class="card rv"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">法人同士の交流</h3><p class="card__b">姫路の経営者・ビジネスパーソンが集まる場として、法人交流イベントを企画します。名刺交換の場ではなく、ゴルフを介した自然なつながりを。</p></article>
     </div>
     <div class="spec rv" style="margin-top:44px">
-      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price" data-tax>近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price" data-tax>近日公開</p></div>
       <div class="spec__row"><p class="spec__k">ご利用人数</p><p class="spec__v" data-frank="store.bays">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">貸切利用</p><p class="spec__v" data-frank="lounge.note">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">ラウンジのご利用時間</p><p class="spec__v" data-frank="lounge.hours">近日公開</p></div>

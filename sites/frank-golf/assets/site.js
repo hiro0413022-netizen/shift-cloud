@@ -21,6 +21,38 @@
     return d.innerHTML;
   }
 
+  /* ---------- 税込価格の自動併記（data-tax） ----------
+     site-data.js の金額はすべて【税抜】で登録します。
+     data-tax を付けた要素では「9,800円」→「9,800円（税込 10,780円）」のように
+     税込価格を小さく併記します。消費税率を変えるときは TAX_RATE だけ直せばOK。 */
+  var TAX_RATE = 0.10;
+
+  function yen(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  function taxTag(v) {
+    return '<small class="tax">（税込 ' + yen(Math.round(v * (1 + TAX_RATE))) + "円）</small>";
+  }
+
+  function withTax(text) {
+    var html = esc(text);
+    var re = /([0-9][0-9,]*)円/g;
+    var nums = [], m;
+    while ((m = re.exec(html))) {
+      var v = parseInt(String(m[1]).replace(/,/g, ""), 10);
+      if (v) nums.push(v);
+    }
+    if (nums.length === 0) return html;
+    // 金額が1つだけなら文末にまとめて（例「9,800円 / 月（税込 10,780円）」）
+    if (nums.length === 1) return html + taxTag(nums[0]);
+    // 複数あるときは各金額の直後に
+    return html.replace(/([0-9][0-9,]*)円/g, function (mm, num) {
+      var n = parseInt(String(num).replace(/,/g, ""), 10);
+      return n ? mm + taxTag(n) : mm;
+    });
+  }
+
   /* ---------- 1) data-frank="キー" → 値を差し込む ----------
      値が null / "" の場合は「近日公開」を表示する。
      data-frank-fallback="文言" … 「近日公開」の代わりの文言
@@ -45,6 +77,9 @@
             return "<li>" + esc(i) + "</li>";
           })
           .join("");
+        el.removeAttribute("data-tbd");
+      } else if (el.hasAttribute("data-tax")) {
+        el.innerHTML = withTax(v);
         el.removeAttribute("data-tbd");
       } else {
         el.textContent = v;
