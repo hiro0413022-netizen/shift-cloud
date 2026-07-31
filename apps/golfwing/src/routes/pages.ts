@@ -1307,11 +1307,11 @@ ${buildPager()}
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">定価 (円)</label>
-              <input class="form-control text-end" name="list_price" type="number" min="0" step="100" placeholder="50000">
+              <input class="form-control text-end" name="list_price" type="number" min="0" step="any" placeholder="50000">
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">掛率 (例: 0.54)</label>
-              <input class="form-control text-end" name="default_rate" type="number" min="0" max="1" step="0.01" placeholder="0.54">
+              <input class="form-control text-end" name="default_rate" type="number" min="0" max="1" step="any" placeholder="0.54">
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">単位</label>

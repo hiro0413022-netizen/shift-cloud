@@ -1,6 +1,6 @@
 import { createRequire } from 'module'; const require = createRequire(import.meta.url);
 
-// ../../node_modules/hono/dist/compose.js
+// node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -44,10 +44,10 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// ../../node_modules/hono/dist/request/constants.js
+// node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// ../../node_modules/hono/dist/utils/buffer.js
+// node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   const response = new Response(arrayBuffer, {
     headers: {
@@ -58,7 +58,7 @@ var bufferToFormData = (arrayBuffer, contentType) => {
   return response.formData();
 };
 
-// ../../node_modules/hono/dist/utils/body.js
+// node_modules/hono/dist/utils/body.js
 var isRawRequest = (request) => "headers" in request;
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
@@ -138,7 +138,7 @@ var handleParsingNestedValues = (form, key, value) => {
   });
 };
 
-// ../../node_modules/hono/dist/utils/url.js
+// node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "") {
@@ -342,7 +342,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// ../../node_modules/hono/dist/request.js
+// node_modules/hono/dist/request.js
 var tryDecodeURIComponent = (str) => tryDecode(str, decodeURIComponent_);
 var HonoRequest = class {
   /**
@@ -625,7 +625,7 @@ var HonoRequest = class {
   }
 };
 
-// ../../node_modules/hono/dist/utils/html.js
+// node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -667,7 +667,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer2) =>
   }
 };
 
-// ../../node_modules/hono/dist/context.js
+// node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -1074,7 +1074,7 @@ var Context = class {
   };
 };
 
-// ../../node_modules/hono/dist/router.js
+// node_modules/hono/dist/router.js
 var METHOD_NAME_ALL = "ALL";
 var METHOD_NAME_ALL_LOWERCASE = "all";
 var METHODS = ["get", "post", "put", "delete", "options", "patch"];
@@ -1082,10 +1082,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// ../../node_modules/hono/dist/utils/constants.js
+// node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// ../../node_modules/hono/dist/hono-base.js
+// node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -1461,7 +1461,7 @@ var Hono = class _Hono {
   };
 };
 
-// ../../node_modules/hono/dist/router/reg-exp-router/matcher.js
+// node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -1482,7 +1482,7 @@ function match(method, path) {
   return match2(method, path);
 }
 
-// ../../node_modules/hono/dist/router/reg-exp-router/node.js
+// node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = ".*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
@@ -1590,7 +1590,7 @@ var Node = class _Node {
   }
 };
 
-// ../../node_modules/hono/dist/router/reg-exp-router/trie.js
+// node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node();
@@ -1646,7 +1646,7 @@ var Trie = class {
   }
 };
 
-// ../../node_modules/hono/dist/router/reg-exp-router/router.js
+// node_modules/hono/dist/router/reg-exp-router/router.js
 var nullMatcher = [/^$/, [], /* @__PURE__ */ Object.create(null)];
 var wildcardRegExpCache = /* @__PURE__ */ Object.create(null);
 function buildWildcardRegExp(path) {
@@ -1825,7 +1825,7 @@ var RegExpRouter = class {
   }
 };
 
-// ../../node_modules/hono/dist/router/smart-router/router.js
+// node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1880,7 +1880,7 @@ var SmartRouter = class {
   }
 };
 
-// ../../node_modules/hono/dist/router/trie-router/node.js
+// node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = /* @__PURE__ */ Object.create(null);
 var hasChildren = (children) => {
   for (const _ in children) {
@@ -2064,7 +2064,7 @@ var Node2 = class _Node2 {
   }
 };
 
-// ../../node_modules/hono/dist/router/trie-router/router.js
+// node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node;
@@ -2086,7 +2086,7 @@ var TrieRouter = class {
   }
 };
 
-// ../../node_modules/hono/dist/hono.js
+// node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   /**
    * Creates an instance of the Hono class.
@@ -2101,7 +2101,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// ../../node_modules/hono/dist/middleware/cors/index.js
+// node_modules/hono/dist/middleware/cors/index.js
 var cors = (options) => {
   const opts = {
     origin: "*",
@@ -2183,10 +2183,10 @@ var cors = (options) => {
   };
 };
 
-// ../../node_modules/hono/dist/utils/compress.js
+// node_modules/hono/dist/utils/compress.js
 var COMPRESSIBLE_CONTENT_TYPE_REGEX = /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|msgpack|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|vnd\.msgpack|wasm|x-httpd-php|x-javascript|x-msgpack|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml|msgpack))(?:[;\s]|$)/i;
 
-// ../../node_modules/hono/dist/utils/mime.js
+// node_modules/hono/dist/utils/mime.js
 var getMimeType = (filename, mimes = baseMimes) => {
   const regexp = /\.([a-zA-Z0-9]+?)$/;
   const match2 = filename.match(regexp);
@@ -2255,7 +2255,7 @@ var _baseMimes = {
 };
 var baseMimes = _baseMimes;
 
-// ../../node_modules/hono/dist/middleware/serve-static/path.js
+// node_modules/hono/dist/middleware/serve-static/path.js
 var defaultJoin = (...paths) => {
   let result = paths.filter((p) => p !== "").join("/");
   result = result.replace(/(?<=\/)\/+/g, "");
@@ -2271,7 +2271,7 @@ var defaultJoin = (...paths) => {
   return resolved.join("/") || ".";
 };
 
-// ../../node_modules/hono/dist/middleware/serve-static/index.js
+// node_modules/hono/dist/middleware/serve-static/index.js
 var ENCODINGS = {
   br: ".br",
   zstd: ".zst",
@@ -2342,7 +2342,7 @@ var serveStatic = (options) => {
   };
 };
 
-// ../../node_modules/hono/dist/adapter/cloudflare-workers/utils.js
+// node_modules/hono/dist/adapter/cloudflare-workers/utils.js
 var getContentFromKVAsset = async (path, options) => {
   let ASSET_MANIFEST;
   if (options && options.manifest) {
@@ -2375,7 +2375,7 @@ var getContentFromKVAsset = async (path, options) => {
   return content;
 };
 
-// ../../node_modules/hono/dist/adapter/cloudflare-workers/serve-static.js
+// node_modules/hono/dist/adapter/cloudflare-workers/serve-static.js
 var serveStatic2 = (options = {}) => {
   return async function serveStatic22(c, next) {
     const getContent = async (path) => {
@@ -2393,12 +2393,12 @@ var serveStatic2 = (options = {}) => {
   };
 };
 
-// ../../node_modules/hono/dist/adapter/cloudflare-workers/serve-static-module.js
+// node_modules/hono/dist/adapter/cloudflare-workers/serve-static-module.js
 var module = (options) => {
   return serveStatic2(options);
 };
 
-// ../../node_modules/hono/dist/helper/websocket/index.js
+// node_modules/hono/dist/helper/websocket/index.js
 var WSContext = class {
   #init;
   constructor(init) {
@@ -2446,7 +2446,7 @@ var defineWebSocketHelper = (handler2) => {
   };
 };
 
-// ../../node_modules/hono/dist/adapter/cloudflare-workers/websocket.js
+// node_modules/hono/dist/adapter/cloudflare-workers/websocket.js
 var upgradeWebSocket = defineWebSocketHelper(async (c, events) => {
   const upgradeHeader = c.req.header("Upgrade");
   if (upgradeHeader !== "websocket") {
@@ -6223,11 +6223,11 @@ ${buildPager()}
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">\u5B9A\u4FA1 (\u5186)</label>
-              <input class="form-control text-end" name="list_price" type="number" min="0" step="100" placeholder="50000">
+              <input class="form-control text-end" name="list_price" type="number" min="0" step="any" placeholder="50000">
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">\u639B\u7387 (\u4F8B: 0.54)</label>
-              <input class="form-control text-end" name="default_rate" type="number" min="0" max="1" step="0.01" placeholder="0.54">
+              <input class="form-control text-end" name="default_rate" type="number" min="0" max="1" step="any" placeholder="0.54">
             </div>
             <div class="col-md-3">
               <label class="form-label fw-semibold">\u5358\u4F4D</label>
@@ -11854,7 +11854,7 @@ async function resetDemoData(db2) {
     }
   }
 }
-var src_default = {
+var index_default = {
   fetch: app3.fetch,
   async scheduled(_event, env, _ctx) {
     await resetDemoData(env.DB);
@@ -11862,11 +11862,11 @@ var src_default = {
   }
 };
 
-// ../../node_modules/postgres/src/index.js
+// node_modules/postgres/src/index.js
 import os from "os";
 import fs from "fs";
 
-// ../../node_modules/postgres/src/query.js
+// node_modules/postgres/src/query.js
 var originCache = /* @__PURE__ */ new Map();
 var originStackCache = /* @__PURE__ */ new Map();
 var originError = Symbol("OriginError");
@@ -12003,7 +12003,7 @@ function cachedError(xs) {
   return originCache.get(xs);
 }
 
-// ../../node_modules/postgres/src/errors.js
+// node_modules/postgres/src/errors.js
 var PostgresError = class extends Error {
   constructor(x) {
     super(x.message);
@@ -12053,7 +12053,7 @@ function notSupported(x) {
   return error;
 }
 
-// ../../node_modules/postgres/src/types.js
+// node_modules/postgres/src/types.js
 var types = {
   string: {
     to: 25,
@@ -12339,14 +12339,14 @@ fromKebab.column = { to: fromKebab };
 var kebab = { ...toKebab };
 kebab.column.to = fromKebab;
 
-// ../../node_modules/postgres/src/connection.js
+// node_modules/postgres/src/connection.js
 import net from "net";
 import tls from "tls";
 import crypto2 from "crypto";
 import Stream from "stream";
 import { performance } from "perf_hooks";
 
-// ../../node_modules/postgres/src/result.js
+// node_modules/postgres/src/result.js
 var Result = class extends Array {
   constructor() {
     super();
@@ -12363,7 +12363,7 @@ var Result = class extends Array {
   }
 };
 
-// ../../node_modules/postgres/src/queue.js
+// node_modules/postgres/src/queue.js
 var queue_default = Queue;
 function Queue(initial = []) {
   let xs = initial.slice();
@@ -12390,7 +12390,7 @@ function Queue(initial = []) {
   };
 }
 
-// ../../node_modules/postgres/src/bytes.js
+// node_modules/postgres/src/bytes.js
 var size = 256;
 var buffer = Buffer.allocUnsafe(size);
 var messages = "BCcDdEFfHPpQSX".split("").reduce((acc, x) => {
@@ -12463,7 +12463,7 @@ function reset() {
   return b;
 }
 
-// ../../node_modules/postgres/src/connection.js
+// node_modules/postgres/src/connection.js
 var connection_default = Connection;
 var uid = 1;
 var Sync = bytes_default().S().end();
@@ -13303,7 +13303,7 @@ function timer(fn, seconds) {
   }
 }
 
-// ../../node_modules/postgres/src/subscribe.js
+// node_modules/postgres/src/subscribe.js
 var noop2 = () => {
 };
 function Subscribe(postgres2, options) {
@@ -13515,7 +13515,7 @@ function parseEvent(x) {
   return (command || "*") + (path ? ":" + (path.indexOf(".") === -1 ? "public." + path : path) : "") + (key ? "=" + key : "");
 }
 
-// ../../node_modules/postgres/src/large.js
+// node_modules/postgres/src/large.js
 import Stream2 from "stream";
 function largeObject(sql, oid, mode = 131072 | 262144) {
   return new Promise(async (resolve, reject) => {
@@ -13581,7 +13581,7 @@ function largeObject(sql, oid, mode = 131072 | 262144) {
   });
 }
 
-// ../../node_modules/postgres/src/index.js
+// node_modules/postgres/src/index.js
 Object.assign(Postgres, {
   PostgresError,
   toPascal,
@@ -13601,7 +13601,7 @@ Object.assign(Postgres, {
     serialize: (x) => x.toString()
   }
 });
-var src_default2 = Postgres;
+var src_default = Postgres;
 function Postgres(a, b2) {
   const options = parseOptions(a, b2), subscribe = options.no_subscribe || Subscribe(Postgres, { ...options });
   let ending = false;
@@ -14060,7 +14060,7 @@ var PgStatement = class _PgStatement {
   }
 };
 function createPgD1(databaseUrl) {
-  const client = src_default2(databaseUrl, {
+  const client = src_default(databaseUrl, {
     prepare: false,
     max: 1,
     idle_timeout: 20,
