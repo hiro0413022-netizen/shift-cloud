@@ -48,7 +48,7 @@ window.FRANK = {
     // 個人3プラン（カード表示）
     plans: [
       { id: "light", name: "LIGHT", nameJa: "ライト会員", price: "9,800円 / 月", featured: false,
-        features: ["平日昼間の利用中心（月8回まで）", "日中ゆったり練習したい方に"] },
+        features: ["平日昼間の利用中心（月4回まで）", "日中ゆったり練習したい方に"] },
       { id: "regular", name: "REGULAR", nameJa: "レギュラー会員（一番人気）", price: "13,800円 / 月", featured: true,
         features: ["全営業日ご利用可能", "1日1時間 通い放題", "毎日練習して上達したいメイン層に"] },
       { id: "master", name: "MASTER", nameJa: "マスター会員", price: "19,800円 / 月", featured: false,

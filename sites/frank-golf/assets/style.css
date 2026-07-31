@@ -1327,3 +1327,62 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
   .bnr { padding: 24px 18px; }
   .check { font-size: 14.5px; padding: 14px 16px; }
 }
+
+/* ==================================================================
+   PC（デスクトップ）最適化
+   ------------------------------------------------------------------
+   ★スマホ優先の設計はそのまま。1024px 以上の画面だけを上書きします。
+     ・本文をわずかに大きく、行長を制御して「小さい／間延び」を解消
+     ・下層ページの見出しを2カラムにして右側の大きな空白を埋める
+     ・スペック表・フロー・カードの余白をPC用に整える
+   ================================================================== */
+@media (min-width: 1024px) {
+  body { font-size: 17px; line-height: 2.0; }
+
+  /* 1行が長くなりすぎないように行長を制御 */
+  .lead { font-size: 16.5px; line-height: 2.0; }
+  .ph-sub { max-width: 46ch; }
+  .center .ph-sub { max-width: 52ch; }
+
+  /* --- 下層ページ見出し：左に見出し／右にリード文の2カラム --- */
+  .page-head { padding: calc(var(--nav-h) + var(--bar-h) + 72px) 0 64px; }
+  .page-head .wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, .9fr);
+    column-gap: 64px;
+    align-items: end;
+  }
+  .page-head .crumb { grid-column: 1 / -1; }
+  .page-head .h-en  { grid-column: 1; grid-row: 2; }
+  .page-head .h-jp  { grid-column: 1; grid-row: 3; }
+  .page-head .lead  { grid-column: 2; grid-row: 2 / span 2; align-self: end; margin-top: 0; max-width: 42ch; }
+
+  /* --- スペック表：項目名の列を広げ、値を大きく --- */
+  .spec__row { grid-template-columns: 260px 1fr; gap: 32px; padding: 22px 6px; }
+  .spec__k { font-size: 14px; }
+  .spec__v { font-size: 16px; max-width: 60ch; }
+
+  /* --- フロー：ステップ番号の列を広げ、説明の行長を抑える --- */
+  .flow__i { grid-template-columns: 120px 1fr; gap: 36px; padding: 32px 0; }
+  .flow__b { max-width: 62ch; }
+
+  /* --- カード：文字を少し大きく、余白をゆったり --- */
+  .grid { gap: 24px; }
+  .card { padding: 34px 30px; }
+  .card__b, .merit__b, .flow__b { font-size: 15.5px; }
+  .merit__t { font-size: 20px; }
+
+  /* --- 料金カード：3枚の高さを揃える --- */
+  .grid--3 > .plan { height: 100%; }
+  .plan { padding: 40px 34px; }
+  .plan__f { font-size: 15px; }
+
+  /* --- FAQ：文字とクリック領域を大きく --- */
+  .faq summary { font-size: 16.5px; }
+}
+
+/* --- ワイドモニタ（1440px〜）：本文幅と余白をひと回り広げる --- */
+@media (min-width: 1440px) {
+  :root { --wrap: 1200px; }
+  .sec { padding: 104px 0; }
+}
