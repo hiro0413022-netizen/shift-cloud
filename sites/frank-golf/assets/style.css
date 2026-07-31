@@ -1341,8 +1341,9 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
 
   /* 1行が長くなりすぎないように行長を制御 */
   .lead { font-size: 16.5px; line-height: 2.0; }
-  .ph-sub { max-width: 46ch; }
-  .center .ph-sub { max-width: 52ch; }
+  /* 日本語は ch より em が実感に近い（1行 約34文字） */
+  .ph-sub { max-width: 34em; }
+  .center .ph-sub { max-width: 40em; }
 
   /* --- 下層ページ見出し：左に見出し／右にリード文の2カラム --- */
   .page-head { padding: calc(var(--nav-h) + var(--bar-h) + 72px) 0 64px; }
@@ -1355,16 +1356,16 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
   .page-head .crumb { grid-column: 1 / -1; }
   .page-head .h-en  { grid-column: 1; grid-row: 2; }
   .page-head .h-jp  { grid-column: 1; grid-row: 3; }
-  .page-head .lead  { grid-column: 2; grid-row: 2 / span 2; align-self: end; margin-top: 0; max-width: 42ch; }
+  .page-head .lead  { grid-column: 2; grid-row: 2 / span 2; align-self: end; margin-top: 0; max-width: none; }
 
   /* --- スペック表：項目名の列を広げ、値を大きく --- */
   .spec__row { grid-template-columns: 260px 1fr; gap: 32px; padding: 22px 6px; }
   .spec__k { font-size: 14px; }
-  .spec__v { font-size: 16px; max-width: 60ch; }
+  .spec__v { font-size: 16px; }
 
   /* --- フロー：ステップ番号の列を広げ、説明の行長を抑える --- */
   .flow__i { grid-template-columns: 120px 1fr; gap: 36px; padding: 32px 0; }
-  .flow__b { max-width: 62ch; }
+  .flow__b { max-width: 36em; }
 
   /* --- カード：文字を少し大きく、余白をゆったり --- */
   .grid { gap: 24px; }
