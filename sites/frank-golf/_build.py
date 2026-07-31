@@ -1741,7 +1741,7 @@ def build_trial_booking():
 
       <!-- STEP 2: 時間 -->
       <div class="tb__step" id="tb-step-time" hidden>
-        <p class="tb__h"><span class="tb__n">2</span>開始時間を選ぶ</p>
+        <p class="tb__h"><span class="tb__n">2</span>開始時間を選ぶ<small class="tb__hint">毎時00分スタート</small></p>
         <label class="tb__lefty">
           <input type="checkbox" id="tb-lefty">
           <span>左打ち（レフティ）です　<em>※ 左右打席のみのご案内になります</em></span>
@@ -1943,7 +1943,7 @@ def build_trial_booking():
         : "この日は満席です。別の日をお選びください。";
       $("tb-times").innerHTML = ""; return;
     }
-    $("tb-time-note").textContent = "所要 約" + j.labelMinutes + "分。ご希望の開始時間をお選びください。";
+    $("tb-time-note").textContent = "体験は毎時00分スタート・所要 約" + j.labelMinutes + "分です。ご希望の開始時間をお選びください。";
     var h = "";
     list.forEach(function(t){ h += '<button type="button" class="tb__time" data-t="' + t + '">' + t + '</button>' });
     $("tb-times").innerHTML = h;

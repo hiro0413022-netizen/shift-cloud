@@ -19,6 +19,13 @@ const FRANK_STORE = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
 export const TRIAL_MINUTES = 60;
 export const TRIAL_LABEL_MINUTES = 55;
 
+/**
+ * 体験の開始は「毎時00分」のみ（2026-07-31 運用ルール）。
+ * 会員の打席予約は frunk_booking_cfg.slot_minutes（30分刻み等）のままなので、
+ * 体験だけこの定数で刻みを上書きする。cfg を変えると会員側にも波及するため触らない。
+ */
+export const TRIAL_START_STEP = 60;
+
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const toTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
@@ -116,7 +123,9 @@ export async function getTrialSlots(dateStr: string): Promise<TrialSlots> {
 
   const slots: string[] = [];
   const leftySlots: string[] = [];
-  for (let s = open; s + TRIAL_MINUTES <= close; s += cfg.slot_minutes) {
+  // 開始は毎時00分のみ。営業開始が 9:30 のような場合は次の00分（10:00）から。
+  const first = Math.ceil(open / TRIAL_START_STEP) * TRIAL_START_STEP;
+  for (let s = first; s + TRIAL_MINUTES <= close; s += TRIAL_START_STEP) {
     if (s < earliest) continue;
     const e = s + TRIAL_MINUTES;
     if (pickBay(bays, busy, s, e, false)) slots.push(toTime(s));
@@ -172,7 +181,8 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
 
   const s = toMin(input.start);
   const e = s + TRIAL_MINUTES;
-  if (s % cfg.slot_minutes !== 0) return { ok: false, error: "時刻が不正です" };
+  // 体験は毎時00分スタートのみ（画面を経由せず直接POSTされた場合の防波堤）
+  if (s % TRIAL_START_STEP !== 0) return { ok: false, error: "体験のご予約は毎時00分開始のみ承っています" };
   if (s < toMin(hours.open) || e > toMin(hours.close)) return { ok: false, error: "営業時間外です" };
 
   const today = jstToday();
