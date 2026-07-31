@@ -176,14 +176,20 @@ function addRow(prefill, freeMode) {
   var fUP  = mkNumTd('unit_price', 'inp-unit-price text-end',  '1',     '0',  null, null,           '80px');
   var fLN  = mkTd('line_note', '', '備考', '90px');
 
-  // ─── 削除ボタンセル ───────────────────────────────────
+  // ─── 操作ボタンセル（コピー / 削除）─────────────────────
   var tdRem = document.createElement('td');
   tdRem.style.whiteSpace = 'nowrap';
+  var btnCopy = document.createElement('button');
+  btnCopy.type = 'button';
+  btnCopy.className = 'btn btn-sm btn-outline-secondary btn-copy me-1';
+  btnCopy.title = 'この行をコピーして下に追加';
+  btnCopy.innerHTML = '<i class="fas fa-copy"></i>';
   var btnRem = document.createElement('button');
   btnRem.type = 'button';
   btnRem.className = 'btn btn-sm btn-outline-danger btn-rem';
   btnRem.title = '削除';
   btnRem.innerHTML = '<i class="fas fa-trash"></i>';
+  tdRem.appendChild(btnCopy);
   tdRem.appendChild(btnRem);
 
   // ─── 行に追加 ────────────────────────────────────────
@@ -195,6 +201,7 @@ function addRow(prefill, freeMode) {
 
   // ─── イベント ─────────────────────────────────────────
   btnRem.addEventListener('click', function() { tr.remove(); recalcTotal(); updateSupplierNotesArea(); });
+  btnCopy.addEventListener('click', function() { duplicateRow(tr); });
 
   fLP.inp.addEventListener('input', function() { calcUnitPrice(tr); });
   fRT.inp.addEventListener('input', function() { calcUnitPrice(tr); });
@@ -207,6 +214,94 @@ function addRow(prefill, freeMode) {
   if (p.list_price && p.default_rate) calcUnitPrice(tr);
 
   return tr;
+}
+
+// ─── 行をコピーして下に追加 ────────────────────────────────
+// 同じ顧客・同じ商品で仕様や色だけ変えて連続入力するための複製
+function duplicateRow(srcTr) {
+  var isFree = srcTr.dataset.free === '1';
+  var newTr  = addRow(null, isFree);
+  var srcIdx = srcTr.dataset.idx;
+  var newIdx = newTr.dataset.idx;
+
+  // 商品ID・選択ラベル
+  var srcPid = srcTr.querySelector('.inp-product-id');
+  var newPid = newTr.querySelector('.inp-product-id');
+  if (srcPid && newPid) newPid.value = srcPid.value;
+  var srcLbl = srcTr.querySelector('.picked-label');
+  var newLbl = newTr.querySelector('.picked-label');
+  if (srcLbl && newLbl) newLbl.textContent = srcLbl.textContent;
+
+  // テキスト・数値フィールド（色は別扱い）
+  ['item_category', 'manufacturer', 'product_name', 'spec', 'club_type',
+   'quantity', 'list_price', 'rate', 'unit_price', 'line_note'].forEach(function(k) {
+    var s = srcTr.querySelector('[name="' + k + '_' + srcIdx + '"]');
+    var d = newTr.querySelector('[name="' + k + '_' + newIdx + '"]');
+    if (!s || !d) return;
+    d.value = s.value;
+    if (s.readOnly) { d.readOnly = true; d.classList.add('bg-light'); }
+  });
+  var srcUp = srcTr.querySelector('.inp-unit-price');
+  var newUp = newTr.querySelector('.inp-unit-price');
+  if (srcUp && newUp && srcUp.dataset.manual) newUp.dataset.manual = '1';
+
+  // 色セル: 複数色商品では select になっているため DOM ごと複製
+  var srcColorTd = srcTr.querySelector('.td-color');
+  var newColorTd = newTr.querySelector('.td-color');
+  if (srcColorTd && newColorTd) {
+    var srcColorCtl = srcColorTd.querySelector('input, select');
+    if (srcColorCtl) {
+      var cloneColor = srcColorCtl.cloneNode(true);
+      cloneColor.name = 'color_' + newIdx;
+      newColorTd.innerHTML = '';
+      newColorTd.appendChild(cloneColor);
+      cloneColor.value = srcColorCtl.value;
+    }
+  }
+
+  // 仕入先
+  var srcSupHid = srcTr.querySelector('.inp-supplier-id');
+  var newSupHid = newTr.querySelector('.inp-supplier-id');
+  if (srcSupHid && newSupHid) newSupHid.value = srcSupHid.value;
+
+  var srcSupSel = srcTr.querySelector('.inp-supplier-select');
+  var newSupSel = newTr.querySelector('.inp-supplier-select');
+  if (srcSupSel && newSupSel) {
+    // マスタ外行: addRow が作った既存セレクトに値だけコピー
+    newSupSel.value = srcSupSel.value;
+    if (newSupHid) newSupHid.value = srcSupSel.value;
+  } else if (srcSupSel) {
+    // 通常行で仕入先が複数ある場合: セレクトを複製してイベントを付け直す
+    var cloneSel = srcSupSel.cloneNode(true);
+    cloneSel.addEventListener('change', function() {
+      if (newSupHid) newSupHid.value = this.value;
+      var opt     = this.options[this.selectedIndex];
+      var newRate = opt ? opt.dataset.rate : '';
+      if (newRate) {
+        var rtEl = newTr.querySelector('.inp-rate');
+        if (rtEl) { rtEl.value = newRate; calcUnitPrice(newTr); }
+      }
+      updateSupplierNotesArea();
+    });
+    var tdPick = newTr.querySelector('td:first-child');
+    if (tdPick) tdPick.appendChild(cloneSel);
+    cloneSel.value = srcSupSel.value;
+  }
+
+  // コピー元の直後へ移動（addRow は末尾に追加するため）
+  if (srcTr.nextSibling !== newTr) {
+    srcTr.parentNode.insertBefore(newTr, srcTr.nextSibling);
+  }
+
+  recalcTotal();
+  updateSupplierNotesArea();
+
+  // 変更しやすいよう仕様欄にフォーカス
+  var focusEl = newTr.querySelector('[name="spec_' + newIdx + '"]')
+             || newTr.querySelector('.inp-qty');
+  if (focusEl) { focusEl.focus(); if (focusEl.select) focusEl.select(); }
+
+  return newTr;
 }
 
 // ─── 商品を行にセット ──────────────────────────────────────

@@ -7198,7 +7198,8 @@ ${modalHtml}
       <div class="d-flex justify-content-between align-items-center mt-2">
         <p class="text-muted small mb-0">
           <i class="fas fa-lightbulb me-1 text-warning"></i>
-          \u5B9A\u4FA1\u30FB\u639B\u7387\u3092\u5165\u529B\u3059\u308B\u3068\u5358\u4FA1\u304C\u81EA\u52D5\u8A08\u7B97\u3055\u308C\u307E\u3059
+          \u5B9A\u4FA1\u30FB\u639B\u7387\u3092\u5165\u529B\u3059\u308B\u3068\u5358\u4FA1\u304C\u81EA\u52D5\u8A08\u7B97\u3055\u308C\u307E\u3059\uFF0F
+          <i class="fas fa-copy mx-1"></i>\u30DC\u30BF\u30F3\u3067\u540C\u3058\u5546\u54C1\u306E\u884C\u3092\u30B3\u30D4\u30FC\u3057\u3066\u8FFD\u52A0\u3067\u304D\u307E\u3059\uFF08\u4ED5\u69D8\u30FB\u8272\u3060\u3051\u5909\u66F4\uFF09
         </p>
         <div class="d-flex gap-2">
           <button type="submit" class="btn btn-primary btn-lg px-4">
@@ -11854,7 +11855,7 @@ async function resetDemoData(db2) {
     }
   }
 }
-var index_default = {
+var src_default = {
   fetch: app3.fetch,
   async scheduled(_event, env, _ctx) {
     await resetDemoData(env.DB);
@@ -13601,7 +13602,7 @@ Object.assign(Postgres, {
     serialize: (x) => x.toString()
   }
 });
-var src_default = Postgres;
+var src_default2 = Postgres;
 function Postgres(a, b2) {
   const options = parseOptions(a, b2), subscribe = options.no_subscribe || Subscribe(Postgres, { ...options });
   let ending = false;
@@ -14060,7 +14061,7 @@ var PgStatement = class _PgStatement {
   }
 };
 function createPgD1(databaseUrl) {
-  const client = src_default(databaseUrl, {
+  const client = src_default2(databaseUrl, {
     prepare: false,
     max: 1,
     idle_timeout: 20,

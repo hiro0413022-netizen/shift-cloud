@@ -2337,7 +2337,8 @@ ${modalHtml}
       <div class="d-flex justify-content-between align-items-center mt-2">
         <p class="text-muted small mb-0">
           <i class="fas fa-lightbulb me-1 text-warning"></i>
-          定価・掛率を入力すると単価が自動計算されます
+          定価・掛率を入力すると単価が自動計算されます／
+          <i class="fas fa-copy mx-1"></i>ボタンで同じ商品の行をコピーして追加できます（仕様・色だけ変更）
         </p>
         <div class="d-flex gap-2">
           <button type="submit" class="btn btn-primary btn-lg px-4">
