@@ -6,6 +6,7 @@ import {
   DEFAULT_BOOKING_CFG,
   loadBookingCfg as loadCfg,
   businessHours as hoursOf,
+  bookableRange,
   type BookingCfg,
 } from "@yozan/core/frank-booking";
 
@@ -74,7 +75,14 @@ export async function getSlots(dateStr: string) {
     .eq("active", true)
     .is("deleted_at", null)
     .order("sort");
-  if (!hours) return { date: dateStr, closed: true, bays: bays ?? [], slots: [], taken: {} };
+  const range = bookableRange(cfg);
+  if (!hours) {
+    const reason =
+      cfg.open_date && dateStr < cfg.open_date
+        ? `ご予約は ${cfg.open_date.replace(/-/g, "/")} ${cfg.open_time}〜 のオープン以降の日付で承ります`
+        : "この日は休業日です";
+    return { date: dateStr, closed: true, reason, open_date: cfg.open_date, min_date: range.min, max_date: range.max, bays: bays ?? [], slots: [], taken: {} };
+  }
   const SLOT_MIN = cfg.slot_minutes;
 
   const slots: string[] = [];
@@ -96,7 +104,7 @@ export async function getSlots(dateStr: string) {
     const list = taken[String(b.bay_id)] ?? (taken[String(b.bay_id)] = []);
     for (let m = toMin(String(b.start_time)); m < toMin(String(b.end_time)); m += SLOT_MIN) list.push(toTime(m));
   }
-  return { date: dateStr, closed: false, hours, bays: bays ?? [], slots, taken };
+  return { date: dateStr, closed: false, hours, open_date: cfg.open_date, min_date: range.min, max_date: range.max, bays: bays ?? [], slots, taken };
 }
 
 /** プラン上限チェック → OKなら予約作成 */
@@ -119,10 +127,11 @@ export async function createBooking(input: {
   const endMin = startMin + input.minutes;
   if (startMin < toMin(hours.open) || endMin > toMin(hours.close)) return { ok: false, error: "営業時間外です" };
   if (!cfg.max_minutes_options.includes(input.minutes)) return { ok: false, error: "利用時間が不正です" };
+  const range = bookableRange(cfg);
   const todayJst = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   if (input.date < todayJst) return { ok: false, error: "過去の日付は予約できません" };
-  const limitDate = new Date(Date.now() + 9 * 3600_000 + cfg.advance_days * 86400_000).toISOString().slice(0, 10);
-  if (input.date > limitDate) return { ok: false, error: `予約は${cfg.advance_days}日先までです` };
+  if (input.date < range.min) return { ok: false, error: `ご予約は ${range.min.replace(/-/g, "/")} 以降で承ります` };
+  if (input.date > range.max) return { ok: false, error: `ご予約は ${range.max.replace(/-/g, "/")} までの日付で承ります` };
 
   // プラン上限
   const plan = (member as unknown as { frunk_plans: { name: string; max_bookings_per_day: number | null } | null }).frunk_plans;

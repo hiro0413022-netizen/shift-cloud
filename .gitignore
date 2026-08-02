@@ -14,3 +14,4 @@ dump.sql
 # 社内資料の受け渡し用ローカルフォルダ（正典はGenesis「資料室」＝privateバケット library）
 # リポジトリはPublicのため資料そのものは置かない（apps/genesis/.../library/actions.ts 参照）
 docs/genesis/資料/
+tsconfig.tscheck.json

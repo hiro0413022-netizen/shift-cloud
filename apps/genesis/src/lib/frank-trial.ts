@@ -2,6 +2,7 @@ import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { loadBookingCfg, businessHours } from "@/lib/frank-booking";
+import { bookableRange } from "@yozan/core/frank-booking";
 
 /**
  * FRANK GOLF 体験のセルフ予約（0083）
@@ -18,6 +19,13 @@ const FRANK_STORE = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
 /** 体験の所要時間。案内は「約55分」、枠は60分押さえる（片付け・見送りの余裕） */
 export const TRIAL_MINUTES = 60;
 export const TRIAL_LABEL_MINUTES = 55;
+
+/**
+ * 体験の開始は「毎時00分」のみ（2026-07-31 運用ルール）。
+ * 会員の打席予約は frunk_booking_cfg.slot_minutes（30分刻み等）のままなので、
+ * 体験だけこの定数で刻みを上書きする。cfg を変えると会員側にも波及するため触らない。
+ */
+export const TRIAL_START_STEP = 60;
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const toTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -89,6 +97,8 @@ export type TrialSlots = {
   closedDows: number[];
   /** 臨時休業日 YYYY-MM-DD */
   closedDates: string[];
+  /** 予約受付の開始日（プレオープン日より前は不可） */
+  openDate: string;
 };
 
 /** 日別の体験の空き（時刻だけ返す。打席名は確定するまで見せない） */
@@ -103,6 +113,7 @@ export async function getTrialSlots(dateStr: string): Promise<TrialSlots> {
     advanceDays: cfg.advance_days,
     closedDows: cfg.closed_dows,
     closedDates: cfg.closed_dates,
+    openDate: cfg.open_date,
   };
   if (!hours) return { ...base, closed: true, slots: [], leftySlots: [] };
 
@@ -116,7 +127,9 @@ export async function getTrialSlots(dateStr: string): Promise<TrialSlots> {
 
   const slots: string[] = [];
   const leftySlots: string[] = [];
-  for (let s = open; s + TRIAL_MINUTES <= close; s += cfg.slot_minutes) {
+  // 開始は毎時00分のみ。営業開始が 9:30 のような場合は次の00分（10:00）から。
+  const first = Math.ceil(open / TRIAL_START_STEP) * TRIAL_START_STEP;
+  for (let s = first; s + TRIAL_MINUTES <= close; s += TRIAL_START_STEP) {
     if (s < earliest) continue;
     const e = s + TRIAL_MINUTES;
     if (pickBay(bays, busy, s, e, false)) slots.push(toTime(s));
@@ -172,13 +185,15 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
 
   const s = toMin(input.start);
   const e = s + TRIAL_MINUTES;
-  if (s % cfg.slot_minutes !== 0) return { ok: false, error: "時刻が不正です" };
+  // 体験は毎時00分スタートのみ（画面を経由せず直接POSTされた場合の防波堤）
+  if (s % TRIAL_START_STEP !== 0) return { ok: false, error: "体験のご予約は毎時00分開始のみ承っています" };
   if (s < toMin(hours.open) || e > toMin(hours.close)) return { ok: false, error: "営業時間外です" };
 
   const today = jstToday();
   if (input.date < today) return { ok: false, error: "過去の日付は予約できません" };
-  const limit = new Date(Date.now() + 9 * 3600_000 + cfg.advance_days * 86400_000).toISOString().slice(0, 10);
-  if (input.date > limit) return { ok: false, error: `ご予約は${cfg.advance_days}日先まで承っています` };
+  const range = bookableRange(cfg);
+  if (input.date < range.min) return { ok: false, error: `ご予約は ${range.min.replace(/-/g, "/")} 以降で承ります` };
+  if (input.date > range.max) return { ok: false, error: `ご予約は ${range.max.replace(/-/g, "/")} までの日付で承ります` };
 
   // 同じ連絡先で、これから先の体験がすでに確定していないか（重複申込・いたずら対策）
   if (phone || email) {

@@ -106,7 +106,7 @@
 
       <!-- STEP 2: 時間 -->
       <div class="tb__step" id="tb-step-time" hidden>
-        <p class="tb__h"><span class="tb__n">2</span>開始時間を選ぶ</p>
+        <p class="tb__h"><span class="tb__n">2</span>開始時間を選ぶ<small class="tb__hint">毎時00分スタート</small></p>
         <label class="tb__lefty">
           <input type="checkbox" id="tb-lefty">
           <span>左打ち（レフティ）です　<em>※ 左右打席のみのご案内になります</em></span>
@@ -247,10 +247,13 @@
     return;
   }
 
-  /* ---------- STEP 1: 日付（今日から14日ぶん） ---------- */
+  /* ---------- STEP 1: 日付（オープン日 2026-09-02 以降・14日ぶん） ---------- */
   var dates = [];
   (function(){
+    var OPEN = "2026-09-02"; // プレオープン日。これより前の日付は出さない
     var base = jstNow();
+    var todayV = ymd(base);
+    if (todayV < OPEN) base = new Date(OPEN + "T00:00:00Z");
     for (var i = 0; i < 14; i++) {
       var d = new Date(base.getTime() + i*86400000);
       dates.push({ v: ymd(d), m: d.getUTCMonth()+1, d: d.getUTCDate(), w: WD[d.getUTCDay()], dow: d.getUTCDay() });
@@ -261,7 +264,7 @@
       h += '<button type="button" class="' + cls + '" data-date="' + x.v + '">'
          + '<span class="tb__date-w">' + x.w + '</span>'
          + '<span class="tb__date-d">' + x.d + '</span>'
-         + '<span class="tb__date-m">' + (i===0 ? "今日" : x.m + "月") + '</span>'
+         + '<span class="tb__date-m">' + (x.v===todayV ? "今日" : x.m + "月") + '</span>'
          + '</button>';
     });
     $("tb-dates").innerHTML = h;
@@ -308,7 +311,7 @@
         : "この日は満席です。別の日をお選びください。";
       $("tb-times").innerHTML = ""; return;
     }
-    $("tb-time-note").textContent = "所要 約" + j.labelMinutes + "分。ご希望の開始時間をお選びください。";
+    $("tb-time-note").textContent = "体験は毎時00分スタート・所要 約" + j.labelMinutes + "分です。ご希望の開始時間をお選びください。";
     var h = "";
     list.forEach(function(t){ h += '<button type="button" class="tb__time" data-t="' + t + '">' + t + '</button>' });
     $("tb-times").innerHTML = h;

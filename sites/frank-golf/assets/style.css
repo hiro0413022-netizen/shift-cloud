@@ -697,19 +697,43 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 
 /* ============================ フロア見取り図 ============================ */
-.floorplan { position: relative; border: 1px solid var(--border); border-radius: 18px; padding: 26px; background: var(--panel); }
-.floorplan svg { width: 100%; height: auto; display: block; }
-.floorplan__badge {
-  position: absolute; top: 16px; right: 16px; z-index: 1;
-  font-family: var(--f-en); font-size: 10px; letter-spacing: .16em; font-weight: 600;
-  color: var(--brass); border: 1px solid var(--brass-glow); background: var(--brass-glow);
-  border-radius: 999px; padding: 4px 11px;
+/* ---- フロアマップ ---- */
+.floorplan { display: grid; gap: 22px; }
+.fmap {
+  margin: 0; border: 1px solid var(--border); border-radius: 18px;
+  background: var(--panel); overflow: hidden;
 }
-.floorplan__note { margin-top: 14px; font-size: 12px; color: var(--dim); }
-.fp-h { font-family: var(--f-en); font-size: 15px; fill: var(--txt-str); letter-spacing: .08em; }
-.fp-t { font-family: var(--f-en); font-size: 10px; fill: var(--dim); letter-spacing: .14em; }
-.fp-jp { font-family: var(--f-jp); font-size: 13px; fill: var(--txt); }
-.fp-flow { font-family: var(--f-jp); font-size: 13px; fill: var(--brass-2); }
+.fmap__head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.fmap__floor {
+  flex: none; font-family: var(--f-en); font-size: 15px; font-weight: 800; letter-spacing: .06em;
+  background: var(--green-2); color: #fff; border-radius: 999px; padding: 4px 14px;
+}
+.fmap__t { font-size: 14px; font-weight: 700; color: var(--txt); margin: 0; line-height: 1.6; }
+.fmap__img { position: relative; display: block; background: #fff; }
+.fmap__img img { width: 100%; height: auto; display: block; }
+.fmap__zoom {
+  position: absolute; right: 12px; bottom: 12px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: .04em;
+  background: rgba(35,32,15,.78); color: #fff;
+  border-radius: 999px; padding: 5px 12px; pointer-events: none;
+}
+.fmap__rooms {
+  list-style: none; margin: 0; padding: 16px 20px;
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.fmap__rooms li {
+  font-size: 12.5px; font-weight: 700; color: var(--txt);
+  background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px;
+}
+.floorplan__note { margin-top: 4px; font-size: 12px; line-height: 1.9; color: var(--dim); }
+@media (min-width: 1024px) { .floorplan { grid-template-columns: 1fr 1fr; align-items: start; }
+  .floorplan__note { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .fmap__head { padding: 13px 15px; gap: 9px; }
+  .fmap__t { font-size: 13px; } .fmap__rooms { padding: 13px 15px; gap: 7px; }
+  .fmap__rooms li { font-size: 11.5px; padding: 4px 10px; } }
 
 /* ============================ ギャラリー ============================ */
 .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
@@ -1398,3 +1422,48 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
   white-space: nowrap;
 }
 .price-card__tax { font-size: 11.5px; font-weight: 600; color: var(--dim); margin-top: 5px; letter-spacing: .02em; }
+
+/* 体験予約 STEP2 の補足（毎時00分スタート） */
+.tb__hint { font-size: 12px; font-weight: 700; color: var(--brass-2); background: var(--brass-l); border-radius: 999px; padding: 3px 10px; margin-left: 10px; letter-spacing: .04em; white-space: nowrap; }
+
+/* ==================================================================
+   日本語の改行制御（文節で折り返す）
+   ------------------------------------------------------------------
+   ・.jb        … 文節を1つの塊にして途中で切らせない（<wbr>で改行点を作る）
+   ・br（本文）  … スマホでは無効化。PC用の改行がスマホで
+                   「す。」だけ次行に落ちる崩れを防ぐ
+   ・auto-phrase… 対応ブラウザ（Chrome/Edge/Android）では自動で文節折り返し
+   ================================================================== */
+.phero__lead,
+.ph-sub,
+.lead,
+.card__b,
+.h-jp {
+  word-break: auto-phrase;      /* 未対応ブラウザは normal にフォールバック */
+  line-break: strict;
+  overflow-wrap: break-word;
+  text-wrap: pretty;
+}
+.jb { display: inline-block; }
+
+/* PC専用の改行（スマホでは無効） */
+@media (max-width: 860px) {
+  .brpc { display: none; }
+  .phero__lead br,
+  .ph-sub br,
+  .lead br,
+  .card__b br { display: none; }
+}
+/* スマホ専用の改行（PCでは無効） */
+@media (min-width: 861px) {
+  .brsp { display: none; }
+}
+
+/* コーチの資格バッジ（PGAをメイン表記） */
+.coach__quals { display: flex; flex-wrap: wrap; gap: 8px; }
+.qual {
+  display: inline-block; font-size: 12.5px; font-weight: 800; letter-spacing: .02em;
+  padding: 5px 13px; border-radius: 999px;
+  background: #fff; color: var(--txt); border: 1px solid var(--border);
+}
+.qual--main { background: var(--green-2); color: #fff; border-color: var(--green-2); }

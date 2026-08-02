@@ -85,7 +85,15 @@ def jsonld_business():
         "employee": {
             "@type": "Person",
             "name": "藤田 晃規",
-            "jobTitle": "ゴルフコーチ / ツアープロ",
+            "jobTitle": "PGA会員（トーナメントプレーヤー） / ゴルフコーチ",
+            "hasCredential": [
+                {"@type": "EducationalOccupationalCredential",
+                 "credentialCategory": "PGA会員（トーナメントプレーヤー）",
+                 "recognizedBy": {"@type": "Organization", "name": "公益社団法人 日本プロゴルフ協会（PGA）"}},
+                {"@type": "EducationalOccupationalCredential",
+                 "credentialCategory": "JGTO ツアーメンバー",
+                 "recognizedBy": {"@type": "Organization", "name": "一般社団法人 日本ゴルフツアー機構（JGTO）"}},
+            ],
             "sameAs": "https://www.jgto.org/player/15674/profile",
         },
         "areaServed": [{"@type": "City", "name": n} for n in AREA_SERVED],
@@ -403,66 +411,46 @@ def media(key, src, alt, cap="", tall=False, cls=""):
 
 
 
+def floormap_fig(floor, title, w, h, caption, rooms):
+    """フロアマップ1枚（webp＋pngフォールバック／クリックで原寸）。"""
+    chips = "".join(f'<li>{r}</li>' for r in rooms)
+    return f"""
+    <figure class="fmap">
+      <div class="fmap__head">
+        <span class="fmap__floor">{floor}</span>
+        <p class="fmap__t">{title}</p>
+      </div>
+      <a class="fmap__img" href="assets/img/floormap-{floor.lower()}.png" target="_blank" rel="noopener"
+         aria-label="{floor}フロアマップを拡大表示">
+        <picture>
+          <source srcset="assets/img/floormap-{floor.lower()}.webp" type="image/webp">
+          <img src="assets/img/floormap-{floor.lower()}.png" alt="{caption}"
+               loading="lazy" width="{w}" height="{h}">
+        </picture>
+        <span class="fmap__zoom">タップで拡大</span>
+      </a>
+      <figcaption>
+        <ul class="fmap__rooms">{chips}</ul>
+      </figcaption>
+    </figure>"""
+
+
 def floorplan():
-    """フロア見取り図（実際の間取りに基づく簡略イメージ図・インラインSVG）。
-    1F: スロープ入口→打席→中央のバーカウンター＆ラウンジ→打席。2Fは個室・スタッフルーム。"""
-    bays_left = "".join(
-        f'<rect x="{132 + i*70}" y="96" width="58" height="120" rx="7" fill="url(#fpbay)" stroke="rgba(62,142,99,.42)"/>'
-        f'<circle cx="{161 + i*70}" cy="180" r="4.5" fill="#E8E2D4"/>'
-        f'<text x="{161 + i*70}" y="150" text-anchor="middle" class="fp-jp">打席{i+1}</text>'
-        for i in range(2)
-    )
-    bays_right = "".join(
-        f'<rect x="{628 + i*70}" y="96" width="58" height="120" rx="7" fill="url(#fpbay)" stroke="rgba(62,142,99,.42)"/>'
-        f'<circle cx="{657 + i*70}" cy="180" r="4.5" fill="#E8E2D4"/>'
-        f'<text x="{657 + i*70}" y="150" text-anchor="middle" class="fp-jp">打席{i+3}</text>'
-        for i in range(2)
-    )
-    return '''<div class="floorplan rv">
-  <div class="floorplan__badge">イメージ図</div>
-  <svg viewBox="0 0 900 470" role="img" aria-label="FRANK GOLF 姫路・土山のフロア見取り図（イメージ）。スロープ入口、全4打席、中央にバーカウンターとラウンジ、2階に個室とスタッフルーム。">
-    <defs>
-      <linearGradient id="fpbay" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#242924"/><stop offset="1" stop-color="#1b1f1b"/></linearGradient>
-      <linearGradient id="fplounge" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#241d12"/><stop offset="1" stop-color="#1a1710"/></linearGradient>
-    </defs>
-    <rect x="8" y="8" width="884" height="454" rx="16" fill="#141714" stroke="rgba(232,226,212,.14)"/>
-    <text x="450" y="40" text-anchor="middle" class="fp-h">1F FLOOR</text>
-
-    <!-- スロープ入口（左下） -->
-    <path d="M60 300 L120 270 L120 360 L60 360 Z" fill="#1b1f1b" stroke="rgba(232,226,212,.18)"/>
-    <text x="92" y="322" text-anchor="middle" class="fp-t">SLOPE</text>
-    <text x="92" y="340" text-anchor="middle" class="fp-jp">スロープ入口</text>
-
-    <!-- 左の打席（個室B） -->
-    <rect x="120" y="80" width="152" height="152" rx="10" fill="rgba(62,142,99,.05)" stroke="rgba(62,142,99,.3)"/>
-    <text x="196" y="72" text-anchor="middle" class="fp-t">PLAY / 打席エリア</text>''' + bays_left + '''
-
-    <!-- 中央：バーカウンター＆ラウンジ -->
-    <rect x="300" y="80" width="290" height="300" rx="12" fill="url(#fplounge)" stroke="rgba(201,162,76,.45)"/>
-    <text x="445" y="118" text-anchor="middle" class="fp-h" fill="#E3C177">BAR &amp; LOUNGE</text>
-    <text x="445" y="140" text-anchor="middle" class="fp-jp">バーカウンター＆ラウンジ</text>
-    <rect x="330" y="168" width="230" height="26" rx="13" fill="none" stroke="#C9A24C" stroke-width="2"/>
-    <text x="445" y="186" text-anchor="middle" class="fp-t">COUNTER / キッチン</text>
-    <rect x="356" y="236" width="78" height="52" rx="6" fill="none" stroke="rgba(232,226,212,.3)"/>
-    <rect x="456" y="236" width="78" height="52" rx="6" fill="none" stroke="rgba(232,226,212,.3)"/>
-    <text x="445" y="322" text-anchor="middle" class="fp-jp">語らいのラウンジ席</text>
-
-    <!-- 右の打席（個室・レフティ対応） -->
-    <rect x="616" y="80" width="152" height="152" rx="10" fill="rgba(62,142,99,.05)" stroke="rgba(62,142,99,.3)"/>
-    <text x="692" y="72" text-anchor="middle" class="fp-t">PLAY / 打席エリア</text>''' + bays_right + '''
-    <text x="692" y="250" text-anchor="middle" class="fp-flow">打席4はレフティ左右対応</text>
-
-    <!-- 階段→2F -->
-    <rect x="616" y="286" width="152" height="90" rx="10" fill="#1b1f1b" stroke="rgba(232,226,212,.16)"/>
-    <text x="692" y="322" text-anchor="middle" class="fp-t">STAIRS ↑ 2F</text>
-    <text x="692" y="344" text-anchor="middle" class="fp-jp">2階も練習フロア（個室）</text>
-
-    <!-- 動線 -->
-    <path d="M120 330 Q 300 400 445 360" fill="none" stroke="#C9A24C" stroke-width="2" stroke-dasharray="6 6"/>
-    <text x="250" y="412" text-anchor="middle" class="fp-flow">打って、そのままラウンジへ →</text>
-  </svg>
-  <p class="floorplan__note">※ 実際の間取りをもとにした簡略イメージ図です（1F・2Fの2フロア／全4打席・バーカウンター併設）。詳細な配置は変更になる場合があります。</p>
-</div>'''
+    """フロアマップ（実際の間取り図・1F/2Fの2枚）。"""
+    f1 = floormap_fig(
+        "1F", "受付・パッティング練習場・バーカウンター・A打席", 1600, 853,
+        "FRANK GOLF 姫路・土山の1階フロアマップ。風除室、受付、パッティング練習場、バーカウンター、物販エリア、トイレ2室、スタッフルーム、A打席（シミュレーター付き）、2階へ上がる階段。",
+        ["風除室・入口", "受付", "パッティング練習場", "バーカウンター",
+         "物販エリア", "A打席（シミュレーター）", "トイレ 2室", "2階へ上がる階段"])
+    f2 = floormap_fig(
+        "2F", "個室の打席（B・C・D）", 1600, 906,
+        "FRANK GOLF 姫路・土山の2階フロアマップ。階段を挟んでB打席、C打席、D打席の3室。各室にシミュレータースクリーンとクラブスタンドを設置。",
+        ["B打席（レフティ対応）", "C打席", "D打席（準備中）", "各室にシミュレーター"])
+    return f"""<div class="floorplan rv">
+  {f1}
+  {f2}
+  <p class="floorplan__note">※ D打席はプレオープン時点では準備中です。設営が完了しだい、このページと公式LINEでお知らせいたします。<br>※ 什器の配置は変更になる場合があります。</p>
+</div>"""
 
 
 def write(name, body):
@@ -486,7 +474,7 @@ def build_index():
     """
     b = head(
         "FRANK GOLF｜姫路・土山のインドアゴルフ｜体験レッスン無料",
-        "姫路・土山のインドアゴルフスクール。ツアープロのマンツーマンレッスンと最新シミュレーター。体験レッスン（約55分）は通常3,300円のところ無料。2026年9月2日プレオープン。",
+        "姫路・土山のインドアゴルフスクール。PGA会員プロのマンツーマンレッスンと最新シミュレーター。体験レッスン（約55分）は通常3,300円のところ無料。2026年9月2日プレオープン。",
         "home",
         jsonld=jsonld_business(),
     )
@@ -503,8 +491,7 @@ def build_index():
         <span class="s2">教わると<span class="hl">面白い</span>。</span>
       </h1>
       <p class="phero__lead">
-        クラブを握ったことがなくても大丈夫。<br>
-        ツアープロがマンツーマンで、あなたの一球を見ます。
+        <span class="jb">クラブを握ったことが</span><wbr><span class="jb">なくても大丈夫。</span><br><wbr><span class="jb">ツアープロが</span><wbr><span class="jb">マンツーマンで、</span><wbr><span class="jb">あなたの一球を見ます。</span>
       </p>
       <div class="phero__cta">
         <a class="btn btn--brass" href="#" data-cta="trial">体験レッスンを予約（無料）</a>
@@ -521,7 +508,7 @@ def build_index():
     <dl class="stats">
       <div><dt>体験レッスン</dt><dd>無料<small>／約55分</small></dd></div>
       <div><dt>打席</dt><dd>4<small>打席</small></dd></div>
-      <div><dt>コーチ</dt><dd>ツアープロ<small>常駐</small></dd></div>
+      <div><dt>コーチ</dt><dd>PGA会員<small>常駐</small></dd></div>
       <div><dt>駐車場</dt><dd>20<small>台・無料</small></dd></div>
     </dl>
   </div>
@@ -551,8 +538,7 @@ def build_index():
     <p class="pill">CONCEPT</p>
     <h2 class="ph">上手くなるほど、<br>ゴルフは<span class="mk">楽しくなる</span>。</h2>
     <p class="ph-sub">
-      自己流だと「何が悪いのか分からない」ままになりがちです。<br>
-      プロが見て、データで確かめる。だから、変化がその日に分かります。
+      <span class="jb">自己流だと</span><wbr><span class="jb">「何が悪いのか分からない」</span><wbr><span class="jb">ままになりがちです。</span><br><wbr><span class="jb">プロが見て、</span><wbr><span class="jb">データで確かめる。</span><wbr><span class="jb">だから、</span><wbr><span class="jb">変化がその日に分かります。</span>
     </p>
   </div>
 </section>
@@ -567,11 +553,9 @@ def build_index():
       </div>
       <div>
         <p class="pill">LESSON</p>
-        <h2 class="ph">ツアープロが、<br>マンツーマンで。</h2>
+        <h2 class="ph">PGA会員プロが、<br>マンツーマンで。</h2>
         <p class="ph-sub">
-          JGTOツアーメンバーの藤田プロが常駐。<br>
-          握り方から、スコアを縮める一点まで。<br>
-          「今日はここだけ」に絞って教えます。
+          <span class="jb">PGA会員</span><wbr><span class="jb">（トーナメントプレーヤー）の</span><wbr><span class="jb">藤田プロが常駐。</span><br><wbr><span class="jb">握り方から、</span><wbr><span class="jb">スコアを縮める一点まで。</span><br><wbr><span class="jb">「今日はここだけ」に</span><wbr><span class="jb">絞って教えます。</span>
         </p>
         <p style="margin-top:26px"><a class="btn btn--ghost" href="lesson.html">レッスンの詳細</a></p>
       </div>
@@ -688,9 +672,7 @@ def build_index():
         <p class="pill">FACILITY</p>
         <h2 class="ph">コースデビューの<br>準備も、ここで。</h2>
         <p class="ph-sub">
-          シミュレーターで実際のコースを回れます。<br>
-          打席のとなりはバーラウンジ。<br>
-          練習のあとに、その日の一球を語れる場所です。
+          <span class="jb">シミュレーターで</span><wbr><span class="jb">実際のコースを回れます。</span><br><wbr><span class="jb">打席のとなりは</span><wbr><span class="jb">バーラウンジ。</span><br><wbr><span class="jb">練習のあとに、</span><wbr><span class="jb">その日の一球を語れる場所です。</span>
         </p>
         <p style="margin-top:26px"><a class="btn btn--ghost" href="facility.html">施設を詳しく見る</a></p>
       </div>
@@ -943,7 +925,7 @@ def build_facility():
     <div class="rv" style="max-width:56ch">
       <p class="eyebrow">Floor Map</p>
       <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.6rem)">打って、そのまま語れる。</h2>
-      <p class="lead">打席とバー・ラウンジがひと続き。着替えも移動もなく、打った熱が冷めないうちに語り合えます。</p>
+      <p class="lead">1階は受付・パッティング練習場・バーカウンター・A打席。2階はB〜Dの個室打席。打席とバーがひと続きなので、打った熱が冷めないうちにそのまま語り合えます。</p>
     </div>
     <div style="margin-top:36px">''' + floorplan() + '''</div>
   </div>
@@ -1105,21 +1087,23 @@ def build_lesson():
     <div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">
       <div class="media-frame media-tall">
         <img data-img-src="lesson" src="assets/img/lesson.jpg" alt="FRANK GOLF 常駐コーチ 藤田晃規プロ（イメージ）" loading="lazy" width="1280" height="853">
-        <span class="media-cap">COACH / 藤田 晃規</span>
+        <span class="media-cap">PGA PRO / 藤田 晃規</span>
       </div>
       <div>
-        <p class="card__no">TOUR PRO</p>
+        <p class="card__no">PGA MEMBER</p>
         <h3 class="card__t" style="font-size:2rem">藤田 晃規</h3>
-        <p class="card__t-jp" style="margin-bottom:20px">ふじた あきのり ／ Akinori FUJITA</p>
+        <p class="card__t-jp" style="margin-bottom:14px">ふじた あきのり ／ Akinori FUJITA</p>
+        <p class="coach__quals" style="margin-bottom:20px">
+          <span class="qual qual--main">PGA会員（トーナメントプレーヤー）</span><span class="qual">JGTO ツアーメンバー</span>
+        </p>
         <p class="card__b" style="margin-bottom:22px">
-          日本ゴルフツアー機構（JGTO）ツアーメンバー。<strong style="color:var(--txt-str)">兵庫県出身</strong>・大阪学院大学卒。
-          2009年にプロ転向、アマチュア時代は日本アマチュア選手権ベスト16。
-          地元・姫路土山で、あなたの一球にフランクに向き合います。
+          <span class="jb">公益社団法人 日本プロゴルフ協会（PGA）会員</span><wbr><span class="jb">（トーナメントプレーヤー）。</span><wbr><span class="jb">日本ゴルフツアー機構（JGTO）</span><wbr><span class="jb">ツアーメンバー。</span><wbr><strong style="color:var(--txt-str)">兵庫県出身</strong><wbr><span class="jb">・大阪学院大学卒。</span><wbr><span class="jb">2009年にプロ転向、</span><wbr><span class="jb">アマチュア時代は</span><wbr><span class="jb">日本アマチュア選手権ベスト16。</span><wbr><span class="jb">地元・姫路土山で、</span><wbr><span class="jb">あなたの一球に</span><wbr><span class="jb">フランクに向き合います。</span>
         </p>
         <ul class="plan__f" style="font-size:13.5px">
+          <li>PGA（日本プロゴルフ協会）会員／トーナメントプレーヤー</li>
+          <li>JGTO（日本ゴルフツアー機構）ツアーメンバー</li>
           <li>出身地：兵庫県</li>
           <li>ゴルフ歴：15歳〜／2009年プロ転向</li>
-          <li>JGTO ツアーメンバー</li>
         </ul>
         <p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="https://www.jgto.org/player/15674/profile" target="_blank" rel="noopener">JGTO 選手プロフィール ↗</a></p>
       </div>
@@ -1741,7 +1725,7 @@ def build_trial_booking():
 
       <!-- STEP 2: 時間 -->
       <div class="tb__step" id="tb-step-time" hidden>
-        <p class="tb__h"><span class="tb__n">2</span>開始時間を選ぶ</p>
+        <p class="tb__h"><span class="tb__n">2</span>開始時間を選ぶ<small class="tb__hint">毎時00分スタート</small></p>
         <label class="tb__lefty">
           <input type="checkbox" id="tb-lefty">
           <span>左打ち（レフティ）です　<em>※ 左右打席のみのご案内になります</em></span>
@@ -1882,10 +1866,13 @@ def build_trial_booking():
     return;
   }
 
-  /* ---------- STEP 1: 日付（今日から14日ぶん） ---------- */
+  /* ---------- STEP 1: 日付（オープン日 2026-09-02 以降・14日ぶん） ---------- */
   var dates = [];
   (function(){
+    var OPEN = "2026-09-02"; // プレオープン日。これより前の日付は出さない
     var base = jstNow();
+    var todayV = ymd(base);
+    if (todayV < OPEN) base = new Date(OPEN + "T00:00:00Z");
     for (var i = 0; i < 14; i++) {
       var d = new Date(base.getTime() + i*86400000);
       dates.push({ v: ymd(d), m: d.getUTCMonth()+1, d: d.getUTCDate(), w: WD[d.getUTCDay()], dow: d.getUTCDay() });
@@ -1896,7 +1883,7 @@ def build_trial_booking():
       h += '<button type="button" class="' + cls + '" data-date="' + x.v + '">'
          + '<span class="tb__date-w">' + x.w + '</span>'
          + '<span class="tb__date-d">' + x.d + '</span>'
-         + '<span class="tb__date-m">' + (i===0 ? "今日" : x.m + "月") + '</span>'
+         + '<span class="tb__date-m">' + (x.v===todayV ? "今日" : x.m + "月") + '</span>'
          + '</button>';
     });
     $("tb-dates").innerHTML = h;
@@ -1943,7 +1930,7 @@ def build_trial_booking():
         : "この日は満席です。別の日をお選びください。";
       $("tb-times").innerHTML = ""; return;
     }
-    $("tb-time-note").textContent = "所要 約" + j.labelMinutes + "分。ご希望の開始時間をお選びください。";
+    $("tb-time-note").textContent = "体験は毎時00分スタート・所要 約" + j.labelMinutes + "分です。ご希望の開始時間をお選びください。";
     var h = "";
     list.forEach(function(t){ h += '<button type="button" class="tb__time" data-t="' + t + '">' + t + '</button>' });
     $("tb-times").innerHTML = h;

@@ -28,6 +28,10 @@ export type BookingCfg = {
   closed_dates: string[];
   /** 何日先まで予約できるか */
   advance_days: number;
+  /** 予約受付の開始日（この日より前は全予約不可）。9/2プレオープン */
+  open_date: string;
+  /** open_date 当日の受付開始時刻（営業openより遅い場合のみ効く） */
+  open_time: string;
 };
 
 export const DEFAULT_BOOKING_CFG: BookingCfg = {
@@ -39,6 +43,8 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   holiday_dates: [],
   closed_dates: [],
   advance_days: 14,
+  open_date: "2026-09-02", // プレオープン日
+  open_time: "10:00",
 };
 
 /** Supabase の admin クライアント。
@@ -78,11 +84,27 @@ export const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().
 
 /** その日の営業時間。定休日・臨時休業なら null */
 export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING_CFG): { open: string; close: string } | null {
+  // オープン日より前は予約枠なし（体験・打席・レッスン共通）
+  if (cfg.open_date && dateStr < cfg.open_date) return null;
   if (cfg.closed_dates.includes(dateStr)) return null;
   const dow = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 日付文字列のみ→曜日はUTCでOK
   if (cfg.closed_dows.includes(dow)) return null;
-  if (dow === 0 || dow === 6 || cfg.holiday_dates.includes(dateStr)) return cfg.weekend;
-  return cfg.weekday;
+  const base = dow === 0 || dow === 6 || cfg.holiday_dates.includes(dateStr) ? cfg.weekend : cfg.weekday;
+  // オープン初日は open_time（10:00）から。閉店時刻はその日の営業時間どおり
+  if (cfg.open_date && dateStr === cfg.open_date && cfg.open_time && toMin(cfg.open_time) > toMin(base.open)) {
+    return { open: cfg.open_time, close: base.close };
+  }
+  return base;
+}
+
+/** 予約を受け付ける日付範囲。オープン前でも「オープン日から advance_days 分」は先行予約できる */
+export function bookableRange(cfg: BookingCfg = DEFAULT_BOOKING_CFG): { min: string; max: string } {
+  const today = jstToday();
+  const min = cfg.open_date && cfg.open_date > today ? cfg.open_date : today;
+  const max = new Date(new Date(`${min}T00:00:00Z`).getTime() + cfg.advance_days * 86400_000)
+    .toISOString()
+    .slice(0, 10);
+  return { min, max };
 }
 
 /** 営業時間から枠の開始時刻を並べる */

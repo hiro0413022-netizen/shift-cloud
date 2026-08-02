@@ -76,6 +76,27 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 営業時間・定休曜日・祝日・臨時休業・枠の刻み・何日先まで予約可 は
 **Genesis の `/site-admin` → 予約設定**から変更できます（`gn_site_content.data.booking`・デプロイ不要）。
 
+### オープン日ゲート（#97・2026-08-03）
+
+`open_date`（2026-09-02）と `open_time`（10:00）を追加。**この日時より前の枠は
+体験・打席・レッスンすべてで出ない**（businessHours が null を返す）。
+オープン前でも「オープン日から advance_days 分」は先行予約できる（`bookableRange`）。
+オープン当日は open_time 開始・閉店はその日の営業時間どおり。
+枠は従来どおり閉店時刻を超えない（最終枠 = close − slot_minutes）。
+
+### 月会費の継続課金（Stripe・#97 / migration 0087）
+
+- 会員は booking.html の「カードで継続課金を登録する」→ `/api/public/frank/billing`
+  → Stripe Checkout(subscription・税込) でカード登録。以後毎月自動課金。
+- Webhook `/api/public/frank/billing/webhook`（checkout.session.completed /
+  invoice.payment_failed / customer.subscription.deleted）が
+  `frunk_members.billing_status`（none/checkout/active/past_due/canceled）を更新。
+  登録完了で `payment_method='card'` に切替＋company_events 記録。
+- コード: `apps/genesis/src/lib/frank-billing.ts`（SDK不使用・fetch直）
+- **必要env（Vercel: yozan-genesis）**: `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`。
+  未設定の間はボタンを押すと「店頭でお手続きください」と案内される（エラーにしない）。
+- 月会費0円のプラン（モニター会員）は登録不可として弾く。
+
 この設定は **お客様側とスタッフ側の両方**が読みます（`@yozan/core/frank-booking`）。
 片方だけ別の時間割にならないよう、ここ以外に営業時間を書かないでください。
 

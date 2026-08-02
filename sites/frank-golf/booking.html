@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>打席予約（会員様）｜FRANK GOLF</title>
-<meta name="description" content="FRANK GOLF の体験のご予約。2026年9月2日、姫路・土山にプレオープン。公式LINEからのご相談も承ります。">
+<meta name="description" content="FRANK GOLF 会員様の打席予約。2026年9月2日10時よりご予約いただけます。会員番号と電話番号下4桁だけでログイン不要。">
 <meta name="format-detection" content="telephone=no">
 <meta property="og:site_name" content="FRANK GOLF">
 <meta property="og:title" content="打席予約（会員様）｜FRANK GOLF">
-<meta property="og:description" content="FRANK GOLF の体験のご予約。2026年9月2日、姫路・土山にプレオープン。公式LINEからのご相談も承ります。">
+<meta property="og:description" content="FRANK GOLF 会員様の打席予約。2026年9月2日10時よりご予約いただけます。">
 <meta property="og:type" content="website">
 <meta name="keywords" content="姫路 インドアゴルフ,土山 ゴルフ,姫路 ゴルフレッスン,インドアゴルフ 会員制,ゴルフシミュレーター 姫路,ゴルフバー 姫路,FRANK GOLF">
 <meta name="robots" content="index,follow">
@@ -80,24 +80,37 @@
       <h2 class="h-en">BAY BOOKING</h2>
       <p class="h-jp">打席予約（会員様専用）</p>
       <p style="margin-top:10px;font-size:13px;opacity:.75">会員番号とお電話番号の下4桁でログイン不要のままご予約いただけます。<br>30分単位・プランの1日上限まで。キャンセルもこのページから。</p>
+      <p style="margin-top:8px;font-size:12px;opacity:.7">ご予約は <b>2026年9月2日（水）10:00</b> のオープン以降の枠から承ります。<br>営業時間: 平日 10:00〜21:00 ／ 土日祝 8:00〜20:00（火曜定休）</p>
     </div>
 
     <div class="card rv" style="margin-top:30px;padding:22px" id="bk-app">
+      <p style="font-size:12px;font-weight:700;opacity:.8;margin-bottom:8px">1. 会員情報（このブラウザに保存され、次回から入力不要です）</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <label style="font-size:12px">会員番号<input id="bk-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
-        <label style="font-size:12px">電話番号 下4桁<input id="bk-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
+        <label style="font-size:12px">会員番号<input id="bk-no" type="text" placeholder="例: F0001" autocomplete="off" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
+        <label style="font-size:12px">電話番号 下4桁<input id="bk-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+      <p style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 8px">2. 日付と利用時間</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
         <label style="font-size:12px">利用時間<select id="bk-min" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit">
           <option value="30">30分</option><option value="60" selected>1時間</option><option value="90">1時間30分</option><option value="120">2時間</option>
         </select></label>
       </div>
-      <p id="bk-status" style="margin-top:12px;font-size:13px;opacity:.8">日付を選ぶと空き状況が表示されます。</p>
-      <div id="bk-grid" style="margin-top:10px;overflow-x:auto"></div>
+      <p style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 0">3. 空いている枠（○）をタップ</p>
+      <p id="bk-status" style="margin-top:8px;font-size:13px;opacity:.8">日付を選ぶと空き状況が表示されます。</p>
+      <div id="bk-grid" style="margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
       <p style="margin-top:14px"><button id="bk-my" class="btn btn--ghost" type="button">自分の予約を確認・キャンセル</button></p>
       <div id="bk-mylist" style="margin-top:10px"></div>
       <p style="margin-top:18px;font-size:12px;opacity:.6">レッスンのご予約は<a href="lesson-booking.html" style="text-decoration:underline">レッスン予約ページ</a>から。</p>
+    </div>
+
+    <div class="card rv" style="margin-top:22px;padding:22px" id="bk-billing">
+      <p class="eyebrow">Monthly Payment</p>
+      <p style="font-size:15px;font-weight:700;margin-top:4px">月会費のお支払い登録（クレジットカード）</p>
+      <p style="margin-top:8px;font-size:13px;opacity:.8">クレジットカードを登録すると、月会費が毎月自動でお支払いになります（安全な決済ページ Stripe に移動します）。<br>上の会員番号・電話番号下4桁を入力のうえ、ボタンを押してください。</p>
+      <p id="bk-bill-status" style="margin-top:10px;font-size:13px"></p>
+      <p style="margin-top:12px"><button id="bk-bill" class="btn btn--brass" type="button">カードで継続課金を登録する</button></p>
+      <p style="margin-top:10px;font-size:11px;opacity:.55">口座振替をご希望の方は店頭でお手続きください。モニター会員（月会費0円）の方は登録不要です。</p>
     </div>
   </div>
 </section>
@@ -160,7 +173,7 @@
       <div>
         <p class="foot__h">MEMBER</p>
         <ul>
-        <li><a href="booking.html">体験のご予約</a></li>
+        <li><a href="booking.html">打席予約（会員様）</a></li>
         <li><a data-link="links.memberLogin">会員ログイン</a></li>
         <li><a data-link="links.memberBooking">会員Web予約</a></li>
         <li><a data-link="links.memberRegister">Web会員登録</a></li>
@@ -185,15 +198,35 @@
 <script>
 (function(){
   var API="https://yozan-genesis.vercel.app/api/public/frank/booking";
+  var BILL_API="https://yozan-genesis.vercel.app/api/public/frank/billing";
+  var OPEN="2026-09-02"; // プレオープン日（サーバー側でも同じ判定をする）
   var $=function(id){return document.getElementById(id)};
-  var sel=null;
+  var sel=null, hoursClose=null, retried=false;
   function jst(){var d=new Date(Date.now()+9*3600*1000);return d.toISOString().slice(0,10)}
-  $("bk-date").min=jst(); $("bk-date").value=jst();
+
+  // 会員番号・下4桁はこのブラウザに保存（毎回の入力を不要に）
+  try{
+    $("bk-no").value=localStorage.getItem("fg_no")||"";
+    $("bk-tel").value=localStorage.getItem("fg_tel")||"";
+  }catch(e){}
+  function remember(a){try{localStorage.setItem("fg_no",a.no);localStorage.setItem("fg_tel",a.tel)}catch(e){}}
+
+  var start = jst()<OPEN ? OPEN : jst();
+  $("bk-date").min=start; $("bk-date").value=start;
+
   function load(){
     var date=$("bk-date").value; if(!date) return;
     $("bk-status").textContent="読み込み中…"; $("bk-grid").innerHTML="";
     fetch(API+"?date="+date).then(function(r){return r.json()}).then(function(j){
-      if(j.closed){$("bk-status").textContent="この日は定休日（火曜）です。";return}
+      if(j.min_date){$("bk-date").min=j.min_date}
+      if(j.max_date){$("bk-date").max=j.max_date}
+      if(j.closed){
+        $("bk-status").textContent=j.reason||"この日は休業日です。別の日付をお選びください。";
+        // オープン前の日付だったら、予約できる最初の日に自動で切り替える（1回だけ）
+        if(!retried && j.min_date && date<j.min_date){retried=true;$("bk-date").value=j.min_date;load()}
+        return;
+      }
+      hoursClose=j.hours.close;
       $("bk-status").textContent="○をタップ → 下の「この枠で予約する」を押してください（営業 "+j.hours.open+"〜"+j.hours.close+"）";
       var h='<table style="border-collapse:collapse;font-size:11px;min-width:640px"><tr><th style="text-align:left;padding:4px 6px">打席</th>';
       j.slots.forEach(function(t){h+='<th style="padding:4px 2px;font-weight:400;opacity:.7">'+t+"</th>"});
@@ -214,9 +247,16 @@
           $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(b2){b2.style.background="transparent"});
           btn.style.background="rgba(53,132,90,.25)";
           sel={bay:btn.getAttribute("data-bay"),t:btn.getAttribute("data-t")};
+          // 閉店時刻を超える利用時間は選べないようにする
+          var toM=function(t){return Number(t.slice(0,2))*60+Number(t.slice(3,5))};
+          var remain=hoursClose?toM(hoursClose)-toM(sel.t):240;
+          var capped=false;
+          Array.prototype.forEach.call($("bk-min").options,function(o){o.disabled=Number(o.value)>remain});
+          if(Number($("bk-min").value)>remain){$("bk-min").value=String(Math.max(30,Math.floor(remain/30)*30));capped=true}
+          var end=(function(m){return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+m%60).slice(-2)})(toM(sel.t)+Number($("bk-min").value));
           var old=$("bk-go"); if(old) old.remove();
           var p=document.createElement("p"); p.id="bk-go"; p.style.marginTop="12px";
-          p.innerHTML='<button class="btn" type="button">この枠で予約する（'+sel.t+'〜・'+$("bk-min").value+'分）</button>';
+          p.innerHTML='<button class="btn" type="button">この枠で予約する（'+sel.t+'〜'+end+'）</button>'+(capped?'<span style="display:block;margin-top:6px;font-size:12px;opacity:.7">閉店（'+hoursClose+'）までのため利用時間を調整しました</span>':'');
           $("bk-grid").after(p);
           p.querySelector("button").addEventListener("click",book);
         });
@@ -226,7 +266,8 @@
   function auth(){
     var no=$("bk-no").value.trim(), tel=$("bk-tel").value.trim();
     if(!no||tel.length!==4){alert("会員番号と電話番号下4桁を入力してください");return null}
-    return {no:no,tel:tel};
+    var a={no:no,tel:tel}; remember(a);
+    return a;
   }
   function book(){
     var a=auth(); if(!a||!sel) return;
@@ -255,9 +296,26 @@
       });
     });
   }
-  $("bk-date").addEventListener("change",load);
+  $("bk-date").addEventListener("change",function(){retried=false;load()});
   $("bk-min").addEventListener("change",function(){var old=document.getElementById("bk-go");if(old)old.remove();sel=null});
   $("bk-my").addEventListener("click",my);
+
+  // ---- 月会費のカード継続課金（Stripe） ----
+  $("bk-bill").addEventListener("click",function(){
+    var a=auth(); if(!a) return;
+    $("bk-bill").disabled=true;
+    $("bk-bill-status").textContent="お支払い登録ページを準備しています…";
+    fetch(BILL_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({member_no:a.no,phone_last4:a.tel})})
+      .then(function(r){return r.json()}).then(function(j){
+        if(j.ok&&j.url){location.href=j.url;return}
+        $("bk-bill").disabled=false;
+        $("bk-bill-status").textContent=j.error||"登録ページを開けませんでした。時間をおいてお試しください。";
+      }).catch(function(){$("bk-bill").disabled=false;$("bk-bill-status").textContent="通信に失敗しました。時間をおいてお試しください。"});
+  });
+  var q=new URLSearchParams(location.search).get("billing");
+  if(q==="success"){$("bk-bill-status").textContent="✅ カードの登録が完了しました。月会費は毎月自動でお支払いになります。";$("bk-billing").scrollIntoView()}
+  if(q==="cancel"){$("bk-bill-status").textContent="カード登録は完了していません。もう一度お試しいただけます。"}
+
   load();
 })();
 </script>
