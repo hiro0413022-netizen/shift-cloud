@@ -439,9 +439,9 @@ def floorplan():
     """フロアマップ（実際の間取り図・1F/2Fの2枚）。"""
     f1 = floormap_fig(
         "1F", "受付・パッティング練習場・バーカウンター・A打席", 1600, 853,
-        "FRANK GOLF 姫路・土山の1階フロアマップ。風除室、受付、パッティング練習場、バーカウンター、物販エリア、トイレ2室、スタッフルーム、A打席（シミュレーター付き）、2階へ上がる階段。",
-        ["風除室・入口", "受付", "パッティング練習場", "バーカウンター",
-         "物販エリア", "A打席（シミュレーター）", "トイレ 2室", "2階へ上がる階段"])
+        "FRANK GOLF 姫路・土山の1階フロアマップ。エントランス、受付、パッティング練習場、バーカウンター、ショップ、トイレ2室、スタッフルーム、A打席（シミュレーター付き）、2階へ上がる階段。",
+        ["エントランス", "受付", "パッティング練習場", "バーカウンター",
+         "ショップ", "A打席（シミュレーター）", "トイレ 2室", "2階へ上がる階段"])
     f2 = floormap_fig(
         "2F", "個室の打席（B・C・D）", 1600, 906,
         "FRANK GOLF 姫路・土山の2階フロアマップ。階段を挟んでB打席、C打席、D打席の3室。各室にシミュレータースクリーンとクラブスタンドを設置。",
@@ -2010,26 +2010,18 @@ def build_tokushoho():
     b += """
 <section class="sec">
   <div class="wrap" style="max-width:880px">
-    <div class="rv draft-note">
-      <p class="draft-note__t">この表記は準備中の草案です</p>
-      <p class="draft-note__b">
-        記載内容が確定しておらず、法務確認も未了です。<strong>Web上での入会申込・決済を開始する前に、
-        必ず内容を確定し、専門家の確認を受けてください。</strong>
-      </p>
-    </div>
     <div class="spec rv" style="margin-top:36px">
       <div class="spec__row"><p class="spec__k">販売事業者</p><p class="spec__v" data-frank="store.company">株式会社YOZAN</p></div>
-      <div class="spec__row"><p class="spec__k">運営統括責任者</p><p class="spec__v"><span class="tbd">近日公開</span></p></div>
-      <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide></span><span data-frank="store.address">近日公開</span></p></div>
-      <div class="spec__row"><p class="spec__k">電話番号</p><p class="spec__v"><a data-tel>近日公開</a></p></div>
-      <div class="spec__row"><p class="spec__k">メールアドレス</p><p class="spec__v" data-frank="store.email">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">販売価格</p><p class="spec__v">各会員プランの料金は<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に記載（<span class="tbd">近日公開</span>）</p></div>
-      <div class="spec__row"><p class="spec__k">商品代金以外の必要料金</p><p class="spec__v"><span class="tbd">近日公開</span></p></div>
-      <div class="spec__row"><p class="spec__k">支払方法</p><p class="spec__v"><span class="tbd">近日公開</span></p></div>
-      <div class="spec__row"><p class="spec__k">支払時期</p><p class="spec__v"><span class="tbd">近日公開</span></p></div>
-      <div class="spec__row"><p class="spec__k">サービスの提供時期</p><p class="spec__v"><span class="tbd">近日公開</span></p></div>
-      <div class="spec__row"><p class="spec__k">返品・キャンセル</p><p class="spec__v"><span class="tbd">近日公開</span></p></div>
-      <div class="spec__row"><p class="spec__k">退会について</p><p class="spec__v"><span class="tbd">近日公開</span></p></div>
+      <div class="spec__row"><p class="spec__k">運営統括責任者</p><p class="spec__v">古川 博庸</p></div>
+      <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide></span><span data-frank="store.address">兵庫県姫路市土山6-6-1</span>（FRANK GOLF）</p></div>
+      <div class="spec__row"><p class="spec__k">電話番号・メールアドレス</p><p class="spec__v">お取引・サービスに関するお問い合わせは<a href="#" data-cta="line" style="color:var(--brass-2)">公式LINE</a>にて承ります。電話番号・メールアドレスは、ご請求をいただければ遅滞なく開示いたします。</p></div>
+      <div class="spec__row"><p class="spec__k">販売価格</p><p class="spec__v">各会員プランの月会費は<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に記載のとおりです（表示は税抜・別途消費税がかかります）。体験レッスンは通常3,300円（税込）、キャンペーン期間中は無料です。</p></div>
+      <div class="spec__row"><p class="spec__k">商品代金以外の必要料金</p><p class="spec__v">消費税。Webサイトのご利用にかかる通信費はお客様のご負担となります。</p></div>
+      <div class="spec__row"><p class="spec__k">支払方法</p><p class="spec__v">クレジットカード（毎月の自動決済）、口座振替、または店頭でのお支払い</p></div>
+      <div class="spec__row"><p class="spec__k">支払時期</p><p class="spec__v">月会費は当月分を毎月お支払いいただきます。クレジットカードはご登録時および以後毎月、自動で決済されます。口座振替・店頭払いは当社所定の日にお支払いいただきます。</p></div>
+      <div class="spec__row"><p class="spec__k">サービスの提供時期</p><p class="spec__v">入会のご承認後、ご利用開始日からご利用いただけます。打席・レッスンは予約された日時に提供します。</p></div>
+      <div class="spec__row"><p class="spec__k">返品・キャンセル</p><p class="spec__v">サービスの性質上、提供済みのサービスの返金はいたしかねます。打席のご予約は、ご利用開始前まで予約ページからキャンセルいただけます。</p></div>
+      <div class="spec__row"><p class="spec__k">退会について</p><p class="spec__v">退会を希望される月の前月末日までに、当社所定の方法でお申し出ください。月会費の日割り精算・返金はいたしません。詳細は<a href="terms.html" style="color:var(--brass-2)">会員規約</a>をご確認ください。</p></div>
     </div>
   </div>
 </section>
@@ -2046,14 +2038,6 @@ def build_privacy():
     b += """
 <section class="sec">
   <div class="wrap" style="max-width:820px">
-    <div class="rv draft-note">
-      <p class="draft-note__t">この文書は準備中の草案です</p>
-      <p class="draft-note__b">
-        一般的な構成に沿った下書きであり、<strong>法務確認は未了です。</strong>
-        実際の取得項目・利用目的・委託先（予約システム等）を確定のうえ、公開前に専門家の確認を受けてください。
-      </p>
-    </div>
-
     <div class="rv legal" style="margin-top:44px">
       <p class="legal__lead">
         <span data-frank="store.company">株式会社YOZAN</span>（以下「当社」）は、FRANK GOLF（以下「当施設」）の
@@ -2083,8 +2067,9 @@ def build_privacy():
 
       <h2 class="legal__h">4. 業務の委託</h2>
       <p class="legal__b">
-        予約管理システム等の運用にあたり、必要な範囲で個人情報の取り扱いを外部に委託する場合があります。
-        委託先に対しては、適切な監督を行います。
+        予約・会員管理システムの運用、クレジットカード決済の処理（Stripe等の決済事業者）など、
+        必要な範囲で個人情報の取り扱いを外部に委託する場合があります。委託先に対しては、適切な監督を行います。
+        なお、クレジットカード番号は当社では保持せず、決済事業者が安全に取り扱います。
       </p>
 
       <h2 class="legal__h">5. 安全管理</h2>
@@ -2107,11 +2092,11 @@ def build_privacy():
       <h2 class="legal__h">8. お問い合わせ窓口</h2>
       <p class="legal__b">
         <span data-frank="store.company">株式会社YOZAN</span>　FRANK GOLF<br>
-        <span data-frank="store.address">近日公開</span><br>
-        TEL <a data-tel>近日公開</a>
+        <span data-frank="store.address">兵庫県姫路市土山6-6-1</span><br>
+        <a href="#" data-cta="line" style="color:var(--brass-2)">公式LINE</a> または店頭にて承ります。
       </p>
 
-      <p class="legal__date">制定日: <span class="tbd">近日公開</span></p>
+      <p class="legal__date">制定日: 2026年8月3日</p>
     </div>
   </div>
 </section>
@@ -2129,14 +2114,6 @@ def build_terms():
     b += """
 <section class="sec">
   <div class="wrap" style="max-width:820px">
-    <div class="rv draft-note">
-      <p class="draft-note__t">この規約は準備中の草案です</p>
-      <p class="draft-note__b">
-        一般的な会員制施設の構成に沿った下書きであり、<strong>内容の確定・法務確認は未了です。</strong>
-        休会・退会の条件、会費、譲渡禁止などは、確定後に正式な条文へ差し替えます。実際の入会受付・課金の開始前に確定してください。
-      </p>
-    </div>
-
     <div class="rv legal" style="margin-top:44px">
       <p class="legal__lead">
         本規約は、<span data-frank="store.company">株式会社YOZAN</span>（以下「当社」）が運営する
@@ -2148,21 +2125,25 @@ def build_terms():
       <p class="legal__b">会員とは、本規約に同意し、所定の入会申込を行い、当社が入会を承認した個人または法人をいいます。当社は、当施設の運営上必要と判断した場合、入会をお断りすることがあります。</p>
 
       <h2 class="legal__h">第2条（会員種別・会費）</h2>
-      <p class="legal__b">会員種別および月会費は、<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に定めるとおりです（表示金額は税抜）。会費は所定の方法により毎月お支払いいただきます。会費および各種料金は、経済情勢等により改定する場合があります。</p>
+      <p class="legal__b">会員種別および月会費は、<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に定めるとおりです（表示金額は税抜）。会費は、クレジットカードによる毎月の自動決済、口座振替、または当社が認めるその他の方法により、当月分を毎月お支払いいただきます。会費および各種料金は、経済情勢等により改定する場合があります。改定する場合は、事前に当施設内の掲示またはWebサイトでお知らせします。</p>
 
-      <h2 class="legal__h">第3条（利用方法・予約）</h2>
-      <p class="legal__b">会員は、会員種別ごとに定める範囲で当施設を利用できます。打席のご利用は、当社が定める予約システム（Web予約等）によりご予約ください。無断キャンセルが続く場合、当社は利用を制限することがあります。</p>
+      <h2 class="legal__h">第3条（利用方法・予約・キャンセル）</h2>
+      <p class="legal__b">会員は、会員種別ごとに定める範囲で当施設を利用できます。打席のご利用は、当社が定める予約システム（Web予約等）によりご予約ください。ご予約は、ご利用開始前まで予約ページからキャンセルいただけます。ご連絡のないキャンセル（無断キャンセル）が続く場合、当社はWeb予約のご利用を制限することがあります。</p>
 
       <h2 class="legal__h">第4条（休会）</h2>
       <p class="legal__b">
-        会員は、当社所定の方法により休会を申し出ることができます。休会・復会の条件、休会中の会費の取り扱い、申請の締切日等の詳細は
-        <span class="tbd">近日公開（確定後に記載）</span> とします。
+        会員は、休会を希望する月の前月末日までに当社所定の方法で申し出ることにより、翌月から休会することができます。
+        休会中は、月会費に代えて休会費として月額1,100円（税込）をお支払いいただきます。休会期間は連続3ヶ月を上限とし、
+        上限を超えて復会のお申し出がない場合は、翌月から通常の月会費に戻ります。
+        復会を希望する場合は、復会を希望する月の前月末日までにお申し出ください。
       </p>
 
       <h2 class="legal__h">第5条（退会）</h2>
       <p class="legal__b">
-        会員は、当社所定の方法により退会を申し出ることができます。退会のお申し出の締切日、締切以降のお申し出における当月/翌月扱い、
-        月会費の日割りの有無等の詳細は <span class="tbd">近日公開（確定後に記載）</span> とします。既にお支払いいただいた会費は、当社に責のある場合を除き返金いたしません。
+        会員は、退会を希望する月の前月末日までに当社所定の方法で申し出ることにより、希望月の末日をもって退会することができます。
+        前月末日を過ぎてのお申し出は、翌月末日での退会となります。月会費の日割り精算は行いません。
+        既にお支払いいただいた会費は、当社に責のある場合を除き返金いたしません。
+        クレジットカードによる自動決済をご利用の場合、退会月の末日をもって決済を停止します。
       </p>
 
       <h2 class="legal__h">第6条（会員資格の停止・除名）</h2>
@@ -2180,7 +2161,7 @@ def build_terms():
       <h2 class="legal__h">第10条（規約の変更）</h2>
       <p class="legal__b">当社は、必要に応じて本規約を変更することがあります。変更後の規約は、当施設内の掲示または本ページへの掲載をもって効力を生じるものとします。</p>
 
-      <p class="legal__date">制定日: <span class="tbd">近日公開</span>　／　運営: <span data-frank="store.company">株式会社YOZAN</span></p>
+      <p class="legal__date">制定日: 2026年8月3日（2026年9月2日施行）　／　運営: <span data-frank="store.company">株式会社YOZAN</span></p>
     </div>
   </div>
 </section>
