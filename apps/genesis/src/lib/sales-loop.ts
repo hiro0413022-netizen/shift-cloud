@@ -220,12 +220,19 @@ export async function runSalesLoop(companyId: string): Promise<Record<string, un
   }
 
   // ---- 生成 → 実行（approval: ホームの判断フィードで文面確認→承認で即配信） ----
-  const body = buildMessage();
+  // 学習適用（0090）: 過去にユーザーが出した修正指示を文面生成に反映する。
+  // ルール無し・APIキー無し・失敗時はテンプレートのまま（安全側フォールバック）。
+  const { applyLearnedRules } = await import("@/lib/feedback");
+  const base = buildMessage();
+  const { body, appliedRules } = await applyLearnedRules(admin, companyId, "line_broadcast", base).catch(() => ({
+    body: base,
+    appliedRules: [] as string[],
+  }));
   const enq = await enqueueAction(admin, {
     companyId,
     actionType: "line_broadcast",
     title: `営業AI: 体験掘り起こしLINE配信（ビジター向け・不足${shortfall}件）`,
-    payload: { channel: "gw_visitor", body },
+    payload: { channel: "gw_visitor", body, applied_rules: appliedRules },
     originKind: "sales_loop",
     dedupeKey: `sales-trial-recovery-${today}`,
     createdBy: null,

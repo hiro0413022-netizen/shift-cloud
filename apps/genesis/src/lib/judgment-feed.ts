@@ -34,6 +34,20 @@ export type JudgmentItem = {
   hasDraft?: boolean;
   /** 判断SLA（#78・REDESIGN §10-2）: 24時間以上放置されている */
   stale?: boolean;
+  /** queue: 送信文の全文（LINE配信等。承認前に必ず全文を確認できるようにする） */
+  body?: string | null;
+  /** queue: 承認すると何がどう実行されるかの実行プラン（カードの「詳細」で表示） */
+  plan?: ExecutionPlan | null;
+  /** queue: 修正指示UIを出すか（awaiting_approval の文面系のみ） */
+  revisable?: boolean;
+};
+
+/** 「承認すると何がどう実行されるか」の説明（ホームの詳細展開用） */
+export type ExecutionPlan = {
+  what: string; // 何をする
+  target: string; // 誰に/どこへ
+  timing: string; // いつ実行されるか
+  irreversible: boolean; // 実行後に取り消せないか
 };
 
 const AGENT_LABEL: Record<string, string> = {
@@ -67,10 +81,55 @@ const TRACK_APP: Record<string, { tag: string; verb: string; base: string }> = {
 type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => (v == null ? null : String(v));
 
+/** action_type ごとの実行プランを組み立てる（承認前に「何がどう動くか」を言語化） */
+function buildPlan(
+  type: string,
+  payload: Record<string, unknown>,
+  channels: Map<string, string>,
+  staffGroupCount: number
+): ExecutionPlan | null {
+  const cron = "承認後、最大10分以内（10分ごとの実行キュー）";
+  if (type === "line_broadcast") {
+    const code = String(payload.channel ?? "gw_visitor");
+    const name = channels.get(code) ?? code;
+    return {
+      what: "LINE公式アカウントから一斉配信（broadcast）",
+      target: `「${name}」の友だち全員`,
+      timing: cron,
+      irreversible: true,
+    };
+  }
+  if (type === "staff_directive") {
+    const target = String(payload.target ?? "") === "all"
+      ? `スタッフLINEグループ 全${staffGroupCount}件`
+      : payload.group_id
+        ? "指定のスタッフLINEグループ 1件"
+        : payload.store_id
+          ? "指定店舗のスタッフLINEグループ"
+          : "既定のスタッフLINEグループ 1件";
+    return { what: "スタッフ用OAからLINEグループへ送信", target, timing: cron, irreversible: true };
+  }
+  if (type === "prod_deploy") {
+    return {
+      what: "Vercelデプロイフックを叩いて本番再デプロイ",
+      target: `プロジェクト: ${String(payload.project ?? "未指定")}`,
+      timing: cron,
+      irreversible: false,
+    };
+  }
+  if (type === "internal_notify" || type === "test_notify" || type === "agent_directive") {
+    return { what: "社内記録のみ（外部送信なし）", target: "company_events（AIの動きログ）", timing: cron, irreversible: false };
+  }
+  if (type === "report_generate") {
+    return { what: "CEO AI日次レポートを再生成", target: "社内（Genesis内のみ）", timing: cron, irreversible: false };
+  }
+  return null;
+}
+
 export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]> {
   const admin = createAdmin();
 
-  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes, hotRes] = await Promise.all([
+  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes, hotRes, chRes, grpRes] = await Promise.all([
     admin
       .from("ai_action_queue")
       .select("id, title, action_type, status, created_at, scheduled_at, payload")
@@ -125,7 +184,17 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       .not("first_viewed_at", "is", null)
       .order("last_viewed_at", { ascending: false })
       .limit(10),
+    // 実行プラン表示用: LINEチャネル名とスタッフグループ数
+    admin.from("gn_line_channels").select("code, name").eq("company_id", companyId).eq("enabled", true),
+    admin
+      .from("gn_line_groups")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", companyId)
+      .is("deleted_at", null),
   ]);
+
+  const channels = new Map<string, string>(((chRes.data ?? []) as Row[]).map((c) => [String(c.code), String(c.name)]));
+  const staffGroupCount = grpRes.count ?? 0;
 
   const items: JudgmentItem[] = [];
 
@@ -134,7 +203,8 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
     const isUndo = s(r.status) === "queued";
     // 外部送信系は承認前に文面をカード上で確認できるようにする（#80）
     const payload = (r.payload ?? {}) as Record<string, unknown>;
-    const bodyPreview = String(payload.body ?? payload.message ?? "").trim().slice(0, 160) || null;
+    const fullBody = String(payload.body ?? payload.message ?? "").trim() || null;
+    const bodyPreview = fullBody ? fullBody.slice(0, 160) : null;
     items.push({
       id: String(r.id),
       source: isUndo ? "undo" : "queue",
@@ -144,6 +214,10 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       createdAt: s(r.created_at),
       href: "/executions",
       scheduledAt: s(r.scheduled_at),
+      body: fullBody,
+      plan: buildPlan(type, payload, channels, staffGroupCount),
+      // 文面がある承認待ちのみ修正指示可（LINE配信・スタッフ連絡）
+      revisable: !isUndo && fullBody != null && (type === "line_broadcast" || type === "staff_directive"),
     });
   }
 

@@ -9,7 +9,13 @@ import { getJudgmentFeed, type JudgmentItem } from "@/lib/judgment-feed";
 import { Panel, Badge, Empty, fmtDate, KpiCard } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { decideApproval } from "./approvals/actions";
-import { approveActionForm, rejectActionForm, cancelActionForm } from "./executions/actions";
+import {
+  approveActionForm,
+  rejectActionForm,
+  cancelActionForm,
+  reviseActionAiForm,
+  reviseActionEditForm,
+} from "./executions/actions";
 import { reviewDeliverable } from "./deliverables/actions";
 import { approveInquiry } from "./inbox/actions";
 import { decideTrialRequest, decideJoinRequest, dismissHotLead } from "./feed-actions";
@@ -122,16 +128,19 @@ export default async function HomePage() {
             {decisionItems.map((f) => (
               <FeedCard key={`${f.source}-${f.id}`} tag={f.tag} title={f.title} detail={f.detail} href={f.href} stale={f.stale}>
                 {f.source === "queue" && (
-                  <div className="flex gap-2">
-                    <form action={rejectActionForm}>
-                      <input type="hidden" name="id" value={f.id} />
-                      <button className="btn-sub">却下</button>
-                    </form>
-                    <form action={approveActionForm}>
-                      <input type="hidden" name="id" value={f.id} />
-                      <button className="btn-main">承認して実行</button>
-                    </form>
-                  </div>
+                  <>
+                    <div className="flex gap-2">
+                      <form action={rejectActionForm}>
+                        <input type="hidden" name="id" value={f.id} />
+                        <button className="btn-sub">却下</button>
+                      </form>
+                      <form action={approveActionForm}>
+                        <input type="hidden" name="id" value={f.id} />
+                        <button className="btn-main">承認して実行</button>
+                      </form>
+                    </div>
+                    <QueueDetails item={f} />
+                  </>
                 )}
                 {f.source === "deliverable" && (
                   <form action={reviewDeliverable} className="flex gap-2">
@@ -232,6 +241,75 @@ export default async function HomePage() {
         )}
       </Panel>
     </div>
+  );
+}
+
+/**
+ * 承認カードの詳細展開（REDESIGN §3-1 の補強）:
+ * 「承認すると何が・誰に・いつ・取り消せるか」＋送信文全文＋修正指示（AI/直接編集）。
+ * 修正しても承認待ちのまま。承認して初めて実行される。
+ */
+function QueueDetails({ item: f }: { item: JudgmentItem }) {
+  if (!f.plan && !f.body) return null;
+  return (
+    <details className="w-full basis-full rounded-lg border border-(--color-line) bg-(--color-panel) px-3 py-2">
+      <summary className="cursor-pointer text-xs text-sky-300 hover:underline">
+        詳細 — 承認すると何がどう実行されるか（文面の確認・修正はこちら）
+      </summary>
+      <div className="mt-3 space-y-3 text-sm">
+        {f.plan && (
+          <div className="grid gap-1 text-xs sm:grid-cols-2">
+            <p><span className="text-(--color-dim)">実行内容: </span>{f.plan.what}</p>
+            <p><span className="text-(--color-dim)">宛先: </span>{f.plan.target}</p>
+            <p><span className="text-(--color-dim)">実行タイミング: </span>{f.plan.timing}</p>
+            <p className={f.plan.irreversible ? "text-amber-300" : "text-(--color-dim)"}>
+              {f.plan.irreversible ? "⚠ 実行後の取り消しはできません（承認前ならこの画面で修正・却下できます）" : "実行後も社内のみ・外部影響なし"}
+            </p>
+          </div>
+        )}
+        {f.body && (
+          <div>
+            <p className="mb-1 text-xs text-(--color-dim)">送信される文面（全文）:</p>
+            <pre className="whitespace-pre-wrap rounded-md border border-(--color-line) bg-(--color-panel-2) p-3 text-xs leading-relaxed">
+              {f.body}
+            </pre>
+          </div>
+        )}
+        {f.revisable && (
+          <div className="grid gap-3 lg:grid-cols-2">
+            <form action={reviseActionAiForm} className="space-y-1.5">
+              <p className="text-xs text-(--color-dim)">AIに修正指示（例:「値上げの話は入れず、もっと柔らかく」）</p>
+              <textarea
+                name="instruction"
+                rows={2}
+                required
+                className="w-full rounded-md border border-(--color-line) bg-(--color-panel-2) p-2 text-xs"
+                placeholder="どこをどう直すか、一言で"
+              />
+              <input type="hidden" name="id" value={f.id} />
+              <button className="btn-sub">AIに修正させる（指示は学習されます）</button>
+            </form>
+            <form action={reviseActionEditForm} className="space-y-1.5">
+              <p className="text-xs text-(--color-dim)">自分で直接編集（差し替え後も承認するまで送信されません）</p>
+              <textarea
+                name="body"
+                rows={5}
+                required
+                defaultValue={f.body ?? ""}
+                className="w-full rounded-md border border-(--color-line) bg-(--color-panel-2) p-2 text-xs"
+              />
+              <input
+                name="note"
+                className="w-full rounded-md border border-(--color-line) bg-(--color-panel-2) p-2 text-xs"
+                placeholder="（任意）なぜ直したか — 書くと次回から学習します"
+              />
+              <input type="hidden" name="id" value={f.id} />
+              <button className="btn-sub">この文面に差し替える</button>
+            </form>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 

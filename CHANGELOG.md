@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-08-04 — Genesis: 判断フィードの実行プラン表示＋修正指示＋学習（DECISIONS #100・migration 0090適用済）
+- feat(genesis): ホームのAI実行カードに「詳細」展開 — 承認すると何を・誰に・いつ実行し取り消せるか（実行プラン）＋送信文の全文を表示（従来160字プレビューのみ）
+- feat(genesis): 修正指示 — AI修正（指示文1つでClaudeが書き直し）と直接編集の両対応。修正しても承認するまで送信されない。履歴はpayload.revisions＋audit_logs
+- feat(genesis): 学習 — 修正指示を gn_feedback(0090) に蓄積し、AI修正プロンプトと営業ループの配信文生成に「過去の学習ルール」として自動注入（キー無し/失敗時はテンプレートのまま）
+- db: 0090 `gn_feedback`（RLS有効・ポリシー無し=service_role専用）
+
 ## 2026-08-03 — Money OS: 担当プロ＋品名の在庫ピッカー＋明細編集（DECISIONS #98・migration 0088適用済）
 - db: 0088 `mon_pros`（担当プロ名簿・店舗別。RLS有効・service_role専用）
 - feat(money-golfwing): /settings 新設 — 店舗ごとの担当プロを追加・並び順・有効/無効・削除（ナビに「設定」）
