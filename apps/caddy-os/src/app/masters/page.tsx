@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
 import { createAdmin } from "@yozan/core/supabase/admin";
-import { ClientEditor, PartnerEditor, TransportMatrix } from "./editors";
+import { ClientEditor, InvoiceSettingsEditor, PartnerEditor, TransportMatrix, type InvoiceSettingsValue } from "./editors";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export default async function MastersPage() {
   const actor = await requireActor();
   const admin = createAdmin();
 
-  const [{ data: clients }, { data: partners }, { data: rates }, { data: caddyStaff }] = await Promise.all([
+  const [{ data: clients }, { data: partners }, { data: rates }, { data: caddyStaff }, { data: company }] = await Promise.all([
     admin
       .from("cad_clients")
       .select("id, code, name, unit_price, partner_fee, closing_day, payment_day, postal_code, address, has_contract, status")
@@ -20,7 +20,7 @@ export default async function MastersPage() {
       .order("code"),
     admin
       .from("cad_partners")
-      .select("id, code, name, name_kana, default_fee, default_transport, hourly_wage, main_course, show_in_picker, status, memo")
+      .select("id, code, name, name_kana, default_fee, default_transport, hourly_wage, main_course, show_in_picker, status, memo, bank_info")
       .eq("company_id", actor.companyId)
       .is("deleted_at", null)
       .order("code"),
@@ -36,7 +36,10 @@ export default async function MastersPage() {
       .eq("company_id", actor.companyId)
       .not("staff_id", "is", null)
       .is("deleted_at", null),
+    admin.from("companies").select("settings").eq("id", actor.companyId).single(),
   ]);
+
+  const invoiceSettings = (((company?.settings ?? {}) as { invoice?: InvoiceSettingsValue }).invoice ?? {}) as InvoiceSettingsValue;
 
   const cs = (clients ?? []) as Parameters<typeof ClientEditor>[0]["clients"];
   const ps = (partners ?? []) as Parameters<typeof PartnerEditor>[0]["partners"];
@@ -66,9 +69,16 @@ export default async function MastersPage() {
         <h1 className="text-2xl font-bold tracking-widest">設定</h1>
         <p className="mt-1 text-sm text-(--color-dim)">
           取引先・委託先マスタと単価表。委託料はゴルフ場ごと、交通費はキャディ×ゴルフ場で設定します。
-          ※個人情報（生年月日・口座）は保持していません
         </p>
       </header>
+
+      <section className={`${cardCls} mb-6`}>
+        <h2 className="mb-3 font-semibold">請求書設定（差出人・振込先）</h2>
+        <p className="mb-2 text-xs text-(--color-dim)">
+          取引先向け請求書のヘッダーに印字される会社情報と振込先銀行です。保存するとすべての請求書に反映されます。
+        </p>
+        <InvoiceSettingsEditor value={invoiceSettings} />
+      </section>
 
       <section className={`${cardCls} mb-6`}>
         <h2 className="mb-3 font-semibold">取引先（ゴルフ場） {cs.length}件</h2>

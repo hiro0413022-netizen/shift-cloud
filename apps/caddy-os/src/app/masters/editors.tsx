@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveClient, savePartner, saveTransportRate, togglePartnerPicker } from "../actions";
+import { saveClient, saveInvoiceSettings, savePartner, saveTransportRate, togglePartnerPicker } from "../actions";
 
 const cell = "rounded border border-(--color-line) bg-white px-2 py-1 text-sm outline-none focus:border-(--color-accent)";
 
@@ -31,6 +31,7 @@ type Partner = {
   show_in_picker: boolean;
   status: string;
   memo: string | null;
+  bank_info: string | null;
 };
 
 /** 汎用: サーバーアクションを呼んで結果を表示する行フォーム */
@@ -130,6 +131,12 @@ function PartnerForm({ p }: { p?: Partner }) {
         <button disabled={pending} className="rounded-lg bg-(--color-accent) px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
           {pending ? "保存中…" : p ? "更新" : "＋ 追加"}
         </button>
+        <input
+          name="bank_info"
+          defaultValue={p?.bank_info ?? ""}
+          placeholder="振込先（例: ○○銀行 ○○支店 普通 1234567 ﾔﾏﾀﾞﾀﾛｳ）※任意・請求書に表示"
+          className={`${cell} flex-1`}
+        />
         {msg ? <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</span> : null}
       </div>
     </form>
@@ -159,6 +166,40 @@ export function PartnerEditor({ partners }: { partners: Partner[] }) {
         <PartnerForm />
       </div>
     </div>
+  );
+}
+
+/* ── 請求書設定（差出人・振込先 / companies.settings.invoice） ── */
+export type InvoiceSettingsValue = {
+  company_name?: string;
+  representative?: string;
+  postal_code?: string;
+  address?: string;
+  bank_name?: string;
+  bank_account?: string;
+  bank_holder?: string;
+};
+
+export function InvoiceSettingsEditor({ value }: { value: InvoiceSettingsValue }) {
+  const { onAction, pending, msg } = useSaver(saveInvoiceSettings);
+  return (
+    <form action={onAction} className="grid grid-cols-12 items-center gap-1.5 text-sm">
+      <div className="col-span-12 text-[11px] text-(--color-dim)">差出人（請求書の右上に出ます）</div>
+      <input name="company_name" defaultValue={value.company_name ?? ""} placeholder="会社名（例: 株式会社YOZAN）" className={`${cell} col-span-3`} />
+      <input name="representative" defaultValue={value.representative ?? ""} placeholder="代表者（例: 代表取締役 ○○○○）" className={`${cell} col-span-3`} />
+      <input name="postal_code" defaultValue={value.postal_code ?? ""} placeholder="〒（例: 〒665-0816）" className={`${cell} col-span-2`} />
+      <input name="address" defaultValue={value.address ?? ""} placeholder="住所" className={`${cell} col-span-4`} />
+      <div className="col-span-12 mt-1 text-[11px] text-(--color-dim)">振込先銀行（請求書の枠内に出ます）</div>
+      <input name="bank_name" defaultValue={value.bank_name ?? ""} placeholder="銀行・支店（例: 尼崎信用金庫 鴻池支店）" className={`${cell} col-span-4`} />
+      <input name="bank_account" defaultValue={value.bank_account ?? ""} placeholder="種別・口座番号（例: 普通預金 4120589）" className={`${cell} col-span-4`} />
+      <input name="bank_holder" defaultValue={value.bank_holder ?? ""} placeholder="口座名義（例: ｶ.ﾖｳｻﾞﾝ）" className={`${cell} col-span-4`} />
+      <div className="col-span-12 flex items-center gap-2">
+        <button disabled={pending} className="rounded-lg bg-(--color-accent) px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
+          {pending ? "保存中…" : "保存"}
+        </button>
+        {msg ? <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</span> : null}
+      </div>
+    </form>
   );
 }
 

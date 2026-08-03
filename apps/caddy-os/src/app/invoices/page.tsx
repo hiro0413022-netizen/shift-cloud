@@ -2,8 +2,8 @@ import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
 import { createAdmin } from "@yozan/core/supabase/admin";
-import { currentYm, ymRange, yen } from "@/lib/caddy";
-import { buildInvoice } from "@/lib/invoice";
+import { currentYm, yen } from "@/lib/caddy";
+import { billingRange, buildInvoice, lastDayOf } from "@/lib/invoice";
 import { InvoiceTabs } from "./tabs";
 import { IssueReceivable } from "./issue-receivable";
 import { markInvoiceStatus } from "../actions";
@@ -15,7 +15,11 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
   const actor = await requireActor();
   const sp = await searchParams;
   const ym = sp.ym ?? currentYm();
-  const { from, to } = ymRange(ym);
+  // 20日締めの取引先は前月21日〜のため、前月1日から広めに取得して取引先ごとに絞る
+  const [yy, mm] = ym.split("-").map(Number);
+  const prevYm = mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, "0")}`;
+  const from = `${prevYm}-01`;
+  const to = lastDayOf(ym);
 
   const admin = createAdmin();
   const [{ data: clients }, { data: rows }, { data: invoices }] = await Promise.all([
@@ -27,10 +31,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       .order("code"),
     admin
       .from("cad_dispatches")
-      .select("client_id, dispatch_date, sales_amount")
+      .select("client_id, dispatch_date, sales_amount, billing_ym")
       .eq("company_id", actor.companyId)
-      .gte("dispatch_date", from)
-      .lte("dispatch_date", to)
+      .or(`and(dispatch_date.gte.${from},dispatch_date.lte.${to}),billing_ym.eq.${ym}`)
       .is("deleted_at", null)
       .gt("sales_amount", 0),
     admin
@@ -49,7 +52,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     closing_day: string | null;
     payment_day: string | null;
   }>;
-  const ds = (rows ?? []) as Array<{ client_id: string; dispatch_date: string; sales_amount: number }>;
+  const ds = (rows ?? []) as Array<{ client_id: string; dispatch_date: string; sales_amount: number; billing_ym: string | null }>;
 
   const invByClient = new Map<string, { id: string; status: string }>();
   for (const iv of (invoices ?? []) as Array<{ id: string; client_id: string; status: string }>) {
@@ -59,7 +62,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
 
   const summaries = cs
     .map((c) => {
-      const mine = ds.filter((d) => d.client_id === c.id);
+      // 締め期間内（請求月の上書きなし）＋ 請求月がこの月に指定された行
+      const r = billingRange(ym, c.closing_day);
+      const mine = ds.filter(
+        (d) =>
+          d.client_id === c.id &&
+          (d.billing_ym ? d.billing_ym === ym : d.dispatch_date >= r.from && d.dispatch_date <= r.to)
+      );
       const inv = buildInvoice(mine, ym, c.closing_day);
       return { client: c, inv, count: mine.length };
     })
@@ -174,7 +183,8 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       </section>
 
       <p className="mt-4 text-xs text-(--color-dim)">
-        ※ 西宮高原ゴルフ倶楽部は「20日締め」のため、締切日が月末になりません（マスタの締め日を参照しています）。
+        ※ 西宮高原ゴルフ倶楽部は「20日締め」のため、請求対象は前月21日〜当月20日の派遣です（マスタの締め日を参照）。
+        研修などで請求を別の月に回したい派遣は、派遣台帳の「請求月」で指定できます。
       </p>
     </main>
   );

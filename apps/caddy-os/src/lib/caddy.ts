@@ -24,6 +24,7 @@ export type DispatchRow = {
   special_amount: number;
   work_hours: number | null;
   memo: string | null;
+  billing_ym: string | null;
   client_id: string | null;
   partner_id: string | null;
   staff_id: string | null;
@@ -74,7 +75,7 @@ export async function getDispatches(companyId: string, ym: string): Promise<Disp
   const { data } = await admin
     .from("cad_dispatches")
     .select(
-      "id, seq, dispatch_date, kind, sales_amount, fee_amount, transport_amount, special_amount, work_hours, memo, client_id, partner_id, staff_id, cad_clients(name), cad_partners(name), staff(name)"
+      "id, seq, dispatch_date, kind, sales_amount, fee_amount, transport_amount, special_amount, work_hours, memo, billing_ym, client_id, partner_id, staff_id, cad_clients(name), cad_partners(name), staff(name)"
     )
     .eq("company_id", companyId)
     .gte("dispatch_date", from)

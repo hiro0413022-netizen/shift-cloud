@@ -6,6 +6,7 @@ import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { ymRange } from "@/lib/caddy";
 import {
+  billingRange,
   buildInvoice,
   buildPayable,
   invoiceNo,
@@ -323,6 +324,7 @@ const partnerSchema = z.object({
   show_in_picker: z.coerce.boolean(),
   status: z.enum(["active", "inactive"]).default("active"),
   memo: z.string().max(500).nullable(),
+  bank_info: z.string().max(200).nullable(),
 });
 
 export async function savePartner(fd: FormData): Promise<{ error?: string }> {
@@ -339,6 +341,7 @@ export async function savePartner(fd: FormData): Promise<{ error?: string }> {
     show_in_picker: fd.get("show_in_picker") === "on" || fd.get("show_in_picker") === "true",
     status: (str(fd, "status") ?? "active") as "active" | "inactive",
     memo: str(fd, "memo"),
+    bank_info: str(fd, "bank_info"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力エラー" };
   const { id, ...row } = parsed.data;
@@ -353,6 +356,66 @@ export async function savePartner(fd: FormData): Promise<{ error?: string }> {
   }
   revalidatePath("/masters");
   revalidatePath("/dispatches");
+  return {};
+}
+
+/* ============================================================
+   設定: 請求書の差出人・振込先（companies.settings.invoice）
+   請求書ヘッダーの会社情報と振込先銀行をここで編集する。
+   ============================================================ */
+const invoiceSettingsSchema = z.object({
+  company_name: z.string().max(120).nullable(),
+  representative: z.string().max(120).nullable(),
+  postal_code: z.string().max(20).nullable(),
+  address: z.string().max(200).nullable(),
+  bank_name: z.string().max(120).nullable(),
+  bank_account: z.string().max(120).nullable(),
+  bank_holder: z.string().max(120).nullable(),
+});
+
+export async function saveInvoiceSettings(fd: FormData): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  const parsed = invoiceSettingsSchema.safeParse({
+    company_name: str(fd, "company_name"),
+    representative: str(fd, "representative"),
+    postal_code: str(fd, "postal_code"),
+    address: str(fd, "address"),
+    bank_name: str(fd, "bank_name"),
+    bank_account: str(fd, "bank_account"),
+    bank_holder: str(fd, "bank_holder"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力エラー" };
+
+  const admin = createAdmin();
+  const { data: company } = await admin.from("companies").select("settings").eq("id", actor.companyId).single();
+  const settings = (company?.settings ?? {}) as Record<string, unknown>;
+  const invoice = { ...((settings.invoice as Record<string, unknown>) ?? {}), ...parsed.data };
+  const { error } = await admin
+    .from("companies")
+    .update({ settings: { ...settings, invoice } })
+    .eq("id", actor.companyId);
+  if (error) return { error: error.message };
+  revalidatePath("/masters");
+  revalidatePath("/invoices");
+  return {};
+}
+
+/**
+ * 派遣行の「請求月」上書き（研修者など請求が月をまたぐ場合 / migration 0089）。
+ * null で解除＝取引先の締め期間どおりに戻る。
+ */
+export async function setDispatchBillingYm(id: string, billingYm: string | null): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  if (billingYm && !/^\d{4}-\d{2}$/.test(billingYm)) return { error: "請求月は YYYY-MM 形式で指定してください" };
+  const admin = createAdmin();
+  const { error } = await admin
+    .from("cad_dispatches")
+    .update({ billing_ym: billingYm })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+  if (error) return { error: error.message };
+  revalidatePath("/dispatches");
+  revalidatePath("/invoices");
   return {};
 }
 
@@ -474,27 +537,28 @@ export async function saveGolfwingBulk(
 export async function issueReceivableInvoice(clientId: string, ym: string): Promise<{ error?: string }> {
   const actor = await requireActor();
   const admin = createAdmin();
-  const { from, to } = ymRange(ym);
 
-  const [{ data: client }, { data: rows }, { data: company }] = await Promise.all([
+  const [{ data: client }, { data: company }] = await Promise.all([
     admin
       .from("cad_clients")
       .select("id, code, name, closing_day")
       .eq("id", clientId)
       .eq("company_id", actor.companyId)
       .single(),
-    admin
-      .from("cad_dispatches")
-      .select("dispatch_date, sales_amount")
-      .eq("company_id", actor.companyId)
-      .eq("client_id", clientId)
-      .gte("dispatch_date", from)
-      .lte("dispatch_date", to)
-      .is("deleted_at", null)
-      .gt("sales_amount", 0),
     admin.from("companies").select("settings").eq("id", actor.companyId).single(),
   ]);
   if (!client) return { error: "取引先が見つかりません" };
+
+  // 締め期間（20日締めなら前月21日〜当月20日）＋ 請求月の上書き行（プレビュー画面と同じ条件）
+  const { from, to } = billingRange(ym, client.closing_day);
+  const { data: rows } = await admin
+    .from("cad_dispatches")
+    .select("dispatch_date, sales_amount")
+    .eq("company_id", actor.companyId)
+    .eq("client_id", clientId)
+    .or(`and(dispatch_date.gte.${from},dispatch_date.lte.${to},billing_ym.is.null),billing_ym.eq.${ym}`)
+    .is("deleted_at", null)
+    .gt("sales_amount", 0);
   const settings = ((company?.settings ?? {}) as { invoice?: { tax_rate?: number; item_label?: string } }).invoice ?? {};
   const inv = buildInvoice(
     (rows ?? []) as Array<{ dispatch_date: string; sales_amount: number }>,

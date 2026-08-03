@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 // ※ import は .ts 拡張子付きが必須（node --test の型ストリップの制約）
-import { buildInvoice, closingDateOf, jpDate, invoiceNo } from "../apps/caddy-os/src/lib/invoice.ts";
+import { billingRange, buildInvoice, closingDateOf, jpDate, invoiceNo } from "../apps/caddy-os/src/lib/invoice.ts";
 
 /* ============================================================
    請求書ロジック（DECISIONS #46）
@@ -72,6 +72,20 @@ test("締切日: 「月末」「空欄」は実在する月末日（2月は28日
   assert.equal(closingDateOf("2026-02", ""), "2026-02-28");
   assert.equal(closingDateOf("2024-02", null), "2024-02-29");
   assert.equal(closingDateOf("2026-01", "月末"), "2026-01-31");
+});
+
+test("請求期間: 20日締めは前月21日〜当月20日（西宮高原の実運用 / migration 0089）", () => {
+  assert.deepEqual(billingRange("2026-07", "２０日締め"), { from: "2026-06-21", to: "2026-07-20" });
+  assert.deepEqual(billingRange("2026-01", "20日"), { from: "2025-12-21", to: "2026-01-20" });
+});
+
+test("請求期間: 月末締め・空欄は暦月どおり", () => {
+  assert.deepEqual(billingRange("2026-06", "月末"), { from: "2026-06-01", to: "2026-06-30" });
+  assert.deepEqual(billingRange("2026-02", null), { from: "2026-02-01", to: "2026-02-28" });
+});
+
+test("請求期間: 前月に存在しない開始日は前月末に丸める（30日締め×3月）", () => {
+  assert.deepEqual(billingRange("2026-03", "30日締め"), { from: "2026-02-28", to: "2026-03-30" });
 });
 
 test("消費税は小計に対して10%・端数はfloor（DECISIONS #4のinteger円）", () => {

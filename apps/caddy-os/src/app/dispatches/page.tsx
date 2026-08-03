@@ -5,6 +5,7 @@ import { getDispatches, getMasters, summarize, byStaff, currentYm, yen, dispatch
 import { BulkGrid } from "./bulk-grid";
 import { GolfwingGrid } from "./golfwing-grid";
 import { deleteDispatch } from "../actions";
+import { BillingYmCell } from "./billing-ym-cell";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,7 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                   <th className="pb-2 text-right">交通費</th>
                   <th className="pb-2 text-right">手当</th>
                   <th className="pb-2 text-right">粗利</th>
+                  <th className="pb-2">請求月</th>
                   <th className="pb-2"></th>
                 </tr>
               </thead>
@@ -166,6 +168,9 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                         className={`py-1.5 text-right font-medium tabular-nums ${!isGw && gross < 0 ? "text-red-600" : ""}`}
                       >
                         {isGw ? <span className="text-(--color-dim)">—</span> : yen(gross)}
+                      </td>
+                      <td className="py-1.5">
+                        {r.sales_amount > 0 ? <BillingYmCell id={r.id} value={r.billing_ym} /> : <span className="text-(--color-dim)">—</span>}
                       </td>
                       <td className="py-1.5 text-right">
                         <form action={deleteDispatch}>

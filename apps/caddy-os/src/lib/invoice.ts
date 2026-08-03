@@ -57,6 +57,29 @@ export function closingDateOf(ym: string, closingDay: string | null | undefined)
   return lastDayOf(ym);
 }
 
+/**
+ * 請求対象期間。20日締めなら「前月21日〜当月20日」、月末締めなら「1日〜月末」。
+ * 例: billingRange('2026-07', '２０日締め') → { from: '2026-06-21', to: '2026-07-20' }
+ * （西宮高原ゴルフ倶楽部の実運用に合わせる。従来は締め日に関係なく暦月で集計していた）
+ */
+export function billingRange(ym: string, closingDay: string | null | undefined): { from: string; to: string } {
+  const raw = (closingDay ?? "").trim();
+  const normalized = raw.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  const m = normalized.match(/(\d{1,2})\s*日/);
+  if (m) {
+    const day = Number(m[1]);
+    const last = Number(lastDayOf(ym).slice(-2));
+    if (day >= 1 && day < last) {
+      const [y, mm] = ym.split("-").map(Number);
+      const prevYm = mm === 1 ? `${y - 1}-12` : `${y}-${String(mm - 1).padStart(2, "0")}`;
+      const prevLast = Number(lastDayOf(prevYm).slice(-2));
+      const fromDay = Math.min(day + 1, prevLast); // 2月等で存在しない日を作らない
+      return { from: `${prevYm}-${String(fromDay).padStart(2, "0")}`, to: `${ym}-${String(day).padStart(2, "0")}` };
+    }
+  }
+  return { from: `${ym}-01`, to: lastDayOf(ym) };
+}
+
 /** 「2026年6月7日」表記（請求書の明細ラベル用。0埋めしない） */
 export function jpDate(date: string): string {
   const [y, m, d] = date.split("-").map(Number);

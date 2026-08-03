@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@yozan/core/supabase/admin";
-import { currentYm, ymRange } from "@/lib/caddy";
-import { buildInvoice, invoiceNo, yen } from "@/lib/invoice";
+import { currentYm } from "@/lib/caddy";
+import { billingRange, buildInvoice, invoiceNo, yen } from "@/lib/invoice";
 import { PrintButton } from "./print-button";
 
 export const dynamic = "force-dynamic";
@@ -32,30 +32,31 @@ export default async function InvoiceDetail({
   const { clientId } = await params;
   const sp = await searchParams;
   const ym = sp.ym ?? currentYm();
-  const { from, to } = ymRange(ym);
 
   const admin = createAdmin();
-  const [{ data: client }, { data: rows }, { data: company }] = await Promise.all([
+  const [{ data: client }, { data: company }] = await Promise.all([
     admin
       .from("cad_clients")
       .select("id, code, name, postal_code, address, closing_day, payment_day")
       .eq("id", clientId)
       .eq("company_id", actor.companyId)
       .single(),
-    admin
-      .from("cad_dispatches")
-      .select("dispatch_date, sales_amount")
-      .eq("company_id", actor.companyId)
-      .eq("client_id", clientId)
-      .gte("dispatch_date", from)
-      .lte("dispatch_date", to)
-      .is("deleted_at", null)
-      .gt("sales_amount", 0)
-      .order("dispatch_date"),
     admin.from("companies").select("settings").eq("id", actor.companyId).single(),
   ]);
 
   if (!client) notFound();
+
+  // 締め期間（20日締めなら前月21日〜当月20日）。billing_ym の上書きがある行は期間に関係なくその月へ
+  const { from, to } = billingRange(ym, client.closing_day);
+  const { data: rows } = await admin
+    .from("cad_dispatches")
+    .select("dispatch_date, sales_amount")
+    .eq("company_id", actor.companyId)
+    .eq("client_id", clientId)
+    .or(`and(dispatch_date.gte.${from},dispatch_date.lte.${to},billing_ym.is.null),billing_ym.eq.${ym}`)
+    .is("deleted_at", null)
+    .gt("sales_amount", 0)
+    .order("dispatch_date");
 
   const settings = ((company?.settings ?? {}) as { invoice?: InvoiceSettings }).invoice ?? {};
   const taxRate = settings.tax_rate ?? 0.1;
@@ -174,8 +175,9 @@ export default async function InvoiceDetail({
       </div>
 
       <div className="mx-auto max-w-3xl p-4 text-xs text-(--color-dim) print:hidden">
+        対象期間 {from} 〜 {to}（締め日: {client.closing_day ?? "月末"}）。
         派遣台帳から自動生成しています（{inv.lines.length}明細 / {inv.lines.reduce((s, l) => s + l.qty, 0)}人工）。
-        金額が合わない場合は台帳を修正してください。
+        台帳で「請求月」を指定した行は期間外でもこの請求書に入ります。金額が合わない場合は台帳を修正してください。
       </div>
     </>
   );
