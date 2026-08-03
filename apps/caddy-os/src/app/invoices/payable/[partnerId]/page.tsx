@@ -28,7 +28,7 @@ export default async function PayableDetail({
   const [{ data: partner }, { data: rows }, { data: company }, { data: existing }] = await Promise.all([
     admin
       .from("cad_partners")
-      .select("id, code, name, bank_info")
+      .select("id, code, name, bank_name, bank_branch, bank_account_type, bank_account_no, bank_holder")
       .eq("id", partnerId)
       .eq("company_id", actor.companyId)
       .single(),
@@ -135,15 +135,24 @@ export default async function PayableDetail({
             </p>
             <p className="mt-3 font-bold">{partner.name}</p>
             <p className="mt-1 text-slate-500">（委託先コード {partner.code ?? "—"}）</p>
-            {partner.bank_info ? (
+            {partner.bank_name || partner.bank_account_no ? (
+              // 振込先口座（設定 → 委託先で登録 / migration 0090）。YOZAN請求書と同じ枠形式
               <div className="mt-3 border border-black p-2">
                 <p className="font-bold">振込先銀行</p>
-                <p>{partner.bank_info}</p>
+                <p>
+                  {[partner.bank_name, partner.bank_branch].filter(Boolean).join(" ")}
+                </p>
+                <p>
+                  {[partner.bank_account_type ? `${partner.bank_account_type}預金` : null, partner.bank_account_no]
+                    .filter(Boolean)
+                    .join(" ")}
+                </p>
+                {partner.bank_holder ? <p>口座名義 {partner.bank_holder}</p> : null}
               </div>
             ) : (
               <div className="mt-3 border border-black p-2 text-[11px] text-slate-500">
                 <p>振込先は別途ご連絡ください</p>
-                <p>（設定 → 委託先の「振込先」欄に登録すると表示されます）</p>
+                <p>（設定 → 委託先の「振込先口座」に登録すると表示されます）</p>
               </div>
             )}
           </div>

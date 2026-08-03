@@ -31,7 +31,11 @@ type Partner = {
   show_in_picker: boolean;
   status: string;
   memo: string | null;
-  bank_info: string | null;
+  bank_name: string | null;
+  bank_branch: string | null;
+  bank_account_type: string | null;
+  bank_account_no: string | null;
+  bank_holder: string | null;
 };
 
 /** 汎用: サーバーアクションを呼んで結果を表示する行フォーム */
@@ -127,16 +131,23 @@ function PartnerForm({ p }: { p?: Partner }) {
         <option value="inactive">無効</option>
       </select>
       <input name="memo" defaultValue={p?.memo ?? ""} placeholder="備考" className={`${cell} col-span-1`} />
+      {/* 振込先口座（任意）— キャディ→YOZANの支払請求書に印字される（migration 0090） */}
+      <div className="col-span-12 grid grid-cols-12 items-center gap-1.5 rounded bg-slate-50 p-1.5">
+        <span className="col-span-1 text-[11px] text-(--color-dim)">振込先口座</span>
+        <input name="bank_name" defaultValue={p?.bank_name ?? ""} placeholder="銀行・信金名" className={`${cell} col-span-3`} />
+        <input name="bank_branch" defaultValue={p?.bank_branch ?? ""} placeholder="支店名" className={`${cell} col-span-2`} />
+        <select name="bank_account_type" defaultValue={p?.bank_account_type ?? ""} className={`${cell} col-span-1`}>
+          <option value="">種別</option>
+          <option value="普通">普通</option>
+          <option value="当座">当座</option>
+        </select>
+        <input name="bank_account_no" defaultValue={p?.bank_account_no ?? ""} placeholder="口座番号" inputMode="numeric" className={`${cell} col-span-2 tabular-nums`} />
+        <input name="bank_holder" defaultValue={p?.bank_holder ?? ""} placeholder="口座名義（カナ）" className={`${cell} col-span-3`} />
+      </div>
       <div className="col-span-12 flex items-center gap-2">
         <button disabled={pending} className="rounded-lg bg-(--color-accent) px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
           {pending ? "保存中…" : p ? "更新" : "＋ 追加"}
         </button>
-        <input
-          name="bank_info"
-          defaultValue={p?.bank_info ?? ""}
-          placeholder="振込先（例: ○○銀行 ○○支店 普通 1234567 ﾔﾏﾀﾞﾀﾛｳ）※任意・請求書に表示"
-          className={`${cell} flex-1`}
-        />
         {msg ? <span className={`text-xs ${msg.ok ? "text-emerald-700" : "text-red-600"}`}>{msg.text}</span> : null}
       </div>
     </form>

@@ -324,7 +324,12 @@ const partnerSchema = z.object({
   show_in_picker: z.coerce.boolean(),
   status: z.enum(["active", "inactive"]).default("active"),
   memo: z.string().max(500).nullable(),
-  bank_info: z.string().max(200).nullable(),
+  // 振込先（キャディ→YOZAN支払請求書に印字 / migration 0090・任意）
+  bank_name: z.string().max(120).nullable(),
+  bank_branch: z.string().max(120).nullable(),
+  bank_account_type: z.enum(["普通", "当座"]).nullable(),
+  bank_account_no: z.string().max(20).regex(/^\d*$/, "口座番号は数字で入力してください").nullable(),
+  bank_holder: z.string().max(120).nullable(),
 });
 
 export async function savePartner(fd: FormData): Promise<{ error?: string }> {
@@ -341,7 +346,11 @@ export async function savePartner(fd: FormData): Promise<{ error?: string }> {
     show_in_picker: fd.get("show_in_picker") === "on" || fd.get("show_in_picker") === "true",
     status: (str(fd, "status") ?? "active") as "active" | "inactive",
     memo: str(fd, "memo"),
-    bank_info: str(fd, "bank_info"),
+    bank_name: str(fd, "bank_name"),
+    bank_branch: str(fd, "bank_branch"),
+    bank_account_type: str(fd, "bank_account_type") as "普通" | "当座" | null,
+    bank_account_no: str(fd, "bank_account_no"),
+    bank_holder: str(fd, "bank_holder"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力エラー" };
   const { id, ...row } = parsed.data;

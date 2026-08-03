@@ -20,7 +20,7 @@ export default async function MastersPage() {
       .order("code"),
     admin
       .from("cad_partners")
-      .select("id, code, name, name_kana, default_fee, default_transport, hourly_wage, main_course, show_in_picker, status, memo, bank_info")
+      .select("id, code, name, name_kana, default_fee, default_transport, hourly_wage, main_course, show_in_picker, status, memo, bank_name, bank_branch, bank_account_type, bank_account_no, bank_holder")
       .eq("company_id", actor.companyId)
       .is("deleted_at", null)
       .order("code"),
@@ -92,7 +92,8 @@ export default async function MastersPage() {
         <h2 className="mb-3 font-semibold">委託先（キャディ） {ps.length}件</h2>
         <p className="mb-2 text-xs text-(--color-dim)">
           「台帳表示」をオフにすると派遣台帳のプルダウンから消えます（退職・休眠キャディを隠す・#62 ④）。
-          「時給(GW)」はゴルフウィング勤務の時給（#62 ⑤）
+          「時給(GW)」はゴルフウィング勤務の時給（#62 ⑤）。
+          「振込先口座」を登録すると、そのキャディ→YOZANの支払請求書に振込先として印字されます（任意）
         </p>
         <PartnerEditor partners={ps} />
       </section>
