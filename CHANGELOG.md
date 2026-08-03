@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 2026-08-03 — Money OS: 担当プロ＋品名の在庫ピッカー＋明細編集（DECISIONS #98・migration 0088適用済）
+- db: 0088 `mon_pros`（担当プロ名簿・店舗別。RLS有効・service_role専用）
+- feat(money-golfwing): /settings 新設 — 店舗ごとの担当プロを追加・並び順・有効/無効・削除（ナビに「設定」）
+- feat(money-golfwing): 売上入力ヘッダーに担当プロselect（detail.proへ名前スナップショット保存）
+- feat(money-golfwing): 品名ピッカー — 自由入力＋「最近の入力」「在庫リスト(inv_stock 362品番)」から選択。品目チップ＋横断検索で絞り込み（全件ダラ見せしない）。在庫品番選択で定価自動セット・区分=販売へ
+- feat(money-golfwing): 在庫連動 — 在庫品番付きの売上保存で inv_movements(kind='sale', qty=-(個数||1), source_app='money-os', source_id=sale.id) を起票（0086(e)の設計を配線）。編集で数量・日付を同期、品番を外す/削除で在庫が戻る
+- feat(money-golfwing): 明細の編集 — 一覧の行から全項目を編集（updateSale）。現金⇄他の切替で現金出納の連携行を追加/更新/削除し、`rebalanceCashLedger` で残高を積み直し。削除時も連携行を削除して積み直し（従来は残ったままだった）
+- fix(money-golfwing): 売上入力の「今日」初期値をJSTで解決（UTCだと朝9時まで前日になる。#73）
+
 ## 2026-07-27 — SWING CORTEX: あいまい症状検索＋コメント短文化＋Gemini対応
 - feat(swing-cortex): 日本語あいまい検索 `lib/jp-search.ts`（正規化＋読み寄せ＋語幹化＋2-gram）。「伸びあがり/伸びあがる/伸び上がる/のびあがり」等の表記ゆれ・活用違いで同じ症状に着地。`/`診断と`/library`の両方に適用、同義語辞書を29グループへ拡張
 - feat(swing-cortex): 自然文コメントを短文化（2〜3文・120字以内。`NATURAL_MAX_CHARS`＋`trimNatural()`で長さをコード側でも担保）。整形版（structured）の分量は従来どおり

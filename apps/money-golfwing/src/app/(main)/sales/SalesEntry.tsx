@@ -3,12 +3,13 @@
 import { useRef, useState, useTransition } from "react";
 import { inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { createSale, createSales, type SaleInput } from "./actions";
+import ProductPicker, { invLabel, type InvPick } from "./ProductPicker";
 
 export type Preset = { label: string; category: string; productName: string; amount: number };
 
-type Line = { productName: string; amount: string; taxIncluded: string; taxManual: boolean; qty: string; memo: string };
+type Line = { productName: string; invItemId: string | null; amount: string; taxIncluded: string; taxManual: boolean; qty: string; memo: string };
 
-const emptyLine = (): Line => ({ productName: "", amount: "", taxIncluded: "", taxManual: false, qty: "", memo: "" });
+const emptyLine = (): Line => ({ productName: "", invItemId: null, amount: "", taxIncluded: "", taxManual: false, qty: "", memo: "" });
 
 /** 税抜→税込（10%・円未満切り捨て）。空/非数値は空。 */
 function calcTax(amountStr: string): string {
@@ -26,6 +27,8 @@ export default function SalesEntry({
   today,
   categories,
   payMethods,
+  pros,
+  invItems,
   productSuggestions,
   customerSuggestions,
   presets,
@@ -33,6 +36,8 @@ export default function SalesEntry({
   today: string;
   categories: string[];
   payMethods: string[];
+  pros: string[];
+  invItems: InvPick[];
   productSuggestions: string[];
   customerSuggestions: string[];
   presets: Preset[];
@@ -43,6 +48,7 @@ export default function SalesEntry({
   const [customerName, setCustomerName] = useState("");
   const [memberKind, setMemberKind] = useState("");
   const [payMethod, setPayMethod] = useState(payMethods[0] ?? "現金");
+  const [pro, setPro] = useState("");
 
   const [mode, setMode] = useState<"single" | "batch">("single");
   const [pending, startTransition] = useTransition();
@@ -55,17 +61,39 @@ export default function SalesEntry({
 
   const productRef = useRef<HTMLInputElement>(null);
 
-  const header = () => ({ soldOn, category, customerName: customerName || undefined, memberKind: memberKind || undefined, payMethod: payMethod || undefined });
+  const header = () => ({
+    soldOn,
+    category,
+    customerName: customerName || undefined,
+    memberKind: memberKind || undefined,
+    payMethod: payMethod || undefined,
+    pro: pro || undefined,
+  });
 
   function lineToInput(l: Line): SaleInput {
     return {
       ...header(),
       productName: l.productName || undefined,
+      invItemId: l.invItemId || undefined,
       amount: num(l.amount),
       taxIncluded: l.taxIncluded ? num(l.taxIncluded) : null,
       qty: l.qty ? num(l.qty) : undefined,
       memo: l.memo || undefined,
     };
+  }
+
+  // 在庫品番を選択: 品名・在庫リンク・（金額が空なら）定価を流し込み。区分も「販売」へ
+  function pickInto(l: Line, it: InvPick): Line {
+    const next: Line = { ...l, productName: invLabel(it), invItemId: it.id };
+    if (!num(l.amount) && it.listPrice) {
+      next.amount = String(Math.round(Number(it.listPrice)));
+      if (!l.taxManual) next.taxIncluded = calcTax(next.amount);
+    }
+    return next;
+  }
+  function onPickAny(it: InvPick, apply: (f: (l: Line) => Line) => void) {
+    if (category !== "販売") setCategory("販売");
+    apply((l) => pickInto(l, it));
   }
 
   // 連続追加：1件保存 → 商品欄だけクリア、ヘッダーは保持、品名にフォーカス
@@ -75,7 +103,7 @@ export default function SalesEntry({
     startTransition(async () => {
       await createSale(input);
       setLine(emptyLine());
-      setFlash(`追加しました：${input.productName ?? category} / ${input.amount.toLocaleString("ja-JP")}円`);
+      setFlash(`追加しました：${input.productName ?? category} / ${input.amount.toLocaleString("ja-JP")}円${input.invItemId ? "（在庫を減らしました）" : ""}`);
       productRef.current?.focus();
     });
   }
@@ -135,15 +163,12 @@ export default function SalesEntry({
       </div>
 
       {/* 共通データリスト */}
-      <datalist id="product-suggestions">
-        {productSuggestions.map((p) => <option key={p} value={p} />)}
-      </datalist>
       <datalist id="customer-suggestions">
         {customerSuggestions.map((c) => <option key={c} value={c} />)}
       </datalist>
 
       {/* ヘッダー（保持項目） */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
         <input type="date" value={soldOn} onChange={(e) => setSoldOn(e.target.value)} className={inputCls} />
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -157,7 +182,14 @@ export default function SalesEntry({
         <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className={inputCls}>
           {payMethods.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
+        <select value={pro} onChange={(e) => setPro(e.target.value)} className={inputCls}>
+          <option value="">担当プロ</option>
+          {pros.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
       </div>
+      {pros.length === 0 && (
+        <p className="text-xs text-(--color-dim)">担当プロは「設定」からこの店舗に追加できます</p>
+      )}
 
       {/* クイックボタン */}
       {presets.length > 0 && (
@@ -174,13 +206,15 @@ export default function SalesEntry({
       {/* 商品入力 */}
       {mode === "single" ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <input
-            ref={productRef}
-            list="product-suggestions"
+          <ProductPicker
+            className="sm:col-span-2"
             value={line.productName}
-            onChange={(e) => setLine({ ...line, productName: e.target.value })}
-            placeholder="品名・内容"
-            className={`${inputCls} sm:col-span-2`}
+            invItemId={line.invItemId}
+            recent={productSuggestions}
+            items={invItems}
+            autoFocusRef={productRef}
+            onChange={(name) => setLine({ ...line, productName: name, invItemId: null })}
+            onPick={(it) => onPickAny(it, (f) => setLine((prev) => f(prev)))}
           />
           <input
             inputMode="numeric"
@@ -218,12 +252,14 @@ export default function SalesEntry({
         <div className="space-y-2">
           {lines.map((l, idx) => (
             <div key={idx} className="grid grid-cols-2 gap-2 sm:grid-cols-12">
-              <input
-                list="product-suggestions"
+              <ProductPicker
+                className="sm:col-span-4"
                 value={l.productName}
-                onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, productName: e.target.value } : x))}
-                placeholder="品名・内容"
-                className={`${inputCls} sm:col-span-4`}
+                invItemId={l.invItemId}
+                recent={productSuggestions}
+                items={invItems}
+                onChange={(name) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, productName: name, invItemId: null } : x))}
+                onPick={(it) => onPickAny(it, (f) => setLines((prev) => prev.map((x, i) => i === idx ? f(x) : x)))}
               />
               <input
                 inputMode="numeric"

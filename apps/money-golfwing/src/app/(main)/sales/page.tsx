@@ -3,8 +3,9 @@ import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore, monthRange } from "@/lib/money";
 import { Panel, Empty, yen, btnGhostCls } from "@/components/ui";
-import { deleteSale } from "./actions";
 import SalesEntry, { type Preset } from "./SalesEntry";
+import SalesTable, { type SaleRow } from "./SalesTable";
+import type { InvPick } from "./ProductPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,33 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     : { data: [] };
   const rows = (data ?? []) as Sale[];
   const total = rows.reduce((a, r) => a + Number(r.amount), 0);
-  const today = new Date().toISOString().slice(0, 10);
+  // 「今日」はJSTで解決（UTCだと朝9時まで前日になる。#73）
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+
+  // 担当プロ（この店舗・有効のみ。/settings で管理）
+  const { data: proRows } = store
+    ? await admin.from("mon_pros").select("name")
+        .eq("company_id", actor.companyId).eq("store_id", store.id)
+        .eq("active", true).is("deleted_at", null)
+        .order("sort_order").order("name")
+    : { data: [] };
+  const pros = (proRows ?? []).map((p) => String(p.name));
+
+  // 在庫リスト（Inventory OS）: 品名ピッカーの選択元。理論在庫つき
+  const { data: invRows } = await admin.from("inv_stock")
+    .select("item_id, code, category, maker, name, variant, list_price, qty")
+    .eq("company_id", actor.companyId).eq("status", "active")
+    .order("code");
+  const invItems: InvPick[] = (invRows ?? []).map((r) => ({
+    id: String(r.item_id),
+    code: String(r.code),
+    category: String(r.category),
+    maker: String(r.maker),
+    name: String(r.name),
+    variant: r.variant ? String(r.variant) : null,
+    listPrice: r.list_price != null ? Number(r.list_price) : null,
+    stock: Number(r.qty ?? 0),
+  }));
 
   // 入力補助：この店舗の直近アプリ入力から品名・お客様名・定番(品名+金額)を作る
   const { data: recent } = store
@@ -77,6 +104,23 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   }
   const presets: Preset[] = [...comboCount.values()].sort((a, b) => b.n - a.n).slice(0, 8).map((x) => x.p);
 
+  // 明細（編集可能テーブルへ渡す形に整形）
+  const saleRows: SaleRow[] = rows.map((r) => ({
+    id: r.id,
+    soldOn: r.sold_on,
+    category: r.category,
+    customerName: r.customer_name ?? "",
+    memberKind: r.member_kind ?? "",
+    amount: Number(r.amount),
+    taxIncluded: r.tax_included != null ? Number(r.tax_included) : null,
+    payMethod: r.pay_method ?? "",
+    memo: r.memo ?? "",
+    productName: String(r.detail?.product_name ?? ""),
+    qty: r.detail?.qty ? Number(r.detail.qty) : null,
+    pro: String(r.detail?.pro ?? ""),
+    invItemId: r.detail?.inv_item_id ? String(r.detail.inv_item_id) : null,
+  }));
+
   return (
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -104,6 +148,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
             today={today}
             categories={CATEGORIES}
             payMethods={PAY_METHODS}
+            pros={pros}
+            invItems={invItems}
             productSuggestions={productSuggestions}
             customerSuggestions={customerSuggestions}
             presets={presets}
@@ -112,40 +158,10 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       </Panel>
 
       <Panel title={`明細（${month}）`}>
-        {rows.length === 0 ? (
+        {saleRows.length === 0 ? (
           <Empty>この月の売上はまだありません</Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
-                  <th className="py-2 pr-2 text-left font-medium">日付</th>
-                  <th className="px-2 py-2 text-left font-medium">区分</th>
-                  <th className="px-2 py-2 text-left font-medium">品名/お客様</th>
-                  <th className="px-2 py-2 text-right font-medium">金額</th>
-                  <th className="px-2 py-2 text-left font-medium">支払</th>
-                  <th className="px-2 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-(--color-line)">
-                    <td className="py-2 pr-2 tabular-nums text-(--color-dim)">{r.sold_on}</td>
-                    <td className="px-2 py-2">{r.category}</td>
-                    <td className="px-2 py-2">{String(r.detail?.product_name ?? "") || r.customer_name || "—"}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{yen(Number(r.amount))}</td>
-                    <td className="px-2 py-2 text-(--color-dim)">{r.pay_method ?? "—"}</td>
-                    <td className="px-2 py-2 text-right">
-                      <form action={deleteSale}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <SalesTable rows={saleRows} categories={CATEGORIES} payMethods={PAY_METHODS} pros={pros} />
         )}
       </Panel>
     </div>

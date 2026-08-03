@@ -42,5 +42,29 @@ export async function latestCashBalance(companyId: string, storeId: string): Pro
   return b == null ? 0 : Number(b);
 }
 
+/**
+ * 現金出納の残高を先頭から積み直す（編集・削除後の整合用）。
+ * balance列は表示用スナップショットのため、途中行を変えたら以降が全部ずれる。
+ * 変わった行だけUPDATEする（通常は末尾付近の数行）。
+ */
+export async function rebalanceCashLedger(companyId: string, storeId: string): Promise<void> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("mon_cash_ledger")
+    .select("id, in_amount, out_amount, balance")
+    .eq("company_id", companyId)
+    .eq("store_id", storeId)
+    .is("deleted_at", null)
+    .order("entry_date", { ascending: true })
+    .order("created_at", { ascending: true });
+  let bal = 0;
+  for (const row of data ?? []) {
+    bal += Number(row.in_amount ?? 0) - Number(row.out_amount ?? 0);
+    if (Number(row.balance) !== bal) {
+      await admin.from("mon_cash_ledger").update({ balance: bal }).eq("id", row.id);
+    }
+  }
+}
+
 // 純粋ユーティリティは money-util.ts へ集約（テスト対象）。既存importの互換のため再export。
 export { toNum, monthRange } from "@/lib/money-util";

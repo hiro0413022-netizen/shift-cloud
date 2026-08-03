@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/count", label: "金種棚卸" },
   { href: "/import", label: "カード・口座取込" },
   { href: "/receipts", label: "証憑" },
+  { href: "/settings", label: "設定" },
 ];
 
 export function TopBar({
