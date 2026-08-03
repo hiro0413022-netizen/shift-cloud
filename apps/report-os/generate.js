@@ -155,7 +155,7 @@ function build(data, outPath) {
     const dyf = delta(ft.current, ft.prevYear, "件");
     s.addShape(p.shapes.ROUNDED_RECTANGLE, { x: bx, y: 1.35, w: bw, h: 1.35, rectRadius: 0.08, fill: { color: C.tint }, line: { type: "none" } });
     s.addText("当月 物販売上", { x: bx + 0.2, y: 1.48, w: bw - 0.4, h: 0.28, fontFace: FONT, fontSize: 11, color: C.muted, bold: true, margin: 0 });
-    s.addText("¥" + nfInt(rs.current), { x: bx + 0.2, y: 1.78, w: bw - 0.4, h: 0.45, fontFace: FONT, fontSize: 19, color: C.green, bold: true, margin: 0 });
+    s.addText(rs.current == null ? (rs.pending || "要入力（取込待ち）") : "¥" + nfInt(rs.current), { x: bx + 0.2, y: 1.78, w: bw - 0.4, h: 0.45, fontFace: FONT, fontSize: rs.current == null ? 14 : 19, color: rs.current == null ? C.muted : C.green, bold: true, margin: 0 });
     s.addText([{ text: "前月比 ", options: { color: C.muted } }, { text: dmr.txt, options: { color: dmr.color, bold: true } }],
       { x: bx + 0.2, y: 2.28, w: bw - 0.4, h: 0.3, fontFace: FONT, fontSize: 11, margin: 0 });
     s.addShape(p.shapes.ROUNDED_RECTANGLE, { x: bx, y: 2.85, w: bw, h: 1.6, rectRadius: 0.08, fill: { color: C.darkGreen }, line: { type: "none" } });

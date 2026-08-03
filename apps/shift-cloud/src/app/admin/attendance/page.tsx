@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Badge, Empty } from "@/components/ui";
-import { currentYM, addMonths, timeJST, fmtMinutes, dowJP } from "@/lib/util";
+import { currentYM, addMonths, timeJST, fmtMinutes, dowJP, todayJST } from "@/lib/util";
 import { monthRange } from "@/lib/payroll-calc";
 import { CorrectionForm } from "./correction-form";
 
@@ -26,6 +26,34 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
     .lte("date", monthRange(ym).to)
     .order("date", { ascending: false });
 
+  // 打刻ゼロの出勤日を洗い出す（BUGFIX 2026-08-04）
+  // attendance_days は打刻か修正が無いと行が作られないため、丸一日打刻を忘れた日は
+  // この画面に一切表示されず修正もできなかった（7月給与の井殿6日欠落の原因）。
+  // 確定シフトがあり・当日以前で・勤怠行が無い日を「打刻なし」行として表に混ぜる。
+  const { data: monthShifts } = await admin
+    .from("shifts")
+    .select("staff_id, store_id, date, staff(name)")
+    .eq("company_id", actor.companyId)
+    .eq("store_id", storeId)
+    .eq("status", "published")
+    .eq("is_day_off", false)
+    .is("deleted_at", null)
+    .gte("date", monthRange(ym).from)
+    .lte("date", monthRange(ym).to)
+    .lte("date", todayJST())
+    .order("date", { ascending: false });
+
+  const attended = new Set((days ?? []).map((d) => `${d.staff_id}|${d.date}`));
+  const missing = (monthShifts ?? []).filter((s) => !attended.has(`${s.staff_id}|${s.date}`));
+
+  type Row =
+    | { kind: "day"; date: string; d: NonNullable<typeof days>[number] }
+    | { kind: "missing"; date: string; s: NonNullable<typeof monthShifts>[number] };
+  const rows: Row[] = [
+    ...(days ?? []).map((d) => ({ kind: "day", date: d.date, d }) as Row),
+    ...missing.map((s) => ({ kind: "missing", date: s.date, s }) as Row),
+  ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
   return (
     <>
       <PageTitle>勤怠管理</PageTitle>
@@ -45,11 +73,29 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
         </div>
       </div>
 
-      {!days?.length ? (
+      {!rows.length ? (
         <Empty>この月の勤怠記録はありません</Empty>
       ) : (
         <Table headers={["日付", "スタッフ", "出勤", "退勤", "休憩", "実働", "差異", "状態", ""]}>
-          {days.map((d) => (
+          {rows.map((row) => {
+            if (row.kind === "missing") {
+              const s = row.s;
+              return (
+                <tr key={`missing-${s.staff_id}-${s.date}`} className="bg-red-50/50 hover:bg-red-50">
+                  <Td className="whitespace-nowrap">{s.date.slice(5)}（{dowJP(s.date)}）</Td>
+                  <Td className="font-medium">{(s.staff as unknown as { name: string } | null)?.name}</Td>
+                  <Td className="text-zinc-400">—</Td>
+                  <Td className="text-zinc-400">—</Td>
+                  <Td className="text-zinc-400">—</Td>
+                  <Td className="text-zinc-400">—</Td>
+                  <Td><Badge color="red">打刻なし</Badge></Td>
+                  <Td><Badge color="zinc">未記録</Badge></Td>
+                  <Td><CorrectionForm staffId={s.staff_id} storeId={s.store_id} date={s.date} breakMinutes={0} isBreakManual={false} /></Td>
+                </tr>
+              );
+            }
+            const d = row.d;
+            return (
             <tr key={d.id} className="hover:bg-zinc-50">
               <Td className="whitespace-nowrap">{d.date.slice(5)}（{dowJP(d.date)}）</Td>
               <Td className="font-medium">{(d.staff as unknown as { name: string } | null)?.name}</Td>
@@ -74,7 +120,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
               <Td>{d.status === "corrected" ? <Badge color="amber">修正済</Badge> : <Badge color="zinc">自動</Badge>}</Td>
               <Td><CorrectionForm staffId={d.staff_id} storeId={d.store_id} date={d.date} breakMinutes={d.break_override_minutes ?? d.break_minutes} isBreakManual={d.break_override_minutes != null} /></Td>
             </tr>
-          ))}
+            );
+          })}
         </Table>
       )}
     </>
