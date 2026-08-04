@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { requireGenesisActor } from "@/lib/auth";
-import { getCockpitData, computeGenesisScore, applyJudgmentPenalties, buildJudgmentList } from "@/lib/kernel";
+import { getCockpitData, computeGenesisScore, applyJudgmentPenalties, buildJudgmentList, alertKey, getAckedAlertKeys } from "@/lib/kernel";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { getOpenSuggestions } from "@/lib/suggestions";
@@ -18,24 +18,28 @@ import {
 } from "./executions/actions";
 import { reviewDeliverable } from "./deliverables/actions";
 import { approveInquiry } from "./inbox/actions";
-import { decideTrialRequest, decideJoinRequest, dismissHotLead } from "./feed-actions";
+import { decideTrialRequest, decideJoinRequest, dismissHotLead, acknowledgeAlert } from "./feed-actions";
 
 export const dynamic = "force-dynamic";
 
 // REDESIGN_2026-07 §3-1: ホーム = スコア＋一言 / 判断フィード（その場で完結） / 5大KPI / AI活動ティッカー
 export default async function HomePage() {
   const actor = await requireGenesisActor();
-  const [d, suggestions, feed] = await Promise.all([
+  const [d, suggestions, feed, ackedKeys] = await Promise.all([
     getCockpitData(actor.companyId),
     getOpenSuggestions(actor.companyId, 3).catch(() => []),
     getJudgmentFeed(actor.companyId).catch(() => [] as JudgmentItem[]),
+    getAckedAlertKeys(actor.companyId).catch(() => new Set<string>()),
   ]);
   const [integrity, legal] = await Promise.all([
     runKpiIntegrityChecks(actor.companyId, d.kpis).catch(() => []),
     runLegalChecks(actor.companyId).catch(() => []),
   ]);
   // approval系はフィード側でカード化するので、アラート一覧からは除外（二重表示防止）
-  const alerts = [...integrity, ...legal, ...buildJudgmentList(d)].filter((j) => j.kind !== "approval");
+  // 確認済み（#101）はここで除外。値が変わればキーが変わり自動的に再表示される。
+  const alerts = [...integrity, ...legal, ...buildJudgmentList(d)]
+    .filter((j) => j.kind !== "approval")
+    .filter((j) => !ackedKeys.has(alertKey(j)));
   const { score, grade, factors } = applyJudgmentPenalties(computeGenesisScore(d), alerts);
 
   const undoItems = feed.filter((f) => f.source === "undo");
@@ -193,10 +197,13 @@ export default async function HomePage() {
               </FeedCard>
             ))}
 
-            {/* 整合性・法務・KPIアラート（リンク型） */}
+            {/* 整合性・法務・KPIアラート */}
             {alerts.slice(0, 7).map((j, i) => (
               <FeedCard key={`al-${i}`} tag={j.kind === "risk" ? "リスク" : j.kind === "blocker" ? "ブロッカー" : "確認"} title={j.title} detail={j.detail ?? null} href={j.href}>
-                <Link href={j.href} className="btn-sub">確認する →</Link>
+                <form action={acknowledgeAlert} className="flex gap-2">
+                  <input type="hidden" name="key" value={alertKey(j)} />
+                  <button className="btn-main">確認した</button>
+                </form>
               </FeedCard>
             ))}
 

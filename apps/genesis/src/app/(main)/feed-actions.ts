@@ -131,3 +131,23 @@ export async function dismissHotLead(formData: FormData) {
   });
   revalidatePath("/");
 }
+
+/**
+ * 整合性・法務・KPIアラート（リンク型）の「確認する」（#101）。
+ * これまでこのボタンは詳細ページへ飛ぶだけで一覧から消えなかったバグの修正。
+ * gn_alert_acks に記録するだけ＝元データは変えない。値が変わればキーが変わり自動的に再表示される。
+ */
+export async function acknowledgeAlert(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const key = String(formData.get("key") ?? "").trim();
+  if (!key) return;
+
+  const admin = createAdmin();
+  await admin
+    .from("gn_alert_acks")
+    .upsert(
+      { company_id: actor.companyId, alert_key: key, acked_by: actor.staffId, acked_at: new Date().toISOString() },
+      { onConflict: "company_id,alert_key" }
+    );
+  revalidatePath("/");
+}

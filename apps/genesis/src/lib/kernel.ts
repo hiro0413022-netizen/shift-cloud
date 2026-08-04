@@ -261,6 +261,22 @@ export function buildJudgmentList(d: CockpitData): JudgmentItem[] {
   return items;
 }
 
+/**
+ * アラート（整合性・法務・KPI）の確認済み判定キー（#101 判断フィードの確認ボタン修正）。
+ * kind＋title をそのままキーにする＝ title に金額・比率・現在値が入っているため、
+ * 内容が変わればキーも変わり、確認済みでも自動的に再表示される。
+ */
+export function alertKey(item: JudgmentItem): string {
+  return `${item.kind}::${item.title}`;
+}
+
+/** 確認済みアラートのキー集合を取得（gn_alert_acks、0092） */
+export async function getAckedAlertKeys(companyId: string): Promise<Set<string>> {
+  const admin = createAdmin();
+  const { data } = await admin.from("gn_alert_acks").select("alert_key").eq("company_id", companyId);
+  return new Set((data ?? []).map((r) => String((r as { alert_key: string }).alert_key)));
+}
+
 /* ============================================================
    事業別 → 店舗ドリルダウン（経営ダッシュボード用）
    事業の器 = fin_segments、当月の実績を fin_entries から集計。
