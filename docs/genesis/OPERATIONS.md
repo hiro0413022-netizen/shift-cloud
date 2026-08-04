@@ -231,3 +231,57 @@ git push origin main
 - **自分でやる場合（Shift Cloud管理画面）**: Shift Cloud → スタッフ管理 → 対象スタッフ → ロール編集 → 該当権限を含むロールを割り当て。該当ロールが無ければ「ロール管理」で新規ロールを作成し permissions に `{"use_survey": true}` 等を設定
 - **注意**: `view_hq` は経営層専用（Genesis本体に入れる権限 #18）。現場スタッフには各アプリの `use_*` だけを付ける
 - 給与系（`view_payroll` / `manage_payroll`）は追加認証付き（#3の例外）。付与は慎重に
+
+## 9. Instagram連携（AI営業 SNSインバウンド #101）
+
+自動投稿の開通に必要なのは env 2つだけ。未設定の間も生成・承認は動き、投稿は「予約のまま待機」します（設定した瞬間に自動開通）。
+**アカウント2つ分（@swingcortex_jp / @yozan_web_jp）を同じ手順で繰り返します**（env名だけ変える・§9-4の表）。所要 1アカウント約30分。
+
+### 9-1. Instagram側（スマホ・約5分／アカウントごと）
+
+1. Instagramアプリ → 該当アカウントに切替 → 右下プロフィール → 右上「≡」→ **設定とプライバシー**
+2. **アカウントの種類とツール** → **プロアカウントに切り替える** → カテゴリ（例: 商品/サービス）→ **ビジネス**を選択
+3. 続けて **Facebookページにリンク** を求められるので、YOZANのFacebookページに接続（無ければその場で新規作成でよい／ページ名は任意）
+   - 既にプロアカウントの場合: 設定 → **ビジネス** → **Facebookでシェア/ページをリンク** から接続状況を確認
+   - **ここでFacebookページと繋がっていないとAPIから投稿できません**（一番よくある詰まりどころ）
+
+### 9-2. Meta開発者アプリの作成（PC・初回1回だけ）
+
+2アカウント目は同じアプリを使い回せます（アプリ作成は1回でOK）。
+
+4. https://developers.facebook.com → 右上 **マイアプリ** → **アプリを作成**
+5. ユースケースは **「他の設定」→ ビジネス**（表記はUI改定で揺れます。要するに空のビジネスアプリ）→ アプリ名 `YOZAN Genesis` など → 作成
+6. 左メニュー **アプリの追加/製品を追加** → **Instagram（Instagram Graph API）** を「設定」
+
+### 9-3. トークンとIDの取得（PC・アカウントごと約10分）
+
+7. https://developers.facebook.com/tools/explorer （グラフAPIエクスプローラ）を開く
+8. 右上「Metaアプリ」で作成したアプリを選択 → 「ユーザーまたはページ」で **ユーザーアクセストークン**
+9. **アクセス許可を追加** で次の3つにチェック:
+   `instagram_basic` / `instagram_content_publish` / `pages_show_list`
+   （`pages_read_engagement` も出れば付けておくと安全）
+10. **アクセストークンを生成** → Facebookのログイン画面 → 対象のFacebookページとInstagramアカウントに**すべてチェックを入れて許可**（1つでも外すと後でIDが取れません）
+11. エクスプローラのURL欄に `me/accounts` と入れて送信 → 返ってきたJSONから該当ページの `id`（＝ページID）をコピー
+12. URL欄に `{ページID}?fields=instagram_business_account` と入れて送信 → `instagram_business_account.id` が **IGビジネスアカウントID**（これが `IG_BUSINESS_ID`）
+13. **長期トークンに交換**（生成直後のトークンは1〜2時間で切れます）:
+    - https://developers.facebook.com/tools/debug/accesstoken/ にトークンを貼って **デバッグ** → 下部 **アクセストークンを延長**（Extend Access Token）
+    - 出てきた長い文字列が `IG_ACCESS_TOKEN`（有効期限 約60日）
+
+### 9-4. Vercelに登録（§2の手順・約5分）
+
+14. Vercel → `yozan-genesis` → Settings → Environment Variables に、アカウントごとに2つずつ登録:
+
+| アカウント | 投稿する商品 | Key |
+|---|---|---|
+| @swingcortex_jp | swing-cortex / pganote | `IG_ACCESS_TOKEN` / `IG_BUSINESS_ID` |
+| @yozan_web_jp | webdesign（HP制作） | `IG_ACCESS_TOKEN_WEB` / `IG_BUSINESS_ID_WEB` |
+
+15. Deployments → 最新の「…」→ **Redeploy**（envは再デプロイで初めて反映）
+16. 確認: **/ai-sales**（AI営業 司令室）の上部警告が消える → 承認済み投稿が次の18:00（過ぎていれば10分以内）に自動投稿される
+17. Instagramプロフィールの**リンク**に対応LPを設定: @swingcortex_jp → `/lp/swing-cortex`、@yozan_web_jp → `/lp/webdesign`
+
+※ 長期トークンは約60日で失効します。失効すると /ai-sales の投稿が failed になり理由が表示されるので、再取得して env を差し替えてください（自動更新は残タスク）。
+
+※ アカウントは2つあります（#101補足）。**アプリ作成（9-2）は共通で1回**、**9-1と9-3をアカウントごとに繰り返し**、9-4でenv名を変えて登録します。片方だけ設定した状態でも安全で、未設定のアカウント分は「予約のまま待機」します。
+
+※ よくあるエラー: `(#200) Requires instagram_content_publish permission` → 手順10でチェックを外した／`instagram_business_account` が返らない → 9-1のFacebookページ接続ができていない。どちらも /ai-sales の投稿カードに理由が出ます。

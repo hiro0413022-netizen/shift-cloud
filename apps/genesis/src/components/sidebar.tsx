@@ -15,6 +15,7 @@ export const PRIMARY_NAV = [
 
 export const ADMIN_NAV = [
   { href: "/command", label: "CEO AI 司令室", en: "CEO AI Command", icon: "⌘" },
+  { href: "/ai-sales", label: "AI営業 司令室", en: "AI Sales Live", icon: "📡" },
   { href: "/suggestions", label: "改善提案", en: "Suggestions", icon: "💡" },
   { href: "/directives", label: "実行指示", en: "Directives", icon: "📣" },
   { href: "/executions", label: "AI自動実行", en: "AI Executor", icon: "⚙" },

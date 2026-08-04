@@ -352,6 +352,18 @@ export const NODES: SystemNode[] = [
     ix: 1080,
     iy: 560,
   },
+  {
+    id: "ext-instagram",
+    name: "Instagram（SNS集客）",
+    kind: "external",
+    status: "external",
+    description:
+      "AI営業SNSインバウンド（#101）。毎朝cronが投稿案を生成→判断フィードで承認→18:00にGraph APIで自動投稿。プロフィールのリンクから集客LP（/lp/pganote・/lp/swing-cortex）へ誘導し、閲覧は@yozan/trackで計測、リードはSales OS / CEO Inboxへ自動投入。監視画面は /ai-sales。",
+    flow: "ai-sales.svg",
+    aliases: ["instagram"],
+    ix: 1080,
+    iy: 660,
+  },
 ];
 
 export const EDGES: SystemEdge[] = [
@@ -361,6 +373,10 @@ export const EDGES: SystemEdge[] = [
   { from: "ext-web", to: "reserve-os", label: "予約申込", type: "external" },
   { from: "ext-web", to: "survey-os", label: "匿名回答", type: "external" },
   { from: "ext-web", to: "genesis", label: "問い合わせメール", type: "external" },
+  // AI営業 SNSインバウンド（#101）: 投稿は自動、リード流入はLP経由
+  { from: "genesis", to: "ext-instagram", label: "SNS自動投稿（cnt_ 承認後）", type: "auto" },
+  { from: "ext-instagram", to: "genesis", label: "集客LP閲覧（trk_）・リード", type: "external" },
+  { from: "genesis", to: "sales-os", label: "LPリード自動投入（PGA NOTE）", type: "auto" },
 
   { from: "shift-cloud", to: "supabase", label: "staff / shifts / 打刻", type: "data" },
   { from: "member-os", to: "supabase", label: "mbr_", type: "data" },

@@ -109,6 +109,20 @@ function buildPlan(
           : "既定のスタッフLINEグループ 1件";
     return { what: "スタッフ用OAからLINEグループへ送信", target, timing: cron, irreversible: true };
   }
+  if (type === "sns_post") {
+    const product = String(payload.product ?? "");
+    const label =
+      product === "pganote" ? "PGA NOTE" : product === "swing-cortex" ? "SWING CORTEX" : product === "webdesign" ? "HP制作" : product;
+    const when = payload.scheduled_for
+      ? new Date(String(payload.scheduled_for)).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "予定時刻";
+    return {
+      what: `Instagramへフィード投稿（${label}の集客投稿・カード画像＋キャプション）`,
+      target: product === "webdesign" ? "@yozan_web_jp のフォロワー・発見タブ" : "@swingcortex_jp のフォロワー・発見タブ",
+      timing: `承認で予約確定 → ${when} に自動投稿（10分ごとの実行キュー）`,
+      irreversible: true, // 投稿後の削除はInstagram側で手動
+    };
+  }
   if (type === "prod_deploy") {
     return {
       what: "Vercelデプロイフックを叩いて本番再デプロイ",
@@ -216,8 +230,9 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       scheduledAt: s(r.scheduled_at),
       body: fullBody,
       plan: buildPlan(type, payload, channels, staffGroupCount),
-      // 文面がある承認待ちのみ修正指示可（LINE配信・スタッフ連絡）
-      revisable: !isUndo && fullBody != null && (type === "line_broadcast" || type === "staff_directive"),
+      // 文面がある承認待ちのみ修正指示可（LINE配信・スタッフ連絡・SNS投稿 #101）
+      revisable:
+        !isUndo && fullBody != null && (type === "line_broadcast" || type === "staff_directive" || type === "sns_post"),
     });
   }
 

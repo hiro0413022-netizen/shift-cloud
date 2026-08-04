@@ -253,6 +253,27 @@ const HANDLERS: Record<string, Handler> = {
     });
     return { channel: channelCode, broadcast: true };
   },
+  // SNS投稿の承認（#101 / content-loop）: 承認＝「予約確定」。実投稿は予定時刻に
+  // /api/cron/execute → publishDueContent が行う（Instagramへは時刻どおりに出したいため）。
+  // 判断フィードでの修正（payload.body差し替え）をここで cnt_posts に同期する。
+  sns_post: async ({ admin, row }) => {
+    const postId = String(row.payload.post_id ?? "");
+    if (!postId) throw new Error("payload.post_id が未指定です");
+    const { markScheduled } = await import("@yozan/content/server");
+    const post = await markScheduled(admin, {
+      postId,
+      body: row.payload.body ? String(row.payload.body) : null,
+      hook: row.payload.hook ? String(row.payload.hook) : null,
+    });
+    if (!post) throw new Error(`cnt_posts が見つかりません: ${postId}`);
+    await logEvent(row.company_id, {
+      event_type: "ai.sns_post_scheduled",
+      title: `Instagram投稿を予約しました（${post.scheduledAt ? new Date(post.scheduledAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "即時"}）`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { post_id: postId, scheduled_at: post.scheduledAt };
+  },
   // 本番デプロイ（#78 / REDESIGN §6）: 承認後にVercel Deploy Hookを叩いて再デプロイ。
   // env VERCEL_DEPLOY_HOOKS = {"yozan-genesis":"https://api.vercel.com/v1/integrations/deploy/..."} 形式。
   // 未設定プロジェクトは明示エラー（安全側）。通常の新規デプロイは git push で自動なので、

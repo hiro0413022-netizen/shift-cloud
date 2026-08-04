@@ -6,6 +6,7 @@ import { runSalesLoop } from "@/lib/sales-loop";
 import { runActivationLoop } from "@/lib/activation-loop";
 import { runAiScorecard } from "@/lib/ai-scorecard";
 import { runMorningDigest } from "@/lib/morning-digest";
+import { runContentLoop } from "@/lib/content-loop";
 
 export const dynamic = "force-dynamic";
 // 60秒だとAI社員の成果物生成が入った時点で504になり、レポートが丸ごと欠落した（2026-07-15〜17）。
@@ -36,13 +37,15 @@ export async function GET(req: NextRequest) {
       const exec = await runDueActions(admin, String(c.id));
       // 営業AIループ（#77）: 体験不足を検知したら配信依頼を起案（approval→ホーム判断フィードへ）
       const sales = await runSalesLoop(String(c.id)).catch((e) => ({ error: String(e) }));
+      // SNSインバウンド（#101）: 投稿案を生成→判断フィードへ（承認→18:00に自動投稿）
+      const content = await runContentLoop(String(c.id)).catch((e) => ({ error: String(e) }));
       // 稼働化プログラム（#82・毎週月曜のみ実行）
       const activation = await runActivationLoop(String(c.id)).catch((e) => ({ error: String(e) }));
       // AI週次成績表（#83・毎週月曜のみ実行）
       const scorecard = await runAiScorecard(String(c.id)).catch((e) => ({ error: String(e) }));
       // 朝の個人LINEダイジェスト（#83・毎日。宛先未設定なら自動skip）
       const digest = await runMorningDigest(String(c.id)).catch((e) => ({ error: String(e) }));
-      results.push({ company: c.id, ...r, executed: exec, salesLoop: sales, activation, scorecard, digest });
+      results.push({ company: c.id, ...r, executed: exec, salesLoop: sales, contentLoop: content, activation, scorecard, digest });
     } catch (e) {
       results.push({ company: c.id, error: String(e) });
     }

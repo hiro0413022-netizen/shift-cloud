@@ -193,3 +193,20 @@ C-9. **Shift Cloud 実運用フィードバック**の収集と改善バック�
 - [ ] **IV-8 inventory_ai の配線** — 適正在庫割れ → 発注候補 → `ai_suggestions`（migration 0006 で planned 済、0012 に duties 定義あり）
 - [ ] **IV-9 shift-cloud /store からの棚卸導線**
 - [ ] **IV-10 FRANK GOLF の物販在庫** — 9/2プレオープン。品番を FRANK の store_id で登録すれば同じ仕組みに乗る
+
+---
+
+## AI営業 SNSインバウンド（#101・2026-08-04）
+
+**ユーザー作業（開通ブロッカー）**
+- IG-1. Instagram接続: `IG_ACCESS_TOKEN` / `IG_BUSINESS_ID` を Vercel(yozan-genesis) に設定（OPERATIONS §9）。未設定でも生成〜承認は動く
+- IG-2. Instagramプロフィールのリンクを集客LPに設定（https://yozan-genesis.vercel.app/lp/pganote など。リンクツリー併用可）
+- IG-3. push前にユーザーPCで `npx tsc --noEmit`（apps/genesis）→ commit & push（OPERATIONS §1）
+
+**開発（次）**
+- C-20. Instagram Insights取得cron（cnt_posts.metrics に reach/likes を書く → /ai-sales と週次レポートへ）
+- C-21. コメント起点の自動DM（投稿に「診断」コメント→リンク自動返信。Graph API comment webhook・完全自動が合法な唯一のDM経路）
+- C-22. IG長期トークンの自動リフレッシュ
+- C-23. Phase 2: @yozan/prospect（Google Maps発見・DESIGN.md）→ Phase 3: @yozan/outreach → Phase 4: DM半自動
+- IG-4. ~~@yozan_web_jp のプロフィール自己紹介を設定~~ **✅ 2026-08-04 完了（ユーザー）**
+- IG-5. webdesign投稿の開通: `IG_ACCESS_TOKEN_WEB` / `IG_BUSINESS_ID_WEB`（@yozan_web_jp をプロアカウント化して取得・OPERATIONS §9と同手順）

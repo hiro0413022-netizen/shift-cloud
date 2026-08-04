@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" font-family="system-ui, sans-serif">
+  <style>
+    .box { fill: #101826; stroke: #2a3a52; rx: 10; }
+    .t { fill: #e5ecf5; font-size: 15px; font-weight: 700; }
+    .s { fill: #8aa0b8; font-size: 11px; }
+    .a { stroke: #4a90d9; stroke-width: 2; fill: none; marker-end: url(#ar); }
+    .lbl { fill: #7fb2e8; font-size: 11px; }
+  </style>
+  <defs>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#4a90d9"/>
+    </marker>
+  </defs>
+  <text x="20" y="30" fill="#e5ecf5" font-size="17" font-weight="700">AI営業 SNSインバウンド（#101） — 生成→承認→投稿→LP→リード</text>
+
+  <rect class="box" x="20" y="60" width="160" height="70"/>
+  <text class="t" x="35" y="90">毎朝6時 cron</text>
+  <text class="s" x="35" y="110">SWING CORTEX資産から生成</text>
+
+  <rect class="box" x="220" y="60" width="160" height="70"/>
+  <text class="t" x="235" y="90">判断フィード</text>
+  <text class="s" x="235" y="110">承認・AI/直接修正（0090学習）</text>
+
+  <rect class="box" x="420" y="60" width="160" height="70"/>
+  <text class="t" x="435" y="90">Instagram</text>
+  <text class="s" x="435" y="110">18:00 Graph APIで自動投稿</text>
+
+  <rect class="box" x="620" y="60" width="160" height="70"/>
+  <text class="t" x="635" y="90">集客LP ×2</text>
+  <text class="s" x="635" y="110">/lp/* ・@yozan/trackで計測</text>
+
+  <rect class="box" x="420" y="190" width="160" height="70"/>
+  <text class="t" x="435" y="220">Sales OS</text>
+  <text class="s" x="435" y="240">PGA NOTE→福原氏タスク</text>
+
+  <rect class="box" x="620" y="190" width="160" height="70"/>
+  <text class="t" x="635" y="220">CEO Inbox</text>
+  <text class="s" x="635" y="240">SWING CORTEX問い合わせ</text>
+
+  <rect class="box" x="220" y="190" width="160" height="70"/>
+  <text class="t" x="235" y="220">/ai-sales</text>
+  <text class="s" x="235" y="240">リアルタイム司令室（15秒）</text>
+
+  <path class="a" d="M180,95 L220,95"/>
+  <path class="a" d="M380,95 L420,95"/>
+  <path class="a" d="M580,95 L620,95"/>
+  <path class="a" d="M700,130 L700,190"/>
+  <text class="lbl" x="708" y="165">問い合わせフォーム</text>
+  <path class="a" d="M660,130 L520,190"/>
+  <path class="a" d="M300,130 L300,190"/>
+  <text class="lbl" x="308" y="165">全活動を集約</text>
+</svg>

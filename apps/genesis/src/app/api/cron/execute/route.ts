@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdmin } from "@/lib/supabase/admin";
 import { runDueActions } from "@/lib/ai-execution";
+import { publishDueContent } from "@/lib/content-loop";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,7 +24,9 @@ export async function GET(req: NextRequest) {
   for (const c of companies ?? []) {
     try {
       const r = await runDueActions(admin, String(c.id));
-      results.push({ company: c.id, ...r });
+      // 承認済みSNS投稿の時刻到来分をInstagramへ（#101・IG未設定なら注記のみでスキップ）
+      const sns = await publishDueContent(admin, String(c.id)).catch((e) => ({ error: String(e) }));
+      results.push({ company: c.id, ...r, sns });
     } catch (e) {
       results.push({ company: c.id, error: String(e) });
     }
