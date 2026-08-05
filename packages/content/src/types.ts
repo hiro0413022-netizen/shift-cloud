@@ -38,7 +38,13 @@ export type CntPost = {
   scheduledAt: string | null;
   postedAt: string | null;
   igMediaId: string | null;
+  /** X（旧Twitter）側のツイートID。#103 で追加（1行をIG・Xの両方へ配信する） */
+  xTweetId: string | null;
+  xPostedAt: string | null;
+  /** IG配信の失敗理由・未設定注記 */
   error: string | null;
+  /** X配信の失敗理由・未設定注記（IGとは独立） */
+  xError: string | null;
   source: Record<string, unknown>;
   metrics: Record<string, unknown>;
   queueId: string | null;

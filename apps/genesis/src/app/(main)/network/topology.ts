@@ -364,6 +364,18 @@ export const NODES: SystemNode[] = [
     ix: 1080,
     iy: 660,
   },
+  {
+    id: "ext-x",
+    name: "X / Twitter（SNS集客）",
+    kind: "external",
+    status: "external",
+    description:
+      "AI営業SNSインバウンドのXチャネル（#103）。Instagramと同じ承認済み投稿を、会社公式1アカウント @YOZAN_inc へ OAuth 1.0a で自動投稿。Xは本文にリンクを直接置けるため、集客LP（/lp/*?src=x）へ直リンクし @yozan/track で計測する。従量課金（投稿$0.015・リンク付き$0.20/件）。監視画面は /ai-sales。",
+    flow: "ai-sales.svg",
+    aliases: ["x", "twitter"],
+    ix: 1080,
+    iy: 760,
+  },
 ];
 
 export const EDGES: SystemEdge[] = [
@@ -376,6 +388,9 @@ export const EDGES: SystemEdge[] = [
   // AI営業 SNSインバウンド（#101）: 投稿は自動、リード流入はLP経由
   { from: "genesis", to: "ext-instagram", label: "SNS自動投稿（cnt_ 承認後）", type: "auto" },
   { from: "ext-instagram", to: "genesis", label: "集客LP閲覧（trk_）・リード", type: "external" },
+  // Xは同じ承認済み投稿を別チャネルへ（#103）。本文にLPリンクを直接置ける＝流入が計測しやすい
+  { from: "genesis", to: "ext-x", label: "SNS自動投稿（@YOZAN_inc・承認後）", type: "auto" },
+  { from: "ext-x", to: "genesis", label: "集客LP閲覧（?src=x）・リード", type: "external" },
   { from: "genesis", to: "sales-os", label: "LPリード自動投入（PGA NOTE）", type: "auto" },
 
   { from: "shift-cloud", to: "supabase", label: "staff / shifts / 打刻", type: "data" },

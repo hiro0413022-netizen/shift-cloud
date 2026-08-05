@@ -15,3 +15,8 @@ dump.sql
 # リポジトリはPublicのため資料そのものは置かない（apps/genesis/.../library/actions.ts 参照）
 docs/genesis/資料/
 tsconfig.tscheck.json
+
+# Report OS の生成物（月次報告pptx＝売上等の実数入り）。リポジトリはPublicのためコミット禁止
+apps/report-os/out/
+# Officeが開いている間に作る一時ロックファイル
+~$*

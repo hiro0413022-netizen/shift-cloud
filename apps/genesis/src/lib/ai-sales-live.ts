@@ -28,11 +28,23 @@ export type LivePost = {
   scheduledAt: string | null;
   postedAt: string | null;
   error: string | null;
+  /** チャネル別の結果（#103。1投稿をIG・Xの両方へ配信する） */
+  igPosted: boolean;
+  xPosted: boolean;
+  xUrl: string | null;
+  xError: string | null;
 };
 
 export type AiSalesLive = {
   generatedAt: string;
-  config: { igConfigured: boolean; igWebConfigured: boolean; aiConfigured: boolean; loopEnabled: boolean | null };
+  config: {
+    igConfigured: boolean;
+    igWebConfigured: boolean;
+    /** X（@YOZAN_inc）のキー4つが揃っているか */
+    xConfigured: boolean;
+    aiConfigured: boolean;
+    loopEnabled: boolean | null;
+  };
   lastRun: { date: string; decision: string; reason: string } | null;
   pipeline: {
     awaiting: number;
@@ -95,7 +107,9 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
     safe(
       admin
         .from("cnt_posts")
-        .select("id, product, hook, theme, status, scheduled_at, posted_at, error, created_at")
+        .select(
+          "id, product, hook, theme, status, scheduled_at, posted_at, error, ig_media_id, x_tweet_id, x_posted_at, x_error, created_at"
+        )
         .eq("company_id", companyId)
         .is("deleted_at", null)
         .order("created_at", { ascending: false })
@@ -277,11 +291,23 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
       tag: "生成",
       text: `${label}の投稿案「${s(p.hook) ?? s(p.theme) ?? ""}」を作成`,
     });
-    if (p.posted_at) {
+    if (p.posted_at && p.ig_media_id) {
       activity.push({ at: String(p.posted_at), icon: "📸", tag: "投稿", text: `${label}をInstagramへ投稿` });
     }
+    if (p.x_posted_at) {
+      activity.push({
+        at: String(p.x_posted_at),
+        icon: "𝕏",
+        tag: "投稿",
+        text: `${label}をX（@YOZAN_inc）へ投稿`,
+        href: p.x_tweet_id ? `https://x.com/YOZAN_inc/status/${String(p.x_tweet_id)}` : null,
+      });
+    }
     if (String(p.status) === "failed" && p.error) {
-      activity.push({ at: String(p.created_at), icon: "⚠️", tag: "失敗", text: `投稿失敗: ${String(p.error).slice(0, 60)}` });
+      activity.push({ at: String(p.created_at), icon: "⚠️", tag: "失敗", text: `Instagram投稿失敗: ${String(p.error).slice(0, 60)}` });
+    }
+    if (p.x_error && !p.x_posted_at && String(p.status) !== "scheduled") {
+      activity.push({ at: String(p.created_at), icon: "⚠️", tag: "失敗", text: `X投稿失敗: ${String(p.x_error).slice(0, 60)}` });
     }
   }
   for (const v of lpRecent) {
@@ -331,6 +357,9 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
     config: {
       igConfigured: Boolean(process.env.IG_ACCESS_TOKEN && process.env.IG_BUSINESS_ID),
       igWebConfigured: Boolean(process.env.IG_ACCESS_TOKEN_WEB && process.env.IG_BUSINESS_ID_WEB),
+      xConfigured: Boolean(
+        process.env.X_API_KEY && process.env.X_API_SECRET && process.env.X_ACCESS_TOKEN && process.env.X_ACCESS_SECRET
+      ),
       aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
       loopEnabled: loopRes ? Boolean(loopRes.enabled) : null,
     },
@@ -362,6 +391,10 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
       scheduledAt: s(p.scheduled_at),
       postedAt: s(p.posted_at),
       error: s(p.error),
+      igPosted: Boolean(p.ig_media_id),
+      xPosted: Boolean(p.x_tweet_id),
+      xUrl: p.x_tweet_id ? `https://x.com/YOZAN_inc/status/${String(p.x_tweet_id)}` : null,
+      xError: s(p.x_error),
     })),
     activity: activity.slice(0, 30),
   };

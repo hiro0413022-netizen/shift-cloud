@@ -204,6 +204,14 @@ C-9. **Shift Cloud 実運用フィードバック**の収集と改善バック�
 - IG-2. Instagramプロフィールのリンクを集客LPに設定（https://yozan-genesis.vercel.app/lp/pganote など。リンクツリー併用可）
 - IG-3. push前にユーザーPCで `npx tsc --noEmit`（apps/genesis）→ commit & push（OPERATIONS §1）
 
+**X（Twitter）チャネル（#103・2026-08-05）— ✅ 実装完了・接続済み**
+- X-1. ~~会社公式Xアカウント作成~~ **✅ 完了** `@YOZAN_inc`「株式会社YOZAN｜ゴルフ×AI」（全事業を1アカウントに集約）
+- X-2. ~~X開発者ポータル登録＋支払い設定~~ **✅ 完了**（Pay Per Use・残高$5・自動チャージON・アプリ権限=読み書き）
+- X-3. ~~Xアダプタ実装~~ **✅ 完了**（OAuth 1.0a自前署名＋POST /2/tweets・280重み自動短縮・LPは `?src=x`）。env 4つ登録済み
+- X-4. ハブLP `/lp`（全事業の入口・X/IGのプロフィールリンク先を1本化）※Xは本文リンクが効くので優先度は中
+- X-5. Xプロフィールの**ウェブサイト欄**を設定（未設定。当面 `/lp/webdesign`、ハブLPができたらそちらへ）
+- X-6. X/IG の反応（インプレッション・いいね）取得cron → `cnt_posts.metrics` → /ai-sales と週次レポートへ
+
 **開発（次）**
 - C-20. Instagram Insights取得cron（cnt_posts.metrics に reach/likes を書く → /ai-sales と週次レポートへ）
 - C-21. コメント起点の自動DM（投稿に「診断」コメント→リンク自動返信。Graph API comment webhook・完全自動が合法な唯一のDM経路）

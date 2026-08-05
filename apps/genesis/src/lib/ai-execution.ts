@@ -268,7 +268,7 @@ const HANDLERS: Record<string, Handler> = {
     if (!post) throw new Error(`cnt_posts が見つかりません: ${postId}`);
     await logEvent(row.company_id, {
       event_type: "ai.sns_post_scheduled",
-      title: `Instagram投稿を予約しました（${post.scheduledAt ? new Date(post.scheduledAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "即時"}）`,
+      title: `SNS投稿（Instagram＋X）を予約しました（${post.scheduledAt ? new Date(post.scheduledAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }) : "即時"}）`,
       source: "ai_executor",
       source_type: "ai",
     });

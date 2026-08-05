@@ -1,6 +1,7 @@
 import type { AdminClient, CntPost, GeneratedPost, Material, Product } from "./types";
 import { buildCaption } from "./generate";
 import { igConfigForProduct, publishImagePost, type IgConfig } from "./instagram";
+import { xConfigFromEnv, publishTweet, buildTweetText, type XConfig } from "./x";
 
 /**
  * サーバー側API（service_role クライアントを引数で受け取る＝アプリ非依存。@yozan/track と同方式）。
@@ -10,7 +11,7 @@ type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => (v == null ? null : String(v));
 
 const SELECT_POST =
-  "id, company_id, product, platform, theme, hook, body, hashtags, status, scheduled_at, posted_at, ig_media_id, error, source, metrics, queue_id, created_at";
+  "id, company_id, product, platform, theme, hook, body, hashtags, status, scheduled_at, posted_at, ig_media_id, x_tweet_id, x_posted_at, error, x_error, source, metrics, queue_id, created_at";
 
 export function toPost(r: Row): CntPost {
   return {
@@ -26,7 +27,10 @@ export function toPost(r: Row): CntPost {
     scheduledAt: s(r.scheduled_at),
     postedAt: s(r.posted_at),
     igMediaId: s(r.ig_media_id),
+    xTweetId: s(r.x_tweet_id),
+    xPostedAt: s(r.x_posted_at),
     error: s(r.error),
+    xError: s(r.x_error),
     source: (r.source ?? {}) as Record<string, unknown>,
     metrics: (r.metrics ?? {}) as Record<string, unknown>,
     queueId: s(r.queue_id),
@@ -188,15 +192,38 @@ export async function syncRejected(admin: AdminClient, companyId: string): Promi
 
 export type PublishSummary = {
   due: number;
+  /** 1チャネル以上に配信できた投稿数 */
   posted: number;
+  /** 設定済みチャネルを試して全滅した投稿数 */
   failed: number;
-  skipped?: string; // IG未設定など
+  /** チャネル別の成功数（内訳表示用） */
+  instagram: number;
+  x: number;
+  skipped?: string; // どのチャネルも未設定
 };
 
+/** 商品 → X本文に貼る集客LPのパス（Xは本文リンクが踏める＝IGのbio誘導と役割が違う） */
+const LP_PATH: Record<string, string> = {
+  pganote: "/lp/pganote",
+  "swing-cortex": "/lp/swing-cortex",
+  webdesign: "/lp/webdesign",
+};
+
+/** X本文に載せるLP URL。?src=x は流入元の識別用（@yozan/track のセッションに残る） */
+function lpUrlFor(product: string, baseUrl: string): string | null {
+  const path = LP_PATH[product];
+  return path ? `${baseUrl}${path}?src=x` : null;
+}
+
 /**
- * 予定時刻を過ぎた scheduled を Instagram へ投稿する（10分cronから）。
- * 投稿先アカウントは商品ごとに解決（igConfigForProduct）。
- * IG env 未設定の商品は何もせず注記だけ残す（failedにしない＝設定後にそのまま流れる）。
+ * 予定時刻を過ぎた scheduled を Instagram と X の両方へ配信する（10分cronから）。
+ *
+ * - Instagram … 商品ごとのアカウント（igConfigForProduct）。カード画像＋キャプション
+ * - X         … 会社公式1アカウント @YOZAN_inc。本文＋LPリンク直貼り（280重み以内に自動短縮）
+ *
+ * 状態の決め方（migration 0093 のコメントと対応）:
+ *   1チャネルでも成功 → posted ／ 設定済みチャネルが全滅 → failed ／ 全未設定 → scheduled のまま
+ * 片方だけ設定済みでも安全に動く（未設定チャネルは注記のみでエラーにしない）。
  */
 export async function publishDue(
   admin: AdminClient,
@@ -214,54 +241,83 @@ export async function publishDue(
     .order("scheduled_at", { ascending: true })
     .limit(opts.limit ?? 3);
   const due = (rows ?? []) as Row[];
-  const summary: PublishSummary = { due: due.length, posted: 0, failed: 0 };
+  const summary: PublishSummary = { due: due.length, posted: 0, failed: 0, instagram: 0, x: 0 };
   if (due.length === 0) return summary;
 
+  const xCfg: XConfig | null = xConfigFromEnv();
   let anyConfigured = false;
+
   for (const r of due) {
     const post = toPost(r);
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    let succeeded = 0;
+    let attempted = 0;
+
+    // ---- Instagram ----
     const ig: IgConfig | null = igConfigForProduct(post.product);
     if (!ig) {
-      // 設定不足の注記（1回だけ書く）。scheduledのまま保持＝env設定後の次tickで自動投稿される
-      if (!post.error) {
-        const envs =
-          post.product === "webdesign"
-            ? "IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB（@yozan_web_jp）"
-            : "IG_ACCESS_TOKEN / IG_BUSINESS_ID（@swingcortex_jp）";
-        await admin
-          .from("cnt_posts")
-          .update({ error: `${envs} 未設定（Vercel envに設定すると自動投稿されます）` })
-          .eq("id", post.id);
+      const envs =
+        post.product === "webdesign"
+          ? "IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB（@yozan_web_jp）"
+          : "IG_ACCESS_TOKEN / IG_BUSINESS_ID（@swingcortex_jp）";
+      patch.error = `${envs} 未設定（Vercel envに設定すると自動投稿されます）`;
+    } else {
+      anyConfigured = true;
+      attempted += 1;
+      try {
+        const { mediaId } = await publishImagePost(ig, {
+          imageUrl: `${opts.cardBaseUrl}/api/public/ai-sales/card/${post.id}`,
+          caption: buildCaption(post.body, post.hashtags),
+        });
+        patch.ig_media_id = mediaId;
+        patch.error = null;
+        succeeded += 1;
+        summary.instagram += 1;
+      } catch (e) {
+        patch.error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       }
-      continue;
     }
-    anyConfigured = true;
-    try {
-      const { mediaId } = await publishImagePost(ig, {
-        imageUrl: `${opts.cardBaseUrl}/api/public/ai-sales/card/${post.id}`,
-        caption: buildCaption(post.body, post.hashtags),
-      });
-      await admin
-        .from("cnt_posts")
-        .update({
-          status: "posted",
-          posted_at: new Date().toISOString(),
-          ig_media_id: mediaId,
-          error: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", post.id);
+
+    // ---- X ----
+    if (!xCfg) {
+      patch.x_error = "X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_SECRET 未設定（@YOZAN_inc）";
+    } else {
+      anyConfigured = true;
+      attempted += 1;
+      try {
+        const { tweetId } = await publishTweet(
+          xCfg,
+          buildTweetText({
+            body: post.body,
+            hashtags: post.hashtags,
+            url: lpUrlFor(post.product, opts.cardBaseUrl),
+          })
+        );
+        patch.x_tweet_id = tweetId;
+        patch.x_posted_at = new Date().toISOString();
+        patch.x_error = null;
+        succeeded += 1;
+        summary.x += 1;
+      } catch (e) {
+        patch.x_error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
+      }
+    }
+
+    // ---- 状態確定 ----
+    if (succeeded > 0) {
+      patch.status = "posted";
+      patch.posted_at = post.postedAt ?? new Date().toISOString();
       summary.posted += 1;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      await admin
-        .from("cnt_posts")
-        .update({ status: "failed", error: msg.slice(0, 500), updated_at: new Date().toISOString() })
-        .eq("id", post.id);
+    } else if (attempted > 0) {
+      patch.status = "failed";
       summary.failed += 1;
     }
+    // attempted === 0（全チャネル未設定）は scheduled のまま＝env設定後の次tickで自動投稿される
+
+    await admin.from("cnt_posts").update(patch).eq("id", post.id);
   }
-  if (!anyConfigured) summary.skipped = "ig_not_configured";
+
+  if (!anyConfigured) summary.skipped = "no_channel_configured";
   return summary;
 }
 

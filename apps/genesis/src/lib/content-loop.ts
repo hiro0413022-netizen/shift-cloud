@@ -166,7 +166,7 @@ export async function runContentLoop(companyId: string): Promise<Record<string, 
   const enq = await enqueueAction(admin, {
     companyId,
     actionType: "sns_post",
-    title: `SNS AI: Instagram投稿（${PRODUCT_LABEL[product]}）「${gen.theme}」→ ${timeLabel} 予定`,
+    title: `SNS AI: Instagram＋X投稿（${PRODUCT_LABEL[product]}）「${gen.theme}」→ ${timeLabel} 予定`,
     payload: {
       post_id: postId,
       product,
@@ -192,14 +192,22 @@ export async function runContentLoop(companyId: string): Promise<Record<string, 
   return { decision: "act", product, post_id: postId, queued: enq };
 }
 
-/** 予定時刻を過ぎた投稿をInstagramへ（/api/cron/execute の10分tickから） */
+/**
+ * 予定時刻を過ぎた投稿を Instagram と X の両方へ（/api/cron/execute の10分tickから・#103）。
+ * IGは商品別アカウント、Xは会社公式1アカウント @YOZAN_inc。片方未設定でももう片方は配信される。
+ */
 export async function publishDueContent(admin: Admin, companyId: string): Promise<PublishSummary> {
-  // 投稿先IGアカウントは商品ごとに publishDue 内で解決（igConfigForProduct）
   const summary = await publishDue(admin, companyId, { cardBaseUrl: GENESIS_BASE_URL });
   if (summary.posted > 0) {
+    const detail = [
+      summary.instagram > 0 ? `Instagram ${summary.instagram}件` : null,
+      summary.x > 0 ? `X ${summary.x}件` : null,
+    ]
+      .filter(Boolean)
+      .join(" / ");
     await logEvent(companyId, {
       event_type: "ai.sns_posted",
-      title: `SNS AIがInstagramへ${summary.posted}件投稿しました`,
+      title: `SNS AIがSNSへ${summary.posted}件投稿しました（${detail}）`,
       source: "content_loop",
       source_type: "ai",
     });
@@ -207,7 +215,7 @@ export async function publishDueContent(admin: Admin, companyId: string): Promis
   if (summary.failed > 0) {
     await logEvent(companyId, {
       event_type: "ai.sns_post_failed",
-      title: `Instagram投稿に${summary.failed}件失敗（/ai-sales で確認）`,
+      title: `SNS投稿に${summary.failed}件失敗（/ai-sales で理由を確認）`,
       source: "content_loop",
       source_type: "ai",
       severity: "warning",

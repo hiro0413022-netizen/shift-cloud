@@ -1,0 +1,204 @@
+/**
+ * X（旧Twitter）への自前アカウント投稿（DECISIONS #103 / migration 0093）。
+ * SDKは使わず fetch + Web Crypto で OAuth 1.0a を自前署名（依存追加なし・#97 Stripe / instagram.ts と同方式）。
+ *
+ * なぜ OAuth 1.0a か:
+ *   自分のアカウントに投稿するだけなら、ポータルで発行した4つの固定値で完結する（リフレッシュ不要）。
+ *   OAuth 2.0 は user context の refresh token 運用が必要になり、失効の運用コストが増える。
+ *
+ * 前提（ユーザー作業・OPERATIONS.md §10）:
+ *   - X開発者ポータル（console.x.com）でアプリを作成し、アプリ権限を「読み取りと書き込み」に
+ *   - env: X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_SECRET
+ *     （未設定の間は投稿せず注記のみ＝エラーにしない。設定した瞬間に次の投稿から流れる）
+ *   - 従量課金（2026年2月〜）: 投稿$0.015/件・リンク付き$0.20/件。残高切れは 403 で返る
+ *
+ * Instagramとの役割分担:
+ *   IG … 商品別アカウント・画像必須・本文のリンクは踏めない → カード画像＋bio誘導
+ *   X  … 会社公式1アカウント @YOZAN_inc・本文にLPリンクを直接置ける → リンク直貼りで計測
+ */
+
+export type XConfig = {
+  apiKey: string;
+  apiSecret: string;
+  accessToken: string;
+  accessSecret: string;
+};
+
+const TWEETS_ENDPOINT = "https://api.x.com/2/tweets";
+
+/** X投稿の上限（重み付き）。全角=2・半角=1、URLは実長に関わらず23で固定 */
+export const X_WEIGHTED_LIMIT = 280;
+const URL_WEIGHT = 23;
+
+/**
+ * envから設定を読む。4つ揃っていなければ null（呼び出し側でスキップ判断）。
+ * Xは商品を分けず会社公式1アカウント（@YOZAN_inc）に集約する＝アカウント別envは無い。
+ */
+export function xConfigFromEnv(): XConfig | null {
+  const apiKey = process.env.X_API_KEY;
+  const apiSecret = process.env.X_API_SECRET;
+  const accessToken = process.env.X_ACCESS_TOKEN;
+  const accessSecret = process.env.X_ACCESS_SECRET;
+  if (!apiKey || !apiSecret || !accessToken || !accessSecret) return null;
+  return { apiKey, apiSecret, accessToken, accessSecret };
+}
+
+/** RFC3986のパーセントエンコード（encodeURIComponent が残す !*'() も潰す＝署名が壊れる元） */
+function pct(v: string): string {
+  return encodeURIComponent(v).replace(/[!*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function nonce(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** HMAC-SHA1（Web Crypto。Node/Edgeどちらでも動く＝ランタイム前提を持たない） */
+async function hmacSha1Base64(key: string, message: string): Promise<string> {
+  const enc = new TextEncoder();
+  const cryptoKey = await globalThis.crypto.subtle.importKey(
+    "raw",
+    enc.encode(key),
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+  const sig = await globalThis.crypto.subtle.sign("HMAC", cryptoKey, enc.encode(message));
+  const bytes = new Uint8Array(sig);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+/**
+ * OAuth 1.0a の Authorization ヘッダを組み立てる。
+ * JSONボディのPOSTでは、署名対象はoauthパラメータ（＋クエリ）だけ。ボディは含めない。
+ */
+export async function buildOAuthHeader(
+  cfg: XConfig,
+  method: "POST" | "GET",
+  url: string,
+  extraParams: Record<string, string> = {}
+): Promise<string> {
+  const oauth: Record<string, string> = {
+    oauth_consumer_key: cfg.apiKey,
+    oauth_nonce: nonce(),
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
+    oauth_token: cfg.accessToken,
+    oauth_version: "1.0",
+    ...extraParams,
+  };
+  const paramString = Object.keys(oauth)
+    .sort()
+    .map((k) => `${pct(k)}=${pct(oauth[k])}`)
+    .join("&");
+  const base = [method, pct(url), pct(paramString)].join("&");
+  const signingKey = `${pct(cfg.apiSecret)}&${pct(cfg.accessSecret)}`;
+  const signature = await hmacSha1Base64(signingKey, base);
+
+  // 明示的に Record<string, string>（型を書かないと spread 後に index signature が消えて TS7053 になる）
+  const header: Record<string, string> = { ...oauth, oauth_signature: signature };
+  return (
+    "OAuth " +
+    Object.keys(header)
+      .sort()
+      .map((k) => `${pct(k)}="${pct(header[k])}"`)
+      .join(", ")
+  );
+}
+
+/** X（Twitter）の文字数カウント。CJK・全角は2、それ以外は1。URLは一律23 */
+export function weightedLength(text: string): number {
+  let n = 0;
+  for (const ch of text) {
+    const cp = ch.codePointAt(0) ?? 0;
+    // Twitter text weighting: 以下の範囲外は重み2（CJK・かな・全角記号・絵文字など）
+    const light =
+      (cp >= 0x0000 && cp <= 0x10ff) ||
+      (cp >= 0x2000 && cp <= 0x200d) ||
+      (cp >= 0x2010 && cp <= 0x201f) ||
+      (cp >= 0x2032 && cp <= 0x2037);
+    n += light ? 1 : 2;
+  }
+  return n;
+}
+
+/** 重み付き上限に収まるよう末尾を落とす（切れた場合は…を付ける。…自体も重み2として勘定する） */
+function truncateWeighted(text: string, limit: number): string {
+  if (weightedLength(text) <= limit) return text;
+  const ellipsisWeight = weightedLength("…"); // 全角扱い＝2
+  let out = "";
+  let n = 0;
+  for (const ch of text) {
+    const w = weightedLength(ch);
+    if (n + w > limit - ellipsisWeight) break;
+    out += ch;
+    n += w;
+  }
+  return `${out.trimEnd()}…`;
+}
+
+/**
+ * X用の本文を組み立てる。
+ * Instagramのキャプション（全角400字想定・bio誘導）はそのままでは長すぎるので、
+ * 「本文（縮める）＋ 空行 ＋ LPリンク ＋ ハッシュタグ2つ」に再構成する。
+ *
+ * リンクはt.co短縮で一律23文字扱いなので、URLの長さは気にしなくてよい。
+ */
+export function buildTweetText(input: {
+  body: string;
+  hashtags?: string[];
+  url?: string | null;
+  limit?: number;
+}): string {
+  const limit = input.limit ?? X_WEIGHTED_LIMIT;
+  // ハッシュタグはXでは付けすぎると読みにくいので先頭2つまで
+  const tags = (input.hashtags ?? []).slice(0, 2).join(" ");
+  const tagsBlock = tags ? `\n${tags}` : "";
+  const urlBlock = input.url ? `\n\n${input.url}` : "";
+  // URLはt.co短縮で一律23文字扱い（実長は無関係）。改行ぶんも予約する
+  const reserve = (input.url ? URL_WEIGHT + 2 : 0) + weightedLength(tagsBlock);
+
+  const body = truncateWeighted(input.body.trim(), Math.max(20, limit - reserve));
+  return `${body}${urlBlock}${tagsBlock}`.trim();
+}
+
+type XErrorBody = {
+  title?: string;
+  detail?: string;
+  errors?: Array<{ message?: string }>;
+  status?: number;
+};
+
+/**
+ * 投稿（POST /2/tweets）。成功で tweetId を返す。
+ * 失敗はメッセージを整えて throw（呼び出し側が cnt_posts.x_error に残す）。
+ */
+export async function publishTweet(cfg: XConfig, text: string): Promise<{ tweetId: string }> {
+  const authorization = await buildOAuthHeader(cfg, "POST", TWEETS_ENDPOINT);
+  const res = await fetch(TWEETS_ENDPOINT, {
+    method: "POST",
+    headers: { authorization, "content-type": "application/json" },
+    body: JSON.stringify({ text }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const json = (await res.json().catch(() => ({}))) as { data?: { id?: string } } & XErrorBody;
+  if (!res.ok) {
+    const detail = json.detail ?? json.errors?.[0]?.message ?? json.title ?? "unknown";
+    // よくある詰まりを日本語で言い添える（/ai-sales の失敗カードにそのまま出る）
+    const hint =
+      res.status === 401
+        ? "（キー4つのどれかが違う／再生成後にenv未更新の可能性）"
+        : res.status === 403
+          ? "（アプリ権限が『読み取りのみ』のまま、またはクレジット残高切れの可能性）"
+          : res.status === 429
+            ? "（レート制限。次のtickで再試行してください）"
+            : "";
+    throw new Error(`X API HTTP ${res.status}: ${detail}${hint}`);
+  }
+  const id = String(json.data?.id ?? "");
+  if (!id) throw new Error("X: 応答にツイートIDがありません");
+  return { tweetId: id };
+}

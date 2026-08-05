@@ -82,6 +82,10 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
     warnings.push("@swingcortex_jp 未接続（IG_ACCESS_TOKEN / IG_BUSINESS_ID）→ 承認済み投稿は接続後に自動配信されます");
   if (!data.config.igWebConfigured)
     warnings.push("@yozan_web_jp 未接続（IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB）→ HP制作の投稿は接続後に自動配信されます");
+  if (!data.config.xConfigured)
+    warnings.push(
+      "X @YOZAN_inc 未接続（X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_SECRET）→ 承認済み投稿は接続後に自動配信されます"
+    );
 
   const funnelSteps = [
     { label: "投稿（30日）", value: f.posts30d, icon: "📸" },
@@ -176,7 +180,31 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
                     </span>
                   </div>
                   <p className="mt-2 text-sm font-medium">{post.hook}</p>
-                  {post.error && <p className="mt-1 text-xs text-red-300">{post.error}</p>}
+                  {/* チャネル別の配信状況（1投稿をInstagramとXの両方へ・#103） */}
+                  <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px]">
+                    <span
+                      className={`rounded border px-1.5 py-0.5 ${
+                        post.igPosted
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                          : "border-(--color-line) text-(--color-dim)"
+                      }`}
+                    >
+                      IG {post.igPosted ? "投稿済み" : "未"}
+                    </span>
+                    {post.xUrl ? (
+                      <a
+                        href={post.xUrl}
+                        target="_blank"
+                        className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-300 hover:underline"
+                      >
+                        X 投稿済み ↗
+                      </a>
+                    ) : (
+                      <span className="rounded border border-(--color-line) px-1.5 py-0.5 text-(--color-dim)">X 未</span>
+                    )}
+                  </div>
+                  {post.error && <p className="mt-1 text-xs text-red-300">IG: {post.error}</p>}
+                  {post.xError && !post.xPosted && <p className="mt-1 text-xs text-red-300">X: {post.xError}</p>}
                   <div className="mt-2 flex gap-3 text-[11px]">
                     <a
                       href={`/api/public/ai-sales/card/${post.id}`}
@@ -221,7 +249,13 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
               <div key={`${a.at}-${i}`} className="flex items-start gap-3 rounded-lg px-2 py-2 hover:bg-(--color-panel-2)">
                 <span className="mt-0.5 text-base">{a.icon}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-snug">{a.text}</p>
+                  {a.href ? (
+                    <a href={a.href} target="_blank" className="text-sm leading-snug text-sky-300 hover:underline">
+                      {a.text} ↗
+                    </a>
+                  ) : (
+                    <p className="text-sm leading-snug">{a.text}</p>
+                  )}
                   <p className="mt-0.5 text-[11px] text-(--color-dim)">
                     {a.tag} ・ {rel(a.at)}
                   </p>
