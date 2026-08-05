@@ -125,19 +125,54 @@ export function weightedLength(text: string): number {
   return n;
 }
 
-/** 重み付き上限に収まるよう末尾を落とす（切れた場合は…を付ける。…自体も重み2として勘定する） */
+/**
+ * 重み付き上限に収まるよう末尾を落とす。
+ * 文の途中でぶつ切りにすると読めない投稿になるので（初回投稿で「✓ 予約・問い合…」と切れた実例）、
+ * 上限内の最後の文末（。！？\n）で切る。文末が早すぎる位置にしか無い場合だけ字数で切って…を付ける。
+ */
 function truncateWeighted(text: string, limit: number): string {
   if (weightedLength(text) <= limit) return text;
   const ellipsisWeight = weightedLength("…"); // 全角扱い＝2
-  let out = "";
+
+  // まず上限（…の分を引く）まで文字を積む
+  let head = "";
   let n = 0;
   for (const ch of text) {
     const w = weightedLength(ch);
     if (n + w > limit - ellipsisWeight) break;
-    out += ch;
+    head += ch;
     n += w;
   }
-  return `${out.trimEnd()}…`;
+
+  // 拾えた部分が短すぎる（上限の6割未満）と本文が痩せるので、その場合は素直に字数で切る
+  const minKeep = (limit - ellipsisWeight) * 0.6;
+
+  // ① 文末（。！？）で切る＝一番きれいに終わる
+  const sentenceEnd = Math.max(head.lastIndexOf("。"), head.lastIndexOf("！"), head.lastIndexOf("？"));
+  if (sentenceEnd > 0) {
+    const candidate = head.slice(0, sentenceEnd + 1).trimEnd();
+    if (weightedLength(candidate) >= minKeep) return candidate;
+  }
+
+  // ② 文末が無ければ改行で切る。ただし「よくある落とし穴は：」のような前振りだけの行は捨てる
+  const newline = head.lastIndexOf("\n");
+  if (newline > 0) {
+    const candidate = head.slice(0, newline).replace(/\n[^\n]*[：:]\s*$/, "").trimEnd();
+    if (weightedLength(candidate) >= minKeep) return candidate;
+  }
+
+  return `${head.trimEnd()}…`;
+}
+
+/**
+ * Instagram前提のCTA表現をX向けに言い換える。
+ * IGは本文リンクが踏めないので「プロフィールのリンク」と書くが、Xは本文にリンクが載る＝そのままだと案内が食い違う。
+ */
+function adaptCtaForX(body: string): string {
+  return body
+    .replace(/プロフィールのリンク/g, "下のリンク")
+    .replace(/プロフィール(?:の)?URL/g, "下のリンク")
+    .replace(/プロフィール欄のリンク/g, "下のリンク");
 }
 
 /**
@@ -161,7 +196,8 @@ export function buildTweetText(input: {
   // URLはt.co短縮で一律23文字扱い（実長は無関係）。改行ぶんも予約する
   const reserve = (input.url ? URL_WEIGHT + 2 : 0) + weightedLength(tagsBlock);
 
-  const body = truncateWeighted(input.body.trim(), Math.max(20, limit - reserve));
+  const source = input.url ? adaptCtaForX(input.body) : input.body;
+  const body = truncateWeighted(source.trim(), Math.max(20, limit - reserve));
   return `${body}${urlBlock}${tagsBlock}`.trim();
 }
 

@@ -89,7 +89,8 @@ test("buildTweetText: 長文でも上限内に収まり、URLとタグが残る"
   assert.ok(weightAsSent(t) <= X_WEIGHTED_LIMIT, `重み超過: ${weightAsSent(t)}`);
   assert.ok(t.includes(LP), "LPリンクが落ちている");
   assert.equal((t.match(/#/g) ?? []).length, 2, "ハッシュタグは2つまで");
-  assert.ok(t.includes("…"), "切り詰め記号が無い");
+  // 元の本文より短くなっている＝ちゃんと切られている（切り口は文末なので…は付かない）
+  assert.ok(weightedLength(t) < weightedLength(long), "切り詰められていない");
 });
 
 test("buildTweetText: 短文はそのまま（余計な加工をしない）", () => {
@@ -104,4 +105,38 @@ test("buildTweetText: URL無し・タグ無しでも上限を守る", () => {
 test("buildTweetText: 本文が空でもURLだけは残る（投稿を落とさない）", () => {
   const t = buildTweetText({ body: "", hashtags: [], url: LP });
   assert.ok(t.includes(LP));
+});
+
+/* ============================================================
+   読みやすさ（初回の実投稿 2026-08-05 で判明した2点の再発防止）
+   ============================================================ */
+
+test("buildTweetText: 文の途中でぶつ切りにせず文末で切る", () => {
+  // 実際に「✓ 予約・問い合…」と途中で切れた形に近い本文
+  const body =
+    "「ホームページは作ったけど、問い合わせが全然来ない…」こんな悩み、ありませんか？\n\n" +
+    "実は、内容が良くても、見た人が「次に何をすればいいか」がわからないと、お客さんは去ってしまいます。\n\n" +
+    "よくある落とし穴は：\n✓ 予約・問い合わせボタンが小さい\n✓ ページの下の方にしかない\n✓ 各ページに統一されていない";
+  const t = buildTweetText({ body, hashtags: ["#ホームページ制作"], url: LP });
+  assert.ok(weightAsSent(t) <= X_WEIGHTED_LIMIT, `重み超過: ${weightAsSent(t)}`);
+  const head = t.split("\n\n" + LP)[0] ?? t;
+  assert.ok(/[。！？]$/.test(head.trimEnd()), `文末で切れていない: ${JSON.stringify(head.slice(-20))}`);
+});
+
+test("buildTweetText: 文末が早い位置にしか無いときは字数で切って…を付ける", () => {
+  const body = "短い。" + "あ".repeat(300); // 最初の文末が早すぎるケース
+  const t = buildTweetText({ body, hashtags: [], url: null });
+  assert.ok(weightedLength(t) <= X_WEIGHTED_LIMIT);
+  assert.ok(t.endsWith("…"), "字数切りのフォールバックが働いていない");
+});
+
+test("buildTweetText: IG向けCTA「プロフィールのリンク」はX向けに言い換える", () => {
+  const t = buildTweetText({ body: "詳しくはプロフィールのリンクからどうぞ。", hashtags: [], url: LP });
+  assert.ok(t.includes("下のリンク"), "言い換えられていない");
+  assert.ok(!t.includes("プロフィールのリンク"));
+});
+
+test("buildTweetText: URLが無いとき（Xにリンクを載せない運用）は言い換えない", () => {
+  const t = buildTweetText({ body: "詳しくはプロフィールのリンクからどうぞ。", hashtags: [], url: null });
+  assert.ok(t.includes("プロフィールのリンク"));
 });
