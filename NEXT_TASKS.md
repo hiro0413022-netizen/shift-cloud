@@ -200,6 +200,7 @@ C-9. **Shift Cloud 実運用フィードバック**の収集と改善バック�
 
 **ユーザー作業（開通ブロッカー）**
 - IG-1. Instagram接続: `IG_ACCESS_TOKEN` / `IG_BUSINESS_ID` を Vercel(yozan-genesis) に設定（OPERATIONS §9）。未設定でも生成〜承認は動く
+  - **2026-08-05 状況**: 9-1（プロアカウント化・FBページ接続）完了。9-2で **Meta for Developers の開発者アカウント登録が必要** と判明 → **SMS認証の再送上限で停止中**（数時間〜24hで解除）。解除後 https://developers.facebook.com/ 右上「開始する」から再開（Verify account → Contact info → About you=開発者）。登録はユーザー作業、以降のアプリ作成・トークン取得はAIが実行可
 - IG-2. Instagramプロフィールのリンクを集客LPに設定（https://yozan-genesis.vercel.app/lp/pganote など。リンクツリー併用可）
 - IG-3. push前にユーザーPCで `npx tsc --noEmit`（apps/genesis）→ commit & push（OPERATIONS §1）
 
