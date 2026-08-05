@@ -1,7 +1,7 @@
 import type { AdminClient, CntPost, GeneratedPost, Material, Product } from "./types";
 import { buildCaption } from "./generate";
 import { igConfigForProduct, publishImagePost, type IgConfig } from "./instagram";
-import { xConfigFromEnv, publishTweet, buildTweetText, type XConfig } from "./x";
+import { xConfigFromEnv, publishTweet, uploadMedia, buildTweetText, type XConfig } from "./x";
 
 /**
  * サーバー側API（service_role クライアントを引数で受け取る＝アプリ非依存。@yozan/track と同方式）。
@@ -199,6 +199,8 @@ export type PublishSummary = {
   /** チャネル別の成功数（内訳表示用） */
   instagram: number;
   x: number;
+  /** うち承認を待たずにXへ自動投稿した本数（#104） */
+  xAuto: number;
   skipped?: string; // どのチャネルも未設定
 };
 
@@ -228,20 +230,22 @@ function lpUrlFor(product: string, baseUrl: string): string | null {
 export async function publishDue(
   admin: AdminClient,
   companyId: string,
-  opts: { cardBaseUrl: string; limit?: number }
+  opts: { cardBaseUrl: string; limit?: number; xAuto?: boolean }
 ): Promise<PublishSummary> {
   const nowIso = new Date().toISOString();
+  // xAuto のときは承認待ちの行も拾う（Xだけ先に出す）。Instagramは従来どおり承認済みのみ
+  const statuses = opts.xAuto ? ["scheduled", "awaiting_approval"] : ["scheduled"];
   const { data: rows } = await admin
     .from("cnt_posts")
     .select(SELECT_POST)
     .eq("company_id", companyId)
-    .eq("status", "scheduled")
+    .in("status", statuses)
     .lte("scheduled_at", nowIso)
     .is("deleted_at", null)
     .order("scheduled_at", { ascending: true })
     .limit(opts.limit ?? 3);
   const due = (rows ?? []) as Row[];
-  const summary: PublishSummary = { due: due.length, posted: 0, failed: 0, instagram: 0, x: 0 };
+  const summary: PublishSummary = { due: due.length, posted: 0, failed: 0, instagram: 0, x: 0, xAuto: 0 };
   if (due.length === 0) return summary;
 
   const xCfg: XConfig | null = xConfigFromEnv();
@@ -249,19 +253,20 @@ export async function publishDue(
 
   for (const r of due) {
     const post = toPost(r);
+    const approved = post.status === "scheduled"; // 承認済みか（未承認でXだけ自動投稿するケースがある）
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     let succeeded = 0;
     let attempted = 0;
 
-    // ---- Instagram ----
-    const ig: IgConfig | null = igConfigForProduct(post.product);
-    if (!ig) {
+    // ---- Instagram（承認済みのみ。承認前は触らない）----
+    const ig: IgConfig | null = approved ? igConfigForProduct(post.product) : null;
+    if (approved && !ig) {
       const envs =
         post.product === "webdesign"
           ? "IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB（@yozan_web_jp）"
           : "IG_ACCESS_TOKEN / IG_BUSINESS_ID（@swingcortex_jp）";
       patch.error = `${envs} 未設定（Vercel envに設定すると自動投稿されます）`;
-    } else {
+    } else if (ig) {
       anyConfigured = true;
       attempted += 1;
       try {
@@ -278,12 +283,24 @@ export async function publishDue(
       }
     }
 
-    // ---- X ----
-    if (!xCfg) {
+    // ---- X（xAuto なら承認を待たない。既に投稿済みなら二重投稿しない）----
+    const xDue = !post.xTweetId && (approved || Boolean(opts.xAuto));
+    if (xDue && !xCfg) {
       patch.x_error = "X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_SECRET 未設定（@YOZAN_inc）";
-    } else {
+    } else if (xDue && xCfg) {
       anyConfigured = true;
       attempted += 1;
+
+      // 画像を付ける（Xは画像付きの方が伸びる #104）。落ちても本文だけで投稿する＝投稿自体は守る
+      let mediaIds: string[] | undefined;
+      let mediaNote = "";
+      try {
+        const { mediaId } = await uploadMedia(xCfg, `${opts.cardBaseUrl}/api/public/ai-sales/card/${post.id}`);
+        mediaIds = [mediaId];
+      } catch (e) {
+        mediaNote = `（画像なしで投稿: ${(e instanceof Error ? e.message : String(e)).slice(0, 120)}）`;
+      }
+
       try {
         const { tweetId } = await publishTweet(
           xCfg,
@@ -291,28 +308,33 @@ export async function publishDue(
             body: post.body,
             hashtags: post.hashtags,
             url: lpUrlFor(post.product, opts.cardBaseUrl),
-          })
+          }),
+          mediaIds
         );
         patch.x_tweet_id = tweetId;
         patch.x_posted_at = new Date().toISOString();
-        patch.x_error = null;
+        patch.x_error = mediaNote || null;
         succeeded += 1;
         summary.x += 1;
+        if (!approved) summary.xAuto += 1;
       } catch (e) {
         patch.x_error = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       }
     }
 
     // ---- 状態確定 ----
-    if (succeeded > 0) {
-      patch.status = "posted";
-      patch.posted_at = post.postedAt ?? new Date().toISOString();
-      summary.posted += 1;
-    } else if (attempted > 0) {
-      patch.status = "failed";
-      summary.failed += 1;
+    // 承認前（Xだけ自動投稿）の行は status を動かさない＝Instagramの承認カードはそのまま残す
+    if (approved) {
+      if (succeeded > 0) {
+        patch.status = "posted";
+        patch.posted_at = post.postedAt ?? new Date().toISOString();
+        summary.posted += 1;
+      } else if (attempted > 0) {
+        patch.status = "failed";
+        summary.failed += 1;
+      }
+      // attempted === 0（全チャネル未設定）は scheduled のまま＝env設定後の次tickで自動投稿される
     }
-    // attempted === 0（全チャネル未設定）は scheduled のまま＝env設定後の次tickで自動投稿される
 
     await admin.from("cnt_posts").update(patch).eq("id", post.id);
   }

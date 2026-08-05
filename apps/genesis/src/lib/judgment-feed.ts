@@ -117,9 +117,10 @@ function buildPlan(
       ? new Date(String(payload.scheduled_for)).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })
       : "予定時刻";
     const igAccount = product === "webdesign" ? "@yozan_web_jp" : "@swingcortex_jp";
+    // Xは承認なしの自動投稿に切り替えた（#104）。この承認カードが決めるのは Instagram だけ
     return {
-      what: `Instagram（カード画像＋キャプション）と X（本文＋集客LPリンク）へ同時投稿（${label}）`,
-      target: `${igAccount} のフォロワー・発見タブ ／ X @YOZAN_inc のフォロワー・タイムライン`,
+      what: `Instagramへフィード投稿（${label}・カード画像＋キャプション）※ X @YOZAN_inc へは承認を待たず ${when} に自動投稿されます`,
+      target: `${igAccount} のフォロワー・発見タブ（Xは自動・この承認の対象外）`,
       timing: `承認で予約確定 → ${when} に自動投稿（10分ごとの実行キュー）`,
       irreversible: true, // 投稿後の削除はInstagram/X側で手動
     };

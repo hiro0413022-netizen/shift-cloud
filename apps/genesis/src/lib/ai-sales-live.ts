@@ -44,6 +44,8 @@ export type AiSalesLive = {
     xConfigured: boolean;
     aiConfigured: boolean;
     loopEnabled: boolean | null;
+    /** Xは承認なしで自動投稿するか（#104・gn_loops.config.x_auto） */
+    xAuto: boolean;
   };
   lastRun: { date: string; decision: string; reason: string } | null;
   pipeline: {
@@ -120,7 +122,7 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
     safe(
       admin
         .from("gn_loops")
-        .select("id, enabled")
+        .select("id, enabled, config")
         .eq("company_id", companyId)
         .eq("code", "sns_content")
         .maybeSingle()
@@ -362,6 +364,7 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
       ),
       aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
       loopEnabled: loopRes ? Boolean(loopRes.enabled) : null,
+      xAuto: (loopRes?.config as Record<string, unknown> | undefined)?.x_auto !== false,
     },
     lastRun:
       runRes.length > 0

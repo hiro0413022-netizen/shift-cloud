@@ -57,7 +57,8 @@ async function ensureLoop(admin: Admin, companyId: string): Promise<LoopRow | nu
       enabled: companyId === YOZAN_COMPANY_ID,
       // 商品ローテーション（日替わり）。pganote は専用IGアカウントがまだ無いため既定から外している
       // （@swingcortex_jp に混ぜたくなったら config.products に追加するだけ）
-      config: { post_hour_jst: 18, products: ["swing-cortex", "webdesign"] },
+      // x_auto: Xは承認を待たず予定時刻に自動投稿（#104）。Instagramは承認が要る（画像＋商品別アカウントのため）
+      config: { post_hour_jst: 18, products: ["swing-cortex", "webdesign"], x_auto: true },
     })
     .select("id, enabled, config")
     .single();
@@ -197,7 +198,24 @@ export async function runContentLoop(companyId: string): Promise<Record<string, 
  * IGは商品別アカウント、Xは会社公式1アカウント @YOZAN_inc。片方未設定でももう片方は配信される。
  */
 export async function publishDueContent(admin: Admin, companyId: string): Promise<PublishSummary> {
-  const summary = await publishDue(admin, companyId, { cardBaseUrl: GENESIS_BASE_URL });
+  // Xは承認なしで自動投稿（#104・gn_loops.config.x_auto）。Instagramは従来どおり承認が要る
+  const { data: loop } = await admin
+    .from("gn_loops")
+    .select("config")
+    .eq("company_id", companyId)
+    .eq("code", LOOP_CODE)
+    .maybeSingle();
+  const xAuto = (loop?.config as Record<string, unknown> | undefined)?.x_auto !== false;
+
+  const summary = await publishDue(admin, companyId, { cardBaseUrl: GENESIS_BASE_URL, xAuto });
+  if (summary.xAuto > 0) {
+    await logEvent(companyId, {
+      event_type: "ai.sns_posted",
+      title: `SNS AIが承認なしでXへ${summary.xAuto}件自動投稿しました（Instagramは承認待ちのまま）`,
+      source: "content_loop",
+      source_type: "ai",
+    });
+  }
   if (summary.posted > 0) {
     const detail = [
       summary.instagram > 0 ? `Instagram ${summary.instagram}件` : null,

@@ -41,6 +41,16 @@ DB: `cnt_posts`（0091・RLS有効ポリシー無し=service_role専用 #65標�
 `awaiting_approval`（生成直後・判断フィード掲載中）→ 承認 → `scheduled`（時刻待ち）→ `posted` / `failed`。
 却下は queue 側 cancelled → 翌朝の掃除（syncRejected）で `rejected` に同期。
 
+**承認の要否（#104）**
+
+| チャネル | 承認 | 理由 |
+|---|---|---|
+| **X @YOZAN_inc** | **不要（自動投稿）** | 会社公式1アカウント・テキスト主体で事故の幅が小さい。`gn_loops.config.x_auto`（既定true。falseにすると承認制に戻る） |
+| Instagram | 必要 | 画像を伴い商品別アカウントに出るため。判断フィードの承認カードが決めるのは**Instagramだけ** |
+
+Xは承認を待たず予定時刻に出るので、`awaiting_approval` の行も publishDue が拾う。
+**このときstatusは動かさない**（Instagramの承認カードを消さないため）。X投稿済みかは `x_tweet_id` で判定＝二重投稿しない。
+
 **2チャネル配信の状態の決め方（#103・0093）**
 
 | 状況 | status | 記録 |
@@ -79,6 +89,8 @@ Instagramは本文リンクが踏めずbio誘導になるので、商品ごと�
   - 切り方は**文末（。！？）優先** → 無ければ改行（「〜は：」の前振り行は捨てる）→ 最後の手段が字数切り＋…
     （初回投稿2026-08-05で「✓ 予約・問い合…」と途中で切れた実例からの改善）
   - CTAの**「プロフィールのリンク」はX向けに「下のリンク」へ自動で言い換える**（IGはbio誘導・Xは本文リンク＝案内が食い違うため）
+  - **画像も添付する**（#104・Xは画像付きの方が伸びる）。IGと同じカード画像を v1.1 `upload.twitter.com/1.1/media/upload.json` へ上げて `media_ids` で添付。
+    OAuth 1.0a では v2 の `/2/media/upload` は使えない（403）。**画像アップロードが失敗しても本文だけで投稿する**（投稿自体は落とさない・理由は `x_error` に注記）
 
 共通env: `ANTHROPIC_API_KEY`（無しはテンプレ生成）・`CONTENT_AI_MODEL`（任意・既定haiku）。
 既定ローテーションは gn_loops(sns_content).config.products = `["swing-cortex","webdesign"]`（日替わり交互）。

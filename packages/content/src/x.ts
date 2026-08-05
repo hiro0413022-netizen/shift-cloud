@@ -208,16 +208,55 @@ type XErrorBody = {
   status?: number;
 };
 
+const MEDIA_UPLOAD_ENDPOINT = "https://upload.twitter.com/1.1/media/upload.json";
+
+/**
+ * 画像を1枚アップロードして media_id を得る（#104）。
+ *
+ * OAuth 1.0a では **v1.1 の upload.twitter.com が正規ルート**（v2の /2/media/upload は OAuth 2.0 前提で、
+ * 1.0aだと403になる報告が多い）。multipartのボディは署名対象に含めない＝oauthパラメータだけで署名する。
+ *
+ * 画像はカード画像エンドポイント（/api/public/ai-sales/card/[id]）から取得する。
+ * 失敗しても投稿自体は落とさない設計（呼び出し側でテキストのみに切り替える）。
+ */
+export async function uploadMedia(cfg: XConfig, imageUrl: string): Promise<{ mediaId: string }> {
+  const imgRes = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
+  if (!imgRes.ok) throw new Error(`カード画像の取得に失敗: HTTP ${imgRes.status}`);
+  const blob = await imgRes.blob();
+  if (blob.size > 5 * 1024 * 1024) throw new Error(`画像が大きすぎます（${Math.round(blob.size / 1024)}KB・上限5MB）`);
+
+  const form = new FormData();
+  form.append("media", blob, "card.png");
+
+  const authorization = await buildOAuthHeader(cfg, "POST", MEDIA_UPLOAD_ENDPOINT);
+  const res = await fetch(MEDIA_UPLOAD_ENDPOINT, {
+    method: "POST",
+    headers: { authorization }, // content-type は FormData に任せる（boundaryを壊さない）
+    body: form,
+    signal: AbortSignal.timeout(60000),
+  });
+  const json = (await res.json().catch(() => ({}))) as { media_id_string?: string } & XErrorBody;
+  if (!res.ok) {
+    const detail = json.detail ?? json.errors?.[0]?.message ?? json.title ?? "unknown";
+    throw new Error(`X media upload HTTP ${res.status}: ${detail}`);
+  }
+  const mediaId = String(json.media_id_string ?? "");
+  if (!mediaId) throw new Error("X media upload: media_id が返りませんでした");
+  return { mediaId };
+}
+
 /**
  * 投稿（POST /2/tweets）。成功で tweetId を返す。
  * 失敗はメッセージを整えて throw（呼び出し側が cnt_posts.x_error に残す）。
  */
-export async function publishTweet(cfg: XConfig, text: string): Promise<{ tweetId: string }> {
+export async function publishTweet(cfg: XConfig, text: string, mediaIds?: string[]): Promise<{ tweetId: string }> {
   const authorization = await buildOAuthHeader(cfg, "POST", TWEETS_ENDPOINT);
+  const payload: Record<string, unknown> = { text };
+  if (mediaIds && mediaIds.length > 0) payload.media = { media_ids: mediaIds.slice(0, 4) };
   const res = await fetch(TWEETS_ENDPOINT, {
     method: "POST",
     headers: { authorization, "content-type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(payload),
     signal: AbortSignal.timeout(30000),
   });
   const json = (await res.json().catch(() => ({}))) as { data?: { id?: string } } & XErrorBody;

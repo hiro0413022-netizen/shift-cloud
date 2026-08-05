@@ -104,6 +104,11 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
           {live ? "LIVE" : "接続エラー"}
           <span className="text-xs text-(--color-dim)">更新 {jstTime(data.generatedAt)}（15秒ごと）</span>
         </span>
+        {data.config.xAuto && (
+          <span className="rounded-full border border-sky-500/30 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-300">
+            X @YOZAN_inc は承認なしで自動投稿（Instagramのみ承認制）
+          </span>
+        )}
         {data.lastRun && (
           <span className="text-xs text-(--color-dim)">
             AIの直近判断: {data.lastRun.date}{" "}
@@ -200,7 +205,9 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
                         X 投稿済み ↗
                       </a>
                     ) : (
-                      <span className="rounded border border-(--color-line) px-1.5 py-0.5 text-(--color-dim)">X 未</span>
+                      <span className="rounded border border-(--color-line) px-1.5 py-0.5 text-(--color-dim)">
+                        {data.config.xAuto ? "X 自動投稿を待機中" : "X 未"}
+                      </span>
                     )}
                   </div>
                   {post.error && <p className="mt-1 text-xs text-red-300">IG: {post.error}</p>}
