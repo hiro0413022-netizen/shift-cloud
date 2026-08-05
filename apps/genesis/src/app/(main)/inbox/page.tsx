@@ -33,7 +33,9 @@ function channelLabel(source: string) {
 function fmtEventTime(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export default async function InboxPage() {
@@ -210,6 +212,21 @@ export default async function InboxPage() {
                 <span>{q.from_name ?? q.from_email ?? "問い合わせ"}</span>
                 {q.subject && <span className="text-xs text-(--color-dim)">／ {q.subject}</span>}
                 <span className="ml-auto text-xs text-(--color-dim)">{fmtDate(q.created_at)}</span>
+                {/* 承認したのに送れていないLINE（#102の滞留・送信失敗）はここから再送する */}
+                {q.status === "approved" && q.source === "line" && !q.reply_sent_at && (
+                  <form action={approveInquiry} className="w-full">
+                    <input type="hidden" name="id" value={q.id} />
+                    <input type="hidden" name="reply" value={q.ai_draft_reply ?? ""} />
+                    <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-600/40 bg-amber-500/10 px-2 py-1.5 text-xs">
+                      <span className="text-amber-200">
+                        未送信です{q.reply_error ? `（${q.reply_error}）` : ""}
+                      </span>
+                      <button className="ml-auto rounded-md bg-amber-600 px-2 py-1 font-medium text-white hover:bg-amber-500">
+                        今すぐ送信
+                      </button>
+                    </div>
+                  </form>
+                )}
               </li>
             ))}
           </ul>

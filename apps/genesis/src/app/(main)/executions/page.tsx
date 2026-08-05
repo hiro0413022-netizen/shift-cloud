@@ -22,7 +22,9 @@ const MODE_LABEL: Record<string, string> = {
 
 function fmt(ts: string | null): string {
   if (!ts) return "—";
-  return new Date(ts).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(ts).toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
 }
 
 export default async function ExecutionsPage() {

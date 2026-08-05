@@ -47,6 +47,7 @@ export type SecInquiry = {
   gmail_thread_id: string | null;
   calendar_event_id: string | null;
   reply_sent_at: string | null;
+  reply_error: string | null;
   created_at: string;
 };
 
@@ -56,6 +57,9 @@ export type ProposedEvent = {
   end?: string;
   location?: string;
   notes?: string;
+  /** LINE受信時に webhook が保存する返信先（push宛先）。カレンダー案とは排他的に使う */
+  line_user_id?: string;
+  line_channel?: string;
 };
 
 /** 未対応（新規・承認待ち）の問い合わせを新しい順で取得。

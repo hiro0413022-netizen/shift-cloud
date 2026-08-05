@@ -14,7 +14,7 @@ export async function enqueueTestAction() {
   await enqueueAction(admin, {
     companyId: actor.companyId,
     actionType: "test_notify",
-    title: `テスト実行 ${new Date().toLocaleString("ja-JP")}`,
+    title: `テスト実行 ${new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}`,
     payload: { by: actor.name },
     originKind: "test",
     createdBy: actor.staffId,

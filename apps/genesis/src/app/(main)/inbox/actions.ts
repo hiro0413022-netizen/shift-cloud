@@ -7,12 +7,15 @@ import { logAudit, logEvent } from "@/lib/kernel";
 import { generateDraftReply, generateMissingDrafts, applyFilterRules } from "@/lib/secretary";
 
 /**
- * 返信案を承認 → status=approved（送信予約）。
+ * 返信案を承認 → 外部送信。
  * 送信の実体:
- *   - source=gmail → 秘書スケジュールタスク（ceo-ai-secretary）が承認済みを拾って送信
- *   - source=line  → n8n「LINE返信送信」ワークフローが承認済みを拾ってPush送信
- * どちらも status='approved' の行だけを送る（VISION §7: 外部送信は承認必須）。
- * 文面はこの画面で編集された内容で確定する。
+ *   - source=line  → その場で LINE Messaging API に push（#102）。
+ *     以前は「n8n『LINE返信送信』が承認済みを拾う」設計だったが、その拾い役が
+ *     どこにも存在せず approved のまま滞留していた（2026-08-05 実障害）。
+ *     スタッフ配信が #85 で直pushに移行済みなので、返信も同じ経路に揃える。
+ *   - source=gmail → 従来どおり status=approved で置き、秘書スケジュールタスク
+ *     （ceo-ai-secretary）が拾って送信する。
+ * 文面はこの画面で編集された内容で確定する（VISION §7: 外部送信は承認必須）。
  */
 export async function approveInquiry(formData: FormData) {
   const actor = await requireGenesisActor();
@@ -27,7 +30,11 @@ export async function approveInquiry(formData: FormData) {
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .single();
-  if (!before || !["new", "awaiting_approval"].includes(String(before.status))) return;
+  // 承認可能: 未対応の2状態。加えて「承認済みなのに送れていないLINE」は再送を許す
+  // （n8n待ちだった行の救済・#102）。送信済み(reply_sent_at)があるものは二重送信しない。
+  const retriable =
+    String(before?.status) === "approved" && String(before?.source) === "line" && !before?.reply_sent_at;
+  if (!before || !(["new", "awaiting_approval"].includes(String(before.status)) || retriable)) return;
 
   // 文面が空のまま承認されると「空メッセージを送る」事故になるので止める
   const finalReply = reply || String(before.ai_draft_reply ?? "").trim();
@@ -41,13 +48,51 @@ export async function approveInquiry(formData: FormData) {
     reply_error: null,
   };
   await admin.from("sec_inquiries").update(after).eq("id", id).eq("company_id", actor.companyId);
-
   await logAudit(actor, "inquiry.approve", "sec_inquiries", id, before, after);
+
+  const isLine = String(before.source) === "line";
+  const who = String(before.from_name ?? before.from_email ?? "問い合わせ");
+
+  // ---- LINEは承認と同時に送る（承認＝送信・#102） ----
+  let sendError: string | null = null;
+  if (isLine) {
+    try {
+      const meta = (before.proposed_event ?? {}) as Record<string, unknown>;
+      const to = meta.line_user_id ? String(meta.line_user_id) : "";
+      const code = meta.line_channel ? String(meta.line_channel) : "";
+      if (!to) throw new Error("送信先のLINEユーザーIDが記録されていません（webhook受信前の古い行）");
+      if (!code) throw new Error("受信チャネルが記録されていません（webhook受信前の古い行）");
+
+      const { getLineChannel, linePush } = await import("@/lib/line");
+      const ch = await getLineChannel(admin, actor.companyId, code);
+      if (!ch) throw new Error(`LINEチャネル未登録または無効: ${code}（gn_line_channels）`);
+
+      await linePush(ch.access_token, to, finalReply);
+
+      await admin
+        .from("sec_inquiries")
+        .update({ status: "replied", reply_sent_at: new Date().toISOString(), reply_error: null })
+        .eq("id", id)
+        .eq("company_id", actor.companyId);
+    } catch (e) {
+      // 送信失敗は approved のまま残し、理由を画面に出す（黙って消えるのが一番困る）
+      sendError = e instanceof Error ? e.message : String(e);
+      await admin
+        .from("sec_inquiries")
+        .update({ reply_error: sendError.slice(0, 500) })
+        .eq("id", id)
+        .eq("company_id", actor.companyId);
+    }
+  }
+
   await logEvent(actor.companyId, {
-    event_type: "inquiry.approved",
-    title: `返信を承認（${String(before.source) === "line" ? "LINE送信予約" : "メール送信予約"}）: ${String(
-      before.from_name ?? before.from_email ?? "問い合わせ"
-    )}`.slice(0, 120),
+    event_type: sendError ? "inquiry.reply_failed" : "inquiry.approved",
+    title: (isLine
+      ? sendError
+        ? `LINE返信の送信に失敗（要確認）: ${who} / ${sendError}`
+        : `LINE返信を送信: ${who}`
+      : `返信を承認（メール送信予約）: ${who}`
+    ).slice(0, 120),
     source: "ceo_inbox",
     source_type: "human",
   });

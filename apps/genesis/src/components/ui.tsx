@@ -108,9 +108,19 @@ export function Empty({ children }: { children: ReactNode }) {
   return <p className="py-6 text-center text-sm text-(--color-dim)">{children}</p>;
 }
 
+/**
+ * 日時表示は必ずJST。timeZone を省くとサーバー（VercelはUTC）でレンダリングされた画面が
+ * 9時間ずれて出る（出来事ログの時刻が合わない実障害・#102）。[[jst-date-rule]] の表示側。
+ */
 export function fmtDate(d: string | null | undefined) {
   if (!d) return "-";
-  return new Date(d).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 /* ============================================================

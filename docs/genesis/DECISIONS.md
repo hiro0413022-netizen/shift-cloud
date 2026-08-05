@@ -188,3 +188,10 @@
   **(c) アカウント別Instagram** — `igConfigForProduct()`: webdesign→`IG_ACCESS_TOKEN_WEB`/`IG_BUSINESS_ID_WEB`、他→従来env。publishDueは投稿ごとにアカウント解決し、未設定アカウント分だけ待機注記（他方は投稿される）。/ai-sales の警告もアカウント別2本に分離。
   **(d) HP制作LP** — `/lp/webdesign`（訴求=demo-sales運用の「契約前に完成デモ」・3ステップ・無料デモ依頼フォーム）。トークン `lp-webdesign`・リードは sec_inquiries（件名「ホームページ制作の相談・デモ希望」）。カード画像に webdesign ブランド（青系）追加。
   残: ①@yozan_web_jp のbioへLPリンク設定（セッションがブラウザに無くログインが必要なためユーザー作業） ②IG env 2アカウント分 ③push前 `npx tsc --noEmit`。
+
+- #102 (2026-08-05) **LINE返信の「承認したのに送られない」を解消＝承認と同時に直push（コード修正のみ・migrationなし）**。実障害: 8/5 10:50に承認したGOLF WING会員様への返信が `sec_inquiries.status='approved'` のまま滞留し、`reply_sent_at` が null のまま送られていなかった。
+  **(a) 原因** — 設計は「approved を n8n『LINE返信送信』ワークフローが拾ってPush」だったが、その**拾い役がリポジトリにもn8nにも存在しなかった**。承認アクションは status を書き換えるだけで終わっていた。
+  **(b) 対応** — `approveInquiry`（inbox/actions.ts・ホーム判断フィードと共用）で source='line' のとき `proposed_event.line_user_id` 宛に `linePush()` で即送信し `status='replied'` / `reply_sent_at` を記録。送信失敗は approved のまま残し理由を `reply_error` に保存して画面に出す（黙って消えるのを防ぐ）。**スタッフ配信が #85 で直push化済みなので、返信も同じ経路に統一＝n8nは使わない**。gmail は従来どおり秘書スケジュールタスクが送る。
+  **(c) 滞留分の救済** — 「approved かつ source=line かつ reply_sent_at が null」は再送を許可し、/inbox の処理済み一覧に「今すぐ送信」ボタンを出す（送信済みは二重送信しない）。
+  **(d) 表示時刻のUTCズレ** — `components/ui.tsx` の `fmtDate` ほか3箇所が `toLocaleString("ja-JP")` を timeZone 指定なしで呼んでおり、サーバー（VercelはUTC）レンダリングの画面が**9時間ずれて**表示されていた（出来事ログ /events の時刻が合わない実障害）。`timeZone:"Asia/Tokyo"` を付与。**[[jst-date-rule]] の表示側ルール: 日時表示は必ずJST明示**。
+  **(e) 検証** — tsc 0エラー・tests 108件通過。なお型チェックは `tsconfig.tscheck.json`（.gitignore対象=各環境ローカル）に @yozan/track・@yozan/content の paths を足して実行した。Windowsのnode_modules symlinkがVMマウント越しに壊れるため、この2パッケージだけ解決できない環境がある。
