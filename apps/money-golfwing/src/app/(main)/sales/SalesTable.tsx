@@ -23,46 +23,64 @@ export type SaleRow = {
 
 type Form = {
   soldOn: string; category: string; customerName: string; memberKind: string;
-  amount: string; taxIncluded: string; payMethod: string; productName: string;
+  unitPrice: string; amount: string; taxIncluded: string; payMethod: string; productName: string;
   qty: string; pro: string; memo: string;
 };
-
-function toForm(r: SaleRow): Form {
-  return {
-    soldOn: r.soldOn, category: r.category, customerName: r.customerName, memberKind: r.memberKind,
-    amount: String(r.amount || ""), taxIncluded: r.taxIncluded != null ? String(r.taxIncluded) : "",
-    payMethod: r.payMethod, productName: r.productName, qty: r.qty ? String(r.qty) : "",
-    pro: r.pro, memo: r.memo,
-  };
-}
 
 function num(s: string): number {
   const n = Number(String(s).replace(/[",，\s]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 
+function toForm(r: SaleRow): Form {
+  const qty = r.qty && r.qty > 0 ? r.qty : 1;
+  return {
+    soldOn: r.soldOn, category: r.category, customerName: r.customerName, memberKind: r.memberKind,
+    unitPrice: r.amount ? String(Math.round(Number(r.amount) / qty)) : "",
+    amount: String(r.amount || ""), taxIncluded: r.taxIncluded != null ? String(r.taxIncluded) : "",
+    payMethod: r.payMethod, productName: r.productName, qty: String(qty),
+    pro: r.pro, memo: r.memo,
+  };
+}
+
+/** 単価・個数を変えたら金額（＝単価×個数）と税込を積み直す */
+function withPriceQty(f: Form, p: Partial<Form>): Form {
+  const next = { ...f, ...p };
+  const total = num(next.unitPrice) * num(next.qty);
+  next.amount = total ? String(Math.round(total)) : "";
+  next.taxIncluded = total ? String(Math.floor(Math.round(total) * 1.1)) : "";
+  return next;
+}
+
 export default function SalesTable({
   rows,
   categories,
+  memberKinds,
   payMethods,
   pros,
 }: {
   rows: SaleRow[];
   categories: string[];
+  memberKinds: string[];
   payMethods: string[];
   pros: string[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Form | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function startEdit(r: SaleRow) {
     setEditingId(r.id);
     setForm(toForm(r));
+    setError(null);
   }
 
   function save(r: SaleRow) {
-    if (!form || num(form.amount) === 0) return;
+    if (!form) return;
+    if (num(form.amount) === 0) { setError("金額を入力してください"); return; }
+    if (num(form.qty) < 1) { setError("個数を入力してください（1以上）"); return; }
+    setError(null);
     startTransition(async () => {
       await updateSale({
         id: r.id,
@@ -75,7 +93,7 @@ export default function SalesTable({
         payMethod: form.payMethod || undefined,
         productName: form.productName || undefined,
         invItemId: r.invItemId || undefined, // 在庫リンクは維持（個数変更は在庫に反映）
-        qty: form.qty ? num(form.qty) : undefined,
+        qty: num(form.qty) || 1,
         pro: form.pro || undefined,
         memo: form.memo || undefined,
       });
@@ -119,7 +137,7 @@ export default function SalesTable({
                     <input value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} placeholder="お客様名" className={inputCls} />
                     <select value={form.memberKind} onChange={(e) => setForm({ ...form, memberKind: e.target.value })} className={inputCls}>
                       <option value="">会員区分</option>
-                      {opts(["会員", "ビジター"], form.memberKind).map((k) => <option key={k} value={k}>{k}</option>)}
+                      {opts(memberKinds, form.memberKind).map((k) => <option key={k} value={k}>{k}</option>)}
                     </select>
                     <select value={form.payMethod} onChange={(e) => setForm({ ...form, payMethod: e.target.value })} className={inputCls}>
                       <option value="">支払方法</option>
@@ -130,19 +148,22 @@ export default function SalesTable({
                       {opts(pros, form.pro).map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
                     <input value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} placeholder="品名・内容" className={`${inputCls} sm:col-span-2`} />
-                    <input inputMode="numeric" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="金額(税抜)" className={inputCls} />
+                    <input inputMode="numeric" value={form.unitPrice} onChange={(e) => setForm(withPriceQty(form, { unitPrice: e.target.value }))} placeholder="単価(税抜)" className={inputCls} />
+                    <input type="number" min={1} step={1} required value={form.qty} onChange={(e) => setForm(withPriceQty(form, { qty: e.target.value }))} placeholder="個数(必須)" aria-label="個数（必須）" className={inputCls} />
+                    <input inputMode="numeric" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="金額(税抜・自動)" className={inputCls} />
                     <input inputMode="numeric" value={form.taxIncluded} onChange={(e) => setForm({ ...form, taxIncluded: e.target.value })} placeholder="税込" className={inputCls} />
-                    <input inputMode="numeric" value={form.qty} onChange={(e) => setForm({ ...form, qty: e.target.value })} placeholder="個数" className={inputCls} />
-                    <input value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} placeholder="備考" className={inputCls} />
+                    <input value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} placeholder="備考" className={`${inputCls} sm:col-span-2`} />
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <button type="button" onClick={() => save(r)} disabled={pending} className={btnCls}>{pending ? "..." : "保存"}</button>
-                    <button type="button" onClick={() => { setEditingId(null); setForm(null); }} className={btnGhostCls}>キャンセル</button>
+                    <button type="button" onClick={() => { setEditingId(null); setForm(null); setError(null); }} className={btnGhostCls}>キャンセル</button>
                     <span className="text-xs text-(--color-dim)">
+                      単価・個数を直すと金額（税抜/税込）は自動で計算されます。
                       {r.invItemId ? "在庫連動あり: 個数・日付の変更は在庫にも反映されます。" : ""}
                       現金の場合は現金出納の連携行と残高も自動で直ります
                     </span>
                   </div>
+                  {error && <p className="mt-1 text-xs text-(--color-accent)">{error}</p>}
                 </td>
               </tr>
             ) : (
@@ -151,6 +172,7 @@ export default function SalesTable({
                 <td className="px-2 py-2">{r.category}</td>
                 <td className="px-2 py-2">
                   {r.productName || r.customerName || "—"}
+                  {r.qty && r.qty > 1 ? <span className="ml-1 text-xs text-(--color-dim)">×{r.qty}</span> : null}
                   {r.invItemId && <span className="ml-1 text-xs text-(--color-gold)" title="在庫連動">◆</span>}
                 </td>
                 <td className="px-2 py-2 text-(--color-dim)">{r.pro || "—"}</td>

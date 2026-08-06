@@ -40,7 +40,8 @@ function normalizeInput(input: SaleInput) {
     memo: (input.memo ?? "").trim() || null,
     productName: (input.productName ?? "").trim(),
     invItemId: (input.invItemId ?? "").trim() || null,
-    qty: Number(input.qty) || 0,
+    // 個数は必須（1以上）。未指定・不正値は1個扱いで保存する
+    qty: Math.max(1, Number(input.qty) || 1),
     pro: (input.pro ?? "").trim() || null,
   };
 }

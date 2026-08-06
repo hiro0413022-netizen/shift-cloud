@@ -10,6 +10,7 @@ import type { InvPick } from "./ProductPicker";
 export const dynamic = "force-dynamic";
 
 const CATEGORIES = ["利用料", "月会費", "販売", "その他"];
+const MEMBER_KINDS = ["会員", "ビジター", "スタッフ"];
 const PAY_METHODS = ["現金", "Airペイ", "SBペイメント", "楽天ペイ", "振込", "その他"];
 
 type Sale = {
@@ -147,6 +148,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           <SalesEntry
             today={today}
             categories={CATEGORIES}
+            memberKinds={MEMBER_KINDS}
             payMethods={PAY_METHODS}
             pros={pros}
             invItems={invItems}
@@ -161,7 +163,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         {saleRows.length === 0 ? (
           <Empty>この月の売上はまだありません</Empty>
         ) : (
-          <SalesTable rows={saleRows} categories={CATEGORIES} payMethods={PAY_METHODS} pros={pros} />
+          <SalesTable rows={saleRows} categories={CATEGORIES} memberKinds={MEMBER_KINDS} payMethods={PAY_METHODS} pros={pros} />
         )}
       </Panel>
     </div>
