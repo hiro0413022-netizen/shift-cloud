@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireMoneyActor } from "@/lib/auth";
 import { getCurrentStore } from "@/lib/money";
 import { Panel, Empty, Badge, yen, btnGhostCls } from "@/components/ui";
-import { segmentSales, categorySales, ledgerBreakdown, prevMonth } from "@/lib/analytics";
+import { segmentSales, categorySales, ledgerBreakdown, proSales, prevMonth } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -57,16 +57,21 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
 
   // 事業別は全社の数字なので本部権限のみ。現場は自店舗のカテゴリ内訳を見る
-  const [seg, cats, br] = await Promise.all([
+  const scopeStoreId = actor.canManageAll ? null : (store?.id ?? null);
+  const [seg, cats, br, pro] = await Promise.all([
     actor.canManageAll ? segmentSales(actor.companyId, month) : Promise.resolve(null),
-    categorySales(actor.companyId, actor.canManageAll ? null : (store?.id ?? null), month),
-    ledgerBreakdown(actor.companyId, actor.canManageAll ? null : (store?.id ?? null), month),
+    categorySales(actor.companyId, scopeStoreId, month),
+    ledgerBreakdown(actor.companyId, scopeStoreId, month),
+    proSales(actor.companyId, scopeStoreId, month),
   ]);
 
   const catTotal = cats.reduce((a, c) => a + c.amount, 0);
   const catPrev = cats.reduce((a, c) => a + c.prev, 0);
   const catMax = Math.max(...cats.map((c) => Math.abs(c.amount)), 1);
   const trendMax = Math.max(...(seg?.trend ?? []).map((t) => t.amount), 1);
+  // プロ間で高さを比べられるよう、推移の物差しは全プロ共通にする
+  const proMax = Math.max(...pro.rows.map((r) => Math.abs(r.amount)), 1);
+  const proTrendMax = Math.max(...pro.rows.flatMap((r) => r.trend.map((t) => Math.abs(t.amount))), 1);
 
   return (
     <div className="space-y-4">
@@ -177,6 +182,71 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
             </ul>
             <p className="mt-4 text-xs text-(--color-dim)">
               「月会費(窓口)」は窓口決済の会費・入会金です。口座振替の月会費は事業別の「月会費」に入ります。
+            </p>
+          </>
+        )}
+      </Panel>
+
+      {/* ---------- 担当プロ別 ---------- */}
+      <Panel title={`担当プロ別 売上（${label(month)}）`}>
+        {pro.rows.length === 0 ? (
+          <Empty>この月の担当プロ付き売上がありません</Empty>
+        ) : (
+          <>
+            <div className="mb-3 flex items-baseline gap-3">
+              <p className="text-2xl font-bold tabular-nums">{yen(pro.total)}<span className="ml-1 text-sm font-normal text-(--color-dim)">円</span></p>
+              <span className="text-xs text-(--color-dim)">担当プロ別に集計できる売上の合計（税抜）</span>
+            </div>
+            <ul className="space-y-5">
+              {pro.rows.map((r) => (
+                <li key={r.name}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className={`text-sm font-semibold ${r.unassigned ? "text-(--color-dim)" : ""}`}>{r.name}</span>
+                    <span className="tabular-nums text-sm font-bold">
+                      {yen(r.amount)}円
+                      <span className="ml-2 text-xs font-normal text-(--color-dim)">
+                        {pro.total ? Math.round((r.amount / pro.total) * 100) : 0}%
+                      </span>
+                    </span>
+                  </div>
+                  <div className="mt-1">
+                    <Bar value={r.amount} max={proMax} tone={r.unassigned ? "dim" : "gold"} />
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <Delta cur={r.amount} prev={r.prev} />
+                    <span className="text-xs text-(--color-dim)">{r.count}件 / お客様 {r.customers}名</span>
+                  </div>
+
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <ul className="flex flex-wrap gap-2">
+                      {r.cats.map((c) => (
+                        <li key={c.name} className="rounded-lg border border-(--color-line) px-2 py-1 text-xs">
+                          <span className="text-(--color-dim)">{c.name}</span>{" "}
+                          <span className="tabular-nums">{yen(c.amount)}円</span>
+                          <span className="ml-1 text-(--color-dim)">({c.count})</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {/* 直近6か月の推移（物差しは全プロ共通） */}
+                    <div className="flex h-10 items-end gap-1 sm:w-40">
+                      {r.trend.map((t) => (
+                        <div key={t.month} className="flex flex-1 flex-col items-center gap-0.5">
+                          <div
+                            className={`w-full rounded-t ${t.month === month ? "bg-(--color-gold)" : "bg-(--color-line)"}`}
+                            style={{ height: `${Math.max(2, Math.round((Math.abs(t.amount) / proTrendMax) * 100))}%` }}
+                            title={`${t.month}: ${yen(t.amount)}円`}
+                          />
+                          <span className="text-[10px] text-(--color-dim)">{Number(t.month.slice(5))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-(--color-dim)">
+              売上台帳の明細（担当プロ列）とアプリ入力の担当プロを合算しています。担当が空欄の明細は「担当なし」にまとまります。
+              右の棒グラフは直近6か月の推移で、高さの物差しは全プロ共通です。
             </p>
           </>
         )}

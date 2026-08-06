@@ -120,6 +120,152 @@ export async function categorySales(companyId: string, storeId: string | null, m
   return [...map.values()].sort((a, b) => b.amount - a.amount);
 }
 
+/* ------------------------------------------------------------
+   担当プロ別の売上（コーチ別実績）
+
+   出どころは2つ。どちらも「明細」なので足しても二重計上にならない:
+   - mon_sales_lines … Excel売上台帳の日次明細（pro列）。月次ロールアップ後の
+     mon_sales(source='ledger') はこの合計なので、こちらは足さない。
+   - mon_sales(source='app') … アプリからの手入力（detail.pro）。linesには入らない。
+   ------------------------------------------------------------ */
+
+export type ProRow = {
+  name: string;
+  /** 担当プロ名が空の明細（＝担当なし）か */
+  unassigned: boolean;
+  amount: number;
+  prev: number;
+  count: number;
+  /** 当月の実人数（お客様名のユニーク数。名前なしは数えない） */
+  customers: number;
+  cats: BreakdownRow[];
+  trend: MonthValue[];
+};
+
+/** 売上1明細を担当プロ集計用に正規化したもの */
+type ProFact = { m: string; pro: string; amount: number; category: string; customer: string };
+
+/**
+ * 同じコーチが別名で入っている分をまとめる（左＝台帳の表記 / 右＝mon_pros の正式名）。
+ * 「春馬」は卜部さんの下の名前で、2026-04以降の台帳がこの表記になっている。
+ */
+const PRO_ALIASES: Record<string, string> = { 春馬: "卜部" };
+
+/**
+ * 担当プロ名の表記ゆれを吸収する。
+ * - 前後の空白（全角含む）を落とす
+ * - 末尾の敬称「プロ」を外す（2025-05以前の台帳は「古川プロ」表記）
+ * - 別名を正式名に寄せる
+ */
+export function normalizePro(raw: string | null | undefined): string {
+  let s = String(raw ?? "").replace(/[\s　]+/g, "").trim();
+  if (!s) return "";
+  if (s.length > 2 && s.endsWith("プロ")) s = s.slice(0, -2);
+  return PRO_ALIASES[s] ?? s;
+}
+
+export async function proSales(
+  companyId: string,
+  storeId: string | null,
+  month: string,
+  months = 6,
+): Promise<{ rows: ProRow[]; total: number; trendMonths: string[] }> {
+  const admin = createAdmin();
+  const since = `${prevMonth(month, months - 1)}-01`;
+  const until = monthRange(month).to;
+
+  // ① Excel売上台帳の明細
+  let ql = admin
+    .from("mon_sales_lines")
+    .select("sold_on, pro, amount, item_category, customer_name")
+    .eq("company_id", companyId)
+    .is("deleted_at", null)
+    .gte("sold_on", since)
+    .lt("sold_on", until);
+  if (storeId) ql = ql.eq("store_id", storeId);
+
+  // ② アプリ手入力（ロールアップ済みの ledger 行は除く＝二重計上しない）
+  let qs = admin
+    .from("mon_sales")
+    .select("sold_on, category, amount, customer_name, detail")
+    .eq("company_id", companyId)
+    .eq("source", "app")
+    .is("deleted_at", null)
+    .gte("sold_on", since)
+    .lt("sold_on", until);
+  if (storeId) qs = qs.eq("store_id", storeId);
+
+  const [{ data: lineData }, { data: saleData }] = await Promise.all([ql, qs]);
+
+  type L = { sold_on: string; pro: string | null; amount: number | string; item_category: string | null; customer_name: string | null };
+  type S = { sold_on: string; category: string | null; amount: number | string; customer_name: string | null; detail: Record<string, unknown> | null };
+
+  const facts: ProFact[] = [];
+  for (const l of (lineData ?? []) as L[]) {
+    facts.push({
+      m: String(l.sold_on).slice(0, 7),
+      pro: normalizePro(l.pro),
+      amount: Number(l.amount) || 0,
+      category: (l.item_category ?? "").trim() || "その他",
+      customer: (l.customer_name ?? "").trim(),
+    });
+  }
+  for (const s of (saleData ?? []) as S[]) {
+    facts.push({
+      m: String(s.sold_on).slice(0, 7),
+      pro: normalizePro(String(s.detail?.pro ?? "")),
+      amount: Number(s.amount) || 0,
+      category: (s.category ?? "").trim() || "その他",
+      customer: (s.customer_name ?? "").trim(),
+    });
+  }
+
+  const cur = month;
+  const prv = prevMonth(month);
+  const trendMonths: string[] = [];
+  for (let i = months - 1; i >= 0; i--) trendMonths.push(prevMonth(month, i));
+
+  type Acc = { row: ProRow; cats: Map<string, BreakdownRow>; customers: Set<string>; trend: Map<string, number> };
+  const acc = new Map<string, Acc>();
+
+  for (const f of facts) {
+    const key = f.pro || "";
+    if (!acc.has(key)) {
+      acc.set(key, {
+        row: { name: f.pro || "担当なし", unassigned: !f.pro, amount: 0, prev: 0, count: 0, customers: 0, cats: [], trend: [] },
+        cats: new Map(),
+        customers: new Set(),
+        trend: new Map(),
+      });
+    }
+    const a = acc.get(key)!;
+    a.trend.set(f.m, (a.trend.get(f.m) ?? 0) + f.amount);
+
+    if (f.m === cur) {
+      a.row.amount += f.amount;
+      a.row.count += 1;
+      if (f.customer) a.customers.add(f.customer);
+      const c = a.cats.get(f.category);
+      if (c) { c.amount += f.amount; c.count += 1; }
+      else a.cats.set(f.category, { name: f.category, amount: f.amount, count: 1 });
+    }
+    if (f.m === prv) a.row.prev += f.amount;
+  }
+
+  const rows: ProRow[] = [];
+  for (const a of acc.values()) {
+    a.row.customers = a.customers.size;
+    a.row.cats = [...a.cats.values()].sort((x, y) => y.amount - x.amount);
+    a.row.trend = trendMonths.map((m) => ({ month: m, amount: a.trend.get(m) ?? 0 }));
+    // 当月も前月も推移も全部0なら出さない（過去に一度だけ担当したプロで表が伸びるのを防ぐ）
+    if (a.row.amount !== 0 || a.row.prev !== 0 || a.row.trend.some((t) => t.amount !== 0)) rows.push(a.row);
+  }
+  // 担当なしは最後。それ以外は当月売上の大きい順
+  rows.sort((x, y) => (x.unassigned ? 1 : 0) - (y.unassigned ? 1 : 0) || y.amount - x.amount);
+
+  return { rows, total: rows.reduce((s, r) => s + r.amount, 0), trendMonths };
+}
+
 /** 台帳明細の内訳（品目→種類 / 支払方法）。当月 */
 export async function ledgerBreakdown(companyId: string, storeId: string | null, month: string) {
   const admin = createAdmin();
