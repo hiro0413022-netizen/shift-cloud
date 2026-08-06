@@ -34,6 +34,14 @@ const EXCLUDE_TYPES = ["スタッフ", "モニター会員", "法人会員2枚�
 const MEMBER_RULE =
   "会員数（正会員）＝会員名簿の在籍から、会員種類名「スタッフ」「モニター会員」「法人会員2枚目」「トライアル会員」を除外。当月末退会者は当月の会員数に含めない。表記は会員名簿の会員種類名どおり。";
 
+// 在籍スタッフ（GOLF WING宝塚の実在籍。2026-08-05 ユーザー確定）
+// 会員名簿の会員種類「スタッフ」(15名)は他事業所・家族カード等を含むため在籍スタッフ数には使わない。
+const STAFF_ROSTER = {
+  pro: ["井殿", "安東", "卜部", "福原", "榎本", "前田"],
+  reception: ["谷川"],
+};
+const STAFF_COUNT = STAFF_ROSTER.pro.length + STAFF_ROSTER.reception.length;
+
 const ymAdd = (m, n) => {
   const [y, mo] = m.split("-").map(Number);
   const d = new Date(Date.UTC(y, mo - 1 + n, 1));
@@ -54,7 +62,26 @@ async function loadMonthly() {
     .lte("ym", first(ym))
     .order("ym");
   if (error) throw error;
-  return Object.fromEntries((data || []).map((r) => [String(r.ym).slice(0, 7), r]));
+  const byYm = Object.fromEntries((data || []).map((r) => [String(r.ym).slice(0, 7), r]));
+
+  // 退会者数はスナップショットを優先する。
+  // 理由: Smart Helloの会員名簿は「退会済み」を名簿から削除するため、名簿を再取込すると
+  // 過去月の退会者が消えて退会率が0%に化ける（2026-06が0.0%になっていた実害）。
+  // rpt_member_snapshots は取込で消えないので、値があるほうを正とする。
+  const { data: snaps, error: e2 } = await sb
+    .from("rpt_member_snapshots")
+    .select("ym,leavers")
+    .eq("company_id", companyId)
+    .gte("ym", first(ymAdd(ym, -13)))
+    .lte("ym", first(ym));
+  if (e2) throw e2;
+  for (const s of snaps || []) {
+    const k = String(s.ym).slice(0, 7);
+    if (byYm[k] && s.leavers != null && Number(s.leavers) > Number(byYm[k].leavers || 0)) {
+      byYm[k].leavers = Number(s.leavers);
+    }
+  }
+  return byYm;
 }
 
 // 正会員の種別内訳・除外区分の内訳（当月末在籍）
@@ -85,11 +112,14 @@ function buildKpi(byYm, comp) {
   const pick = (r, f) => (r && r[f] != null ? Number(r[f]) : null);
 
   // 退会率＝当月退会者 ÷ (月末会員数＋当月退会者)
+  // 退会者0の月は「本当に0」ではなく「未取得」（会員名簿が退会済みを削除するため）。
+  // 嘘の0.0%を出さず null（資料上は「—」）にする。実データはスナップショット運用開始(2026-06)以降。
   const churn = (r) => {
     if (!r || r.members == null) return null;
     const lv = Number(r.leavers || 0);
+    if (!lv) return null;
     const base = Number(r.members) + lv;
-    return base ? round1((lv / base) * 100) : 0;
+    return base ? round1((lv / base) * 100) : null;
   };
   // 入会率＝当月入会数 ÷ 当月体験数（体験非経由の直接入会も含むため100%超あり）
   const conv = (r) => (r && r.trials ? round1((Number(r.new_joins || 0) / Number(r.trials)) * 100) : null);
@@ -110,7 +140,12 @@ function buildKpi(byYm, comp) {
       ...(cur.retail_sales == null ? { pending: "物販売上の取込待ち（rpt_retail_sales）" } : {}),
     },
     fittings: { label: "フィッティング", unit: "件", current: pick(cur, "fittings"), prevMonth: pick(pm, "fittings"), prevYear: pick(py, "fittings") },
-    staff: { label: "在籍スタッフ", unit: "人", current: comp.excluded.find((e) => e.label === "スタッフ")?.v ?? null, prevMonth: null, prevYear: null },
+    staff: {
+      label: "在籍スタッフ", unit: "人",
+      current: STAFF_COUNT, prevMonth: STAFF_COUNT, prevYear: null,
+      roster: STAFF_ROSTER,
+      note: `プロ${STAFF_ROSTER.pro.length}名（${STAFF_ROSTER.pro.join("・")}）／受付${STAFF_ROSTER.reception.length}名（${STAFF_ROSTER.reception.join("・")}）`,
+    },
   };
 }
 
@@ -161,7 +196,7 @@ const out = {
     monthLabel: `${ym.split("-")[0]}年${+ym.split("-")[1]}月`, month: ym,
     author: "CEO AI 秘書 (YOZAN GENESIS)",
     note_data:
-      "会員数・入会数・除外区分は会員名簿(mbr_members)、体験・フィッティングは一時利用者名簿(mbr_walkin_visits)、物販売上は売上データ(rpt_retail_sales・品目「販売」税込)。入会率＝当月入会数÷当月体験数（体験非経由の入会も含むため100%超あり）。会員推移・退会率は名簿の入会日/退会日の再構成のため、名簿から消えた過去の退会者を含まない参考値（過去月の退会率が0になることがある）。文章はAI下書き（要承認）。",
+      "会員数・入会数・除外区分は会員名簿(mbr_members)、体験・フィッティングは一時利用者名簿(mbr_walkin_visits)、物販売上は売上台帳明細(mon_sales_lines 品目「販売」税抜→rpt_retail_sales)。入会率＝当月入会数÷当月体験数（体験非経由の入会も含むため100%超あり）。退会率＝当月退会者÷(月末会員数＋当月退会者)で、退会者数は rpt_member_snapshots を優先（会員名簿は退会済みを削除するため）。在籍スタッフはGOLF WING宝塚の実在籍（会員名簿の会員種類「スタッフ」とは別）。会員数の推移は名簿の入会日からの再構成のため、過去に退会した会員を含まない参考値。文章はAI下書き（要承認）。",
   },
   kpi,
   memberTrend: trend(byYm, "members"),
