@@ -1,4 +1,4 @@
-import type { GeneratedPost, Material, Product } from "./types";
+import type { GeneratedPost, Material, SalesProduct } from "./types";
 import { PRODUCT_LABEL } from "./types";
 
 /**
@@ -6,21 +6,21 @@ import { PRODUCT_LABEL } from "./types";
  * どちらの経路でも GeneratedPost の同じ形を返す＝呼び出し側は生成方法を意識しない。
  */
 
-const HASHTAGS: Record<Product, string[]> = {
+const HASHTAGS: Record<SalesProduct, string[]> = {
   pganote: ["#ゴルフレッスン", "#ゴルフコーチ", "#ゴルフスクール", "#レッスンプロ", "#PGANOTE", "#ゴルフ上達"],
   "swing-cortex": ["#ゴルフレッスン", "#ゴルフコーチ", "#スイング分析", "#ゴルフ上達", "#SWINGCORTEX", "#レッスンプロ"],
   webdesign: ["#ホームページ制作", "#ホームページ", "#集客", "#個人事業主", "#店舗経営", "#クリニック開業"],
 };
 
 /** 商品ごとのCTA（LPへ誘導。DMは相手起点のみ＝キャプションでDM送付を約束しない） */
-const CTA: Record<Product, string> = {
+const CTA: Record<SalesProduct, string> = {
   pganote: "レッスンの記録と生徒さんとのつながりを仕組みにしたい方は、プロフィールのリンクからどうぞ。",
   "swing-cortex": "レッスン現場でその場で使える診断ツールに興味のある方は、プロフィールのリンクからどうぞ。",
   webdesign: "「まず完成形を見てから決めたい」という方は、プロフィールのリンクからどうぞ。",
 };
 
 /** 商品ごとの読者像（生成プロンプトに注入） */
-const AUDIENCE: Record<Product, string> = {
+const AUDIENCE: Record<SalesProduct, string> = {
   pganote: "日本のゴルフコーチ・レッスンプロ・練習場運営者",
   "swing-cortex": "日本のゴルフコーチ・レッスンプロ・練習場運営者",
   webdesign: "ホームページが無い・古いままの日本の店舗/クリニック/教室/個人事業のオーナー",
@@ -60,7 +60,7 @@ function materialText(m: Material): string {
 }
 
 /** キー無し・API失敗時のテンプレート生成（安全側フォールバック） */
-export function buildTemplatePost(product: Product, m: Material): GeneratedPost {
+export function buildTemplatePost(product: SalesProduct, m: Material): GeneratedPost {
   const p = m.points[0];
   if (product === "webdesign") {
     const body = [
@@ -122,7 +122,7 @@ export type GenerateOptions = {
   timeoutMs?: number;
 };
 
-function buildSystem(product: Product): string {
+function buildSystem(product: SalesProduct): string {
   return [
     `あなたは中小事業者向けサービスのSNS運用者。読者は${AUDIENCE[product]}。`,
     "与えられた「本日の題材」から、Instagramのフィード投稿を1本作る。",
@@ -134,14 +134,14 @@ function buildSystem(product: Product): string {
 
 /** Claudeで投稿を生成。失敗したらテンプレートに落ちる（throwしない） */
 export async function generatePost(
-  product: Product,
+  product: SalesProduct,
   m: Material,
   opts: GenerateOptions = {}
 ): Promise<GeneratedPost> {
   const apiKey = opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return buildTemplatePost(product, m);
 
-  const description: Record<Product, string> = {
+  const description: Record<SalesProduct, string> = {
     pganote: "レッスンの記録・生徒とのつながりを仕組みにするコーチ向けノートシステム",
     "swing-cortex": "症状を入れると原因・対処・ドリルが出る、コーチ向けのレッスン現場診断ツール",
     webdesign: "契約前に完成デモを見てから決められるホームページ制作サービス（YOZAN WEB制作）",

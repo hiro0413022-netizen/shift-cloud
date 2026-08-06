@@ -248,11 +248,19 @@ export async function uploadMedia(cfg: XConfig, imageUrl: string): Promise<{ med
 /**
  * 投稿（POST /2/tweets）。成功で tweetId を返す。
  * 失敗はメッセージを整えて throw（呼び出し側が cnt_posts.x_error に残す）。
+ *
+ * replyToId を渡すとその投稿への返信になる＝連続投稿（スレッド）を繋ぐ手段はこれだけ。
  */
-export async function publishTweet(cfg: XConfig, text: string, mediaIds?: string[]): Promise<{ tweetId: string }> {
+export async function publishTweet(
+  cfg: XConfig,
+  text: string,
+  mediaIds?: string[],
+  replyToId?: string | null
+): Promise<{ tweetId: string }> {
   const authorization = await buildOAuthHeader(cfg, "POST", TWEETS_ENDPOINT);
   const payload: Record<string, unknown> = { text };
   if (mediaIds && mediaIds.length > 0) payload.media = { media_ids: mediaIds.slice(0, 4) };
+  if (replyToId) payload.reply = { in_reply_to_tweet_id: replyToId };
   const res = await fetch(TWEETS_ENDPOINT, {
     method: "POST",
     headers: { authorization, "content-type": "application/json" },
@@ -276,4 +284,77 @@ export async function publishTweet(cfg: XConfig, text: string, mediaIds?: string
   const id = String(json.data?.id ?? "");
   if (!id) throw new Error("X: 応答にツイートIDがありません");
   return { tweetId: id };
+}
+
+/** 1回のtickで投稿する上限。/api/cron/execute の maxDuration=60秒に収めるための安全弁 */
+const THREAD_MAX_PER_RUN = 12;
+/** 連投の間隔（ms）。短時間の連打はスパム判定・429を招きやすいので少し空ける */
+const THREAD_INTERVAL_MS = 1200;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 各パートをX投稿できる形に整える。
+ * 上限超過は落とさず末尾を削る（1本の長さミスでスレッド全体を止めない）。空行だけの要素は捨てる。
+ */
+export function normalizeThreadParts(parts: string[]): string[] {
+  return parts
+    .map((p) => (p ?? "").trim())
+    .filter((p) => p.length > 0)
+    .map((p) => truncateWeighted(p, X_WEIGHTED_LIMIT));
+}
+
+export type ThreadResult = {
+  /** このtickで新たに投稿できたツイートID（順番どおり） */
+  tweetIds: string[];
+  /** 途中で止まった理由。未完了のまま返るときだけ入る */
+  error?: string;
+  /** 全パートを投稿しきったか */
+  done: boolean;
+};
+
+/**
+ * 連続投稿（スレッド）を投稿する。**途中から再開できる**のが要点。
+ *
+ * X APIは429や一時エラーがそれなりに出る。全部やり直す設計にすると、
+ * 失敗のたびに前半が重複投稿される（取り消せない公開投稿でこれは致命的）。
+ * そこで「すでに投稿できたIDの配列」を渡してもらい、その続きだけを投げる。
+ * 親は直前のツイート＝ postedIds の末尾（無ければ1本目は親なし）。
+ *
+ * 1本でも投げた後に落ちた場合も、投げられたぶんのIDは必ず返す（呼び出し側がDBに残す＝次tickの再開点になる）。
+ */
+export async function publishThread(
+  cfg: XConfig,
+  parts: string[],
+  postedIds: string[] = [],
+  opts: { mediaIdsForFirst?: string[]; maxPerRun?: number } = {}
+): Promise<ThreadResult> {
+  const all = normalizeThreadParts(parts);
+  const startIndex = postedIds.length;
+  const tweetIds: string[] = [];
+  if (startIndex >= all.length) return { tweetIds, done: true };
+
+  const limit = Math.min(all.length, startIndex + (opts.maxPerRun ?? THREAD_MAX_PER_RUN));
+  let parent: string | null = postedIds.length > 0 ? postedIds[postedIds.length - 1] : null;
+
+  for (let i = startIndex; i < limit; i += 1) {
+    if (i > startIndex) await sleep(THREAD_INTERVAL_MS);
+    // 画像は先頭にだけ付ける（全部に付けるとタイムラインが画像だらけになる）
+    const mediaIds = i === 0 ? opts.mediaIdsForFirst : undefined;
+    try {
+      const { tweetId } = await publishTweet(cfg, all[i], mediaIds, parent);
+      tweetIds.push(tweetId);
+      parent = tweetId;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { tweetIds, error: `${i + 1}/${all.length}本目で中断: ${msg}`, done: false };
+    }
+  }
+
+  const posted = startIndex + tweetIds.length;
+  return {
+    tweetIds,
+    done: posted >= all.length,
+    error: posted >= all.length ? undefined : `残り${all.length - posted}本は次のtickで投稿します`,
+  };
 }

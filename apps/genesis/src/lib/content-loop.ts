@@ -14,7 +14,7 @@ import {
   contentStats,
   type PublishSummary,
 } from "@yozan/content/server";
-import type { Material, Product } from "@yozan/content/types";
+import type { Material, SalesProduct } from "@yozan/content/types";
 import { PRODUCT_LABEL } from "@yozan/content/types";
 
 type Admin = ReturnType<typeof createAdmin>;
@@ -76,8 +76,8 @@ function nextPostTime(postHourJst: number): string {
 }
 
 /** 日替わりで商品を交互に（偶数日=PGA NOTE / 奇数日=SWING CORTEX） */
-function productOfDay(config: Record<string, unknown>): Product {
-  const products = (Array.isArray(config.products) ? config.products : ["swing-cortex", "webdesign"]) as Product[];
+function productOfDay(config: Record<string, unknown>): SalesProduct {
+  const products = (Array.isArray(config.products) ? config.products : ["swing-cortex", "webdesign"]) as SalesProduct[];
   const day = Number(jstYmd().slice(8, 10));
   return products[day % products.length] ?? "swing-cortex";
 }

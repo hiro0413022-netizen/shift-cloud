@@ -1,7 +1,7 @@
 import type { AdminClient, CntPost, GeneratedPost, Material, Product } from "./types";
 import { buildCaption } from "./generate";
 import { igConfigForProduct, publishImagePost, type IgConfig } from "./instagram";
-import { xConfigFromEnv, publishTweet, uploadMedia, buildTweetText, type XConfig } from "./x";
+import { xConfigFromEnv, publishTweet, publishThread, uploadMedia, buildTweetText, type XConfig } from "./x";
 
 /**
  * サーバー側API（service_role クライアントを引数で受け取る＝アプリ非依存。@yozan/track と同方式）。
@@ -11,7 +11,9 @@ type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => (v == null ? null : String(v));
 
 const SELECT_POST =
-  "id, company_id, product, platform, theme, hook, body, hashtags, status, scheduled_at, posted_at, ig_media_id, x_tweet_id, x_posted_at, error, x_error, source, metrics, queue_id, created_at";
+  "id, company_id, product, platform, theme, hook, body, hashtags, status, scheduled_at, posted_at, ig_media_id, x_tweet_id, x_posted_at, error, x_error, thread_parts, thread_tweet_ids, source, metrics, queue_id, created_at";
+
+const arr = (v: unknown): string[] => (Array.isArray(v) ? (v as unknown[]).map((x) => String(x)) : []);
 
 export function toPost(r: Row): CntPost {
   return {
@@ -31,6 +33,8 @@ export function toPost(r: Row): CntPost {
     xPostedAt: s(r.x_posted_at),
     error: s(r.error),
     xError: s(r.x_error),
+    threadParts: arr(r.thread_parts),
+    threadTweetIds: arr(r.thread_tweet_ids),
     source: (r.source ?? {}) as Record<string, unknown>,
     metrics: (r.metrics ?? {}) as Record<string, unknown>,
     queueId: s(r.queue_id),
@@ -135,6 +139,55 @@ export async function insertDraft(
   return data?.id ? String(data.id) : null;
 }
 
+/**
+ * X連続投稿（スレッド）を予約する（migration 0096）。
+ *
+ * 会社紹介・お知らせ・採用など「1本のツイートでは説明しきれない発信」用。
+ * platform='x' 固定＝Instagramには配信しない（IG用のカード画像を作る前提が無いため）。
+ *
+ * status:
+ *   'scheduled'          … 承認なしで予定時刻に自動投稿（Xの既定運用 #104と同じ思想）
+ *   'awaiting_approval'  … 判断フィードで承認してから投稿（x_auto が有効だと承認前でも流れる点に注意）
+ *
+ * 予定時刻を過ぎていれば、次の10分tickでそのまま投稿される（PCを開いている必要はない）。
+ */
+export async function insertThread(
+  admin: AdminClient,
+  input: {
+    companyId: string;
+    product?: Product;
+    theme: string;
+    hook: string;
+    parts: string[];
+    scheduledAt: string;
+    status?: "awaiting_approval" | "scheduled";
+    hashtags?: string[];
+    source?: Record<string, unknown>;
+  }
+): Promise<string | null> {
+  const parts = input.parts.map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const { data } = await admin
+    .from("cnt_posts")
+    .insert({
+      company_id: input.companyId,
+      product: input.product ?? "yozan",
+      platform: "x",
+      theme: input.theme,
+      hook: input.hook.slice(0, 30),
+      // body は一覧・承認カードでの表示用（実際に投稿されるのは thread_parts の各要素）
+      body: parts.join("\n\n"),
+      hashtags: input.hashtags ?? [],
+      status: input.status ?? "scheduled",
+      scheduled_at: input.scheduledAt,
+      thread_parts: parts,
+      source: { ...(input.source ?? {}), kind: "thread", parts: parts.length },
+    })
+    .select("id")
+    .single();
+  return data?.id ? String(data.id) : null;
+}
+
 /** 承認カード（ai_action_queue）との紐付け */
 export async function attachQueue(admin: AdminClient, postId: string, queueId: string): Promise<void> {
   await admin.from("cnt_posts").update({ queue_id: queueId, updated_at: new Date().toISOString() }).eq("id", postId);
@@ -201,8 +254,13 @@ export type PublishSummary = {
   x: number;
   /** うち承認を待たずにXへ自動投稿した本数（#104） */
   xAuto: number;
+  /** うち連続投稿（スレッド）として最後まで投稿しきった本数（0096） */
+  threads: number;
   skipped?: string; // どのチャネルも未設定
 };
+
+/** 進捗ゼロのtickを何回まで許すか（10分tick × 6 = 約1時間）。半端に公開されたスレッドを諦めない上限 */
+const THREAD_STALL_LIMIT = 6;
 
 /** 商品 → X本文に貼る集客LPのパス（Xは本文リンクが踏める＝IGのbio誘導と役割が違う） */
 const LP_PATH: Record<string, string> = {
@@ -245,7 +303,7 @@ export async function publishDue(
     .order("scheduled_at", { ascending: true })
     .limit(opts.limit ?? 3);
   const due = (rows ?? []) as Row[];
-  const summary: PublishSummary = { due: due.length, posted: 0, failed: 0, instagram: 0, x: 0, xAuto: 0 };
+  const summary: PublishSummary = { due: due.length, posted: 0, failed: 0, instagram: 0, x: 0, xAuto: 0, threads: 0 };
   if (due.length === 0) return summary;
 
   const xCfg: XConfig | null = xConfigFromEnv();
@@ -257,10 +315,16 @@ export async function publishDue(
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     let succeeded = 0;
     let attempted = 0;
+    /** スレッドが途中まで進んだ＝失敗ではなく「次tickで続き」。status を動かさない */
+    let deferred = false;
+
+    // platform='x' はX専用（会社紹介スレッドなど、IGに出す絵が無い投稿）。IGは最初から対象外
+    const xOnly = post.platform === "x";
+    const isThread = post.threadParts.length > 0;
 
     // ---- Instagram（承認済みのみ。承認前は触らない）----
-    const ig: IgConfig | null = approved ? igConfigForProduct(post.product) : null;
-    if (approved && !ig) {
+    const ig: IgConfig | null = approved && !xOnly ? igConfigForProduct(post.product) : null;
+    if (approved && !xOnly && !ig) {
       const envs =
         post.product === "webdesign"
           ? "IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB（@yozan_web_jp）"
@@ -284,9 +348,37 @@ export async function publishDue(
     }
 
     // ---- X（xAuto なら承認を待たない。既に投稿済みなら二重投稿しない）----
-    const xDue = !post.xTweetId && (approved || Boolean(opts.xAuto));
+    // スレッドは「全部投げ終わるまで」未完了扱い。進捗は thread_tweet_ids の長さそのもの
+    const threadRemaining = isThread ? post.threadParts.length - post.threadTweetIds.length : 0;
+    const xDue = (isThread ? threadRemaining > 0 : !post.xTweetId) && (approved || Boolean(opts.xAuto));
     if (xDue && !xCfg) {
       patch.x_error = "X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_SECRET 未設定（@YOZAN_inc）";
+    } else if (xDue && xCfg && isThread) {
+      anyConfigured = true;
+      attempted += 1;
+
+      // 連続投稿。途中で落ちても投げられたぶんのIDは必ず積む＝次tickがそこから再開する
+      const res = await publishThread(xCfg, post.threadParts, post.threadTweetIds);
+      const allIds = [...post.threadTweetIds, ...res.tweetIds];
+      if (res.tweetIds.length > 0) {
+        patch.thread_tweet_ids = allIds;
+        patch.x_tweet_id = allIds[0]; // 先頭＝スレッドの入口URL（既存UIのリンクはこの列を見る）
+      }
+      if (res.done) {
+        patch.x_posted_at = post.xPostedAt ?? new Date().toISOString();
+        patch.x_error = null;
+        succeeded += 1;
+        summary.x += 1;
+        summary.threads += 1;
+        if (!approved) summary.xAuto += 1;
+      } else {
+        patch.x_error = (res.error ?? "スレッド未完了").slice(0, 500);
+        // 半端に公開されたスレッドは必ず完成させたい。進捗ゼロのtickが続いても一定回数は失敗扱いにしない。
+        // 一度も投稿できていない（＝公開されていない）場合は、単発投稿と同じく素直に失敗にする
+        const stalls = res.tweetIds.length > 0 ? 0 : Number(post.source.thread_stalls ?? 0) + 1;
+        patch.source = { ...post.source, thread_stalls: stalls };
+        deferred = allIds.length > 0 && stalls < THREAD_STALL_LIMIT;
+      }
     } else if (xDue && xCfg) {
       anyConfigured = true;
       attempted += 1;
@@ -329,10 +421,11 @@ export async function publishDue(
         patch.status = "posted";
         patch.posted_at = post.postedAt ?? new Date().toISOString();
         summary.posted += 1;
-      } else if (attempted > 0) {
+      } else if (attempted > 0 && !deferred) {
         patch.status = "failed";
         summary.failed += 1;
       }
+      // deferred（スレッド途中）は scheduled のまま＝次の10分tickが続きを投稿する
       // attempted === 0（全チャネル未設定）は scheduled のまま＝env設定後の次tickで自動投稿される
     }
 

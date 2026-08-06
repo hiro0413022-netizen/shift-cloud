@@ -14,14 +14,23 @@
  * pganote / swing-cortex → @swingcortex_jp（コーチ向け・env IG_ACCESS_TOKEN / IG_BUSINESS_ID）
  * webdesign             → @yozan_web_jp（HP制作営業・env IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB）
  */
-export type Product = "pganote" | "swing-cortex" | "webdesign";
+export type SalesProduct = "pganote" | "swing-cortex" | "webdesign";
+
+/**
+ * cnt_posts.product の値。
+ * SalesProduct = 毎朝の生成ループが回す売り込み商品（トーン・CTA・投稿先IGアカウントがこれで決まる）
+ * "yozan"      = YOZAN公式の発信（会社紹介・お知らせ・採用）。売り込みではないので生成ループの対象外・X専用（0096）
+ */
+export type Product = SalesProduct | "yozan";
 
 export type PostStatus = "draft" | "awaiting_approval" | "scheduled" | "posted" | "failed" | "rejected";
 
 export const PRODUCT_LABEL: Record<Product, string> = {
+  // 表示ラベルは yozan も含めた全値ぶん必要（一覧・アクティビティに出るため）
   pganote: "PGA NOTE",
   "swing-cortex": "SWING CORTEX",
   webdesign: "HP制作",
+  yozan: "YOZAN公式",
 };
 
 /** cnt_posts 1行 */
@@ -45,6 +54,10 @@ export type CntPost = {
   error: string | null;
   /** X配信の失敗理由・未設定注記（IGとは独立） */
   xError: string | null;
+  /** X連続投稿（スレッド）の本文。空 = 単発投稿（migration 0096） */
+  threadParts: string[];
+  /** 投稿済みツイートIDの並び＝進捗。途中失敗時はこの長さから再開する */
+  threadTweetIds: string[];
   source: Record<string, unknown>;
   metrics: Record<string, unknown>;
   queueId: string | null;
