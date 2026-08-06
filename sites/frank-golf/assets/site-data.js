@@ -33,7 +33,7 @@ window.FRANK = {
     mapEmbed: "https://maps.google.com/maps?q=%E5%85%B5%E5%BA%AB%E7%9C%8C%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1&hl=ja&z=16&output=embed",
     tel: null,                     // 例: "079-000-0000"（確定後）
     email: null,
-    hours: "平日 11:00〜22:00 ／ 土日祝 9:00〜20:00",  // ★確定
+    hours: "平日 10:00〜22:00 ／ 土日祝 9:00〜20:00",  // ★確定（2026-08-07 更新）
     holiday: "毎週火曜日",          // ★確定
     parking: "最大20台・無料",      // ★確定
     access: "お車でのご来店に便利な立地（駐車場20台完備）",  // ★確定

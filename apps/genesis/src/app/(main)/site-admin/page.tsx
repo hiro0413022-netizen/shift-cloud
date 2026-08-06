@@ -34,7 +34,7 @@ export default async function SiteAdminPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={label}>営業時間</label>
-            <input name="hours" defaultValue={d.store?.hours ?? ""} placeholder="平日 10:00〜21:00 ／ 土日祝 8:00〜20:00" className={input} />
+            <input name="hours" defaultValue={d.store?.hours ?? ""} placeholder="平日 10:00〜22:00 ／ 土日祝 9:00〜20:00" className={input} />
           </div>
           <div>
             <label className={label}>定休日</label>

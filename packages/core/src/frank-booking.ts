@@ -35,8 +35,8 @@ export type BookingCfg = {
 };
 
 export const DEFAULT_BOOKING_CFG: BookingCfg = {
-  weekday: { open: "10:00", close: "21:00" },
-  weekend: { open: "08:00", close: "20:00" },
+  weekday: { open: "10:00", close: "22:00" },
+  weekend: { open: "09:00", close: "20:00" },
   closed_dows: [2], // 火曜定休
   slot_minutes: 30,
   max_minutes_options: [30, 60, 90, 120],
