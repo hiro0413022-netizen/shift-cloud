@@ -196,11 +196,7 @@ export async function runContentLoop(companyId: string): Promise<Record<string, 
 }
 
 /**
- * 予定時刻を過ぎた投稿を Instagram と X の両方へ（/api/cron/execute の10分tickから・#103）。
- * IGは商品別アカウント、Xは会社公式1アカウント @YOZAN_inc。片方未設定でももう片方は配信される。
- */
-/**
- * Xの反応数を取り込む（日次cronから1日1回・#108）。
+ * Xの反応数を取り込む（日次cronから1日1回・#109）。
  *
  * 10分tickではなく日次にしているのは料金のため。Owned Reads は $0.001/件・UTC日内は重複課金なしなので、
  * 「1日1回、直近30日ぶんをタイムラインから一括で取る」が一番安い（月$1未満）。
@@ -239,6 +235,11 @@ export async function refreshContentMetrics(admin: Admin, companyId: string): Pr
   return summary;
 }
 
+/**
+ * 予定時刻を過ぎた投稿を Instagram と X の両方へ（/api/cron/execute の10分tickから・#103）。
+ * IGは商品別アカウント、Xは会社公式1アカウント @YOZAN_inc。片方未設定でももう片方は配信される。
+ * 連投（スレッド）は途中まででも進捗を残し、次のtickが続きを投稿する（0096）。
+ */
 export async function publishDueContent(admin: Admin, companyId: string): Promise<PublishSummary> {
   // Xは承認なしで自動投稿（#104・gn_loops.config.x_auto）。Instagramは従来どおり承認が要る
   const { data: loop } = await admin

@@ -1,4 +1,4 @@
-// Xの反応数取得のテスト（DECISIONS #108 / @yozan/content）
+// Xの反応数取得のテスト（DECISIONS #109 / @yozan/content）
 // ※ import は .ts 拡張子付きが必須（node --test の型ストリップの制約）
 //
 // ここで守りたいのは2つ:

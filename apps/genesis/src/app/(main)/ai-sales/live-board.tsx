@@ -127,7 +127,7 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
         >
           {pending ? "実行中..." : "今日の投稿案をいま作る"}
         </button>
-        {/* 通常は日次cronが取り込む。押しても同じ投稿はUTC日内で重複課金されない（#108） */}
+        {/* 通常は日次cronが取り込む。押しても同じ投稿はUTC日内で重複課金されない（#109） */}
         <button
           onClick={() => startTransition(async () => setData(await refreshMetricsNow().then(() => fetchAiSalesLive())))}
           disabled={pending || !data.config.xConfigured}
@@ -237,7 +237,7 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
                       </span>
                     )}
                   </div>
-                  {/* 反応数（#108・日次cronで取得。スレッドは連投全体の合計） */}
+                  {/* 反応数（#109・日次cronで取得。スレッドは連投全体の合計） */}
                   {post.reactions && (
                     <div className="mt-1.5 flex flex-wrap gap-2.5 text-[11px] text-(--color-dim)">
                       {post.reactions.impressions != null && <span>👁 {post.reactions.impressions.toLocaleString()}</span>}

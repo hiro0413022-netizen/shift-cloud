@@ -460,7 +460,7 @@ export type MetricsSummary = {
 };
 
 /**
- * X（@YOZAN_inc）の反応数を取り込んで cnt_posts.metrics に保存する（日次cronから・#108）。
+ * X（@YOZAN_inc）の反応数を取り込んで cnt_posts.metrics に保存する（日次cronから・#109）。
  *
  * 課金設計:
  *   自分のタイムラインを**1回だけ**読む（Owned Reads $0.001/件）。投稿を1本ずつIDで引くと5倍かかる。

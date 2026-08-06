@@ -363,7 +363,7 @@ export async function publishThread(
 }
 
 /* ============================================================
-   反応数の取得（DECISIONS #108 / cnt_posts.metrics）
+   反応数の取得（DECISIONS #109 / cnt_posts.metrics）
 
    なぜ「自分のタイムラインを1回読む」方式か — **料金がまるごと変わるから**:
      GET /2/tweets?ids=...        … Posts: Read      $0.005/件

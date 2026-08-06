@@ -12,7 +12,7 @@ type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => (v == null ? null : String(v));
 
 /**
- * cnt_posts.metrics から画面に出す反応数を取り出す（#108）。
+ * cnt_posts.metrics から画面に出す反応数を取り出す（#109）。
  * スレッドは連投全体の合計（metrics.x_thread）を優先する — 入口だけ見ると返信に付いた反応が消えるため。
  */
 function pickReactions(metrics: unknown): LivePost["reactions"] {
@@ -53,7 +53,7 @@ export type LivePost = {
   /** 連投（スレッド）のとき、本数と投稿済み本数（0096）。単発投稿は parts=0 */
   threadParts: number;
   threadPosted: number;
-  /** Xの反応数（#108・日次cronで取得）。スレッドは連投全体の合計 */
+  /** Xの反応数（#109・日次cronで取得）。スレッドは連投全体の合計 */
   reactions: { likes: number; reposts: number; replies: number; impressions: number | null } | null;
 };
 

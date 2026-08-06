@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       const sales = await runSalesLoop(String(c.id)).catch((e) => ({ error: String(e) }));
       // SNSインバウンド（#101）: 投稿案を生成→判断フィードへ（承認→18:00に自動投稿）
       const content = await runContentLoop(String(c.id)).catch((e) => ({ error: String(e) }));
-      // Xの反応数の取り込み（#108）: 1日1回だけ。10分tickでやると読み取り課金が30倍以上になる
+      // Xの反応数の取り込み（#109）: 1日1回だけ。10分tickでやると読み取り課金が30倍以上になる
       const metrics = await refreshContentMetrics(admin, String(c.id)).catch((e) => ({ error: String(e) }));
       // 稼働化プログラム（#82・毎週月曜のみ実行）
       const activation = await runActivationLoop(String(c.id)).catch((e) => ({ error: String(e) }));
