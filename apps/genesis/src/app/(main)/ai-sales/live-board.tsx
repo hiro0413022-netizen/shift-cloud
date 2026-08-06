@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { AiSalesLive } from "@/lib/ai-sales-live";
-import { fetchAiSalesLive, runContentLoopNow } from "./actions";
+import { fetchAiSalesLive, runContentLoopNow, refreshMetricsNow } from "./actions";
 
 /**
  * AI営業ライブボード（#101）。15秒ごとにサーバーアクションで再取得。
@@ -20,7 +20,12 @@ const STATUS_CHIP: Record<string, { label: string; cls: string }> = {
   draft: { label: "下書き", cls: "bg-zinc-500/15 text-zinc-300 border-zinc-500/30" },
 };
 
-const PRODUCT_SHORT: Record<string, string> = { pganote: "PGA NOTE", "swing-cortex": "SWING CORTEX", webdesign: "HP制作" };
+const PRODUCT_SHORT: Record<string, string> = {
+  pganote: "PGA NOTE",
+  "swing-cortex": "SWING CORTEX",
+  webdesign: "HP制作",
+  yozan: "YOZAN公式", // 会社紹介など売り込みではない発信（0096）
+};
 
 function rel(iso: string | null): string {
   if (!iso) return "";
@@ -122,6 +127,15 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
         >
           {pending ? "実行中..." : "今日の投稿案をいま作る"}
         </button>
+        {/* 通常は日次cronが取り込む。押しても同じ投稿はUTC日内で重複課金されない（#108） */}
+        <button
+          onClick={() => startTransition(async () => setData(await refreshMetricsNow().then(() => fetchAiSalesLive())))}
+          disabled={pending || !data.config.xConfigured}
+          className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs text-(--color-dim) hover:bg-(--color-panel-2) hover:text-(--color-txt) disabled:opacity-50"
+          title="Xの反応数を取り込みます（通常は毎朝の自動処理で更新されます）"
+        >
+          {pending ? "実行中..." : "反応数をいま取り込む"}
+        </button>
       </div>
 
       {/* 設定の警告 */}
@@ -202,14 +216,36 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
                         target="_blank"
                         className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-300 hover:underline"
                       >
-                        X 投稿済み ↗
+                        X {post.threadParts > 0 ? "スレッド" : "投稿済み"} ↗
                       </a>
                     ) : (
                       <span className="rounded border border-(--color-line) px-1.5 py-0.5 text-(--color-dim)">
                         {data.config.xAuto ? "X 自動投稿を待機中" : "X 未"}
                       </span>
                     )}
+                    {/* 連投の進捗（0096）。途中で止まっているのが一目で分かるようにする */}
+                    {post.threadParts > 0 && (
+                      <span
+                        className={`rounded border px-1.5 py-0.5 ${
+                          post.threadPosted >= post.threadParts
+                            ? "border-sky-500/30 bg-sky-500/10 text-sky-300"
+                            : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                        }`}
+                      >
+                        連投 {post.threadPosted}/{post.threadParts}
+                        {post.threadPosted > 0 && post.threadPosted < post.threadParts ? "（続きを投稿中）" : ""}
+                      </span>
+                    )}
                   </div>
+                  {/* 反応数（#108・日次cronで取得。スレッドは連投全体の合計） */}
+                  {post.reactions && (
+                    <div className="mt-1.5 flex flex-wrap gap-2.5 text-[11px] text-(--color-dim)">
+                      {post.reactions.impressions != null && <span>👁 {post.reactions.impressions.toLocaleString()}</span>}
+                      <span>♡ {post.reactions.likes}</span>
+                      <span>↻ {post.reactions.reposts}</span>
+                      <span>💬 {post.reactions.replies}</span>
+                    </div>
+                  )}
                   {post.error && <p className="mt-1 text-xs text-red-300">IG: {post.error}</p>}
                   {post.xError && !post.xPosted && <p className="mt-1 text-xs text-red-300">X: {post.xError}</p>}
                   <div className="mt-2 flex gap-3 text-[11px]">

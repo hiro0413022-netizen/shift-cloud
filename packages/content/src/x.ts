@@ -103,6 +103,9 @@ export async function buildOAuthHeader(
   return (
     "OAuth " +
     Object.keys(header)
+      // Authorizationヘッダに載せてよいのは oauth_* だけ。
+      // クエリ（例: max_results）は**署名の材料には要るがヘッダには入れない**（入れると401になり得る）
+      .filter((k) => k.startsWith("oauth_"))
       .sort()
       .map((k) => `${pct(k)}="${pct(header[k])}"`)
       .join(", ")
@@ -357,4 +360,148 @@ export async function publishThread(
     done: posted >= all.length,
     error: posted >= all.length ? undefined : `残り${all.length - posted}本は次のtickで投稿します`,
   };
+}
+
+/* ============================================================
+   反応数の取得（DECISIONS #108 / cnt_posts.metrics）
+
+   なぜ「自分のタイムラインを1回読む」方式か — **料金がまるごと変わるから**:
+     GET /2/tweets?ids=...        … Posts: Read      $0.005/件
+     GET /2/users/{id}/tweets     … **Owned Reads**  $0.001/件（自分のアプリで自分の投稿を読む場合）
+     （docs.x.com/x-api/getting-started/pricing・2026-08確認）
+   投稿を1本ずつIDで引くと5倍かかる。1回の呼び出しで直近100本を丸ごと取り、
+   こちら側でIDを突き合わせる。日1回なら月$1未満に収まる。
+  
+   同じリソースはUTC日内で重複課金されない（deduplication）ので、
+   日次cronから1日1回呼ぶ限り、何度失敗して再実行しても課金は増えない。
+  
+   取得できる数字（public_metrics）: いいね・リポスト・返信・引用・ブックマーク・表示回数。
+   表示回数(impression_count)は自分の投稿でのみ返る（他人の投稿では欠ける）ので、無ければ省く。
+   ============================================================ */
+
+
+
+const USERS_ME_ENDPOINT = "https://api.x.com/2/users/me";
+
+export type XMetrics = {
+  likes: number;
+  reposts: number;
+  replies: number;
+  quotes: number;
+  bookmarks: number;
+  /** 表示回数。自分の投稿でのみ返る（返らなければ null） */
+  impressions: number | null;
+};
+
+export const EMPTY_METRICS: XMetrics = {
+  likes: 0,
+  reposts: 0,
+  replies: 0,
+  quotes: 0,
+  bookmarks: 0,
+  impressions: null,
+};
+
+type ErrorBody = { title?: string; detail?: string; errors?: Array<{ message?: string }> };
+
+async function xGet(cfg: XConfig, url: string, query: Record<string, string> = {}): Promise<Record<string, unknown>> {
+  // OAuth 1.0a では **クエリ文字列も署名対象**（POSTのJSONボディと違う点。ここを外すと401になる）
+  const authorization = await buildOAuthHeader(cfg, "GET", url, query);
+  const qs = new URLSearchParams(query).toString();
+  const res = await fetch(qs ? `${url}?${qs}` : url, {
+    method: "GET",
+    headers: { authorization },
+    signal: AbortSignal.timeout(30000),
+  });
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown> & ErrorBody;
+  if (!res.ok) {
+    const detail = json.detail ?? json.errors?.[0]?.message ?? json.title ?? "unknown";
+    const hint =
+      res.status === 401
+        ? "（キー4つのどれかが違う／クエリの署名漏れ）"
+        : res.status === 403
+          ? "（アプリ権限またはクレジット残高切れの可能性）"
+          : res.status === 429
+            ? "（レート制限。次回のcronで再試行されます）"
+            : "";
+    throw new Error(`X API HTTP ${res.status}: ${detail}${hint}`);
+  }
+  return json;
+}
+
+/**
+ * 認証しているアカウント（@YOZAN_inc）のユーザーIDを引く。
+ * User: Read は $0.010/件と読み取りの中では高いので、**呼び出し側でキャッシュする前提**
+ * （gn_loops.config.x_user_id に保存し、2回目以降はAPIを叩かない）。
+ */
+export async function fetchOwnUserId(cfg: XConfig): Promise<string> {
+  const json = await xGet(cfg, USERS_ME_ENDPOINT);
+  const id = String((json.data as { id?: string } | undefined)?.id ?? "");
+  if (!id) throw new Error("X: /2/users/me にユーザーIDがありません");
+  return id;
+}
+
+type TimelineTweet = {
+  id?: string;
+  public_metrics?: {
+    like_count?: number;
+    retweet_count?: number;
+    reply_count?: number;
+    quote_count?: number;
+    bookmark_count?: number;
+    impression_count?: number;
+  };
+};
+
+/**
+ * 自分の直近の投稿を読み、ツイートID → 反応数 の対応表を返す（Owned Reads）。
+ *
+ * 返信（スレッドの2本目以降）はタイムラインの既定から除外されないが、
+ * 取りこぼすと連投の合計が出せないので `exclude` は指定しない。
+ *
+ * @param maxResults 1回に取る本数（5〜100）。課金は返ってきた件数ぶん＝ここが実質の予算
+ */
+export async function fetchOwnTweetMetrics(
+  cfg: XConfig,
+  userId: string,
+  opts: { maxResults?: number; startTime?: string } = {}
+): Promise<Map<string, XMetrics>> {
+  const query: Record<string, string> = {
+    max_results: String(Math.min(100, Math.max(5, opts.maxResults ?? 100))),
+    "tweet.fields": "public_metrics",
+  };
+  if (opts.startTime) query.start_time = opts.startTime;
+
+  const json = await xGet(cfg, `https://api.x.com/2/users/${userId}/tweets`, query);
+  const rows = (json.data ?? []) as TimelineTweet[];
+  const map = new Map<string, XMetrics>();
+  for (const t of rows) {
+    if (!t.id) continue;
+    const m = t.public_metrics ?? {};
+    map.set(String(t.id), {
+      likes: Number(m.like_count ?? 0),
+      reposts: Number(m.retweet_count ?? 0),
+      replies: Number(m.reply_count ?? 0),
+      quotes: Number(m.quote_count ?? 0),
+      bookmarks: Number(m.bookmark_count ?? 0),
+      impressions: m.impression_count == null ? null : Number(m.impression_count),
+    });
+  }
+  return map;
+}
+
+/** 連投（スレッド）の合計。表示回数は1本でも取れれば合算する（全部欠けていれば null のまま） */
+export function sumMetrics(list: XMetrics[]): XMetrics {
+  const total = { ...EMPTY_METRICS };
+  let impressions: number | null = null;
+  for (const m of list) {
+    total.likes += m.likes;
+    total.reposts += m.reposts;
+    total.replies += m.replies;
+    total.quotes += m.quotes;
+    total.bookmarks += m.bookmarks;
+    if (m.impressions != null) impressions = (impressions ?? 0) + m.impressions;
+  }
+  total.impressions = impressions;
+  return total;
 }

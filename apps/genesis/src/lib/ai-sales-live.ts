@@ -11,6 +11,23 @@ type Admin = ReturnType<typeof createAdmin>;
 type Row = Record<string, unknown>;
 const s = (v: unknown): string | null => (v == null ? null : String(v));
 
+/**
+ * cnt_posts.metrics から画面に出す反応数を取り出す（#108）。
+ * スレッドは連投全体の合計（metrics.x_thread）を優先する — 入口だけ見ると返信に付いた反応が消えるため。
+ */
+function pickReactions(metrics: unknown): LivePost["reactions"] {
+  const m = (metrics ?? {}) as Record<string, unknown>;
+  const src = (m.x_thread ?? m.x) as Record<string, unknown> | null | undefined;
+  if (!src) return null;
+  const n = (v: unknown) => Number(v ?? 0);
+  return {
+    likes: n(src.likes),
+    reposts: n(src.reposts),
+    replies: n(src.replies),
+    impressions: src.impressions == null ? null : Number(src.impressions),
+  };
+}
+
 export type ActivityItem = {
   at: string;
   icon: string;
@@ -33,6 +50,11 @@ export type LivePost = {
   xPosted: boolean;
   xUrl: string | null;
   xError: string | null;
+  /** 連投（スレッド）のとき、本数と投稿済み本数（0096）。単発投稿は parts=0 */
+  threadParts: number;
+  threadPosted: number;
+  /** Xの反応数（#108・日次cronで取得）。スレッドは連投全体の合計 */
+  reactions: { likes: number; reposts: number; replies: number; impressions: number | null } | null;
 };
 
 export type AiSalesLive = {
@@ -110,7 +132,7 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
       admin
         .from("cnt_posts")
         .select(
-          "id, product, hook, theme, status, scheduled_at, posted_at, error, ig_media_id, x_tweet_id, x_posted_at, x_error, created_at"
+          "id, product, hook, theme, status, scheduled_at, posted_at, error, ig_media_id, x_tweet_id, x_posted_at, x_error, thread_parts, thread_tweet_ids, metrics, created_at"
         )
         .eq("company_id", companyId)
         .is("deleted_at", null)
@@ -398,6 +420,9 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
       xPosted: Boolean(p.x_tweet_id),
       xUrl: p.x_tweet_id ? `https://x.com/YOZAN_inc/status/${String(p.x_tweet_id)}` : null,
       xError: s(p.x_error),
+      threadParts: Array.isArray(p.thread_parts) ? (p.thread_parts as unknown[]).length : 0,
+      threadPosted: Array.isArray(p.thread_tweet_ids) ? (p.thread_tweet_ids as unknown[]).length : 0,
+      reactions: pickReactions(p.metrics),
     })),
     activity: activity.slice(0, 30),
   };

@@ -1,7 +1,19 @@
 import type { AdminClient, CntPost, GeneratedPost, Material, Product } from "./types";
 import { buildCaption } from "./generate";
 import { igConfigForProduct, publishImagePost, type IgConfig } from "./instagram";
-import { xConfigFromEnv, publishTweet, publishThread, uploadMedia, buildTweetText, type XConfig } from "./x";
+import {
+  xConfigFromEnv,
+  publishTweet,
+  publishThread,
+  uploadMedia,
+  buildTweetText,
+  fetchOwnUserId,
+  fetchOwnTweetMetrics,
+  sumMetrics,
+  type XConfig,
+  type XMetrics,
+} from "./x";
+
 
 /**
  * サーバー側API（service_role クライアントを引数で受け取る＝アプリ非依存。@yozan/track と同方式）。
@@ -434,6 +446,84 @@ export async function publishDue(
 
   if (!anyConfigured) summary.skipped = "no_channel_configured";
   return summary;
+}
+
+export type MetricsSummary = {
+  /** 対象にした投稿数 */
+  targets: number;
+  /** 反応数を更新できた投稿数 */
+  updated: number;
+  /** APIから返ってきたツイート件数（＝課金対象の件数） */
+  fetched: number;
+  skipped?: string;
+  error?: string;
+};
+
+/**
+ * X（@YOZAN_inc）の反応数を取り込んで cnt_posts.metrics に保存する（日次cronから・#108）。
+ *
+ * 課金設計:
+ *   自分のタイムラインを**1回だけ**読む（Owned Reads $0.001/件）。投稿を1本ずつIDで引くと5倍かかる。
+ *   同じ投稿はUTC日内で重複課金されないので、日1回の実行なら月$1未満。
+ *
+ * スレッドは「入口ツイートの数字」と「連投全体の合計」を分けて持つ。
+ * 入口だけ見ると返信に付いたいいねが消え、合計だけ見ると入口の伸びが分からなくなるため。
+ */
+export async function refreshXMetrics(
+  admin: AdminClient,
+  companyId: string,
+  opts: { days?: number; userId?: string | null; onUserId?: (id: string) => Promise<void> } = {}
+): Promise<MetricsSummary> {
+  const cfg = xConfigFromEnv();
+  if (!cfg) return { targets: 0, updated: 0, fetched: 0, skipped: "x_not_configured" };
+
+  const days = opts.days ?? 30;
+  const since = new Date(Date.now() - days * 24 * 3600_000).toISOString();
+  const { data: rows } = await admin
+    .from("cnt_posts")
+    .select("id, x_tweet_id, thread_tweet_ids, metrics")
+    .eq("company_id", companyId)
+    .not("x_tweet_id", "is", null)
+    .gte("created_at", since)
+    .is("deleted_at", null);
+  const targets = (rows ?? []) as Row[];
+  if (targets.length === 0) return { targets: 0, updated: 0, fetched: 0, skipped: "no_posts" };
+
+  try {
+    // ユーザーIDは User: Read $0.010 と読み取りの中では高い。呼び出し側にキャッシュさせる
+    let userId = opts.userId ?? null;
+    if (!userId) {
+      userId = await fetchOwnUserId(cfg);
+      if (opts.onUserId) await opts.onUserId(userId);
+    }
+    const byTweet = await fetchOwnTweetMetrics(cfg, userId, { startTime: since });
+
+    let updated = 0;
+    for (const r of targets) {
+      const entryId = String(r.x_tweet_id);
+      const entry = byTweet.get(entryId);
+      const partIds = arr(r.thread_tweet_ids);
+      const partMetrics = partIds.map((id) => byTweet.get(id)).filter((m): m is XMetrics => Boolean(m));
+      // タイムラインに1本も見つからない（100件より古い等）ときは、前回の数字を消さずに素通りする
+      if (!entry && partMetrics.length === 0) continue;
+
+      const metrics = (r.metrics ?? {}) as Record<string, unknown>;
+      const next: Record<string, unknown> = {
+        ...metrics,
+        x: entry ?? metrics.x ?? null,
+        x_fetched_at: new Date().toISOString(),
+      };
+      if (partIds.length > 1) {
+        next.x_thread = { ...sumMetrics(partMetrics), parts: partMetrics.length, of: partIds.length };
+      }
+      await admin.from("cnt_posts").update({ metrics: next, updated_at: new Date().toISOString() }).eq("id", r.id);
+      updated += 1;
+    }
+    return { targets: targets.length, updated, fetched: byTweet.size };
+  } catch (e) {
+    // 反応数が取れなくても投稿は続く。日次レポートに理由だけ残す
+    return { targets: targets.length, updated: 0, fetched: 0, error: (e instanceof Error ? e.message : String(e)).slice(0, 300) };
+  }
 }
 
 /** 週次レポート用の集計（過去N日） */

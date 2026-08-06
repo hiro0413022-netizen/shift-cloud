@@ -12,7 +12,9 @@ import {
   syncRejected,
   publishDue,
   contentStats,
+  refreshXMetrics,
   type PublishSummary,
+  type MetricsSummary,
 } from "@yozan/content/server";
 import type { Material, SalesProduct } from "@yozan/content/types";
 import { PRODUCT_LABEL } from "@yozan/content/types";
@@ -197,6 +199,46 @@ export async function runContentLoop(companyId: string): Promise<Record<string, 
  * 予定時刻を過ぎた投稿を Instagram と X の両方へ（/api/cron/execute の10分tickから・#103）。
  * IGは商品別アカウント、Xは会社公式1アカウント @YOZAN_inc。片方未設定でももう片方は配信される。
  */
+/**
+ * Xの反応数を取り込む（日次cronから1日1回・#108）。
+ *
+ * 10分tickではなく日次にしているのは料金のため。Owned Reads は $0.001/件・UTC日内は重複課金なしなので、
+ * 「1日1回、直近30日ぶんをタイムラインから一括で取る」が一番安い（月$1未満）。
+ * ユーザーIDの取得は $0.010 と割高なので gn_loops.config.x_user_id に焼いて2回目以降は叩かない。
+ */
+export async function refreshContentMetrics(admin: Admin, companyId: string): Promise<MetricsSummary> {
+  const { data: loop } = await admin
+    .from("gn_loops")
+    .select("config")
+    .eq("company_id", companyId)
+    .eq("code", LOOP_CODE)
+    .maybeSingle();
+  const config = (loop?.config ?? {}) as Record<string, unknown>;
+  const cached = config.x_user_id ? String(config.x_user_id) : null;
+
+  const summary = await refreshXMetrics(admin, companyId, {
+    userId: cached,
+    onUserId: async (id: string) => {
+      await admin
+        .from("gn_loops")
+        .update({ config: { ...config, x_user_id: id } })
+        .eq("company_id", companyId)
+        .eq("code", LOOP_CODE);
+    },
+  });
+
+  if (summary.error) {
+    await logEvent(companyId, {
+      event_type: "ai.sns_metrics_failed",
+      title: `Xの反応数を取得できませんでした: ${summary.error}`,
+      source: "content_loop",
+      source_type: "ai",
+      severity: "warning",
+    });
+  }
+  return summary;
+}
+
 export async function publishDueContent(admin: Admin, companyId: string): Promise<PublishSummary> {
   // Xは承認なしで自動投稿（#104・gn_loops.config.x_auto）。Instagramは従来どおり承認が要る
   const { data: loop } = await admin
