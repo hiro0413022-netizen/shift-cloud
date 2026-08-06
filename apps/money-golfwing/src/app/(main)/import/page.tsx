@@ -4,8 +4,13 @@ import { Panel, Empty, Badge, yen, inputCls, btnGhostCls } from "@/components/ui
 import { Uploader } from "./uploader";
 import { confirmTxn, ignoreTxn } from "./actions";
 import { proposeCategory } from "@/lib/import/categorize";
+import { SettlementPanel } from "./settlement-panel";
+import type { ExpenseRow, TxnRow } from "@/lib/settlement";
 
 export const dynamic = "force-dynamic";
+
+/** 消込の対象にする期間（発生・支払とも直近このぶんだけ見る）。全期間を舐めない */
+const SETTLE_LOOKBACK_DAYS = 400;
 
 type Seg = { id: string; name: string; code: string };
 type Cat = { code: string; name: string; kind: string };
@@ -15,18 +20,37 @@ export default async function ImportPage() {
   const actor = await requireManageAll();
   const admin = createAdmin();
 
-  const [{ data: sources }, { data: segments }, { data: categories }, { data: txns }] = await Promise.all([
+  const since = new Date(Date.now() - SETTLE_LOOKBACK_DAYS * 86400000).toISOString().slice(0, 10);
+
+  const [
+    { data: sources },
+    { data: segments },
+    { data: categories },
+    { data: txns },
+    { data: expenseRows },
+    { data: settleTxnRows },
+  ] = await Promise.all([
     admin.from("mon_bank_source").select("code, name").eq("company_id", actor.companyId).is("deleted_at", null).order("code"),
     admin.from("fin_segments").select("id, name, code").eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
     admin.from("fin_categories").select("code, name, kind").eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
     admin.from("mon_bank_txn").select("id, txn_date, description, amount, balance")
       .eq("company_id", actor.companyId).eq("status", "unassigned").is("deleted_at", null)
       .order("txn_date", { ascending: false }).limit(100),
+    // 消込パネル用: 直近の経費（発生）と 確定済みの出金（支払）
+    admin.from("mon_expense").select("id, spent_on, item, payee, category, amount, settled_txn_id")
+      .eq("company_id", actor.companyId).is("deleted_at", null).gte("spent_on", since)
+      .order("spent_on", { ascending: false }),
+    admin.from("mon_bank_txn").select("id, txn_date, description, amount")
+      .eq("company_id", actor.companyId).is("deleted_at", null)
+      .eq("status", "confirmed").lt("amount", 0).gte("txn_date", since)
+      .order("txn_date", { ascending: false }),
   ]);
 
   const segs = (segments ?? []) as Seg[];
   const cats = (categories ?? []).filter((c: Cat) => c.kind !== "revenue") as Cat[];
   const rows = (txns ?? []) as Txn[];
+  const expenses = (expenseRows ?? []) as ExpenseRow[];
+  const settleTxns = (settleTxnRows ?? []) as TxnRow[];
   const hqId = segs.find((s) => s.code === "hq")?.id ?? segs[0]?.id ?? "";
 
   return (
@@ -39,6 +63,8 @@ export default async function ImportPage() {
       <Panel title="CSVアップロード">
         <Uploader sources={(sources ?? []) as { code: string; name: string }[]} />
       </Panel>
+
+      <SettlementPanel expenses={expenses} txns={settleTxns} />
 
       <Panel title={`未仕分けの明細（${rows.length}件）`}>
         {rows.length === 0 ? (

@@ -84,6 +84,56 @@ export async function confirmTxn(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
+/**
+ * 経費（発生）と 出金明細（支払）を突合する = 消込（DECISIONS #108）。
+ * refresh_money_to_finance が出金からこの経費分を差し引くので、二重計上が消える。
+ */
+export async function settleExpense(formData: FormData): Promise<void> {
+  const actor = await requireManageAll();
+  const admin = createAdmin();
+  const expenseId = String(formData.get("expense_id") ?? "");
+  const txnId = String(formData.get("txn_id") ?? "");
+  if (!expenseId || !txnId) return;
+
+  // 他社の明細を掴まないよう company_id で確認してから結ぶ
+  const { data: txn } = await admin
+    .from("mon_bank_txn")
+    .select("id")
+    .eq("id", txnId)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!txn) return;
+
+  await admin
+    .from("mon_expense")
+    .update({ settled_txn_id: txnId, updated_at: new Date().toISOString() })
+    .eq("id", expenseId)
+    .eq("company_id", actor.companyId);
+
+  await admin.rpc("refresh_money_to_finance", { p_company_id: actor.companyId });
+  revalidatePath("/import");
+  revalidatePath("/");
+}
+
+/** 消込の解除（間違えて結んだとき）。金額は元に戻る。 */
+export async function unsettleExpense(formData: FormData): Promise<void> {
+  const actor = await requireManageAll();
+  const admin = createAdmin();
+  const expenseId = String(formData.get("expense_id") ?? "");
+  if (!expenseId) return;
+
+  await admin
+    .from("mon_expense")
+    .update({ settled_txn_id: null, updated_at: new Date().toISOString() })
+    .eq("id", expenseId)
+    .eq("company_id", actor.companyId);
+
+  await admin.rpc("refresh_money_to_finance", { p_company_id: actor.companyId });
+  revalidatePath("/import");
+  revalidatePath("/");
+}
+
 /** 明細を除外（会社経費でない個人利用など）。 */
 export async function ignoreTxn(formData: FormData): Promise<void> {
   const actor = await requireManageAll();

@@ -50,6 +50,42 @@ export async function updateProOrder(formData: FormData): Promise<void> {
   revalidatePath("/sales");
 }
 
+/**
+ * 給与連携の設定を更新（DECISIONS #105 / migration 0094）。
+ * - staff_id     … 誰の手当になるか（未選択なら手当に取り込まれない）
+ * - payout_mode  … payroll=給与の手当 / outsourcing=外注費に上乗せ / none=対象外
+ * - aliases      … 売上台帳の表記ゆれ・通称（読点/カンマ/スペース区切り。例:「春馬」）
+ */
+export async function updateProPayroll(formData: FormData): Promise<void> {
+  const actor = await requireMoneyActor();
+  const admin = createAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const staffId = String(formData.get("staff_id") ?? "").trim();
+  const mode = String(formData.get("payout_mode") ?? "payroll");
+  const aliases = String(formData.get("aliases") ?? "")
+    .split(/[,、\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // 不正値でCHECK制約に落とさない（UIのselect以外から来た場合の保険）
+  const payoutMode = ["payroll", "outsourcing", "none"].includes(mode) ? mode : "payroll";
+
+  await admin
+    .from("mon_pros")
+    .update({
+      staff_id: staffId || null,
+      payout_mode: payoutMode,
+      aliases,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+
+  revalidatePath("/settings");
+}
+
 /** 削除（論理削除）。 */
 export async function deletePro(formData: FormData): Promise<void> {
   const actor = await requireMoneyActor();
