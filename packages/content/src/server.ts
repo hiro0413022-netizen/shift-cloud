@@ -514,7 +514,16 @@ export async function refreshXMetrics(
         x_fetched_at: new Date().toISOString(),
       };
       if (partIds.length > 1) {
-        next.x_thread = { ...sumMetrics(partMetrics), parts: partMetrics.length, of: partIds.length };
+        const sum = sumMetrics(partMetrics);
+        // 連投は「自分の次の投稿」も返信として数えられる（9本なら8件が自作自演）。
+        // そのまま出すと「8人が反応してくれた」と読めてしまうので、連結ぶんを引いて**外部からの返信**にする
+        const selfReplies = Math.max(0, partMetrics.length - 1);
+        next.x_thread = {
+          ...sum,
+          replies: Math.max(0, sum.replies - selfReplies),
+          parts: partMetrics.length,
+          of: partIds.length,
+        };
       }
       await admin.from("cnt_posts").update({ metrics: next, updated_at: new Date().toISOString() }).eq("id", r.id);
       updated += 1;

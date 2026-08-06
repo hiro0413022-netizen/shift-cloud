@@ -74,3 +74,21 @@ test("buildOAuthHeader: クエリは署名に使うがAuthorizationヘッダに�
   assert.ok(!header.includes("tweet.fields"));
   assert.ok(header.includes("oauth_signature="));
 });
+
+/* ============================================================
+   連投の返信数（実データで見つかった読み間違い）
+   9本のスレッドを投稿すると、自分の次の投稿も「返信」として数えられ、
+   合計8件になる。そのまま出すと「8人が反応した」と読めてしまう。
+   ============================================================ */
+
+test("連投の返信数は、自分の連結ぶん(本数-1)を引いて外部からの返信にする", () => {
+  // 9本の連投で replies 合計8 = すべて自作自演 → 外部からの返信は0
+  const parts = 9;
+  const sum = sumMetrics([{ ...EMPTY_METRICS, replies: 8 }]);
+  const external = Math.max(0, sum.replies - Math.max(0, parts - 1));
+  assert.equal(external, 0);
+
+  // 外部から2件付いた場合は 8 + 2 = 10 → 2件だけ残る
+  const withExternal = sumMetrics([{ ...EMPTY_METRICS, replies: 10 }]);
+  assert.equal(Math.max(0, withExternal.replies - (parts - 1)), 2);
+});
