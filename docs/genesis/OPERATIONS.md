@@ -322,3 +322,34 @@ git push origin main
 | 401 | 署名不一致 | キー4つのどれかがズレている（再生成後にenv未更新が典型） |
 | 403 | 権限か残高 | アプリ権限が「読み取りのみ」／トークンが権限変更前のまま／クレジット残高切れ |
 | 429 | レート制限 | 放置でOK（次の10分tickで再試行） |
+
+## 11. demo-sales の自動ピックアップを動かす（#110）
+
+営業先の自動巡回（毎日 JST 5:00 / 8:00）は **demo-sales プロジェクトの Vercel Cron** が動かします。
+Genesis とは**別プロジェクト**なので、環境変数も別に設定が必要です。
+
+### 11-1. CRON_SECRET（必須・これが無いと動きません）
+
+Vercel は `CRON_SECRET` という名前の環境変数があると、cron実行時に自動で
+`Authorization: Bearer <その値>` を付けて自分のエンドポイントを叩きます。
+`/api/cron/prospect` はこのヘッダを検証し、一致しなければ401を返します（＝外部から叩かれても実行されない）。
+
+1. https://vercel.com → プロジェクト **demo-sales** を開く（`yozan-genesis` ではないので注意）
+2. **Settings** → **Environment Variables**
+3. Key: `CRON_SECRET` ／ Value: ランダムな40文字程度。Environments は「All Environments」
+   - 値は Genesis と**同じでなくてよい**（プロジェクトごとに独立。むしろ分けたほうが安全）
+   - PowerShellで生成: `-join ((48..57)+(97..122) | Get-Random -Count 40 | % {[char]$_})`
+4. **Save** → **Deployments** タブ → 最新の行の「…」→ **Redeploy**
+
+**確認**: demo-sales →「営業先の自動ピックアップ」→「いま1回だけ試す」で実行ログの行が増えれば、
+アプリ側は正常。cron経由の確認は翌朝5時以降に同じ画面の実行ログを見る（`prs_runs` に必ず1行残る設計）。
+
+### 11-2. 任意の環境変数
+
+| Key | 無いとどうなるか |
+|---|---|
+| `GOOGLE_PLACES_API_KEY` | Google Places の巡回元だけ自動で見送られる。公開名簿の巡回は動く。取得: https://console.cloud.google.com → APIとサービス → Places API (New) を有効化 → 認証情報 → APIキー |
+| `PAGESPEED_API_KEY` | 表示速度の採点をHTML取得時間で代用する（他の項目は影響なし）。取得: 同じGoogle Cloudで PageSpeed Insights API を有効化。無料枠あり |
+| `PROSPECT_MAX_NEW` / `PROSPECT_MAX_AUDITS` / `PROSPECT_DEMO_SCORE_MIN` / `PROSPECT_MAX_DEMOS` | 既定値（30 / 25 / 55 / 3）で動く。拾う件数や自動デモの基準を変えたいときだけ設定 |
+
+⚠ APIキー・シークレットの**入力欄への貼り付けはご本人が行ってください**（#103のルール。AIは入力しません）。
