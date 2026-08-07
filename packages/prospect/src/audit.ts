@@ -267,3 +267,35 @@ export function extractEmails(html: string, pageUrl: string): string[] {
 
   return [...found.entries()].sort((a, b) => a[1] - b[1]).map(([e]) => e);
 }
+
+/**
+ * ホームページが見つからない先の評価。
+ *
+ * **HP制作営業では、これが最良の見込み客**（作るものが無いのではなく、まだ何も無い）。
+ * 「サイトが取得できなかった（unreachableAudit・40点）」とは意味がまったく違うので分けている。
+ * 前者は「作れば全部が改善」＝最優先、後者は「調べ直しが要る」＝保留。
+ */
+export function noWebsiteAudit(): WebAudit {
+  return {
+    ok: true,
+    reason: "no_website",
+    items: {
+      mobile: { score: 1, note: "ホームページが見当たりません" },
+      ssl: { score: 1, note: "ホームページが見当たりません" },
+      updated: { score: 1, note: "ホームページが見当たりません" },
+      cta: { score: 1, note: "Web上に予約・問い合わせの導線がありません" },
+      design: { score: 1, note: "ホームページが見当たりません" },
+      volume: { score: 1, note: "Web上の情報がありません" },
+      trust: { score: 1, note: "検索しても情報にたどり着けません" },
+    },
+    // 改善余地が最大。ただし取得失敗（40点）と区別できるよう、満点ではなく95に置く
+    score: 95,
+    goodPoints: [],
+    improvePoints: [
+      "ホームページが見当たりません（検索しても情報にたどり着けない状態）",
+      "スマートフォンで診療時間・予約・アクセスを確認できません",
+    ],
+    noSolicit: false,
+    raw: { noWebsite: true },
+  };
+}

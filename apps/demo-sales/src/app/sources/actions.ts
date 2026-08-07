@@ -28,8 +28,9 @@ export async function saveSource(fd: FormData) {
     url: s(fd, "url"),
     link_pattern: s(fd, "link_pattern"),
     query: s(fd, "query"),
-    max_per_run: Math.max(1, Math.min(50, Number(s(fd, "max_per_run") ?? 10))),
+    max_per_run: Math.max(1, Math.min(500, Number(s(fd, "max_per_run") ?? 100))),
     enabled: fd.get("enabled") === "on",
+    visit_detail: fd.get("visit_detail") === "on",
     sort: Number(s(fd, "sort") ?? 0),
     updated_at: new Date().toISOString(),
   };
@@ -60,8 +61,8 @@ export async function runNow() {
   const admin = createAdmin();
   await runProspectPickup(admin, actor.companyId, {
     budgetMs: 45_000,
-    maxNewProspects: 10,
-    maxAudits: 8,
+    maxNewProspects: 300,
+    maxAudits: 10,
     maxDemos: 1,
     onDemo: (p) => createAutoDemo(admin, actor.companyId, p),
   });

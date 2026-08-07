@@ -18,6 +18,7 @@ type Source = {
   query: string | null;
   max_per_run: number;
   enabled: boolean;
+  visit_detail: boolean;
   sort: number;
   last_run_at: string | null;
   last_result: { picked?: number; candidates?: number; errors?: string[] } | null;
@@ -81,7 +82,7 @@ export default async function SourcesPage() {
           </select>,
         )}
         {field("市区町村", <input name="city" defaultValue={src?.city ?? ""} placeholder="伊丹市" className={inputCls} />)}
-        {field("1回の上限", <input name="max_per_run" type="number" defaultValue={src?.max_per_run ?? 10} className={inputCls} />, "急に増やさないための歯止め")}
+        {field("1回の上限", <input name="max_per_run" type="number" defaultValue={src?.max_per_run ?? 100} className={inputCls} />, "一覧1ページから拾える件数の上限")}
       </div>
       {field("一覧ページURL（公開名簿のとき）", <input name="url" defaultValue={src?.url ?? ""} placeholder="https://www.itami-med.or.jp/kikan/..." className={inputCls} />)}
       {field(
@@ -93,6 +94,9 @@ export default async function SourcesPage() {
       <div className="flex items-center gap-4">
         <label className="flex items-center gap-1 text-xs">
           <input type="checkbox" name="enabled" defaultChecked={src?.enabled ?? true} /> 巡回する
+        </label>
+        <label className="flex items-center gap-1 text-xs" title="1件ごとに1秒以上かかるため、ONにすると1回に拾える件数が大幅に減ります">
+          <input type="checkbox" name="visit_detail" defaultChecked={src?.visit_detail ?? false} /> 詳細ページも開く（遅い）
         </label>
         <label className="text-xs text-(--color-dim)">
           並び <input name="sort" type="number" defaultValue={src?.sort ?? 0} className={`${inputCls} w-20`} />
@@ -118,6 +122,7 @@ export default async function SourcesPage() {
         <p className="text-sm text-(--color-dim)">
           毎日 朝5時と朝8時に、ここに登録した巡回元から新しい営業先を拾い、ホームページの現況を採点します。
           パソコンを開いていなくても動きます（Vercel Cron）。点数の高い先は自動でデモまで作られ、送るかどうかだけを判断できる状態になります。
+          <b>ホームページが見当たらない先は95点（最優先）</b>として扱います — 作るものが何も無い先こそ、この営業の本命だからです。
         </p>
       </header>
 

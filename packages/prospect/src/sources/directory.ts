@@ -46,9 +46,11 @@ export const directoryAdapter: SourceAdapter = {
     const fresh = rows.filter((r) => !ctx.seen.has(r.refKey)).slice(0, ctx.limit);
 
     for (const row of fresh) {
-      // 一覧の時点で屋号・住所・電話は揃っている。詳細ページは公式サイトを探すためだけに開く
+      // 一覧の時点で屋号・住所・電話は揃っているので、詳細ページは既定で開かない（#116）。
+      // 1件ごとに待ち時間が要るため、開くと1回に拾える件数が10分の1以下になる。
+      // 公式サイトのURLが要るときだけ visit_detail=true にする。
       let websiteUrl: string | null = null;
-      if (isAllowed(robots, new URL(row.refKey).pathname)) {
+      if (source.visit_detail && isAllowed(robots, new URL(row.refKey).pathname)) {
         await sleep(ctx.delayMs);
         try {
           const page = await fetchPage(row.refKey);
@@ -66,7 +68,7 @@ export const directoryAdapter: SourceAdapter = {
         } catch (e) {
           errors.push(`${row.name}: ${String(e).slice(0, 80)}`);
         }
-      } else {
+      } else if (source.visit_detail) {
         errors.push(`robots.txtで拒否: ${row.refKey}`);
       }
 

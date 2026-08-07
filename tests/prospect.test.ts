@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { auditPage, detectNoSolicit, latestYear, salesScore, stripTags, unreachableAudit } from "../packages/prospect/src/audit.ts";
+import { auditPage, detectNoSolicit, latestYear, noWebsiteAudit, salesScore, stripTags, unreachableAudit } from "../packages/prospect/src/audit.ts";
 import { dedupeKeys, isDuplicate, normalizeName, normalizePhone, normalizeSite } from "../packages/prospect/src/dedupe.ts";
 import { isAllowed, parseRobots } from "../packages/prospect/src/robots.ts";
 import { UA } from "../packages/prospect/src/http.ts";
@@ -273,4 +273,26 @@ test("屋号が全件同じなら「抽出が壊れている」と判定する",
   assert.equal(looksBroken(ok), null);
   // 件数が少ないうちは判定しない（たまたま同名の可能性があるため）
   assert.equal(looksBroken([{ name: "a" }, { name: "a" }]), null);
+});
+
+// ---------------------------------------------------------------- サイトが無い先（#116）
+
+test("ホームページが無い先は最優先（95点）＝HP制作営業の本命", () => {
+  const none = noWebsiteAudit();
+  const legacy = auditPage(snap(LEGACY, { finalUrl: "http://old.example.jp/" }), { now: new Date("2026-08-07") });
+  assert.equal(none.ok, true, "取得失敗ではなく「無い」という確かな観測");
+  assert.equal(none.score, 95);
+  assert.ok(none.score > legacy.score, "古いサイトより、そもそも無い方が見込みが高い");
+  assert.ok(none.improvePoints.some((s) => s.includes("見当たりません")));
+});
+
+test("「サイトが無い」と「サイトを取得できなかった」を区別する", () => {
+  // 無い＝作れば全部が改善する最優先の先。取得失敗＝調べ直しが要る保留の先。
+  // 混ぜると、単に落ちていたサイトを最優先で営業してしまう
+  const none = noWebsiteAudit();
+  const failed = unreachableAudit("timeout");
+  assert.equal(none.ok, true);
+  assert.equal(failed.ok, false);
+  assert.ok(none.score > failed.score);
+  assert.equal(failed.score, 40);
 });

@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
     try {
       const r = await runProspectPickup(admin, companyId, {
         budgetMs: Number(process.env.PROSPECT_BUDGET_MS ?? 240_000),
-        maxNewProspects: Number(process.env.PROSPECT_MAX_NEW ?? 30),
-        maxAudits: Number(process.env.PROSPECT_MAX_AUDITS ?? 25),
+        maxNewProspects: Number(process.env.PROSPECT_MAX_NEW ?? 300),
+        maxAudits: Number(process.env.PROSPECT_MAX_AUDITS ?? 60),
         demoScoreMin: Number(process.env.PROSPECT_DEMO_SCORE_MIN ?? 55),
         maxDemos: Number(process.env.PROSPECT_MAX_DEMOS ?? 3),
         onDemo: (p) => createAutoDemo(admin, companyId, p),

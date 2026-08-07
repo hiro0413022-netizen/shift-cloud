@@ -81,4 +81,6 @@ export interface SourceRow {
   link_pattern: string | null;
   query: string | null;
   max_per_run: number;
+  /** 詳細ページを開いて公式サイトURLを探すか（既定false＝一覧だけで拾う・#116） */
+  visit_detail?: boolean;
 }

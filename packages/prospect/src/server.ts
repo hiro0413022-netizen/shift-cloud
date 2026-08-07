@@ -11,7 +11,7 @@
 //    動いた証跡を必ず1行残す。
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { auditPage, unreachableAudit } from "./audit";
+import { auditPage, noWebsiteAudit, unreachableAudit } from "./audit";
 import { dedupeKeys, isDuplicate, type DedupeKeys } from "./dedupe";
 import { fetchPage, pageSpeedScore, sleep } from "./http";
 import { ADAPTERS } from "./sources";
@@ -45,9 +45,10 @@ export interface PickupResult {
 }
 
 const DEFAULTS = {
+  // 一覧ページ1枚から数百件を候補化できるので、上限は大きく取る（#116）
   budgetMs: 240_000,
-  maxNewProspects: 30,
-  maxAudits: 25,
+  maxNewProspects: 300,
+  maxAudits: 60,
   demoScoreMin: 55,
   maxDemos: 3,
   delayMs: 1200,
@@ -77,7 +78,7 @@ export async function runProspectPickup(
   // ---------------------------------------------------------------
   const { data: sources } = await admin
     .from("prs_sources")
-    .select("id,company_id,name,kind,industry,city,url,link_pattern,query,max_per_run")
+    .select("id,company_id,name,kind,industry,city,url,link_pattern,query,max_per_run,visit_detail")
     .eq("company_id", companyId)
     .eq("enabled", true)
     .is("deleted_at", null)
@@ -107,7 +108,7 @@ export async function runProspectPickup(
       sourceLog.push({ source: src.name, error: `未知のkind: ${src.kind}` });
       continue;
     }
-    const limit = Math.min(src.max_per_run ?? 10, o.maxNewProspects - picked);
+    const limit = Math.min(src.max_per_run ?? 100, o.maxNewProspects - picked);
     let collected: { candidates: ProspectCandidate[]; errors: string[] };
     try {
       collected = await adapter.collect(src, { limit, seen, delayMs: o.delayMs, env });
@@ -184,14 +185,17 @@ export async function runProspectPickup(
     .eq("company_id", companyId)
     .is("deleted_at", null)
     .is("audited_at", null)
-    .not("website_url", "is", null)
     .order("created_at")
     .limit(o.maxAudits);
 
   const auditErrors: string[] = [];
-  for (const p of (toAudit ?? []) as { id: string; name: string; website_url: string; industry: string; email: string | null }[]) {
+  for (const p of (toAudit ?? []) as { id: string; name: string; website_url: string | null; industry: string; email: string | null }[]) {
     if (left() < 25_000) break;
     let result: WebAudit;
+    // ホームページが無い先は「取得失敗」ではなく最優先の見込み客（#116）。外部への通信も要らない
+    if (!p.website_url) {
+      result = noWebsiteAudit();
+    } else
     try {
       const snap = await fetchPage(p.website_url);
       if (snap.status >= 400) {
@@ -240,7 +244,7 @@ export async function runProspectPickup(
       })
       .eq("id", p.id);
     audited++;
-    await sleep(o.delayMs);
+    if (p.website_url) await sleep(o.delayMs);
   }
   if (auditErrors.length) detail.auditErrors = auditErrors.slice(0, 10);
 
