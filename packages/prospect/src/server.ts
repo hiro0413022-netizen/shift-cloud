@@ -117,16 +117,19 @@ export async function runProspectPickup(
     }
 
     let addedHere = 0;
+    const collectErrors: string[] = [];
     for (const c of collected.candidates) {
       seen.add(c.refKey);
       const keys = { ...dedupeKeys(c), city: c.city ?? null };
       const dup = existing.some((e) => isDuplicate(keys, e));
       if (dup) {
         skipped++;
-        await admin.from("prs_seen").insert({ company_id: companyId, source_id: src.id, ref_key: c.refKey, skip_reason: "duplicate" });
+        await admin
+          .from("prs_seen")
+          .insert({ company_id: companyId, source_id: src.id, ref_key: c.refKey, skip_reason: "duplicate", note: c.name });
         continue;
       }
-      const { data: ins } = await admin
+      const { data: ins, error: insErr } = await admin
         .from("dms_prospects")
         .insert({
           company_id: companyId,
@@ -144,12 +147,16 @@ export async function runProspectPickup(
         })
         .select("id")
         .single();
+      // 失敗は必ず理由を残す。握りつぶすと「なぜ0件なのか」が追えなくなる（#114の教訓）
+      if (insErr) collectErrors.push(`${c.name}: 登録に失敗 ${insErr.message}`);
       await admin.from("prs_seen").insert({
         company_id: companyId,
         source_id: src.id,
         ref_key: c.refKey,
         prospect_id: ins?.id ?? null,
         skip_reason: ins?.id ? null : "insert_failed",
+        // 何を拾ったのかを残す。これが無いと抽出のおかしさに気づけない
+        note: `${c.name}${c.phone ? " / " + c.phone : ""}`,
       });
       if (ins?.id) {
         existing.push(keys);
@@ -158,7 +165,11 @@ export async function runProspectPickup(
       }
     }
 
-    const result = { picked: addedHere, candidates: collected.candidates.length, errors: collected.errors.slice(0, 5) };
+    const result = {
+      picked: addedHere,
+      candidates: collected.candidates.length,
+      errors: [...collected.errors, ...collectErrors].slice(0, 8),
+    };
     sourceLog.push({ source: src.name, ...result });
     await admin.from("prs_sources").update({ last_run_at: new Date().toISOString(), last_result: result }).eq("id", src.id);
   }

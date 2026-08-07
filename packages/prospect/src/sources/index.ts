@@ -9,5 +9,5 @@ export const ADAPTERS: Record<string, SourceAdapter> = {
 };
 
 export { directoryAdapter, placesAdapter };
-export { extractContact, extractLinks, cityFromAddress, guessIndustry } from "../parse";
+export { extractContact, extractLinks, extractRows, looksBroken, cityFromAddress, guessIndustry } from "../parse";
 export { extractEmails } from "../audit";

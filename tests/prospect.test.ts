@@ -4,7 +4,7 @@ import { auditPage, detectNoSolicit, latestYear, salesScore, stripTags, unreacha
 import { dedupeKeys, isDuplicate, normalizeName, normalizePhone, normalizeSite } from "../packages/prospect/src/dedupe.ts";
 import { isAllowed, parseRobots } from "../packages/prospect/src/robots.ts";
 import { UA } from "../packages/prospect/src/http.ts";
-import { cityFromAddress, extractContact, extractLinks, guessIndustry } from "../packages/prospect/src/parse.ts";
+import { cityFromAddress, extractContact, extractLinks, extractRows, guessIndustry, looksBroken } from "../packages/prospect/src/parse.ts";
 import type { PageSnapshot } from "../packages/prospect/src/types.ts";
 
 /**
@@ -222,4 +222,55 @@ test("User-Agent はASCIIだけ（日本語を入れると全リクエストが�
   assert.doesNotThrow(() => new Headers({ "user-agent": UA }));
   // 誰が来ているか分かるよう、連絡先は必ず入れる
   assert.ok(UA.includes("@"), "UAに連絡先が必要");
+});
+
+// ---------------------------------------------------------------- 一覧の行から拾う（#114）
+
+// 伊丹市医師会DBの構造を模したもの。詳細ページには見出しが無く title が全ページ共通なので、
+// 一覧の表から「リンクの文字＝屋号」「同じ行のセル＝住所・電話・診療科」を読む。
+const LIST_HTML = `<table>
+<tr><th>医院・施設機関名</th><th>住所</th><th>電話番号</th><th>診療科目</th></tr>
+<tr>
+  <td><a href="itamidb.cgi?cmd=dp&num=6">あいわ内科クリニック</a></td>
+  <td>伊丹市中央3-8-14</td><td>072-773-7160</td><td>内科、循環器内科</td>
+</tr>
+<tr>
+  <td><a href="itamidb.cgi?cmd=dp&num=8">やまだ動物病院</a></td>
+  <td>兵庫県伊丹市西台6-14-2</td><td>072-778-8110</td><td>動物病院</td>
+</tr>
+<tr><td><a href="/about">医師会について</a></td><td>案内</td></tr>
+</table>`;
+
+test("一覧ページの行から屋号・住所・電話を拾う（詳細ページの見出しに頼らない）", () => {
+  const rows = extractRows(LIST_HTML, "https://www.itami-med.or.jp/kikan/list.html", "cmd=dp");
+  assert.equal(rows.length, 2, "link_patternに合う行だけ拾う");
+  assert.equal(rows[0].name, "あいわ内科クリニック");
+  assert.equal(rows[0].phone, "072-773-7160");
+  assert.equal(rows[0].city, "伊丹市");
+  assert.ok(rows[0].address?.includes("中央"));
+  assert.equal(rows[1].name, "やまだ動物病院");
+  assert.equal(rows[1].city, "伊丹市", "都道府県付きの住所からも市を取れる");
+});
+
+test("行の診療科名から業種を寄せる（名簿は科が混在するため）", () => {
+  const rows = extractRows(LIST_HTML, "https://www.itami-med.or.jp/kikan/list.html", "cmd=dp");
+  assert.equal(guessIndustry(`${rows[1].name} ${rows[1].hint}`, "naika"), "vet");
+  assert.equal(guessIndustry(`${rows[0].name} ${rows[0].hint}`, "other"), "naika");
+});
+
+test("屋号が全件同じなら「抽出が壊れている」と判定する", () => {
+  // #114の実障害そのもの: title を拾って10件すべて同じ屋号になり、
+  // 1件だけ登録されて残りが重複扱いで静かに消えた
+  const same = Array.from({ length: 10 }, () => ({ name: "ITAMI med Database [データ詳細]" }));
+  assert.match(looksBroken(same) ?? "", /全件同じ/);
+
+  // 種類が少なすぎる場合も異常として拾う
+  const few = [...Array(9)].map((_, i) => ({ name: i < 8 ? "同じ名前" : "別の名前" }));
+  assert.ok(looksBroken(few));
+
+  // 正常なら null（止めない）
+  const ok = [...Array(10)].map((_, i) => ({ name: `クリニック${i}` }));
+  assert.equal(looksBroken(ok), null);
+  // 件数が少ないうちは判定しない（たまたま同名の可能性があるため）
+  assert.equal(looksBroken([{ name: "a" }, { name: "a" }]), null);
 });
