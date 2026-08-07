@@ -24,6 +24,11 @@
 | `booking.html` | **会員の打席予約**。会員番号＋電話下4桁でログインなし予約 |
 | `lesson-booking.html` | **レッスン予約**。プロが公開した枠から選ぶ |
 
+**ご入会は `/join-web`（member-os）に一本化しています（#120）。**
+Web入会申込 → スタッフが `/frunk` で承認 → 会員番号（`F0001`…）を発行、という順です。
+会員番号が出るまで打席・レッスンの予約はできません（`verifyMember` が `status` を見ます）。
+会員ログイン（member-os `/member/login`）も**会員番号＋電話番号下4桁**で、booking.html と同じ鍵に揃えました。
+
 ---
 
 ## 2. 台帳（DB）
@@ -97,6 +102,10 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 - コード: `apps/genesis/src/lib/frank-mail.ts`（文面は frank-mail-pure.ts・tests/frank-pos.test.ts）。
 - **env**: `RESEND_API_KEY` / `FRANK_MAIL_FROM`（Vercel: yozan-genesis）。未設定なら自動スキップ＝予約は通る。
   Resendで frankgolf.jp のドメイン認証が必要（OPERATIONS §14-3）。
+- **Web入会申込の受付メール（#120）** — `/join-web` 送信時に申込者へ自動送信。
+  コード: `apps/member-os/src/lib/frank-mail.ts`。**env は member-os 側にも必要**
+  （`RESEND_API_KEY` / `FRANK_MAIL_FROM` を Vercel: member-os に設定。未設定なら送信スキップで申込は成立）。
+  ⚠**承認時（会員番号の発行時）の通知は未実装**。当面は電話・LINEで会員番号を伝えてください。
 
 ### 店頭POS（Square・#118 / 実行計画§3-7）
 
@@ -149,6 +158,8 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 | `res_resources` / `res_bookings` | 台帳は `frunk_*` に統合（テーブルは残置・commentで明示） |
 | `apps/member-os/src/lib/reservation.ts` | 空にした。`@yozan/core/frank-booking` を使う |
 | member-os `/member/book` | サイト `booking.html` へリダイレクト |
+| member-os `/member/register`（仮会員 `P########`） | **廃止（#120）**。`mbr_provisional_members` に作られる番号は `frunk_members` に無く、打席予約で必ず弾かれた。`/join-web` へリダイレクト |
+| 会員ログインの「会員番号＋生年月日」 | **廃止（#120）**。`frunk_members` の「会員番号＋電話下4桁」に統一 |
 | member-os `/book/[token]` | サイト `trial-booking.html` へリダイレクト |
 | Web予約用トークンURLの発行 | 廃止。**掲示用（board）だけ**残っています |
 

@@ -175,12 +175,15 @@ FOOT_NAV = [
         ("faq.html", "よくあるご質問"),
         ("terms.html", "会員規約"),
     ]),
+    # 「入会のお申し込み」は導線の入口。以前は料金ページの本文にしか無く、
+    # 見つけられなかった人が別系統の「Web会員登録」（仮会員）に流れて予約できない、
+    # という事故になっていたため MEMBER の先頭に置く（2026-08-07）。
     ("MEMBER", [
+        ("@links.joinWeb", "入会のお申し込み"),
+        ("booking.html", "打席予約（会員様）"),
+        ("@links.memberLogin", "会員ログイン"),
         ("trial-booking.html", "体験レッスンを予約"),
         ("trial.html", "体験の内容"),
-        ("@links.memberLogin", "会員ログイン"),
-        ("@links.memberBooking", "会員Web予約"),
-        ("@links.memberRegister", "Web会員登録"),
     ]),
 ]
 
@@ -250,6 +253,8 @@ def head(title, desc, page, jsonld=""):
       <div class="nav__m-cta">
         <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約</a>
         <a class="btn btn--line btn--sm" href="#" data-cta="line">公式LINEで相談</a>
+        <a class="btn btn--ghost btn--sm" data-link="links.joinWeb">入会のお申し込み</a>
+        <a class="btn btn--ghost btn--sm" href="booking.html">打席予約（会員様）</a>
         <a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a>
       </div>
     </nav>
@@ -1347,7 +1352,7 @@ def build_plan():
           <h3 class="flow__t">会員登録・Web予約の開始</h3>
           <p class="flow__b">
             ご入会後は、会員ページからWeb予約をご利用いただけます。<br>
-            <a data-link="links.memberRegister" style="color:var(--brass-2)">Web会員登録 ↗</a>
+            <a data-link="links.joinWeb" style="color:var(--brass-2)">入会のお申し込み ↗</a>
             <a data-link="links.memberLogin" style="color:var(--brass-2)">会員ログイン ↗</a>
           </p>
         </div>
@@ -1365,9 +1370,9 @@ def build_plan():
       <p class="lead">ご入会後は、こちらから打席のご予約・ご確認いただけます。</p>
     </div>
     <div class="grid grid--3 rv" style="margin-top:40px">
-      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">LOGIN</h3><p class="card__b" style="margin:12px 0 20px">会員番号と生年月日でログイン</p><a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a></article>
+      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">LOGIN</h3><p class="card__b" style="margin:12px 0 20px">会員番号と電話番号下4桁でログイン</p><a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a></article>
       <article class="card center"><h3 class="card__t" style="font-size:1.2rem">BOOKING</h3><p class="card__b" style="margin:12px 0 20px">打席のWeb予約・キャンセル</p><a class="btn btn--ghost btn--sm" data-link="links.memberBooking">Web予約</a></article>
-      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">REGISTER</h3><p class="card__b" style="margin:12px 0 20px">はじめての方の会員登録</p><a class="btn btn--ghost btn--sm" data-link="links.memberRegister">Web会員登録</a></article>
+      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">JOIN</h3><p class="card__b" style="margin:12px 0 20px">はじめての方のご入会</p><a class="btn btn--ghost btn--sm" data-link="links.joinWeb">入会のお申し込み</a></article>
     </div>
   </div>
 </section>
@@ -1625,11 +1630,11 @@ def build_trial():
     <div class="rv" style="margin-top:44px">
       <p class="card__t-jp" style="font-size:15px;color:var(--brass-2);margin-bottom:6px">会員の方（入会後の打席予約）</p>
       <div class="flow">
-        <div class="flow__i"><p class="flow__n">STEP 01</p><div><h3 class="flow__t">会員ログイン</h3><p class="flow__b">会員番号と生年月日でログイン。<a data-link="links.memberLogin" style="color:var(--brass-2)">会員ログイン ↗</a></p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 01</p><div><h3 class="flow__t">会員ログイン</h3><p class="flow__b">会員番号と電話番号下4桁でログイン。<a data-link="links.memberLogin" style="color:var(--brass-2)">会員ログイン ↗</a></p></div></div>
         <div class="flow__i"><p class="flow__n">STEP 02</p><div><h3 class="flow__t">Web予約で打席を確保</h3><p class="flow__b">スマホから空き時間を選んで予約完了。<a data-link="links.memberBooking" style="color:var(--brass-2)">Web予約 ↗</a></p></div></div>
         <div class="flow__i"><p class="flow__n">STEP 03</p><div><h3 class="flow__t">スマート入退室でそのまま打席へ</h3><p class="flow__b">完全予約制なので待ち時間なし。予約した時間に、そのまま練習に入れます。</p></div></div>
       </div>
-      <p class="lead" style="font-size:12.5px;margin-top:14px">※ ご入会後、会員ページからWeb予約をご利用いただけます。<a data-link="links.memberRegister" style="color:var(--brass-2)">はじめての会員登録はこちら ↗</a></p>
+      <p class="lead" style="font-size:12.5px;margin-top:14px">※ ご入会の承認後、会員番号をお送りします。その番号でWeb予約をご利用いただけます。<a data-link="links.joinWeb" style="color:var(--brass-2)">入会のお申し込みはこちら ↗</a></p>
     </div>
 
     <!-- 体験のお申し込み（member-os の体験フォームへ） -->
@@ -1687,9 +1692,9 @@ def build_trial():
       <p class="h-jp">会員の方はこちら</p>
     </div>
     <div class="grid grid--3 rv" style="margin-top:40px">
-      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">LOGIN</h3><p class="card__b" style="margin:12px 0 20px">会員番号と生年月日でログイン</p><a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a></article>
+      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">LOGIN</h3><p class="card__b" style="margin:12px 0 20px">会員番号と電話番号下4桁でログイン</p><a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a></article>
       <article class="card center"><h3 class="card__t" style="font-size:1.2rem">BOOKING</h3><p class="card__b" style="margin:12px 0 20px">打席のWeb予約・キャンセル</p><a class="btn btn--ghost btn--sm" data-link="links.memberBooking">Web予約</a></article>
-      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">REGISTER</h3><p class="card__b" style="margin:12px 0 20px">はじめての方の会員登録</p><a class="btn btn--ghost btn--sm" data-link="links.memberRegister">Web会員登録</a></article>
+      <article class="card center"><h3 class="card__t" style="font-size:1.2rem">JOIN</h3><p class="card__b" style="margin:12px 0 20px">はじめての方のご入会</p><a class="btn btn--ghost btn--sm" data-link="links.joinWeb">入会のお申し込み</a></article>
     </div>
   </div>
 </section>

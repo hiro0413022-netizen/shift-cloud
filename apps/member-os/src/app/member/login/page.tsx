@@ -15,17 +15,25 @@ export default function MemberLoginPage() {
       <div className="mb-6 text-center">
         <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF 姫路</p>
         <h1 className="text-2xl font-bold tracking-wide">会員ログイン</h1>
-        <p className="mt-2 text-sm text-(--color-dim)">会員番号と生年月日でログインできます</p>
+        <p className="mt-2 text-sm text-(--color-dim)">会員番号と電話番号の下4桁でログインできます</p>
       </div>
 
       <form action={action} className="space-y-4 rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
         <div>
           <label className={label}>会員番号</label>
-          <input name="member_no" required placeholder="010026..." className={field} />
+          <input name="member_no" required placeholder="F0001" className={field} />
+          <p className="mt-1 text-xs text-(--color-dim)">ご入会の承認後にお送りしている番号です</p>
         </div>
         <div>
-          <label className={label}>生年月日</label>
-          <input type="date" name="birth_date" required className={field} />
+          <label className={label}>電話番号 下4桁</label>
+          <input
+            name="phone_last4"
+            required
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="0000"
+            className={field}
+          />
         </div>
 
         {state.error && <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{state.error}</p>}
@@ -39,8 +47,11 @@ export default function MemberLoginPage() {
       </form>
 
       <p className="mt-5 text-center text-sm text-(--color-dim)">
-        はじめての方は{" "}
-        <Link href="/member/register" className="font-semibold text-sky-300">新規登録</Link>
+        まだ会員でない方は{" "}
+        <Link href="/join-web" className="font-semibold text-sky-300">入会のお申し込み</Link>
+      </p>
+      <p className="mt-2 text-center text-xs text-(--color-dim)">
+        会員番号がお分かりにならない場合は、店舗までお問い合わせください。
       </p>
     </main>
   );

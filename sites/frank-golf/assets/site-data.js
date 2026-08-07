@@ -144,9 +144,13 @@ window.FRANK = {
     line: null,           // 例: "https://lin.ee/xxxxxxx"
 
     // 会員向け（member-os / 稼働中）
+    // ★会員ログインは「会員番号＋電話番号下4桁」。打席予約(booking.html)と同じ frunk_members を見ます。
     memberLogin:    "https://member-os-tau.vercel.app/member/login",
-    memberRegister: "https://member-os-tau.vercel.app/member/register",
-    memberBooking:  "https://member-os-tau.vercel.app/member/book",
+    // ★旧 /member/register（仮会員 P########）は廃止しました（2026-08-07）。
+    //   その番号では打席予約が通らないため、入会は joinWeb に一本化しています。
+    memberRegister: "https://member-os-tau.vercel.app/join-web",
+    // ★お客様の打席予約は公式サイトに一本化（#93）。member-os の /member/book は転送のみ。
+    memberBooking:  "booking.html",
     memberHome:     "https://member-os-tau.vercel.app/member",
 
     instagram: null,

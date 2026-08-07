@@ -3,6 +3,7 @@
 import { createAdmin } from "@/lib/supabase/admin";
 import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
+import { sendFrankMail, buildWebSignupReceiptMail } from "@/lib/frank-mail";
 
 export type WebSignupState = { ok?: boolean; error?: string };
 
@@ -40,12 +41,27 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
   // プランが当該会社のものか検証
   const { data: plan } = await admin
     .from("frunk_plans")
-    .select("id")
+    .select("id, name")
     .eq("id", str(formData.get("plan_id")))
     .eq("company_id", store.companyId)
     .is("deleted_at", null)
     .maybeSingle();
   if (!plan) return { error: "選択されたプランが無効です。画面を更新して再度お試しください。" };
+
+  // 二重申込のガード。
+  // 受付メールが無かった頃は「送信できたか分からず、もう一度申し込む」が起きていた。
+  // 同じ電話番号/メールで審査待ちが残っている間は、新しい行を作らず「受付済み」として返す。
+  {
+    let dup = admin
+      .from("frunk_members")
+      .select("id")
+      .eq("company_id", store.companyId)
+      .eq("status", "pending")
+      .is("deleted_at", null);
+    dup = phone ? dup.eq("phone", phone) : dup.eq("email", email);
+    const { data: existing } = await dup.maybeSingle();
+    if (existing) return { ok: true };
+  }
 
   const { error } = await admin.from("frunk_members").insert({
     company_id: store.companyId,
@@ -75,5 +91,12 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     source_type: "external",
     severity: "info",
   });
+
+  // 受付メール（申込者あて）。送信失敗で申込を落とさない＝台帳には既に入っている。
+  if (email) {
+    const mail = buildWebSignupReceiptMail({ name, planName: (plan as { name?: string }).name ?? null });
+    await sendFrankMail({ to: email, subject: mail.subject, text: mail.text });
+  }
+
   return { ok: true };
 }

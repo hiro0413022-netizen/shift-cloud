@@ -1,6 +1,8 @@
-﻿# 判断フィード: 実行プラン表示＋修正指示＋学習（#100 / migration 0090 適用済）
-# 内容: ホームのAI実行カードに詳細展開（何がどう実行されるか＋LINE文面全文）、
-#       AI修正/直接編集の修正指示、gn_feedbackへの学習蓄積と生成への注入
+﻿# FRANK: 会員登録を入会申込に一本化＋受付メール＋バーガー無反応を修正（#120）
+# 内容: /member/register(仮会員P########)を廃止して /join-web に一本化、
+#       会員ログインを会員番号＋電話下4桁(frunk_members)に統一、
+#       /join-web の受付メール(Resend)＋二重申込ガード、入会導線の追加、
+#       site.js の init() 二重実行によるバーガーメニュー無反応の修正。
 # 実行方法:
 #   cd "C:\Users\hiro0\Claude\Projects\YOZAN GENESIS"; .\commit-and-deploy.ps1
 
@@ -10,19 +12,17 @@ Write-Host "[1/6] gitロックファイルを掃除..." -ForegroundColor Cyan
 Remove-Item ".git\HEAD.lock",".git\index.lock",".git\refs\heads\main.lock",".git\MERGE_HEAD.lock",".git\ORIG_HEAD.lock" -Force -ErrorAction SilentlyContinue
 
 Write-Host "[2/6] 型チェック（VMのマウントIO不調で未完走のため、ここで実行）..." -ForegroundColor Cyan
-Push-Location "apps\genesis"
-npx tsc -p tsconfig.tscheck.json --noEmit
+npx tsc -p apps\member-os\tsconfig.tscheck.json --noEmit
 if ($LASTEXITCODE -ne 0) {
-    Pop-Location
     Write-Host "tscエラーあり。コミットを中止しました。エラー内容をClaudeに貼ってください。" -ForegroundColor Red
     exit 1
 }
-Pop-Location
 
-Write-Host "[3/6] コミット（今回の変更ファイルのみ・caddy-os等の並行作業は含めない）..." -ForegroundColor Cyan
-git add apps/genesis/src supabase/migrations/0090_gn_feedback.sql `
-        docs/genesis/DECISIONS.md CHANGELOG.md commit-and-deploy.ps1
-git commit -m "feat(genesis): 判断フィードに実行プラン表示・修正指示(AI/直接編集)・学習蓄積(#100, 0090)"
+Write-Host "[3/6] コミット（今回の変更ファイルのみ・demo-sales/prospect等の並行作業は含めない）..." -ForegroundColor Cyan
+git add sites/frank-golf apps/member-os/src `
+        docs/genesis/DECISIONS.md docs/modules/frank/RESERVATION_SYSTEM.md `
+        NEXT_TASKS.md commit-and-deploy.ps1
+git commit -m "fix(frank): 会員登録を入会申込に一本化・受付メール・バーガー無反応を修正 (#120)"
 
 Write-Host "[4/6] リモートと統合（衝突はローカル優先）..." -ForegroundColor Cyan
 git pull --no-rebase --no-edit -X ours origin main
@@ -35,9 +35,12 @@ Write-Host "[6/6] プッシュ（Vercelが自動デプロイ）..." -ForegroundC
 git push origin main
 
 Write-Host ""
-Write-Host "完了。2-3分後に genesis のデプロイが終わります。" -ForegroundColor Green
+Write-Host "完了。2-3分後に frank-golf と member-os のデプロイが終わります。" -ForegroundColor Green
 Write-Host "確認手順:" -ForegroundColor Green
-Write-Host "  1. ホームのAI実行カード（LINE配信など）の「詳細 — 承認すると何がどう実行されるか」を開く" -ForegroundColor Gray
-Write-Host "  2. 実行内容・宛先・タイミング・送信文全文が出る" -ForegroundColor Gray
-Write-Host "  3. AI修正欄に「もっと短く」等を入れて送信 → 文面が書き直されて承認待ちのまま残る" -ForegroundColor Gray
-Write-Host "  4. /executions を開いてもカードは承認待ちのまま（承認するまで送信されない）" -ForegroundColor Gray
+Write-Host "  1. スマホで frankgolf.jp/booking.html を開き、右上の三本線をタップ → メニューが開く" -ForegroundColor Gray
+Write-Host "  2. メニューとフッターに「入会のお申し込み」が出ている" -ForegroundColor Gray
+Write-Host "  3. 入会のお申し込みから1件送信 → 受付メールが届く（RESEND_API_KEY設定後）" -ForegroundColor Gray
+Write-Host "  4. member-os の「FRANK会員」で承認 → 会員番号(F0001…)を控えてお客様へ連絡" -ForegroundColor Gray
+Write-Host "  5. その番号＋電話下4桁で booking.html から予約できる" -ForegroundColor Gray
+Write-Host ""
+Write-Host "※ Vercel(member-os) に RESEND_API_KEY / FRANK_MAIL_FROM を設定するまでメールは飛びません" -ForegroundColor Yellow

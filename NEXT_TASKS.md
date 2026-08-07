@@ -12,6 +12,8 @@ A-00. **FRANK GOLF 9/2オープンの残作業（#118・2026-08-07実測。手�
    1. **Stripe本番切替（最重要・9/2まで）**: 本番申請の完了（残=銀行口座→アカウント保護→送信）→ sk_live差替え → Webhook再登録（**invoice.paid を含める**）→ §14-1のテスト
    2. **Squareアカウント申請**（審査数日＋端末調達あり=お盆前推奨）→ Webhook署名キー設定（§14-2）。導入までは店頭台帳運用
    3. **Resendで frankgolf.jp をドメイン認証**＋ yozan-genesis に RESEND_API_KEY / FRANK_MAIL_FROM（§14-3）→ 体験の確認・前日リマインダーメールが動き出す
+      - **⚠#120追加: 同じ2つのenvを Vercel(member-os) にも設定**してください。入れないと**Web入会申込の受付メールが飛びません**（申込自体は成立します）
+      - **承認時に会員番号を伝えるメールは未実装**です。当面は承認したら電話・LINEで会員番号（F0001…）をご連絡ください
    4. **FRANKスタッフLINEグループへOA追加**（1分・店舗別朝連絡の宛先になる）／FRANK公式LINE開設したら site-data.js の links.line へ
    5. **サイトの「近日公開」埋め**（下記A-0）と法務3ページ確定（A-0d）
    6. **D打席設営後**: frunk_bays を active=true / trial_priority=4 に

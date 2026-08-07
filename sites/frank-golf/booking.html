@@ -61,6 +61,8 @@
       <div class="nav__m-cta">
         <a class="btn btn--brass btn--sm" href="#" data-cta="trial">体験予約（無料）</a>
         <a class="btn btn--line btn--sm" href="#" data-cta="line">公式LINEで相談</a>
+        <a class="btn btn--ghost btn--sm" data-link="links.joinWeb">入会のお申し込み</a>
+        <a class="btn btn--ghost btn--sm" href="booking.html">打席予約（会員様）</a>
         <a class="btn btn--ghost btn--sm" data-link="links.memberLogin">会員ログイン</a>
       </div>
     </nav>
@@ -89,6 +91,12 @@
         <label style="font-size:12px">会員番号<input id="bk-no" type="text" placeholder="例: F0001" autocomplete="off" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
         <label style="font-size:12px">電話番号 下4桁<input id="bk-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
       </div>
+      <p style="margin-top:10px;font-size:12px;opacity:.75">
+        会員番号は、ご入会の承認後にお送りしている <b>F</b> ではじまる番号です（例: F0001）。
+        まだ会員でない方・番号がお分かりにならない方は
+        <a data-link="links.joinWeb" style="text-decoration:underline">入会のお申し込み ↗</a>
+        から、または店舗までお問い合わせください。
+      </p>
       <p style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 8px">2. 日付と利用時間</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
@@ -174,9 +182,8 @@
         <p class="foot__h">MEMBER</p>
         <ul>
         <li><a href="booking.html">打席予約（会員様）</a></li>
+        <li><a data-link="links.joinWeb">入会のお申し込み</a></li>
         <li><a data-link="links.memberLogin">会員ログイン</a></li>
-        <li><a data-link="links.memberBooking">会員Web予約</a></li>
-        <li><a data-link="links.memberRegister">Web会員登録</a></li>
         </ul>
       </div>
       </div>

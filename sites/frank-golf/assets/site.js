@@ -348,24 +348,30 @@
   }
 
   /* ---------- 6) スクロール演出 ---------- */
+  var revealIo = null;
   function reveal() {
-    var items = document.querySelectorAll(".rv");
+    // init() が複数回呼ばれても、同じ要素を二度 observe しない（data-rv で印をつける）
+    var items = Array.prototype.filter.call(
+      document.querySelectorAll(".rv"),
+      function (i) { return !i.hasAttribute("data-rv"); }
+    );
     if (!items.length) return;
+    items.forEach(function (i) { i.setAttribute("data-rv", "1"); });
     if (!("IntersectionObserver" in window)) {
       items.forEach(function (i) { i.classList.add("is-in"); });
       return;
     }
-    var io = new IntersectionObserver(
+    var io = revealIo || (revealIo = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (e) {
           if (e.isIntersecting) {
             e.target.classList.add("is-in");
-            io.unobserve(e.target);
+            revealIo.unobserve(e.target);
           }
         });
       },
       { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
-    );
+    ));
     items.forEach(function (i, n) {
       i.style.transitionDelay = Math.min(n % 4, 3) * 90 + "ms";
       io.observe(i);
@@ -443,18 +449,28 @@
       .join("");
   }
 
+  /* init() は2回走る（DOMContentLoaded で1回 → cms.js が CMS を取得したあと
+     FRANK_RENDER() でもう1回）。addEventListener を含む処理を毎回呼ぶと
+     ハンドラが二重登録され、バーガーメニューが「開く→即閉じる」で無反応に見える。
+     体験フォームも2回POSTされる。よってイベント登録は初回だけに限定する。 */
+  var wired = false;
+
   function init() {
     fillValues();
     markSections();
     wireLinks();
-    nav();
     media();
-    trialForm();
     news();
-    reveal();
     notice();
     trialSteps();
-    stickyCta();
+    reveal();         // 要素ごとに二重登録を防ぐ（後から増えた .rv も拾う）
+
+    if (!wired) {
+      wired = true;
+      nav();          // burger の click / scroll
+      trialForm();    // form の submit
+      stickyCta();    // scroll
+    }
   }
 
   window.FRANK_RENDER = init;  /* CMS(cms.js)がマージ後に再描画するため公開 (#85) */
