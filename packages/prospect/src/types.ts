@@ -14,7 +14,7 @@ export interface ProspectCandidate {
   phone?: string | null;
   websiteUrl?: string | null;
   /**
-   * 公式サイトの有無を**実際に調べたか**（#118）。
+   * 公式サイトの有無を**実際に調べたか**（#119）。
    * websiteUrl が null なだけでは「HPが無い」と断定できない。一覧ページしか見ていない名簿では
    * そもそも探していないからで、これを「HPなし95点＝最優先」にすると、
    * ホームページを持っている医院に「見当たりません」と営業することになる。

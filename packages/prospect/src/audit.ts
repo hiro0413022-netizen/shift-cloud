@@ -269,6 +269,23 @@ export function extractEmails(html: string, pageUrl: string): string[] {
 }
 
 /**
+ * その営業先のホームページについて「今わかっていること」（#119）。
+ *
+ * `has`     … URLがある。取りに行って採点する
+ * `none`    … 探した上で無かった。95点＝最優先で採点する
+ * `unknown` … **まだ探していない**。採点しない（保留）
+ *
+ * ここを分けない実装が実際に事故を起こした: 名簿の一覧ページだけを見た100件は
+ * 公式サイトを一度も探していないのに website_url が null というだけで全件95点＝最優先になり、
+ * ホームページを持っている医院に「見当たりません」と営業する寸前だった。
+ * 「知らない」を「無い」に潰さないことが、この関数の唯一の役目。
+ */
+export function websiteVerdict(p: { website_url?: string | null; website_checked?: boolean | null }): "has" | "none" | "unknown" {
+  if (p.website_url) return "has";
+  return p.website_checked ? "none" : "unknown";
+}
+
+/**
  * ホームページが見つからない先の評価。
  *
  * **HP制作営業では、これが最良の見込み客**（作るものが無いのではなく、まだ何も無い）。

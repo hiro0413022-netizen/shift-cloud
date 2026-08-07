@@ -101,6 +101,9 @@ export const directoryAdapter: SourceAdapter = {
         address: row.address,
         phone: row.phone,
         websiteUrl,
+        // 詳細ページを開いたときだけ「公式サイトを探した」と言える（#119）。
+        // 一覧しか見ていないのに websiteUrl=null を「HPなし」と扱うと最優先が嘘になる
+        websiteChecked: !!source.visit_detail,
         sourceUrl: row.refKey,
       });
     }

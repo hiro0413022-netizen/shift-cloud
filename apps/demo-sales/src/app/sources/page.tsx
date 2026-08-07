@@ -41,10 +41,18 @@ export default async function SourcesPage() {
   const actor = await requireActor();
   const admin = createAdmin();
 
-  const [{ data: sources }, { data: runs }, { count: autoCount }] = await Promise.all([
+  const [{ data: sources }, { data: runs }, { count: autoCount }, { count: uncheckedCount }] = await Promise.all([
     admin.from("prs_sources").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("sort"),
     admin.from("prs_runs").select("started_at,finished_at,picked,skipped,audited,demos").eq("company_id", actor.companyId).order("started_at", { ascending: false }).limit(7),
     admin.from("dms_prospects").select("id", { count: "exact", head: true }).eq("company_id", actor.companyId).eq("source", "auto").is("deleted_at", null),
+    // 「サイトの有無を確認できていない」件数。ここが増えっぱなしなら採点が進んでいない合図（#119）
+    admin
+      .from("dms_prospects")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .eq("website_checked", false)
+      .is("website_url", null),
   ]);
 
   const rows = (sources ?? []) as Source[];
@@ -132,7 +140,8 @@ export default async function SourcesPage() {
         <p className="text-sm text-(--color-dim)">
           毎日 朝5時と朝8時に、ここに登録した巡回元から新しい営業先を拾い、ホームページの現況を採点します。
           パソコンを開いていなくても動きます（Vercel Cron）。点数の高い先は自動でデモまで作られ、送るかどうかだけを判断できる状態になります。
-          <b>ホームページが見当たらない先は95点（最優先）</b>として扱います — 作るものが何も無い先こそ、この営業の本命だからです。
+          <b>ホームページが無い先は95点（最優先）</b>として扱います — 作るものが何も無い先こそ、この営業の本命だからです。
+          ただし<b>「無い」と確認できた先だけ</b>です。まだ調べていない先は採点を保留します（持っている医院に「見当たりません」と送らないため）。
         </p>
       </header>
 
@@ -140,6 +149,11 @@ export default async function SourcesPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm">
             自動で拾った営業先: <b>{autoCount ?? 0}</b> 件
+            {uncheckedCount ? (
+              <span className="ml-3 text-xs text-(--color-dim)">
+                うち <b>{uncheckedCount}</b> 件はホームページの有無を確認中（確認できるまで採点しません）
+              </span>
+            ) : null}
           </div>
           <form action={runNow}>
             <button className={btnCls}>いま1回だけ試す（45秒）</button>

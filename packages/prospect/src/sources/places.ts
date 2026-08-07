@@ -12,6 +12,7 @@
 
 import type { AdapterContext, ProspectCandidate, SourceAdapter, SourceRow } from "../types";
 import { cityFromAddress } from "../parse";
+import { normalizeName } from "../dedupe";
 
 export { cityFromAddress };
 
@@ -36,6 +37,42 @@ interface PlacesResponse {
     googleMapsUri?: string;
   }[];
   nextPageToken?: string;
+}
+
+/**
+ * 屋号＋市区町村から1件だけ引き当てて、公式サイトの有無を確認する（#119）。
+ *
+ * 名簿から拾った先は一覧しか見ていないので「HPがあるのか無いのか」を知らない。
+ * ここでPlacesに問い合わせて確認済みにする＝名簿由来の先も採点できるようになる。
+ *
+ * **別の店を掴まないことが最優先**なので、返ってきた屋号が正規化して一致しなければ捨てる。
+ * 一致しなければ未確認のまま（＝採点しない）で構わない。誤った相手に営業する方がはるかに高くつく。
+ */
+export async function lookupWebsite(
+  p: { name: string; city?: string | null; address?: string | null },
+  key: string,
+): Promise<{ found: true; websiteUrl: string | null; matched: string } | { found: false; reason: string }> {
+  const q = [p.name, p.city ?? p.address ?? ""].filter(Boolean).join(" ");
+  try {
+    const res = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask": "places.displayName,places.websiteUri,places.formattedAddress",
+      },
+      body: JSON.stringify({ textQuery: q, languageCode: "ja", regionCode: "JP", maxResultCount: 1 }),
+    });
+    if (!res.ok) return { found: false, reason: `Places ${res.status}` };
+    const json = (await res.json()) as PlacesResponse;
+    const hit = json.places?.[0];
+    const name = hit?.displayName?.text?.trim();
+    if (!hit || !name) return { found: false, reason: "該当なし" };
+    if (normalizeName(name) !== normalizeName(p.name)) return { found: false, reason: `別の店の可能性（${name}）` };
+    return { found: true, websiteUrl: hit.websiteUri ?? null, matched: name };
+  } catch (e) {
+    return { found: false, reason: String(e).slice(0, 80) };
+  }
 }
 
 export const placesAdapter: SourceAdapter = {
@@ -95,6 +132,8 @@ export const placesAdapter: SourceAdapter = {
           city: cityFromAddress(p.formattedAddress) ?? source.city ?? null,
           phone: p.nationalPhoneNumber ?? null,
           websiteUrl: p.websiteUri ?? null,
+          // Places は websiteUri を返すか返さないかで「サイトの有無」を答えている＝確認済み（#119）
+          websiteChecked: true,
           gmapUrl: p.googleMapsUri ?? null,
           sourceUrl: p.googleMapsUri ?? null,
         });

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { auditPage, detectNoSolicit, latestYear, noWebsiteAudit, salesScore, stripTags, unreachableAudit } from "../packages/prospect/src/audit.ts";
+import { auditPage, detectNoSolicit, latestYear, noWebsiteAudit, salesScore, stripTags, unreachableAudit, websiteVerdict } from "../packages/prospect/src/audit.ts";
 import { dedupeKeys, isDuplicate, normalizeName, normalizePhone, normalizeSite } from "../packages/prospect/src/dedupe.ts";
 import { isAllowed, parseRobots } from "../packages/prospect/src/robots.ts";
 import { UA } from "../packages/prospect/src/http.ts";
@@ -296,6 +296,32 @@ test("「サイトが無い」と「サイトを取得できなかった」を�
   assert.equal(failed.ok, false);
   assert.ok(none.score > failed.score);
   assert.equal(failed.score, 40);
+});
+
+// ---------------------------------------------------------------- 未確認と「無い」の区別（#119）
+
+test("探していない先を「ホームページが無い」と断定しない", () => {
+  // 実障害: 名簿の一覧しか見ていない100件が website_url=null というだけで全件95点＝最優先になり、
+  // ホームページを持っている医院に「見当たりません」と営業する寸前だった。
+  // 「知らない」を「無い」に潰さないことがこの関数の唯一の役目
+  assert.equal(websiteVerdict({ website_url: null, website_checked: false }), "unknown");
+  assert.equal(websiteVerdict({ website_url: null, website_checked: true }), "none");
+  assert.equal(websiteVerdict({ website_url: "https://x.example.jp", website_checked: false }), "has");
+  // 列を足す前の行（website_checked が無い）も未確認として扱う＝既定は安全側
+  assert.equal(websiteVerdict({ website_url: null }), "unknown");
+  assert.equal(websiteVerdict({}), "unknown");
+});
+
+test("採点していいのは has か none の先だけ（unknown は保留）", () => {
+  // server.ts は verdict==="unknown" を continue する。ここで「保留が採点対象に混ざらない」ことを固定する
+  const rows = [
+    { website_url: null, website_checked: false },
+    { website_url: null, website_checked: true },
+    { website_url: "https://a.example.jp", website_checked: true },
+  ];
+  const scorable = rows.filter((r) => websiteVerdict(r) !== "unknown");
+  assert.equal(scorable.length, 2);
+  assert.ok(!scorable.some((r) => !r.website_url && !r.website_checked));
 });
 
 // ---------------------------------------------------------------- AI抽出（#117）

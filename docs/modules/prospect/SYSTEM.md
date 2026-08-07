@@ -49,7 +49,7 @@ DECISIONS **#110** / migration **0098** / パッケージ `packages/prospect` / 
 | `prs_sources` | 巡回元。`kind`='directory'（公開名簿ページ）/'places'（Google Places API） |
 | `prs_seen` | 巡回済みの参照先。**営業先にしなかった理由も残す**（残さないと毎回同じページを取りに行く） |
 | `prs_runs` | 実行ログ。自動化は「静かに止まる」のが最悪の壊れ方なので必ず1行残す |
-| `dms_prospects` 追加列 | `prs_source_id` / `source_url` / `audited_at` / `audit` / `auto_demo_at` |
+| `dms_prospects` 追加列 | `prs_source_id` / `source_url` / `audited_at` / `audit` / `auto_demo_at` / `website_checked`(0102) |
 
 `analysis` は**所見**（AIや人が書き換える）、`audit` は**観測値**（上書きしない）。同じ場所に混ぜると、
 人が直した所見を次のcronが機械の値で潰す。
@@ -66,6 +66,24 @@ DECISIONS **#110** / migration **0098** / パッケージ `packages/prospect` / 
 - **総合営業スコア `score`（0-100）は「改善余地の大きさ」**。`mobile` を最重（26点）に置いているのは、
   スマホで見られないことが最も強い提案材料であり、営業の当たりに直結するため。
 - サイトが取れなかった先は **0点にせず40点**（中位）に置く。消すと人の目に触れなくなる。
+- **ホームページが無い先は95点（最優先）**＝作るものが何も無い先こそHP制作営業の本命（#116）。
+
+### 「無い」と「まだ探していない」を混ぜない（#119・実障害）
+
+`websiteVerdict(p)` が `has` / `none` / `unknown` を返し、**採点に進めるのは has と none だけ**。
+
+| 状態 | 条件 | 扱い |
+|---|---|---|
+| `has` | `website_url` がある | 取りに行って採点 |
+| `none` | URLは無いが `website_checked=true` | **95点（最優先）** |
+| `unknown` | `website_checked=false` | **採点しない（保留）** |
+
+名簿は `visit_detail=false` だと公式サイトを一度も探していない。ここを `none` に混ぜた結果、
+医院100件が一律95点＝最優先になり、**HPを持っている先に「見当たりません」と営業する寸前**だった。
+`website_checked` の既定は `false`（＝未確認）なので、埋め忘れても嘘の最優先は生まれない。
+
+未確認は `lookupWebsite()`（屋号＋市区町村でPlacesに1件問い合わせ・1回60件まで）が解消する。
+**返ってきた屋号が正規化一致しなければ捨てる**（別の店を掴んで営業する方がはるかに高くつく）。
 
 **文字コードは必ず見る**（`http.ts` の `decodeHtml`）。古いサイトほど Shift_JIS が残っており＝まさに営業対象。
 UTF-8決め打ちだと本文が文字化けし、「情報量が少ない・更新が古い」と**誤って高得点**になる。
@@ -124,6 +142,8 @@ UTF-8決め打ちだと本文が文字化けし、「情報量が少ない・更
 - **`prs_seen` に「拾わなかった理由」を書き忘れる** → 毎回同じページを取りに行き、外部サイトに無駄な負荷をかける
 - **重複判定を通さずに `dms_prospects` へ insert する** → ②outreach で二重送信になる
 - **Places の FieldMask を広げる** → 課金階層が上がる。id/displayName/address/phone/website/mapsUri に留める
+- **`website_url is null` を「HPが無い」と読む** → 探していないだけの先が最優先(95点)になる。必ず `websiteVerdict()` を通す（#119）
+- **新しい取得アダプタで `websiteChecked` を埋め忘れる** → 既定falseなので保留になるだけで事故にはならないが、採点がいつまでも進まない。/sources の「確認中N件」で気づける
 
 ## 11. 次（②へ）
 
