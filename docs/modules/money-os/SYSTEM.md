@@ -107,6 +107,15 @@ CSV形式は取込元ごとに違う（AMEXと信金で列も符号も別）た�
 
 - **ダッシュボード**: 今月の売上/経費/粗利、現金残高、直近の差異アラート、未締め件数
 - **売上入力/一覧**: 明細フォーム＋一覧（期・月・支払方法フィルタ）。GOLF WINGは品目/メーカー等の拡張フォーム
+  - 金額の入力は台帳Excelと同じ流れ: **定価 + 割引額 = 売価 → 売価 × 個数 = 金額(税抜) → 切り捨て10% = 決済金額(税込)**。
+    下流の欄を手で直すとそこから下の自動計算が止まる（`unitManual` / `amountManual` / `taxManual`）。
+    定価・割引額は migration 無しで `mon_sales.detail.list_price` / `.discount` に保存（集計の正は従来どおり `amount`）
+  - お客様名は一覧の独立列。クリックで購入履歴（`mon_sales` source='app' ＋ `mon_sales_lines` を混ぜて集計）
+  - **Excel出力** `/api/sales/export?month=YYYY-MM`（`lib/sales-excel.ts`）: 売上データ.xlsxの「◯◯期売上一覧」と同じ列・書式・数式で当月明細を書き出す。
+    H定価は `detail.list_price` →`inv_items.list_price` →売価 の順で採用し、I割引額は必ず「売価−定価」で出し直す
+    （金額を手で上書きした明細でも `定価+割引額=売価`・`売価×個数=金額` が崩れないようにするため）。
+    種類/メーカー名/仕入れ値は `detail.inv_item_id` → `inv_items` から自動補完。
+    source が ledger/migration/slack_import の行は月次まるめなので**必ず除外**（`mon_sales_lines` と二重に載る）
 - **現金出納**: 入金/出金入力、残高自動計算、売上(現金)の自動流入行を表示
 - **金種棚卸**: レジ・金庫の枚数入力→合計自動、理論残高との差異自動表示
 - **経費入力/一覧**

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // exceljs はCJS＋Node依存。バンドルさせずNode側でrequireする（/api/sales/export）
+  serverExternalPackages: ["exceljs"],
   experimental: {
     serverActions: {
       // 証憑アップロード（スマホ撮影の画像/PDF）のため既定1MB→8MBへ

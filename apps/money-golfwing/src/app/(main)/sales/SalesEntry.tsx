@@ -8,16 +8,25 @@ import ProductPicker, { invLabel, type InvPick } from "./ProductPicker";
 export type Preset = { label: string; category: string; productName: string; amount: number };
 
 /**
- * 商品行。金額は「単価 × 個数」で自動計算する（手で金額を直したら amountManual=true で自動計算を止める）。
+ * 商品行。売上台帳Excelと同じ計算の流れで積み上げる:
+ *   定価 + 割引額 = 売価 → 売価 × 個数 = 金額(税抜) → 金額×1.1切り捨て = 決済金額(税込)
+ * 下流の欄を手で直したらそこから下の自動計算は止める（unitManual / amountManual / taxManual）。
  * pro は空文字なら「ヘッダーの既定プロ」を使う＝同じお客様・同じ商品でも行ごとにコーチを変えられる。
  */
 type Line = {
   productName: string;
   invItemId: string | null;
+  /** 定価（税抜・1個あたり） */
+  listPrice: string;
+  /** 割引額（値引きはマイナス） */
+  discount: string;
+  /** 売価（＝定価+割引額の自動値。手入力すると固定される） */
   unitPrice: string;
+  unitManual: boolean;
   qty: string;
   amount: string;
   amountManual: boolean;
+  /** 決済金額（税込） */
   taxIncluded: string;
   taxManual: boolean;
   pro: string;
@@ -25,7 +34,8 @@ type Line = {
 };
 
 const emptyLine = (): Line => ({
-  productName: "", invItemId: null, unitPrice: "", qty: "1",
+  productName: "", invItemId: null, listPrice: "", discount: "",
+  unitPrice: "", unitManual: false, qty: "1",
   amount: "", amountManual: false, taxIncluded: "", taxManual: false, pro: "", memo: "",
 });
 
@@ -41,9 +51,18 @@ function num(s: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** 単価×個数→金額→税込 を再計算（手動で直した欄は上書きしない） */
+/** 定価+割引額→売価→金額→決済金額 を再計算（手動で直した欄より下だけ動かす） */
 function recalc(l: Line): Line {
   const next = { ...l };
+  // 定価を飛ばして「売価だけ入れてから割引額」を打つ人がいる。
+  // その場合は今出ている売価を定価とみなす（そうしないと割引額が効かない）
+  if (!next.unitManual && next.listPrice === "" && next.discount !== "" && next.unitPrice !== "") {
+    next.listPrice = next.unitPrice;
+  }
+  if (!next.unitManual && next.listPrice !== "") {
+    const unit = num(next.listPrice) + num(next.discount);
+    next.unitPrice = unit ? String(Math.round(unit)) : "";
+  }
   if (!next.amountManual) {
     const total = num(next.unitPrice) * num(next.qty);
     next.amount = total ? String(Math.round(total)) : "";
@@ -110,6 +129,8 @@ export default function SalesEntry({
       ...header(),
       productName: l.productName || undefined,
       invItemId: l.invItemId || undefined,
+      listPrice: l.listPrice ? num(l.listPrice) : null,
+      discount: l.discount ? num(l.discount) : null,
       amount: num(l.amount),
       taxIncluded: l.taxIncluded ? num(l.taxIncluded) : null,
       qty: num(l.qty) || 1,
@@ -121,15 +142,15 @@ export default function SalesEntry({
 
   /** 入力チェック: 金額と個数（個数は必須・1以上） */
   function invalidReason(l: Line): string | null {
-    if (num(l.amount) === 0) return "金額を入力してください（単価と個数を入れると自動で計算されます）";
+    if (num(l.amount) === 0) return "金額を入力してください（定価・割引額・個数を入れると自動で計算されます）";
     if (num(l.qty) < 1) return "個数を入力してください（1以上）";
     return null;
   }
 
-  // 在庫品番を選択: 品名・在庫リンク・（単価が空なら）定価を流し込み。区分も「販売」へ
+  // 在庫品番を選択: 品名・在庫リンク・（定価が空なら）在庫マスタの定価を流し込み。区分も「販売」へ
   function pickInto(l: Line, it: InvPick): Line {
     const next: Partial<Line> = { productName: invLabel(it), invItemId: it.id };
-    if (!num(l.unitPrice) && it.listPrice) next.unitPrice = String(Math.round(Number(it.listPrice)));
+    if (!num(l.listPrice) && it.listPrice) next.listPrice = String(Math.round(Number(it.listPrice)));
     return patch(l, next);
   }
   function onPickAny(it: InvPick, apply: (f: (l: Line) => Line) => void) {
@@ -164,10 +185,10 @@ export default function SalesEntry({
     });
   }
 
-  // クイックボタン：現在のモードの入力欄に流し込む（金額は単価として扱い、個数1）
+  // クイックボタン：現在のモードの入力欄に流し込む（金額は定価として扱い、個数1）
   function applyPreset(p: Preset) {
     setCategory(p.category);
-    const filled = patch(emptyLine(), { productName: p.productName, unitPrice: String(p.amount) });
+    const filled = patch(emptyLine(), { productName: p.productName, listPrice: String(p.amount) });
     if (mode === "single") {
       setLine(filled);
       productRef.current?.focus();
@@ -266,11 +287,30 @@ export default function SalesEntry({
           />
           <input
             inputMode="numeric"
-            value={line.unitPrice}
-            onChange={(e) => setLine((prev) => patch(prev, { unitPrice: e.target.value }))}
+            value={line.listPrice}
+            onChange={(e) => setLine((prev) => patch(prev, { listPrice: e.target.value, unitManual: false }))}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
-            placeholder="単価(税抜)"
+            placeholder="定価(税抜)"
             className={inputCls}
+            aria-label="定価（税抜）"
+          />
+          <input
+            inputMode="numeric"
+            value={line.discount}
+            onChange={(e) => setLine((prev) => patch(prev, { discount: e.target.value, unitManual: false }))}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+            placeholder="割引額(-)"
+            className={inputCls}
+            aria-label="割引額（値引きはマイナス）"
+          />
+          <input
+            inputMode="numeric"
+            value={line.unitPrice}
+            onChange={(e) => setLine((prev) => patch(prev, { unitPrice: e.target.value, unitManual: true }))}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+            placeholder="売価(自動)"
+            className={inputCls}
+            aria-label="売価（税抜・自動）"
           />
           <input
             type="number"
@@ -291,20 +331,23 @@ export default function SalesEntry({
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
             placeholder="金額(税抜・自動)"
             className={inputCls}
+            aria-label="金額（税抜・自動）"
           />
           <input
             inputMode="numeric"
             value={line.taxIncluded}
             onChange={(e) => setLine((prev) => ({ ...prev, taxIncluded: e.target.value, taxManual: true }))}
-            placeholder="税込(自動)"
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+            placeholder="決済金額(税込)"
             className={inputCls}
+            aria-label="決済金額（税込）"
           />
           {proSelect(line.pro, (v) => setLine((prev) => ({ ...prev, pro: v })))}
           <input
             value={line.memo}
             onChange={(e) => setLine((prev) => ({ ...prev, memo: e.target.value }))}
             placeholder="備考(任意)"
-            className={`${inputCls} sm:col-span-4`}
+            className={`${inputCls} sm:col-span-2`}
           />
           <button type="button" onClick={addSingle} disabled={pending} className={`${btnCls} justify-center`}>
             {pending ? "..." : "追加"}
@@ -325,10 +368,27 @@ export default function SalesEntry({
               />
               <input
                 inputMode="numeric"
-                value={l.unitPrice}
-                onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? patch(x, { unitPrice: e.target.value }) : x))}
-                placeholder="単価(税抜)"
+                value={l.listPrice}
+                onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? patch(x, { listPrice: e.target.value, unitManual: false }) : x))}
+                placeholder="定価(税抜)"
                 className={`${inputCls} sm:col-span-2`}
+                aria-label="定価（税抜）"
+              />
+              <input
+                inputMode="numeric"
+                value={l.discount}
+                onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? patch(x, { discount: e.target.value, unitManual: false }) : x))}
+                placeholder="割引額(-)"
+                className={`${inputCls} sm:col-span-2`}
+                aria-label="割引額（値引きはマイナス）"
+              />
+              <input
+                inputMode="numeric"
+                value={l.unitPrice}
+                onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? patch(x, { unitPrice: e.target.value, unitManual: true }) : x))}
+                placeholder="売価(自動)"
+                className={`${inputCls} sm:col-span-2`}
+                aria-label="売価（税抜・自動）"
               />
               <input
                 type="number"
@@ -345,15 +405,17 @@ export default function SalesEntry({
                 inputMode="numeric"
                 value={l.amount}
                 onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? patch(x, { amount: e.target.value, amountManual: true }) : x))}
-                placeholder="金額(自動)"
+                placeholder="金額(税抜・自動)"
                 className={`${inputCls} sm:col-span-2`}
+                aria-label="金額（税抜・自動）"
               />
               <input
                 inputMode="numeric"
                 value={l.taxIncluded}
                 onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, taxIncluded: e.target.value, taxManual: true } : x))}
-                placeholder="税込(自動)"
+                placeholder="決済金額(税込)"
                 className={`${inputCls} sm:col-span-2`}
+                aria-label="決済金額（税込）"
               />
               {proSelect(
                 l.pro,
@@ -364,7 +426,7 @@ export default function SalesEntry({
                 value={l.memo}
                 onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, memo: e.target.value } : x))}
                 placeholder="備考"
-                className={`${inputCls} sm:col-span-10`}
+                className={`${inputCls} sm:col-span-6`}
               />
               <button
                 type="button"

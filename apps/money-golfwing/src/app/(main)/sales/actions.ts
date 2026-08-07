@@ -13,7 +13,13 @@ export type SaleInput = {
   category: string;
   customerName?: string;
   memberKind?: string;
+  /** 定価（税抜・1個あたり）。売上台帳Excelの H列 */
+  listPrice?: number | null;
+  /** 割引額（値引きはマイナス）。売上台帳Excelの I列。売価 = 定価 + 割引額 */
+  discount?: number | null;
+  /** 金額（税抜合計＝売価×個数）。集計の正はここ */
   amount: number;
+  /** 決済金額（税込。実際に頂いた額） */
   taxIncluded?: number | null;
   payMethod?: string;
   productName?: string;
@@ -28,10 +34,19 @@ export type SaleInput = {
 /** 明細編集（updateSale）用: id 付き */
 export type SaleUpdate = SaleInput & { id: string };
 
+/** 0や空を「未入力(null)」として扱う。0円の定価・0円の割引は書いても意味がないため */
+function optNum(v: unknown): number | null {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n !== 0 ? n : null;
+}
+
 function normalizeInput(input: SaleInput) {
   return {
     soldOn: String(input.soldOn ?? "").trim(),
     category: String(input.category ?? "").trim(),
+    listPrice: optNum(input.listPrice),
+    discount: optNum(input.discount),
     amount: Number(input.amount) || 0,
     taxIncluded: input.taxIncluded != null && input.taxIncluded !== 0 ? Number(input.taxIncluded) : null,
     payMethod: (input.payMethod ?? "").trim() || null,
@@ -49,10 +64,14 @@ function normalizeInput(input: SaleInput) {
 function buildDetail(base: Record<string, unknown>, n: ReturnType<typeof normalizeInput>): Record<string, unknown> {
   const detail: Record<string, unknown> = { ...base };
   delete detail.product_name; delete detail.qty; delete detail.pro; delete detail.inv_item_id;
+  // 未入力なら消す（編集で定価を空にしたのに古い値が残る、を防ぐ）
+  delete detail.list_price; delete detail.discount;
   if (n.productName) detail.product_name = n.productName;
   if (n.qty) detail.qty = n.qty;
   if (n.pro) detail.pro = n.pro;
   if (n.invItemId) detail.inv_item_id = n.invItemId;
+  if (n.listPrice != null) detail.list_price = n.listPrice;
+  if (n.discount != null) detail.discount = n.discount;
   return detail;
 }
 
@@ -361,4 +380,118 @@ export async function deleteSaleById(id: string): Promise<void> {
 /** 旧・FormData版（互換のため残置）。 */
 export async function deleteSale(formData: FormData): Promise<void> {
   await deleteSaleById(String(formData.get("id") ?? ""));
+}
+
+// ============================================================
+// お客様の購入履歴（明細のお客様名クリックで開く）
+// ============================================================
+
+export type CustomerPurchase = {
+  soldOn: string;
+  category: string;
+  productName: string;
+  qty: number;
+  amount: number;
+  payMethod: string;
+  pro: string;
+  memo: string;
+  /** 台帳(Excel取込) 由来か、アプリ入力か */
+  source: "ledger" | "app";
+};
+
+export type CustomerHistory = {
+  name: string;
+  memberKind: string;
+  /** 税抜の累計 */
+  total: number;
+  count: number;
+  /** 来店日数（同じ日の複数明細は1回と数える） */
+  visitDays: number;
+  firstOn: string | null;
+  lastOn: string | null;
+  rows: CustomerPurchase[];
+  /** 上限に達して打ち切られたか */
+  truncated: boolean;
+};
+
+const HISTORY_LIMIT = 300;
+
+/**
+ * お客様1人の購入履歴。
+ * アプリ入力(mon_sales)と売上台帳の取込明細(mon_sales_lines)の両方を混ぜて返す。
+ * 台帳側にしか無い過去の履歴が落ちると「このお客様は初めて」と誤読するため。
+ */
+export async function getCustomerHistory(name: string): Promise<CustomerHistory | null> {
+  const actor = await requireMoneyActor();
+  const store = await getCurrentStore(actor);
+  const customer = String(name ?? "").trim();
+  if (!store || !customer) return null;
+
+  const admin = createAdmin();
+  const [{ data: sales }, { data: lines }] = await Promise.all([
+    admin.from("mon_sales")
+      .select("sold_on, category, customer_name, member_kind, amount, pay_method, memo, detail")
+      .eq("company_id", actor.companyId).eq("store_id", store.id)
+      .eq("customer_name", customer).eq("source", "app")
+      .is("deleted_at", null)
+      .order("sold_on", { ascending: false }).limit(HISTORY_LIMIT),
+    admin.from("mon_sales_lines")
+      .select("sold_on, customer_name, member_kind, item_category, product_name, qty, amount, pay_method, pro, memo")
+      .eq("company_id", actor.companyId).eq("store_id", store.id)
+      .eq("customer_name", customer)
+      .is("deleted_at", null)
+      .order("sold_on", { ascending: false }).limit(HISTORY_LIMIT),
+  ]);
+
+  const appRows = (sales ?? []) as Array<{
+    sold_on: string; category: string; member_kind: string | null; amount: number | string;
+    pay_method: string | null; memo: string | null; detail: Record<string, unknown> | null;
+  }>;
+  const ledgerRows = (lines ?? []) as Array<{
+    sold_on: string; member_kind: string | null; item_category: string | null; product_name: string | null;
+    qty: number | string | null; amount: number | string; pay_method: string | null; pro: string | null; memo: string | null;
+  }>;
+
+  const rows: CustomerPurchase[] = [
+    ...appRows.map((r) => ({
+      soldOn: String(r.sold_on),
+      category: r.category ?? "",
+      productName: String(r.detail?.product_name ?? ""),
+      qty: Math.max(1, Number(r.detail?.qty) || 1),
+      amount: Number(r.amount) || 0,
+      payMethod: r.pay_method ?? "",
+      pro: String(r.detail?.pro ?? ""),
+      memo: r.memo ?? "",
+      source: "app" as const,
+    })),
+    ...ledgerRows.map((r) => ({
+      soldOn: String(r.sold_on),
+      category: r.item_category ?? "",
+      productName: r.product_name ?? "",
+      qty: Math.max(1, Number(r.qty) || 1),
+      amount: Number(r.amount) || 0,
+      payMethod: r.pay_method ?? "",
+      pro: r.pro ?? "",
+      memo: r.memo ?? "",
+      source: "ledger" as const,
+    })),
+  ].sort((a, b) => b.soldOn.localeCompare(a.soldOn));
+
+  const memberKind =
+    appRows.find((r) => r.member_kind)?.member_kind ??
+    ledgerRows.find((r) => r.member_kind)?.member_kind ??
+    "";
+  const days = new Set(rows.map((r) => r.soldOn));
+
+  return {
+    name: customer,
+    memberKind: memberKind ?? "",
+    total: rows.reduce((a, r) => a + r.amount, 0),
+    count: rows.length,
+    visitDays: days.size,
+    firstOn: rows.length > 0 ? rows[rows.length - 1].soldOn : null,
+    lastOn: rows.length > 0 ? rows[0].soldOn : null,
+    rows,
+    truncated: appRows.length >= HISTORY_LIMIT || ledgerRows.length >= HISTORY_LIMIT,
+  };
 }

@@ -112,6 +112,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     category: r.category,
     customerName: r.customer_name ?? "",
     memberKind: r.member_kind ?? "",
+    listPrice: r.detail?.list_price != null ? Number(r.detail.list_price) : null,
+    discount: r.detail?.discount != null ? Number(r.detail.discount) : null,
     amount: Number(r.amount),
     taxIncluded: r.tax_included != null ? Number(r.tax_included) : null,
     payMethod: r.pay_method ?? "",
@@ -133,6 +135,10 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           <Link href={`/sales?month=${shift(month, -1)}`} className={btnGhostCls}>← 前月</Link>
           <span className="min-w-24 text-center font-bold tabular-nums">{month}</span>
           <Link href={`/sales?month=${shift(month, 1)}`} className={btnGhostCls}>翌月 →</Link>
+          {/* 売上データ.xlsx と同じレイアウトで書き出す（そのまま既存ブックへ貼れる） */}
+          <a href={`/api/sales/export?month=${month}`} className={btnGhostCls} title="この月の明細を売上データ.xlsxと同じ形式で書き出します">
+            Excel出力
+          </a>
         </div>
       </header>
 
