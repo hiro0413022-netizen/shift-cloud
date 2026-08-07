@@ -54,6 +54,35 @@ test("オープン前でも『9/2から14日分』は先行予約できる範囲
   }
 });
 
+/* ============================================================
+   特別営業日（#118）: 内覧会・体験会などオープン前の特定日だけ予約を受け付ける。
+   /site-admin「予約設定」の special_open_dates で設定（デプロイ不要）。
+   ============================================================ */
+
+test("特別営業日: オープン前でもその日だけ営業時間が出る（他の日は出ない）", () => {
+  const c = { ...cfg, special_open_dates: ["2026-08-16"] };
+  assert.deepEqual(businessHours("2026-08-16", c), { open: "09:00", close: "20:00" }); // 日曜=weekend
+  assert.equal(businessHours("2026-08-15", c), null); // 前日は通常どおり閉まったまま
+});
+
+test("特別営業日: 定休曜日・臨時休業の指定より優先する", () => {
+  const c = { ...cfg, special_open_dates: ["2026-08-18"], closed_dates: ["2026-08-18"] };
+  // 8/18は火曜（定休）かつ臨時休業指定でも、特別営業日なら開く
+  assert.deepEqual(businessHours("2026-08-18", c), { open: "10:00", close: "22:00" });
+});
+
+test("特別営業日: 予約可能範囲がその日まで前倒しされる（オープン日以降の範囲は狭まらない）", () => {
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  if (today < "2026-08-16") {
+    const r = bookableRange({ ...cfg, special_open_dates: ["2026-08-16"] });
+    assert.equal(r.min, "2026-08-16");
+    assert.equal(r.max, "2026-09-16"); // maxはopen_date基準のまま
+  }
+  // 過去の特別営業日は無視される
+  const r2 = bookableRange({ ...cfg, special_open_dates: ["2020-01-01"] });
+  assert.ok(r2.min >= "2026-01-01");
+});
+
 test("open_timeが営業openより遅い日だけ開始が繰り下がる（他日は影響なし）", () => {
   // 9/2 は weekday open 10:00 と同じなのでそのまま。土日オープンだったら 10:00 に繰り下がる想定の確認
   const weekendOpenCfg = { ...cfg, open_date: "2026-09-05" }; // 土曜: 9:00開店だが受付は10:00から

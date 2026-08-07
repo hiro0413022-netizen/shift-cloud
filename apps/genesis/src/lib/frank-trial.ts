@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { loadBookingCfg, businessHours } from "@/lib/frank-booking";
 import { bookableRange } from "@yozan/core/frank-booking";
+import { buildTrialConfirmMail, sendFrankMail } from "@/lib/frank-mail";
 
 /**
  * FRANK GOLF 体験のセルフ予約（0083）
@@ -282,6 +283,19 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
     source_type: "external",
     severity: "info",
   });
+
+  // 確認メール（キャンセルURLの控え）。送信失敗しても予約は成立させる（#118）
+  if (email) {
+    const mail = buildTrialConfirmMail({
+      name,
+      date: input.date,
+      start: input.start,
+      end: endTime,
+      bayName: bay.name,
+      cancelToken,
+    });
+    await sendFrankMail({ to: email, ...mail });
+  }
 
   return {
     ok: true,

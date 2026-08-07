@@ -7,6 +7,7 @@ import { runActivationLoop } from "@/lib/activation-loop";
 import { runAiScorecard } from "@/lib/ai-scorecard";
 import { runMorningDigest } from "@/lib/morning-digest";
 import { runContentLoop, refreshContentMetrics } from "@/lib/content-loop";
+import { runFrankReminders } from "@/lib/frank-mail";
 
 export const dynamic = "force-dynamic";
 // 60秒だとAI社員の成果物生成が入った時点で504になり、レポートが丸ごと欠落した（2026-07-15〜17）。
@@ -52,5 +53,7 @@ export async function GET(req: NextRequest) {
       results.push({ company: c.id, error: String(e) });
     }
   }
-  return NextResponse.json({ ok: true, results });
+  // FRANK 明日の予約リマインダーメール（#118・会社ループの外＝1回だけ。RESEND未設定なら自動skip）
+  const frankReminders = await runFrankReminders().catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ok: true, results, frankReminders });
 }

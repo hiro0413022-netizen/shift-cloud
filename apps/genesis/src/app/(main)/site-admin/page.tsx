@@ -139,6 +139,10 @@ function BookingSection({ d, input, label, btn }: { d: Record<string, unknown>; 
           <label className={label}>臨時休業日（YYYY-MM-DDを「,」区切り）</label>
           <input name="closed_dates" defaultValue={cfg.closed_dates.join(", ")} placeholder="2026-12-31" className={input} />
         </div>
+        <div className="col-span-2">
+          <label className={label}>特別営業日（内覧会など・オープン前や定休日でもこの日だけ予約を受け付ける）</label>
+          <input name="special_open_dates" defaultValue={(cfg.special_open_dates ?? []).join(", ")} placeholder="2026-08-16, 2026-08-17" className={input} />
+        </div>
       </div>
       <button type="submit" className={btn}>予約設定を保存</button>
     </form>

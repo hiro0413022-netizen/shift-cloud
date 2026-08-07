@@ -32,6 +32,9 @@ export type BookingCfg = {
   open_date: string;
   /** open_date 当日の受付開始時刻（営業openより遅い場合のみ効く） */
   open_time: string;
+  /** 特別営業日: open_date より前でもこの日だけは予約を受け付ける（内覧会・体験会など）。
+   *  営業時間はその日の曜日どおり（土日祝なら weekend）。定休曜日・臨時休業の指定より優先。 */
+  special_open_dates: string[];
 };
 
 export const DEFAULT_BOOKING_CFG: BookingCfg = {
@@ -45,6 +48,7 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   advance_days: 14,
   open_date: "2026-09-02", // プレオープン日
   open_time: "10:00",
+  special_open_dates: [],
 };
 
 /** Supabase の admin クライアント。
@@ -84,11 +88,15 @@ export const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().
 
 /** その日の営業時間。定休日・臨時休業なら null */
 export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING_CFG): { open: string; close: string } | null {
+  // 特別営業日（内覧会など）は、オープン前・定休日・臨時休業の指定より優先して営業扱い
+  const special = (cfg.special_open_dates ?? []).includes(dateStr);
   // オープン日より前は予約枠なし（体験・打席・レッスン共通）
-  if (cfg.open_date && dateStr < cfg.open_date) return null;
-  if (cfg.closed_dates.includes(dateStr)) return null;
+  if (!special && cfg.open_date && dateStr < cfg.open_date) return null;
   const dow = new Date(`${dateStr}T00:00:00Z`).getUTCDay(); // 日付文字列のみ→曜日はUTCでOK
-  if (cfg.closed_dows.includes(dow)) return null;
+  if (!special) {
+    if (cfg.closed_dates.includes(dateStr)) return null;
+    if (cfg.closed_dows.includes(dow)) return null;
+  }
   const base = dow === 0 || dow === 6 || cfg.holiday_dates.includes(dateStr) ? cfg.weekend : cfg.weekday;
   // オープン初日は open_time（10:00）から。閉店時刻はその日の営業時間どおり
   if (cfg.open_date && dateStr === cfg.open_date && cfg.open_time && toMin(cfg.open_time) > toMin(base.open)) {
@@ -100,10 +108,14 @@ export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING
 /** 予約を受け付ける日付範囲。オープン前でも「オープン日から advance_days 分」は先行予約できる */
 export function bookableRange(cfg: BookingCfg = DEFAULT_BOOKING_CFG): { min: string; max: string } {
   const today = jstToday();
-  const min = cfg.open_date && cfg.open_date > today ? cfg.open_date : today;
+  let min = cfg.open_date && cfg.open_date > today ? cfg.open_date : today;
   const max = new Date(new Date(`${min}T00:00:00Z`).getTime() + cfg.advance_days * 86400_000)
     .toISOString()
     .slice(0, 10);
+  // 特別営業日（内覧会など）が今日以降・オープン日より前にあれば、範囲をそこまで前倒しする
+  // （範囲が広がるだけで、特別営業日以外のオープン前日程は businessHours が null を返すので枠は出ない）
+  const specials = (cfg.special_open_dates ?? []).filter((d) => d >= today && d < min).sort();
+  if (specials.length > 0) min = specials[0];
   return { min, max };
 }
 

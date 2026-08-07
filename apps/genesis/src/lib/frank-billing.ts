@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { verifyMember } from "@/lib/frank-booking";
+import { exTax } from "@/lib/frank-pos-pure";
 
 /**
  * FRANK GOLF 月会費の継続課金（Stripe）#97 / migration 0087
@@ -145,6 +146,50 @@ async function memberByRef(admin: Admin, memberId: string | null, customerId: st
   return null;
 }
 
+/** 税込→税抜。Checkout作成時の unit_amount = round(税抜×1.1) の逆算（9,800/13,800/19,800円で往復一致・tests/frank-pos.test.tsで固定） */
+const monthlyFeeExTax = exTax;
+
+/** 月会費入金を mon_sales（FRANK店舗・姫路セグメント・category=月会費）へ1回だけ記録 */
+async function recordMonthlyFeeSale(
+  admin: Admin,
+  member: { id: unknown; company_id: unknown; name: unknown; member_no: unknown },
+  invoiceId: string,
+  paidTaxIncluded: number,
+): Promise<void> {
+  // Webhookは同一イベントが複数回届くことがある＝invoice idで冪等に
+  const { data: dup } = await admin.from("mon_sales").select("id").eq("detail->>stripe_invoice_id", invoiceId).limit(1);
+  if ((dup ?? []).length > 0) return;
+
+  const companyId = String(member.company_id);
+  const { data: store } = await admin.from("stores").select("id").eq("code", "frunk_himeji").maybeSingle();
+  const { data: seg } = await admin
+    .from("fin_segments")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("code", "himeji")
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  const { error } = await admin.from("mon_sales").insert({
+    company_id: companyId,
+    store_id: store?.id ?? null,
+    segment_id: seg?.id ?? null,
+    sold_on: new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10), // JSTの入金日
+    category: "月会費",
+    customer_name: String(member.name ?? ""),
+    member_kind: "会員",
+    amount: monthlyFeeExTax(paidTaxIncluded),
+    tax_included: paidTaxIncluded,
+    pay_method: "カード",
+    memo: `Stripe自動課金（${String(member.member_no ?? "")}）`,
+    detail: { stripe_invoice_id: invoiceId, frunk_member_id: String(member.id) },
+    entered_by: "Stripe(自動)",
+    source: "stripe",
+  });
+  if (error) throw new Error(`mon_sales insert failed: ${error.message}`);
+  await admin.rpc("refresh_money_to_finance", { p_company_id: companyId });
+}
+
 /** Webhook本体。ルートは署名検証済みの payload(JSON文字列) を渡す */
 export async function handleStripeEvent(payload: string): Promise<void> {
   const event = JSON.parse(payload) as { type: string; data: { object: Record<string, unknown> } };
@@ -173,6 +218,18 @@ export async function handleStripeEvent(payload: string): Promise<void> {
       source: "frank_billing",
       source_type: "system",
     });
+    return;
+  }
+
+  if (event.type === "invoice.paid" || event.type === "invoice.payment_succeeded") {
+    // 月会費の入金を Money OS（mon_sales）へ自動計上（#118 / 実行計画§3-2「売上はMoney OSへ自動連携」）
+    const invoiceId = String(obj.id ?? "");
+    const paid = Number((obj.amount_paid as number | undefined) ?? 0); // 税込・円
+    if (!invoiceId || paid <= 0) return;
+    const customerId = (obj.customer as string | null) ?? null;
+    const member = await memberByRef(admin, null, customerId);
+    if (!member) return;
+    await recordMonthlyFeeSale(admin, member, invoiceId, paid);
     return;
   }
 

@@ -435,3 +435,66 @@ Vercel の **demo-sales** に `ANTHROPIC_API_KEY` を登録すると、規則で
 
 - **Places**: 「取得方法＝Google Places API」＋検索語（例: `美容室 伊丹市`）。業種とエリアを変えて数を作る
 - **名簿**: 「取得方法＝公開名簿ページを巡回」＋一覧ページURL。読み取り方は「自動」でよい
+
+---
+
+## 14. FRANK GOLF 9/2オープンの残り設定（#118）
+
+オープンまでにユーザー作業が要るのはこの4つ。**どれも「未設定でもサイトや予約は落ちない」設計**なので、
+できたものから順に有効化すれば大丈夫です。
+
+### 14-1. Stripe を本番モードへ（月会費の実課金・最重要）
+
+いまはテストモード（sk_test）＝**実カードには課金されません**。9/2までに:
+
+1. https://dashboard.stripe.com → 本番環境の有効化を完了する
+   （残りは 銀行口座の追加 → アカウント保護 → 確認して送信。明細書表記は設定済み）
+2. 本番モードの **APIキー（sk_live_...）** を取得 → Vercel（yozan-genesis）の `STRIPE_SECRET_KEY` を差し替え
+3. 本番モードで **Webhookを再登録**: 宛先 `https://yozan-genesis.vercel.app/api/public/frank/billing/webhook`
+   イベントは `checkout.session.completed` / `invoice.paid` / `invoice.payment_failed` / `customer.subscription.deleted`
+   （**invoice.paid は今回追加**。これが月会費をMoney OSへ自動計上します）
+4. 新しい `whsec_...` を `STRIPE_WEBHOOK_SECRET` に差し替え → Redeploy
+5. テスト: 自分のカードでモニター以外のプランを1件登録→ frunk_members.billing_status='active'、
+   翌請求で Money OS の売上（姫路・月会費）に自動で1行入ることを確認
+
+### 14-2. Square（店頭レジ）の申請と接続
+
+1. https://squareup.com/jp で無料アカウント作成（法人確認あり・数日）。端末は Square Terminal 推奨（約4.6万円）
+2. 商品カタログに 物販・ビジター料・レッスン単発・体験料 を登録（税込価格）
+3. https://developer.squareup.com → アプリ作成 → **Webhooks** →
+   URL: `https://yozan-genesis.vercel.app/api/public/frank/pos/webhook`
+   イベント: `payment.created` / `payment.updated` / `refund.created` / `refund.updated`
+4. 表示される **Signature Key** を Vercel（yozan-genesis）に `SQUARE_WEBHOOK_SIGNATURE_KEY` として登録 → Redeploy
+5. テスト決済1件 → Money OS（FRANK GOLF 姫路）の売上に「Square(自動)」の行が入ることを確認
+   - 現金をSquareでレジ打ちすると現金出納にも自動で入ります
+   - 記録先の内訳（category）は一律「利用料」。物販が多い日はMoney OSで「販売」に直せば集計に反映されます
+6. 稼働したら vault_systems に「Square（FRANK GOLF 店頭POS）」を登録
+
+### 14-3. お客様への確認・リマインダーメール（体験の歩留まり対策）
+
+体験のWeb予約に **確認メール（キャンセルURLの控え）** と **前日リマインダー** を実装済み。
+Resendで `frankgolf.jp` を認証すると動き出します（未認証の間は自動スキップ・予約自体は通る）:
+
+1. Resend → Domains → Add Domain → `frankgolf.jp`
+2. 表示されるDNSレコードをお名前.com の `frankgolf.jp` に登録 → Verify
+   （§12-1と同じ要領。frankgolf.jp はメール運用が無いのでMX追加の心配は不要）
+3. Vercel（yozan-genesis）に `RESEND_API_KEY`（demo-salesと同じ値でOK）と
+   `FRANK_MAIL_FROM`（例: `FRANK GOLF <info@frankgolf.jp>`）を登録 → Redeploy
+4. テスト: 自分のメールで体験予約→確認メールが届く／リマインダーは毎朝6時のcronで前日分が送られます
+
+### 14-4. FRANK公式LINEとスタッフグループ
+
+- **FRANKスタッフグループへOAを追加**（§6の要領・1分）: スタッフ連絡用OAをFRANKのグループへ招待
+  → joinイベントでグループIDが自動記録され、店舗別の朝連絡・指示が届くようになります
+- **FRANK公式LINE（お客様向け）を開設したら**: `sites/frank-golf/assets/site-data.js` の `links.line` に
+  URL（https://lin.ee/…）を入れて push → 全ページのLINEボタンが自動で有効化
+
+### 14-5. そのほか開店前チェック
+
+- **D打席を設営したら**: Supabase で `update frunk_bays set active=true, trial_priority=4 where code='bay-d';`
+- **内覧会をやる場合**: Genesis `/site-admin` → 予約設定 → **特別営業日** に日付を入れるだけで
+  オープン前でもその日だけ体験・予約を受け付けます（デプロイ不要）
+- **サイトの「近日公開」を埋める**: `sites/frank-golf/assets/site-data.js`（住所・電話・入会金・
+  ビジター料・持ち物・ラウンジ・特典）。null の項目が画面で「近日公開」になっています
+- **特商法・プライバシー・会員規約**（tokushoho/privacy/terms.html）は草案のまま。
+  Web決済を本格開始する前に確定と専門家確認を

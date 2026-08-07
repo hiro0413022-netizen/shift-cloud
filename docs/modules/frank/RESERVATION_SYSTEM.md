@@ -84,14 +84,40 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 オープン当日は open_time 開始・閉店はその日の営業時間どおり。
 枠は従来どおり閉店時刻を超えない（最終枠 = close − slot_minutes）。
 
+### 特別営業日（#118）
+
+`special_open_dates`（/site-admin → 予約設定 → 特別営業日）に日付を入れると、
+**オープン前・定休曜日・臨時休業の指定より優先して**その日だけ予約を受け付ける（内覧会・体験会用）。
+営業時間はその日の曜日どおり（土日祝なら weekend）。予約可能範囲もその日まで自動で前倒しされる。
+
+### 確認メール・前日リマインダー（#118）
+
+- 体験のWeb予約時、メールアドレスがあれば**確認メール**（キャンセルURLの控え）を送る。
+- 毎朝6時の日次cronが**前日リマインダー**を送る（明日の体験＋会員の打席予約でメールがある人）。
+- コード: `apps/genesis/src/lib/frank-mail.ts`（文面は frank-mail-pure.ts・tests/frank-pos.test.ts）。
+- **env**: `RESEND_API_KEY` / `FRANK_MAIL_FROM`（Vercel: yozan-genesis）。未設定なら自動スキップ＝予約は通る。
+  Resendで frankgolf.jp のドメイン認証が必要（OPERATIONS §14-3）。
+
+### 店頭POS（Square・#118 / 実行計画§3-7）
+
+- Square Webhook `/api/public/frank/pos/webhook` → `mon_sales`（source='square'・姫路セグメント）へ自動記録
+  → `refresh_money_to_finance` で fin_entries／KPI／日次レポートへ。現金は現金出納にも自動反映。
+- 返金はマイナスの売上行（category=返金）＋company_events に notice。
+- 冪等: `detail->>square_payment_id` / `square_refund_id` で二重記録を防ぐ（Webhookは同一イベントが複数回届く）。
+- コード: `apps/genesis/src/lib/frank-pos.ts`（純粋部は frank-pos-pure.ts）。
+- **env**: `SQUARE_WEBHOOK_SIGNATURE_KEY` / `SQUARE_WEBHOOK_URL`（省略時は本番URL）。設定手順 OPERATIONS §14-2。
+
 ### 月会費の継続課金（Stripe・#97 / migration 0087）
 
 - 会員は booking.html の「カードで継続課金を登録する」→ `/api/public/frank/billing`
   → Stripe Checkout(subscription・税込) でカード登録。以後毎月自動課金。
-- Webhook `/api/public/frank/billing/webhook`（checkout.session.completed /
+- Webhook `/api/public/frank/billing/webhook`（checkout.session.completed / **invoice.paid（#118追加）** /
   invoice.payment_failed / customer.subscription.deleted）が
   `frunk_members.billing_status`（none/checkout/active/past_due/canceled）を更新。
   登録完了で `payment_method='card'` に切替＋company_events 記録。
+  **invoice.paid は月会費入金を mon_sales（姫路・category=月会費・source='stripe'）へ自動計上**
+  （invoice idで冪等・refresh_money_to_finance まで実行）。Stripe側のWebhook登録イベントに
+  invoice.paid を含めること（OPERATIONS §14-1）。
 - コード: `apps/genesis/src/lib/frank-billing.ts`（SDK不使用・fetch直）
 - **必要env（Vercel: yozan-genesis）**: `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`。
   未設定の間はボタンを押すと「店頭でお手続きください」と案内される（エラーにしない）。

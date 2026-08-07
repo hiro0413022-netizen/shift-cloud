@@ -13,6 +13,14 @@ export interface ProspectCandidate {
   address?: string | null;
   phone?: string | null;
   websiteUrl?: string | null;
+  /**
+   * 公式サイトの有無を**実際に調べたか**（#118）。
+   * websiteUrl が null なだけでは「HPが無い」と断定できない。一覧ページしか見ていない名簿では
+   * そもそも探していないからで、これを「HPなし95点＝最優先」にすると、
+   * ホームページを持っている医院に「見当たりません」と営業することになる。
+   * 既定は false（＝未確認）。安全側に倒すため、埋め忘れても嘘の最優先は生まれない。
+   */
+  websiteChecked?: boolean;
   gmapUrl?: string | null;
   /** 拾ってきた元ページ（出どころを辿れるように必ず入れる） */
   sourceUrl?: string | null;

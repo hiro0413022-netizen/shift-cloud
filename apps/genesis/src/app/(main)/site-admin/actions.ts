@@ -51,6 +51,8 @@ export async function saveBookingCfg(formData: FormData): Promise<void> {
   const dates = (k: string) => t(k).split(/[、,\s]+/).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
   const dows = t("closed_dows").split(/[、,\s]+/).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
   data.booking = {
+    // open_date / open_time など、このフォームに無いキーを消さない（#118）
+    ...((data.booking as Record<string, unknown> | undefined) ?? {}),
     weekday: { open: t("wd_open") || "10:00", close: t("wd_close") || "21:00" },
     weekend: { open: t("we_open") || "08:00", close: t("we_close") || "20:00" },
     closed_dows: dows.length > 0 ? dows : [2],
@@ -58,6 +60,7 @@ export async function saveBookingCfg(formData: FormData): Promise<void> {
     max_minutes_options: [30, 60, 90, 120],
     holiday_dates: dates("holiday_dates"),
     closed_dates: dates("closed_dates"),
+    special_open_dates: dates("special_open_dates"),
     advance_days: Math.min(60, Math.max(1, Number(t("advance_days")) || 14)),
   };
   await admin.from("gn_site_content").update({ data, updated_at: new Date().toISOString() }).eq("id", row.id);
