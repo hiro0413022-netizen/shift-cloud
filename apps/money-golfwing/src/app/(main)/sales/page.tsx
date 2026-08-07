@@ -9,6 +9,9 @@ import type { InvPick } from "./ProductPicker";
 
 export const dynamic = "force-dynamic";
 
+/** 定番ボタンの最大数。増やすと押し間違いが増え、探すのに一覧を目で追うことになる */
+const PRESET_LIMIT = 10;
+
 const CATEGORIES = ["利用料", "月会費", "販売", "その他"];
 const MEMBER_KINDS = ["会員", "ビジター", "スタッフ"];
 const PAY_METHODS = ["現金", "Airペイ", "SBペイメント", "楽天ペイ", "振込", "その他"];
@@ -81,7 +84,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         .eq("source", "app").is("deleted_at", null)
         .order("sold_on", { ascending: false }).limit(500)
     : { data: [] };
-  const recentRows = (recent ?? []) as Pick<Sale, "category" | "customer_name" | "amount" | "detail">[];
+  const recentRows = (recent ?? []) as Pick<Sale, "category" | "customer_name" | "amount" | "detail" | "sold_on">[];
 
   const productSuggestions = uniqTop(
     recentRows.map((r) => String(r.detail?.product_name ?? "").trim()).filter(Boolean),
@@ -91,19 +94,39 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     recentRows.map((r) => String(r.customer_name ?? "").trim()).filter(Boolean),
     100,
   );
-  // 定番: (品名+金額)の頻度上位8件
-  const comboCount = new Map<string, { p: Preset; n: number }>();
+
+  // 定番ボタン: 直近の入力から「よく打つ組み合わせ」を自動で並べる。
+  //   - 金額は合計(amount)ではなく単価で数える。合計で数えると同じ商品が個数ごとに別の定番に割れ、
+  //     押したときに定価へ合計額が入ってしまう（個数2の4,000円が「定価4,000」になる）
+  //   - 並びは「打った回数の多い順」、同数なら「最近打った順」。使われなくなった組み合わせは
+  //     PRESET_LIMIT の外へ自然に押し出される＝手で入れ替えなくていい
+  const combos = new Map<string, { p: Preset; n: number; last: string }>();
   for (const r of recentRows) {
     const product = String(r.detail?.product_name ?? "").trim();
     if (!product) continue;
-    const amount = Number(r.amount) || 0;
-    if (amount === 0) continue;
-    const key = `${r.category}|${product}|${amount}`;
-    const cur = comboCount.get(key);
-    if (cur) cur.n += 1;
-    else comboCount.set(key, { p: { label: `${product} ${amount.toLocaleString("ja-JP")}`, category: r.category, productName: product, amount }, n: 1 });
+    const qty = Math.max(1, Number(r.detail?.qty) || 1);
+    const unit = r.detail?.list_price != null
+      ? Math.round(Number(r.detail.list_price))
+      : Math.round((Number(r.amount) || 0) / qty);
+    if (!unit) continue;
+    const soldOn = String(r.sold_on ?? "");
+    const key = `${r.category}|${product}|${unit}`;
+    const cur = combos.get(key);
+    if (cur) {
+      cur.n += 1;
+      if (soldOn > cur.last) cur.last = soldOn;
+    } else {
+      combos.set(key, {
+        p: { label: `${product} ${unit.toLocaleString("ja-JP")}`, category: r.category, productName: product, unitPrice: unit },
+        n: 1,
+        last: soldOn,
+      });
+    }
   }
-  const presets: Preset[] = [...comboCount.values()].sort((a, b) => b.n - a.n).slice(0, 8).map((x) => x.p);
+  const presets: Preset[] = [...combos.values()]
+    .sort((a, b) => (b.n - a.n) || b.last.localeCompare(a.last))
+    .slice(0, PRESET_LIMIT)
+    .map((x) => x.p);
 
   // 明細（編集可能テーブルへ渡す形に整形）
   const saleRows: SaleRow[] = rows.map((r) => ({

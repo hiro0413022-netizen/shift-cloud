@@ -5,7 +5,8 @@ import { inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { createSale, createSales, type SaleInput } from "./actions";
 import ProductPicker, { invLabel, type InvPick } from "./ProductPicker";
 
-export type Preset = { label: string; category: string; productName: string; amount: number };
+/** 定番ボタン1つ分。unitPrice は「1個あたりの定価」（合計金額ではない） */
+export type Preset = { label: string; category: string; productName: string; unitPrice: number };
 
 /**
  * 商品行。売上台帳Excelと同じ計算の流れで積み上げる:
@@ -185,10 +186,10 @@ export default function SalesEntry({
     });
   }
 
-  // クイックボタン：現在のモードの入力欄に流し込む（金額は定価として扱い、個数1）
+  // 定番ボタン：現在のモードの入力欄に流し込む（単価を定価に入れ、個数は1から）
   function applyPreset(p: Preset) {
     setCategory(p.category);
-    const filled = patch(emptyLine(), { productName: p.productName, listPrice: String(p.amount) });
+    const filled = patch(emptyLine(), { productName: p.productName, listPrice: String(p.unitPrice) });
     if (mode === "single") {
       setLine(filled);
       productRef.current?.focus();
