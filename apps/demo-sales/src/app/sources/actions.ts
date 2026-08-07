@@ -31,6 +31,7 @@ export async function saveSource(fd: FormData) {
     max_per_run: Math.max(1, Math.min(500, Number(s(fd, "max_per_run") ?? 100))),
     enabled: fd.get("enabled") === "on",
     visit_detail: fd.get("visit_detail") === "on",
+    parser: ["auto", "rules", "ai"].includes(s(fd, "parser") ?? "") ? s(fd, "parser")! : "auto",
     sort: Number(s(fd, "sort") ?? 0),
     updated_at: new Date().toISOString(),
   };

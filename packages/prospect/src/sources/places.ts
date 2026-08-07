@@ -1,6 +1,9 @@
 // 取得アダプタ② Google Places API (New) — Text Search
 //
-// ユーザー選択（2026-08-07）: 名簿巡回で先に回し、Places は「後付けできる形で同梱」。
+// **これが営業リストの主軸**（2026-08-07にユーザーと決定 #117）。
+// 名簿は「業界団体が名簿を公開している業種」にしか使えないが、Placesはエリア×業種で
+// どの業種でも機械的に取れ、実在も保証される。名簿はPlacesに無い情報（診療科など）を補う位置づけ。
+//
 // そのため GOOGLE_PLACES_API_KEY が未設定なら**エラーにせず黙ってskip**する。
 // キーをVercelのenvに入れた瞬間に、コード変更なしで有効になる。
 //
@@ -62,7 +65,9 @@ export const placesAdapter: SourceAdapter = {
             textQuery: q,
             languageCode: "ja",
             regionCode: "JP",
-            maxResultCount: Math.min(20, ctx.limit),
+            // 1コールで最大20件。nextPageToken で最大60件まで辿れる（Places APIの上限）。
+            // 件数を稼ぎたいときはクエリを分ける（「美容室 伊丹市中央」など）方が確実
+            maxResultCount: 20,
             ...(pageToken ? { pageToken } : {}),
           }),
         });

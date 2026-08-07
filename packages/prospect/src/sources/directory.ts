@@ -9,6 +9,7 @@
 // 詳細ページは**公式サイトのURLを取るためだけ**に、必要な件数だけ訪問する。
 
 import { fetchPage, sleep, UA } from "../http";
+import { aiExtractRows, verifyAgainstSource } from "../ai-extract";
 import { extractContact, extractRows, guessIndustry, looksBroken } from "../parse";
 import { isAllowed, loadRobots } from "../robots";
 import type { AdapterContext, ProspectCandidate, SourceAdapter, SourceRow } from "../types";
@@ -33,15 +34,34 @@ export const directoryAdapter: SourceAdapter = {
     }
     if (list.status >= 400) return { candidates, errors: [`一覧ページが ${list.status}`] };
 
-    const rows = extractRows(list.html, list.finalUrl, source.link_pattern);
-    if (rows.length === 0) {
-      return { candidates, errors: ["一覧ページから営業先の行を1件も拾えませんでした（link_pattern と一覧ページURLを確認してください）"] };
+    // まず規則で読む（速い・無料）。ダメならAIに読ませる（#117）。
+    // どちらで読んだかは errors に残して、あとから費用と成否を追えるようにする。
+    const parser = source.parser ?? "auto";
+    let rows = parser === "ai" ? [] : extractRows(list.html, list.finalUrl, source.link_pattern);
+    let broken = rows.length === 0 ? "規則では1件も拾えませんでした" : looksBroken(rows);
+
+    if (broken && parser !== "rules") {
+      const ai = await aiExtractRows(list.html, list.finalUrl, { apiKey: ctx.env.ANTHROPIC_API_KEY });
+      if (ai.rows && ai.rows.length > 0) {
+        // AIが指示に反して補完することがあるので、元のHTMLに実在する屋号だけを残す
+        const { kept, dropped } = verifyAgainstSource(ai.rows, list.html);
+        if (dropped.length) errors.push(`AIの出力から元ページに無い${dropped.length}件を除外しました`);
+        if (kept.length > 0) {
+          rows = kept;
+          broken = looksBroken(kept);
+          errors.push(`AIで読み取りました（${kept.length}件・HTML ${Math.round(ai.usedChars / 1000)}KB）`);
+        }
+      } else if (ai.error) {
+        errors.push(`AI読み取りに失敗: ${ai.error}`);
+      }
     }
 
+    if (rows.length === 0) {
+      return { candidates, errors: [...errors, "一覧ページから営業先を1件も拾えませんでした（一覧ページURLと詳細ページの見分け方を確認してください）"] };
+    }
     // 抽出が壊れているなら、中途半端に登録せず巡回元ごと止める。
     // 「1件だけ登録されて残りは重複扱い」という静かな失敗を防ぐ（#114の実障害）
-    const broken = looksBroken(rows);
-    if (broken) return { candidates, errors: [broken] };
+    if (broken) return { candidates, errors: [...errors, broken] };
 
     const fresh = rows.filter((r) => !ctx.seen.has(r.refKey)).slice(0, ctx.limit);
 

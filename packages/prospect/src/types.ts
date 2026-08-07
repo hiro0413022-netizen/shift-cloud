@@ -83,4 +83,6 @@ export interface SourceRow {
   max_per_run: number;
   /** 詳細ページを開いて公式サイトURLを探すか（既定false＝一覧だけで拾う・#116） */
   visit_detail?: boolean;
+  /** 一覧の読み取り方: auto=規則→ダメならAI / rules=規則のみ / ai=AIのみ（#117） */
+  parser?: string;
 }

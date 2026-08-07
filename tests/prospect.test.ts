@@ -4,6 +4,7 @@ import { auditPage, detectNoSolicit, latestYear, noWebsiteAudit, salesScore, str
 import { dedupeKeys, isDuplicate, normalizeName, normalizePhone, normalizeSite } from "../packages/prospect/src/dedupe.ts";
 import { isAllowed, parseRobots } from "../packages/prospect/src/robots.ts";
 import { UA } from "../packages/prospect/src/http.ts";
+import { compactHtml, parseJsonArray, verifyAgainstSource } from "../packages/prospect/src/ai-extract.ts";
 import { cityFromAddress, extractContact, extractLinks, extractRows, guessIndustry, looksBroken } from "../packages/prospect/src/parse.ts";
 import type { PageSnapshot } from "../packages/prospect/src/types.ts";
 
@@ -295,4 +296,39 @@ test("「サイトが無い」と「サイトを取得できなかった」を�
   assert.equal(failed.ok, false);
   assert.ok(none.score > failed.score);
   assert.equal(failed.score, 40);
+});
+
+// ---------------------------------------------------------------- AI抽出（#117）
+
+test("AIが書いた屋号が元ページに無ければ落とす（創作を営業先にしない）", () => {
+  // ここがAI利用の最後の砦。LLMは指示に反して補完することがあり、
+  // 架空の宛先が営業リストに混ざるとメールは届かず電話も繋がらない
+  const html = "<table><tr><td>あいわ内科クリニック</td></tr><tr><td>やまだ動物病院</td></tr></table>";
+  const { kept, dropped } = verifyAgainstSource(
+    [{ name: "あいわ内科クリニック" }, { name: "存在しないクリニック" }, { name: "やまだ 動物病院" }],
+    html,
+  );
+  assert.deepEqual(kept.map((r) => r.name), ["あいわ内科クリニック", "やまだ 動物病院"], "空白の違いは許す");
+  assert.deepEqual(dropped.map((r) => r.name), ["存在しないクリニック"]);
+});
+
+test("AIに渡す前にHTMLを削る（費用は入力の長さに比例するため）", () => {
+  const html = `<html><head><style>${"a{}".repeat(500)}</style><script>${"x;".repeat(500)}</script></head>
+    <body><!-- コメント --><svg><path d="M0 0"/></svg><table><tr><td>あいわ内科</td></tr></table></body></html>`;
+  const out = compactHtml(html, 100_000);
+  assert.ok(!out.includes("<script"), "scriptは落とす");
+  assert.ok(!out.includes("<style"), "styleは落とす");
+  assert.ok(!out.includes("<svg"), "svgは落とす");
+  assert.ok(!out.includes("コメント"), "HTMLコメントは落とす");
+  assert.ok(out.includes("あいわ内科"), "本体の情報は残す");
+  // 上限を超えたら切る（長すぎる入力は費用も失敗率も上がる）
+  assert.equal(compactHtml("あ".repeat(500), 100).length, 100);
+});
+
+test("AIの出力がコードブロックで囲まれていてもJSONを読む", () => {
+  assert.deepEqual(parseJsonArray('```json\n[{"name":"A"}]\n```'), [{ name: "A" }]);
+  assert.deepEqual(parseJsonArray('了解しました。[{"name":"A"}] です。'), [{ name: "A" }]);
+  // 読めないものは null（壊れた出力で処理を続けない）
+  assert.equal(parseJsonArray("配列を返せませんでした"), null);
+  assert.equal(parseJsonArray('{"name":"A"}'), null, "オブジェクト単体は配列ではない");
 });

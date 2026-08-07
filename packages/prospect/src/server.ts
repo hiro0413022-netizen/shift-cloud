@@ -78,7 +78,7 @@ export async function runProspectPickup(
   // ---------------------------------------------------------------
   const { data: sources } = await admin
     .from("prs_sources")
-    .select("id,company_id,name,kind,industry,city,url,link_pattern,query,max_per_run,visit_detail")
+    .select("id,company_id,name,kind,industry,city,url,link_pattern,query,max_per_run,visit_detail,parser")
     .eq("company_id", companyId)
     .eq("enabled", true)
     .is("deleted_at", null)

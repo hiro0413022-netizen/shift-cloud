@@ -19,6 +19,7 @@ type Source = {
   max_per_run: number;
   enabled: boolean;
   visit_detail: boolean;
+  parser: string;
   sort: number;
   last_run_at: string | null;
   last_result: { picked?: number; candidates?: number; errors?: string[] } | null;
@@ -82,6 +83,15 @@ export default async function SourcesPage() {
           </select>,
         )}
         {field("市区町村", <input name="city" defaultValue={src?.city ?? ""} placeholder="伊丹市" className={inputCls} />)}
+        {field(
+          "読み取り方",
+          <select name="parser" defaultValue={src?.parser ?? "auto"} className={inputCls}>
+            <option value="auto">自動（規則→ダメならAI）</option>
+            <option value="rules">規則のみ（無料・速い）</option>
+            <option value="ai">AIで読む（どんな構造でも）</option>
+          </select>,
+          "AIは一覧に書いてあることを写すだけ。存在しない店は作りません",
+        )}
         {field("1回の上限", <input name="max_per_run" type="number" defaultValue={src?.max_per_run ?? 100} className={inputCls} />, "一覧1ページから拾える件数の上限")}
       </div>
       {field("一覧ページURL（公開名簿のとき）", <input name="url" defaultValue={src?.url ?? ""} placeholder="https://www.itami-med.or.jp/kikan/..." className={inputCls} />)}
