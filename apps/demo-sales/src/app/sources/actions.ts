@@ -63,6 +63,7 @@ export async function runNow() {
   await runProspectPickup(admin, actor.companyId, {
     budgetMs: 45_000,
     maxNewProspects: 300,
+    maxWebsiteLookups: 15,
     maxAudits: 10,
     maxDemos: 1,
     onDemo: (p) => createAutoDemo(admin, actor.companyId, p),

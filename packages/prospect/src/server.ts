@@ -9,12 +9,16 @@
 //  - デモ生成の実装は持たない（renderDemo は demo-sales のもの）。onDemo で受け取る＝パッケージをアプリ非依存に保つ。
 //  - 失敗は握りつぶさず prs_runs.detail に残す。自動化は「静かに止まる」のが最悪の壊れ方なので、
 //    動いた証跡を必ず1行残す。
+//  - **知らないことを知っていると言わない**（#119）。「サイトが無い」は最優先(95点)扱いなので、
+//    探していないだけの先をそこに混ぜると、HPを持つ医院に「見当たりません」と営業してしまう。
+//    website_checked が true の先だけが採点に進む。
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { auditPage, noWebsiteAudit, unreachableAudit } from "./audit";
+import { auditPage, noWebsiteAudit, unreachableAudit, websiteVerdict } from "./audit";
 import { dedupeKeys, isDuplicate, type DedupeKeys } from "./dedupe";
 import { fetchPage, pageSpeedScore, sleep } from "./http";
 import { ADAPTERS } from "./sources";
+import { lookupWebsite } from "./sources/places";
 import type { ProspectCandidate, SourceRow, WebAudit } from "./types";
 
 export interface PickupOptions {
@@ -24,6 +28,8 @@ export interface PickupOptions {
   maxNewProspects?: number;
   /** 1回の実行でスコアを付ける上限 */
   maxAudits?: number;
+  /** 1回の実行で「公式サイトの有無」をPlacesに確認する上限（#119） */
+  maxWebsiteLookups?: number;
   /** 自動デモ生成のスコア下限。これ未満は人が判断する */
   demoScoreMin?: number;
   /** 1回の実行で自動生成するデモの上限 */
@@ -49,6 +55,7 @@ const DEFAULTS = {
   budgetMs: 240_000,
   maxNewProspects: 300,
   maxAudits: 60,
+  maxWebsiteLookups: 60,
   demoScoreMin: 55,
   maxDemos: 3,
   delayMs: 1200,
@@ -143,6 +150,7 @@ export async function runProspectPickup(
           gmap_url: c.gmapUrl ?? null,
           status: "unanalyzed",
           source: "auto",
+          website_checked: c.websiteChecked ?? false,
           prs_source_id: src.id,
           source_url: c.sourceUrl ?? null,
         })
@@ -177,23 +185,71 @@ export async function runProspectPickup(
   detail.sources = sourceLog;
 
   // ---------------------------------------------------------------
-  // 2) Web現況スコア（未計測から順に）
+  // 2) 公式サイトの有無を確認する（#119）
+  //
+  // 名簿から拾った先は一覧しか見ていないので、サイトが有るのか無いのかを知らない。
+  // ここでPlacesに1件ずつ引き当てて確認済みにする。確認できた先だけが次の採点に進む＝
+  // 「探していないだけなのにHPなし95点」という嘘の最優先が構造的に生まれない。
+  // キーが無ければ何もしない（名簿は visit_detail=true にすれば従来どおり確認できる）。
+  let looked = 0;
+  const lookupNotes: string[] = [];
+  if (env.GOOGLE_PLACES_API_KEY && o.maxWebsiteLookups > 0) {
+    const { data: unchecked } = await admin
+      .from("dms_prospects")
+      .select("id,name,city,address")
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .eq("website_checked", false)
+      .is("website_url", null)
+      .order("created_at")
+      .limit(o.maxWebsiteLookups);
+
+    for (const p of (unchecked ?? []) as { id: string; name: string; city: string | null; address: string | null }[]) {
+      if (left() < 30_000) break;
+      const r = await lookupWebsite(p, env.GOOGLE_PLACES_API_KEY);
+      if (!r.found) {
+        // 確認できないものは未確認のまま残す。次回また試す（＝嘘の断定より保留を選ぶ）
+        if (lookupNotes.length < 10) lookupNotes.push(`${p.name}: ${r.reason}`);
+        continue;
+      }
+      await admin.from("dms_prospects").update({ website_url: r.websiteUrl, website_checked: true }).eq("id", p.id);
+      looked++;
+    }
+  }
+  if (looked) detail.websiteLookups = looked;
+  if (lookupNotes.length) detail.websiteLookupSkipped = lookupNotes;
+
   // ---------------------------------------------------------------
+  // 3) Web現況スコア（未計測から順に）
+  // ---------------------------------------------------------------
+  // 「サイトURLがある」か「無いことを確認済み」の先だけを採点する。
+  // 未確認の先をここに入れると noWebsiteAudit() が95点＝最優先を作ってしまう（#119の実障害）
   const { data: toAudit } = await admin
     .from("dms_prospects")
-    .select("id,name,website_url,industry,phone,address,email")
+    .select("id,name,website_url,website_checked,industry,phone,address,email")
     .eq("company_id", companyId)
     .is("deleted_at", null)
     .is("audited_at", null)
+    .or("website_url.not.is.null,website_checked.is.true")
     .order("created_at")
     .limit(o.maxAudits);
 
   const auditErrors: string[] = [];
-  for (const p of (toAudit ?? []) as { id: string; name: string; website_url: string | null; industry: string; email: string | null }[]) {
+  for (const p of (toAudit ?? []) as {
+    id: string;
+    name: string;
+    website_url: string | null;
+    website_checked: boolean;
+    industry: string;
+    email: string | null;
+  }[]) {
     if (left() < 25_000) break;
+    const verdict = websiteVerdict(p);
+    // まだ探していない先は採点しない（保留）。ここで continue しないと嘘の最優先が生まれる（#119）
+    if (verdict === "unknown") continue;
     let result: WebAudit;
     // ホームページが無い先は「取得失敗」ではなく最優先の見込み客（#116）。外部への通信も要らない
-    if (!p.website_url) {
+    if (verdict === "none" || !p.website_url) {
       result = noWebsiteAudit();
     } else
     try {
@@ -249,7 +305,7 @@ export async function runProspectPickup(
   if (auditErrors.length) detail.auditErrors = auditErrors.slice(0, 10);
 
   // ---------------------------------------------------------------
-  // 3) スコア上位の自動デモ生成
+  // 4) スコア上位の自動デモ生成
   // ---------------------------------------------------------------
   if (o.onDemo) {
     const { data: forDemo } = await admin
