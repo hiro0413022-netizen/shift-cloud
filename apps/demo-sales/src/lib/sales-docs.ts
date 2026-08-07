@@ -3,6 +3,7 @@
 // 思想: 現サイトを批判しない。「現在の魅力を活かしながら、スマホでより分かりやすく整理した案」として提案する。
 
 import { INDUSTRIES, type IndustryKey } from "./types";
+import { getTemplate, vocabOf } from "./templates";
 
 export interface DocInput {
   name: string; // 院名
@@ -20,9 +21,11 @@ export interface DocInput {
 }
 
 const yen = (n: number) => n.toLocaleString("ja-JP") + "円";
-const label = (k: IndustryKey) => INDUSTRIES[k] ?? "医院";
+const label = (k: IndustryKey) => INDUSTRIES[k] ?? "事業所";
 const isVet = (k: IndustryKey) => k === "vet";
-const visitors = (k: IndustryKey) => (isVet(k) ? "飼い主さま" : "患者さま");
+// 語彙は業種テンプレートから引く。美容室・飲食に「院長先生」「診療時間」と書いた提案書を出さないため（#110）
+const vb = (k: IndustryKey) => vocabOf(getTemplate(k));
+const visitors = (k: IndustryKey) => (isVet(k) ? "飼い主さま" : vb(k).patients);
 
 export function buildProposal(d: DocInput): { title: string; content: string } {
   const v = visitors(d.industry);
@@ -38,18 +41,18 @@ ${d.goodPoints || `${label(d.industry)}としての情報がきちんと掲載�
 
 ## 2. ${v}目線で、もう一歩分かりやすくできる点
 
-${d.improvePoints || `- スマートフォンでの診療時間・予約方法の見つけやすさ\n- 初めての方向けの案内（持ち物・流れ）\n- 電話・予約への導線`}
+${d.improvePoints || `- スマートフォンでの${vb(d.industry).hours}・予約方法の見つけやすさ\n- 初めての方向けの案内（持ち物・流れ）\n- 電話・予約への導線`}
 
 ## 3. 今回作成したデモの内容
 
-現在の情報と${d.name}さまの魅力を活かしたまま、スマートフォンで「診療時間・予約・アクセス」がすぐ分かる構成に整理した案です。
+現在の情報と${d.name}さまの魅力を活かしたまま、スマートフォンで「${vb(d.industry).hours}・予約・アクセス」がすぐ分かる構成に整理した案です。
 
 ${d.demoUrl ? `**デモURL**: ${d.demoUrl}\n（非公開・検索対象外。スマートフォンでもご覧いただけます）` : "（デモURLは共有時に記載）"}
 
 ## 4. 改善後に期待できること
 
-- ${v}が迷わず予約・来院できる（電話・予約導線の明確化）
-- スマートフォンからの新規${isVet(d.industry) ? "来院" : "受診"}のしやすさ向上
+- ${v}が迷わず予約・${vb(d.industry).visit}できる（電話・予約導線の明確化）
+- スマートフォンからの新規${isVet(d.industry) ? "来院" : vb(d.industry).visit}のしやすさ向上
 - お知らせ更新が簡単になり、情報が新しく保てる
 - 採用募集の受け皿ができる
 
@@ -76,7 +79,7 @@ ${d.demoUrl ? `**デモURL**: ${d.demoUrl}\n（非公開・検索対象外。ス
 
 export function buildPhoneTalk(d: DocInput): { title: string; content: string } {
   const v = visitors(d.industry);
-  const target = isVet(d.industry) ? "院長先生" : "院長先生（またはホームページのご担当者さま）";
+  const target = `${vb(d.industry).ownerHonorific}（またはホームページのご担当者さま）`;
   return {
     title: `${d.name}さま 電話営業トーク（目的: 10分の面談獲得）`,
     content: `# 電話トーク — ${d.name}さま
@@ -90,17 +93,17 @@ export function buildPhoneTalk(d: DocInput): { title: string; content: string } 
 売り込みというより、**必要かどうかを画面を見てご判断いただきたく**ご連絡しました。
 ${target}に、お取り次ぎいただくことは可能でしょうか？」
 
-## 取り次いでもらえた場合（院長・担当者へ）
+## 取り次いでもらえた場合（${vb(d.industry).owner}・担当者へ）
 
 「${d.name}さま専用のホームページ案を、勝手ながら先にお作りしました。
 ${d.goodPoints ? `現在のホームページの${d.goodPoints.split("\n")[0].replace(/^[-・]\s*/, "")}はそのまま活かした上で、` : "現在の情報や貴院の雰囲気はそのまま活かした上で、"}
-スマートフォンで${v}が診療時間や予約方法をすぐ見つけられる形に整理した案です。
+スマートフォンで${v}が${vb(d.industry).hours}や予約方法をすぐ見つけられる形に整理した案です。
 **10分だけ**実物をご覧いただけないでしょうか。見ていただいて不要であれば、それで終わりで構いません。」
 
 ## 受付で断られた場合
 
 「承知しました。それでは、デモ画面のURLと1枚のご案内だけお渡し（お送り）してもよろしいでしょうか。
-院長先生のお手すきの際に、1分だけ見ていただければ十分です。」
+${vb(d.industry).ownerHonorific}のお手すきの際に、1分だけ見ていただければ十分です。」
 
 ## 折り返しをお願いする場合
 
@@ -123,15 +126,15 @@ export function buildVisitTalk(d: DocInput): { title: string; content: string } 
 ## 進行（この順番を守る）
 
 1. **現在サイトの良い点から入る**
-   「${d.goodPoints || "（分析後に具体化。例: 診療方針が丁寧に書かれている、など）"}」
+   「${d.goodPoints || "（分析後に具体化。例: 方針が丁寧に書かれている、など）"}」
 2. **${v}が迷いやすい部分を、批判せずに共有**
-   「スマホで見たとき、${d.improvePoints ? d.improvePoints.split("\n")[0].replace(/^[-・]\s*/, "") : "診療時間と予約方法にたどり着くまでに数タップかかる"}ことがあり、もったいないと感じました」
+   「スマホで見たとき、${d.improvePoints ? d.improvePoints.split("\n")[0].replace(/^[-・]\s*/, "") : `${vb(d.industry).hours}と予約方法にたどり着くまでに数タップかかる`}ことがあり、もったいないと感じました」
 3. **デモサイトの提示（PC→そのままスマホ）**
    「そこで、貴院の魅力を活かしたままこういう形にした案をお持ちしました」
    ${d.demoUrl ? `→ その場でスマホで開く: ${d.demoUrl}` : "→ タブレット・スマホで提示"}
-4. **スマートフォン比較** — 現サイトとデモを並べて、ファーストビュー・診療時間・電話ボタンの違いを見せる
+4. **スマートフォン比較** — 現サイトとデモを並べて、ファーストビュー・${vb(d.industry).hours}・電話ボタンの違いを見せる
 5. **予約導線の違い** — 「${v}は最短2タップで電話できます」
-6. **院長の感想を聞く**（ここで一度黙る）
+6. **${vb(d.industry).owner}の感想を聞く**（ここで一度黙る）
 7. **修正希望を聞く** — 「色・構成・載せたい内容、その場で承ります」→ GENESISに入力
 8. **料金提示** — ${d.planName}: 初期${yen(d.buildPrice)}＋月額${yen(d.monthlyFee)}（税別）
 9. **次のステップ** — 「修正版のデモと正式なお見積りを、◯日までにお送りします」
@@ -165,7 +168,7 @@ ${d.name}
 ${d.demoUrl ? `▼ デモサイト（非公開URL・検索には載りません）\n${d.demoUrl}\n※スマートフォンでもご覧いただけます` : "（デモURL）"}
 
 現在のホームページの情報と貴院の雰囲気はそのまま活かし、
-スマートフォンで${v}が「診療時間・予約方法・アクセス」を
+スマートフォンで${v}が「${vb(d.industry).hours}・予約方法・アクセス」を
 すぐに見つけられる形に整理した案です。
 
 売り込みのご連絡ではございません。

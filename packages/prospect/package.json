@@ -1,0 +1,19 @@
+{
+  "name": "@yozan/prospect",
+  "version": "0.1.0",
+  "private": true,
+  "description": "営業先の自動ピックアップとWeb現況スコア（prs_* / migration 0098 / DECISIONS #110）。TSソースのまま提供 — 利用側next.config.tsで transpilePackages: ['@yozan/prospect'] を指定",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./audit": "./src/audit.ts",
+    "./http": "./src/http.ts",
+    "./robots": "./src/robots.ts",
+    "./dedupe": "./src/dedupe.ts",
+    "./parse": "./src/parse.ts",
+    "./sources": "./src/sources/index.ts",
+    "./server": "./src/server.ts"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.50.0"
+  }
+}

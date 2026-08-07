@@ -8,7 +8,7 @@ import { cardCls, inputCls, btnCls } from "@/components/ui";
 import { ColorField, GalleryField, ImageField } from "@/components/demo-media";
 import { QuoteBuilder, type OptionRow, type PlanRow } from "@/components/quote-builder";
 import { createQuote, setQuoteStatus } from "@/app/quote-actions";
-import { INDUSTRIES, STATUSES, LOST_REASONS, HERO_STYLES, type IndustryKey, type StatusKey } from "@/lib/types";
+import { ANALYSIS_ITEMS, INDUSTRIES, STATUSES, LOST_REASONS, HERO_STYLES, type AnalysisItemKey, type IndustryKey, type StatusKey } from "@/lib/types";
 import { getTemplate } from "@/lib/templates";
 import { addActivity, generateDemo, generateDocs, setDemoAccess, transferToProject, updateProspect } from "@/app/actions";
 
@@ -145,6 +145,34 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
             </div>
           </form>
         </section>
+
+        {/* 自動計測の内訳（@yozan/prospect #110）。人が上書きした所見と混ざらないよう、観測値は読み取り専用で出す */}
+        {p.audited_at ? (
+          <section className={cardCls}>
+            <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-semibold">自動計測の内訳</h2>
+              <span className="text-xs text-(--color-dim)">
+                計測 {new Date(p.audited_at as string).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                {p.auto_demo_at ? " ／ デモは自動生成" : ""}
+              </span>
+            </div>
+            <div className="grid gap-1 text-xs sm:grid-cols-2">
+              {Object.entries(((p.analysis as { items?: Record<string, { score?: number; note?: string }> })?.items ?? {})).map(([k, v]) => (
+                <div key={k} className="flex items-baseline gap-2 border-b border-(--color-line) py-1">
+                  <span className="w-8 shrink-0 font-mono" title={`${v.score ?? "—"} / 5`}>
+                    {"●".repeat(Math.max(0, Math.min(5, v.score ?? 0)))}
+                    <span className="opacity-25">{"●".repeat(5 - Math.max(0, Math.min(5, v.score ?? 0)))}</span>
+                  </span>
+                  <span className="w-32 shrink-0 text-(--color-dim)">{ANALYSIS_ITEMS[k as AnalysisItemKey] ?? k}</span>
+                  <span className="opacity-80">{v.note}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-(--color-dim)">
+              機械が見た観測値です。下の「分析・営業スコア」で上書きすると、そちらが正になります（次回の自動計測では戻りません）。
+            </p>
+          </section>
+        ) : null}
 
         {/* 分析・営業スコア */}
         <section className={cardCls}>

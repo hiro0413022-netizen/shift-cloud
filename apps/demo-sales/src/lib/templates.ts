@@ -4,17 +4,48 @@
 
 import type { DemoBrief, IndustryKey } from "./types";
 
+/**
+ * 業種ごとの語彙。医療系（既定値）以外の業種を足したときに、
+ * 「院長あいさつ」「ご来院の流れ」がそのまま美容室のデモに出るのを防ぐための層（#110）。
+ * 省略した項目は MEDICAL_VOCAB の値になるので、既存の医療系テンプレートは触らなくてよい。
+ */
+export interface IndustryVocab {
+  services: string; // 「診療案内」「施術案内」「メニュー・料金」
+  hours: string; // 「診療時間」「営業時間」
+  firstVisit: string; // 「初めての方へ」
+  patients: string; // 「患者さま」「飼い主さま」「お客さま」
+  owner?: string; // 肩書き「院長」「オーナー」「店長」
+  ownerHonorific?: string; // 呼びかけ「院長先生」「オーナーさま」
+  visit?: string; // 「受診」「ご来店」
+  visitFlow?: string; // 「ご来院の流れ」「ご来店の流れ」
+  about?: string; // ページ見出し「院長あいさつ・院内紹介」
+  aboutShort?: string; // ナビ「院長・院内紹介」
+  careWord?: string; // 「診療」「施術」「サービス」
+  place?: string; // 「医院」「店舗」
+}
+
+const MEDICAL_VOCAB = {
+  owner: "院長",
+  ownerHonorific: "院長先生",
+  visit: "受診",
+  visitFlow: "ご来院の流れ",
+  about: "院長あいさつ・院内紹介",
+  aboutShort: "院長・院内紹介",
+  careWord: "診療",
+  place: "医院",
+} as const;
+
+/** 語彙を既定値で埋めて返す。render-demo / sales-docs はこれ経由で文言を作る */
+export function vocabOf(t: IndustryTemplate): Required<IndustryVocab> {
+  return { ...MEDICAL_VOCAB, ...t.vocab };
+}
+
 export interface IndustryTemplate {
   key: IndustryKey;
   label: string;
   palette: { primary: string; dark: string; soft: string; accent: string };
   heroEmoji: string;
-  vocab: {
-    services: string; // 「診療案内」「施術案内」等
-    hours: string; // 「診療時間」「受付時間」
-    firstVisit: string; // 「初めての方へ」等
-    patients: string; // 「患者さま」「飼い主さま」
-  };
+  vocab: IndustryVocab;
   defaults: Required<
     Pick<DemoBrief, "tagline" | "intro" | "services" | "strengths" | "firstVisit" | "hoursRows" | "hoursNote" | "reserveNote">
   >;
@@ -244,6 +275,110 @@ export const TEMPLATES: Record<IndustryKey, IndustryTemplate> = {
       reserveNote: "予約優先制。お電話またはLINEからどうぞ（※仮）。",
     },
   },
+  // ---- 非医療の業種（#110）。医療広告ガイドラインの縛りが無いので、
+  //      「お客さまの声」「施術前後」「価格」を前面に出せる＝医療系とは構成の勝ち筋が違う。
+  salon: {
+    key: "salon",
+    label: "美容室・理容室",
+    palette: { primary: "#2f2f33", dark: "#151517", soft: "#f4f2ef", accent: "#c8a96a" },
+    heroEmoji: "✂️",
+    vocab: {
+      services: "メニュー・料金",
+      hours: "営業時間",
+      firstVisit: "はじめてのお客さまへ",
+      patients: "お客さま",
+      owner: "オーナー",
+      ownerHonorific: "オーナーさま",
+      visit: "ご来店",
+      visitFlow: "ご来店の流れ",
+      about: "スタッフ紹介・店内のご案内",
+      aboutShort: "スタッフ・店内",
+      careWord: "施術",
+      place: "店舗",
+    },
+    defaults: {
+      tagline: "髪が決まると、\n一日の気分が変わる。",
+      intro: "カウンセリングを大切に、髪質・骨格・普段のスタイリングに合わせたご提案をしています。ご自宅で再現できる仕上がりを目指します。（※仮文章）",
+      services: [
+        { name: "カット", desc: "骨格と髪質を見ながら、乾かすだけで決まる形に整えます。（※仮価格）" },
+        { name: "カラー", desc: "白髪ぼかし・透明感カラー・ブリーチまで対応します。（※仮価格）" },
+        { name: "縮毛矯正・パーマ", desc: "髪の状態を見て薬剤を選び、ダメージを抑えて仕上げます。（※仮価格）" },
+      ],
+      strengths: ["カウンセリングに時間をかける", "再現しやすいスタイル提案", "土日も営業（※仮）"],
+      firstVisit: ["ご予約時になりたいイメージの写真があるとスムーズです", "カウンセリング込みで少し長めにお時間をいただきます", "駐車場のご利用案内（※仮）"],
+      hoursRows: [WEEK_HEAD, ["9:00〜19:00", "休", "●", "●", "●", "●", "●", "●"]],
+      hoursNote: "※定休日：月曜／最終受付は営業終了の1時間前（※仮）",
+      reserveNote: "Web予約・LINE・お電話からご予約いただけます。",
+    },
+  },
+  esthe: {
+    key: "esthe",
+    label: "エステ・ネイル・リラクゼーション",
+    palette: { primary: "#a9748a", dark: "#82576a", soft: "#faf2f5", accent: "#e0b9c8" },
+    heroEmoji: "🌸",
+    vocab: {
+      services: "メニュー・料金",
+      hours: "営業時間",
+      firstVisit: "はじめてのお客さまへ",
+      patients: "お客さま",
+      owner: "オーナー",
+      ownerHonorific: "オーナーさま",
+      visit: "ご来店",
+      visitFlow: "ご来店の流れ",
+      about: "サロン紹介・スタッフ",
+      aboutShort: "サロン紹介",
+      careWord: "施術",
+      place: "サロン",
+    },
+    defaults: {
+      tagline: "整える時間が、\n自分を取り戻す時間に。",
+      intro: "お一人おひとりの状態を伺いながら、無理のないペースでご提案しています。強引な勧誘は行いません。（※仮文章）",
+      services: [
+        { name: "フェイシャル", desc: "肌の状態に合わせたコースをご提案します。（※仮価格）" },
+        { name: "ボディ・リラクゼーション", desc: "凝りやむくみに合わせた施術を行います。（※仮価格）" },
+        { name: "ネイル", desc: "デザイン・ケアのご相談を承ります。（※仮価格）" },
+      ],
+      strengths: ["完全予約制のプライベート空間（※仮）", "料金がわかりやすい", "初回カウンセリング無料（※仮）"],
+      firstVisit: ["初回はカウンセリングを含めて少し長めにお時間をいただきます", "当日はお化粧を落とすスペースをご用意しています", "施術内容・料金は事前にご説明します"],
+      hoursRows: [WEEK_HEAD, ["10:00〜20:00", "●", "●", "休", "●", "●", "●", "●"]],
+      hoursNote: "※完全予約制／定休日：水曜（※仮）",
+      reserveNote: "Web予約・LINEからのご予約が便利です。",
+    },
+  },
+  restaurant: {
+    key: "restaurant",
+    label: "飲食店",
+    palette: { primary: "#8c3b2e", dark: "#6a2b21", soft: "#faf3f0", accent: "#d0805f" },
+    heroEmoji: "🍽",
+    vocab: {
+      services: "お品書き",
+      hours: "営業時間",
+      firstVisit: "ご来店のご案内",
+      patients: "お客さま",
+      owner: "店主",
+      ownerHonorific: "店主さま",
+      visit: "ご来店",
+      visitFlow: "ご来店の流れ",
+      about: "お店について",
+      aboutShort: "お店について",
+      careWord: "お料理",
+      place: "お店",
+    },
+    defaults: {
+      tagline: "今日は、\nすこし良い時間を。",
+      intro: "季節の食材を中心に、その日いちばんのものをお出ししています。少人数から宴会まで承ります。（※仮文章）",
+      services: [
+        { name: "ランチ", desc: "日替わりを中心にご用意しています。（※仮価格）" },
+        { name: "ディナー・コース", desc: "季節のコースを2種類ご用意（※仮価格）。" },
+        { name: "ご宴会・貸切", desc: "人数・ご予算に合わせてご相談ください。（※仮）" },
+      ],
+      strengths: ["季節の食材にこだわる", "個室あり（※仮）", "駅から徒歩圏（※仮）"],
+      firstVisit: ["ご予約なしでもご来店いただけます（満席の場合はご容赦ください）", "アレルギー・苦手な食材は事前にお知らせください", "お子さま連れも歓迎です（※仮）"],
+      hoursRows: [WEEK_HEAD, ["11:30〜14:00", "休", "●", "●", "●", "●", "●", "●"], ["17:30〜22:00", "休", "●", "●", "●", "●", "●", "休"]],
+      hoursNote: "※定休日：月曜／ラストオーダーは閉店の30分前（※仮）",
+      reserveNote: "お電話またはWebからご予約ください。当日のご予約もお受けしています。",
+    },
+  },
   other: {
     key: "other",
     label: "その他",
@@ -283,6 +418,9 @@ export const SYMPTOMS: Record<IndustryKey, string[]> = {
   beauty: ["シミ・くすみが気になる", "ムダ毛の自己処理をやめたい", "ニキビ跡・毛穴の悩み", "エイジングケアを始めたい"],
   vet: ["食欲がない・元気がない", "皮膚をかゆがる・毛が抜ける", "ワクチン・予防の相談", "歳をとってきたので健診したい"],
   judo: ["ぎっくり腰・寝違え", "スポーツでのケガ", "慢性的な肩こり・腰痛", "交通事故後の痛み"],
+  salon: ["朝のスタイリングが決まらない", "白髪が気になり始めた", "髪のダメージ・広がり", "似合う髪型がわからない"],
+  esthe: ["肌の乾燥・くすみが気になる", "脚のむくみ・体の疲れ", "自分の時間がとれていない", "続けやすいコースを知りたい"],
+  restaurant: ["記念日の食事をしたい", "接待・会食のお店を探している", "少人数の宴会を予約したい", "子ども連れでも入れるお店を探している"],
   other: ["お悩み例1（※仮）", "お悩み例2（※仮）", "お悩み例3（※仮）", "お悩み例4（※仮）"],
 };
 
@@ -298,5 +436,8 @@ export const EXTRA_FAQ: Record<IndustryKey, { q: string; a: string }[]> = {
   beauty: [{ q: "カウンセリングだけでも大丈夫ですか？", a: "もちろんです。無理な勧誘は行いません。（※仮）" }],
   vet: [{ q: "対応している動物の種類は？", a: "犬・猫を中心に診療しています。その他の動物はお電話でご確認ください。（※仮）" }],
   judo: [{ q: "健康保険は使えますか？", a: "急性のケガ（捻挫・打撲など）は保険適用です。症状により異なるためご相談ください。（※仮）" }],
+  salon: [{ q: "指名は必要ですか？", a: "ご指名なしでもご予約いただけます。ご希望があればお申し付けください。（※仮）" }],
+  esthe: [{ q: "勧誘はありますか？", a: "無理な勧誘は行いません。ご希望のときだけご提案します。（※仮）" }],
+  restaurant: [{ q: "個室はありますか？", a: "ご用意しています。人数によりお受けできない場合がありますのでお早めにご相談ください。（※仮）" }],
   other: [{ q: "よくある質問（※仮）", a: "回答を掲載します。（※仮）" }],
 };

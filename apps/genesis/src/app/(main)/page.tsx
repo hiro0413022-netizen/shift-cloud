@@ -189,6 +189,11 @@ export default async function HomePage() {
                     )}
                   </div>
                 )}
+                {f.source === "prospect" && f.href && (
+                  <a href={f.href} target="_blank" rel="noreferrer" className="btn-main">
+                    デモを確認する →
+                  </a>
+                )}
                 {f.source === "reserve" && f.href && (
                   <a href={f.href} target="_blank" rel="noreferrer" className="btn-sub">
                     開いて対応 →

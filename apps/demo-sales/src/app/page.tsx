@@ -88,6 +88,7 @@ export default async function HomePage() {
           <p className="mt-1 text-sm text-(--color-dim)">営業先専用デモの高速生成 → 完成イメージを見せて営業する</p>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/sources" className="text-sm text-(--color-accent) hover:underline">営業先の自動ピックアップ</Link>
           <Link href="/settings" className="text-sm text-(--color-accent) hover:underline">料金・見積の設定</Link>
           <form action="/api/logout" method="post">
             <button className="text-sm text-(--color-dim) hover:text-(--color-txt)">{actor.name} — ログアウト</button>

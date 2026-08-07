@@ -376,6 +376,18 @@ export const NODES: SystemNode[] = [
     ix: 1080,
     iy: 760,
   },
+  {
+    id: "ext-places",
+    name: "Google Places API",
+    kind: "external",
+    status: "external",
+    description:
+      "営業先の自動ピックアップ（@yozan/prospect #110）の取得元②。エリア×業種で店舗を検索し、屋号・住所・電話・サイトURLを取得する。従量課金のため prs_sources.max_per_run で上限をかける。GOOGLE_PLACES_API_KEY 未設定のあいだは自動でskipされ、公開名簿（ext-web）の巡回だけが動く。",
+    flow: "demo-sales.svg",
+    aliases: ["places", "google places", "googleマップ"],
+    ix: 700,
+    iy: 1000,
+  },
 ];
 
 export const EDGES: SystemEdge[] = [
@@ -410,8 +422,11 @@ export const EDGES: SystemEdge[] = [
   { from: "lesson-os", to: "supabase", label: "lsn_", type: "data" },
   { from: "golfwing", to: "supabase", label: "D1→移行中", type: "data" },
   { from: "sales-os", to: "supabase", label: "sales_os（同居）", type: "data" },
-  { from: "demo-sales", to: "supabase", label: "dms_", type: "data" },
-  { from: "ext-web", to: "demo-sales", label: "営業先の現サイト分析", type: "external" },
+  { from: "demo-sales", to: "supabase", label: "dms_ / prs_", type: "data" },
+  // 営業先の自動ピックアップ（#110）: cronが毎朝、公開名簿を巡回して拾い、現サイトを採点する
+  { from: "ext-web", to: "demo-sales", label: "公開名簿の巡回＋現サイト分析（prs_・毎朝5時）", type: "auto" },
+  { from: "ext-places", to: "demo-sales", label: "エリア×業種の店舗検索（キー設定時のみ）", type: "auto" },
+  { from: "demo-sales", to: "genesis", label: "自動生成デモ→判断フィード「送るか」", type: "approval" },
   { from: "demo-sales", to: "genesis", label: "営業指示 directive / 正式制作移行", type: "approval" },
 
   { from: "supabase", to: "kernel", label: "実データ", type: "kpi" },

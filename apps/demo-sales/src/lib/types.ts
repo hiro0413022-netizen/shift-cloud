@@ -11,6 +11,11 @@ export const INDUSTRIES = {
   beauty: "美容クリニック",
   vet: "動物病院",
   judo: "接骨院・整骨院",
+  // 非医療の業種（#110 で追加）。医療広告ガイドラインの規制対象外なので、
+  // お客さまの声・施術前後の写真・価格の打ち出しが使える＝デモの見せ方が変わる。
+  salon: "美容室・理容室",
+  esthe: "エステ・ネイル・リラクゼーション",
+  restaurant: "飲食店",
   other: "その他",
 } as const;
 export type IndustryKey = keyof typeof INDUSTRIES;

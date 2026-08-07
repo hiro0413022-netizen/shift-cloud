@@ -1,14 +1,14 @@
 // デモサイトレンダラー v2 — DemoBrief＋業種テンプレート → 複数ページ構成の単一ファイルHTML。
 // 方針:
-//  - 単一HTMLのままハッシュルーティングで6ページ（ホーム/診療案内/初めての方へ/院長・院内紹介/アクセス/Web予約）。
+//  - 単一HTMLのままハッシュルーティングで6ページ（ホーム/案内/初めての方へ/紹介/アクセス/Web予約）。見出しは業種語彙(vocabOf)で切り替える。
 //    DB(dms_demos.html)・配信(/d/[token])・version管理は従来のまま
-//  - 写真は「院から提供された写真・フリー素材」のみ。未設定箇所は sample-art.ts のSVGイラスト（※仮画像ラベル入り）で成立
+//  - 写真は「先方から提供された写真・フリー素材」のみ。未設定箇所は sample-art.ts のSVGイラスト（※仮画像ラベル入り）で成立
 //  - Web予約はデモ動作のみ: カレンダー→時間枠→入力→確認→完了。どこにも送信・保存しない
 //  - アニメーション: スクロール連動のフェード/スライドイン・ヘッダー縮小・ページ遷移フェード。prefers-reduced-motion対応
 //  - noindex/nofollow・DEMOリボン・※仮ラベルは従来どおり
 //  - 埋め込みJSはテンプレートリテラル内のため、バッククォートと ${ を使わない（文字列連結で書く）
 
-import { getTemplate, SYMPTOMS, EXTRA_FAQ } from "./templates";
+import { getTemplate, vocabOf, SYMPTOMS, EXTRA_FAQ } from "./templates";
 import { sampleHero, samplePortrait, sampleMap, sampleGallery } from "./sample-art";
 import type { DemoBrief } from "./types";
 
@@ -18,6 +18,8 @@ const nl2br = (s: string) => esc(s).replace(/\n/g, "<br>");
 
 export function renderDemo(brief: DemoBrief): string {
   const t = getTemplate(brief.industry);
+  // 語彙は必ず vocabOf 経由で取る。業種を足したときに「院長あいさつ」が美容室のデモに出るのを防ぐ（#110）
+  const vb = vocabOf(t);
   const d = t.defaults;
   const primary = brief.colorPrimary || t.palette.primary;
   const palette = { ...t.palette, primary };
@@ -58,14 +60,14 @@ export function renderDemo(brief: DemoBrief): string {
   const dImg = safeImg(brief.directorImage) || samplePortrait(palette);
   const realGallery = (brief.gallery ?? []).filter((g) => safeImg(g.url)).slice(0, 6);
   const gallery = realGallery.length
-    ? realGallery.map((g) => ({ url: safeImg(g.url), caption: g.caption ?? "院内の様子" }))
+    ? realGallery.map((g) => ({ url: safeImg(g.url), caption: g.caption ?? `${vb.place}の様子` }))
     : sampleGallery(palette, t.heroEmoji);
   const mapImg = sampleMap(palette);
 
   // ---- FAQ（共通＋業種別） ----
   const faq: { q: string; a: string }[] = [
     { q: "予約は必要ですか？", a: reserveNote },
-    { q: "初めての受診で必要なものは？", a: firstVisit[0] ?? "保険証をお持ちください。（※仮）" },
+    { q: `初めての${vb.visit}で必要なものは？`, a: firstVisit[0] ?? "ご持参いただくものを掲載します。（※仮）" },
     { q: "駐車場はありますか？", a: brief.parking || "駐車場のご案内を掲載します。（※仮）" },
     ...(EXTRA_FAQ[t.key] ?? []),
     { q: "クレジットカードは使えますか？", a: "お支払い方法の対応状況を掲載します。（※仮）" },
@@ -149,17 +151,17 @@ export function renderDemo(brief: DemoBrief): string {
         )
         .join("")}
     </div>
-    <div class="more rv"><a class="btn btn-line" href="#/about">院長あいさつ・院内紹介を見る →</a></div>
+    <div class="more rv"><a class="btn btn-line" href="#/about">${esc(vb.about)}を見る →</a></div>
   </section>
 
   <section class="wide soft"><div class="inn">
     <div class="teaser rv">
-      <img class="tsr-img" src="${dImg}" alt="${esc(brief.directorName || "院長")}">
+      <img class="tsr-img" src="${dImg}" alt="${esc(brief.directorName || vb.owner)}">
       <div>
         <h2 style="text-align:left">ごあいさつ</h2>
-        <p class="nm">${esc(brief.directorTitle || "院長")}　${esc(brief.directorName || "（お名前を掲載します ※仮）")}</p>
+        <p class="nm">${esc(brief.directorTitle || vb.owner)}　${esc(brief.directorName || "（お名前を掲載します ※仮）")}</p>
         <p class="tsr-txt">${nl2br(
-          (brief.directorMessage || `${t.vocab.patients}に安心して通っていただける場所であるために、一つひとつの診療を丁寧に。スタッフ一同、心を込めて対応いたします。（※仮文章）`).slice(0, 90)
+          (brief.directorMessage || `${vb.patients}に安心してお越しいただける場所であるために、一つひとつの${vb.careWord}を丁寧に。スタッフ一同、心を込めて対応いたします。（※仮文章）`).slice(0, 90)
         )}…</p>
         <a class="btn btn-line" href="#/about">全文を読む →</a>
       </div>
@@ -186,7 +188,7 @@ export function renderDemo(brief: DemoBrief): string {
   <section>${ctaBand}</section>
 </div>`;
 
-  // ==== ページ: 診療案内 ====
+  // ==== ページ: 案内（診療案内 / メニュー） ====
   const pgServices = `
 <div class="page" data-pg="services">
   <div class="phero"><h1>${esc(t.vocab.services)}</h1><p>Services</p></div>
@@ -224,7 +226,7 @@ export function renderDemo(brief: DemoBrief): string {
 <div class="page" data-pg="first">
   <div class="phero"><h1>${esc(t.vocab.firstVisit)}</h1><p>First Visit</p></div>
   <section>
-    <h2 class="rv">ご来院の流れ・お持ちいただくもの</h2><span class="h2sub rv">Flow</span>
+    <h2 class="rv">${esc(vb.visitFlow)}・お持ちいただくもの</h2><span class="h2sub rv">Flow</span>
     <ol class="flow">
       ${firstVisit.map((f, i) => `<li class="rv" style="transition-delay:${i * 0.08}s">${esc(f)}</li>`).join("")}
     </ol>
@@ -246,17 +248,17 @@ export function renderDemo(brief: DemoBrief): string {
   <section>${ctaBand}</section>
 </div>`;
 
-  // ==== ページ: 院長・院内紹介 ====
+  // ==== ページ: 紹介（院長あいさつ / スタッフ・店舗紹介） ====
   const pgAbout = `
 <div class="page" data-pg="about">
-  <div class="phero"><h1>院長あいさつ・院内紹介</h1><p>About</p></div>
+  <div class="phero"><h1>${esc(vb.about)}</h1><p>About</p></div>
   <section>
     <div class="director rv">
-      <div class="d-photo"><img src="${dImg}" alt="${esc(brief.directorName || "院長")}"></div>
+      <div class="d-photo"><img src="${dImg}" alt="${esc(brief.directorName || vb.owner)}"></div>
       <div>
         <h3>ごあいさつ</h3>
-        <p class="nm">${esc(brief.directorTitle || "院長")}　${esc(brief.directorName || "（お名前を掲載します ※仮）")}</p>
-        <p style="font-size:15px">${nl2br(brief.directorMessage || `${t.vocab.patients}に安心して通っていただける場所であるために、一つひとつの診療を丁寧に。スタッフ一同、心を込めて対応いたします。（※仮文章 — 院長先生のお考えを伺って作成します）`)}</p>
+        <p class="nm">${esc(brief.directorTitle || vb.owner)}　${esc(brief.directorName || "（お名前を掲載します ※仮）")}</p>
+        <p style="font-size:15px">${nl2br(brief.directorMessage || `${vb.patients}に安心してお越しいただける場所であるために、一つひとつの${vb.careWord}を丁寧に。スタッフ一同、心を込めて対応いたします。（※仮文章 — ${vb.ownerHonorific}のお考えを伺って作成します）`)}</p>
       </div>
     </div>
   </section>
@@ -340,7 +342,7 @@ export function renderDemo(brief: DemoBrief): string {
       <div class="rb-head">ご予約情報の入力（<b id="form-when"></b>）</div>
       <div class="fld"><label>お名前 <span class="req">必須</span></label><input type="text" id="f-name" placeholder="山田 太郎"></div>
       <div class="fld"><label>お電話番号 <span class="req">必須</span></label><input type="tel" id="f-tel" placeholder="090-0000-0000"></div>
-      <div class="fld"><label>ご来院区分</label><select id="f-kind"><option>初めての受診</option><option>2回目以降の受診</option><option>相談のみ</option></select></div>
+      <div class="fld"><label>ご利用区分</label><select id="f-kind"><option>初めての${vb.visit}</option><option>2回目以降</option><option>相談のみ</option></select></div>
       <div class="fld"><label>ご相談内容（任意）</label><textarea id="f-note" rows="3" placeholder="症状やご希望があればご記入ください"></textarea></div>
       <p class="ferr hid" id="f-err">お名前とお電話番号を入力してください（デモのため実在の情報でなくて構いません）</p>
       <div class="cta">
@@ -379,7 +381,7 @@ export function renderDemo(brief: DemoBrief): string {
       <a href="#/home" data-nav="home">ホーム</a>
       <a href="#/services" data-nav="services">${esc(t.vocab.services)}</a>
       <a href="#/first" data-nav="first">${esc(t.vocab.firstVisit)}</a>
-      <a href="#/about" data-nav="about">院長・院内紹介</a>
+      <a href="#/about" data-nav="about">${esc(vb.aboutShort)}</a>
       <a href="#/access" data-nav="access">アクセス</a>`;
 
   return `<!doctype html>

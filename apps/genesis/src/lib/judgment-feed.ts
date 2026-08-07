@@ -17,7 +17,8 @@ export type JudgmentSource =
   | "trial" // mbr_trial_requests pending（member-os）
   | "join" // frunk_members pending（member-os Web入会）
   | "reserve" // res_requests pending（reserve-os）
-  | "hotlead"; // trk_links 初回開封・未対応（@yozan/track #95）
+  | "hotlead" // trk_links 初回開封・未対応（@yozan/track #95）
+  | "prospect"; // dms_prospects 自動生成デモが未送信（@yozan/prospect #110）
 
 export type JudgmentItem = {
   id: string;
@@ -145,7 +146,7 @@ function buildPlan(
 export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]> {
   const admin = createAdmin();
 
-  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes, hotRes, chRes, grpRes] = await Promise.all([
+  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes, hotRes, prospectRes, chRes, grpRes] = await Promise.all([
     admin
       .from("ai_action_queue")
       .select("id, title, action_type, status, created_at, scheduled_at, payload")
@@ -200,6 +201,17 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       .not("first_viewed_at", "is", null)
       .order("last_viewed_at", { ascending: false })
       .limit(10),
+    // 自動ピックアップがデモまで作った営業先。人が決めるのは「送るか」だけ（#110）
+    admin
+      .from("dms_prospects")
+      .select("id, name, industry, city, score, improve_points, auto_demo_at")
+      .eq("company_id", companyId)
+      .is("deleted_at", null)
+      .not("auto_demo_at", "is", null)
+      .eq("status", "demo_done")
+      .is("last_contact_on", null)
+      .order("score", { ascending: false })
+      .limit(5),
     // 実行プラン表示用: LINEチャネル名とスタッフグループ数
     admin.from("gn_line_channels").select("code, name").eq("company_id", companyId).eq("enabled", true),
     admin
@@ -318,6 +330,20 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       // last_viewed_at を時刻とする（開封からの経過＝鮮度）
       createdAt: s(r.last_viewed_at) ?? s(r.first_viewed_at),
       href: href ? `${app.base}${href}` : null,
+      scheduledAt: null,
+    });
+  }
+
+  for (const r of (prospectRes.data ?? []) as Row[]) {
+    const improve = s(r.improve_points)?.split("\n").filter(Boolean).slice(0, 2).join(" / ");
+    items.push({
+      id: String(r.id),
+      source: "prospect",
+      tag: "デモ完成",
+      title: `${s(r.name) ?? "営業先"}（Web現況スコア ${Number(r.score ?? 0)}点）のデモができました`,
+      detail: improve ? `見つかった改善余地: ${improve}` : "内容を確認して、送るかどうかを決めてください",
+      createdAt: s(r.auto_demo_at),
+      href: `${DEMO_SALES_URL}/p/${String(r.id)}`,
       scheduledAt: null,
     });
   }
