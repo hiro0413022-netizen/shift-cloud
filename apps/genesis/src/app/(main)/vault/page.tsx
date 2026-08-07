@@ -4,16 +4,9 @@ import { isVaultUnlocked } from "@/lib/vault";
 import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { UnlockForm, SecretCell } from "./vault-ui";
 import { saveSystem, deleteSystem, lockVault } from "./actions";
+import { VAULT_CATEGORIES, groupByCategory, normalizeCategory } from "@/lib/vault-categories";
 
 export const dynamic = "force-dynamic";
-
-const CATEGORIES: Record<string, string> = {
-  site: "サイト/アプリ",
-  dev: "開発",
-  mail: "メール/ドメイン",
-  saas: "SaaS",
-  other: "その他",
-};
 
 type VaultRow = {
   id: string;
@@ -32,7 +25,7 @@ function SystemForm({ row }: { row?: VaultRow }) {
       {row && <input type="hidden" name="id" value={row.id} />}
       <input name="name" placeholder="システム名 *" defaultValue={row?.name} className={inputCls} required />
       <select name="category" defaultValue={row?.category ?? "other"} className={inputCls}>
-        {Object.entries(CATEGORIES).map(([v, label]) => (
+        {Object.entries(VAULT_CATEGORIES).map(([v, label]) => (
           <option key={v} value={v}>{label}</option>
         ))}
       </select>
@@ -73,9 +66,8 @@ export default async function VaultPage() {
     .order("sort_order")
     .order("name");
   const rows = (data ?? []) as VaultRow[];
-  const grouped = Object.keys(CATEGORIES)
-    .map((cat) => ({ cat, items: rows.filter((r) => r.category === cat) }))
-    .filter((g) => g.items.length > 0);
+  // 未知のカテゴリでも必ずどこかに出す（分類漏れで台帳から消えるのを防ぐ・2026-08-07の実障害）
+  const grouped = groupByCategory(rows);
 
   return (
     <div className="flex flex-col gap-4 p-6">
@@ -86,19 +78,19 @@ export default async function VaultPage() {
         </form>
       </div>
       <p className="text-xs text-(--color-dim)">
-        全関連システムのURL・ログイン情報を一元管理。新しいシステムは下の「追加」フォームか、AIに依頼すれば自動で登録されます。
+        全関連システムのURL・ログイン情報を一元管理（{rows.length}件）。新しいシステムは下の「追加」フォームか、AIに依頼すれば自動で登録されます。
       </p>
 
       {grouped.length === 0 && <Empty>まだ登録がありません</Empty>}
 
-      {grouped.map(({ cat, items }) => (
-        <Panel key={cat} title={CATEGORIES[cat]}>
+      {grouped.map(({ cat, label, items }) => (
+        <Panel key={cat} title={label}>
           <div className="flex flex-col divide-y divide-(--color-line)">
             {items.map((row) => (
               <div key={row.id} className="flex flex-col gap-1 py-3">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="font-semibold">{row.name}</span>
-                  <Badge>{CATEGORIES[row.category] ?? row.category}</Badge>
+                  <Badge>{VAULT_CATEGORIES[normalizeCategory(row.category)]}</Badge>
                   {row.url && (
                     <a
                       href={row.url}
