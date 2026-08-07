@@ -173,6 +173,8 @@ export function auditPage(snap: PageSnapshot, opts: { psiScore?: number | null; 
       bytes: snap.bytes,
       psiScore: psi ?? null,
       generator: (html.match(/<meta[^>]+name=["']generator["'][^>]+content=["']([^"']+)/i) ?? [])[1] ?? null,
+      // ②outreach で使う。先方サイトに「公表されている」ことが送信の根拠なので、拾えた場合だけ持つ（推測はしない）
+      emails: extractEmails(html, snap.finalUrl),
     },
   };
 }
@@ -221,4 +223,47 @@ export function unreachableAudit(reason: string): WebAudit {
     noSolicit: false,
     raw: { reason },
   };
+}
+
+/**
+ * ページから「先方が公表しているメールアドレス」を拾う（純粋関数）。
+ *
+ * これは②outreach の**法的根拠そのもの**。特定電子メール法3条1項3号は
+ * 「自己の電子メールアドレスを公表している営業者」への送信を同意なしで認めるので、
+ * 「先方のサイト上に載っていた」という事実が取れないアドレスは使ってはいけない。
+ * 推測（info@ドメイン を組み立てる等）は絶対にしない。
+ *
+ * 優先順位: 同一ドメインのアドレス > その他。フォーム画像やダミーは除外する。
+ */
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+const EMAIL_NG =
+  /(example\.(com|org|net)|test\.|sentry\.io|wixpress|jimdo|\.png$|\.jpe?g$|\.gif$|\.svg$|\.webp$|@2x|no-?reply|do-?not-?reply)/i;
+
+export function extractEmails(html: string, pageUrl: string): string[] {
+  const host = (() => {
+    try {
+      return new URL(pageUrl).hostname.replace(/^www\./, "").toLowerCase();
+    } catch {
+      return "";
+    }
+  })();
+
+  const found = new Map<string, number>(); // email → 優先度（小さいほど先）
+  const add = (raw: string, base: number) => {
+    const e = raw.trim().toLowerCase().replace(/[.,;:)】」]+$/, "");
+    if (!e.includes("@") || EMAIL_NG.test(e)) return;
+    const dom = e.split("@")[1] ?? "";
+    // 同一ドメイン（またはそのサブドメイン）を最優先。無関係なドメインは後ろへ
+    const sameDomain = host && (dom === host || dom.endsWith("." + host) || host.endsWith("." + dom));
+    const score = base + (sameDomain ? 0 : 10);
+    if (!found.has(e) || found.get(e)! > score) found.set(e, score);
+  };
+
+  // mailto: は「連絡してよい」という明示なので最優先
+  for (const m of html.matchAll(/href=["']mailto:([^"'?]+)/gi)) add(decodeURIComponent(m[1]), 0);
+  // 本文中の表記
+  const text = stripTags(html);
+  for (const m of text.matchAll(EMAIL_RE)) add(m[0], 5);
+
+  return [...found.entries()].sort((a, b) => a[1] - b[1]).map(([e]) => e);
 }

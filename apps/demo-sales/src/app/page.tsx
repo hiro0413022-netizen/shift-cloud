@@ -89,6 +89,7 @@ export default async function HomePage() {
         </div>
         <div className="flex items-center gap-4">
           <Link href="/sources" className="text-sm text-(--color-accent) hover:underline">営業先の自動ピックアップ</Link>
+          <Link href="/outreach" className="text-sm text-(--color-accent) hover:underline">営業メールの送受信</Link>
           <Link href="/settings" className="text-sm text-(--color-accent) hover:underline">料金・見積の設定</Link>
           <form action="/api/logout" method="post">
             <button className="text-sm text-(--color-dim) hover:text-(--color-txt)">{actor.name} — ログアウト</button>

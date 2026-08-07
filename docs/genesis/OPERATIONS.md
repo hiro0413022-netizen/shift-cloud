@@ -353,3 +353,53 @@ Vercel は `CRON_SECRET` という名前の環境変数があると、cron実行
 | `PROSPECT_MAX_NEW` / `PROSPECT_MAX_AUDITS` / `PROSPECT_DEMO_SCORE_MIN` / `PROSPECT_MAX_DEMOS` | 既定値（30 / 25 / 55 / 3）で動く。拾う件数や自動デモの基準を変えたいときだけ設定 |
 
 ⚠ APIキー・シークレットの**入力欄への貼り付けはご本人が行ってください**（#103のルール。AIは入力しません）。
+
+## 12. 営業メールを送れるようにする（#111）
+
+②営業メール（`@yozan/outreach`）は **送信ドメインの認証が終わるまで動きません**（既定でOFF）。
+認証前に送ると迷惑メール判定され、`yozan-group.jp` 本体のメールまで届かなくなるためです。
+
+### 12-1. Resendのアカウントとドメイン認証（ユーザー作業・約20分＋DNS反映待ち）
+
+1. https://resend.com にログイン（未登録なら Sign up）
+2. **Domains → Add Domain** → `send.yozan-group.jp` を入力（**本体の yozan-group.jp ではありません**）
+3. 表示される **DNSレコード3種**（MX / TXT(SPF) / TXT(DKIM)）をメモ
+4. お名前.com のDNS設定（ドメイン Navi → DNS → DNSレコード設定）で、`yozan-group.jp` に上記を登録
+   - ホスト名は `send` や `resend._domainkey.send` のようにサブドメイン部分だけを入れます
+   - 既存の `yozan-group.jp` のMX（お名前レンタルサーバー）は**触らない**。触ると既存メールが止まります
+5. Resendの画面で **Verify** → すべて緑になれば完了（反映に数分〜数時間）
+6. **API Keys → Create API Key**（Sending access）→ 値をコピー
+
+### 12-2. Vercel（demo-sales）に登録
+
+§2の手順で以下を追加 → **Redeploy**。
+
+| Key | 値 |
+|---|---|
+| `RESEND_API_KEY` | 12-1 でコピーしたキー |
+| `RESEND_WEBHOOK_SECRET` | 12-3 で取得（後からで可） |
+
+### 12-3. 配信結果の通知（Webhook）
+
+1. Resend → **Webhooks → Add Webhook**
+2. Endpoint: `https://demo-sales-delta.vercel.app/api/webhooks/resend`
+3. Events: `email.sent` / `email.delivered` / `email.opened` / `email.bounced` / `email.complained`
+4. 表示される **Signing Secret**（`whsec_` で始まる）を `RESEND_WEBHOOK_SECRET` に登録 → Redeploy
+
+これが無いと「届いたか・迷惑報告されたか」が分からず、**自動停止も効きません**。
+
+### 12-4. 送信をONにする
+
+1. demo-sales → **営業メールの送受信**（`/outreach`）
+2. 「送らずに内容を確認」を押し、送信対象の件数と文面を確認
+3. 文面を必要なら編集（会社の住所・配信停止リンクは自動で付くので本文に書かない）
+4. 「自動送信を有効にする」にチェック → 保存
+
+以後、毎日10時（JST）に自動送信されます。初日10通・1日10通ずつ増え、上限で頭打ち。
+宛先不明が8%を超える、または迷惑メール報告が2件に達すると自動で停止し、画面に理由が出ます。
+
+### 12-5. 送受信の確認場所
+
+- **送った・届いた・開かれた**: `/outreach` の送信ログ
+- **先方からの返信**: info@yozan-group.jp（hiro0413022@gmail.com へ転送済み）→ Gmailで読む
+- **デモが開かれた**: Genesisホームの判断フィード（開封直後の架電がもっとも繋がります）

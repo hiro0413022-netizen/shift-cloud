@@ -169,7 +169,7 @@ export async function runProspectPickup(
   // ---------------------------------------------------------------
   const { data: toAudit } = await admin
     .from("dms_prospects")
-    .select("id,name,website_url,industry,phone,address")
+    .select("id,name,website_url,industry,phone,address,email")
     .eq("company_id", companyId)
     .is("deleted_at", null)
     .is("audited_at", null)
@@ -178,7 +178,7 @@ export async function runProspectPickup(
     .limit(o.maxAudits);
 
   const auditErrors: string[] = [];
-  for (const p of (toAudit ?? []) as { id: string; name: string; website_url: string; industry: string }[]) {
+  for (const p of (toAudit ?? []) as { id: string; name: string; website_url: string; industry: string; email: string | null }[]) {
     if (left() < 25_000) break;
     let result: WebAudit;
     try {
@@ -194,10 +194,25 @@ export async function runProspectPickup(
       auditErrors.push(`${p.name}: ${String(e).slice(0, 80)}`);
     }
 
+    // 先方サイトに公表されているメールアドレス。②outreach の送信根拠（特定電子メール法3条1項3号）なので、
+    // 「どのページで見つけたか」まで残す。推測アドレス（info@ドメインの組み立て等）は作らない。
+    // 既に入っているアドレス（人が入れたもの）は上書きしない
+    const emails = p.email ? [] : ((result.raw.emails as string[] | undefined) ?? []);
+    const emailPatch =
+      emails.length > 0
+        ? {
+            email: emails[0],
+            email_source: "site",
+            email_found_at: new Date().toISOString(),
+            email_page_url: String(result.raw.finalUrl ?? p.website_url),
+          }
+        : {};
+
     // analysis は「所見」。機械の観測は audit に置き、analysis.items は初期値として入れる（人が上書きできる）
     await admin
       .from("dms_prospects")
       .update({
+        ...emailPatch,
         analysis: {
           items: result.items,
           summary: result.ok

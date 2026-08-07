@@ -388,6 +388,18 @@ export const NODES: SystemNode[] = [
     ix: 700,
     iy: 1000,
   },
+  {
+    id: "ext-resend",
+    name: "Resend（メール送信）",
+    kind: "external",
+    status: "external",
+    description:
+      "営業メールの送信基盤（@yozan/outreach #111）。送信専用サブドメイン send.yozan-group.jp から送り、配信・開封・バウンス・苦情を Webhook で demo-sales に返す。返信は既存の info@yozan-group.jp（Gmail転送）で受ける。reserve-os の確定メールも同じResendを使う。",
+    flow: "demo-sales.svg",
+    aliases: ["resend", "メール送信"],
+    ix: 520,
+    iy: 1000,
+  },
 ];
 
 export const EDGES: SystemEdge[] = [
@@ -427,6 +439,9 @@ export const EDGES: SystemEdge[] = [
   { from: "ext-web", to: "demo-sales", label: "公開名簿の巡回＋現サイト分析（prs_・毎朝5時）", type: "auto" },
   { from: "ext-places", to: "demo-sales", label: "エリア×業種の店舗検索（キー設定時のみ）", type: "auto" },
   { from: "demo-sales", to: "genesis", label: "自動生成デモ→判断フィード「送るか」", type: "approval" },
+  // 営業メール（#111）: 毎日10時にcronが送り、配信結果はWebhookで戻る
+  { from: "demo-sales", to: "ext-resend", label: "営業メール自動送信（毎日10時・out_）", type: "auto" },
+  { from: "ext-resend", to: "demo-sales", label: "配信・開封・バウンス（Webhook）", type: "external" },
   { from: "demo-sales", to: "genesis", label: "営業指示 directive / 正式制作移行", type: "approval" },
 
   { from: "supabase", to: "kernel", label: "実データ", type: "kpi" },

@@ -1,0 +1,16 @@
+{
+  "name": "@yozan/outreach",
+  "version": "0.1.0",
+  "private": true,
+  "description": "営業メールの自動送信（out_* / migration 0099 / DECISIONS #111）。TSソースのまま提供 — 利用側next.config.tsで transpilePackages: ['@yozan/outreach'] を指定",
+  "exports": {
+    "./types": "./src/types.ts",
+    "./policy": "./src/policy.ts",
+    "./compose": "./src/compose.ts",
+    "./resend": "./src/resend.ts",
+    "./server": "./src/server.ts"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.50.0"
+  }
+}

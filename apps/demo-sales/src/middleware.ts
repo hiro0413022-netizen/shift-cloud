@@ -4,8 +4,10 @@ import { createAuthMiddleware } from "@yozan/core/middleware";
 //   /d          … 営業デモの非公開プレビュー配信（トークン検証は配信側で実施）
 //   /api/track  … 閲覧計測の受信（デモ内のビーコンから叩かれる。登録漏れは #90 の事故）
 //   /api/cron   … 営業先の自動ピックアップ（Vercel Cron。認証は Bearer CRON_SECRET で route 側が行う）
+//   /unsubscribe … 配信停止（先方がログインなしで押せなければ意味がない）
+//   /api/webhooks … Resendからの配信結果通知
 //   /login
-export const middleware = createAuthMiddleware({ publicPrefixes: ["/login", "/d", "/api/track", "/api/cron"] });
+export const middleware = createAuthMiddleware({ publicPrefixes: ["/login", "/d", "/api/track", "/api/cron", "/unsubscribe", "/api/webhooks"] });
 
 // Next.jsの静的解析のためmatcherはリテラル必須（@yozan/coreからのimport識別子は使えない）
 export const config = {
