@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { auditPage, detectNoSolicit, latestYear, salesScore, stripTags, unreachableAudit } from "../packages/prospect/src/audit.ts";
 import { dedupeKeys, isDuplicate, normalizeName, normalizePhone, normalizeSite } from "../packages/prospect/src/dedupe.ts";
 import { isAllowed, parseRobots } from "../packages/prospect/src/robots.ts";
+import { UA } from "../packages/prospect/src/http.ts";
 import { cityFromAddress, extractContact, extractLinks, guessIndustry } from "../packages/prospect/src/parse.ts";
 import type { PageSnapshot } from "../packages/prospect/src/types.ts";
 
@@ -207,4 +208,18 @@ test("名簿ページの診療科名から業種を寄せる（拾えなけれ�
   assert.equal(guessIndustry("カット・カラーの美容室", "other"), "salon");
   // 手がかりが無いときに勝手に other へ落とさない
   assert.equal(guessIndustry("診療案内", "naika"), "naika");
+});
+
+// ---------------------------------------------------------------- HTTPヘッダ
+
+test("User-Agent はASCIIだけ（日本語を入れると全リクエストが落ちる）", () => {
+  // 2026-08-07の実障害: UAに「株式会社YOZAN」が入っており、HTTPヘッダは ByteString(Latin-1) しか
+  // 受け付けないため fetch が TypeError を投げ、**巡回も採点も1件残らず失敗**していた。
+  // 画面上は「採点8・新規0」と一見動いたように見えるのが厄介なので、文字種をここで固定する。
+  const bad = [...UA].filter((c) => c.charCodeAt(0) > 255);
+  assert.deepEqual(bad, [], `UAに使えない文字が含まれています: ${bad.join(",")}`);
+  // 実際にヘッダとして組み立てられることまで確認する（上の判定の裏取り）
+  assert.doesNotThrow(() => new Headers({ "user-agent": UA }));
+  // 誰が来ているか分かるよう、連絡先は必ず入れる
+  assert.ok(UA.includes("@"), "UAに連絡先が必要");
 });

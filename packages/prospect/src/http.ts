@@ -7,8 +7,11 @@
 
 import type { PageSnapshot } from "./types";
 
+// ⚠ HTTPヘッダは ByteString（Latin-1）しか受け付けない。**日本語を1文字でも入れると fetch が例外を投げ、
+// 巡回も採点も全滅する**（2026-08-07の実障害: 「株式会社YOZAN」を入れていて全リクエストが TypeError）。
+// ここは必ずASCIIだけで書くこと。tests/prospect.test.ts が文字種を固定している。
 export const UA =
-  "YozanProspectBot/0.1 (+https://yozan.co.jp/; 株式会社YOZAN ホームページ制作の営業調査; 連絡先 info@yozan.co.jp)";
+  "YozanProspectBot/0.1 (+https://yozan-inc.jp/; YOZAN Inc. - website research for web design proposals; contact: info@yozan-group.jp)";
 
 const MAX_BYTES = 2_000_000; // 2MB。これを超えるHTMLは評価しても意味がない
 
