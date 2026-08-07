@@ -314,3 +314,11 @@
   **(e) 後始末** — 屋号がページタイトルになっていたゴミ1件を論理削除し、`prs_seen` の伊丹市医師会分を消して拾い直せるようにした。
   **(f) 検証** — `tests/prospect.test.ts` に4件追加（実ページを模した一覧HTMLから屋号・電話・市を取れること／診療科名から業種を寄せること／**全件同じ屋号を異常と判定すること**／件数が少ないうちは判定しないこと）＝全 **202件通過**、demo-sales tsc 0エラー。
   **(g) 教訓** — 「h1が無ければtitle」は一般には妥当だが、**CGI型の名簿では全ページ同じ値になる**。汎用の抽出は必ず「同じ値ばかり返っていないか」を自分で疑う仕組みとセットにする。#113と合わせ、**外部サイト相手の処理は実データで1回通すまで完了と見なさない**。
+- #115 (2026-08-07) **モジュール化 優先順位①〜④のpackages切り出し（コードのみ・migrationなし・既存アプリ変更なし）**。正典 `docs/genesis/MODULARIZATION_PLAN.md`（同日作成）の実行。重複はgrep実測: CSV系10アプリ／Stripe実体はgenesis1箇所／jst.tsはgenesis+inventory-osに同一コピー／cron認可はgenesis daily・demo-sales prospectが完全同型。
+  **(a) 方針** — 実績コードの逐語切り出しに徹し、新規の汎用化はしない。DBを触る処理はアプリ側に残す（trackと同じ「クライアントは引数で受け取る」方式）。**既存アプリは1行も変更していない**（B-6: 移行は1アプリずつ・Vercelビルド確認付き。今回のpackagesは新規アプリと次の商品から使う）。
+  **(b) `@yozan/import`（①）** — `csv`（parseCsv逐語＋toCsv新設・既定BOM付き）/ `decode`（cp932ラベル吸収）/ `normalize`（toNumber・parseDate逐語＋makeDedupKey）/ `table`（ヘッダ行マッピング）。切り出し元はMoney OSのbankCsv.ts。Excelは対象外（ExcelJS依存＋Smart Hello名前空間ハックはmember-os固有のため）。
+  **(c) `@yozan/billing`（②）** — frank-billing.ts(#97)からStripe往復だけを抽出: stripePost / 顧客作成 / Checkout(subscription) / 署名検証（逐語）/ `createStripeWebhookHandler`。Checkoutパラメータは`buildSubscriptionCheckoutParams`として純粋関数化（#113の教訓:「外部に出ていく値の組み立て」をテストで固定するため）。1ファイル構成（パッケージ内の拡張子なし相対importはnode --testが解決できないため。prospectの内部importをテストが踏んでいないのと同じ制約）。
+  **(d) `@yozan/core/jst`（③）** — genesisのjst.tsを逐語でcoreへ。テストは3コピー（core/genesis/inventory-os）の**出力一致を固定**し、片方だけ直して日付がズレる静かなドリフトを検知する形にした。
+  **(e) `@yozan/cron`（④）** — requireCronAuth＋createCronHandler（会社ごとループ・1社の失敗は他社を巻き込まない=genesis daily方針）。maxDuration宣言とmiddleware公開プレフィックスは肩代わりできないのでREADMEに⚠明記。
+  **(f) 検証** — tests 16件追加（import 6 / billing 5 / cron 4 / core-jst 1）＝全 **218件通過**。billingは「切り出し元と同一挙動」より強く、署名の改ざん・鍵違い・5分超過・503/400/500の応答コードまで固定。
+  **(g) 使いどころ** — billingはFRANKのsk_live差替え時にこの経路へ。importは次に取込機能を触るアプリから。⑤承認フローは計画どおり外販確定まで着手しない。

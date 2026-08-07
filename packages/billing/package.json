@@ -1,0 +1,10 @@
+{
+  "name": "@yozan/billing",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stripe継続課金の共通コア（SDKなし・fetchでREST直）。切り出し元: apps/genesis/src/lib/frank-billing.ts（#97実績）。DB更新はアプリ側に残す（track方式: クライアントは引数で受け取る）",
+  "exports": {
+    "./stripe": "./src/stripe.ts",
+    "./webhook": "./src/stripe.ts"
+  }
+}

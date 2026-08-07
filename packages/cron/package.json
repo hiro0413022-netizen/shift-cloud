@@ -1,0 +1,9 @@
+{
+  "name": "@yozan/cron",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vercel Cronルートの共通形（CRON_SECRET認可＋会社ごとループ）。切り出し元: apps/genesis/api/cron/daily と apps/demo-sales/api/cron/prospect（同型2箇所目＝切り出しルール発動）",
+  "exports": {
+    "./server": "./src/server.ts"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@yozan/import",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CSV取込/出力の共通コア（依存なし・Node/Edge両対応）。実績コードの切り出し元: apps/money-golfwing/src/lib/import/bankCsv.ts（MODULARIZATION_PLAN 優先順位①）",
+  "exports": {
+    "./csv": "./src/csv.ts",
+    "./decode": "./src/decode.ts",
+    "./normalize": "./src/normalize.ts",
+    "./table": "./src/table.ts"
+  }
+}
