@@ -1,6 +1,7 @@
 # CHANGELOG
 
 ## 2026-08-10 — Money OS: 過去の売上明細を/salesに表示＋入力画面をExcel全列対応
+- feat(money-golfwing): 明細一覧の見出しクリックでソート（日付・区分・お客様名・品名・担当・金額・支払、昇順⇄降順。文字列は日本語ロケール比較・既定は日付の新しい順）
 - feat(money-golfwing): /sales の明細一覧にアプリ入力(mon_sales)＋売上台帳の取込明細(mon_sales_lines)を統合表示。過去期（28〜31期）の明細が月送りで見えるように（従来はmon_salesの月次まるめ行しか出ず「明細が入っていない」ように見えた）。台帳明細は「台帳」バッジ付きの閲覧のみ・月次まるめ行(ledger/migration/slack_import)は二重表示になるため一覧から除外
 - feat(money-golfwing): 合計パネルを2本立てに — 明細合計（一覧の合計）＋月次計上合計（月会費予測・自動計上含む。0円の月は非表示）
 - feat(money-golfwing): 売上入力・明細編集に 種類(E列)・メーカー名(F列)・販売者(Q列) を追加（detail.item_type/maker/seller）。種類・メーカーは売上台帳の語彙から候補表示、在庫ピッカー選択で自動セット。入力者(R列)は従来どおりentered_byで自動 → Excel出力(A〜R列)が全列埋まる

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { inputCls, btnCls, btnGhostCls, yen } from "@/components/ui";
 import { updateSale, deleteSaleById } from "./actions";
 import CustomerHistoryDialog from "./CustomerHistoryDialog";
@@ -68,6 +68,26 @@ function toForm(r: SaleRow): Form {
  * 定価+割引額→売価→金額→決済金額 を積み直す。
  * どの欄を直したかで再計算の開始点を変える（売価を直接直したら定価・割引額は触らない）。
  */
+/** ソート対象の列。ラベルは見出しに出す文言と同じ */
+type SortKey = "soldOn" | "category" | "customerName" | "productName" | "pro" | "amount" | "payMethod";
+
+/**
+ * 明細のソート比較。文字列は日本語ロケールで比較（濁点・カナの並びを自然に）。
+ * 同値のときは日付降順→金額降順で安定させる（毎回同じ並びになる）。
+ */
+function compareRows(a: SaleRow, b: SaleRow, key: SortKey): number {
+  let c = 0;
+  if (key === "amount") {
+    c = a.amount - b.amount;
+  } else if (key === "soldOn") {
+    c = a.soldOn.localeCompare(b.soldOn);
+  } else {
+    c = String(a[key] ?? "").localeCompare(String(b[key] ?? ""), "ja");
+  }
+  if (c !== 0) return c;
+  return b.soldOn.localeCompare(a.soldOn) || (b.amount - a.amount);
+}
+
 function recalcFrom(f: Form, p: Partial<Form>, start: "price" | "unit" | "amount"): Form {
   const next = { ...f, ...p };
   if (start === "price") {
@@ -102,6 +122,42 @@ export default function SalesTable({
   const [pending, startTransition] = useTransition();
   // お客様名クリックで開く購入履歴（名前で引くので明細IDではなく名前を持つ）
   const [historyName, setHistoryName] = useState<string | null>(null);
+
+  // ソート: 見出しクリックで昇順⇄降順。既定は日付の新しい順（サーバーの並びと同じ）
+  const [sortKey, setSortKey] = useState<SortKey>("soldOn");
+  const [sortDesc, setSortDesc] = useState(true);
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortDesc((d) => !d);
+    } else {
+      setSortKey(key);
+      // 金額・日付は「大きい/新しい順」から、名前系は「あいうえお順」から始める
+      setSortDesc(key === "amount" || key === "soldOn");
+    }
+  }
+  const sortedRows = useMemo(() => {
+    const arr = [...rows].sort((a, b) => compareRows(a, b, sortKey));
+    if (sortDesc) arr.reverse();
+    return arr;
+  }, [rows, sortKey, sortDesc]);
+
+  /** ソート可能な見出しセル */
+  function sortableTh(key: SortKey, label: string, className: string) {
+    const active = key === sortKey;
+    return (
+      <th className={className}>
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className={`inline-flex items-center gap-1 font-medium hover:text-(--color-gold) ${active ? "text-(--color-gold)" : ""}`}
+          title={`${label}で並び替え`}
+        >
+          {label}
+          <span className="text-[10px]">{active ? (sortDesc ? "▼" : "▲") : "▽"}</span>
+        </button>
+      </th>
+    );
+  }
 
   function startEdit(r: SaleRow) {
     setEditingId(r.id);
@@ -154,18 +210,18 @@ export default function SalesTable({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
-            <th className="py-2 pr-2 text-left font-medium">日付</th>
-            <th className="px-2 py-2 text-left font-medium">区分</th>
-            <th className="px-2 py-2 text-left font-medium">お客様名</th>
-            <th className="px-2 py-2 text-left font-medium">品名・内容</th>
-            <th className="px-2 py-2 text-left font-medium">担当</th>
-            <th className="px-2 py-2 text-right font-medium">金額</th>
-            <th className="px-2 py-2 text-left font-medium">支払</th>
+            {sortableTh("soldOn", "日付", "py-2 pr-2 text-left")}
+            {sortableTh("category", "区分", "px-2 py-2 text-left")}
+            {sortableTh("customerName", "お客様名", "px-2 py-2 text-left")}
+            {sortableTh("productName", "品名・内容", "px-2 py-2 text-left")}
+            {sortableTh("pro", "担当", "px-2 py-2 text-left")}
+            {sortableTh("amount", "金額", "px-2 py-2 text-right")}
+            {sortableTh("payMethod", "支払", "px-2 py-2 text-left")}
             <th className="px-2 py-2"></th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {sortedRows.map((r) => (
             editingId === r.id && form ? (
               <tr key={r.id} className="border-b border-(--color-line) bg-(--color-bg)">
                 <td colSpan={8} className="p-2">
