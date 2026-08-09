@@ -253,6 +253,52 @@ const HANDLERS: Record<string, Handler> = {
     });
     return { channel: channelCode, broadcast: true };
   },
+  // 登録済み個人連絡先への1対1 push（#121・gn_line_contacts）。
+  // payload.contact = 宛名（person_name 部分一致・一意必須） / payload.contact_id = uuid直指定
+  // 例: 「小川にメッセージ送って」→ { contact: '小川', body: '...' } を enqueue（policy=auto）
+  line_push_contact: async ({ admin, row }) => {
+    const { getLineChannel, linePush } = await import("@/lib/line");
+    const body = String(row.payload.body ?? row.payload.message ?? "").trim();
+    if (!body) throw new Error("body が空です");
+    const contactId = row.payload.contact_id ? String(row.payload.contact_id) : null;
+    const personName = row.payload.contact ? String(row.payload.contact) : null;
+    if (!contactId && !personName) throw new Error("contact（宛名）か contact_id を指定してください");
+    let query = admin
+      .from("gn_line_contacts")
+      .select("id, person_name, display_name, line_user_id, channel_code")
+      .eq("company_id", row.company_id)
+      .is("deleted_at", null);
+    query = contactId ? query.eq("id", contactId) : query.ilike("person_name", `%${personName}%`);
+    const { data: contacts } = await query;
+    if (!contacts || contacts.length === 0) throw new Error(`連絡先が見つかりません: ${personName ?? contactId}`);
+    if (contacts.length > 1)
+      throw new Error(
+        `宛名が複数一致します（${contacts.map((c) => c.person_name).join(" / ")}）。contact_id で指定してください`
+      );
+    const c = contacts[0];
+    if (!c.line_user_id)
+      throw new Error(
+        `${c.person_name ?? "この連絡先"} はまだLINE未リンクです（本人から公式LINEへの初回メッセージ受信で自動リンクされます）`
+      );
+    const ch = await getLineChannel(admin, row.company_id, String(c.channel_code ?? "staff"));
+    if (!ch) throw new Error(`LINEチャネル未登録: ${String(c.channel_code ?? "staff")}（gn_line_channels）`);
+    await linePush(ch.access_token, String(c.line_user_id), body);
+    // 送信履歴を outbox にも残す（status=sent）
+    await admin.from("gn_line_outbox").insert({
+      company_id: row.company_id,
+      to_group_id: String(c.line_user_id),
+      body,
+      status: "sent",
+      created_by: null,
+    });
+    await logEvent(row.company_id, {
+      event_type: "line.push_contact",
+      title: `LINE個別送信: ${c.person_name ?? c.display_name ?? "連絡先"}「${body.split("\n")[0].slice(0, 40)}」`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { contact: c.person_name ?? c.display_name ?? null, sent: true };
+  },
   // SNS投稿の承認（#101 / content-loop）: 承認＝「予約確定」。実投稿は予定時刻に
   // /api/cron/execute → publishDueContent が行う（Instagramへは時刻どおりに出したいため）。
   // 判断フィードでの修正（payload.body差し替え）をここで cnt_posts に同期する。

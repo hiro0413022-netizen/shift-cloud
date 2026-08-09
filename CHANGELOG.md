@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-08-09 — Genesis: 公式LINEの個人連絡先台帳＋個別push（DECISIONS #121・migration 0103適用済）
+- db: 0103 `gn_line_contacts`（個人連絡先台帳。select=tenant・書き込みはservice_role専用）＋小川うららを期待連絡先としてシード＋policy `line_push_contact`=auto
+- feat(genesis): LINE受信webhook — 1対1送信者をプロフィールAPIで自動登録。期待連絡先はmatch_hint一致で自動リンク（複数一致は安全側でリンクしない・リンク時はcompany_eventsに記録）。Inboxのfrom_nameに正式名>表示名（従来「差出人不明」）
+- feat(genesis): executor `line_push_contact` — 登録済み連絡先へ公式LINEから1対1 push（宛名部分一致 or contact_id。複数一致/未リンクはエラーで停止）。履歴はgn_line_outbox(status=sent)
+- test: line-contact-pure 3件（全240件通過）
+
 ## 2026-08-04 — Genesis: 判断フィードの実行プラン表示＋修正指示＋学習（DECISIONS #100・migration 0090適用済）
 - feat(genesis): ホームのAI実行カードに「詳細」展開 — 承認すると何を・誰に・いつ実行し取り消せるか（実行プラン）＋送信文の全文を表示（従来160字プレビューのみ）
 - feat(genesis): 修正指示 — AI修正（指示文1つでClaudeが書き直し）と直接編集の両対応。修正しても承認するまで送信されない。履歴はpayload.revisions＋audit_logs

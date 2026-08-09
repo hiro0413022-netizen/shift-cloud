@@ -367,3 +367,8 @@
   **(d) 三本線が反応しない** — `sites/frank-golf/assets/site.js` の `init()` が**2回走る**（DOMContentLoaded で1回＋`cms.js` が CMS 取得後に `FRANK_RENDER()` でもう1回）。`nav()` が毎回 `addEventListener` するのでハンドラが二重登録され、1タップで「開く→即閉じる」が連続実行されて**無反応に見えていた**。`trialForm()` も二重登録＝体験フォームが2回POSTされる状態だった。決定: **イベント登録（nav/trialForm/stickyCta）は初回のみ**、描画（fillValues/wireLinks/news等）は毎回、`reveal()` は要素に `data-rv` を付けて二重 observe を防ぐ。全ページ共通のバグ。
   **(e) 検証** — linkedom で booking.html に site.js を実際に読ませ、`FRANK_RENDER()` の2回目まで再現したうえで **修正前=1タップで開かない／修正後=1タップで開き2タップ目で閉じる**を確認。member-os 型チェック通過、tests 237件全通過。
   残（ユーザー作業）: ①Vercel(member-os) に `RESEND_API_KEY` / `FRANK_MAIL_FROM` を設定（未設定だとメールは飛ばない） ②Resend の frankgolf.jp ドメイン認証 ③テストで入った仮会員2件（P57932221 / P37571648）の扱い ④**承認時に会員番号を伝える手段は今回未実装**＝当面は電話・LINEで案内する運用。
+- #121 (2026-08-09) **公式LINEの個人連絡先台帳＋個別push（migration 0103適用済）**。きっかけ: 小川うらら（役員）がYOZAN公式LINEへ1対1でメッセージを送ってくる予定→従来はInboxで「差出人不明」表示・こちらから個別に送る手段も無かった。
+  **(a) gn_line_contacts（0103）** — 1対1の送信者を受信時に自動登録（LINEプロフィールAPIで表示名取得）。`person_name`（正式名）が入っていれば個別pushの宛先になる。**期待連絡先**: line_user_id空＋match_hint（カンマ区切り）で先に名前だけ登録でき、表示名がヒントに一致した初回受信で自動リンク（一致が複数なら安全側でリンクしない）。リンク時は company_events（line.contact_linked）に記録。小川うらら（hint: 小川,うらら,ウララ,urara,ogawa）をシード済み。
+  **(b) webhook** — sec_inquiries.from_name に正式名>表示名を設定（従来null）。連絡先処理の失敗で受信全体は落とさない。純粋部は `line-contact-pure.ts`（誤リンク防止: 空表示名・空ヒントは絶対にリンクしない）。tests 3件追加＝全**240件通過**。
+  **(c) 個別push** — executorに `line_push_contact`（payload: contact=宛名部分一致 or contact_id、body）。policy=**auto**（ユーザー指示で送る用途のため承認の二度手間にしない）。複数一致・未リンク宛はエラーで停止。送信履歴は gn_line_outbox に status='sent' で残す。
+  運用: 「小川にメッセージ送って」→ ai_action_queue に line_push_contact を積む→ /api/cron/execute（10分毎）が送信。返信はこれまで通りInbox承認→linePush直送信（#102）。

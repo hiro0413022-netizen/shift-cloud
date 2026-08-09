@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
+import { matchesContactHint, contactFromName } from "@/lib/line-contact-pure";
 
 export const dynamic = "force-dynamic";
 
@@ -130,13 +131,88 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ code: stri
       .maybeSingle();
     if (dup) continue;
 
+    // 個人連絡先の自動登録（#121）: 1対1の送信者を gn_line_contacts へ。
+    // プロフィール表示名を取り、期待連絡先（match_hint一致）があれば自動リンク。
+    // Inboxの from_name には person_name（正式名）> 表示名 の順で入れる。
+    let fromName: string | null = null;
+    if (userId && source.type === "user") {
+      try {
+        let displayName: string | null = null;
+        const prof = await fetch(`https://api.line.me/v2/bot/profile/${userId}`, {
+          headers: { Authorization: `Bearer ${String(channel.access_token)}` },
+        });
+        if (prof.ok) {
+          const p = (await prof.json()) as { displayName?: string };
+          displayName = p.displayName ?? null;
+        }
+        const nowIso = new Date().toISOString();
+        const { data: contact } = await admin
+          .from("gn_line_contacts")
+          .select("id, person_name")
+          .eq("company_id", channel.company_id)
+          .eq("line_user_id", userId)
+          .is("deleted_at", null)
+          .maybeSingle();
+        if (contact) {
+          await admin
+            .from("gn_line_contacts")
+            .update({ display_name: displayName ?? undefined, last_message_at: nowIso, updated_at: nowIso })
+            .eq("id", contact.id);
+          fromName = contactFromName(contact.person_name as string | null, displayName);
+        } else {
+          let linked = false;
+          if (displayName) {
+            const { data: expected } = await admin
+              .from("gn_line_contacts")
+              .select("id, person_name, match_hint")
+              .eq("company_id", channel.company_id)
+              .is("line_user_id", null)
+              .is("deleted_at", null);
+            const hits = (expected ?? []).filter((e) => matchesContactHint(displayName, e.match_hint as string | null));
+            if (hits.length === 1) {
+              await admin
+                .from("gn_line_contacts")
+                .update({
+                  line_user_id: userId,
+                  display_name: displayName,
+                  channel_code: channel.code,
+                  last_message_at: nowIso,
+                  updated_at: nowIso,
+                })
+                .eq("id", hits[0].id);
+              fromName = contactFromName(hits[0].person_name as string | null, displayName);
+              linked = true;
+              await logEvent(String(channel.company_id), {
+                event_type: "line.contact_linked",
+                title: `LINE個人連絡先をリンク: ${hits[0].person_name ?? displayName}（表示名: ${displayName}）`.slice(0, 120),
+                source: "line_webhook",
+                source_type: "system",
+              });
+            }
+          }
+          if (!linked) {
+            await admin.from("gn_line_contacts").insert({
+              company_id: channel.company_id,
+              channel_code: channel.code,
+              line_user_id: userId,
+              display_name: displayName,
+              last_message_at: nowIso,
+            });
+            fromName = displayName;
+          }
+        }
+      } catch {
+        /* 連絡先登録の失敗で受信全体を落とさない */
+      }
+    }
+
     await admin.from("sec_inquiries").insert({
       company_id: channel.company_id,
       source: "line",
       external_id: externalId,
       inquiry_type: text.includes("体験") ? "trial" : "general",
       priority: text.includes("体験") ? "high" : "normal",
-      from_name: null,
+      from_name: fromName,
       subject: `LINE返信（${channel.name}）: ${text.slice(0, 40)}`,
       snippet: text.slice(0, 500),
       received_at: new Date(Number(ev.timestamp ?? Date.now())).toISOString(),
