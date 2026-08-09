@@ -14,13 +14,31 @@ const PRESET_LIMIT = 10;
 
 const CATEGORIES = ["利用料", "月会費", "販売", "その他"];
 const MEMBER_KINDS = ["会員", "ビジター", "スタッフ"];
-const PAY_METHODS = ["現金", "Airペイ", "SBペイメント", "楽天ペイ", "振込", "その他"];
+// 売上台帳Excelで実際に使われている決済手段に合わせる（Square 369件・金券3件の実績あり）
+const PAY_METHODS = ["現金", "Airペイ", "Square", "SBペイメント", "振込", "金券", "楽天ペイ", "その他"];
 
 type Sale = {
   id: string; sold_on: string; category: string; customer_name: string | null;
   member_kind: string | null; amount: number; tax_included: number | null;
   pay_method: string | null; memo: string | null; detail: Record<string, unknown>;
+  source: string;
 };
+
+/** 台帳明細（mon_sales_lines）。過去期のExcel取込明細はここに入っている */
+type LedgerLine = {
+  id: string; sold_on: string; customer_name: string | null; member_kind: string | null;
+  item_category: string | null; item_type: string | null; maker: string | null;
+  product_name: string | null; list_price: number | string | null; discount: number | string | null;
+  qty: number | string | null; amount: number | string; tax_included: number | string | null;
+  pay_method: string | null; pro: string | null; memo: string | null;
+};
+
+/**
+ * mon_sales のうち「月次まるめ行」のsource。
+ * 中身は mon_sales_lines を月末日付で合計したもの＝明細テーブルに出すと台帳明細と二重になる。
+ * 合計（PL計上）にだけ使い、明細一覧からは除外する。
+ */
+const AGG_SOURCES = new Set(["ledger", "migration", "slack_import"]);
 
 function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 function shift(y: string, n: number) { const [a, m] = y.split("-").map(Number); return ym(new Date(a, m - 1 + n, 1)); }
@@ -40,13 +58,23 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
   const { from, to } = monthRange(month);
 
-  const { data } = store
-    ? await admin.from("mon_sales").select("*")
-        .eq("company_id", actor.companyId).eq("store_id", store.id)
-        .gte("sold_on", from).lt("sold_on", to).is("deleted_at", null)
-        .order("sold_on", { ascending: false })
-    : { data: [] };
+  const [{ data }, { data: lineData }] = store
+    ? await Promise.all([
+        admin.from("mon_sales").select("*")
+          .eq("company_id", actor.companyId).eq("store_id", store.id)
+          .gte("sold_on", from).lt("sold_on", to).is("deleted_at", null)
+          .order("sold_on", { ascending: false }),
+        // 台帳明細（Excel取込）。過去期の明細はmon_salesではなくここにある
+        admin.from("mon_sales_lines")
+          .select("id, sold_on, customer_name, member_kind, item_category, item_type, maker, product_name, list_price, discount, qty, amount, tax_included, pay_method, pro, memo")
+          .eq("company_id", actor.companyId).eq("store_id", store.id)
+          .gte("sold_on", from).lt("sold_on", to).is("deleted_at", null)
+          .order("sold_on", { ascending: false }),
+      ])
+    : [{ data: [] }, { data: [] }];
   const rows = (data ?? []) as Sale[];
+  const ledgerLines = (lineData ?? []) as LedgerLine[];
+  /** PL計上合計（月次まるめ・月会費予測等を含む） */
   const total = rows.reduce((a, r) => a + Number(r.amount), 0);
   // 「今日」はJSTで解決（UTCだと朝9時まで前日になる。#73）
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
@@ -95,6 +123,27 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     100,
   );
 
+  // 種類・メーカーの候補: 売上台帳の語彙（直近800行）＋アプリ入力から。Excelと同じ言葉で入れられるように
+  const { data: vocabRows } = store
+    ? await admin.from("mon_sales_lines").select("item_type, maker")
+        .eq("company_id", actor.companyId).eq("store_id", store.id)
+        .is("deleted_at", null)
+        .order("sold_on", { ascending: false }).limit(800)
+    : { data: [] };
+  const itemTypeSuggestions = uniqTop([
+    ...(vocabRows ?? []).map((r) => String(r.item_type ?? "").trim()),
+    ...recentRows.map((r) => String(r.detail?.item_type ?? "").trim()),
+  ].filter(Boolean), 30);
+  const makerSuggestions = uniqTop([
+    ...(vocabRows ?? []).map((r) => String(r.maker ?? "").trim()),
+    ...recentRows.map((r) => String(r.detail?.maker ?? "").trim()),
+  ].filter(Boolean), 40);
+  // 販売者の候補: 直近のアプリ入力＋担当プロ
+  const sellerSuggestions = uniqTop([
+    ...recentRows.map((r) => String(r.detail?.seller ?? "").trim()),
+    ...pros,
+  ].filter(Boolean), 20);
+
   // 定番ボタン: 直近の入力から「よく打つ組み合わせ」を自動で並べる。
   //   - 金額は合計(amount)ではなく単価で数える。合計で数えると同じ商品が個数ごとに別の定番に割れ、
   //     押したときに定価へ合計額が入ってしまう（個数2の4,000円が「定価4,000」になる）
@@ -129,23 +178,56 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     .map((x) => x.p);
 
   // 明細（編集可能テーブルへ渡す形に整形）
-  const saleRows: SaleRow[] = rows.map((r) => ({
-    id: r.id,
-    soldOn: r.sold_on,
-    category: r.category,
+  // アプリ入力(mon_sales)＋台帳明細(mon_sales_lines)を1つの一覧にする。
+  // 月次まるめ行(AGG_SOURCES)は台帳明細と二重になるため一覧から除外（合計には入れる）
+  const fromApp: SaleRow[] = rows
+    .filter((r) => !AGG_SOURCES.has(r.source))
+    .map((r) => ({
+      id: r.id,
+      source: "app" as const,
+      soldOn: r.sold_on,
+      category: r.category,
+      customerName: r.customer_name ?? "",
+      memberKind: r.member_kind ?? "",
+      itemType: String(r.detail?.item_type ?? ""),
+      maker: String(r.detail?.maker ?? ""),
+      seller: String(r.detail?.seller ?? ""),
+      listPrice: r.detail?.list_price != null ? Number(r.detail.list_price) : null,
+      discount: r.detail?.discount != null ? Number(r.detail.discount) : null,
+      amount: Number(r.amount),
+      taxIncluded: r.tax_included != null ? Number(r.tax_included) : null,
+      payMethod: r.pay_method ?? "",
+      memo: r.memo ?? "",
+      productName: String(r.detail?.product_name ?? ""),
+      qty: r.detail?.qty ? Number(r.detail.qty) : null,
+      pro: String(r.detail?.pro ?? ""),
+      invItemId: r.detail?.inv_item_id ? String(r.detail.inv_item_id) : null,
+    }));
+  const fromLedger: SaleRow[] = ledgerLines.map((r) => ({
+    id: `line:${r.id}`,
+    source: "ledger" as const,
+    soldOn: String(r.sold_on),
+    category: r.item_category ?? "",
     customerName: r.customer_name ?? "",
     memberKind: r.member_kind ?? "",
-    listPrice: r.detail?.list_price != null ? Number(r.detail.list_price) : null,
-    discount: r.detail?.discount != null ? Number(r.detail.discount) : null,
-    amount: Number(r.amount),
+    itemType: r.item_type ?? "",
+    maker: r.maker ?? "",
+    seller: "",
+    listPrice: r.list_price != null ? Number(r.list_price) : null,
+    discount: r.discount != null ? Number(r.discount) : null,
+    amount: Number(r.amount) || 0,
     taxIncluded: r.tax_included != null ? Number(r.tax_included) : null,
     payMethod: r.pay_method ?? "",
     memo: r.memo ?? "",
-    productName: String(r.detail?.product_name ?? ""),
-    qty: r.detail?.qty ? Number(r.detail.qty) : null,
-    pro: String(r.detail?.pro ?? ""),
-    invItemId: r.detail?.inv_item_id ? String(r.detail.inv_item_id) : null,
+    productName: r.product_name ?? "",
+    qty: r.qty != null ? Number(r.qty) : null,
+    pro: r.pro ?? "",
+    invItemId: null,
   }));
+  const saleRows: SaleRow[] = [...fromApp, ...fromLedger]
+    .sort((a, b) => b.soldOn.localeCompare(a.soldOn));
+  /** 明細合計（税抜）: 一覧に出している明細の合計 */
+  const detailTotal = saleRows.reduce((a, r) => a + r.amount, 0);
 
   return (
     <div className="space-y-4">
@@ -165,9 +247,19 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         </div>
       </header>
 
-      <Panel title={`当月売上合計（税抜）`}>
-        <p className="text-3xl font-bold tabular-nums">{yen(total)} 円</p>
-        <p className="mt-1 text-sm text-(--color-dim)">{rows.length} 件</p>
+      <Panel title={`当月売上（税抜）`}>
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
+          <div>
+            <p className="text-3xl font-bold tabular-nums">{yen(detailTotal)} 円</p>
+            <p className="mt-1 text-sm text-(--color-dim)">明細合計 {saleRows.length} 件（アプリ入力＋売上台帳）</p>
+          </div>
+          {total > 0 && (
+            <div>
+              <p className="text-xl font-bold tabular-nums text-(--color-dim)">{yen(total)} 円</p>
+              <p className="mt-1 text-xs text-(--color-dim)">月次計上合計（月会費予測・自動計上を含む）</p>
+            </div>
+          )}
+        </div>
       </Panel>
 
       <Panel title="売上を追加">
@@ -183,6 +275,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
             invItems={invItems}
             productSuggestions={productSuggestions}
             customerSuggestions={customerSuggestions}
+            itemTypeSuggestions={itemTypeSuggestions}
+            makerSuggestions={makerSuggestions}
+            sellerSuggestions={sellerSuggestions}
             presets={presets}
           />
         )}

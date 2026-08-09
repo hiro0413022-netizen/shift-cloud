@@ -17,6 +17,10 @@ export type Preset = { label: string; category: string; productName: string; uni
 type Line = {
   productName: string;
   invItemId: string | null;
+  /** 種類（ボール / グリップ / 打席利用 …）。Excel E列 */
+  itemType: string;
+  /** メーカー名。Excel F列 */
+  maker: string;
   /** 定価（税抜・1個あたり） */
   listPrice: string;
   /** 割引額（値引きはマイナス） */
@@ -35,7 +39,7 @@ type Line = {
 };
 
 const emptyLine = (): Line => ({
-  productName: "", invItemId: null, listPrice: "", discount: "",
+  productName: "", invItemId: null, itemType: "", maker: "", listPrice: "", discount: "",
   unitPrice: "", unitManual: false, qty: "1",
   amount: "", amountManual: false, taxIncluded: "", taxManual: false, pro: "", memo: "",
 });
@@ -86,6 +90,9 @@ export default function SalesEntry({
   invItems,
   productSuggestions,
   customerSuggestions,
+  itemTypeSuggestions,
+  makerSuggestions,
+  sellerSuggestions,
   presets,
 }: {
   today: string;
@@ -96,6 +103,9 @@ export default function SalesEntry({
   invItems: InvPick[];
   productSuggestions: string[];
   customerSuggestions: string[];
+  itemTypeSuggestions: string[];
+  makerSuggestions: string[];
+  sellerSuggestions: string[];
   presets: Preset[];
 }) {
   // 保持されるヘッダー項目
@@ -105,6 +115,8 @@ export default function SalesEntry({
   const [memberKind, setMemberKind] = useState("");
   const [payMethod, setPayMethod] = useState(payMethods[0] ?? "現金");
   const [pro, setPro] = useState("");
+  /** 販売者（Excel Q列）。レジに立つ人は日中変わらないのでヘッダーで保持 */
+  const [seller, setSeller] = useState("");
 
   const [mode, setMode] = useState<"single" | "batch">("single");
   const [pending, startTransition] = useTransition();
@@ -129,6 +141,9 @@ export default function SalesEntry({
     return {
       ...header(),
       productName: l.productName || undefined,
+      itemType: l.itemType || undefined,
+      maker: l.maker || undefined,
+      seller: seller || undefined,
       invItemId: l.invItemId || undefined,
       listPrice: l.listPrice ? num(l.listPrice) : null,
       discount: l.discount ? num(l.discount) : null,
@@ -148,9 +163,11 @@ export default function SalesEntry({
     return null;
   }
 
-  // 在庫品番を選択: 品名・在庫リンク・（定価が空なら）在庫マスタの定価を流し込み。区分も「販売」へ
+  // 在庫品番を選択: 品名・在庫リンク・種類・メーカー・（定価が空なら）在庫マスタの定価を流し込み。区分も「販売」へ
   function pickInto(l: Line, it: InvPick): Line {
     const next: Partial<Line> = { productName: invLabel(it), invItemId: it.id };
+    if (!l.itemType && it.category) next.itemType = it.category;
+    if (!l.maker && it.maker) next.maker = it.maker;
     if (!num(l.listPrice) && it.listPrice) next.listPrice = String(Math.round(Number(it.listPrice)));
     return patch(l, next);
   }
@@ -235,9 +252,18 @@ export default function SalesEntry({
       <datalist id="customer-suggestions">
         {customerSuggestions.map((c) => <option key={c} value={c} />)}
       </datalist>
+      <datalist id="item-type-suggestions">
+        {itemTypeSuggestions.map((t) => <option key={t} value={t} />)}
+      </datalist>
+      <datalist id="maker-suggestions">
+        {makerSuggestions.map((m) => <option key={m} value={m} />)}
+      </datalist>
+      <datalist id="seller-suggestions">
+        {sellerSuggestions.map((s) => <option key={s} value={s} />)}
+      </datalist>
 
       {/* ヘッダー（保持項目） */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-7">
         <input type="date" value={soldOn} onChange={(e) => setSoldOn(e.target.value)} className={inputCls} />
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -254,6 +280,7 @@ export default function SalesEntry({
           <option value="">担当プロ（既定）</option>
           {pros.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
+        <input list="seller-suggestions" value={seller} onChange={(e) => setSeller(e.target.value)} placeholder="販売者" className={inputCls} aria-label="販売者（Excel Q列。保持されます）" />
       </div>
       <p className="text-xs text-(--color-dim)">
         {pros.length === 0
@@ -285,6 +312,22 @@ export default function SalesEntry({
             autoFocusRef={productRef}
             onChange={(name) => setLine((prev) => ({ ...prev, productName: name, invItemId: null }))}
             onPick={(it) => onPickAny(it, (f) => setLine((prev) => f(prev)))}
+          />
+          <input
+            list="item-type-suggestions"
+            value={line.itemType}
+            onChange={(e) => setLine((prev) => ({ ...prev, itemType: e.target.value }))}
+            placeholder="種類"
+            className={inputCls}
+            aria-label="種類（ボール・グリップ・打席利用など）"
+          />
+          <input
+            list="maker-suggestions"
+            value={line.maker}
+            onChange={(e) => setLine((prev) => ({ ...prev, maker: e.target.value }))}
+            placeholder="メーカー名"
+            className={inputCls}
+            aria-label="メーカー名"
           />
           <input
             inputMode="numeric"
@@ -366,6 +409,22 @@ export default function SalesEntry({
                 items={invItems}
                 onChange={(name) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, productName: name, invItemId: null } : x))}
                 onPick={(it) => onPickAny(it, (f) => setLines((prev) => prev.map((x, i) => i === idx ? f(x) : x)))}
+              />
+              <input
+                list="item-type-suggestions"
+                value={l.itemType}
+                onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, itemType: e.target.value } : x))}
+                placeholder="種類"
+                className={`${inputCls} sm:col-span-2`}
+                aria-label="種類（ボール・グリップ・打席利用など）"
+              />
+              <input
+                list="maker-suggestions"
+                value={l.maker}
+                onChange={(e) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, maker: e.target.value } : x))}
+                placeholder="メーカー名"
+                className={`${inputCls} sm:col-span-2`}
+                aria-label="メーカー名"
               />
               <input
                 inputMode="numeric"

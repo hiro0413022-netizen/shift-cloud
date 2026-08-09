@@ -23,6 +23,12 @@ export type SaleInput = {
   taxIncluded?: number | null;
   payMethod?: string;
   productName?: string;
+  /** 種類（ボール / グリップ / 打席利用 …）。売上台帳Excelの E列 */
+  itemType?: string;
+  /** メーカー名。売上台帳Excelの F列 */
+  maker?: string;
+  /** 販売者。売上台帳Excelの Q列（入力者R列は entered_by で自動） */
+  seller?: string;
   /** Inventory OS の品番ID。付いていると保存時に在庫が減る（inv_movements kind='sale'） */
   invItemId?: string;
   qty?: number;
@@ -54,6 +60,9 @@ function normalizeInput(input: SaleInput) {
     memberKind: (input.memberKind ?? "").trim() || null,
     memo: (input.memo ?? "").trim() || null,
     productName: (input.productName ?? "").trim(),
+    itemType: (input.itemType ?? "").trim(),
+    maker: (input.maker ?? "").trim(),
+    seller: (input.seller ?? "").trim(),
     invItemId: (input.invItemId ?? "").trim() || null,
     // 個数は必須（1以上）。未指定・不正値は1個扱いで保存する
     qty: Math.max(1, Number(input.qty) || 1),
@@ -66,12 +75,16 @@ function buildDetail(base: Record<string, unknown>, n: ReturnType<typeof normali
   delete detail.product_name; delete detail.qty; delete detail.pro; delete detail.inv_item_id;
   // 未入力なら消す（編集で定価を空にしたのに古い値が残る、を防ぐ）
   delete detail.list_price; delete detail.discount;
+  delete detail.item_type; delete detail.maker; delete detail.seller;
   if (n.productName) detail.product_name = n.productName;
   if (n.qty) detail.qty = n.qty;
   if (n.pro) detail.pro = n.pro;
   if (n.invItemId) detail.inv_item_id = n.invItemId;
   if (n.listPrice != null) detail.list_price = n.listPrice;
   if (n.discount != null) detail.discount = n.discount;
+  if (n.itemType) detail.item_type = n.itemType;
+  if (n.maker) detail.maker = n.maker;
+  if (n.seller) detail.seller = n.seller;
   return detail;
 }
 

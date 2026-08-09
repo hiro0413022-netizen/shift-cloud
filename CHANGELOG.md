@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2026-08-10 — Money OS: 過去の売上明細を/salesに表示＋入力画面をExcel全列対応
+- feat(money-golfwing): /sales の明細一覧にアプリ入力(mon_sales)＋売上台帳の取込明細(mon_sales_lines)を統合表示。過去期（28〜31期）の明細が月送りで見えるように（従来はmon_salesの月次まるめ行しか出ず「明細が入っていない」ように見えた）。台帳明細は「台帳」バッジ付きの閲覧のみ・月次まるめ行(ledger/migration/slack_import)は二重表示になるため一覧から除外
+- feat(money-golfwing): 合計パネルを2本立てに — 明細合計（一覧の合計）＋月次計上合計（月会費予測・自動計上含む。0円の月は非表示）
+- feat(money-golfwing): 売上入力・明細編集に 種類(E列)・メーカー名(F列)・販売者(Q列) を追加（detail.item_type/maker/seller）。種類・メーカーは売上台帳の語彙から候補表示、在庫ピッカー選択で自動セット。入力者(R列)は従来どおりentered_byで自動 → Excel出力(A〜R列)が全列埋まる
+- feat(money-golfwing): 支払方法の選択肢を台帳実績に合わせ Square・金券 を追加
+- data: 31期売上一覧(Excel)とmon_sales_linesを月別照合 — 2025-06〜2026-07は件数・金額とも1:1で完全一致（取込済）。Excelの2026-08分11件はアプリ入力と同一売上（8/5まで二重記帳）のため取込せず＝アプリが正
+- note: 2025-06〜12はmon_salesの月次まるめ未生成のままにしてある（PL二重計上を避けるためrefresh_mon_sales_from_linesは実行していない。必要になったら別途判断）
+
 ## 2026-08-09 — Genesis: 公式LINEの個人連絡先台帳＋個別push（DECISIONS #121・migration 0103適用済）
 - db: 0103 `gn_line_contacts`（個人連絡先台帳。select=tenant・書き込みはservice_role専用）＋小川うららを期待連絡先としてシード＋policy `line_push_contact`=auto
 - feat(genesis): LINE受信webhook — 1対1送信者をプロフィールAPIで自動登録。期待連絡先はmatch_hint一致で自動リンク（複数一致は安全側でリンクしない・リンク時はcompany_eventsに記録）。Inboxのfrom_nameに正式名>表示名（従来「差出人不明」）

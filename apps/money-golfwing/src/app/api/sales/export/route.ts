@@ -112,8 +112,9 @@ export async function GET(request: NextRequest) {
       customerName: r.customer_name ?? "",
       memberKind: r.member_kind ?? "",
       itemCategory: r.category ?? "",
-      itemType: inv?.category ?? "",
-      maker: inv?.maker ?? "",
+      // 種類・メーカーは入力値を優先、無ければ在庫マスタから補完
+      itemType: String(detail.item_type ?? "") || (inv?.category ?? ""),
+      maker: String(detail.maker ?? "") || (inv?.maker ?? ""),
       productName: String(detail.product_name ?? ""),
       listPrice,
       discount,
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
       payMethod: r.pay_method ?? "",
       memo: r.memo ?? "",
       pro: String(detail.pro ?? ""),
-      seller: "",
+      seller: String(detail.seller ?? ""),
       enteredBy: r.entered_by ?? "",
       costPrice: inv?.cost_price != null && inv.cost_price > 0 ? Math.round(inv.cost_price) : null,
     };

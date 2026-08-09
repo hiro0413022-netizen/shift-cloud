@@ -8,10 +8,18 @@ import CustomerHistoryDialog from "./CustomerHistoryDialog";
 /** 一覧・編集用の1明細（サーバーで整形して渡す） */
 export type SaleRow = {
   id: string;
+  /** app=アプリ入力(mon_sales・編集可) / ledger=売上台帳の取込明細(mon_sales_lines・閲覧のみ) */
+  source: "app" | "ledger";
   soldOn: string;
   category: string;
   customerName: string;
   memberKind: string;
+  /** 種類（Excel E列） */
+  itemType: string;
+  /** メーカー名（Excel F列） */
+  maker: string;
+  /** 販売者（Excel Q列） */
+  seller: string;
   /** 定価（税抜・1個あたり） */
   listPrice: number | null;
   /** 割引額（値引きはマイナス） */
@@ -29,6 +37,7 @@ export type SaleRow = {
 
 type Form = {
   soldOn: string; category: string; customerName: string; memberKind: string;
+  itemType: string; maker: string; seller: string;
   listPrice: string; discount: string; unitPrice: string;
   amount: string; taxIncluded: string; payMethod: string; productName: string;
   qty: string; pro: string; memo: string;
@@ -44,6 +53,7 @@ function toForm(r: SaleRow): Form {
   const unit = r.amount ? Math.round(Number(r.amount) / qty) : 0;
   return {
     soldOn: r.soldOn, category: r.category, customerName: r.customerName, memberKind: r.memberKind,
+    itemType: r.itemType, maker: r.maker, seller: r.seller,
     // 定価が未記録の古い明細は「売価＝定価・割引なし」として開く（保存しても金額は変わらない）
     listPrice: String(r.listPrice ?? unit ?? ""),
     discount: r.discount != null ? String(r.discount) : "",
@@ -111,6 +121,9 @@ export default function SalesTable({
         category: form.category,
         customerName: form.customerName || undefined,
         memberKind: form.memberKind || undefined,
+        itemType: form.itemType || undefined,
+        maker: form.maker || undefined,
+        seller: form.seller || undefined,
         listPrice: form.listPrice ? num(form.listPrice) : null,
         discount: form.discount ? num(form.discount) : null,
         amount: num(form.amount),
@@ -175,6 +188,9 @@ export default function SalesTable({
                       {opts(pros, form.pro).map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
                     <input value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} placeholder="品名・内容" className={`${inputCls} sm:col-span-2`} />
+                    <input value={form.itemType} onChange={(e) => setForm({ ...form, itemType: e.target.value })} placeholder="種類" aria-label="種類（ボール・グリップ・打席利用など）" className={inputCls} />
+                    <input value={form.maker} onChange={(e) => setForm({ ...form, maker: e.target.value })} placeholder="メーカー名" aria-label="メーカー名" className={inputCls} />
+                    <input value={form.seller} onChange={(e) => setForm({ ...form, seller: e.target.value })} placeholder="販売者" aria-label="販売者" className={inputCls} />
                     <input inputMode="numeric" value={form.listPrice} onChange={(e) => setForm(recalcFrom(form, { listPrice: e.target.value }, "price"))} placeholder="定価(税抜)" aria-label="定価（税抜）" className={inputCls} />
                     <input inputMode="numeric" value={form.discount} onChange={(e) => setForm(recalcFrom(form, { discount: e.target.value }, "price"))} placeholder="割引額(-)" aria-label="割引額（値引きはマイナス）" className={inputCls} />
                     <input inputMode="numeric" value={form.unitPrice} onChange={(e) => setForm(recalcFrom(form, { unitPrice: e.target.value }, "unit"))} placeholder="売価(自動)" aria-label="売価（税抜・自動）" className={inputCls} />
@@ -216,6 +232,9 @@ export default function SalesTable({
                   {r.productName || "—"}
                   {r.qty && r.qty > 1 ? <span className="ml-1 text-xs text-(--color-dim)">×{r.qty}</span> : null}
                   {r.invItemId && <span className="ml-1 text-xs text-(--color-gold)" title="在庫連動">◆</span>}
+                  {(r.itemType || r.maker) && (
+                    <span className="ml-1 text-xs text-(--color-dim)">{[r.itemType, r.maker].filter(Boolean).join(" / ")}</span>
+                  )}
                 </td>
                 <td className="px-2 py-2 text-(--color-dim)">{r.pro || "—"}</td>
                 <td className="px-2 py-2 text-right tabular-nums">
@@ -224,8 +243,14 @@ export default function SalesTable({
                 </td>
                 <td className="px-2 py-2 text-(--color-dim)">{r.payMethod || "—"}</td>
                 <td className="px-2 py-2 text-right whitespace-nowrap">
-                  <button type="button" onClick={() => startEdit(r)} className="mr-3 text-xs text-(--color-dim) hover:text-(--color-gold)">編集</button>
-                  <button type="button" onClick={() => remove(r)} disabled={pending} className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
+                  {r.source === "ledger" ? (
+                    <span className="text-xs text-(--color-dim)" title="売上台帳（Excel取込）の明細。修正はExcel再取込で">台帳</span>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => startEdit(r)} className="mr-3 text-xs text-(--color-dim) hover:text-(--color-gold)">編集</button>
+                      <button type="button" onClick={() => remove(r)} disabled={pending} className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
+                    </>
+                  )}
                 </td>
               </tr>
             )
