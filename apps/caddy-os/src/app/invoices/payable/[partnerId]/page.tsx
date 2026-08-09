@@ -203,11 +203,11 @@ export default async function PayableDetail({
                 <td className="py-1 text-right tabular-nums">{yen(pay.total)}</td>
               </tr>
               <tr>
-                <td className="py-1 text-slate-500">消費税</td>
-                <td className="py-1 text-right text-slate-500">免税</td>
+                <td className="py-1 text-slate-500">うち消費税（内税10%）</td>
+                <td className="py-1 text-right text-slate-500 tabular-nums">{yen(Math.floor((pay.total * 10) / 110))}</td>
               </tr>
               <tr className="border-t-2 border-black">
-                <td className="py-2 font-bold">ご請求金額</td>
+                <td className="py-2 font-bold">ご請求金額（税込）</td>
                 <td className="py-2 text-right text-lg font-bold tabular-nums">¥ {yen(pay.total)}</td>
               </tr>
             </tbody>
@@ -218,7 +218,7 @@ export default async function PayableDetail({
       </div>
 
       <div className="mx-auto max-w-3xl p-4 text-xs text-(--color-dim) print:hidden">
-        派遣台帳から自動生成しています（{pay.lines.length}明細）。免税事業者のため消費税は加算していません。
+        派遣台帳から自動生成しています（{pay.lines.length}明細）。内税表記（消費税は合計に含み、上乗せしません）。
         ゴルフウィング勤務分も含みます。金額が合わない場合は台帳を修正してください。
       </div>
     </>

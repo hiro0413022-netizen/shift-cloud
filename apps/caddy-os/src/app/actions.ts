@@ -658,7 +658,7 @@ export async function issuePayableInvoice(partnerId: string, ym: string): Promis
       closing_date: closingDateOf(ym, "月末"),
       issue_date: new Date().toISOString().slice(0, 10),
       subtotal: pay.total,
-      tax_rate: 0, // 免税事業者
+      tax_rate: 0, // 内税（合計に含む・上乗せしない）
       tax: 0,
       total: pay.total,
       lines: pay.lines,

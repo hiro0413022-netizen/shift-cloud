@@ -77,7 +77,7 @@ export default async function PayablePage({ searchParams }: { searchParams: Prom
           </Link>
           <h1 className="text-2xl font-bold tracking-widest">支払（キャディ→YOZAN）</h1>
           <p className="mt-1 text-sm text-(--color-dim)">
-            委託先が YOZAN へ上げる請求書のもと。委託料＋交通費＋特別手当＋ゴルフウィング時給。消費税なし（免税）
+            委託先が YOZAN へ上げる請求書のもと。委託料＋交通費＋特別手当＋ゴルフウィング時給。内税（消費税込・上乗せなし）
           </p>
         </div>
         <form method="get" className="flex items-center gap-2">
