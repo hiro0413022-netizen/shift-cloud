@@ -15,6 +15,7 @@ import {
   sumAmount,
   type LessonCountRow,
 } from "@/lib/lesson-allowance";
+import { LessonUnlinkedFixer, type UnlinkedLine, type ProOption, type StaffOption } from "./lesson-fix";
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ ym?: string }> }) {
   const actor = await requireActor("view_payroll");
@@ -49,6 +50,38 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     p_to: mTo,
   });
   const lesson = splitLessonCounts((lessonRows ?? []) as LessonCountRow[]);
+
+  // 未紐付けがある月だけ「どの明細か」まで取りに行き、画面上で直せるようにする（0104）
+  let unlinkedLines: UnlinkedLine[] = [];
+  let proOptions: ProOption[] = [];
+  let staffOptions: StaffOption[] = [];
+  if (lesson.unlinked.length > 0) {
+    const [u, p, s] = await Promise.all([
+      admin.rpc("personal_lesson_unlinked_lines", {
+        p_company_id: actor.companyId,
+        p_from: mFrom,
+        p_to: mTo,
+      }),
+      admin
+        .from("mon_pros")
+        .select("id, name, staff_id, payout_mode")
+        .eq("company_id", actor.companyId)
+        .is("deleted_at", null)
+        .eq("active", true)
+        .order("sort_order")
+        .order("name"),
+      admin
+        .from("staff")
+        .select("id, name")
+        .eq("company_id", actor.companyId)
+        .is("deleted_at", null)
+        .order("name"),
+    ]);
+    unlinkedLines = (u.data ?? []) as UnlinkedLine[];
+    proOptions = (p.data ?? []) as ProOption[];
+    staffOptions = (s.data ?? []) as StaffOption[];
+  }
+
   const lessonPayroll = mergeByStaff(lesson.payroll);
   const lessonOutsourcing = mergeByStaff(lesson.outsourcing);
   const lessonExcluded = mergeByStaff(lesson.excluded);
@@ -111,17 +144,21 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             </p>
           </div>
 
-          {lesson.unlinked.length > 0 && (
-            <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-              <p className="font-medium">担当プロが特定できない売上があります（手当に反映されません）</p>
-              <ul className="mt-1 list-disc pl-5">
-                {lesson.unlinked.map((r) => (
-                  <li key={r.pro_name}>
-                    {r.pro_name} — {r.qty}件。money-osの売上明細で担当プロを設定するか、設定＞担当プロでスタッフに紐付けてください。
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {canManage ? (
+            <LessonUnlinkedFixer lines={unlinkedLines} pros={proOptions} staff={staffOptions} ym={ym} />
+          ) : (
+            lesson.unlinked.length > 0 && (
+              <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                <p className="font-medium">担当プロが特定できない売上があります（手当に反映されません）</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {lesson.unlinked.map((r) => (
+                    <li key={r.pro_name}>
+                      {r.pro_name} — {r.qty}件
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
           )}
 
           <Table headers={["担当プロ", "スタッフ", "件数", "手当額", "扱い"]}>

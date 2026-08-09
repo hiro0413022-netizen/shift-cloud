@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient as createBareClient } from "@supabase/supabase-js";
 import { requireActor, loginIdToEmail } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { grantPayrollAccess } from "@/lib/reauth";
+import { grantPayrollAccess, hasPayrollAccess } from "@/lib/reauth";
 import { logAudit } from "@/lib/audit";
 import { monthRange, calcMonthlyPayroll, type WageRow, type AllowanceRow } from "@/lib/payroll-calc";
 import {
@@ -217,6 +217,132 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
   });
   revalidatePath("/admin/payroll");
   return {};
+}
+
+// ============================================================
+// レッスン手当の「担当プロ未紐付け」をその場で直す（2026-08-10 ユーザー要望）
+// 警告を出すだけでは money-os を探し回ることになるため、給与画面から直接修正する。
+// 対象データは money-os の売上台帳 / 担当プロ名簿（同一DB・service_roleで更新）。
+// ============================================================
+
+/** 未紐付けの売上明細に担当プロを設定する（mon_sales_lines.pro を埋める） */
+export async function assignLessonPro(formData: FormData): Promise<void> {
+  const actor = await requireActor("manage_payroll");
+  // 給与画面の再認証（15分）を通っていない場合は何もしない
+  if (!(await hasPayrollAccess(actor.staffId))) return;
+
+  const lineId = String(formData.get("line_id") ?? "").trim();
+  const pro = String(formData.get("pro") ?? "").trim();
+  const ym = String(formData.get("ym") ?? "");
+  if (!lineId || !pro) return;
+
+  const admin = createAdmin();
+  const { data: before } = await admin
+    .from("mon_sales_lines")
+    .select("id, pro, sold_on, customer_name")
+    .eq("id", lineId)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!before) return;
+
+  await admin
+    .from("mon_sales_lines")
+    .update({ pro, updated_at: new Date().toISOString() })
+    .eq("id", lineId)
+    .eq("company_id", actor.companyId);
+
+  await logAudit(actor, "payroll.lesson_pro_assign", "mon_sales_lines", lineId, null, {
+    ym,
+    sold_on: before.sold_on,
+    customer: before.customer_name,
+    before: before.pro,
+    after: pro,
+  });
+  revalidatePath("/admin/payroll");
+}
+
+/**
+ * 売上台帳に出てくるプロ表記を名簿へ紐付ける。
+ *  target = "alias:<mon_pros.id>" … 既存プロの別名（表記ゆれ）として登録
+ *  target = "staff:<staff.id>"    … 新しい担当プロとして登録し、そのスタッフに紐付け
+ */
+export async function linkLessonPro(formData: FormData): Promise<void> {
+  const actor = await requireActor("manage_payroll");
+  if (!(await hasPayrollAccess(actor.staffId))) return;
+
+  const proName = String(formData.get("pro_name") ?? "").trim();
+  const target = String(formData.get("target") ?? "").trim();
+  const storeId = String(formData.get("store_id") ?? "").trim();
+  const mode = String(formData.get("payout_mode") ?? "payroll");
+  const ym = String(formData.get("ym") ?? "");
+  if (!proName || !target) return;
+  // CHECK制約に落とさない保険（0094）
+  const payoutMode = ["payroll", "outsourcing", "none"].includes(mode) ? mode : "payroll";
+
+  const admin = createAdmin();
+
+  if (target.startsWith("alias:")) {
+    const proId = target.slice("alias:".length);
+    const { data: pro } = await admin
+      .from("mon_pros")
+      .select("id, name, aliases")
+      .eq("id", proId)
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!pro) return;
+    const aliases = [...new Set([...(pro.aliases ?? []), proName])];
+    await admin
+      .from("mon_pros")
+      .update({ aliases, updated_at: new Date().toISOString() })
+      .eq("id", pro.id)
+      .eq("company_id", actor.companyId);
+    await logAudit(actor, "payroll.lesson_pro_alias", "mon_pros", pro.id, null, { ym, alias: proName, pro: pro.name });
+    revalidatePath("/admin/payroll");
+    return;
+  }
+
+  if (target.startsWith("staff:") && storeId) {
+    const staffId = target.slice("staff:".length);
+    // 同名が既にある場合は作らずスタッフを紐付ける（uq_mon_pros_name の衝突回避）
+    const { data: exists } = await admin
+      .from("mon_pros")
+      .select("id")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", storeId)
+      .eq("name", proName)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    if (exists) {
+      await admin
+        .from("mon_pros")
+        .update({ staff_id: staffId, payout_mode: payoutMode, updated_at: new Date().toISOString() })
+        .eq("id", exists.id)
+        .eq("company_id", actor.companyId);
+      await logAudit(actor, "payroll.lesson_pro_link", "mon_pros", exists.id, null, { ym, pro: proName, staffId, payoutMode });
+    } else {
+      const { data: created } = await admin
+        .from("mon_pros")
+        .insert({
+          company_id: actor.companyId,
+          store_id: storeId,
+          name: proName,
+          staff_id: staffId,
+          payout_mode: payoutMode,
+        })
+        .select("id")
+        .maybeSingle();
+      await logAudit(actor, "payroll.lesson_pro_create", "mon_pros", created?.id ?? null, null, {
+        ym,
+        pro: proName,
+        staffId,
+        payoutMode,
+      });
+    }
+    revalidatePath("/admin/payroll");
+  }
 }
 
 export async function lockPayroll(formData: FormData) {
