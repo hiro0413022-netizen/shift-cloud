@@ -5,6 +5,7 @@
   "description": "AI営業 SNSインバウンド（cnt_posts / migration 0091 / DECISIONS #101）。投稿の生成・予約・Instagram配信。TSソースのまま提供 — 利用側next.config.tsで transpilePackages: ['@yozan/content'] を指定",
   "exports": {
     "./server": "./src/server.ts",
+    "./due": "./src/due.ts",
     "./generate": "./src/generate.ts",
     "./instagram": "./src/instagram.ts",
     "./x": "./src/x.ts",

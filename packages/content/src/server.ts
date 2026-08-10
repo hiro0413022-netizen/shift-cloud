@@ -1,5 +1,6 @@
 import type { AdminClient, CntPost, GeneratedPost, Material, Product } from "./types";
 import { buildCaption } from "./generate";
+import { THREAD_STALL_LIMIT, hasPendingWork } from "./due";
 import { igConfigForProduct, publishImagePost, type IgConfig } from "./instagram";
 import {
   xConfigFromEnv,
@@ -272,7 +273,7 @@ export type PublishSummary = {
 };
 
 /** 進捗ゼロのtickを何回まで許すか（10分tick × 6 = 約1時間）。半端に公開されたスレッドを諦めない上限 */
-const THREAD_STALL_LIMIT = 6;
+// → due.ts に移動（テストから読めるようにするため）。値は 6 のまま
 
 /** 商品 → X本文に貼る集客LPのパス（Xは本文リンクが踏める＝IGのbio誘導と役割が違う） */
 const LP_PATH: Record<string, string> = {
@@ -305,6 +306,11 @@ export async function publishDue(
   const nowIso = new Date().toISOString();
   // xAuto のときは承認待ちの行も拾う（Xだけ先に出す）。Instagramは従来どおり承認済みのみ
   const statuses = opts.xAuto ? ["scheduled", "awaiting_approval"] : ["scheduled"];
+  const limit = opts.limit ?? 3;
+  // ⚠ ここで limit を直接かけてはいけない（2026-08-10のX投稿停止の原因）。
+  //   「Xは投稿済み・Instagramは承認待ちのまま」の行は status が awaiting_approval のまま永久に残る。
+  //   古い順にlimit件だけ取ると、その残骸が枠を占領して新しい投稿に永久に順番が回らなくなる。
+  //   → 広めに取ってから「やることが残っている行」だけに絞り、そのあとで limit をかける。
   const { data: rows } = await admin
     .from("cnt_posts")
     .select(SELECT_POST)
@@ -313,8 +319,8 @@ export async function publishDue(
     .lte("scheduled_at", nowIso)
     .is("deleted_at", null)
     .order("scheduled_at", { ascending: true })
-    .limit(opts.limit ?? 3);
-  const due = (rows ?? []) as Row[];
+    .limit(Math.max(limit * 10, 30));
+  const due = ((rows ?? []) as Row[]).filter((r) => hasPendingWork(toPost(r), opts.xAuto ?? false)).slice(0, limit);
   const summary: PublishSummary = { due: due.length, posted: 0, failed: 0, instagram: 0, x: 0, xAuto: 0, threads: 0 };
   if (due.length === 0) return summary;
 
