@@ -4,6 +4,8 @@ import { useActionState, useRef, useState, useEffect, useCallback } from "react"
 import { submitSignup, type SignupState } from "./actions";
 import { FRUNK_PAYMENT_METHODS, yen } from "@/lib/frunk";
 import { OCCUPATIONS, CONTACT_METHODS } from "@/lib/walkin";
+import { AddressFields } from "@/components/address-fields";
+import { BirthDateInput } from "@/components/birth-date-input";
 
 type Plan = {
   id: string;
@@ -84,11 +86,8 @@ export function JoinForm({ token, plans }: { token: string; plans: Plan[] }) {
           <input name="name_kana" placeholder="ヤマダ タロウ" className={field} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>生年月日</label>
-            <input type="date" name="birth_date" className={field} />
-          </div>
-          <div>
+          <BirthDateInput inputClassName={field} labelClassName={labelCls} className="col-span-2" />
+          <div className="col-span-2">
             <label className={labelCls}>性別</label>
             <select name="gender" defaultValue="" className={field}>
               <option value="">選択</option>
@@ -109,15 +108,8 @@ export function JoinForm({ token, plans }: { token: string; plans: Plan[] }) {
             <input name="email" type="email" placeholder="example@mail.com" className={field} />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label className={labelCls}>郵便番号</label>
-            <input name="postal_code" placeholder="670-0000" className={field} />
-          </div>
-          <div className="col-span-2">
-            <label className={labelCls}>ご住所</label>
-            <input name="address" placeholder="兵庫県姫路市〇〇町1-2-3" className={field} />
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <AddressFields inputClassName={field} labelClassName={labelCls} wideClassName="col-span-2" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

@@ -13,6 +13,8 @@ import {
   CONTACT_METHODS,
 } from "@/lib/walkin";
 import { updateVisit, updateGuest, deleteVisit } from "./actions";
+import { AddressFields } from "@/components/address-fields";
+import { BirthDateInput } from "@/components/birth-date-input";
 
 type Row = Record<string, unknown>;
 
@@ -132,21 +134,23 @@ export function VisitRow({ v, guest, rec }: { v: Row; guest: Row | null; rec: Ro
                 ))}
               </select>
             </Field>
-            <Field label="生年月日">
-              <input type="date" name="birth_date" defaultValue={s(guest?.birth_date)} className={inputCls} />
-            </Field>
-            <Field label="郵便番号">
-              <input name="postal_code" defaultValue={s(guest?.postal_code)} placeholder="670-0000" className={inputCls} />
-            </Field>
-            <Field label="都道府県">
-              <input name="prefecture" defaultValue={s(guest?.prefecture)} placeholder="兵庫県" className={inputCls} />
-            </Field>
-            <Field label="住所（市区町村・番地）">
-              <input name="address1" defaultValue={s(guest?.address1)} placeholder="姫路市〇〇町1-2-3" className={`${inputCls} col-span-2`} />
-            </Field>
-            <Field label="建物・部屋">
-              <input name="building" defaultValue={s(guest?.building)} placeholder="〇〇マンション101" className={inputCls} />
-            </Field>
+            <BirthDateInput
+              inputClassName={inputCls}
+              labelClassName="mb-1 block text-xs text-(--color-dim)"
+              defaultValue={s(guest?.birth_date) || null}
+              className="col-span-2"
+            />
+            <AddressFields
+              inputClassName={inputCls}
+              labelClassName="mb-1 block text-xs text-(--color-dim)"
+              defaults={{
+                postal_code: s(guest?.postal_code),
+                prefecture: s(guest?.prefecture),
+                address1: s(guest?.address1),
+                building: s(guest?.building),
+              }}
+              wideClassName="col-span-2"
+            />
             <Field label="電話番号">
               <input name="phone" defaultValue={s(guest?.phone)} placeholder="079-..." className={inputCls} />
             </Field>

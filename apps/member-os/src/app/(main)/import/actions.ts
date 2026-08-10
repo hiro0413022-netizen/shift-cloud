@@ -7,6 +7,7 @@ import JSZip from "jszip";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/kernel";
+import { splitPrefecture } from "@/lib/address";
 
 export type ImportState = { ok?: boolean; error?: string; message?: string };
 
@@ -391,7 +392,9 @@ export async function importWalkins(_prev: ImportState, formData: FormData): Pro
       gender: normGender(cellText(C(row, 6))),
       birth_date: cellDate(C(row, 5)),
       postal_code: cellText(C(row, 7)),
-      address1: cellText(C(row, 8)),
+      // 名簿の住所は「兵庫県…」の1行。都道府県を切り離して保存する
+      prefecture: splitPrefecture(cellText(C(row, 8))).prefecture,
+      address1: splitPrefecture(cellText(C(row, 8))).rest || null,
       phone: cellText(C(row, 10)),
       email: cellText(C(row, 11)),
       occupation: cellText(C(row, 12)),

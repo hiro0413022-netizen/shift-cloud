@@ -3,6 +3,7 @@
 import { createAdmin } from "@/lib/supabase/admin";
 import { hashToken } from "@/lib/intake";
 import { logEvent } from "@/lib/kernel";
+import { normalizeAddress } from "@/lib/address";
 
 export type ReceptionState = { ok?: boolean; error?: string };
 
@@ -48,6 +49,12 @@ export async function submitReception(
   if (str(formData.get("consent")) !== "1")
     return { error: "個人情報の取扱いへの同意が必要です" };
 
+  // 都道府県は欄が空でも住所の先頭から補完する（旧フォーム由来のnull防止）
+  const addr = normalizeAddress(
+    orNull(formData.get("prefecture")),
+    orNull(formData.get("address1")) ?? orNull(formData.get("address"))
+  );
+
   const guestPayload = {
     company_id: tok.company_id as string,
     store_id: tok.store_id as string | null,
@@ -56,7 +63,9 @@ export async function submitReception(
     gender: GENDERS.includes(str(formData.get("gender"))) ? str(formData.get("gender")) : null,
     birth_date: orNull(formData.get("birth_date")),
     postal_code: orNull(formData.get("postal_code")),
-    address1: orNull(formData.get("address")),
+    prefecture: addr.prefecture,
+    address1: addr.address1,
+    building: orNull(formData.get("building")),
     phone: orNull(formData.get("phone")),
     email: orNull(formData.get("email")),
     occupation: orNull(formData.get("occupation")),

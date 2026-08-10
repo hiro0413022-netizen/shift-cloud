@@ -3,6 +3,7 @@
 import { createAdmin } from "@/lib/supabase/admin";
 import { hashToken } from "@/lib/intake";
 import { logEvent } from "@/lib/kernel";
+import { joinAddress } from "@/lib/address";
 
 export type SignupState = { ok?: boolean; error?: string };
 
@@ -45,7 +46,12 @@ export async function submitSignup(_prev: SignupState, formData: FormData): Prom
     birth_date: orNull(formData.get("birth_date")),
     gender: GENDERS.includes(str(formData.get("gender"))) ? str(formData.get("gender")) : null,
     postal_code: orNull(formData.get("postal_code")),
-    address1: orNull(formData.get("address")),
+    // frunk_membersは都道府県列を持たないため、1行に結合して保存する
+    address1: joinAddress(
+      formData.get("prefecture") as string | null,
+      (formData.get("address1") as string | null) ?? (formData.get("address") as string | null),
+      formData.get("building") as string | null
+    ),
     phone: orNull(formData.get("phone")),
     email: orNull(formData.get("email")),
     occupation: orNull(formData.get("occupation")),

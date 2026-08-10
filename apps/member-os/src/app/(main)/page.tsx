@@ -2,9 +2,10 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
-import { VISIT_TYPES, VISIT_TYPE_LABEL, REFERRAL_SOURCES, OCCUPATIONS } from "@/lib/walkin";
+import { VISIT_TYPES, VISIT_TYPE_LABEL } from "@/lib/walkin";
 import { createVisitManual, issueStoreToken } from "./actions";
 import { VisitRow } from "./visit-row";
+import { ManualVisitForm } from "./manual-visit-form";
 
 export const dynamic = "force-dynamic";
 
@@ -106,57 +107,11 @@ export default async function LedgerPage({
 
       {/* 手動追加 */}
       <Panel title="一時利用を手動で登録（電話・飛び込み等）" className="d1">
-        <form action={createVisitManual} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Field label="日付">
-            <input type="date" name="visited_on" defaultValue={to} className={inputCls} />
-          </Field>
-          <Field label="利用区分">
-            <select name="visit_type" className={inputCls} defaultValue="trial">
-              {VISIT_TYPES.map((v) => <option key={v.value} value={v.value}>{v.label}</option>)}
-            </select>
-          </Field>
-          <Field label="お名前">
-            <input name="name" placeholder="山田 太郎" className={inputCls} />
-          </Field>
-          <Field label="フリガナ">
-            <input name="name_kana" placeholder="ヤマダ タロウ" className={inputCls} />
-          </Field>
-          <Field label="電話番号">
-            <input name="phone" placeholder="090-..." className={inputCls} />
-          </Field>
-          <Field label="メールアドレス">
-            <input name="email" type="email" placeholder="example@mail.com" className={inputCls} />
-          </Field>
-          <Field label="ご住所">
-            <input name="address" placeholder="兵庫県宝塚市〇〇町1-2-3" className={inputCls} />
-          </Field>
-          <Field label="ご職業">
-            <select name="occupation" defaultValue="" className={inputCls}>
-              <option value="">選択</option>
-              {OCCUPATIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </Field>
-          <Field label="利用料">
-            <input name="fee" inputMode="numeric" placeholder="5500" className={inputCls} />
-          </Field>
-          <Field label="経路">
-            <select name="referral_source" className={inputCls} defaultValue="">
-              <option value="">-</option>
-              {REFERRAL_SOURCES.map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </Field>
-          {storeList.length > 1 && (
-            <Field label="店舗">
-              <select name="store_id" className={inputCls}>
-                <option value="">-</option>
-                {storeList.map((s) => <option key={String(s.id)} value={String(s.id)}>{String(s.name)}</option>)}
-              </select>
-            </Field>
-          )}
-          <div className="col-span-2 flex items-end sm:col-span-1">
-            <button className={`${btnCls} w-full justify-center`}>＋ 登録</button>
-          </div>
-        </form>
+        <ManualVisitForm
+          action={createVisitManual}
+          stores={storeList.map((s) => ({ id: String(s.id), name: String(s.name) }))}
+          defaultDate={to}
+        />
       </Panel>
 
       {/* 一覧 */}

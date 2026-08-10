@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 import { submitWebSignup, type WebSignupState } from "./actions";
 import { FRUNK_PAYMENT_METHODS, yen } from "@/lib/frunk";
 import { termsUrl, privacyUrl } from "@/lib/site";
+import { AddressFields } from "@/components/address-fields";
+import { BirthDateInput } from "@/components/birth-date-input";
 
 function Doc({ href, children }: { href: string | null; children: React.ReactNode }) {
   if (!href) return <span className="font-medium text-(--color-txt)">{children}</span>;
@@ -87,8 +89,8 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           <div><label className={label}>フリガナ</label><input name="name_kana" placeholder="ヤマダ タロウ" className={field} /></div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={label}>生年月日</label><input type="date" name="birth_date" className={field} /></div>
-          <div>
+          <BirthDateInput inputClassName={field} labelClassName={label} className="col-span-2" />
+          <div className="col-span-2">
             <label className={label}>性別</label>
             <select name="gender" defaultValue="" className={field}>
               <option value="">選択</option>
@@ -104,9 +106,8 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           <div><label className={label}>メールアドレス</label><input name="email" type="email" placeholder="example@mail.com" className={field} /></div>
         </div>
         <p className="text-xs text-(--color-dim)">※ 電話・メールのいずれかは必須です</p>
-        <div className="grid grid-cols-3 gap-3">
-          <div><label className={label}>郵便番号</label><input name="postal_code" placeholder="670-0000" className={field} /></div>
-          <div className="col-span-2"><label className={label}>ご住所</label><input name="address" placeholder="兵庫県姫路市〇〇町1-2-3" className={field} /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <AddressFields inputClassName={field} labelClassName={label} wideClassName="col-span-2" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

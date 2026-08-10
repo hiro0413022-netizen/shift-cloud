@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
   let q = admin
     .from("mbr_walkin_visits")
-    .select("*, mbr_guests(name, name_kana, birth_date, gender, postal_code, address1, distance_km, phone, email, occupation, contact_method), reception:staff!reception_staff_id(name)")
+    .select("*, mbr_guests(name, name_kana, birth_date, gender, postal_code, prefecture, address1, building, distance_km, phone, email, occupation, contact_method), reception:staff!reception_staff_id(name)")
     .is("deleted_at", null)
     .gte("visited_on", from)
     .lte("visited_on", to)
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
     row[4] = s(g.birth_date);
     row[5] = GENDER_LABEL[s(g.gender)] ?? "";
     row[6] = s(g.postal_code);
-    row[7] = s(g.address1);
+    row[7] = [s(g.prefecture), s(g.address1), s(g.building)].filter(Boolean).join(" ");
     row[8] = s(g.distance_km);
     row[9] = s(g.phone);
     row[10] = s(g.email);

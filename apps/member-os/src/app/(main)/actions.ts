@@ -7,6 +7,7 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit, logEvent } from "@/lib/kernel";
 import { hashToken, generateToken } from "@/lib/intake";
+import { normalizeAddress } from "@/lib/address";
 
 async function refreshMemberKpis(companyId: string) {
   const admin = createAdmin();
@@ -42,8 +43,14 @@ export async function createVisitManual(formData: FormData) {
   const storeId = orNull(formData.get("store_id"));
   const nameKana = orNull(formData.get("name_kana"));
   const email = orNull(formData.get("email"));
-  const address = orNull(formData.get("address"));
   const occupation = orNull(formData.get("occupation"));
+  const gender = str(formData.get("gender"));
+  const note = orNull(formData.get("note"));
+  // 都道府県は欄が空でも住所の先頭から補完する（旧フォーム由来のnull防止）
+  const addr = normalizeAddress(
+    orNull(formData.get("prefecture")),
+    orNull(formData.get("address1")) ?? orNull(formData.get("address"))
+  );
   if (!name && !phone) return; // 空送信ガード
 
   let guestId: string | null = null;
@@ -55,16 +62,26 @@ export async function createVisitManual(formData: FormData) {
         store_id: storeId,
         name,
         phone,
+        mobile: orNull(formData.get("mobile")),
         name_kana: nameKana,
         email,
-        address1: address,
+        gender: GENDERS.includes(gender) ? gender : null,
+        birth_date: orNull(formData.get("birth_date")),
+        postal_code: orNull(formData.get("postal_code")),
+        prefecture: addr.prefecture,
+        address1: addr.address1,
+        building: orNull(formData.get("building")),
         occupation,
+        contact_method: orNull(formData.get("contact_method")),
+        note,
       })
       .select("id")
       .single();
     guestId = g?.id ?? null;
   }
 
+  const result = str(formData.get("result"));
+  const payment = str(formData.get("payment_method"));
   const { data: visit } = await admin
     .from("mbr_walkin_visits")
     .insert({
@@ -74,8 +91,15 @@ export async function createVisitManual(formData: FormData) {
       visited_on: visitedOn ?? new Date().toISOString().slice(0, 10),
       visit_type: visitType,
       fee: intOrNull(formData.get("fee")),
+      discount: orNull(formData.get("discount")),
+      payment_method: PAYMENTS.includes(payment) ? payment : null,
+      pro_staff: orNull(formData.get("pro_staff")),
+      result: RESULTS.includes(result) ? result : "none",
+      reapproach_date: orNull(formData.get("reapproach_date")),
       reception_staff_id: actor.staffId,
       referral_source: orNull(formData.get("referral_source")),
+      referral_source_other: orNull(formData.get("referral_source_other")),
+      note,
       created_by: actor.staffId,
     })
     .select("id")
@@ -154,13 +178,14 @@ export async function updateGuest(formData: FormData) {
   if (!visit) return;
 
   const gender = str(formData.get("gender"));
+  const addr = normalizeAddress(orNull(formData.get("prefecture")), orNull(formData.get("address1")));
   const fields = {
     name_kana: orNull(formData.get("name_kana")),
     gender: GENDERS.includes(gender) ? gender : null,
     birth_date: orNull(formData.get("birth_date")),
     postal_code: orNull(formData.get("postal_code")),
-    prefecture: orNull(formData.get("prefecture")),
-    address1: orNull(formData.get("address1")),
+    prefecture: addr.prefecture,
+    address1: addr.address1,
     building: orNull(formData.get("building")),
     phone: orNull(formData.get("phone")),
     mobile: orNull(formData.get("mobile")),

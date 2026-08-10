@@ -6,6 +6,8 @@ import {
   VISIT_TYPES, OCCUPATIONS, CONTACT_METHODS, REFERRAL_SOURCES,
   TRIAL_REASONS, FITTING_REASONS, SCHOOL_GOALS, JOIN_INTEREST,
 } from "@/lib/walkin";
+import { AddressFields } from "@/components/address-fields";
+import { BirthDateInput } from "@/components/birth-date-input";
 
 const field =
   "w-full rounded-xl border border-(--color-line) bg-white px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
@@ -28,29 +30,9 @@ function CheckGroup({ name, options }: { name: string; options: string[] }) {
 export function ReceptionForm({ token, storeName }: { token: string; storeName: string | null }) {
   const [state, action, pending] = useActionState<ReceptionState, FormData>(submitReception, {});
   const [visitType, setVisitType] = useState("trial");
-  const [postal, setPostal] = useState("");
-  const [address, setAddress] = useState("");
-  const [addrLoading, setAddrLoading] = useState(false);
   const [confirm, setConfirm] = useState<Record<string, string> | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
-
-  // 郵便番号 → 住所 自動入力（zipcloud・キー不要の公開API）
-  async function lookupPostal(zip: string) {
-    const digits = zip.replace(/[^\d]/g, "");
-    if (digits.length !== 7) return;
-    setAddrLoading(true);
-    try {
-      const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${digits}`);
-      const json = await res.json();
-      const r = json?.results?.[0];
-      if (r) setAddress(`${r.address1}${r.address2}${r.address3}`);
-    } catch {
-      /* オフライン等は手入力にフォールバック */
-    } finally {
-      setAddrLoading(false);
-    }
-  }
 
   function openConfirm() {
     setLocalError(null);
@@ -73,7 +55,10 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
       電話番号: phone,
       メール: String(fd.get("email") ?? ""),
       郵便番号: String(fd.get("postal_code") ?? ""),
-      ご住所: String(fd.get("address") ?? ""),
+      ご住所: [fd.get("prefecture"), fd.get("address1"), fd.get("building")]
+        .map((v) => String(v ?? "").trim())
+        .filter(Boolean)
+        .join(" "),
       ご職業: String(fd.get("occupation") ?? ""),
       連絡方法: String(fd.get("contact_method") ?? ""),
     });
@@ -149,11 +134,8 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
             <input name="name_kana" placeholder="ヤマダ タロウ" className={field} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>生年月日</label>
-              <input type="date" name="birth_date" className={field} />
-            </div>
-            <div>
+            <BirthDateInput inputClassName={field} labelClassName={labelCls} className="col-span-2" />
+            <div className="col-span-2">
               <label className={labelCls}>性別</label>
               <select name="gender" defaultValue="" className={field}>
                 <option value="">選択</option>
@@ -174,31 +156,8 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
               <input name="email" type="email" placeholder="example@mail.com" className={field} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className={labelCls}>郵便番号</label>
-              <input
-                name="postal_code"
-                inputMode="numeric"
-                placeholder="665-0000"
-                className={field}
-                value={postal}
-                onChange={(e) => {
-                  setPostal(e.target.value);
-                  lookupPostal(e.target.value);
-                }}
-              />
-            </div>
-            <div className="col-span-2">
-              <label className={labelCls}>ご住所{addrLoading && <span className="ml-2 text-xs text-accent">住所を検索中…</span>}</label>
-              <input
-                name="address"
-                placeholder="兵庫県宝塚市〇〇町1-2-3"
-                className={field}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <AddressFields inputClassName={field} labelClassName={labelCls} wideClassName="col-span-2" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
