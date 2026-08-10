@@ -42,6 +42,8 @@ DECISIONS #48 / migration 0039。Shift Cloudのスタッフ画面を「スタッ
 
 - 構成: ①月間カレンダー（店舗全員の出勤者名チップ・イベント●・体験予約●・やること●、日タップで詳細）→ ②今月KPIカード4種 → ③業務リンク集（sp_links）
 - やること = **店舗共通タスクのみ**（sp_tasks staff_id null / #55）。追加・完了チェック可。個人タスクは共有画面に出さない
+  - スタッフ側 /home・/calendar の「やることを追加」には **「店舗のみんなに共有する」チェック**がある（既定OFF＝個人あて）。ONで `staff_id=null` + `store_id=主店舗` となり、この店舗端末にも出る。主店舗未設定のスタッフはONにできない（0050 sp_tasks_target_check）
+  - 「自分のカレンダーには出るのに店舗端末に出ない」という問い合わせは、ほぼこのチェックOFFが原因
 - KPI（店舗別・今月・すべて既存テーブルから直接集計＝新テーブルなし）:
   - 体験: GOLF WING=mbr_trial_bookings / FRANK=mbr_trial_requests(#72)
   - 物販: mon_sales category='販売'（当月なしは最新実績月をフォールバック表示）
