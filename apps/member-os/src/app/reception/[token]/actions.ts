@@ -4,6 +4,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { hashToken } from "@/lib/intake";
 import { logEvent } from "@/lib/kernel";
 import { normalizeAddress } from "@/lib/address";
+import { readName } from "@/lib/name";
 
 export type ReceptionState = { ok?: boolean; error?: string };
 
@@ -38,10 +39,8 @@ export async function submitReception(
 
   if (!tok || !tok.active) return { error: "無効な受付URLです。スタッフにお声がけください" };
 
-  // 姓・名を分割入力（Excelで「姓 名」に整形）。旧nameフィールドにもフォールバック。
-  const familyName = str(formData.get("family_name"));
-  const givenName = str(formData.get("given_name"));
-  const name = [familyName, givenName].filter(Boolean).join(" ") || str(formData.get("name"));
+  // 姓・名／セイ・メイを分割入力（保存時に「姓 名」へ整形）。旧1欄フォームにもフォールバック。
+  const { name, nameKana } = readName(formData);
   if (!name) return { error: "お名前を入力してください" };
   const visitType = VISIT_TYPES.includes(str(formData.get("visit_type")))
     ? str(formData.get("visit_type"))
@@ -59,7 +58,7 @@ export async function submitReception(
     company_id: tok.company_id as string,
     store_id: tok.store_id as string | null,
     name,
-    name_kana: orNull(formData.get("name_kana")),
+    name_kana: nameKana,
     gender: GENDERS.includes(str(formData.get("gender"))) ? str(formData.get("gender")) : null,
     birth_date: orNull(formData.get("birth_date")),
     postal_code: orNull(formData.get("postal_code")),

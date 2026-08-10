@@ -3,6 +3,7 @@
 import { createAdmin } from "@/lib/supabase/admin";
 import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
+import { readName } from "@/lib/name";
 
 export type TrialState = { ok?: boolean; error?: string };
 
@@ -19,8 +20,8 @@ export async function submitTrial(_prev: TrialState, formData: FormData): Promis
   const store = await resolveHimeji();
   if (!store) return { error: "店舗情報が見つかりません。時間をおいて再度お試しください。" };
 
-  const name = str(formData.get("name"));
-  if (!name) return { error: "お名前を入力してください" };
+  const { name, nameKana } = readName(formData);
+  if (!name) return { error: "お名前（姓・名）を入力してください" };
   const phone = str(formData.get("phone"));
   const email = str(formData.get("email"));
   if (!phone && !email) return { error: "電話番号またはメールアドレスのいずれかをご入力ください" };
@@ -33,7 +34,7 @@ export async function submitTrial(_prev: TrialState, formData: FormData): Promis
     company_id: store.companyId,
     store_id: store.storeId,
     name,
-    name_kana: orNull(formData.get("name_kana")),
+    name_kana: nameKana,
     phone: phone || null,
     email: email || null,
     pref1: orNull(formData.get("pref1")),

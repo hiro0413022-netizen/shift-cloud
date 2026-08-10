@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 2026-08-10 — お客様フォームの氏名を姓/名に分割＋FRANK入会の支払方法欄を撤去
+- feat(member-os): 共通コンポーネント `NameFields`（姓・名・セイ・メイの4欄）＋ `lib/name.ts`（joinName / splitName / readName）。1欄だと「山田太郎」「太郎 山田」「全角スペース」が混ざり、名簿の並び替え・宛名・Excel出力・重複判定が崩れるため、お客様の入力は必ず分割で受ける。DBは name / name_kana の1列のままで、保存時に「姓 名」へ結合（列追加なし・旧1欄フォームからの送信もフォールバックで受ける）
+- feat(member-os): `/join-web`（Web入会）・`/join/[token]`（店頭タブレット入会）・`/trial`（体験申込）・`/reception/[token]`（店頭受付）を NameFields に統一。receptionは姓/名は既に分割済みでフリガナのみ分割
+- feat(frank-golf): トライアル予約（trial-booking）の氏名も姓/名・セイ/メイに分割。送信時にJSで結合（`_build.py` を修正して静的HTML再生成）
+- change(member-os): FRANK入会フォーム（Web・タブレット両方）から**お支払い方法の選択を撤去**。月会費はSquareのカード自動課金のみ＝ `payment_method='credit'` を固定保存し、「カード登録は会員番号の発行後（会員ページ）」という案内を表示。現金・口座振替・SBペイメントの選択肢は既存データの表示用に `FRUNK_PAYMENT_LABEL` として残置
+- test: name-fields ロジック11件（結合・全角スペース・区切り無し・null安全）
+
 ## 2026-08-10 — Money OS: 過去の売上明細を/salesに表示＋入力画面をExcel全列対応
 - feat(money-golfwing): 明細一覧の見出しクリックでソート（日付・区分・お客様名・品名・担当・金額・支払、昇順⇄降順。文字列は日本語ロケール比較・既定は日付の新しい順）
 - feat(money-golfwing): /sales の明細一覧にアプリ入力(mon_sales)＋売上台帳の取込明細(mon_sales_lines)を統合表示。過去期（28〜31期）の明細が月送りで見えるように（従来はmon_salesの月次まるめ行しか出ず「明細が入っていない」ように見えた）。台帳明細は「台帳」バッジ付きの閲覧のみ・月次まるめ行(ledger/migration/slack_import)は二重表示になるため一覧から除外

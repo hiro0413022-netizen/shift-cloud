@@ -8,6 +8,8 @@ import {
 } from "@/lib/walkin";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
+import { NameFields } from "@/components/name-fields";
+import { joinName } from "@/lib/name";
 
 const field =
   "w-full rounded-xl border border-(--color-line) bg-white px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
@@ -49,8 +51,8 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
     const vt = VISIT_TYPES.find((v) => v.value === fd.get("visit_type"));
     setConfirm({
       利用区分: vt?.label ?? "",
-      お名前: `${familyName} ${givenName}`,
-      フリガナ: String(fd.get("name_kana") ?? ""),
+      お名前: joinName(familyName, givenName),
+      フリガナ: joinName(String(fd.get("family_name_kana") ?? ""), String(fd.get("given_name_kana") ?? "")),
       生年月日: String(fd.get("birth_date") ?? ""),
       電話番号: phone,
       メール: String(fd.get("email") ?? ""),
@@ -120,18 +122,7 @@ export function ReceptionForm({ token, storeName }: { token: string; storeName: 
         <div className={`${cardCls} space-y-4`}>
           <p className="text-sm font-semibold text-(--color-txt)">お客様情報</p>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>姓 <span className="text-rose-500">*</span></label>
-              <input name="family_name" required placeholder="山田" className={field} />
-            </div>
-            <div>
-              <label className={labelCls}>名 <span className="text-rose-500">*</span></label>
-              <input name="given_name" required placeholder="太郎" className={field} />
-            </div>
-          </div>
-          <div>
-            <label className={labelCls}>フリガナ</label>
-            <input name="name_kana" placeholder="ヤマダ タロウ" className={field} />
+            <NameFields inputClassName={field} labelClassName={labelCls} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <BirthDateInput inputClassName={field} labelClassName={labelCls} className="col-span-2" />

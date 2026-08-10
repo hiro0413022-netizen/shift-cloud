@@ -2,10 +2,11 @@
 
 import { useActionState, useState } from "react";
 import { submitWebSignup, type WebSignupState } from "./actions";
-import { FRUNK_PAYMENT_METHODS, yen } from "@/lib/frunk";
+import { yen } from "@/lib/frunk";
 import { termsUrl, privacyUrl } from "@/lib/site";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
+import { NameFields } from "@/components/name-fields";
 
 function Doc({ href, children }: { href: string | null; children: React.ReactNode }) {
   if (!href) return <span className="font-medium text-(--color-txt)">{children}</span>;
@@ -85,8 +86,11 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
       <div className={`${cardCls} space-y-4`}>
         <p className="text-sm font-semibold text-(--color-txt)">お客様情報</p>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={label}>お名前 <span className="text-rose-400">*</span></label><input name="name" required placeholder="山田 太郎" className={field} /></div>
-          <div><label className={label}>フリガナ</label><input name="name_kana" placeholder="ヤマダ タロウ" className={field} /></div>
+          <NameFields
+            inputClassName={field}
+            labelClassName={label}
+            requiredMark={<span className="text-rose-400"> *</span>}
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <BirthDateInput inputClassName={field} labelClassName={label} className="col-span-2" />
@@ -109,15 +113,16 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         <div className="grid grid-cols-2 gap-3">
           <AddressFields inputClassName={field} labelClassName={label} wideClassName="col-span-2" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={label}>お支払い方法</label>
-            <select name="payment_method" defaultValue="" className={field}>
-              <option value="">選択</option>
-              {FRUNK_PAYMENT_METHODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </div>
-          <div><label className={label}>ご利用開始希望日</label><input type="date" name="start_date" className={field} /></div>
+        <div>
+          <label className={label}>ご利用開始希望日</label>
+          <input type="date" name="start_date" className={field} />
+        </div>
+        <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-sm text-(--color-dim)">
+          <span className="font-medium text-(--color-txt)">お支払いはクレジットカードのみ</span>
+          <br />
+          月会費は毎月カードで自動お支払いになります。カードのご登録は、この申込のあと
+          <span className="font-medium text-(--color-txt)">会員番号をメールでお送りしてから</span>
+          （会員ページ）となります。このフォームでカード情報を入力する必要はありません。
         </div>
         <div>
           <label className={label}>クーポンコード（お持ちの方のみ）</label>

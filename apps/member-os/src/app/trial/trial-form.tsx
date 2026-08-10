@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { submitTrial, type TrialState } from "./actions";
 import { TRIAL_EXPERIENCE } from "@/lib/trial";
 import { privacyUrl } from "@/lib/site";
+import { NameFields } from "@/components/name-fields";
 
 const field =
   "w-full rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
@@ -27,14 +28,11 @@ export function TrialForm() {
   return (
     <form action={action} className="space-y-4 rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
       <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={label}>お名前 <span className="text-rose-400">*</span></label>
-          <input name="name" required placeholder="山田 太郎" className={field} />
-        </div>
-        <div>
-          <label className={label}>フリガナ</label>
-          <input name="name_kana" placeholder="ヤマダ タロウ" className={field} />
-        </div>
+        <NameFields
+          inputClassName={field}
+          labelClassName={label}
+          requiredMark={<span className="text-rose-400"> *</span>}
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>

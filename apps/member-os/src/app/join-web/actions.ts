@@ -6,6 +6,7 @@ import { logEvent } from "@/lib/kernel";
 import { sendFrankMail, buildWebSignupReceiptMail } from "@/lib/frank-mail";
 import { validCoupon, normalizeCoupon } from "@/lib/frank-billing-pure";
 import { joinAddress } from "@/lib/address";
+import { readName } from "@/lib/name";
 
 export type WebSignupState = { ok?: boolean; error?: string };
 
@@ -28,8 +29,8 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
   const store = await resolveHimeji();
   if (!store) return { error: "店舗情報が見つかりません。時間をおいて再度お試しください。" };
 
-  const name = str(formData.get("name"));
-  if (!name) return { error: "お名前を入力してください" };
+  const { name, nameKana } = readName(formData);
+  if (!name) return { error: "お名前（姓・名）を入力してください" };
   if (!str(formData.get("plan_id"))) return { error: "ご希望のプランをお選びください" };
   const phone = str(formData.get("phone"));
   const email = str(formData.get("email"));
@@ -78,7 +79,7 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     store_id: store.storeId,
     plan_id: plan.id,
     name,
-    name_kana: orNull(formData.get("name_kana")),
+    name_kana: nameKana,
     birth_date: orNull(formData.get("birth_date")),
     gender: GENDERS.includes(str(formData.get("gender"))) ? str(formData.get("gender")) : null,
     postal_code: orNull(formData.get("postal_code")),
@@ -90,7 +91,8 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     ),
     phone: phone || null,
     email: email || null,
-    payment_method: orNull(formData.get("payment_method")),
+    // 月会費はクレジットカード（Square自動課金）の一本化。フォームから選ばせない
+    payment_method: "credit",
     start_date: orNull(formData.get("start_date")),
     consent_privacy: true,
     consent_terms: true,

@@ -1746,12 +1746,20 @@ def build_trial_booking():
         <div class="form">
           <div class="form__grid">
             <div class="form__row">
-              <label class="form__label" for="tb-name">お名前 <span class="req">必須</span></label>
-              <input id="tb-name" type="text" autocomplete="name" placeholder="山田 太郎">
+              <label class="form__label" for="tb-sei">姓 <span class="req">必須</span></label>
+              <input id="tb-sei" type="text" autocomplete="family-name" placeholder="山田">
             </div>
             <div class="form__row">
-              <label class="form__label" for="tb-kana">フリガナ</label>
-              <input id="tb-kana" type="text" placeholder="ヤマダ タロウ">
+              <label class="form__label" for="tb-mei">名 <span class="req">必須</span></label>
+              <input id="tb-mei" type="text" autocomplete="given-name" placeholder="太郎">
+            </div>
+            <div class="form__row">
+              <label class="form__label" for="tb-sei-kana">セイ（フリガナ）</label>
+              <input id="tb-sei-kana" type="text" placeholder="ヤマダ">
+            </div>
+            <div class="form__row">
+              <label class="form__label" for="tb-mei-kana">メイ（フリガナ）</label>
+              <input id="tb-mei-kana" type="text" placeholder="タロウ">
             </div>
             <div class="form__row">
               <label class="form__label" for="tb-phone">電話番号 <span class="req">必須</span></label>
@@ -1964,15 +1972,19 @@ def build_trial_booking():
   $("tb-submit").addEventListener("click", function(){
     var el = $("tb-status"); el.className = "form__status"; el.textContent = "";
     if (!state.date || !state.start) { el.className = "form__status is-err"; el.textContent = "日時をお選びください"; return }
-    var name = $("tb-name").value.trim();
+    /* 姓・名は分けて受け取り、送信時に「姓 名」に結合する（台帳側は1列） */
+    var sei = $("tb-sei").value.trim(), mei = $("tb-mei").value.trim();
+    var name = [sei, mei].filter(Boolean).join(" ");
+    var kana = [$("tb-sei-kana").value.trim(), $("tb-mei-kana").value.trim()].filter(Boolean).join(" ");
     var phone = $("tb-phone").value.trim();
-    if (!name)  { el.className = "form__status is-err"; el.textContent = "お名前をご入力ください"; $("tb-name").focus(); return }
+    if (!sei)  { el.className = "form__status is-err"; el.textContent = "姓をご入力ください"; $("tb-sei").focus(); return }
+    if (!mei)  { el.className = "form__status is-err"; el.textContent = "名をご入力ください"; $("tb-mei").focus(); return }
     if (!phone) { el.className = "form__status is-err"; el.textContent = "電話番号をご入力ください"; $("tb-phone").focus(); return }
     if (!$("tb-consent").checked) { el.className = "form__status is-err"; el.textContent = "個人情報の取扱いへの同意が必要です"; return }
 
     var btn = $("tb-submit"); btn.disabled = true; el.textContent = "確定しています…";
     fetch(API, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({
-      action:"book", name:name, name_kana:$("tb-kana").value.trim(), phone:phone,
+      action:"book", name:name, name_kana:kana, phone:phone,
       email:$("tb-email").value.trim(), date:state.date, start:state.start,
       lefty:state.lefty, experience:$("tb-exp").value, message:$("tb-msg").value.trim(), consent:true
     })}).then(function(r){ return r.json() }).then(function(j){

@@ -2,10 +2,11 @@
 
 import { useActionState, useRef, useState, useEffect, useCallback } from "react";
 import { submitSignup, type SignupState } from "./actions";
-import { FRUNK_PAYMENT_METHODS, yen } from "@/lib/frunk";
+import { yen } from "@/lib/frunk";
 import { OCCUPATIONS, CONTACT_METHODS } from "@/lib/walkin";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
+import { NameFields } from "@/components/name-fields";
 
 type Plan = {
   id: string;
@@ -77,13 +78,8 @@ export function JoinForm({ token, plans }: { token: string; plans: Plan[] }) {
       {/* お客様情報 */}
       <div className={`${cardCls} space-y-4`}>
         <p className="text-sm font-semibold text-(--color-txt)">お客様情報</p>
-        <div>
-          <label className={labelCls}>お名前 <span className="text-rose-500">*</span></label>
-          <input name="name" required placeholder="山田 太郎" className={field} />
-        </div>
-        <div>
-          <label className={labelCls}>フリガナ</label>
-          <input name="name_kana" placeholder="ヤマダ タロウ" className={field} />
+        <div className="grid grid-cols-2 gap-3">
+          <NameFields inputClassName={field} labelClassName={labelCls} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <BirthDateInput inputClassName={field} labelClassName={labelCls} className="col-span-2" />
@@ -127,18 +123,16 @@ export function JoinForm({ token, plans }: { token: string; plans: Plan[] }) {
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>お支払い方法</label>
-            <select name="payment_method" defaultValue="" className={field}>
-              <option value="">選択</option>
-              {FRUNK_PAYMENT_METHODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>ご利用開始希望日</label>
-            <input type="date" name="start_date" className={field} />
-          </div>
+        <div>
+          <label className={labelCls}>ご利用開始希望日</label>
+          <input type="date" name="start_date" className={field} />
+        </div>
+        <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-sm text-(--color-dim)">
+          <span className="font-medium text-(--color-txt)">お支払いはクレジットカードのみ</span>
+          <br />
+          月会費は毎月カードで自動お支払いになります。カードのご登録は、この申込のあと
+          <span className="font-medium text-(--color-txt)">会員番号が発行されてから</span>
+          （会員ページ）となります。この画面でカード情報を入力する必要はありません。
         </div>
       </div>
 

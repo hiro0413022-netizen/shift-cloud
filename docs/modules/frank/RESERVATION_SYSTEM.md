@@ -118,6 +118,9 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 
 ### 月会費の継続課金（Square・#123 / migration 0105。旧Stripe #97は廃止）
 
+- **カード登録は「入会申込時」ではなく「承認後」**。verifyMember（会員番号＋電話下4桁）を通すため、
+  会員番号が発行される前は登録できない（`入会承認前はご登録いただけません`）。入会フォームは
+  カード情報も支払方法の選択も取らない（payment_method='credit' 固定・#125）。
 - 会員は booking.html の「カードで継続課金を登録する」→ `/api/public/frank/billing`
   → **Squareのサブスク決済ページ**（決済リンク・税込）でカード登録。以後毎月自動課金。
 - 決済リンクは会員ごとにAPIで発行し、返ってきた注文IDを `frunk_members.square_checkout_order_id`
