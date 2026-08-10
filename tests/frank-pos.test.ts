@@ -8,6 +8,9 @@ import {
   jstDateOf,
   mapSquarePayment,
   mapSquareRefund,
+  monthlyFeeTaxIncluded,
+  toE164Jp,
+  classifySquareMonthlyPayment,
 } from "../apps/genesis/src/lib/frank-pos-pure.ts";
 import { buildTrialConfirmMail, buildReminderMail } from "../apps/genesis/src/lib/frank-mail-pure.ts";
 
@@ -95,6 +98,41 @@ test("返金マッピング: マイナスの売上行（category=返金）にな
   assert.equal(r.tax_included, -1100);
   assert.equal(r.category, "返金");
   assert.equal(mapSquareRefund({ id: "REF2", status: "PENDING", amount_money: { amount: 100 } }), null);
+});
+
+/* ============================================================
+   月会費のSquare一本化（#123）
+   同じWebhookに月会費と店頭売上が届く＝振り分けを間違えると
+   二重計上（月会費が「利用料」にもなる）や取りこぼしが起きる。
+   ============================================================ */
+
+test("月会費の税込額: round(税抜×1.1)＝exTaxと往復一致（全5プラン）", () => {
+  for (const ex of [9800, 13800, 19800, 39800, 59800]) {
+    const incl = monthlyFeeTaxIncluded(ex);
+    assert.equal(exTax(incl), ex);
+  }
+  assert.equal(monthlyFeeTaxIncluded(9800), 10780);
+});
+
+test("電話番号→E.164: 0始まりは+81へ・変換できなければnull（省略）", () => {
+  assert.equal(toE164Jp("090-1234-5678"), "+819012345678");
+  assert.equal(toE164Jp("0791 22 3344"), "+81791223344");
+  assert.equal(toE164Jp("+81 90 1234 5678"), "+819012345678");
+  assert.equal(toE164Jp("1234"), null);
+  assert.equal(toE164Jp(null), null);
+});
+
+test("月会費の振り分け: 注文ID一致=初回・顧客ID一致は金額がプラン税込月額のときだけ継続", () => {
+  // 初回（決済リンクの注文IDが一致）は金額に関係なく月会費
+  assert.equal(classifySquareMonthlyPayment({ orderMatched: true, customerMatched: false, amount: 10780, planTaxIncluded: 10780 }), "initial");
+  // 継続課金: 顧客ID一致＋プラン税込月額と同額
+  assert.equal(classifySquareMonthlyPayment({ orderMatched: false, customerMatched: true, amount: 15180, planTaxIncluded: 15180 }), "recurring");
+  // 会員が店頭で会員価格ドリンク（400円）を買っても月会費と誤記録しない
+  assert.equal(classifySquareMonthlyPayment({ orderMatched: false, customerMatched: true, amount: 400, planTaxIncluded: 15180 }), null);
+  // 会員でも注文でもない＝店頭売上（POS経路）
+  assert.equal(classifySquareMonthlyPayment({ orderMatched: false, customerMatched: false, amount: 10780, planTaxIncluded: null }), null);
+  // モニター会員（月会費0円＝planTaxIncluded null）は継続課金と判定しない
+  assert.equal(classifySquareMonthlyPayment({ orderMatched: false, customerMatched: true, amount: 10780, planTaxIncluded: null }), null);
 });
 
 /* ============================================================

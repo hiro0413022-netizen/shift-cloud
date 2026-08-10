@@ -443,32 +443,36 @@ Vercel の **demo-sales** に `ANTHROPIC_API_KEY` を登録すると、規則で
 オープンまでにユーザー作業が要るのはこの4つ。**どれも「未設定でもサイトや予約は落ちない」設計**なので、
 できたものから順に有効化すれば大丈夫です。
 
-### 14-1. Stripe を本番モードへ（月会費の実課金・最重要）
+### 14-1. Square（月会費＋店頭レジ・最重要）
 
-いまはテストモード（sk_test）＝**実カードには課金されません**。9/2までに:
+**#123で月会費もSquareに一本化しました（Stripeは廃止・本番鍵の設定は不要になりました）。**
+店頭POS・物販・飲食・月会費が全部Square 1社＝入金・手数料・管理画面が1本になります。
 
-1. https://dashboard.stripe.com → 本番環境の有効化を完了する
-   （残りは 銀行口座の追加 → アカウント保護 → 確認して送信。明細書表記は設定済み）
-2. 本番モードの **APIキー（sk_live_...）** を取得 → Vercel（yozan-genesis）の `STRIPE_SECRET_KEY` を差し替え
-3. 本番モードで **Webhookを再登録**: 宛先 `https://yozan-genesis.vercel.app/api/public/frank/billing/webhook`
-   イベントは `checkout.session.completed` / `invoice.paid` / `invoice.payment_failed` / `customer.subscription.deleted`
-   （**invoice.paid は今回追加**。これが月会費をMoney OSへ自動計上します）
-4. 新しい `whsec_...` を `STRIPE_WEBHOOK_SECRET` に差し替え → Redeploy
-5. テスト: 自分のカードでモニター以外のプランを1件登録→ frunk_members.billing_status='active'、
-   翌請求で Money OS の売上（姫路・月会費）に自動で1行入ることを確認
+1. https://squareup.com/jp のアカウントで法人確認を完了する（未完なら。数日かかる）。
+   端末は Square Terminal 推奨（約4.6万円）
+2. https://developer.squareup.com → Sign in → アプリを1つ作成（名前例: YOZAN Genesis）→
+   **Production の Access Token** を控える
+3. 初期設定スクリプトを実行（何度実行しても安全）:
+   `SQUARE_ACCESS_TOKEN=EAAA... node scripts/frank-square-setup.mjs`
+   これが自動でやること: ①消費税10%（内税） ②ドリンクメニュー3カテゴリ24品（一般/会員の2価格）
+   ③サブスクプラン「FRANK GOLF 月会費」5種（税込・毎月） ④Webhook購読（payment/refund/subscription）
+4. スクリプトが最後に出力する値を設定:
+   - Vercel（yozan-genesis）: `SQUARE_ACCESS_TOKEN` / `SQUARE_LOCATION_ID` / `SQUARE_WEBHOOK_SIGNATURE_KEY` → Redeploy
+   - Supabase: frunk_plans.square_variation_id の update文を実行
+5. テスト: booking.html から自分のカードでモニター以外のプランを1件登録 →
+   frunk_members.billing_status='active'、Money OS の売上（姫路・月会費）に自動で1行入ることを確認
+6. 物販（ゴルフ用品等）は Square ダッシュボード → 商品ライブラリ に追加していく（税込価格）。
+   ドリンクは登録済み。レジでは会員に「会員」バリエーションを選ぶだけ
+7. vault_systems に Square Developer のアクセストークンの置き場所をメモ（トークン自体はVercelのenvが正）
 
-### 14-2. Square（店頭レジ）の申請と接続
+⚠ 店頭レジで月会費を打たないでください（カード登録済みの会員は毎月自動課金＝二重請求になります）。
+⚠ Webhookは月会費と店頭売上を自動で振り分けます（仕組みは docs/modules/frank/RESERVATION_SYSTEM.md）。
 
-1. https://squareup.com/jp で無料アカウント作成（法人確認あり・数日）。端末は Square Terminal 推奨（約4.6万円）
-2. 商品カタログに 物販・ビジター料・レッスン単発・体験料 を登録（税込価格）
-3. https://developer.squareup.com → アプリ作成 → **Webhooks** →
-   URL: `https://yozan-genesis.vercel.app/api/public/frank/pos/webhook`
-   イベント: `payment.created` / `payment.updated` / `refund.created` / `refund.updated`
-4. 表示される **Signature Key** を Vercel（yozan-genesis）に `SQUARE_WEBHOOK_SIGNATURE_KEY` として登録 → Redeploy
-5. テスト決済1件 → Money OS（FRANK GOLF 姫路）の売上に「Square(自動)」の行が入ることを確認
-   - 現金をSquareでレジ打ちすると現金出納にも自動で入ります
-   - 記録先の内訳（category）は一律「利用料」。物販が多い日はMoney OSで「販売」に直せば集計に反映されます
-6. 稼働したら vault_systems に「Square（FRANK GOLF 店頭POS）」を登録
+### 14-2. （旧）Stripe手順 → 廃止
+
+#123でSquareへ一本化。Stripeはテストモードのみで実課金ゼロのまま終了。
+本番有効化・sk_live差替え・Webhook再登録は**不要**です。ダッシュボードは解約せず放置でOK
+（過去のテストデータ参照用）。
 
 ### 14-3. お客様への確認・リマインダーメール（体験の歩留まり対策）
 

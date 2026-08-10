@@ -8,6 +8,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { generateToken, hashToken } from "@/lib/intake";
 import { logAudit } from "@/lib/kernel";
 import { FRUNK_STORE_CODE } from "@/lib/frunk";
+import { buildApprovalMail, sendFrankMail } from "@/lib/frank-mail";
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
@@ -98,6 +99,25 @@ export async function approveSignup(formData: FormData) {
     reviewed_at: new Date().toISOString(),
   }).eq("id", id);
   await logAudit(actor, "frunk.signup_approve", "frunk_members", null, null, { id, member_no: memberNo });
+
+  // 承認メール（会員番号の通知＋カード登録の案内 #123）。送信失敗で承認は落とさない
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("name, email, frunk_plans(name, monthly_price)")
+    .eq("id", id)
+    .maybeSingle();
+  const email = (m?.email as string | null) ?? null;
+  if (email) {
+    const plan = (m as unknown as { frunk_plans: { name: string; monthly_price: number | null } | null } | null)?.frunk_plans;
+    const price = Number(plan?.monthly_price ?? 0);
+    const mail = buildApprovalMail({
+      name: String(m?.name ?? ""),
+      memberNo,
+      planName: plan?.name ?? null,
+      monthlyFeeTaxIncluded: price > 0 ? Math.round(price * 1.1) : 0,
+    });
+    await sendFrankMail({ to: email, subject: mail.subject, text: mail.text });
+  }
   revalidatePath("/frunk");
 }
 

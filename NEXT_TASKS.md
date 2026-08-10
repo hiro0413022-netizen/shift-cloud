@@ -7,13 +7,16 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
-A-00. **FRANK GOLF 9/2オープンの残作業（#118・2026-08-07実測。手順の正典 = OPERATIONS §14）**
-   開発側は完了（予約・課金・レッスン・CMS・タブレット・LINE配信・Square受信・月会費自動計上・確認/リマインダーメール・特別営業日）。残りは全部ユーザー作業:
-   1. **Stripe本番切替（最重要・9/2まで）**: 本番申請の完了（残=銀行口座→アカウント保護→送信）→ sk_live差替え → Webhook再登録（**invoice.paid を含める**）→ §14-1のテスト
-   2. **Squareアカウント申請**（審査数日＋端末調達あり=お盆前推奨）→ Webhook署名キー設定（§14-2）。導入までは店頭台帳運用
+A-00. **FRANK GOLF 9/2オープンの残作業（#118→#123更新・2026-08-10。手順の正典 = OPERATIONS §14）**
+   開発側は完了（予約・課金・レッスン・CMS・タブレット・LINE配信・Square一本化・月会費自動計上・確認/リマインダーメール・特別営業日）。残りは全部ユーザー作業:
+   1. **Square一本化の仕上げ（最重要・9/2まで・#123でStripeは廃止）**: Square法人確認の完了 →
+      Developer でアプリ作成・Production Access Token 取得 → `scripts/frank-square-setup.mjs` 実行
+      （プラン5種・ドリンク24品・Webhookを自動作成）→ Vercel env 3つ＋frunk_plans 更新 → §14-1のテスト
+      ※ Stripe の本番切替・sk_live 差替えは**不要になりました**
+   2. **Square端末（Terminal 約4.6万円）の調達**（お盆前推奨）。導入までは店頭台帳運用
    3. **Resendで frankgolf.jp をドメイン認証**＋ yozan-genesis に RESEND_API_KEY / FRANK_MAIL_FROM（§14-3）→ 体験の確認・前日リマインダーメールが動き出す
-      - **⚠#120追加: 同じ2つのenvを Vercel(member-os) にも設定**してください。入れないと**Web入会申込の受付メールが飛びません**（申込自体は成立します）
-      - **承認時に会員番号を伝えるメールは未実装**です。当面は承認したら電話・LINEで会員番号（F0001…）をご連絡ください
+      - **⚠#120追加: 同じ2つのenvを Vercel(member-os) にも設定**してください。入れないと**Web入会申込の受付メール・入会承認メールが飛びません**（申込・承認自体は成立します）
+      - ~~承認時に会員番号を伝えるメールは未実装~~ **✅ #123で実装**（承認と同時に会員番号＋カード登録案内をメール。Resend設定が前提）
    4. **FRANKスタッフLINEグループへOA追加**（1分・店舗別朝連絡の宛先になる）／FRANK公式LINE開設したら site-data.js の links.line へ
    5. **サイトの「近日公開」埋め**（下記A-0）と法務3ページ確定（A-0d）
    6. **D打席設営後**: frunk_bays を active=true / trial_priority=4 に
@@ -190,7 +193,7 @@ C-9. **Shift Cloud 実運用フィードバック**の収集と改善バック�
 - ✅ Storage上限200MB・CRON_SECRET: ユーザー設定済み（実効性はB-1で最終判定）
 - ✅ 基盤アップグレード（2026-07-11）: packages/core移行・RUNBOOK・時給の月中変更（日付按分 #39）・KPIチェッカー・CI
 - ✅ Legal OS 本番稼働 + legal_ai 日次チェック（#40）／Money OS `mon_receipts` フェーズ1＋OCR（#41,#42）／Caddy OS（#46）／社内連絡 /notes（0040）
-                                                                                       
+
 ## Inventory OS（在庫・棚卸 / #96）
 
 - [x] **IV-1 Vercelデプロイ**（2026-07-30）— https://inventory-os-seven.vercel.app / Root Directory `apps/inventory-os` / `INVENTORY_API_TOKEN` は Vault に発行済み

@@ -6,6 +6,9 @@ import { verifyMember } from "@/lib/frank-booking";
 import { exTax } from "@/lib/frank-pos-pure";
 
 /**
+ * ⚠ #123でSquareへ一本化（frank-square-billing.ts）。このStripe版は使われていない。
+ * テストモードのみで実課金ゼロのため、過去Webhookの受け皿として残置（本番鍵は設定しない）。
+ *
  * FRANK GOLF 月会費の継続課金（Stripe）#97 / migration 0087
  *
  * - 会員はサイト booking.html の「カードで継続課金を登録する」から

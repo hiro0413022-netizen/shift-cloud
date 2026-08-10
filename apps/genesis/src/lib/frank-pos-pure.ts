@@ -90,6 +90,39 @@ export function mapSquarePayment(p: SquarePayment): MappedSale | null {
   };
 }
 
+// ------------------------------------------------------------------
+// 月会費（Squareサブスク）#123
+// ------------------------------------------------------------------
+
+/** 税抜プラン価格→税込請求額。Stripe時代の unit_amount=round(税抜×1.1) と同じ式（9,800/13,800/19,800で exTax と往復一致） */
+export const monthlyFeeTaxIncluded = (priceExTax: number) => Math.round(priceExTax * 1.1);
+
+/** 日本の電話番号 → E.164（+81…）。Squareの pre_populated_data 用。変換できなければ null（省略する） */
+export function toE164Jp(phone: string | null | undefined): string | null {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  if (digits.startsWith("81") && digits.length >= 11) return `+${digits}`;
+  if (digits.startsWith("0") && digits.length >= 10) return `+81${digits.slice(1)}`;
+  return null;
+}
+
+/**
+ * Square払いを「月会費」か「店頭売上」かへ振り分ける。
+ * - 決済リンクの注文ID一致＝初回の月会費（金額はリンク作成時にプラン額で固定済み）
+ * - 顧客ID一致は、金額がプランの税込月額と一致するときだけ継続課金の月会費と判定する。
+ *   （店頭で会員プロフィールを決済に紐付けてドリンク等を買った場合を月会費と誤記録しないため）
+ * どちらでもなければ null＝店頭売上として既存のPOS経路へ。
+ */
+export function classifySquareMonthlyPayment(i: {
+  orderMatched: boolean;
+  customerMatched: boolean;
+  amount: number; // 税込・円
+  planTaxIncluded: number | null;
+}): "initial" | "recurring" | null {
+  if (i.orderMatched) return "initial";
+  if (i.customerMatched && i.planTaxIncluded !== null && i.amount === i.planTaxIncluded) return "recurring";
+  return null;
+}
+
 export type SquareRefund = {
   id?: string;
   status?: string;

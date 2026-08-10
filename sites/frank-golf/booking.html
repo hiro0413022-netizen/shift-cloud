@@ -115,7 +115,7 @@
     <div class="card rv" style="margin-top:22px;padding:22px" id="bk-billing">
       <p class="eyebrow">Monthly Payment</p>
       <p style="font-size:15px;font-weight:700;margin-top:4px">月会費のお支払い登録（クレジットカード）</p>
-      <p style="margin-top:8px;font-size:13px;opacity:.8">クレジットカードを登録すると、月会費が毎月自動でお支払いになります（安全な決済ページ Stripe に移動します）。<br>上の会員番号・電話番号下4桁を入力のうえ、ボタンを押してください。</p>
+      <p style="margin-top:8px;font-size:13px;opacity:.8">クレジットカードを登録すると、月会費が毎月自動でお支払いになります（安全な決済ページ Square に移動します）。<br>上の会員番号・電話番号下4桁を入力のうえ、ボタンを押してください。</p>
       <p id="bk-bill-status" style="margin-top:10px;font-size:13px"></p>
       <p style="margin-top:12px"><button id="bk-bill" class="btn btn--brass" type="button">カードで継続課金を登録する</button></p>
       <p style="margin-top:10px;font-size:11px;opacity:.55">口座振替をご希望の方は店頭でお手続きください。モニター会員（月会費0円）の方は登録不要です。</p>
@@ -307,7 +307,7 @@
   $("bk-min").addEventListener("change",function(){var old=document.getElementById("bk-go");if(old)old.remove();sel=null});
   $("bk-my").addEventListener("click",my);
 
-  // ---- 月会費のカード継続課金（Stripe） ----
+  // ---- 月会費のカード継続課金（Square） ----
   $("bk-bill").addEventListener("click",function(){
     var a=auth(); if(!a) return;
     $("bk-bill").disabled=true;

@@ -116,21 +116,31 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 - コード: `apps/genesis/src/lib/frank-pos.ts`（純粋部は frank-pos-pure.ts）。
 - **env**: `SQUARE_WEBHOOK_SIGNATURE_KEY` / `SQUARE_WEBHOOK_URL`（省略時は本番URL）。設定手順 OPERATIONS §14-2。
 
-### 月会費の継続課金（Stripe・#97 / migration 0087）
+### 月会費の継続課金（Square・#123 / migration 0105。旧Stripe #97は廃止）
 
 - 会員は booking.html の「カードで継続課金を登録する」→ `/api/public/frank/billing`
-  → Stripe Checkout(subscription・税込) でカード登録。以後毎月自動課金。
-- Webhook `/api/public/frank/billing/webhook`（checkout.session.completed / **invoice.paid（#118追加）** /
-  invoice.payment_failed / customer.subscription.deleted）が
-  `frunk_members.billing_status`（none/checkout/active/past_due/canceled）を更新。
-  登録完了で `payment_method='card'` に切替＋company_events 記録。
-  **invoice.paid は月会費入金を mon_sales（姫路・category=月会費・source='stripe'）へ自動計上**
-  （invoice idで冪等・refresh_money_to_finance まで実行）。Stripe側のWebhook登録イベントに
-  invoice.paid を含めること（OPERATIONS §14-1）。
-- コード: `apps/genesis/src/lib/frank-billing.ts`（SDK不使用・fetch直）
-- **必要env（Vercel: yozan-genesis）**: `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`。
+  → **Squareのサブスク決済ページ**（決済リンク・税込）でカード登録。以後毎月自動課金。
+- 決済リンクは会員ごとにAPIで発行し、返ってきた注文IDを `frunk_members.square_checkout_order_id`
+  に控える。**これがWebhookで初回決済と会員を結ぶ唯一の鍵**（Squareのリンク決済は顧客IDを事前指定できない）。
+- Webhookは店頭POSと同じ `/api/public/frank/pos/webhook` の1本。payment イベントを自動で振り分ける:
+  1. 注文IDが `square_checkout_order_id` に一致 → **初回の月会費**（billing_status='active'・
+     `square_customer_id` を控える・payment_method='card'・company_events 記録）
+  2. 顧客IDが `square_customer_id` に一致し金額がプランの税込月額と一致 → **継続の月会費**
+  3. どちらでもない → 店頭売上（従来のPOS経路）
+  月会費は mon_sales（姫路・category=月会費・source='square'）へ自動計上
+  （payment idで冪等・refresh_money_to_finance まで実行）。
+  会員が店頭で会員価格ドリンク等を買っても金額が違うので月会費と誤記録されない（tests/frank-pos.test.ts）。
+- 決済失敗（payment FAILED・プラン額と一致）→ billing_status='past_due'＋company_events。
+  subscription.updated の CANCELED/DEACTIVATED → 'canceled'＋company_events。
+- プランとの対応は `frunk_plans.square_variation_id`（`scripts/frank-square-setup.mjs` が
+  Square側にプラン5種・ドリンクメニュー24品・Webhook購読を自動作成して発行）。
+- コード: `apps/genesis/src/lib/frank-square-billing.ts`（リンク発行）＋ `frank-pos.ts`（Webhook振り分け）。SDK不使用・fetch直。
+- **必要env（Vercel: yozan-genesis）**: `SQUARE_ACCESS_TOKEN` / `SQUARE_LOCATION_ID` /
+  `SQUARE_WEBHOOK_SIGNATURE_KEY` / `SQUARE_WEBHOOK_URL`（省略時は本番URL）。
   未設定の間はボタンを押すと「店頭でお手続きください」と案内される（エラーにしない）。
 - 月会費0円のプラン（モニター会員）は登録不可として弾く。
+- 入会承認時に member-os が承認メール（会員番号＋カード登録の案内）を送る（`buildApprovalMail`・Resend未設定ならスキップ）。
+- 旧Stripe版 `frank-billing.ts` はテストモードのみで実課金ゼロ。Webhookの受け皿として残置（本番鍵は設定しない）。
 
 この設定は **お客様側とスタッフ側の両方**が読みます（`@yozan/core/frank-booking`）。
 片方だけ別の時間割にならないよう、ここ以外に営業時間を書かないでください。

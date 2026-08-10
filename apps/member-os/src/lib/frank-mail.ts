@@ -86,3 +86,53 @@ export function buildWebSignupReceiptMail(input: { name: string; planName?: stri
     ].join("\n"),
   };
 }
+
+/**
+ * 入会承認メール（会員番号の通知）#123
+ *
+ * #120の残課題「承認時に会員番号を伝える手段が未実装＝電話・LINEで案内する運用」を解消する。
+ * このメールが届いて初めてお客様は (1)Web予約 (2)月会費のカード登録 ができるようになるため、
+ * 会員番号・ログイン方法（会員番号＋電話下4桁）・カード登録の場所、の3点を必ず書く。
+ */
+export function buildApprovalMail(input: {
+  name: string;
+  memberNo: string;
+  planName?: string | null;
+  monthlyFeeTaxIncluded?: number | null; // 税込・円（0円プランは案内を変える）
+}): { subject: string; text: string } {
+  const fee = input.monthlyFeeTaxIncluded ?? 0;
+  const planLine = input.planName
+    ? `ご入会プラン: ${input.planName}${fee > 0 ? `（月会費 ${fee.toLocaleString()}円・税込）` : ""}`
+    : "";
+  const billing =
+    fee > 0
+      ? [
+          "■ 月会費のお支払い登録（クレジットカード）",
+          `打席予約ページ（${FRANK_SITE}/booking.html）の「月会費のお支払い登録」から、`,
+          "会員番号と電話番号下4桁を入力してお手続きください。安全な決済ページ（Square）で",
+          "カードを登録すると、月会費は毎月自動でお支払いになります。",
+          "（口座振替をご希望の方は店頭でお手続きください）",
+          "",
+        ]
+      : [];
+  return {
+    subject: `【FRANK GOLF】ご入会が完了しました（会員番号 ${input.memberNo}）`,
+    text: [
+      `${input.name} 様`,
+      "",
+      "FRANK GOLF へのご入会ありがとうございます。ご入会手続きが完了しました。",
+      "",
+      `■ あなたの会員番号: ${input.memberNo}`,
+      ...(planLine ? [planLine, ""] : [""]),
+      "■ 打席のWeb予約",
+      `${FRANK_SITE}/booking.html から、会員番号と電話番号下4桁でご予約いただけます。`,
+      "",
+      ...billing,
+      "会員番号はこのメールを保存するか、スクリーンショットでお控えください。",
+      "",
+      "ご不明な点はこのメールにご返信ください。",
+      "FRANK GOLF（姫路・土山）",
+      FRANK_SITE,
+    ].join("\n"),
+  };
+}
