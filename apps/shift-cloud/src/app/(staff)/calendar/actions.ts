@@ -74,16 +74,25 @@ export async function toggleTask(taskId: string): Promise<{ error?: string }> {
   return {};
 }
 
-/** 自分のタスクを追加（date=実施日） */
-export async function addTask(date: string, title: string): Promise<{ error?: string }> {
+/**
+ * タスクを追加（date=実施日）。
+ * shared=false: 自分あて（staff_id=本人）。自分の画面にだけ出る。
+ * shared=true : 店舗共通（staff_id=null + store_id=主店舗）。同じ店のスタッフ全員と
+ *               店舗端末のカレンダー（/store）にも出る（DECISIONS #55）。
+ */
+export async function addTask(date: string, title: string, shared = false): Promise<{ error?: string }> {
   const actor = await requireActor();
   const admin = createAdmin();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "日付が不正です" };
   const t = title.trim();
   if (!t) return { error: "タイトルを入力してください" };
+  // 店舗共通は store_id が必須（0050 sp_tasks_target_check）。主店舗未設定なら共有できない
+  if (shared && !actor.primaryStoreId) {
+    return { error: "主店舗が未設定のため店舗共有できません。シフト管理＞スタッフ で所属店舗を設定してください" };
+  }
   const { error } = await admin.from("sp_tasks").insert({
     company_id: actor.companyId,
-    staff_id: actor.staffId,
+    staff_id: shared ? null : actor.staffId,
     store_id: actor.primaryStoreId,
     date,
     title: t.slice(0, 200),

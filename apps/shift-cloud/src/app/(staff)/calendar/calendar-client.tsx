@@ -16,6 +16,8 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
   const [selected, setSelected] = useState<string>(days.includes(today) ? today : days[0]);
   const [memoDraft, setMemoDraft] = useState<string>(feed[selected]?.memo ?? "");
   const [taskDraft, setTaskDraft] = useState("");
+  const [taskShared, setTaskShared] = useState(false);
+  const [taskMsg, setTaskMsg] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -175,7 +177,8 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
                   disabled={pending || !taskDraft.trim()}
                   onClick={() =>
                     startTransition(async () => {
-                      const r = await addTask(selected, taskDraft);
+                      const r = await addTask(selected, taskDraft, taskShared);
+                      setTaskMsg(r.error ?? null);
                       if (!r.error) setTaskDraft("");
                     })
                   }
@@ -184,6 +187,17 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
                   追加
                 </button>
               </div>
+              {/* 店舗共有: 店舗端末（店頭の共有カレンダー）と同じ店のスタッフ全員に出る */}
+              <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                <input
+                  type="checkbox"
+                  checked={taskShared}
+                  onChange={(e) => { setTaskShared(e.target.checked); setTaskMsg(null); }}
+                  className="h-3.5 w-3.5 accent-(--color-brand)"
+                />
+                店舗のみんなに共有する（店頭の共有カレンダーにも出す）
+              </label>
+              {taskMsg && <p className="text-xs text-red-500">{taskMsg}</p>}
             </div>
           </div>
 

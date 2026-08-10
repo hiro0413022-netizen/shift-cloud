@@ -20,6 +20,8 @@ export type TaskItem = {
  */
 export function TasksCard({ today, tasks }: { today: string; tasks: TaskItem[] }) {
   const [draft, setDraft] = useState("");
+  const [shareDraft, setShareDraft] = useState(false);
+  const [addMsg, setAddMsg] = useState<string | null>(null);
   const [openNote, setOpenNote] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const open = tasks.filter((t) => t.status === "open").length;
@@ -85,7 +87,8 @@ export function TasksCard({ today, tasks }: { today: string; tasks: TaskItem[] }
             disabled={pending || !draft.trim()}
             onClick={() =>
               startTransition(async () => {
-                const r = await addTask(today, draft);
+                const r = await addTask(today, draft, shareDraft);
+                setAddMsg(r.error ?? null);
                 if (!r.error) setDraft("");
               })
             }
@@ -94,6 +97,17 @@ export function TasksCard({ today, tasks }: { today: string; tasks: TaskItem[] }
             追加
           </button>
         </div>
+        {/* 店舗共有: 店舗端末（店頭の共有カレンダー）と同じ店のスタッフ全員に出る */}
+        <label className="flex items-center gap-1.5 pl-1 text-xs text-zinc-500">
+          <input
+            type="checkbox"
+            checked={shareDraft}
+            onChange={(e) => { setShareDraft(e.target.checked); setAddMsg(null); }}
+            className="h-3.5 w-3.5 accent-(--color-brand)"
+          />
+          店舗のみんなに共有する（店頭の共有カレンダーにも出す）
+        </label>
+        {addMsg && <p className="pl-1 text-xs text-red-500">{addMsg}</p>}
       </div>
     </div>
   );
