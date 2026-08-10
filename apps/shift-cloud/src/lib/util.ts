@@ -5,6 +5,18 @@ export function todayJST(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: TZ }).format(new Date());
 }
 
+/**
+ * 「今」のJST日付と時刻（フォームの初期値用）。
+ * サーバーはUTCなので new Date() から直接組み立てると9時間ずれる（[[jst-date-rule]]）。
+ */
+export function nowPartsJST(): { date: string; time: string } {
+  const now = new Date();
+  return {
+    date: new Intl.DateTimeFormat("sv-SE", { timeZone: TZ }).format(now),
+    time: new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", minute: "2-digit", hour12: false }).format(now),
+  };
+}
+
 /** timestamptz→JSTのYYYY-MM-DD */
 export function dateJST(iso: string): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: TZ }).format(new Date(iso));

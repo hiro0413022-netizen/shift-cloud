@@ -106,7 +106,7 @@ C-3. **SaaS化（正典 docs/genesis/SAAS_PLAN.md）**: Phase S0＝FRUNK GOLF姫
 
 C-4. **Money OS**: 経費自動起票（OCR精度の実績待ち。`mon_receipts` は0件＝運用未開始）／mon_expense・mon_bank_txn との突合UI強化
 
-C-5. **スタッフポータル後続（STAFF_PORTAL.md §5）**: 店長タスク配信 / Genesis判断リスト→sp_tasks自動配信 / 日報週報のCEO AI要約流入 / 予約ソース実接続（`sp_reports` 0件＝運用これから）
+C-5. **スタッフポータル後続（STAFF_PORTAL.md §6）**: 店長タスク配信 / Genesis判断リスト→sp_tasks自動配信 / 予約ソース実接続。※日報→**イレギュラー報告は #125 で完了**（sp_incidents + Genesis /incidents。残はユーザー作業＝公式LINEへ1回送信して通知先リンク＋スタッフ周知）
 
 C-6. **Survey OS フェーズ3**: 条件分岐 / KPI接続（回答率・満足度）/ n8n連携（GOLF WINGアンケートは公開中・回答2件）
 

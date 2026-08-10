@@ -1,83 +1,108 @@
-import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Card, Badge } from "@/components/ui";
-import { todayJST, mondayOf, fmtDateJP } from "@/lib/util";
-import { ReportForm } from "./report-form";
+import { incidentCategoryLabel, INCIDENT_SEVERITY_LABEL, normalizeSeverity } from "@yozan/core/incidents";
+import { nowPartsJST } from "@/lib/util";
+import { IncidentForm } from "./incident-form";
+import { IncidentItem } from "./incident-item";
 
 /**
- * 日報・週報（DECISIONS #48）
- * 自分の記入＋店舗メンバーの直近レポート閲覧（情報共有）。
- * CEO AIの日次レポートへの要約流入は後続フェーズ（sp_reports.ai_summary）。
+ * イレギュラー報告（DECISIONS #125 / 日報・週報 sp_reports の置き換え）
+ *
+ * 毎日書かせるのをやめ、「何かあった時だけ」書く。カテゴリー→いつ/どこ/だれ/なに/対応 の構造化入力。
+ * 集まった報告は Genesis /incidents で分析され、再発防止策になる。
  */
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function ReportsPage() {
   const actor = await requireActor();
   const admin = createAdmin();
-  const sp = await searchParams;
-  const tab: "daily" | "weekly" = sp.tab === "weekly" ? "weekly" : "daily";
-  const today = todayJST();
-  const key = tab === "weekly" ? mondayOf(today) : today;
+  const { date, time } = nowPartsJST();
 
-  const [{ data: mine }, { data: recent }] = await Promise.all([
+  const [{ data: stores }, { data: recent }] = await Promise.all([
+    actor.storeIds.length
+      ? admin.from("stores").select("id, name").in("id", actor.storeIds).order("name")
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     admin
-      .from("sp_reports")
-      .select("body")
-      .eq("staff_id", actor.staffId)
-      .eq("type", tab)
-      .eq("date", key)
-      .is("deleted_at", null)
-      .maybeSingle(),
-    admin
-      .from("sp_reports")
-      .select("id, type, date, body, staff_id, staff(name), stores(name), updated_at")
+      .from("sp_incidents")
+      .select("id, category, severity, occurred_at, place, involved, body, action_taken, status, resolution_note, staff:staff_id(name), stores:store_id(name)")
       .eq("company_id", actor.companyId)
       .is("deleted_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(20),
+      .order("occurred_at", { ascending: false })
+      .limit(30),
   ]);
 
-  // 情報共有: 社内メンバーの直近レポートを全員が見られる（店舗絞込みは後続で必要になれば）
-  const visible = recent ?? [];
+  const rows = recent ?? [];
+  const openCount = rows.filter((r) => r.status === "open").length;
 
   return (
-    <div className="space-y-4">
-      <div className="flex rounded-lg border border-zinc-200 bg-white p-1 text-sm">
-        <Link
-          href="/reports"
-          className={`flex-1 rounded-md py-1.5 text-center ${tab === "daily" ? "bg-brand-light font-medium text-brand" : "text-zinc-500"}`}
-        >
-          日報
-        </Link>
-        <Link
-          href="/reports?tab=weekly"
-          className={`flex-1 rounded-md py-1.5 text-center ${tab === "weekly" ? "bg-brand-light font-medium text-brand" : "text-zinc-500"}`}
-        >
-          週報
-        </Link>
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-lg font-semibold">イレギュラー報告</h1>
+        <p className="mt-0.5 text-xs text-zinc-500">
+          いつもと違うことが起きた時だけ書いてください。毎日の報告は不要です。
+        </p>
       </div>
 
-      <Card>
-        <p className="mb-2 text-sm font-medium text-zinc-500">
-          {tab === "daily" ? `今日の日報（${fmtDateJP(key)}）` : `今週の週報（${fmtDateJP(key)}の週）`}
-        </p>
-        <ReportForm key={`${tab}-${key}`} type={tab} initialBody={mine?.body ?? ""} />
-      </Card>
+      <IncidentForm
+        stores={stores ?? []}
+        defaultStoreId={actor.primaryStoreId}
+        nowDate={date}
+        nowTime={time}
+      />
 
       <div>
-        <p className="mb-2 text-sm font-medium text-zinc-500">みんなのレポート</p>
+        <div className="mb-2 flex items-baseline justify-between">
+          <p className="text-sm font-medium text-zinc-500">みんなの報告</p>
+          {openCount > 0 && <span className="text-xs text-amber-600">未対応 {openCount} 件</span>}
+        </div>
         <div className="space-y-2">
-          {visible.length === 0 && <p className="text-sm text-zinc-400">まだレポートがありません</p>}
-          {visible.map((r) => (
-            <Card key={r.id} className="!p-4">
-              <div className="flex items-center gap-2 text-xs text-zinc-400">
-                <span className="font-medium text-zinc-600">{(r.staff as unknown as { name: string } | null)?.name}</span>
-                <Badge color={r.type === "daily" ? "zinc" : "amber"}>{r.type === "daily" ? "日報" : "週報"}</Badge>
-                <span>{fmtDateJP(r.date)}{r.type === "weekly" ? "の週" : ""}</span>
-                <span>{(r.stores as unknown as { name: string } | null)?.name}</span>
-              </div>
-              <p className="mt-1.5 whitespace-pre-wrap text-sm">{r.body}</p>
+          {rows.length === 0 && (
+            <Card className="!p-4">
+              <p className="text-sm text-zinc-400">まだ報告はありません。何かあった時に上から報告してください。</p>
             </Card>
-          ))}
+          )}
+          {rows.map((r) => {
+            const sev = normalizeSeverity(r.severity);
+            return (
+              <Card key={r.id} className="!p-4">
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
+                  <Badge color={sev === "high" ? "red" : sev === "mid" ? "amber" : "zinc"}>
+                    {INCIDENT_SEVERITY_LABEL[sev]}
+                  </Badge>
+                  <Badge color="blue">{incidentCategoryLabel(r.category)}</Badge>
+                  {r.status === "resolved" && <Badge color="green">対応済み</Badge>}
+                  <span>
+                    {new Date(r.occurred_at).toLocaleString("ja-JP", {
+                      timeZone: "Asia/Tokyo",
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                  <span>{(r.stores as unknown as { name: string } | null)?.name}</span>
+                  {r.place && <span>/ {r.place}</span>}
+                </div>
+                {r.involved && <p className="mt-1 text-xs text-zinc-500">対象: {r.involved}</p>}
+                <p className="mt-1.5 whitespace-pre-wrap text-sm">{r.body}</p>
+                {r.action_taken && (
+                  <p className="mt-1.5 whitespace-pre-wrap rounded bg-zinc-50 p-2 text-[13px] text-zinc-600">
+                    対応: {r.action_taken}
+                  </p>
+                )}
+                {r.resolution_note && (
+                  <p className="mt-1.5 whitespace-pre-wrap rounded bg-emerald-50 p-2 text-[13px] text-emerald-700">
+                    決着: {r.resolution_note}
+                  </p>
+                )}
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-zinc-400">
+                    報告: {(r.staff as unknown as { name: string } | null)?.name}
+                  </span>
+                  <IncidentItem id={r.id} resolved={r.status === "resolved"} />
+                </div>
+              </Card>
+            );
+          })}
         </div>
       </div>
     </div>

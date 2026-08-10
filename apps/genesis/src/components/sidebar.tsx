@@ -22,6 +22,7 @@ export const ADMIN_NAV = [
   { href: "/approvals", label: "承認待ち", en: "Approvals", icon: "✓" },
   { href: "/inbox", label: "問い合わせ受信箱", en: "CEO Inbox", icon: "📨" },
   { href: "/deliverables", label: "成果物レビュー", en: "AI Deliverables", icon: "🎁" },
+  { href: "/incidents", label: "イレギュラー分析", en: "Incidents", icon: "⚠" },
   { href: "/notes", label: "社内連絡", en: "Notes", icon: "📝" },
   { href: "/notice", label: "スタッフへ連絡", en: "Staff Notice", icon: "📢" },
   { href: "/legal", label: "契約・法務", en: "Legal", icon: "📄" },

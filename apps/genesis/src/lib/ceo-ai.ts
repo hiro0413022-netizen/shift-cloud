@@ -14,6 +14,7 @@ import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { runLegalAiExtraction } from "@/lib/legal-ai";
 import { runReceiptAiExtraction } from "@/lib/receipt-ai";
+import { runIncidentAnalysis } from "@/lib/incident-analysis";
 import { generateDeliverables, type PromptForRun } from "@/lib/agent-runner";
 import { enqueueAction } from "@/lib/ai-execution";
 import { jstDateJa, jstYmd } from "@/lib/jst";
@@ -485,6 +486,8 @@ async function runDailyAfterwork(
     ["deliverables", () => generateDeliverables(companyId, createdPrompts)],
     // 朝、承認を押すだけにするための返信下書き
     ["drafts", () => generateMissingDrafts(companyId, 8)],
+    // イレギュラー報告の再発防止分析（#125。報告が0件なら即終わる）
+    ["incidents", () => runIncidentAnalysis(companyId)],
     // 契約書の抽出・証憑OCR（対象が無ければ即終わる）
     ["legal", () => runLegalAiExtraction(companyId)],
     ["receipt", () => runReceiptAiExtraction(companyId)],
