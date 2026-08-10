@@ -1,0 +1,103 @@
+import "server-only";
+import { randomUUID } from "crypto";
+
+/**
+ * FRANK GOLF member-os → Square 操作（#124）
+ *
+ * スタッフ操作に紐づくSquare側の追従だけを担当する:
+ *   - 休会 → サブスクの一時停止（月会費の自動課金を止める。休会費2,200円は店頭徴収）
+ *   - 復帰 → 再開
+ *   - プラン変更 → サブスクのプラン差し替え（翌請求から新額）＋当月差額のカード請求
+ *
+ * env（Vercel: member-os）: SQUARE_ACCESS_TOKEN（yozan-genesis と同じ値）
+ * 未設定なら何もしないで {skipped:true} を返す（スタッフ操作自体は成立させる。
+ * その場合のSquare側の追従は手動＝ダッシュボードで行う）。
+ * 失敗しても throw しない（呼び出し側が結果メッセージでスタッフに伝える）。
+ */
+
+const BASE = "https://connect.squareup.com/v2";
+
+export type SquareOpResult = { ok: boolean; skipped?: boolean; error?: string };
+
+function token(): string | null {
+  const t = process.env.SQUARE_ACCESS_TOKEN;
+  return t && t.trim().length > 10 ? t.trim() : null;
+}
+
+async function sq(method: string, path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    const errs = (json.errors as Array<{ detail?: string; code?: string }> | undefined) ?? [];
+    throw new Error(errs.map((e) => e.detail ?? e.code).join("; ") || `Square ${method} ${path} (${res.status})`);
+  }
+  return json;
+}
+
+/** 休会: 月会費の自動課金を止める */
+export async function pauseSubscription(subscriptionId: string): Promise<SquareOpResult> {
+  if (!token()) return { ok: false, skipped: true };
+  try {
+    await sq("POST", `/subscriptions/${subscriptionId}/pause`, {});
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square] pause failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}
+
+/** 復帰: 自動課金を再開する */
+export async function resumeSubscription(subscriptionId: string): Promise<SquareOpResult> {
+  if (!token()) return { ok: false, skipped: true };
+  try {
+    await sq("POST", `/subscriptions/${subscriptionId}/resume`, {});
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square] resume failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}
+
+/** プラン変更: 翌請求から新プラン額（入会金なしバリエーションへスワップ＝入会金を二重請求しない） */
+export async function swapSubscriptionPlan(subscriptionId: string, newVariationId: string): Promise<SquareOpResult> {
+  if (!token()) return { ok: false, skipped: true };
+  try {
+    await sq("POST", `/subscriptions/${subscriptionId}/swap-plan`, { new_plan_variation_id: newVariationId });
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square] swap-plan failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}
+
+/**
+ * 当月差額の即時請求（登録済みカードに課金）。
+ * カード未登録なら {ok:false, error:'no_card'} ＝店頭で徴収してもらう。
+ */
+export async function chargeCardOnFile(input: {
+  customerId: string;
+  amountTaxIncluded: number; // 円
+  note: string; // 例: プラン変更差額（FR0001）
+}): Promise<SquareOpResult> {
+  if (!token()) return { ok: false, skipped: true };
+  try {
+    const cards = await sq("GET", `/cards?customer_id=${encodeURIComponent(input.customerId)}`);
+    const card = ((cards.cards as Array<{ id?: string; enabled?: boolean }> | undefined) ?? []).find((c) => c.enabled !== false);
+    if (!card?.id) return { ok: false, error: "no_card" };
+    await sq("POST", "/payments", {
+      idempotency_key: randomUUID(),
+      source_id: card.id,
+      customer_id: input.customerId,
+      amount_money: { amount: input.amountTaxIncluded, currency: "JPY" },
+      note: input.note,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square] charge failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}

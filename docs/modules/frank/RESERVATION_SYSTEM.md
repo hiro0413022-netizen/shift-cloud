@@ -139,8 +139,26 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
   `SQUARE_WEBHOOK_SIGNATURE_KEY` / `SQUARE_WEBHOOK_URL`（省略時は本番URL）。
   未設定の間はボタンを押すと「店頭でお手続きください」と案内される（エラーにしない）。
 - 月会費0円のプラン（モニター会員）は登録不可として弾く。
-- 入会承認時に member-os が承認メール（会員番号＋カード登録の案内）を送る（`buildApprovalMail`・Resend未設定ならスキップ）。
+- 入会承認時に member-os が承認メール（会員番号＋カード登録＋入会金の案内）を送る（`buildApprovalMail`・Resend未設定ならスキップ）。
 - 旧Stripe版 `frank-billing.ts` はテストモードのみで実課金ゼロ。Webhookの受け皿として残置（本番鍵は設定しない）。
+
+### 入会金・休会・プラン変更（#124 / migration 0106）
+
+- **入会金 10,000円税抜＝11,000円税込**（frunk_plans.joining_fee）。Squareの決済リンクは
+  「有料フェーズ1つ」のプランしか受けないため、初回にまとめられない。
+  → **初回の月会費入金を確認したWebhookが、保存されたカードへ続けて11,000円を自動請求**
+  （note接頭辞「FRANK入会金」→ mon_sales category=入会金 で記録・joining_fee_charged_at で二重請求ガード）。
+  失敗時は company_events(warning)＝店頭で徴収。
+- **クーポン**（`frank-billing-pure.ts` の JOINING_FEE_COUPONS・6種）: /join-web で入力→検証→
+  `frunk_members.joining_fee_waived=true`。無効なコードは申込時に弾いて教える
+  （黙って無効化すると「無料のはずが請求された」トラブルになるため）。
+- **休会**: member-os setMemberStatus が Square の PauseSubscription/ResumeSubscription を追従実行。
+  休会費 2,000円税抜（2,200円税込）は店頭徴収（レジ商品「休会費（1か月）」）。
+- **プラン変更**: member-os changePlan。決定（2026-08-10）「差額（税込）を4分割し、変更した週から
+  月末までの残り週数分をその場で請求。翌月から新プラン満額」。計算は `planChangeProration`
+  （第1週=4週分…第4週=1週分・ダウングレードは0円）。Squareは swap-plan（翌請求から新額）＋
+  card-on-file への即時請求。カード未登録なら店頭徴収の案内を画面に出す。
+- **⚠退会は自動解約しない**（お客様都合のタイミング考慮）。画面がSquareダッシュボードでの解約を促す。
 
 この設定は **お客様側とスタッフ側の両方**が読みます（`@yozan/core/frank-booking`）。
 片方だけ別の時間割にならないよう、ここ以外に営業時間を書かないでください。

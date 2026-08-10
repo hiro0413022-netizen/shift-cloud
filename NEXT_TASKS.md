@@ -9,10 +9,12 @@
 
 A-00. **FRANK GOLF 9/2オープンの残作業（#118→#123更新・2026-08-10。手順の正典 = OPERATIONS §14）**
    開発側は完了（予約・課金・レッスン・CMS・タブレット・LINE配信・Square一本化・月会費自動計上・確認/リマインダーメール・特別営業日）。残りは全部ユーザー作業:
-   1. **Square一本化の仕上げ（最重要・9/2まで・#123でStripeは廃止）**: Square法人確認の完了 →
+   1. **Square一本化の仕上げ（最重要・9/2まで・#123/#124でStripeは廃止）**: Square法人確認の完了 →
       Developer でアプリ作成・Production Access Token 取得 → `scripts/frank-square-setup.mjs` 実行
-      （プラン5種・ドリンク24品・Webhookを自動作成）→ Vercel env 3つ＋frunk_plans 更新 → §14-1のテスト
+      （プラン5種・ドリンク24品・入会金/休会費のレジ商品・Webhookを自動作成）→
+      Vercel env（yozan-genesis に3つ＋**member-os に SQUARE_ACCESS_TOKEN**）＋frunk_plans 更新 → §14-1のテスト
       ※ Stripe の本番切替・sk_live 差替えは**不要になりました**
+      ※ 入会金10,000円/クーポン6種/休会2,000円/プラン変更週割は #124 で実装済み（手順も §14-1）
    2. **Square端末（Terminal 約4.6万円）の調達**（お盆前推奨）。導入までは店頭台帳運用
    3. **Resendで frankgolf.jp をドメイン認証**＋ yozan-genesis に RESEND_API_KEY / FRANK_MAIL_FROM（§14-3）→ 体験の確認・前日リマインダーメールが動き出す
       - **⚠#120追加: 同じ2つのenvを Vercel(member-os) にも設定**してください。入れないと**Web入会申込の受付メール・入会承認メールが飛びません**（申込・承認自体は成立します）

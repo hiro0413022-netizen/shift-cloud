@@ -105,6 +105,10 @@ export function toE164Jp(phone: string | null | undefined): string | null {
   return null;
 }
 
+/** 入会金の自動課金noteの接頭辞。frank-square-billing.chargeCardOnFile が付け、Webhookがこれで判定する */
+export const JOINING_FEE_NOTE_PREFIX = "FRANK入会金";
+export const isJoiningFeeNote = (note: string | null | undefined) => (note ?? "").startsWith(JOINING_FEE_NOTE_PREFIX);
+
 /**
  * Square払いを「月会費」か「店頭売上」かへ振り分ける。
  * - 決済リンクの注文ID一致＝初回の月会費（金額はリンク作成時にプラン額で固定済み）

@@ -71,13 +71,21 @@ export async function createSquareBillingCheckout(
     .eq("id", member.id)
     .maybeSingle();
   if (!row) return { ok: false, error: "会員情報を取得できませんでした" };
-  const plan = (row as unknown as { frunk_plans: { name: string; monthly_price: number | null; square_variation_id: string | null } | null }).frunk_plans;
+  const plan = (row as unknown as {
+    frunk_plans: { name: string; monthly_price: number | null; square_variation_id: string | null } | null;
+  }).frunk_plans;
   const priceExTax = Number(plan?.monthly_price ?? 0);
   if (!plan || priceExTax <= 0) return { ok: false, error: "このプランは月会費のお支払い登録が不要です（月会費0円）" };
-  if (!plan.square_variation_id) return { ok: false, error: "カード払いの受付準備中です。恐れ入りますが店頭でお手続きください。" };
   if (String(row.billing_status) === "active") return { ok: false, error: "すでにカードのご登録が完了しています（毎月自動でお支払いになります）" };
 
-  const amount = monthlyFeeTaxIncluded(priceExTax); // 税込・円
+  // 入会金（#124）は決済リンクに乗せない。
+  // Squareの決済リンクは「有料フェーズ1つ」のバリエーションしか受け付けないため、
+  // 初回だけ金額を変えるプランが組めない。入会金11,000円（税込）は、初回決済のWebhookが
+  // 保存されたカードへ続けて自動請求する（frank-pos.ts・クーポン適用会員は請求しない）。
+  const variationId = plan.square_variation_id;
+  if (!variationId) return { ok: false, error: "カード払いの受付準備中です。恐れ入りますが店頭でお手続きください。" };
+
+  const amount = monthlyFeeTaxIncluded(priceExTax); // 月会費（税込・円）＝バリエーション価格と一致
 
   try {
     const phone = toE164Jp(row.phone ? String(row.phone) : null);
@@ -89,7 +97,7 @@ export async function createSquareBillingCheckout(
         location_id: locationId,
       },
       checkout_options: {
-        subscription_plan_id: plan.square_variation_id,
+        subscription_plan_id: variationId,
         redirect_url: `${SITE}/booking.html?billing=success`,
         ask_for_shipping_address: false,
       },
@@ -112,5 +120,38 @@ export async function createSquareBillingCheckout(
   } catch (e) {
     console.error("[frank-square-billing] checkout failed:", e);
     return { ok: false, error: "登録ページの作成に失敗しました。時間をおいてお試しください。" };
+  }
+}
+
+/**
+ * 保存カードへの即時課金（#124・入会金用）。
+ * Webhookが初回の月会費入金を確認した直後に呼ぶ。noteの先頭は必ず "FRANK入会金" にする
+ * （Webhookがこのnoteで「入会金の入金」と判定して mon_sales の category=入会金 に記録するため）。
+ */
+export async function chargeCardOnFile(input: {
+  customerId: string;
+  amountTaxIncluded: number;
+  note: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const token = accessToken();
+  if (!token) return { ok: false, error: "no_token" };
+  try {
+    const res = await fetch(`${SQUARE_API}/cards?customer_id=${encodeURIComponent(input.customerId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = (await res.json()) as { cards?: Array<{ id?: string; enabled?: boolean }> };
+    const card = (json.cards ?? []).find((c) => c.enabled !== false);
+    if (!card?.id) return { ok: false, error: "no_card" };
+    await squarePost(token, "/payments", {
+      idempotency_key: randomUUID(),
+      source_id: card.id,
+      customer_id: input.customerId,
+      amount_money: { amount: input.amountTaxIncluded, currency: "JPY" },
+      note: input.note,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square-billing] charge failed:", e);
+    return { ok: false, error: String(e) };
   }
 }

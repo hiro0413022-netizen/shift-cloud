@@ -3,7 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import {
-  createPlan, updatePlan, deletePlan, approveSignup, rejectSignup, setMemberStatus, issueSignupToken,
+  createPlan, updatePlan, deletePlan, approveSignup, rejectSignup, setMemberStatus, issueSignupToken, changePlan,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ type Row = Record<string, unknown>;
 export default async function FrunkPage({
   searchParams,
 }: {
-  searchParams: Promise<{ signup_url?: string; err?: string }>;
+  searchParams: Promise<{ signup_url?: string; err?: string; msg?: string }>;
 }) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
@@ -39,6 +39,7 @@ export default async function FrunkPage({
       </header>
 
       {sp.err && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{sp.err}</p>}
+      {sp.msg && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{sp.msg}</p>}
 
       {sp.signup_url && (
         <Panel title="入会フォームURL（タブレット/QR掲示・一度だけ表示）" className="d1">
@@ -111,6 +112,18 @@ export default async function FrunkPage({
                     {m.join_date ? <span className="text-xs text-(--color-dim)">入会 {String(m.join_date)}</span> : null}
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {st === "active" && (
+                      <form action={changePlan} className="flex items-center gap-1">
+                        <input type="hidden" name="id" value={String(m.id)} />
+                        <select name="plan_id" defaultValue="" className={`${inputCls} !w-auto !py-1 text-xs`}>
+                          <option value="" disabled>プラン変更…</option>
+                          {planList.filter((p) => p.active !== false && p.id !== m.plan_id && Number(p.monthly_price ?? 0) > 0).map((p) => (
+                            <option key={String(p.id)} value={String(p.id)}>{String(p.name)}</option>
+                          ))}
+                        </select>
+                        <button className={btnGhostCls}>変更</button>
+                      </form>
+                    )}
                     {st !== "suspended" && st !== "left" && (
                       <form action={setMemberStatus}><input type="hidden" name="id" value={String(m.id)} /><input type="hidden" name="to" value="suspended" /><button className={btnGhostCls}>休会</button></form>
                     )}

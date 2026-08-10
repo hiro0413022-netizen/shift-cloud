@@ -118,6 +118,11 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           </div>
           <div><label className={label}>ご利用開始希望日</label><input type="date" name="start_date" className={field} /></div>
         </div>
+        <div>
+          <label className={label}>クーポンコード（お持ちの方のみ）</label>
+          <input name="coupon" autoCapitalize="none" autoCorrect="off" placeholder="例: FRANKGOLF2026" className={field} />
+          <p className="mt-1 text-xs text-(--color-dim)">ご紹介などのクーポンコードをお持ちの方はご入力ください（入会金が無料になります）</p>
+        </div>
       </div>
 
       {/* 同意 */}

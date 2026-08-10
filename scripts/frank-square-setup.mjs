@@ -6,7 +6,10 @@
  *   1. ロケーションIDの確認
  *   2. 消費税10%（内税）の税オブジェクト
  *   3. ドリンクメニュー3カテゴリ＋24商品（各商品「一般」「会員」の2価格・税込）
- *   4. 月会費サブスクプラン「FRANK GOLF 月会費」＋5バリエーション（税込・毎月）
+ *      ＋レジ用「会費・その他」カテゴリ（入会金11,000円・休会費2,200円）
+ *   4. 月会費サブスクプラン「FRANK GOLF 月会費」＋5バリエーション（税込・毎月・フェーズ1つ）
+ *      ※ 入会金11,000円はプランに乗せない（決済リンクは有料フェーズ1つ限定のため）。
+ *        初回決済のWebhookが保存カードへ別途自動請求する（クーポン適用会員は請求しない）
  *   5. Webhook購読（payment/refund/subscription → yozan-genesis の /api/public/frank/pos/webhook）
  *
  * 使い方:
@@ -80,6 +83,15 @@ const PLANS = [
   ["法人プレミアムプラン", 59800],
 ];
 const taxIncl = (exTax) => Math.round(exTax * 1.1);
+const JOINING_FEE_TAX = taxIncl(10000); // 入会金 10,000円税抜 → 11,000円税込（#124）
+const SUSPEND_FEE_TAX = taxIncl(2000); // 休会費 2,000円税抜 → 2,200円税込（店頭徴収）
+
+// レジ用の会費商品（POSで打つ・単一価格）
+const FEE_CATEGORY = "会費・その他";
+const FEE_ITEMS = [
+  ["入会金", JOINING_FEE_TAX],
+  ["休会費（1か月）", SUSPEND_FEE_TAX],
+];
 
 // ---------------------------------------------------------------
 // 既存カタログの取得（名前→id）
@@ -127,7 +139,7 @@ async function main() {
   // 3. カテゴリ
   const cats = await listCatalog("CATEGORY");
   const catIds = {};
-  for (const name of CATEGORIES) {
+  for (const name of [...CATEGORIES, FEE_CATEGORY]) {
     const found = cats.find((c) => c.category_data?.name === name);
     if (found) {
       catIds[name] = found.id;
@@ -192,6 +204,44 @@ async function main() {
   }
   console.log(`✔ ドリンク: 新規${created}件 / 全${DRINKS.length}件`);
 
+  // 4b. レジ用の会費商品（入会金・休会費。単一価格・税込）
+  for (const [name, price] of FEE_ITEMS) {
+    if (existingNames.has(name)) {
+      console.log(`・商品既存: ${name}`);
+      continue;
+    }
+    const object = {
+      type: "ITEM",
+      id: "#item",
+      present_at_all_locations: true,
+      item_data: {
+        name,
+        tax_ids: [tax.id],
+        categories: [{ id: catIds[FEE_CATEGORY] }],
+        reporting_category: { id: catIds[FEE_CATEGORY] },
+        variations: [
+          {
+            type: "ITEM_VARIATION",
+            id: "#v1",
+            present_at_all_locations: true,
+            item_variation_data: { item_id: "#item", name: "通常", ordinal: 0, pricing_type: "FIXED_PRICING", price_money: { amount: price, currency: "JPY" } },
+          },
+        ],
+      },
+    };
+    try {
+      await sq("POST", "/v2/catalog/object", { idempotency_key: uid(), object });
+    } catch (e) {
+      if (String(e).includes("categories")) {
+        delete object.item_data.categories;
+        delete object.item_data.reporting_category;
+        object.item_data.category_id = catIds[FEE_CATEGORY];
+        await sq("POST", "/v2/catalog/object", { idempotency_key: uid(), object });
+      } else throw e;
+    }
+    console.log(`✔ 商品作成: ${name}（¥${price}・税込）`);
+  }
+
   // 5. 月会費サブスクプラン
   const plans = await listCatalog("SUBSCRIPTION_PLAN");
   let plan = plans.find((p) => p.subscription_plan_data?.name === "FRANK GOLF 月会費");
@@ -206,13 +256,12 @@ async function main() {
     console.log(`・サブスクプラン既存: FRANK GOLF 月会費（${plan.id}）`);
   }
   const existingVars = plan.subscription_plan_data?.subscription_plan_variations ?? [];
-  const varIds = {}; // プラン名 → variation id
-  for (const [name, exTax] of PLANS) {
+  const varIds = {}; // プラン名 → { normal, nofee }
+  const ensureVariation = async (name, phases) => {
     const found = existingVars.find((v) => v.subscription_plan_variation_data?.name === name);
     if (found) {
-      varIds[name] = found.id;
       console.log(`・バリエーション既存: ${name}（${found.id}）`);
-      continue;
+      return found.id;
     }
     const r = await sq("POST", "/v2/catalog/object", {
       idempotency_key: uid(),
@@ -220,15 +269,21 @@ async function main() {
         type: "SUBSCRIPTION_PLAN_VARIATION",
         id: "#var",
         present_at_all_locations: true,
-        subscription_plan_variation_data: {
-          name,
-          subscription_plan_id: plan.id,
-          phases: [{ cadence: "MONTHLY", ordinal: 0, pricing: { type: "STATIC", price: { amount: taxIncl(exTax), currency: "JPY" } } }],
-        },
+        subscription_plan_variation_data: { name, subscription_plan_id: plan.id, phases },
       },
     });
-    varIds[name] = r.catalog_object.id;
-    console.log(`✔ バリエーション作成: ${name} ¥${taxIncl(exTax).toLocaleString()}/月・税込（${varIds[name]}）`);
+    console.log(`✔ バリエーション作成: ${name}（${r.catalog_object.id}）`);
+    return r.catalog_object.id;
+  };
+  // ⚠ Squareの決済リンクは「有料フェーズ1つ」のバリエーションしか受けない。
+  // 入会金はプランのフェーズに乗せず、初回決済のWebhookが保存カードへ別途自動請求する（frank-pos.ts #124）。
+  for (const [name, exTax] of PLANS) {
+    const monthly = taxIncl(exTax);
+    const id = await ensureVariation(name, [
+      { cadence: "MONTHLY", ordinal: 0, pricing: { type: "STATIC", price: { amount: monthly, currency: "JPY" } } },
+    ]);
+    varIds[name] = id;
+    console.log(`  ${name}: ¥${monthly.toLocaleString()}/月・税込（初回のみ別途 入会金¥${JOINING_FEE_TAX.toLocaleString()}を自動請求）`);
   }
 
   // 6. Webhook購読
@@ -265,9 +320,11 @@ async function main() {
   console.log(`  SQUARE_LOCATION_ID           = ${location.id}`);
   console.log(`  SQUARE_WEBHOOK_SIGNATURE_KEY = ${signatureKey ?? "（既存購読のためダッシュボードで確認）"}`);
   console.log(`  SQUARE_WEBHOOK_URL           = ${WEBHOOK_URL}`);
-  console.log("\n■ Supabase（frunk_plans.square_variation_id）:");
+  console.log("\n■ Supabase（frunk_plans の Squareバリエーション対応）:");
+  console.log("  ※ nofee_id はプラン変更のスワップ先。フェーズが1つ＝入会金を含まないので同じIDでよい");
   for (const [name] of PLANS) {
-    if (varIds[name]) console.log(`  update frunk_plans set square_variation_id='${varIds[name]}' where name='${name}' and deleted_at is null;`);
+    const v = varIds[name];
+    if (v) console.log(`  update frunk_plans set square_variation_id='${v}', square_variation_nofee_id='${v}' where name='${name}' and deleted_at is null;`);
   }
   console.log("\n完了。");
 }

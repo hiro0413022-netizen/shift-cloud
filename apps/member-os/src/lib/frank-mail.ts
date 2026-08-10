@@ -99,8 +99,10 @@ export function buildApprovalMail(input: {
   memberNo: string;
   planName?: string | null;
   monthlyFeeTaxIncluded?: number | null; // 税込・円（0円プランは案内を変える）
+  joiningFeeTaxIncluded?: number | null; // 税込・円（クーポン適用なら0を渡す）
 }): { subject: string; text: string } {
   const fee = input.monthlyFeeTaxIncluded ?? 0;
+  const joinFee = input.joiningFeeTaxIncluded ?? 0;
   const planLine = input.planName
     ? `ご入会プラン: ${input.planName}${fee > 0 ? `（月会費 ${fee.toLocaleString()}円・税込）` : ""}`
     : "";
@@ -111,6 +113,9 @@ export function buildApprovalMail(input: {
           `打席予約ページ（${FRANK_SITE}/booking.html）の「月会費のお支払い登録」から、`,
           "会員番号と電話番号下4桁を入力してお手続きください。安全な決済ページ（Square）で",
           "カードを登録すると、月会費は毎月自動でお支払いになります。",
+          joinFee > 0
+            ? `初回のみ、月会費に続けて入会金 ${joinFee.toLocaleString()}円（税込）を同じカードへ自動でご請求します。`
+            : "入会金はクーポン適用のため無料です。",
           "（口座振替をご希望の方は店頭でお手続きください）",
           "",
         ]

@@ -4,6 +4,8 @@ import { logEvent } from "@/lib/kernel";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import {
   classifySquareMonthlyPayment,
+  exTax,
+  isJoiningFeeNote,
   mapSquarePayment,
   mapSquareRefund,
   monthlyFeeTaxIncluded,
@@ -11,6 +13,7 @@ import {
   type SquarePayment,
   type SquareRefund,
 } from "@/lib/frank-pos-pure";
+import { chargeCardOnFile } from "@/lib/frank-square-billing";
 
 export { verifySquareSignature };
 
@@ -148,10 +151,13 @@ type MemberRow = {
   name: unknown;
   member_no: unknown;
   billing_status: unknown;
-  frunk_plans: { monthly_price: number | null } | null;
+  joining_fee_waived: boolean | null;
+  joining_fee_charged_at: string | null;
+  frunk_plans: { monthly_price: number | null; joining_fee: number | null } | null;
 };
 
-const MEMBER_COLS = "id, company_id, name, member_no, billing_status, frunk_plans(monthly_price)";
+const MEMBER_COLS =
+  "id, company_id, name, member_no, billing_status, joining_fee_waived, joining_fee_charged_at, frunk_plans(monthly_price, joining_fee)";
 
 async function memberByCheckoutOrder(admin: Admin, orderId: string | null | undefined): Promise<MemberRow | null> {
   if (!orderId) return null;
@@ -223,6 +229,59 @@ async function tryRecordMonthlyFee(
     member_kind: "会員",
     detail: { square_payment_id: mapped.square_payment_id, frunk_member_id: String(member.id) },
   });
+
+  // 入会金（#124）: 初回の月会費入金を確認できたら、保存されたカードへ続けて11,000円（税込）を自動請求。
+  // 決済リンクは有料フェーズ1つのプランしか受けないため、初回にまとめられない＝この場所が唯一の確実な起点。
+  // クーポン適用（joining_fee_waived）と請求済み（joining_fee_charged_at）は請求しない。
+  // この請求のWebhookは note の接頭辞「FRANK入会金」で category=入会金 に記録される（handleSquareEventの先頭で判定）。
+  if (kind === "initial" && !member.joining_fee_waived && !member.joining_fee_charged_at) {
+    const feeExTax = Number(member.frunk_plans?.joining_fee ?? 0);
+    if (feeExTax > 0 && raw.customer_id) {
+      const feeTax = monthlyFeeTaxIncluded(feeExTax);
+      const r = await chargeCardOnFile({
+        customerId: raw.customer_id,
+        amountTaxIncluded: feeTax,
+        note: `FRANK入会金（${String(member.member_no ?? "")}）`,
+      });
+      if (r.ok) {
+        await admin.from("frunk_members").update({ joining_fee_charged_at: new Date().toISOString() }).eq("id", member.id);
+      } else {
+        await logEvent(String(member.company_id), {
+          event_type: "billing.joining_fee_failed",
+          title: `入会金の自動請求に失敗: ${member.name}様（${member.member_no}）${feeTax.toLocaleString()}円を店頭で徴収してください`.slice(0, 120),
+          source: "frank_billing",
+          source_type: "system",
+          severity: "warning",
+        });
+      }
+    }
+  }
+  return true;
+}
+
+/** 入会金の自動課金（noteの接頭辞で判定）を category=入会金 で記録する。対象外は false */
+async function tryRecordJoiningFee(
+  admin: Admin,
+  ctx: { storeId: string; companyId: string; segmentId: string | null },
+  raw: SquarePayment,
+  mapped: { sold_on: string; tax_included: number; square_payment_id: string },
+): Promise<boolean> {
+  if (!isJoiningFeeNote(raw.note)) return false;
+  const member = await memberBySquareCustomer(admin, raw.customer_id);
+  await insertSale(admin, ctx, {
+    sold_on: mapped.sold_on,
+    category: "入会金",
+    amount: exTax(mapped.tax_included),
+    tax_included: mapped.tax_included,
+    pay_method: "カード",
+    memo: `Square自動課金・${String(raw.note ?? "入会金")}`,
+    customer_name: member ? String(member.name ?? "") : undefined,
+    member_kind: member ? "会員" : undefined,
+    detail: {
+      square_payment_id: mapped.square_payment_id,
+      ...(member ? { frunk_member_id: String(member.id) } : {}),
+    },
+  });
   return true;
 }
 
@@ -292,6 +351,11 @@ export async function handleSquareEvent(payload: string): Promise<void> {
     const mapped = mapSquarePayment(raw);
     if (!mapped) return;
     if (await alreadyRecorded(admin, "square_payment_id", mapped.square_payment_id)) return;
+    // 入会金の自動課金（note接頭辞）→ category=入会金
+    if (await tryRecordJoiningFee(admin, ctx, raw, mapped)) {
+      await admin.rpc("refresh_money_to_finance", { p_company_id: ctx.companyId });
+      return;
+    }
     // 月会費（サブスク）なら月会費として記録し、店頭売上には入れない
     if (await tryRecordMonthlyFee(admin, ctx, raw, mapped)) {
       await admin.rpc("refresh_money_to_finance", { p_company_id: ctx.companyId });

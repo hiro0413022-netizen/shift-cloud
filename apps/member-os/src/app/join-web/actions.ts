@@ -4,6 +4,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
 import { sendFrankMail, buildWebSignupReceiptMail } from "@/lib/frank-mail";
+import { validCoupon, normalizeCoupon } from "@/lib/frank-billing-pure";
 
 export type WebSignupState = { ok?: boolean; error?: string };
 
@@ -35,6 +36,14 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
   if (str(formData.get("consent_privacy")) !== "1") return { error: "個人情報の取扱いへの同意が必要です" };
   if (str(formData.get("consent_terms")) !== "1")
     return { error: "会員規約（休会・退会規定を含む）への同意が必要です" };
+
+  // 入会金無料クーポン（#124）。入力があるのに無効なら申込を止めて教える
+  // （黙って無効化すると「無料のはずが11,000円請求された」というトラブルになる）
+  const couponInput = str(formData.get("coupon"));
+  const coupon = validCoupon(couponInput);
+  if (couponInput && !coupon) {
+    return { error: `クーポンコード「${normalizeCoupon(couponInput)}」は無効です。綴りをご確認いただくか、空欄のまま送信してください。` };
+  }
 
   const admin = createAdmin();
 
@@ -79,7 +88,9 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     start_date: orNull(formData.get("start_date")),
     consent_privacy: true,
     consent_terms: true,
-    note: "Web入会申込（公式サイト）",
+    joining_fee_coupon: coupon,
+    joining_fee_waived: !!coupon,
+    note: coupon ? `Web入会申込（公式サイト）クーポン適用: ${coupon}` : "Web入会申込（公式サイト）",
     status: "pending",
   });
   if (error) return { error: `送信に失敗しました: ${error.message}` };
