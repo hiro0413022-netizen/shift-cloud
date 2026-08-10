@@ -83,10 +83,16 @@ export function LiveBoard({ initial }: { initial: AiSalesLive }) {
   const warnings: string[] = [];
   if (data.config.loopEnabled === false) warnings.push("SNSコンテンツループが無効です（gn_loops sns_content）");
   if (!data.config.aiConfigured) warnings.push("ANTHROPIC_API_KEY 未設定 → 投稿文はテンプレート生成になります");
-  if (!data.config.igConfigured)
-    warnings.push("@swingcortex_jp 未接続（IG_ACCESS_TOKEN / IG_BUSINESS_ID）→ 承認済み投稿は接続後に自動配信されます");
-  if (!data.config.igWebConfigured)
-    warnings.push("@yozan_web_jp 未接続（IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB）→ HP制作の投稿は接続後に自動配信されます");
+  // Instagramを使わない運用（ig_enabled=false・#127）のときは未接続を警告しない。
+  // 「直す気のない警告」を出し続けると、本当に直すべき警告が埋もれる
+  if (data.config.igEnabled === false) {
+    warnings.push("Instagramは停止中です（X @YOZAN_inc のみに投稿）。Meta接続ができたら gn_loops sns_content の ig_enabled を true に戻してください");
+  } else {
+    if (!data.config.igConfigured)
+      warnings.push("@swingcortex_jp 未接続（IG_ACCESS_TOKEN / IG_BUSINESS_ID）→ 承認済み投稿は接続後に自動配信されます");
+    if (!data.config.igWebConfigured)
+      warnings.push("@yozan_web_jp 未接続（IG_ACCESS_TOKEN_WEB / IG_BUSINESS_ID_WEB）→ HP制作の投稿は接続後に自動配信されます");
+  }
   if (!data.config.xConfigured)
     warnings.push(
       "X @YOZAN_inc 未接続（X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_SECRET）→ 承認済み投稿は接続後に自動配信されます"

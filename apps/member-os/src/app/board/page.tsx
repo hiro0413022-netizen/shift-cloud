@@ -1,5 +1,3 @@
-import { createAdmin } from "@/lib/supabase/admin";
-import { hashToken } from "@/lib/intake";
 import { loadDay, occupancy, lessonOccupancy, type BookingRow } from "@/lib/frank-reservation";
 import { toMin, outstanding, CUSTOMER_KIND_LABEL } from "@yozan/core/frank-booking";
 import { BoardAutoRefresh } from "./refresh";
@@ -9,6 +7,9 @@ export const dynamic = "force-dynamic";
 /**
  * 店頭カレンダー（ロビー掲示・常設タブレット）
  * 台帳は frunk_bookings 一本（#93）。会員・体験・都度・レッスン枠がこの1画面に出る。
+ *
+ * 店舗アカウントでログインして開く（middleware の認可対象）。
+ * 以前あったトークンURL `/board/<token>` は廃止した。
  */
 
 function jstNow(): { date: string; hhmm: string } {
@@ -24,27 +25,7 @@ function shortName(b: BookingRow): string {
   return head.length > 6 ? head.slice(0, 6) : head;
 }
 
-export default async function BoardPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const admin = createAdmin();
-
-  const { data: tok } = await admin
-    .from("res_tokens")
-    .select("active, purpose")
-    .eq("token_hash", hashToken(token))
-    .maybeSingle();
-
-  if (!tok || !tok.active || tok.purpose !== "board") {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-black text-center">
-        <div>
-          <p className="text-2xl font-semibold text-white">表示URLが無効です</p>
-          <p className="mt-2 text-sm text-neutral-400">スタッフにお問い合わせください。</p>
-        </div>
-      </main>
-    );
-  }
-
+export default async function BoardPage() {
   const jst = jstNow();
   const view = await loadDay(jst.date);
   const bays = view.bays.filter((b) => b.active);

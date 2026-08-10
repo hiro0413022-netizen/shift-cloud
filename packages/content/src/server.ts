@@ -131,19 +131,29 @@ export async function pickMaterial(
 /** 生成結果を draft として保存 */
 export async function insertDraft(
   admin: AdminClient,
-  input: { companyId: string; product: Product; gen: GeneratedPost; scheduledAt: string; source: Record<string, unknown> }
+  input: {
+    companyId: string;
+    product: Product;
+    gen: GeneratedPost;
+    scheduledAt: string;
+    source: Record<string, unknown>;
+    /** 'instagram'=IG＋X両方（既定）／'x'=X専用（IG未接続のとき・#127） */
+    platform?: string;
+    /** 'awaiting_approval'=承認カードを出す（既定）／'scheduled'=承認なしで予定時刻に投稿 */
+    status?: "awaiting_approval" | "scheduled";
+  }
 ): Promise<string | null> {
   const { data } = await admin
     .from("cnt_posts")
     .insert({
       company_id: input.companyId,
       product: input.product,
-      platform: "instagram",
+      platform: input.platform ?? "instagram",
       theme: input.gen.theme,
       hook: input.gen.hook,
       body: input.gen.body,
       hashtags: input.gen.hashtags,
-      status: "awaiting_approval",
+      status: input.status ?? "awaiting_approval",
       scheduled_at: input.scheduledAt,
       source: { ...input.source, generator: input.gen.generator },
     })

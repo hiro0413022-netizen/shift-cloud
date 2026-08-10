@@ -60,7 +60,8 @@ async function ensureLoop(admin: Admin, companyId: string): Promise<LoopRow | nu
       // 商品ローテーション（日替わり）。pganote は専用IGアカウントがまだ無いため既定から外している
       // （@swingcortex_jp に混ぜたくなったら config.products に追加するだけ）
       // x_auto: Xは承認を待たず予定時刻に自動投稿（#104）。Instagramは承認が要る（画像＋商品別アカウントのため）
-      config: { post_hour_jst: 18, products: ["swing-cortex", "webdesign"], x_auto: true },
+      // ig_enabled: falseにするとX専用になる（承認カードも出さない・#127）。Meta接続ができたらtrueに戻すだけ
+      config: { post_hour_jst: 18, products: ["swing-cortex", "webdesign"], x_auto: true, ig_enabled: true },
     })
     .select("id, enabled, config")
     .single();
@@ -152,20 +153,40 @@ export async function runContentLoop(companyId: string): Promise<Record<string, 
   }));
   gen.body = body;
 
+  // Instagram未接続なら X専用（platform='x'）＋承認済み（scheduled）で作る（#127）。
+  // 承認カードを出さないのは、Xは x_auto で承認を待たずに投稿するため
+  // 「承認しても何も起きず、承認しないと永久に残る」カードになってしまうから（#126のX停止の原因がこれ）。
+  const igEnabled = cfg.ig_enabled !== false;
+
   const postId = await insertDraft(admin, {
     companyId,
     product,
     gen,
     scheduledAt,
     source: { sc_symptom_id: material.symptomId, symptom: material.symptomName, applied_rules: appliedRules },
+    platform: igEnabled ? "instagram" : "x",
+    status: igEnabled ? "awaiting_approval" : "scheduled",
   });
   if (!postId) {
     await saveRun("skip", "cnt_posts への保存に失敗", null, null);
     return { decision: "skip", reason: "insert_failed" };
   }
 
-  // ---- 承認カード（判断フィード）へ ----
   const timeLabel = new Date(scheduledAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+  // ---- X専用のときは承認カードを出さずに終了（/ai-sales には投稿として並ぶので確認・編集はできる） ----
+  if (!igEnabled) {
+    await saveRun("act", `${PRODUCT_LABEL[product]} の投稿案を生成（${gen.generator}・X専用）`, gen.body, null);
+    await logEvent(companyId, {
+      event_type: "ai.sns_content",
+      title: `SNS AIが${PRODUCT_LABEL[product]}の投稿案を生成 →「${gen.theme}」（${timeLabel} にXへ自動投稿）`,
+      source: "content_loop",
+      source_type: "ai",
+    });
+    return { decision: "act", product, post_id: postId, platform: "x" };
+  }
+
+  // ---- 承認カード（判断フィード）へ ----
   const enq = await enqueueAction(admin, {
     companyId,
     actionType: "sns_post",

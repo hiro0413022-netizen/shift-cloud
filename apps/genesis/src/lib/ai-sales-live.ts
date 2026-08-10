@@ -68,6 +68,8 @@ export type AiSalesLive = {
     loopEnabled: boolean | null;
     /** Xは承認なしで自動投稿するか（#104・gn_loops.config.x_auto） */
     xAuto: boolean;
+    /** Instagramを使うか（#127・gn_loops.config.ig_enabled）。false＝X専用で回している */
+    igEnabled: boolean;
   };
   lastRun: { date: string; decision: string; reason: string } | null;
   pipeline: {
@@ -387,6 +389,8 @@ export async function getAiSalesLive(companyId: string): Promise<AiSalesLive> {
       aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
       loopEnabled: loopRes ? Boolean(loopRes.enabled) : null,
       xAuto: (loopRes?.config as Record<string, unknown> | undefined)?.x_auto !== false,
+      // false = Instagramを使わずX専用で回している（#127）。未接続の警告を出す意味がないので画面側で抑止する
+      igEnabled: (loopRes?.config as Record<string, unknown> | undefined)?.ig_enabled !== false,
     },
     lastRun:
       runRes.length > 0
