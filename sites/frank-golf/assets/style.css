@@ -841,7 +841,9 @@ ul { margin: 0; padding: 0; list-style: none; }
     display: flex; flex-direction: column; align-items: stretch; gap: 0;
     position: fixed; inset: calc(var(--bar-h) + var(--nav-h)) 0 auto 0;
     background: rgba(255, 253, 248, .99);
-    backdrop-filter: blur(18px);
+    /* backdrop-filter は外した: 背景が.99不透明でぼかしの意味がない上、
+       iOS系WebKit(LINE内ブラウザ等)でメニュー内ボタンの文字が描画されない
+       合成バグの原因になり得るため（2026-08-11 実機報告） */
     padding: 12px 22px 30px;
     border-bottom: 1px solid var(--border);
     max-height: calc(100svh - var(--bar-h) - var(--nav-h));
