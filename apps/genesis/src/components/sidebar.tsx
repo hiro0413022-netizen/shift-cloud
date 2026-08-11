@@ -55,14 +55,14 @@ function NavLink({ item, active }: { item: (typeof NAV)[number]; active: boolean
     <Link
       href={item.href}
       title={item.en}
-      className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+      className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm leading-snug transition-colors ${
         active
           ? "bg-(--color-panel-2) text-sky-300 shadow-[inset_2px_0_0_0_#38bdf8]"
           : "text-(--color-dim) hover:bg-(--color-panel-2) hover:text-(--color-txt)"
       }`}
     >
-      <span className="w-4 text-center text-xs">{item.icon}</span>
-      {item.label}
+      <span className="w-4 shrink-0 text-center text-xs">{item.icon}</span>
+      <span className="min-w-0">{item.label}</span>
     </Link>
   );
 }
@@ -73,7 +73,8 @@ export function Sidebar({ userName }: { userName: string }) {
   const [adminOpen, setAdminOpen] = useState(inAdmin);
 
   return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r border-(--color-line) bg-(--color-panel) p-3 md:flex">
+    /* 文字を+15%したぶん幅も足す（w-60だと「経営メモ（AIの記憶）」等が折り返す） */
+    <aside className="hidden w-68 shrink-0 flex-col border-r border-(--color-line) bg-(--color-panel) p-3 md:flex">
       <div className="mb-6 px-2 pt-2">
         <p className="text-xs tracking-[0.3em] text-(--color-gold)">YOZAN</p>
         <p className="text-lg font-bold tracking-wide">GENESIS</p>

@@ -43,7 +43,7 @@ function access(r: StaffRow) {
 
 function Dot({ on }: { on: boolean }) {
   return on ? (
-    <span className="inline-block h-2 w-2 rounded-full bg-sky-400" title="アクセス可" />
+    <span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-400" title="アクセス可" />
   ) : (
     <span className="text-(--color-dim)">·</span>
   );
@@ -70,17 +70,17 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto rounded-xl border border-(--color-line)">
-        <table className="w-full min-w-[720px] border-collapse text-sm">
+        <table className="w-full min-w-[940px] border-collapse text-sm">
           <thead>
-            <tr className="bg-(--color-panel-2) text-left text-xs text-(--color-dim)">
-              <th className="px-3 py-2 font-medium">氏名 / 役割</th>
-              <th className="px-2 py-2 text-center font-medium">ログイン</th>
-              <th className="px-2 py-2 text-center font-medium" title="Genesis・Money・Legal・Caddy・Survey">本部系</th>
-              <th className="px-2 py-2 text-center font-medium" title="Shift Cloud">勤怠</th>
-              <th className="px-2 py-2 text-center font-medium" title="Member OS・Reserve OS">受付</th>
-              <th className="px-2 py-2 text-center font-medium" title="Lesson OS">Lesson</th>
-              <th className="px-2 py-2 text-center font-medium">状態</th>
-              <th className="px-2 py-2 text-right font-medium">操作</th>
+            <tr className="bg-(--color-panel-2) text-left text-xs whitespace-nowrap text-(--color-dim)">
+              <th className="px-3 py-2.5 font-medium">氏名 / 役割</th>
+              <th className="px-2 py-2.5 text-center font-medium">ログイン</th>
+              <th className="px-2 py-2.5 text-center font-medium" title="Genesis・Money・Legal・Caddy・Survey">本部系</th>
+              <th className="px-2 py-2.5 text-center font-medium" title="Shift Cloud">勤怠</th>
+              <th className="px-2 py-2.5 text-center font-medium" title="Member OS・Reserve OS">受付</th>
+              <th className="px-2 py-2.5 text-center font-medium" title="Lesson OS">Lesson</th>
+              <th className="px-2 py-2.5 text-center font-medium">状態</th>
+              <th className="px-2 py-2.5 text-right font-medium">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-(--color-line)">
@@ -91,17 +91,18 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
               return (
                 <Fragment key={r.id}>
                   <tr className={r.status !== "active" ? "opacity-50" : ""}>
-                    <td className="px-3 py-2">
-                      <div className="font-semibold">{r.name}</div>
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold whitespace-nowrap">{r.name}</div>
                       <form
                         action={(fd) => run(fd, assignRole, r.id, "役割を更新しました")}
-                        className="mt-1 flex items-center gap-1"
+                        className="mt-1.5 flex items-center gap-1"
                       >
                         <input type="hidden" name="staff_id" value={r.id} />
+                        {/* 高さ固定(h-7 py-0)にすると文字サイズを上げた時に下が見切れる。paddingで自然に伸ばす */}
                         <select
                           name="role_id"
                           defaultValue={r.roleId ?? ""}
-                          className={`${inputCls} h-7 py-0 text-xs`}
+                          className={`${inputCls} max-w-[15rem] leading-normal`}
                           onChange={(e) => e.currentTarget.form?.requestSubmit()}
                         >
                           <option value="" disabled>
@@ -130,7 +131,7 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
                       <form action={(fd) => run(fd, toggleStatus, r.id, "状態を切替えました")}>
                         <input type="hidden" name="staff_id" value={r.id} />
                         <button
-                          className={`rounded px-2 py-0.5 text-xs ${
+                          className={`rounded px-2.5 py-1 text-xs whitespace-nowrap ${
                             r.status === "active"
                               ? "bg-emerald-500/15 text-emerald-300"
                               : "bg-red-500/15 text-red-300"
@@ -143,7 +144,7 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
                     </td>
                     <td className="px-2 py-2 text-right">
                       <button
-                        className={`${btnGhostCls} text-xs`}
+                        className={`${btnGhostCls} text-xs whitespace-nowrap`}
                         onClick={() => setOpen(isOpen ? null : r.id)}
                       >
                         {r.hasLogin ? "PW再発行" : "ログイン発行"}

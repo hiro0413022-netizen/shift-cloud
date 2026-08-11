@@ -176,7 +176,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
             <div className="space-y-2">
               {byCategory.map((c) => (
                 <div key={c.cat} className="flex items-center gap-2">
-                  <span className="w-32 shrink-0 truncate text-xs">{c.label}</span>
+                  <span className="w-40 shrink-0 truncate text-xs" title={c.label}>{c.label}</span>
                   <div className="h-2 flex-1 rounded-full bg-(--color-line)">
                     <div className="h-2 rounded-full bg-(--color-accent)" style={{ width: `${(c.count / maxCat) * 100}%` }} />
                   </div>

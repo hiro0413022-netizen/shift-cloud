@@ -388,7 +388,7 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
             <svg
               ref={svgRef}
               viewBox={`0 0 ${W} ${H}`}
-              className="h-[calc(100vh-180px)] min-h-[480px] w-full touch-none select-none"
+              className="h-[calc(100vh-210px)] min-h-[480px] w-full touch-none select-none"
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
@@ -451,7 +451,7 @@ export function NetworkMap({ vaultSystems }: { vaultSystems: VaultRow[] }) {
                         {n.name}
                       </text>
                       {n.schema && n.kind === "app" && (
-                        <text x={n.x} y={n.y + r + 36} textAnchor="middle" fontSize={11} fill="#7f93b0">
+                        <text x={n.x} y={n.y + r + 36} textAnchor="middle" fontSize={12.5} fill="#7f93b0">
                           {n.schema.length > 22 ? n.schema.slice(0, 22) + "…" : n.schema}
                         </text>
                       )}

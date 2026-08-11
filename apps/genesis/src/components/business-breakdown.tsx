@@ -41,13 +41,13 @@ function SegmentCard({ seg }: { seg: SegmentMetric }) {
           onKeyDown={(e) => e.key === "Enter" && setOpenLines((v) => !v)}
           title="タップで収支の内訳を表示"
           className="mt-3 grid cursor-pointer grid-cols-3 gap-2 rounded-lg text-center transition-colors hover:bg-(--color-panel-2)">
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] text-(--color-dim)">売上</p>
-            <p className="tabular-nums text-sm font-semibold text-sky-200">{yen(seg.revenue)}</p>
+            <p className="tabular-nums text-sm font-semibold break-all text-sky-200">{yen(seg.revenue)}</p>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-[10px] text-(--color-dim)">原価+経費</p>
-            <p className="tabular-nums text-sm font-semibold text-(--color-txt)">{yen(seg.cogs + seg.expense)}</p>
+            <p className="tabular-nums text-sm font-semibold break-all text-(--color-txt)">{yen(seg.cogs + seg.expense)}</p>
           </div>
           <div>
             <p className="text-[10px] text-(--color-dim)">利益</p>

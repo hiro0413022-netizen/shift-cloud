@@ -293,7 +293,7 @@ function SummaryCard({
   return (
     <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
       <p className="text-xs tracking-wide text-(--color-dim)">{label}</p>
-      <p className={`mt-1 text-2xl font-bold tabular-nums ${negative ? "text-red-300" : ""}`}>
+      <p className={`mt-1 text-xl font-bold tabular-nums break-all lg:text-2xl ${negative ? "text-red-300" : ""}`}>
         {negative && "▲"}
         <CountUp value={Math.abs(value)} />
         <span className="ml-0.5 text-sm font-medium text-(--color-dim)">円</span>

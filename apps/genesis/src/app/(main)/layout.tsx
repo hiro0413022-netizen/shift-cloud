@@ -8,7 +8,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
     <div className="flex min-h-screen flex-col md:flex-row">
       <MobileNav userName={actor.name} />
       <Sidebar userName={actor.name} />
-      <main className="min-w-0 flex-1 p-4 md:p-6">{children}</main>
+      <main className="min-w-0 flex-1 p-3 sm:p-4 md:p-6">{children}</main>
     </div>
   );
 }

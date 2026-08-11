@@ -55,7 +55,7 @@ export default async function FuturePage() {
           {timeline.map((t, i) => (
             <li key={t.label} className="reveal relative" style={{ animationDelay: `${0.1 + i * 0.08}s` }}>
               <span
-                className={`absolute -left-[31px] top-0.5 flex h-2.5 w-2.5 rounded-full ${
+                className={`absolute -left-[31px] top-1.5 flex h-2.5 w-2.5 rounded-full ${
                   i === 0 ? "bg-sky-400 node-processing" : i < 3 ? "bg-indigo-400" : "bg-zinc-600"
                 }`}
               />

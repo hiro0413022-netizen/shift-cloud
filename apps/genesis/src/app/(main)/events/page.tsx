@@ -61,7 +61,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
           <ul className="relative space-y-4 border-l border-(--color-line) pl-5">
             {events.map((e) => (
               <li key={e.id} className="relative">
-                <span className="absolute -left-[26px] top-1">
+                <span className="absolute -left-[26px] top-2">
                   <StatusDot
                     status={e.severity === "critical" ? "danger" : e.severity === "warning" ? "warning" : e.source_type === "ai" ? "processing" : "normal"}
                   />

@@ -14,12 +14,57 @@
   --color-ok: #34d399;
   --color-warn: #fbbf24;
   --color-danger: #f87171;
+
+  /* ============================================================
+     フォントスケール（2026-08-11: 全画面 約+15%）
+     Tailwindの text-xs / text-sm ... の実寸をここで一括定義する。
+     ※各ページのクラスは触らずに全33画面がまとめて大きくなる。
+       サイズを戻したい・さらに上げたい時はこの数値だけを変える。
+     ============================================================ */
+  --text-xs: 0.85rem;      /* 13.6px（旧12） */
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.975rem;     /* 15.6px（旧14） */
+  --text-sm--line-height: 1.55;
+  --text-base: 1.125rem;   /* 18px（旧16） */
+  --text-base--line-height: 1.6;
+  --text-lg: 1.3125rem;    /* 21px（旧18） */
+  --text-lg--line-height: 1.5;
+  --text-xl: 1.5rem;       /* 24px（旧20） */
+  --text-xl--line-height: 1.45;
+  --text-2xl: 1.75rem;     /* 28px（旧24） */
+  --text-2xl--line-height: 1.35;
+  --text-3xl: 2.125rem;    /* 34px（旧30） */
+  --text-3xl--line-height: 1.25;
+  --text-4xl: 2.5rem;      /* 40px（旧36） */
+  --text-4xl--line-height: 1.2;
+}
+
+html {
+  /* iOSの自動文字拡大でレイアウトが崩れるのを防ぐ（拡大は下のスケールで明示的に行う） */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
   font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
   @apply bg-(--color-bg) text-(--color-txt) antialiased;
 }
+
+/* 数字は等幅に（桁が揃って読みやすく・カウントアップで幅が跳ねない） */
+table,
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   px直指定（text-[11px]等）はテーマスケールに乗らないので個別に底上げ
+   ------------------------------------------------------------ */
+.text-\[9px\]  { font-size: 10.5px; }
+.text-\[10px\] { font-size: 11.5px; }
+.text-\[11px\] { font-size: 12.5px; }
+.text-\[12px\] { font-size: 13.5px; }
+.text-\[13px\] { font-size: 15px; }
+.text-\[15px\] { font-size: 17px; }
 
 /* ============================================================
    背景: 微細グリッド＋上部グロー（管制室の空気感）
@@ -165,7 +210,7 @@ body::before {
   border-radius: 0.5rem;
   background: var(--color-accent);
   color: #07090f;
-  font-size: 0.8rem;
+  font-size: 0.925rem; /* 全体+15%に合わせる（旧0.8rem） */
   font-weight: 700;
   padding: 0.45rem 0.9rem;
   white-space: nowrap;
@@ -178,7 +223,7 @@ body::before {
   border-radius: 0.5rem;
   border: 1px solid var(--color-line);
   color: var(--color-dim);
-  font-size: 0.8rem;
+  font-size: 0.925rem; /* 全体+15%に合わせる（旧0.8rem） */
   padding: 0.45rem 0.9rem;
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
@@ -223,5 +268,29 @@ body::before {
     max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  /* 指で押せる大きさを確保（Appleの推奨44px） */
+  button,
+  select,
+  [role="button"],
+  a.btn-main,
+  a.btn-sub {
+    min-height: 44px;
+  }
+  /* テーブル内の小ボタンは行が伸びすぎるので少しだけ緩める */
+  table button,
+  table select {
+    min-height: 40px;
+  }
+  input,
+  select,
+  textarea {
+    /* 16px未満だとiOS Safariが入力時に勝手にズームする */
+    font-size: max(16px, 1em);
+  }
+  /* 横スクロールできることを示す余白 */
+  .overflow-x-auto {
+    scrollbar-width: thin;
   }
 }

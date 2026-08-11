@@ -184,7 +184,8 @@ export function KpiCard({
   return (
     <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
       <p className="text-xs tracking-wide text-(--color-dim)">{name}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums">
+      {/* 桁の多い金額でカードから溢れないよう、狭い時は1段小さく */}
+      <p className="mt-1 text-xl font-bold tabular-nums break-all lg:text-2xl">
         {value != null ? (
           <>
             <CountUp value={value} />

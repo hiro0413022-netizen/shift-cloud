@@ -60,7 +60,7 @@ export default async function SiteAdminPage() {
 
       <div className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
         <h2 className="text-sm font-semibold">お知らせ（サイトのNEWS欄）</h2>
-        <form action={addNews} className="grid grid-cols-[110px_110px_1fr_auto] gap-2">
+        <form action={addNews} className="grid grid-cols-1 gap-2 sm:grid-cols-[10.5rem_8rem_1fr_auto]">
           <input name="date" type="date" className={input} />
           <input name="tag" placeholder="お知らせ" className={input} />
           <input name="title" placeholder="タイトル（必須）" required className={input} />

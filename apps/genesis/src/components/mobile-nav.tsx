@@ -37,7 +37,7 @@ export function MobileNav({ userName }: { userName: string }) {
       {open && (
         <div className="fixed inset-0 z-40">
           <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 flex w-64 flex-col border-r border-(--color-line) bg-(--color-panel) p-3">
+          <div className="absolute inset-y-0 left-0 flex w-[17.5rem] max-w-[85vw] flex-col border-r border-(--color-line) bg-(--color-panel) p-3">
             <div className="mb-4 flex items-start justify-between px-2 pt-2">
               <div>
                 <p className="text-xs tracking-[0.3em] text-(--color-gold)">YOZAN</p>
