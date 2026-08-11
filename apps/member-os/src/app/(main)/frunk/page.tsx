@@ -4,7 +4,7 @@ import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/com
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import {
   createPlan, updatePlan, deletePlan, approveSignup, rejectSignup, setMemberStatus, issueSignupToken, changePlan,
-  resendApprovalMail,
+  resendApprovalMail, saveAlertNote,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -143,6 +143,18 @@ export default async function FrunkPage({
                       <form action={setMemberStatus}><input type="hidden" name="id" value={String(m.id)} /><input type="hidden" name="to" value="left" /><button className="text-xs text-(--color-dim) hover:text-rose-600">退会</button></form>
                     )}
                   </div>
+                  {/* 重要説明事項（#129）: 入力があると予約カレンダーの予約セルに⚠が付く */}
+                  <form action={saveAlertNote} className="flex w-full items-center gap-2">
+                    <input type="hidden" name="id" value={String(m.id)} />
+                    <span className={`text-sm ${m.alert_note ? "" : "opacity-30"}`}>⚠</span>
+                    <input
+                      name="alert_note"
+                      defaultValue={String(m.alert_note ?? "")}
+                      placeholder="重要説明事項（例: 左打ち・腰痛のため強度注意・未収あり）— 入力するとカレンダーに⚠"
+                      className={`${inputCls} flex-1 !py-1.5 text-xs`}
+                    />
+                    <button className={btnGhostCls}>保存</button>
+                  </form>
                 </div>
               );
             })}

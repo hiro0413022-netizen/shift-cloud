@@ -3,19 +3,11 @@
 import { useActionState, useState } from "react";
 import { submitWebSignup, type WebSignupState } from "./actions";
 import { yen } from "@/lib/frunk";
-import { termsUrl, privacyUrl } from "@/lib/site";
+import { FRANK_TERMS_TEXT, FRANK_PRIVACY_URL } from "@/lib/frank-terms";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
 import { NameFields } from "@/components/name-fields";
-
-function Doc({ href, children }: { href: string | null; children: React.ReactNode }) {
-  if (!href) return <span className="font-medium text-(--color-txt)">{children}</span>;
-  return (
-    <a href={href} target="_blank" rel="noopener" className="font-medium text-(--color-gold) underline">
-      {children}
-    </a>
-  );
-}
+import { SignaturePad } from "@/components/signature-pad";
 
 type Plan = {
   id: string;
@@ -34,8 +26,10 @@ const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5
 export function WebJoinForm({ plans }: { plans: Plan[] }) {
   const [state, action, pending] = useActionState<WebSignupState, FormData>(submitWebSignup, {});
   const [planId, setPlanId] = useState(plans.find((p) => p.name.includes("レギュラー"))?.id ?? plans[0]?.id ?? "");
+  const [signature, setSignature] = useState("");
 
   if (state.ok) {
+    // Square未設定環境のフォールバック（通常は決済ページへリダイレクトするためここには来ない）
     return (
       <div className="rounded-2xl border border-emerald-500/40 bg-(--color-panel) p-8 text-center">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-3xl text-emerald-400">✓</div>
@@ -106,10 +100,10 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={label}>電話番号</label><input name="phone" type="tel" placeholder="090-1234-5678" className={field} /></div>
-          <div><label className={label}>メールアドレス</label><input name="email" type="email" placeholder="example@mail.com" className={field} /></div>
+          <div><label className={label}>電話番号 <span className="text-rose-400">*</span></label><input name="phone" type="tel" required placeholder="090-1234-5678" className={field} /></div>
+          <div><label className={label}>メールアドレス <span className="text-rose-400">*</span></label><input name="email" type="email" required placeholder="example@mail.com" className={field} /></div>
         </div>
-        <p className="text-xs text-(--color-dim)">※ 電話・メールのいずれかは必須です</p>
+        <p className="text-xs text-(--color-dim)">※ 会員ページのログインに電話番号下4桁を、入会の控え（PDF）の送付にメールアドレスを使用します</p>
         <div className="grid grid-cols-2 gap-3">
           <AddressFields inputClassName={field} labelClassName={label} wideClassName="col-span-2" />
         </div>
@@ -120,9 +114,9 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-sm text-(--color-dim)">
           <span className="font-medium text-(--color-txt)">お支払いはクレジットカードのみ</span>
           <br />
-          月会費は毎月カードで自動お支払いになります。カードのご登録は、この申込のあと
-          <span className="font-medium text-(--color-txt)">会員番号をメールでお送りしてから</span>
-          （会員ページ）となります。このフォームでカード情報を入力する必要はありません。
+          このあと安全な決済ページ（Square）に進み、初回月会費のお支払いとカード登録を行います。
+          <span className="font-medium text-(--color-txt)">決済完了と同時にご入会が確定し、会員番号を発行</span>
+          します（入会の控えPDFをメールでお送りします）。月会費は以後毎月自動でお支払いになります。
         </div>
         <div>
           <label className={label}>クーポンコード（お持ちの方のみ）</label>
@@ -131,27 +125,40 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         </div>
       </div>
 
-      {/* 同意 */}
+      {/* 規約・同意・電子サイン */}
       <div className={`${cardCls} space-y-3`}>
-        <p className="text-sm font-semibold text-(--color-txt)">ご確認・同意</p>
+        <p className="text-sm font-semibold text-(--color-txt)">会員規約のご確認・同意 <span className="text-rose-400">*</span></p>
+        <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded-xl border border-(--color-line) bg-(--color-panel-2) p-4 text-xs leading-relaxed text-(--color-dim)">
+          {FRANK_TERMS_TEXT}
+        </div>
         <label className="flex items-start gap-3 text-sm text-(--color-dim)">
           <input type="checkbox" name="consent_privacy" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
-          <span><Doc href={privacyUrl()}>プライバシーポリシー</Doc>に同意し、個人情報を入会手続き・サービス提供の目的で利用することに同意します。<span className="text-rose-400">*</span></span>
+          <span>
+            <a href={FRANK_PRIVACY_URL} target="_blank" rel="noopener" className="font-medium text-(--color-gold) underline">プライバシーポリシー</a>
+            に同意し、個人情報を入会手続き・サービス提供の目的で利用することに同意します。<span className="text-rose-400">*</span>
+          </span>
         </label>
         <label className="flex items-start gap-3 text-sm text-(--color-dim)">
           <input type="checkbox" name="consent_terms" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
-          <span><Doc href={termsUrl()}>会員規約</Doc>（休会・退会の規定を含む）を確認し、同意します。<span className="text-rose-400">*</span></span>
+          <span>上記の会員規約（休会・退会の規定を含む）を確認し、同意します。<span className="text-rose-400">*</span></span>
         </label>
+        <div>
+          <p className="mb-1 text-sm font-medium text-(--color-dim)">ご署名（電子サイン） <span className="text-rose-400">*</span></p>
+          <SignaturePad value={signature} onChange={setSignature} />
+          <input type="hidden" name="signature" value={signature} />
+        </div>
       </div>
 
       {state.error && (
         <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-center text-sm text-rose-300">{state.error}</p>
       )}
 
-      <button disabled={pending} className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50">
-        {pending ? "送信中..." : "この内容で入会を申し込む"}
+      <button disabled={pending || !signature} className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50">
+        {pending ? "決済ページへ移動中..." : "同意して決済に進む"}
       </button>
-      <p className="text-center text-xs text-(--color-dim)">お申し込み後、スタッフが確認し折り返しご連絡します。確定をもって入会となります（オンライン決済はありません）。</p>
+      <p className="text-center text-xs text-(--color-dim)">
+        このあと安全な決済ページ（Square）で初回月会費をお支払いいただくと、その場でご入会が確定し会員番号が発行されます。
+      </p>
     </form>
   );
 }

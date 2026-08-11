@@ -4,6 +4,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
 import { readName } from "@/lib/name";
+import { sendFrankMail, buildTrialRequestReceiptMail } from "@/lib/frank-mail";
 
 export type TrialState = { ok?: boolean; error?: string };
 
@@ -55,5 +56,16 @@ export async function submitTrial(_prev: TrialState, formData: FormData): Promis
     source_type: "external",
     severity: "info",
   });
+
+  // 受付メール（メールアドレスがある場合のみ。送信失敗で申込は落とさない）
+  if (email) {
+    const mail = buildTrialRequestReceiptMail({
+      name,
+      pref1: orNull(formData.get("pref1")),
+      pref2: orNull(formData.get("pref2")),
+      pref3: orNull(formData.get("pref3")),
+    });
+    await sendFrankMail({ to: email, ...mail });
+  }
   return { ok: true };
 }

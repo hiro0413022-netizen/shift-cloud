@@ -422,3 +422,12 @@
   **(d) member-os** — 受付台帳・今月KPI・店舗selectを配属店舗で絞り、server action は `scopedStoreId()` でフォームのstore_idを検証（配属外なら主店舗に差し替え）＝UI非表示だけに頼らない。
   **(e) データ** — frank@（FRANK店舗アカウント）に FRANK GOLF 姫路の配属が無かったので staff_store_assignments に追加（is_primary）。⚠現在 manage_company を持つのは古川さんと**小川うらら**の2名（両者とも会社オーナーロール）。小川さんを自店のみにするならロールを変えること。
   検証: tests 261件通過・shift-cloud/money-golfwing/member-os の tsc クリーン。
+- #129 (2026-08-11) **FRANK Web入会を「承認レス・即決済」に全面改修＋店舗ダッシュボード＝予約カレンダー化**（migration 0108適用済）。
+  **(a) 入会フロー** — /join-web: 規約全文のスクロール表示＋同意＋電子サイン（店頭タブレットのSignaturePadを共通化 `components/signature-pad.tsx`）→ Square決済リンク（月会費サブスク）へ即リダイレクト → 初回入金のWebhook（genesis frank-pos.ts）が `activateWebJoin`（`lib/frank-join.ts`）で **会員番号FR####採番・active化・入会金カード課金・Lesson OSカルテ作成・控えPDFメール** まで全自動。スタッフ承認は挟まない（/frunkの承認は店頭iPad入会と救済用に残置）。決済リンク作成はSquare envがyozan-genesisにしか無いため **公開API `/api/public/frank/join-checkout`**（member_id=UUIDが実質の認可・redirect先はmember-os/frankgolf.jpのみ許可）。完了画面 `/join-web/complete?sid=` は5秒自動更新で会員番号を表示。Squareが使えない環境は旧承認フローに自動フォールバック。
+  **(b) 採番の安全化（0108）** — `uq_frunk_members_member_no`（company_id, member_no・partial unique）。count+1採番は衝突したらリトライ。
+  **(c) 入会控えPDF** — `lib/frank-join-pdf.ts`（pdf-lib＋fontkit）。レイアウトはゴルフウィング紙申込書の見本に準拠（申込者情報/費用/コース/サイン画像/店舗情報）。⚠**pdf-libのsubset埋め込みはCJKでグリフ欠落する**（poppler/gs両方で実証）→ glyf版NotoSansJPをJIS第1+2水準にfonttoolsでサブセットした2.3MBを**フル埋め込み**（PDF約1.4MB）。フォントは `src/assets/`＋`outputFileTracingIncludes`。Resendの `attachments` 対応を genesis/member-os両方の sendFrankMail に追加。
+  **(d) Lesson OS連携** — 入会確定時に `lsn_students`（member_code=会員番号）と `lsn_share_tokens` を自動作成。完了メールにカルテURL（lesson-os.vercel.app/s/…）を記載、member-os会員ページ（会員番号+電話下4桁ログイン）にも「レッスンカルテを見る」を追加＝お客様のID/PWは会員登録と同一。
+  **(e) 店舗ダッシュボード** — FRANK姫路アカウントは /dashboard＝**予約カレンダー**（日/週切替・打席×時間・体験/会員/都度/レッスン色分け・iPad横スクロール対応）。会員の**重要説明事項 `alert_note`**（0108・/frunkで記入）があると予約セルに⚠＋hoverで内容。レッスン管理（lesson-os/frank）・予約管理・/boardへの導線ボタン。GOLF WING宝塚は従来の月次KPI（オーナーは?store=で行き来）。ログイン後の着地は/dashboardに変更。
+  **(f) 体験メール** — member-os /trial（希望日時申込型）に受付メールを追加（サイトのカレンダー予約は#118で送信済み）。
+  **(g) サイト文言** — plan/trialの「スタッフ確認後に確定・オンライン決済はありません」を即時決済の説明に差し替え（_build.py再生成）。
+  ⚠残: 規約・特商法・プライバシーは草案のまま（NEXT_TASKS A-0d・専門家確認は決済開始前に必須）。Webhook未達時はpendingのまま＝/frunkの承認で救済。

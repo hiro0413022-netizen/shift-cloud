@@ -1321,7 +1321,7 @@ def build_plan():
         <a class="btn btn--brass" data-link="links.joinWeb">Webで入会を申し込む</a>
         <a class="btn btn--ghost" href="#" data-cta="trial">まずは体験する</a>
       </div>
-      <p class="cta__note" style="margin-top:14px">Web入会はスタッフ確認後に確定します（オンライン決済はありません）。</p>
+      <p class="cta__note" style="margin-top:14px">Web入会は規約に同意・電子サインのうえ、その場でお支払いまで完了。会員番号が即時発行され、控え（PDF）をメールでお送りします。</p>
     </div>
   </div>
 </section>
@@ -1344,7 +1344,7 @@ def build_plan():
       </div>
       <div class="flow__i">
         <p class="flow__n">STEP 03</p>
-        <div><h3 class="flow__t">ご入会手続き</h3><p class="flow__b">プランをお選びいただき、お手続きを行います。ご来店時のほか、<a data-link="links.joinWeb" style="color:var(--brass-2)">Webでの入会申込 ↗</a>も可能です（スタッフ確認後に確定・オンライン決済はありません）。その場で決めていただく必要はありません。</p></div>
+        <div><h3 class="flow__t">ご入会手続き</h3><p class="flow__b">プランをお選びいただき、お手続きを行います。ご来店時のほか、<a data-link="links.joinWeb" style="color:var(--brass-2)">Webでの入会申込 ↗</a>も可能です。Webなら規約同意・電子サイン・お支払いまでその場で完了し、会員番号が即時発行されます。</p></div>
       </div>
       <div class="flow__i">
         <p class="flow__n">STEP 04</p>
@@ -1634,7 +1634,7 @@ def build_trial():
         <div class="flow__i"><p class="flow__n">STEP 02</p><div><h3 class="flow__t">Web予約で打席を確保</h3><p class="flow__b">スマホから空き時間を選んで予約完了。<a data-link="links.memberBooking" style="color:var(--brass-2)">Web予約 ↗</a></p></div></div>
         <div class="flow__i"><p class="flow__n">STEP 03</p><div><h3 class="flow__t">スマート入退室でそのまま打席へ</h3><p class="flow__b">完全予約制なので待ち時間なし。予約した時間に、そのまま練習に入れます。</p></div></div>
       </div>
-      <p class="lead" style="font-size:12.5px;margin-top:14px">※ ご入会の承認後、会員番号をお送りします。その番号でWeb予約をご利用いただけます。<a data-link="links.joinWeb" style="color:var(--brass-2)">入会のお申し込みはこちら ↗</a></p>
+      <p class="lead" style="font-size:12.5px;margin-top:14px">※ Web入会は決済完了と同時に会員番号が発行され、すぐにWeb予約をご利用いただけます。<a data-link="links.joinWeb" style="color:var(--brass-2)">入会のお申し込みはこちら ↗</a></p>
     </div>
 
     <!-- 体験のお申し込み（member-os の体験フォームへ） -->

@@ -20,8 +20,15 @@ const FROM_DEFAULT = "FRANK GOLF <info@frankgolf.jp>";
 export const FRANK_SITE = "https://frankgolf.jp";
 
 export type MailResult = { ok: boolean; skipped?: boolean; error?: string };
+/** Resend の添付（content は base64 文字列） */
+export type MailAttachment = { filename: string; content: string };
 
-export async function sendFrankMail(input: { to: string; subject: string; text: string }): Promise<MailResult> {
+export async function sendFrankMail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  attachments?: MailAttachment[];
+}): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn("[frank-mail] RESEND_API_KEY 未設定のため送信をスキップ:", input.subject);
@@ -36,6 +43,7 @@ export async function sendFrankMail(input: { to: string; subject: string; text: 
         to: [input.to],
         subject: input.subject,
         text: input.text,
+        ...(input.attachments?.length ? { attachments: input.attachments } : {}),
       }),
     });
     if (!res.ok) {
@@ -48,6 +56,42 @@ export async function sendFrankMail(input: { to: string; subject: string; text: 
     console.error("[frank-mail] 送信失敗:", e);
     return { ok: false, error: String(e) };
   }
+}
+
+/**
+ * 体験申込（希望日時3つの申込型・member-os /trial）の受付メール。
+ * サイトのカレンダー予約（即確定）と違い、この時点では日時は確定していない。
+ * 「スタッフから連絡して日時を確定する」ことを必ず書く。
+ */
+export function buildTrialRequestReceiptMail(input: {
+  name: string;
+  pref1?: string | null;
+  pref2?: string | null;
+  pref3?: string | null;
+}): { subject: string; text: string } {
+  const prefs = [input.pref1, input.pref2, input.pref3]
+    .map((p, i) => (p ? `第${i + 1}希望: ${p}` : null))
+    .filter(Boolean)
+    .join("\n");
+  return {
+    subject: "【FRANK GOLF】体験レッスンのお申し込みを受け付けました",
+    text: [
+      `${input.name} 様`,
+      "",
+      "FRANK GOLF（姫路）です。体験レッスンのお申し込みありがとうございます。",
+      "以下の内容で受け付けました。",
+      "",
+      prefs || "ご希望日時: （記載なし）",
+      "",
+      "スタッフが空き状況を確認のうえ、お電話またはメールで日時を確定のご連絡をいたします。",
+      "1〜2営業日たっても連絡がない場合は、お手数ですがこのメールにご返信ください。",
+      "",
+      "当日は動きやすい服装でお越しください。クラブ・シューズは無料でお貸しします。",
+      "",
+      "FRANK GOLF（姫路・土山）",
+      FRANK_SITE,
+    ].join("\n"),
+  };
 }
 
 /**

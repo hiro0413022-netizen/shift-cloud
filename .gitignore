@@ -20,3 +20,7 @@ tsconfig.tscheck.json
 apps/report-os/out/
 # Officeが開いている間に作る一時ロックファイル
 ~$*
+
+# 一時検証ディレクトリと未使用フォント（サンドボックスから削除不可のため除外・#129）
+.pdftest/
+apps/genesis/src/assets/NotoSansJP-Regular.otf

@@ -3,6 +3,8 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel } from "@/components/ui";
 import { StatCard, type StatGroup } from "./stat-card";
+import { FrankCalendarDashboard } from "./frank-calendar";
+import { FRANK_STORE_ID, jstToday } from "@yozan/core/frank-booking";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +32,35 @@ function rate(n: number, d: number): string {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; date?: string; view?: string; store?: string }>;
 }) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
   const sp = await searchParams;
+
+  // 店舗分岐（#129）: FRANK姫路の店舗アカウントは予約カレンダーが最初の画面。
+  // GOLF WING宝塚は従来の月次KPI。オーナーは ?store= で行き来できる（既定はFRANKカレンダー）。
+  const isFrankStaff = !actor.isOwner && actor.primaryStoreId === FRANK_STORE_ID;
+  const showFrank =
+    sp.store === "gw" ? false : sp.store === "frank" ? true : isFrankStaff || actor.isOwner;
+  if (showFrank && actor.storeIds.includes(FRANK_STORE_ID)) {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : jstToday();
+    const view = sp.view === "week" ? ("week" as const) : ("day" as const);
+    return (
+      <div className="space-y-4">
+        {actor.isOwner && (
+          <p className="text-right text-xs">
+            <Link href="/dashboard?store=gw" className="text-(--color-dim) underline hover:text-(--color-txt)">GOLF WING 宝塚の月次サマリーを見る →</Link>
+          </p>
+        )}
+        <FrankCalendarDashboard date={date} view={view} extraQuery={actor.isOwner ? "&store=frank" : ""} />
+      </div>
+    );
+  }
+
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
   const { start, end, prev, next, label } = monthBounds(month);
+  const storeQ = actor.isOwner ? "&store=gw" : "";
 
   const [{ data: visits }, { data: joins }, { data: leaves }] = await Promise.all([
     admin
@@ -138,8 +162,12 @@ export default async function DashboardPage({
           <p className="mt-0.5 text-sm text-(--color-dim)">GOLF WING 宝塚 ・ 月次サマリー</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/dashboard?month=${prev}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="前月">←</Link>
+          {actor.isOwner && (
+            <Link href="/dashboard?store=frank" className="mr-2 text-xs text-(--color-dim) underline hover:text-(--color-txt)">← FRANK姫路のカレンダー</Link>
+          )}
+          <Link href={`/dashboard?month=${prev}${storeQ}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="前月">←</Link>
           <form>
+            {actor.isOwner && <input type="hidden" name="store" value="gw" />}
             <input
               type="month"
               name="month"
@@ -147,7 +175,7 @@ export default async function DashboardPage({
               className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm font-medium text-(--color-txt) focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15"
             />
           </form>
-          <Link href={`/dashboard?month=${next}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="翌月">→</Link>
+          <Link href={`/dashboard?month=${next}${storeQ}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="翌月">→</Link>
         </div>
       </header>
 

@@ -46,7 +46,7 @@ export type BookingRow = {
   payment_method: string | null;
   member_id: string | null;
   trial_request_id: string | null;
-  frunk_members: { name: string; member_no: string } | null;
+  frunk_members: { name: string; member_no: string; alert_note: string | null } | null;
   frunk_bays: { name: string } | null;
   mbr_trial_requests: { name: string; phone: string | null; lefty: boolean; experience: string | null; message: string | null } | null;
 };
@@ -64,7 +64,7 @@ export type LessonRow = {
 const BOOKING_COLS =
   "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, " +
   "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
-  "frunk_members(name, member_no), frunk_bays(name), " +
+  "frunk_members(name, member_no, alert_note), frunk_bays(name), " +
   "mbr_trial_requests(name, phone, lefty, experience, message)";
 
 export type DayView = {

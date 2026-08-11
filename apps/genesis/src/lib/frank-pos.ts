@@ -14,6 +14,7 @@ import {
   type SquareRefund,
 } from "@/lib/frank-pos-pure";
 import { chargeCardOnFile } from "@/lib/frank-square-billing";
+import { activateWebJoin } from "@/lib/frank-join";
 
 export { verifySquareSignature };
 
@@ -150,6 +151,7 @@ type MemberRow = {
   company_id: unknown;
   name: unknown;
   member_no: unknown;
+  status: unknown;
   billing_status: unknown;
   joining_fee_waived: boolean | null;
   joining_fee_charged_at: string | null;
@@ -157,7 +159,7 @@ type MemberRow = {
 };
 
 const MEMBER_COLS =
-  "id, company_id, name, member_no, billing_status, joining_fee_waived, joining_fee_charged_at, frunk_plans(monthly_price, joining_fee)";
+  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, frunk_plans(monthly_price, joining_fee)";
 
 async function memberByCheckoutOrder(admin: Admin, orderId: string | null | undefined): Promise<MemberRow | null> {
   if (!orderId) return null;
@@ -205,6 +207,17 @@ async function tryRecordMonthlyFee(
         updated_at: new Date().toISOString(),
       })
       .eq("id", member.id);
+
+    // Web入会（即決済・#129）: pending のままの初回入金＝入会の確定。
+    // 会員番号の採番・カルテ作成・控えPDFメールまで activateWebJoin が行う。
+    if (String(member.status) === "pending") {
+      try {
+        const issued = await activateWebJoin(admin, String(member.id));
+        if (issued) member.member_no = issued; // 以降の売上メモ・入会金noteに新番号を使う
+      } catch (e) {
+        console.error("[frank-pos] activateWebJoin failed:", e);
+      }
+    }
     if (String(member.billing_status) !== "active") {
       await logEvent(String(member.company_id), {
         event_type: "billing.registered",

@@ -52,6 +52,74 @@ async function squarePost(token: string, path: string, body: Record<string, unkn
   return json;
 }
 
+/**
+ * Web入会（即決済・#129）用: 会員ID直接指定で決済リンクを作る。
+ * /join-web が申込行（status='pending'）を作った直後に呼ぶ。member_no はまだ無い。
+ * redirect_url は member-os の完了画面（決済後に会員番号を表示する）。
+ */
+export async function createJoinCheckoutForMember(
+  memberId: string,
+  redirectUrl: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const admin = createAdmin();
+  const token = accessToken();
+  const locationId = process.env.SQUARE_LOCATION_ID;
+  if (!token || !locationId) return { ok: false, error: "square_env_missing" };
+
+  const { data: row } = await admin
+    .from("frunk_members")
+    .select("id, name, email, phone, status, billing_status, frunk_plans(name, monthly_price, square_variation_id)")
+    .eq("id", memberId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!row) return { ok: false, error: "member_not_found" };
+  if (!["pending", "active"].includes(String(row.status))) return { ok: false, error: "invalid_status" };
+  if (String(row.billing_status) === "active") return { ok: false, error: "already_active" };
+
+  const plan = (row as unknown as {
+    frunk_plans: { name: string; monthly_price: number | null; square_variation_id: string | null } | null;
+  }).frunk_plans;
+  const priceExTax = Number(plan?.monthly_price ?? 0);
+  if (!plan || priceExTax <= 0) return { ok: false, error: "plan_free" };
+  const variationId = plan.square_variation_id;
+  if (!variationId) return { ok: false, error: "square_env_missing" };
+
+  const amount = monthlyFeeTaxIncluded(priceExTax);
+  try {
+    const phone = toE164Jp(row.phone ? String(row.phone) : null);
+    const json = await squarePost(token, "/online-checkout/payment-links", {
+      idempotency_key: randomUUID(),
+      quick_pay: {
+        name: `FRANK GOLF 月会費（${plan.name}・税込）`,
+        price_money: { amount, currency: "JPY" },
+        location_id: locationId,
+      },
+      checkout_options: {
+        subscription_plan_id: variationId,
+        redirect_url: redirectUrl,
+        ask_for_shipping_address: false,
+      },
+      pre_populated_data: {
+        ...(row.email ? { buyer_email: String(row.email) } : {}),
+        ...(phone ? { buyer_phone_number: phone } : {}),
+      },
+      payment_note: `FRANK月会費 Web入会（${String(row.name ?? "")}）`,
+    });
+    const link = json.payment_link as { url?: string; order_id?: string } | undefined;
+    if (!link?.url || !link.order_id) throw new Error("payment_link missing url/order_id");
+
+    await admin
+      .from("frunk_members")
+      .update({ square_checkout_order_id: link.order_id, billing_status: "checkout", updated_at: new Date().toISOString() })
+      .eq("id", memberId)
+      .neq("billing_status", "active");
+    return { ok: true, url: String(link.url) };
+  } catch (e) {
+    console.error("[frank-square-billing] join checkout failed:", e);
+    return { ok: false, error: "checkout_failed" };
+  }
+}
+
 /** 会員認証→Squareサブスク決済リンクのURLを返す（Stripe版 createBillingCheckout の置き換え） */
 export async function createSquareBillingCheckout(
   memberNo: string,

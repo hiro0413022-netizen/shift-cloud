@@ -186,6 +186,23 @@ export async function rejectSignup(formData: FormData) {
   revalidatePath("/frunk");
 }
 
+/** 重要説明事項（#129）: 入力があると予約カレンダーの予約セルに⚠が付く。空で保存=解除 */
+export async function saveAlertNote(formData: FormData) {
+  const actor = await requireReceptionActor();
+  const admin = createAdmin();
+  const id = str(formData.get("id"));
+  if (!id) return;
+  const note = str(formData.get("alert_note"));
+  await admin
+    .from("frunk_members")
+    .update({ alert_note: note || null, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+  await logAudit(actor, "frunk.alert_note.save", "frunk_members", id, null, { alert_note: note || null });
+  revalidatePath("/frunk");
+  revalidatePath("/dashboard");
+}
+
 // ---- 会員ステータス変更（休会・復帰・退会） ----
 // 休会=Squareの月会費自動課金を一時停止（休会費2,200円税込は店頭で徴収）／復帰=再開（#124）
 export async function setMemberStatus(formData: FormData) {

@@ -29,6 +29,24 @@ export default async function MemberHomePage({
     .eq("company_id", member.companyId).eq("member_no", member.memberNo)
     .is("deleted_at", null).maybeSingle();
 
+  // レッスンカルテ（Lesson OS・#129）: member_no ⇄ lsn_students.member_code、閲覧は共有トークン
+  let karteUrl: string | null = null;
+  {
+    const { data: student } = await admin
+      .from("lsn_students").select("id")
+      .eq("company_id", member.companyId).eq("member_code", member.memberNo)
+      .is("deleted_at", null).limit(1).maybeSingle();
+    if (student) {
+      const { data: tok } = await admin
+        .from("lsn_share_tokens").select("token")
+        .eq("student_id", student.id).is("revoked_at", null).limit(1).maybeSingle();
+      if (tok?.token) {
+        const base = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
+        karteUrl = `${base}/s/${String(tok.token)}`;
+      }
+    }
+  }
+
   const { data: bookings } = me
     ? await admin
         .from("frunk_bookings")
@@ -63,9 +81,14 @@ export default async function MemberHomePage({
       {notice && <p className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{notice.text}</p>}
       {sp.err && <p className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{sp.err}</p>}
 
-      <a href="https://frankgolf.jp/booking.html" className="mb-6 block w-full rounded-xl bg-sky-600 py-4 text-center text-lg font-semibold text-white transition-all hover:bg-sky-500">
+      <a href="https://frankgolf.jp/booking.html" className="mb-3 block w-full rounded-xl bg-sky-600 py-4 text-center text-lg font-semibold text-white transition-all hover:bg-sky-500">
         ＋ Web予約する
       </a>
+      {karteUrl && (
+        <a href={karteUrl} target="_blank" rel="noreferrer" className="mb-6 block w-full rounded-xl border border-(--color-gold)/50 bg-(--color-panel) py-3.5 text-center font-semibold text-(--color-gold) transition-all hover:bg-(--color-panel-2)">
+          📋 レッスンカルテを見る
+        </a>
+      )}
 
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold text-(--color-dim)">これからのご予約</h2>

@@ -20,5 +20,7 @@ export async function login(
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "IDまたはパスワードが正しくありません" };
-  redirect("/");
+  // 店舗で最初に見たいのは予約カレンダー（#129）。/dashboard が店舗ごとに出し分ける
+  // （FRANK姫路=カレンダー / GOLF WING宝塚=月次KPI）
+  redirect("/dashboard");
 }

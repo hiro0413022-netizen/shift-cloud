@@ -22,8 +22,15 @@ export { buildTrialConfirmMail, buildReminderMail };
 const FROM_DEFAULT = "FRANK GOLF <info@frankgolf.jp>";
 
 export type MailResult = { ok: boolean; skipped?: boolean; error?: string };
+/** Resend の添付（content は base64 文字列）#129 */
+export type MailAttachment = { filename: string; content: string };
 
-export async function sendFrankMail(input: { to: string; subject: string; text: string }): Promise<MailResult> {
+export async function sendFrankMail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  attachments?: MailAttachment[];
+}): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     console.warn("[frank-mail] RESEND_API_KEY 未設定のため送信をスキップ:", input.subject);
@@ -38,6 +45,7 @@ export async function sendFrankMail(input: { to: string; subject: string; text: 
         to: [input.to],
         subject: input.subject,
         text: input.text,
+        ...(input.attachments?.length ? { attachments: input.attachments } : {}),
       }),
     });
     if (!res.ok) {
