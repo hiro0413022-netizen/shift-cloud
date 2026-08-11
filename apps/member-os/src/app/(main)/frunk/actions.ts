@@ -80,6 +80,42 @@ export async function deletePlan(formData: FormData) {
   revalidatePath("/frunk");
 }
 
+/**
+ * 会員番号の案内メールを送る（承認時と、あとからの再送で共用）。
+ * 送れなかった理由を必ず返す＝スタッフが「送ったつもり」にならないようにする
+ * （2026-08-11: frankgolf.jp のResend認証漏れでメールが1通も出ていなかった実例あり）。
+ */
+async function sendApprovalMailTo(
+  admin: ReturnType<typeof createAdmin>,
+  memberId: string,
+  memberNo: string,
+): Promise<{ ok: boolean; reason?: string }> {
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("name, email, joining_fee_waived, frunk_plans(name, monthly_price, joining_fee)")
+    .eq("id", memberId)
+    .maybeSingle();
+  const email = (m?.email as string | null) ?? null;
+  if (!email) return { ok: false, reason: "メールアドレスが登録されていないため送れません（電話・LINEでお伝えください）" };
+
+  const plan = (m as unknown as {
+    frunk_plans: { name: string; monthly_price: number | null; joining_fee: number | null } | null;
+  } | null)?.frunk_plans;
+  const price = Number(plan?.monthly_price ?? 0);
+  const joinFee = m?.joining_fee_waived ? 0 : Number(plan?.joining_fee ?? 0);
+  const mail = buildApprovalMail({
+    name: String(m?.name ?? ""),
+    memberNo,
+    planName: plan?.name ?? null,
+    monthlyFeeTaxIncluded: price > 0 ? Math.round(price * 1.1) : 0,
+    joiningFeeTaxIncluded: joinFee > 0 ? Math.round(joinFee * 1.1) : 0,
+  });
+  const r = await sendFrankMail({ to: email, subject: mail.subject, text: mail.text });
+  if (r.skipped) return { ok: false, reason: "メール送信が未設定です（Vercel member-os の RESEND_API_KEY / FRANK_MAIL_FROM）" };
+  if (!r.ok) return { ok: false, reason: `送信に失敗しました（${r.error ?? "原因不明"}）` };
+  return { ok: true };
+}
+
 // ---- 入会申込の承認 / 却下 ----
 export async function approveSignup(formData: FormData) {
   const actor = await requireReceptionActor();
@@ -102,27 +138,41 @@ export async function approveSignup(formData: FormData) {
   }).eq("id", id);
   await logAudit(actor, "frunk.signup_approve", "frunk_members", null, null, { id, member_no: memberNo });
 
-  // 承認メール（会員番号の通知＋カード登録の案内 #123）。送信失敗で承認は落とさない
-  const { data: m } = await admin
-    .from("frunk_members")
-    .select("name, email, joining_fee_waived, frunk_plans(name, monthly_price, joining_fee)")
-    .eq("id", id)
-    .maybeSingle();
-  const email = (m?.email as string | null) ?? null;
-  if (email) {
-    const plan = (m as unknown as { frunk_plans: { name: string; monthly_price: number | null; joining_fee: number | null } | null } | null)?.frunk_plans;
-    const price = Number(plan?.monthly_price ?? 0);
-    const joinFee = m?.joining_fee_waived ? 0 : Number(plan?.joining_fee ?? 0);
-    const mail = buildApprovalMail({
-      name: String(m?.name ?? ""),
-      memberNo,
-      planName: plan?.name ?? null,
-      monthlyFeeTaxIncluded: price > 0 ? Math.round(price * 1.1) : 0,
-      joiningFeeTaxIncluded: joinFee > 0 ? Math.round(joinFee * 1.1) : 0,
-    });
-    await sendFrankMail({ to: email, subject: mail.subject, text: mail.text });
+  // 承認メール（会員番号の通知＋カード登録の案内 #123）。送信失敗で承認は落とさないが、
+  // 「送れていない」ことは画面で必ず伝える（黙って落とすと会員番号が誰にも届かない）
+  const mail = await sendApprovalMailTo(admin, id, memberNo);
+  if (!mail.ok) {
+    redirect("/frunk?err=" + encodeURIComponent(
+      `${memberNo} で承認しました。ただし会員番号のメールは${mail.reason} 会員番号を口頭・LINEでお伝えいただくか、原因を直してから「承認メール再送」を押してください。`,
+    ));
   }
   revalidatePath("/frunk");
+}
+
+/** 承認メール（会員番号の案内）の再送。承認は1回きりなので、届かなかった時の救済用 */
+export async function resendApprovalMail(formData: FormData) {
+  const actor = await requireReceptionActor();
+  const admin = createAdmin();
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("member_no, name, status")
+    .eq("id", id)
+    .maybeSingle();
+  const memberNo = m?.member_no ? String(m.member_no) : "";
+  if (!memberNo) {
+    redirect("/frunk?err=" + encodeURIComponent("会員番号が未発行です。先に入会申込を承認してください"));
+  }
+
+  const r = await sendApprovalMailTo(admin, id, memberNo);
+  await logAudit(actor, "frunk.approval_mail_resend", "frunk_members", null, null, { id, member_no: memberNo, ok: r.ok });
+  redirect(
+    r.ok
+      ? "/frunk?msg=" + encodeURIComponent(`${String(m?.name ?? "")}様へ会員番号（${memberNo}）の案内メールを再送しました`)
+      : "/frunk?err=" + encodeURIComponent(`再送できませんでした: ${r.reason ?? ""}`),
+  );
 }
 
 export async function rejectSignup(formData: FormData) {

@@ -28,6 +28,13 @@ export default async function LedgerPage({
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? (sp.to as string) : new Date().toISOString().slice(0, 10);
   const typeFilter = VISIT_TYPES.some((v) => v.value === sp.type) ? sp.type : "";
 
+  // 店舗またぎ事故の防止（#128）: オーナー以外は配属店舗のみ。所属ゼロは何も見えない
+  const scopeIds = actor.isOwner
+    ? null
+    : actor.storeIds.length > 0
+      ? actor.storeIds
+      : ["00000000-0000-0000-0000-000000000000"];
+
   let q = admin
     .from("mbr_walkin_visits")
     .select("*, mbr_guests(id, name, name_kana, gender, birth_date, postal_code, prefecture, address1, building, phone, mobile, email, occupation, contact_method, note), reception:staff!reception_staff_id(name)")
@@ -38,13 +45,15 @@ export default async function LedgerPage({
     .order("visited_on", { ascending: false })
     .order("visit_seq", { ascending: false });
   if (typeFilter) q = q.eq("visit_type", typeFilter);
+  if (scopeIds) q = q.in("store_id", scopeIds);
 
-  const [{ data: visits }, { data: stores }, { data: monthAll }] = await Promise.all([
-    q,
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
-    admin.from("mbr_walkin_visits").select("visit_type, result")
-      .eq("company_id", actor.companyId).is("deleted_at", null).gte("visited_on", monthStart()),
-  ]);
+  let storesQ = admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name");
+  if (scopeIds) storesQ = storesQ.in("id", scopeIds);
+  let monthQ = admin.from("mbr_walkin_visits").select("visit_type, result")
+    .eq("company_id", actor.companyId).is("deleted_at", null).gte("visited_on", monthStart());
+  if (scopeIds) monthQ = monthQ.in("store_id", scopeIds);
+
+  const [{ data: visits }, { data: stores }, { data: monthAll }] = await Promise.all([q, storesQ, monthQ]);
 
   const list = (visits ?? []) as Row[];
   const storeList = (stores ?? []) as Row[];

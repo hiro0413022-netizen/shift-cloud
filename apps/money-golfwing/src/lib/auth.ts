@@ -12,7 +12,7 @@ export type MoneyActor = {
   companyId: string;
   name: string;
   email: string | null;
-  /** 全店舗横断（本部経理・経営層: view_hq / manage_money_all） */
+  /** 全店舗横断＝オーナーのみ（manage_company）。店舗またぎ事故防止のため view_hq では跨げない */
   canManageAll: boolean;
   /** アクセスできる店舗（本部=全店舗 / 現場=Shift Cloudの配属店舗） */
   stores: AccessibleStore[];
@@ -20,8 +20,8 @@ export type MoneyActor = {
 
 /**
  * お金管理のアクセスは「Shift Cloudの店舗配属」を流用（DECISIONS #27, 同一DB）。
- * - view_hq / manage_money_all を持つ人 = 全店舗を閲覧・締め
- * - それ以外 = staff_store_assignments で配属された店舗のみ入力可
+ * - オーナー（manage_company）= 全店舗を閲覧・締め・切替
+ * - それ以外 = staff_store_assignments で配属された店舗のみ（切替UIは出ない）
  */
 export const getMoneyActor = cache(async (): Promise<MoneyActor | null> => {
   const supabase = await createClient();
@@ -45,8 +45,8 @@ export const getMoneyActor = cache(async (): Promise<MoneyActor | null> => {
   const canManageAll = (roleRows ?? []).some((row) => {
     const perms = (row as unknown as { roles: { permissions: Record<string, boolean> } | null })
       .roles?.permissions;
-    if (!perms) return false;
-    return !!perms.view_hq || !!perms.manage_money_all;
+    if (!perms || perms.read_only) return false;
+    return !!perms.manage_company;
   });
 
   let stores: AccessibleStore[] = [];

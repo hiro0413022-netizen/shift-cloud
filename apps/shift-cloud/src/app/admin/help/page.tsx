@@ -1,4 +1,4 @@
-import { requireActor } from "@/lib/auth";
+import { requireActor, visibleStores } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -9,8 +9,8 @@ export default async function HelpPage() {
   const actor = await requireActor("create_shifts");
   const admin = createAdmin();
 
-  const [{ data: stores }, { data: helps }] = await Promise.all([
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
+  const [stores, { data: helps }] = await Promise.all([
+    visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("help_requests")
       .select("*, stores(name), help_applications(id, status, staff_id, staff(name))")
       .eq("company_id", actor.companyId).is("deleted_at", null)

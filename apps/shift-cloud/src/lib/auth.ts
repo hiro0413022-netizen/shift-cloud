@@ -100,6 +100,41 @@ export function can(actor: Actor, perm: Permission) {
   return !!actor.permissions[perm];
 }
 
+/** オーナー（最高権限）= manage_company。全店舗を横断できる唯一の立場 */
+export function isOwner(actor: Actor) {
+  return !actor.permissions.read_only && !!actor.permissions.manage_company;
+}
+
+/**
+ * 管理画面で見せてよい店舗（店舗またぎ事故の防止）。
+ * オーナー = 会社の全店舗 / それ以外 = 配属店舗（staff_store_assignments）のみ。
+ * 店舗が1つなら切替タブは自然に消える（map描画のため）。
+ */
+export async function visibleStores(actor: Actor): Promise<Array<{ id: string; name: string }>> {
+  if (!isOwner(actor) && actor.storeIds.length === 0) return [];
+  const admin = createAdmin();
+  let q = admin
+    .from("stores")
+    .select("id, name")
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .order("name");
+  if (!isOwner(actor)) q = q.in("id", actor.storeIds);
+  const { data } = await q;
+  return (data ?? []) as Array<{ id: string; name: string }>;
+}
+
+/** ?store= の直打ち対策: 見せてよい店舗に含まれる値だけ採用（外れは主店舗→先頭） */
+export function pickStore(
+  stores: Array<{ id: string; name: string }>,
+  requested: string | undefined,
+  primaryStoreId?: string | null,
+): string | undefined {
+  if (requested && stores.some((s) => s.id === requested)) return requested;
+  if (primaryStoreId && stores.some((s) => s.id === primaryStoreId)) return primaryStoreId;
+  return stores[0]?.id;
+}
+
 export function isAdmin(actor: Actor) {
   return (
     ["manage_staff", "manage_org", "create_shifts", "edit_attendance", "view_payroll"] as Permission[]

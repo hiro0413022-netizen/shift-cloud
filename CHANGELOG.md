@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 2026-08-11 — FRANK: frankgolf.jp のResendドメイン認証＋承認メール再送ボタン
+- ops: **frankgolf.jp を Resend で Verified に**（お名前.com Navi の DNSレコード設定に DKIM `resend._domainkey` / MX `send`(10) / SPF `send` / DMARC `_dmarc` を追加。既存の A 216.150.1.1・CNAME www は不変）。これまで送信は `403 The frankgolf.jp domain is not verified` で全て落ちており、**Web入会の受付メールも入会承認メールも1通も届いていなかった**（Vercel member-os の Runtime Logs で確認）
+- test: /join-web からテスト申込1件 → `info@frankgolf.jp` の受付メールがGmail受信トレイに到達を確認（テスト行は rejected + deleted_at で退避）。氏名の姓/名分割が name=「姓 名」、name_kana=「セイ メイ」で保存されることも実データで確認
+- feat(member-os): /frunk の会員一覧に**「会員番号メール再送」**を追加（承認は1回きりで、失敗すると会員番号が誰にも届かないため）。承認メールの生成・送信を `sendApprovalMailTo` に共通化し、**送れなかった理由を画面に出す**（アドレス未登録／RESEND未設定／送信失敗）。承認時にメールが落ちた場合も警告を表示（従来は黙って無視）
+- note: 障害の切り分けは Vercel の Runtime Logs を `frank-mail` で検索するのが最短（未設定ならスキップ警告、認証漏れなら403が出る）
+
 ## 2026-08-10 — お客様フォームの氏名を姓/名に分割＋FRANK入会の支払方法欄を撤去
 - feat(member-os): 共通コンポーネント `NameFields`（姓・名・セイ・メイの4欄）＋ `lib/name.ts`（joinName / splitName / readName）。1欄だと「山田太郎」「太郎 山田」「全角スペース」が混ざり、名簿の並び替え・宛名・Excel出力・重複判定が崩れるため、お客様の入力は必ず分割で受ける。DBは name / name_kana の1列のままで、保存時に「姓 名」へ結合（列追加なし・旧1欄フォームからの送信もフォールバックで受ける）
 - feat(member-os): `/join-web`（Web入会）・`/join/[token]`（店頭タブレット入会）・`/trial`（体験申込）・`/reception/[token]`（店頭受付）を NameFields に統一。receptionは姓/名は既に分割済みでフリガナのみ分割

@@ -1,4 +1,4 @@
-import { requireActor } from "@/lib/auth";
+import { requireActor, visibleStores } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { hashPassword } from "@/lib/store-session";
@@ -12,9 +12,9 @@ export default async function KiosksPage({ searchParams }: { searchParams: Promi
   const admin = createAdmin();
   const sp = await searchParams;
 
-  const [{ data: devices }, { data: stores }, { data: storeLogins }] = await Promise.all([
+  const [{ data: devices }, stores, { data: storeLogins }] = await Promise.all([
     admin.from("kiosk_devices").select("*, stores(name)").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at"),
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
+    visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("store_dash_logins").select("id, login_id, status, created_at, stores(name)").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at"),
   ]);
 

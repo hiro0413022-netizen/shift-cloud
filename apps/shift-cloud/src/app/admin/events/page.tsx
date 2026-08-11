@@ -1,4 +1,4 @@
-import { requireActor } from "@/lib/auth";
+import { requireActor, visibleStores } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -8,11 +8,11 @@ import { hm, dowJP, todayJST } from "@/lib/util";
 export default async function EventsPage() {
   const actor = await requireActor("manage_announcements");
   const admin = createAdmin();
-  const [{ data: events }, { data: stores }, { data: types }] = await Promise.all([
+  const [{ data: events }, stores, { data: types }] = await Promise.all([
     admin.from("store_events").select("*, stores(name), schedule_types(name, color)")
       .eq("company_id", actor.companyId).is("deleted_at", null)
       .gte("date", todayJST()).order("date").limit(100),
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
+    visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("schedule_types").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
   ]);
 

@@ -4,6 +4,7 @@ import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/com
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import {
   createPlan, updatePlan, deletePlan, approveSignup, rejectSignup, setMemberStatus, issueSignupToken, changePlan,
+  resendApprovalMail,
 } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +113,14 @@ export default async function FrunkPage({
                     {m.join_date ? <span className="text-xs text-(--color-dim)">入会 {String(m.join_date)}</span> : null}
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {m.member_no && m.email ? (
+                      <form action={resendApprovalMail}>
+                        <input type="hidden" name="id" value={String(m.id)} />
+                        <button className={btnGhostCls} title={`会員番号とカード登録の案内を ${String(m.email)} へ送り直します`}>
+                          会員番号メール再送
+                        </button>
+                      </form>
+                    ) : null}
                     {st === "active" && (
                       <form action={changePlan} className="flex items-center gap-1">
                         <input type="hidden" name="id" value={String(m.id)} />

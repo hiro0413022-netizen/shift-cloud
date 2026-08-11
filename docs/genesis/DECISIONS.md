@@ -415,3 +415,10 @@
   **(c) 未接続警告の抑止** — ig_enabled=false のときは「@swingcortex_jp 未接続」等を出さず、代わりに「Instagramは停止中（戻し方）」を1行出す。**直す気のない警告を出し続けると本当に直すべき警告が埋もれる**。
   **(d) 既存データの決着** — 滞留していた承認待ち5件は全てXへ投稿済みだったので `posted` に確定、未投稿の1件（8/11 18:00）はX専用・scheduled に変換して queue_id を外し、承認カード6件は cancelled。以後 awaiting_approval の残骸は生まれない。
   残: Meta接続（**普段Facebookを開いている端末で認証を1回通す**のが最短。ユーザー作業・急がない）。復帰時は ig_enabled を true に戻す＋OPERATIONS §9。
+- #128 (2026-08-11) **店舗またぎの表示・切替を廃止＝各アカウントは自分の店舗しか見えない／触れない（オーナーのみ全店横断）**。理由: money-os や shift-cloud の店舗切替・member-os の全店表示は「宝塚のつもりで姫路に登録する」型の事故のもと（ユーザー指示）。
+  **(a) オーナー判定の正典は `manage_company`**（会社オーナーロールだけが持つ）。**view_hq では跨げない**＝「本部」「役員（本部閲覧）」ロールは自店のみ。`packages/core/src/auth.ts` の Actor に `isOwner / storeIds / primaryStoreId` を追加（オーナー=会社の全active店舗、他=staff_store_assignments）。core を使う7アプリ（member-os/reserve-os/lesson-os/survey-os/swing-cortex/caddy-os/demo-sales）に一括で届く。
+  **(b) money-golfwing** — 全店横断（canManageAll）を view_hq→manage_company に変更。店舗が1つの人は切替プルダウンではなく店名ラベル表示。事業別分析・カード/口座取込（requireManageAll）もオーナー限定に。cookieに他店IDが残っていても getCurrentStore が無視する既存実装で下流は無改修。
+  **(c) shift-cloud** — `visibleStores(actor)`/`pickStore()` を auth.ts に新設。シフト作成・勤怠・月末照合・紙シフトの4画面の店舗タブと `?store=` 直打ちを封鎖（配属1店舗ならタブ自体が消える）。イベント・ヘルプ募集・キオスク・スタッフ管理の店舗選択肢も同様に絞る。
+  **(d) member-os** — 受付台帳・今月KPI・店舗selectを配属店舗で絞り、server action は `scopedStoreId()` でフォームのstore_idを検証（配属外なら主店舗に差し替え）＝UI非表示だけに頼らない。
+  **(e) データ** — frank@（FRANK店舗アカウント）に FRANK GOLF 姫路の配属が無かったので staff_store_assignments に追加（is_primary）。⚠現在 manage_company を持つのは古川さんと**小川うらら**の2名（両者とも会社オーナーロール）。小川さんを自店のみにするならロールを変えること。
+  検証: tests 261件通過・shift-cloud/money-golfwing/member-os の tsc クリーン。

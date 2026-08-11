@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireActor } from "@/lib/auth";
+import { requireActor, visibleStores, pickStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Badge, Empty } from "@/components/ui";
 import { currentYM, addMonths, timeJST, fmtMinutes, hm, dowJP } from "@/lib/util";
@@ -12,9 +12,8 @@ export default async function ReconciliationPage({ searchParams }: { searchParam
   const sp = await searchParams;
   const ym = sp.ym ?? currentYM();
 
-  const { data: stores } = await admin.from("stores").select("id, name")
-    .eq("company_id", actor.companyId).is("deleted_at", null).order("name");
-  const storeId = sp.store ?? stores?.[0]?.id;
+  const stores = await visibleStores(actor); // オーナー=全店 / それ以外=配属店舗のみ（#128）
+  const storeId = pickStore(stores, sp.store, actor.primaryStoreId);
   if (!storeId) return <PageTitle>月末照合</PageTitle>;
 
   const { from, to } = monthRange(ym); // -31固定は2月等で0件になる（DECISIONS #53）

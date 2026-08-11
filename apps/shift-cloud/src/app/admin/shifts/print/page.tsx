@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireActor } from "@/lib/auth";
+import { requireActor, visibleStores, pickStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { currentYM, addMonths, daysOfMonth, daysBetween, halfMonthRange, dowJP, hm } from "@/lib/util";
 import { PrintButton } from "./print-button";
@@ -25,9 +25,8 @@ export default async function ShiftPrintPage({
   else { const d = daysOfMonth(ym); start = d[0]; end = d[d.length - 1]; }
   const days = daysBetween(start, end);
 
-  const { data: stores } = await admin.from("stores").select("id, name")
-    .eq("company_id", actor.companyId).is("deleted_at", null).order("name");
-  const storeId = sp.store ?? stores?.[0]?.id;
+  const stores = await visibleStores(actor); // オーナー=全店 / それ以外=配属店舗のみ（#128）
+  const storeId = pickStore(stores, sp.store, actor.primaryStoreId);
   if (!storeId) return <p className="p-8">店舗がありません</p>;
   const store = stores?.find((s) => s.id === storeId);
 

@@ -26,6 +26,16 @@ function intOrNull(v: FormDataEntryValue | null): number | null {
   return s === "" ? null : parseInt(s, 10);
 }
 
+/** 店舗またぎ事故の防止（#128）: オーナー以外はフォームの store_id が配属店舗でなければ主店舗に差し替える */
+function scopedStoreId(
+  actor: { isOwner: boolean; storeIds: string[]; primaryStoreId: string | null },
+  requested: string | null,
+): string | null {
+  if (actor.isOwner) return requested;
+  if (requested && actor.storeIds.includes(requested)) return requested;
+  return actor.primaryStoreId;
+}
+
 const VISIT_TYPES = ["trial", "fitting", "bay", "visitor_bay", "other"];
 const RESULTS = ["none", "join", "purchase"];
 const PAYMENTS = ["store", "web", "free_campaign", "other"];
@@ -40,7 +50,7 @@ export async function createVisitManual(formData: FormData) {
   const visitedOn = orNull(formData.get("visited_on"));
   const name = orNull(formData.get("name"));
   const phone = orNull(formData.get("phone"));
-  const storeId = orNull(formData.get("store_id"));
+  const storeId = scopedStoreId(actor, orNull(formData.get("store_id")));
   const nameKana = orNull(formData.get("name_kana"));
   const email = orNull(formData.get("email"));
   const occupation = orNull(formData.get("occupation"));
@@ -251,7 +261,7 @@ export async function deleteVisit(formData: FormData) {
 export async function issueStoreToken(formData: FormData) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
-  const storeId = orNull(formData.get("store_id"));
+  const storeId = scopedStoreId(actor, orNull(formData.get("store_id")));
   const label = orNull(formData.get("label"));
 
   // 既存の同店舗トークンを無効化（1店舗1URL運用）

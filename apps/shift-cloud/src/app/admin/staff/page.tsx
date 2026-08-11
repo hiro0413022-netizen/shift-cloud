@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireActor } from "@/lib/auth";
+import { requireActor, visibleStores } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Badge, Button, Empty } from "@/components/ui";
 import { StaffForm, type StaffEdit } from "./staff-form";
@@ -15,8 +15,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const admin = createAdmin();
   const sp = await searchParams;
 
-  const [{ data: stores }, { data: roles }] = await Promise.all([
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
+  const [stores, { data: roles }] = await Promise.all([
+    visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("roles").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
   ]);
 
