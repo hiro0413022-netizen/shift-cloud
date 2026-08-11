@@ -13,7 +13,7 @@ import {
   type SquarePayment,
   type SquareRefund,
 } from "@/lib/frank-pos-pure";
-import { chargeCardOnFile } from "@/lib/frank-square-billing";
+import { chargeCardOnFile, pauseSubscriptionCycles } from "@/lib/frank-square-billing";
 import { activateWebJoin } from "@/lib/frank-join";
 
 export { verifySquareSignature };
@@ -155,11 +155,13 @@ type MemberRow = {
   billing_status: unknown;
   joining_fee_waived: boolean | null;
   joining_fee_charged_at: string | null;
+  join_campaign: string | null;
+  prepay_pause_done_at: string | null;
   frunk_plans: { monthly_price: number | null; joining_fee: number | null } | null;
 };
 
 const MEMBER_COLS =
-  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, frunk_plans(monthly_price, joining_fee)";
+  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, frunk_plans(monthly_price, joining_fee)";
 
 async function memberByCheckoutOrder(admin: Admin, orderId: string | null | undefined): Promise<MemberRow | null> {
   if (!orderId) return null;
@@ -337,6 +339,26 @@ async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown
     return;
   }
   await admin.from("frunk_members").update(patch).eq("id", member.id);
+
+  // 前取り入会（#131）: 2か月分を先にいただいているので、直近1回の自動課金をスキップする。
+  // subscription.created はサブスクIDが分かる最初のタイミング＝ここで1周期pause（自動で再開される）。
+  if (member.join_campaign && !member.prepay_pause_done_at && ["ACTIVE", "PENDING"].includes(status)) {
+    const r = await pauseSubscriptionCycles(sub.id, 1);
+    if (r.ok) {
+      await admin
+        .from("frunk_members")
+        .update({ prepay_pause_done_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", member.id);
+    } else {
+      await logEvent(String(member.company_id), {
+        event_type: "billing.prepay_pause_failed",
+        title: `前取りのサブスク1周期スキップに失敗: ${member.name}様（${member.member_no}）来月の自動課金が二重になります — Squareで手動停止してください`.slice(0, 120),
+        source: "frank_billing",
+        source_type: "system",
+        severity: "warning",
+      });
+    }
+  }
 }
 
 /** Webhook本体。ルートは署名検証済みの payload(JSON文字列) を渡す */

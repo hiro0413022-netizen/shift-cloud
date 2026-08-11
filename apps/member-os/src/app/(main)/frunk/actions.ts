@@ -211,6 +211,15 @@ export async function setMemberStatus(formData: FormData) {
   const id = str(formData.get("id"));
   const to = str(formData.get("to"));
   if (!id || !["active", "suspended", "left"].includes(to)) return;
+  // キャンペーン入会は6か月継続（#131）: 期間内の退会はスタッフに警告（ブロックはしない・特例対応可）
+  let minTermWarn = "";
+  if (to === "left") {
+    const { data: pre } = await admin.from("frunk_members").select("min_term_until").eq("id", id).maybeSingle();
+    if (pre?.min_term_until && String(pre.min_term_until) > today()) {
+      minTermWarn = `⚠ この会員はキャンペーン入会の継続期間中です（${String(pre.min_term_until)}まで）。`;
+    }
+  }
+
   const patch: Record<string, unknown> = { status: to };
   if (to === "suspended") patch.suspend_start = today();
   if (to === "active") patch.suspend_end = today();
@@ -237,10 +246,11 @@ export async function setMemberStatus(formData: FormData) {
     }
     if (to === "left") {
       redirect("/frunk?err=" + encodeURIComponent(
-        `退会にしました。月会費の自動課金は自動では止まりません。Squareダッシュボードでサブスクリプションを解約してください（${m?.member_no ?? ""}）`,
+        `${minTermWarn}退会にしました。月会費の自動課金は自動では止まりません。Squareダッシュボードでサブスクリプションを解約してください（${m?.member_no ?? ""}）`,
       ));
     }
   }
+  if (minTermWarn) redirect("/frunk?err=" + encodeURIComponent(`${minTermWarn}退会にしました。`));
   revalidatePath("/frunk");
 }
 

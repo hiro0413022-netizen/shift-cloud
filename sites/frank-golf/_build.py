@@ -625,6 +625,7 @@ def build_index():
       <div class="price-join">
         <span>入会金</span><b data-frank="price.joinFee" data-frank-fallback="近日公開">近日公開</b>
       </div>
+      <p class="price-plus" style="color:var(--brass-2);font-weight:800">いまなら入会金無料＋入会月の月会費無料（2026年内のご入会）</p>
       <p class="price-plus">＋ お好きなプランの月額</p>
       <div class="price-list">
         <div class="price-card">
@@ -1314,6 +1315,7 @@ def build_plan():
       <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee" data-tax>近日公開</p></div>
       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月自動でのお支払いです。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
       <div class="spec__row"><p class="spec__k">備考</p><p class="spec__v" data-frank="price.note">近日公開</p></div>
     </div>
     <div class="center rv" style="margin-top:40px">
@@ -1672,6 +1674,7 @@ def build_trial():
       <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v" data-frank="store.address">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月自動でのお支払いです。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
     </div>
 
     <div class="note-solo rv">
@@ -1879,37 +1882,49 @@ def build_trial_booking():
     return;
   }
 
-  /* ---------- STEP 1: 日付（オープン日 2026-09-02 以降・14日ぶん） ---------- */
+  /* ---------- STEP 1: 日付（オープン日 2026-09-02 以降・月ごとのカレンダーで最大60日先まで #131） ---------- */
   var dates = [];
   (function(){
     var OPEN = "2026-09-02"; // プレオープン日。これより前の日付は出さない
+    var MAX_DAYS = 60;       // 予約設定 advance_days と後で同期される（少ない方に絞る）
     var base = jstNow();
     var todayV = ymd(base);
     if (todayV < OPEN) base = new Date(OPEN + "T00:00:00Z");
-    for (var i = 0; i < 14; i++) {
+    for (var i = 0; i < MAX_DAYS; i++) {
       var d = new Date(base.getTime() + i*86400000);
-      dates.push({ v: ymd(d), m: d.getUTCMonth()+1, d: d.getUTCDate(), w: WD[d.getUTCDay()], dow: d.getUTCDay() });
+      dates.push({ v: ymd(d), y: d.getUTCFullYear(), m: d.getUTCMonth()+1, d: d.getUTCDate(), w: WD[d.getUTCDay()], dow: d.getUTCDay(), i: i });
     }
+    // 月ごとにカレンダー（週=7列）で描く。曜日ヘッダー＋月初の空きマスを詰める
     var h = "";
-    dates.forEach(function(x, i){
+    var curKey = "";
+    dates.forEach(function(x){
+      var key = x.y + "-" + x.m;
+      if (key !== curKey) {
+        if (curKey) h += '</div>';
+        curKey = key;
+        h += '<p class="tb__month">' + x.m + '月</p>';
+        h += '<div class="tb__cal">';
+        h += '<span class="tb__wd is-sun">日</span><span class="tb__wd">月</span><span class="tb__wd">火</span><span class="tb__wd">水</span><span class="tb__wd">木</span><span class="tb__wd">金</span><span class="tb__wd is-sat">土</span>';
+        for (var e = 0; e < x.dow; e++) h += '<span class="tb__pad"></span>';
+      }
       var cls = "tb__date" + (x.dow===0 ? " is-sun" : x.dow===6 ? " is-sat" : "");
-      h += '<button type="button" class="' + cls + '" data-date="' + x.v + '">'
-         + '<span class="tb__date-w">' + x.w + '</span>'
+      h += '<button type="button" class="' + cls + '" data-date="' + x.v + '" data-i="' + x.i + '">'
          + '<span class="tb__date-d">' + x.d + '</span>'
-         + '<span class="tb__date-m">' + (x.v===todayV ? "今日" : x.m + "月") + '</span>'
+         + (x.v===todayV ? '<span class="tb__date-m">今日</span>' : '')
          + '</button>';
     });
+    if (curKey) h += '</div>';
     $("tb-dates").innerHTML = h;
     $("tb-dates").querySelectorAll("button[data-date]").forEach(function(btn){
       btn.addEventListener("click", function(){ selectDate(btn.getAttribute("data-date"), btn) });
     });
-    // 定休日は最初からグレーにする（選んでから「定休日です」と言われるのは体験が悪い）
+    // 定休日・予約範囲外は最初からグレーにする（選んでから「定休日です」と言われるのは体験が悪い）
     fetch(API + "?date=" + dates[0].v).then(function(r){ return r.json() }).then(function(cfg){
       var dows = cfg.closedDows || [], closed = cfg.closedDates || [];
       var n = Math.min(dates.length, (cfg.advanceDays || 14));
-      $("tb-dates").querySelectorAll("button[data-date]").forEach(function(btn, i){
-        var x = dates[i];
-        var off = dows.indexOf(x.dow) >= 0 || closed.indexOf(x.v) >= 0 || i >= n;
+      $("tb-dates").querySelectorAll("button[data-date]").forEach(function(btn){
+        var x = dates[Number(btn.getAttribute("data-i"))];
+        var off = dows.indexOf(x.dow) >= 0 || closed.indexOf(x.v) >= 0 || x.i >= n;
         if (off) { btn.disabled = true; btn.classList.add("is-off"); btn.title = "この日はご予約いただけません"; }
       });
     }).catch(function(){ /* 取れなくても選んだ時点で判定されるので致命的ではない */ });

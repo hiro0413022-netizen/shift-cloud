@@ -41,6 +41,12 @@ export type JoinPdfInput = {
   joiningFeeTaxIncluded: number; // 円（クーポン適用なら0）
   couponApplied?: boolean;
   signatureDataUrl?: string | null; // data:image/png;base64,...
+  /** 費用欄の行を直接指定（キャンペーン等・#131）。未指定なら月会費+入会金の既定行 */
+  costRows?: Array<[string, string]>;
+  /** 計の金額（円・税込）。未指定なら既定計算 */
+  totalOverride?: number;
+  /** 施設使用欄に入れる備考（キャンペーン・6か月継続など） */
+  remark?: string | null;
 };
 
 const GENDER_JA: Record<string, string> = { male: "男性", female: "女性", other: "その他", unknown: "無回答" };
@@ -128,22 +134,24 @@ export async function buildJoinPdf(input: JoinPdfInput): Promise<Uint8Array> {
   box(R.x, ry, R.w - priceW, R.hh, true); box(R.x + R.w - priceW, ry, priceW, R.hh, true);
   text("商品名", R.x + (R.w - priceW) / 2 - 20, ry + 7, 9);
   text("価格（税込）", R.x + R.w - priceW + 24, ry + 7, 9);
-  const priceRows: Array<[string, string]> = [
-    [`${input.planName}（初回月会費）`, `${input.monthlyFeeTaxIncluded.toLocaleString()}円（税込）`],
-  ];
-  if (input.joiningFeeTaxIncluded > 0) {
-    priceRows.push(["入会金", `${input.joiningFeeTaxIncluded.toLocaleString()}円（税込）`]);
-  } else if (input.couponApplied) {
-    priceRows.push(["入会金（クーポン適用）", "0円"]);
-  }
+  const priceRows: Array<[string, string]> =
+    input.costRows ??
+    (() => {
+      const rows: Array<[string, string]> = [
+        [`${input.planName}（初回月会費）`, `${input.monthlyFeeTaxIncluded.toLocaleString()}円（税込）`],
+      ];
+      if (input.joiningFeeTaxIncluded > 0) rows.push(["入会金", `${input.joiningFeeTaxIncluded.toLocaleString()}円（税込）`]);
+      else if (input.couponApplied) rows.push(["入会金（クーポン適用）", "0円"]);
+      return rows;
+    })();
   for (const [k, v] of priceRows) {
     ry -= R.hh;
     box(R.x, ry, R.w - priceW, R.hh); box(R.x + R.w - priceW, ry, priceW, R.hh);
     text(k, R.x + 8, ry + 7, 9.5);
     text(v, R.x + R.w - priceW + 8, ry + 7, 9.5);
   }
-  // 空行を数行
-  for (let i = 0; i < 3; i++) {
+  // 空行（合計6行になるまで）
+  for (let i = priceRows.length; i < 6; i++) {
     ry -= R.hh;
     box(R.x, ry, R.w - priceW, R.hh); box(R.x + R.w - priceW, ry, priceW, R.hh);
   }
@@ -151,7 +159,7 @@ export async function buildJoinPdf(input: JoinPdfInput): Promise<Uint8Array> {
   ry -= R.hh;
   box(R.x, ry, R.w - priceW, R.hh); box(R.x + R.w - priceW, ry, priceW, R.hh);
   text("計", R.x + 8, ry + 7, 9.5);
-  const total = input.monthlyFeeTaxIncluded + Math.max(0, input.joiningFeeTaxIncluded);
+  const total = input.totalOverride ?? input.monthlyFeeTaxIncluded + Math.max(0, input.joiningFeeTaxIncluded);
   text(`${total.toLocaleString()}円（税込）`, R.x + R.w - priceW + 8, ry + 7, 10);
 
   // ===== 下: 申込内容
@@ -165,6 +173,13 @@ export async function buildJoinPdf(input: JoinPdfInput): Promise<Uint8Array> {
     box(x, cy - h * 2, wCourse, h); box(x + wCourse, cy - h * 2, wDate, h);
     text(input.planName, x + 8, cy - h * 2 + 8, 10);
     text(slashDate(input.startDate) || input.appliedOn, x + wCourse + 8, cy - h * 2 + 8, 10);
+  }
+
+  // ===== 備考（キャンペーン・6か月継続など）
+  if (input.remark) {
+    text("備考", 40, cy - 66, 8.5);
+    box(40, cy - 96, 540, 24);
+    text(input.remark, 48, cy - 88, 8.5);
   }
 
   // ===== 署名

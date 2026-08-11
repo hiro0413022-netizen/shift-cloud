@@ -53,6 +53,28 @@ async function squarePost(token: string, path: string, body: Record<string, unkn
 }
 
 /**
+ * サブスクを指定周期ぶんスキップ（#131・前取り用）。
+ * 入会時に2か月分を前取りするため、直近1回の自動課金を止める
+ * （止めないと前取り分と翌月の自動課金が二重になる）。cycles 経過後は自動で再開される。
+ */
+export async function pauseSubscriptionCycles(
+  subscriptionId: string,
+  cycles: number,
+): Promise<{ ok: boolean; error?: string }> {
+  const token = accessToken();
+  if (!token) return { ok: false, error: "square_env_missing" };
+  try {
+    await squarePost(token, `/subscriptions/${subscriptionId}/pause`, {
+      pause_cycle_duration: cycles,
+    });
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square-billing] pause cycles failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}
+
+/**
  * Web入会（即決済・#129）用: 会員ID直接指定で決済リンクを作る。
  * /join-web が申込行（status='pending'）を作った直後に呼ぶ。member_no はまだ無い。
  * redirect_url は member-os の完了画面（決済後に会員番号を表示する）。

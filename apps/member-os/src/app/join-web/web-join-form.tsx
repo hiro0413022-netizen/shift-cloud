@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { submitWebSignup, type WebSignupState } from "./actions";
 import { yen } from "@/lib/frunk";
+import { joinEstimate, JOIN_CAMPAIGN } from "@/lib/frank-billing-pure";
 import { FRANK_TERMS_TEXT, FRANK_PRIVACY_URL } from "@/lib/frank-terms";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
@@ -23,10 +24,38 @@ const field =
 const label = "mb-1 block text-sm font-medium text-(--color-dim)";
 const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5";
 
+/** 「2026-09-11」→ その月・翌月・翌々月の「9月」「10月」「11月」表記 */
+function monthLabels(baseYmd: string): [string, string, string] {
+  const d = new Date(`${baseYmd}T12:00:00+09:00`);
+  const names: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1));
+    names.push(`${m.getUTCMonth() + 1}月`);
+  }
+  return names as [string, string, string];
+}
+
 export function WebJoinForm({ plans }: { plans: Plan[] }) {
   const [state, action, pending] = useActionState<WebSignupState, FormData>(submitWebSignup, {});
   const [planId, setPlanId] = useState(plans.find((p) => p.name.includes("レギュラー"))?.id ?? plans[0]?.id ?? "");
   const [signature, setSignature] = useState("");
+  const [step, setStep] = useState<"input" | "estimate">("input");
+  const formRef = useRef<HTMLFormElement | null>(null);
+
+  const todayYmd = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const plan = plans.find((p) => p.id === planId) ?? null;
+
+  const toEstimate = () => {
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+    if (!signature) {
+      alert("ご署名（電子サイン）をお願いします");
+      return;
+    }
+    setStep("estimate");
+    setTimeout(() => document.getElementById("join-estimate")?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
 
   if (state.ok) {
     // Square未設定環境のフォールバック（通常は決済ページへリダイレクトするためここには来ない）
@@ -42,7 +71,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
   }
 
   return (
-    <form action={action} className="space-y-4">
+    <form ref={formRef} action={action} className="space-y-4">
       {/* プラン選択 */}
       <div className={`${cardCls} space-y-3`}>
         <p className="text-sm font-semibold text-(--color-txt)">ご希望のプラン <span className="text-rose-400">*</span></p>
@@ -149,15 +178,78 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         </div>
       </div>
 
+      {/* ===== お見積り（#131）: 入力内容の確認と、その場でお支払いいただく金額 ===== */}
+      {step === "estimate" && plan && (() => {
+        const est = joinEstimate({
+          monthlyExTax: Number(plan.monthly_price ?? 0),
+          joiningFeeExTax: Number(plan.joining_fee ?? 0),
+          applyDateYmd: todayYmd,
+        });
+        const [m0, m1, m2] = monthLabels(todayYmd);
+        const row = "flex items-baseline justify-between gap-3 py-2 border-b border-(--color-line)/60";
+        return (
+          <div id="join-estimate" className={`${cardCls} space-y-3 border-(--color-gold)/60`}>
+            <p className="text-base font-bold text-(--color-txt)">お見積り（{plan.name}）</p>
+            <div className="text-sm">
+              <div className={row}>
+                <span>入会金</span>
+                <span>
+                  {est.campaign ? (
+                    <>
+                      <s className="text-(--color-dim)">{est.joiningFeeTaxIncluded.toLocaleString()}円</s>
+                      <span className="ml-2 font-bold text-emerald-500">→ 0円（年内入会キャンペーン）</span>
+                    </>
+                  ) : (
+                    <span className="font-bold">{est.joiningFeeCharged.toLocaleString()}円（税込）</span>
+                  )}
+                </span>
+              </div>
+              <div className={row}>
+                <span>月会費（{m0}分・入会月）</span>
+                <span>
+                  <s className="text-(--color-dim)">{est.monthlyTaxIncluded.toLocaleString()}円</s>
+                  <span className="ml-2 font-bold text-emerald-500">→ 0円（キャンペーン）</span>
+                </span>
+              </div>
+              <div className={row}>
+                <span>月会費 前取り（{m1}分＋{m2}分）</span>
+                <span className="font-bold">{est.monthlyTaxIncluded.toLocaleString()}円 × 2 ＝ {(est.monthlyTaxIncluded * 2).toLocaleString()}円（税込）</span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 pt-3">
+                <span className="font-bold">本日のお支払い合計</span>
+                <span className="text-2xl font-bold text-(--color-gold)">{est.totalDueNow.toLocaleString()}円<span className="text-xs font-normal">（税込）</span></span>
+              </div>
+            </div>
+            <ul className="space-y-1 rounded-xl bg-(--color-panel-2) p-3 text-xs text-(--color-dim)">
+              <li>・{m2}以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります。</li>
+              <li>・キャンペーンでのご入会は、<span className="font-semibold text-(--color-txt)">{JOIN_CAMPAIGN.minMonths}か月間の継続</span>をお願いしています。</li>
+              <li>・決済ページではまず1か月分（{m1}分）をお支払いいただき、残り1か月分（{m2}分）は同じカードへ自動で続けてご請求します。</li>
+              <li>・決済は安全な決済ページ（Square）で行います。決済完了と同時に会員番号を発行します。</li>
+            </ul>
+          </div>
+        );
+      })()}
+
       {state.error && (
         <p className="rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-center text-sm text-rose-300">{state.error}</p>
       )}
 
-      <button disabled={pending || !signature} className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50">
-        {pending ? "決済ページへ移動中..." : "同意して決済に進む"}
-      </button>
+      {step === "input" ? (
+        <button type="button" onClick={toEstimate} className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white transition-colors hover:bg-accent/90">
+          お見積りを確認する
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <button disabled={pending || !signature} className="w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50">
+            {pending ? "決済ページへ移動中..." : "この内容で決済に進む"}
+          </button>
+          <button type="button" onClick={() => setStep("input")} className="w-full rounded-xl border border-(--color-line) py-3 text-sm text-(--color-dim) hover:text-(--color-txt)">
+            ← 入力内容を修正する
+          </button>
+        </div>
+      )}
       <p className="text-center text-xs text-(--color-dim)">
-        このあと安全な決済ページ（Square）で初回月会費をお支払いいただくと、その場でご入会が確定し会員番号が発行されます。
+        決済ページ（Square）でのお支払い完了と同時にご入会が確定し、会員番号と入会の控え（PDF）をメールでお送りします。
       </p>
     </form>
   );

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validCoupon, planChangeProration, taxIncl } from "../apps/member-os/src/lib/frank-billing-pure.ts";
+import { validCoupon, planChangeProration, taxIncl, isJoinCampaignActive, joinEstimate } from "../apps/member-os/src/lib/frank-billing-pure.ts";
 import { isJoiningFeeNote } from "../apps/genesis/src/lib/frank-pos-pure.ts";
 
 /* ============================================================
@@ -45,4 +45,31 @@ test("入会金: 税込11,000円・noteの接頭辞で入会金の入金と判�
   assert.equal(isJoiningFeeNote("FRANK入会金（FR0001）"), true);
   assert.equal(isJoiningFeeNote("Square: コーヒー"), false);
   assert.equal(isJoiningFeeNote(null), false);
+});
+
+// ===== 年内入会キャンペーン（#131） =====
+test("キャンペーン判定: 2026-12-31まで適用・2027-01-01から対象外", () => {
+  assert.equal(isJoinCampaignActive("2026-08-11"), true);
+  assert.equal(isJoinCampaignActive("2026-12-31"), true);
+  assert.equal(isJoinCampaignActive("2027-01-01"), false);
+});
+
+test("入会見積: キャンペーン中は入会金0・入会月0・2か月分前取り", () => {
+  // レギュラー会員 13,800税抜 → 税込15,180。入会金5,000税抜 → 税込5,500
+  const e = joinEstimate({ monthlyExTax: 13800, joiningFeeExTax: 5000, applyDateYmd: "2026-09-11" });
+  assert.equal(e.campaign, true);
+  assert.equal(e.joiningFeeTaxIncluded, 5500);
+  assert.equal(e.joiningFeeCharged, 0);
+  assert.equal(e.monthlyTaxIncluded, 15180);
+  assert.equal(e.prepaidMonths, 2);
+  assert.equal(e.totalDueNow, 30360); // 15,180×2
+  assert.equal(e.minMonths, 6);
+});
+
+test("入会見積: キャンペーン後は入会金5,500円を請求（前取り2か月は継続）", () => {
+  const e = joinEstimate({ monthlyExTax: 13800, joiningFeeExTax: 5000, applyDateYmd: "2027-01-05" });
+  assert.equal(e.campaign, false);
+  assert.equal(e.joiningFeeCharged, 5500);
+  assert.equal(e.totalDueNow, 5500 + 15180 * 2);
+  assert.equal(e.minMonths, 0);
 });

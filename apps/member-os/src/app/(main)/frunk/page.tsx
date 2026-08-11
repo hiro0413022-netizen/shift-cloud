@@ -111,6 +111,11 @@ export default async function FrunkPage({
                     {m.member_no ? <span className="text-xs text-(--color-dim)">{String(m.member_no)}</span> : null}
                     <span className="text-xs text-(--color-dim)">{planName(m.plan_id) ?? "—"}</span>
                     {m.join_date ? <span className="text-xs text-(--color-dim)">入会 {String(m.join_date)}</span> : null}
+                    {m.min_term_until && String(m.min_term_until) > new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10) ? (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" title="キャンペーン入会・6か月継続の対象">
+                        継続 {String(m.min_term_until)}まで
+                      </span>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-1.5">
                     {m.member_no && m.email ? (

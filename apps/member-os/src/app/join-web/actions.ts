@@ -5,7 +5,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
 import { sendFrankMail, buildWebSignupReceiptMail } from "@/lib/frank-mail";
-import { validCoupon, normalizeCoupon } from "@/lib/frank-billing-pure";
+import { validCoupon, normalizeCoupon, isJoinCampaignActive, JOIN_CAMPAIGN } from "@/lib/frank-billing-pure";
 import { joinAddress } from "@/lib/address";
 import { readName } from "@/lib/name";
 
@@ -59,6 +59,10 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
 
   const admin = createAdmin();
 
+  // 入会キャンペーン（#131）: 年内申込は 入会金無料＋入会月無料＋2か月前取り＋6か月継続
+  const todayYmd = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const campaign = isJoinCampaignActive(todayYmd);
+
   const { data: plan } = await admin
     .from("frunk_plans")
     .select("id, name")
@@ -90,8 +94,14 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     consent_terms: true,
     signature,
     joining_fee_coupon: coupon,
-    joining_fee_waived: !!coupon,
-    note: coupon ? `Web入会（即決済）クーポン適用: ${coupon}` : "Web入会（即決済）",
+    // キャンペーン中は入会金無料（クーポンと同じ無料化フラグを立てる＝Webhookが請求しない）
+    joining_fee_waived: campaign || !!coupon,
+    join_campaign: campaign ? JOIN_CAMPAIGN.id : null,
+    note: campaign
+      ? `Web入会（即決済）年内キャンペーン: 入会金無料・入会月無料・2か月前取り・${JOIN_CAMPAIGN.minMonths}か月継続${coupon ? `・クーポン ${coupon}` : ""}`
+      : coupon
+        ? `Web入会（即決済）クーポン適用: ${coupon}`
+        : "Web入会（即決済）",
     status: "pending" as const,
   };
 

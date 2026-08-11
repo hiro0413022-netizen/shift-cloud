@@ -984,13 +984,15 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
 .tb__note { font-size: 13.5px; color: var(--dim); margin-bottom: 14px; }
 
 /* 日付ボタン（横スクロールの帯） */
-.tb__dates {
-  display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px;
-  scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
-}
+.tb__dates { padding: 4px 2px 12px; }
+/* 月ごとのカレンダー表示（#131・60日先まで） */
+.tb__month { margin: 18px 0 8px; font-weight: 800; font-size: 15px; }
+.tb__cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.tb__wd { text-align: center; font-size: 11px; opacity: .55; padding: 2px 0; }
+.tb__wd.is-sun { color: #C0392B; } .tb__wd.is-sat { color: #2471A3; }
+.tb__pad { min-height: 1px; }
 .tb__date {
-  flex: none; scroll-snap-align: start;
-  width: 62px; padding: 12px 0 10px;
+  width: auto; padding: 10px 0 8px;
   display: grid; justify-items: center; gap: 2px;
   background: var(--panel); color: var(--txt);
   border: 1px solid var(--border); border-radius: 14px;
@@ -1071,8 +1073,7 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
 @media (max-width: 640px) {
   .tb__times { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .tb__time { padding: 14px 0; font-size: 15px; }
-  .tb__dates { gap: 8px; }
-  .tb__date { width: 58px; }
+  .tb__cal { gap: 5px; }
 }
 
 /* ============================ 地図 ============================
