@@ -11,7 +11,7 @@
 |---|---|---|
 | **お客様** | 公式サイト **frankgolf.jp** | 体験・会員の打席予約・レッスン予約 |
 | **スタッフ** | **member-os** `/reservations` | 電話/店頭予約の登録、来店確認、入金・未収金 |
-| **お客様（店頭）** | member-os `/board/<token>` | ロビー掲示の当日カレンダー（見るだけ） |
+| **店頭掲示** | member-os `/board` | ロビー掲示の当日カレンダー（見るだけ・**店舗アカウントでログインして開く**） |
 | **会員本人** | member-os `/member` | 自分の予約の確認とキャンセル |
 
 **お客様向けの予約フォームを member-os に作らないでください。** サイト側に集約しています。
@@ -178,6 +178,7 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 | `apps/genesis/src/lib/frank-lesson.ts` | レッスン |
 | `apps/genesis/src/app/api/public/frank/*` | サイトが叩く公開API（CORS対応） |
 | `apps/member-os/src/lib/frank-reservation.ts` | スタッフ画面が台帳を読む |
+| `apps/member-os/src/app/board/page.tsx` | 店頭カレンダー（ログイン必須・60秒自動更新・名字のみ表示） |
 | `apps/shift-cloud/src/lib/store-dash.ts` | 店舗ダッシュボードの当日予約 |
 
 ---
@@ -192,6 +193,6 @@ CHECK 制約で「3つのうちどれか必須」を強制しています。
 | member-os `/member/register`（仮会員 `P########`） | **廃止（#120）**。`mbr_provisional_members` に作られる番号は `frunk_members` に無く、打席予約で必ず弾かれた。`/join-web` へリダイレクト |
 | 会員ログインの「会員番号＋生年月日」 | **廃止（#120）**。`frunk_members` の「会員番号＋電話下4桁」に統一 |
 | member-os `/book/[token]` | サイト `trial-booking.html` へリダイレクト |
-| Web予約用トークンURLの発行 | 廃止。**掲示用（board）だけ**残っています |
+| トークンURLの発行（`res_tokens`） | **全廃**。Web予約用に続き、掲示用（`purpose='board'`）も廃止。店頭は店舗アカウントでログインして `/board` を開く（middleware の `publicPrefixes` に `/board` を**入れないこと**） |
 
 > `res_services` / `res_requests`（0032）は **Reserve OS の別システム**です。こことは無関係なので消さないでください。

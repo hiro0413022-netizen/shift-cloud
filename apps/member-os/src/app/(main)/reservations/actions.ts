@@ -1,9 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
-import { headers } from "next/headers";
-import { hashToken, generateToken } from "@/lib/intake";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/kernel";
@@ -187,33 +184,6 @@ export async function recordPayment(formData: FormData) {
   back(date);
 }
 
-/** 店頭カレンダー（ロビー掲示）のURLを発行する。旧URLは無効化される。
- *  ※ お客様Web予約のトークンURLは廃止（#93・予約はサイトに集約）。掲示用だけ残す。 */
-export async function issueBoardToken() {
-  const actor = await requireReceptionActor();
-  const admin = createAdmin();
-
-  await admin
-    .from("res_tokens")
-    .update({ active: false })
-    .eq("company_id", actor.companyId)
-    .eq("store_id", FRANK_STORE_ID)
-    .eq("purpose", "board")
-    .eq("active", true);
-
-  const token = generateToken();
-  await admin.from("res_tokens").insert({
-    company_id: actor.companyId,
-    store_id: FRANK_STORE_ID,
-    purpose: "board",
-    token_hash: hashToken(token),
-    active: true,
-    created_by: actor.staffId,
-  });
-  await logAudit(actor, "frank.board_token.issue", "res_tokens", null, null, { purpose: "board" });
-
-  const h = await headers();
-  const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("host") ?? "";
-  redirect(`/reservations?board_url=${encodeURIComponent(`${proto}://${host}/board/${token}`)}`);
-}
+/* 店頭カレンダーのトークンURL発行は廃止した。
+ * 店頭では店舗アカウントでログインして `/board` を開く（ログイン必須）。
+ * お客様Web予約のトークンURLも廃止済み（#93・予約はサイトに集約）。 */

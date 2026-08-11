@@ -9,7 +9,7 @@ import {
   jstToday,
   outstanding,
 } from "@yozan/core/frank-booking";
-import { createBooking, setBookingStatus, deleteBooking, recordPayment, issueBoardToken } from "./actions";
+import { createBooking, setBookingStatus, deleteBooking, recordPayment } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ function who(b: BookingRow): string {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; board_url?: string }>;
+  searchParams: Promise<{ date?: string }>;
 }) {
   await requireReceptionActor();
   const sp = await searchParams;
@@ -71,15 +71,6 @@ export default async function ReservationsPage({
           <button className={btnGhostCls}>表示</button>
         </form>
       </header>
-
-      {sp.board_url && (
-        <Panel title="店頭カレンダーURL（ロビー掲示・常設タブレット用・一度だけ表示）" className="d1">
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-xs text-amber-700">{sp.board_url}</code>
-            <a href={sp.board_url} target="_blank" rel="noreferrer" className={btnCls}>カレンダーを開く ↗</a>
-          </div>
-        </Panel>
-      )}
 
       <Panel title="お客様のご予約について" className="d1">
         <p className="text-sm text-(--color-dim)">
@@ -333,14 +324,12 @@ export default async function ReservationsPage({
         )}
       </Panel>
 
-      <Panel title="店頭カレンダーの掲示URL" className="d3">
+      <Panel title="店頭カレンダー（ロビー掲示）" className="d3">
         <p className="mb-3 text-xs text-(--color-dim)">
-          ロビーの常設タブレットに映す当日カレンダーのURLを発行します（発行すると旧URLは無効化）。
-          お客様のご予約は公式サイトに集約したため、Web予約用のトークンURLは廃止しました。
+          ロビーの常設タブレットに映す当日カレンダーです。店舗アカウントでログインしたまま開いてください
+          （60秒ごとに自動更新・お名前は名字のみ表示）。URLの発行は不要になりました。
         </p>
-        <form action={issueBoardToken}>
-          <button className={btnGhostCls}>店頭カレンダーURLを発行</button>
-        </form>
+        <a href="/board" target="_blank" rel="noreferrer" className={btnGhostCls}>店頭カレンダーを開く ↗</a>
       </Panel>
     </div>
   );
