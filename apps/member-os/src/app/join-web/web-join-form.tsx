@@ -143,9 +143,10 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-sm text-(--color-dim)">
           <span className="font-medium text-(--color-txt)">お支払いはクレジットカードのみ</span>
           <br />
-          このあと安全な決済ページ（Square）に進み、初回月会費のお支払いとカード登録を行います。
+          このあと安全な決済ページ（Square）に進み、<span className="font-medium text-(--color-txt)">入会時のお支払い（入会金＋前取りの月会費）を1回で</span>
+          お済ませいただきます。同時にカードが登録され、
           <span className="font-medium text-(--color-txt)">決済完了と同時にご入会が確定し、会員番号を発行</span>
-          します（入会の控えPDFをメールでお送りします）。月会費は以後毎月自動でお支払いになります。
+          します（入会の控えPDFをメールでお送りします）。前取り期間のあとは、毎月自動でのお支払いになります。
         </div>
         <div>
           <label className={label}>クーポンコード（お持ちの方のみ）</label>
@@ -204,13 +205,15 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
                   )}
                 </span>
               </div>
-              <div className={row}>
-                <span>月会費（{m0}分・入会月）</span>
-                <span>
-                  <s className="text-(--color-dim)">{est.monthlyTaxIncluded.toLocaleString()}円</s>
-                  <span className="ml-2 font-bold text-emerald-500">→ 0円（キャンペーン）</span>
-                </span>
-              </div>
+              {est.campaign && (
+                <div className={row}>
+                  <span>月会費（{m0}分・入会月）</span>
+                  <span>
+                    <s className="text-(--color-dim)">{est.monthlyTaxIncluded.toLocaleString()}円</s>
+                    <span className="ml-2 font-bold text-emerald-500">→ 0円（キャンペーン）</span>
+                  </span>
+                </div>
+              )}
               <div className={row}>
                 <span>月会費 前取り（{m1}分＋{m2}分）</span>
                 <span className="font-bold">{est.monthlyTaxIncluded.toLocaleString()}円 × 2 ＝ {(est.monthlyTaxIncluded * 2).toLocaleString()}円（税込）</span>
@@ -223,7 +226,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
             <ul className="space-y-1 rounded-xl bg-(--color-panel-2) p-3 text-xs text-(--color-dim)">
               <li>・{m2}以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります。</li>
               <li>・キャンペーンでのご入会は、<span className="font-semibold text-(--color-txt)">{JOIN_CAMPAIGN.minMonths}か月間の継続</span>をお願いしています。</li>
-              <li>・決済ページではまず1か月分（{m1}分）をお支払いいただき、残り1か月分（{m2}分）は同じカードへ自動で続けてご請求します。</li>
+              <li>・上記の合計を、決済ページで<span className="font-semibold text-(--color-txt)">1回でお支払い</span>いただきます（分割されません）。</li>
               <li>・決済は安全な決済ページ（Square）で行います。決済完了と同時に会員番号を発行します。</li>
             </ul>
           </div>

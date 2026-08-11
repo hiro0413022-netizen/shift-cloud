@@ -13,8 +13,9 @@ import {
   type SquarePayment,
   type SquareRefund,
 } from "@/lib/frank-pos-pure";
-import { chargeCardOnFile, pauseSubscriptionCycles } from "@/lib/frank-square-billing";
+import { chargeCardOnFile, pauseSubscriptionCycles, clearSubscriptionPriceOverride } from "@/lib/frank-square-billing";
 import { activateWebJoin } from "@/lib/frank-join";
+import { JOIN_PREPAID_MONTHS, joinInitialTotal } from "@/lib/frank-join-pure";
 
 export { verifySquareSignature };
 
@@ -197,6 +198,9 @@ async function tryRecordMonthlyFee(
   });
   if (!kind || !member) return false;
 
+  // Web入会（/join-web）からの初回入金か。activateWebJoin が status を active に変えてしまうので先に控える
+  const wasWebJoin = kind === "initial" && String(member.status) === "pending";
+
   // 会員状態の更新（初回＝カード登録完了）。記録の冪等チェックより先でも害はない（updateは何度でも同じ結果）
   if (kind === "initial") {
     await admin
@@ -233,23 +237,67 @@ async function tryRecordMonthlyFee(
     await admin.from("frunk_members").update({ billing_status: "active", updated_at: new Date().toISOString() }).eq("id", member.id);
   }
 
-  await insertSale(admin, ctx, {
-    sold_on: mapped.sold_on,
-    category: "月会費",
-    amount: mapped.amount,
-    tax_included: mapped.tax_included,
-    pay_method: "カード",
-    memo: `Square自動課金（${String(member.member_no ?? "")}）`,
-    customer_name: String(member.name ?? ""),
-    member_kind: "会員",
-    detail: { square_payment_id: mapped.square_payment_id, frunk_member_id: String(member.id) },
-  });
+  // ---- 売上への記帳 ----
+  // Web入会の初回は「入会金＋月会費×前取り月数」の一括入金（#131b）。
+  // 1行の「月会費」で丸ごと記帳すると入会金が売上分類から消えるので、内訳に割って入れる。
+  const est = wasWebJoin
+    ? joinInitialTotal({
+        monthlyExTax: Number(member.frunk_plans?.monthly_price ?? 0),
+        joiningFeeExTax: Number(member.frunk_plans?.joining_fee ?? 0),
+        applyDateYmd: mapped.sold_on,
+        joiningFeeWaived: !!member.joining_fee_waived,
+      })
+    : null;
+  const splitOk = !!est && est.total === mapped.tax_included && est.monthly > 0;
 
-  // 入会金（#124）: 初回の月会費入金を確認できたら、保存されたカードへ続けて11,000円（税込）を自動請求。
-  // 決済リンクは有料フェーズ1つのプランしか受けないため、初回にまとめられない＝この場所が唯一の確実な起点。
-  // クーポン適用（joining_fee_waived）と請求済み（joining_fee_charged_at）は請求しない。
-  // この請求のWebhookは note の接頭辞「FRANK入会金」で category=入会金 に記録される（handleSquareEventの先頭で判定）。
-  if (kind === "initial" && !member.joining_fee_waived && !member.joining_fee_charged_at) {
+  if (splitOk && est) {
+    const memberNo = String(member.member_no ?? "");
+    if (est.joiningFee > 0) {
+      await insertSale(admin, ctx, {
+        sold_on: mapped.sold_on,
+        category: "入会金",
+        amount: Math.round(est.joiningFee / 1.1),
+        tax_included: est.joiningFee,
+        pay_method: "カード",
+        memo: `Web入会 初回一括の内訳（${memberNo}）`,
+        customer_name: String(member.name ?? ""),
+        member_kind: "会員",
+        detail: { square_payment_id: mapped.square_payment_id, frunk_member_id: String(member.id), part: "joining_fee" },
+      });
+    }
+    await insertSale(admin, ctx, {
+      sold_on: mapped.sold_on,
+      category: "月会費",
+      amount: Math.round((est.monthly * est.prepaidMonths) / 1.1),
+      tax_included: est.monthly * est.prepaidMonths,
+      pay_method: "カード",
+      memo: `Web入会 前取り${est.prepaidMonths}か月分（${memberNo}）`,
+      customer_name: String(member.name ?? ""),
+      member_kind: "会員",
+      detail: { square_payment_id: mapped.square_payment_id, frunk_member_id: String(member.id), part: "prepaid_months" },
+    });
+    // 入会金は初回一括に含めて頂戴済み＝あとから別途請求しない
+    await admin
+      .from("frunk_members")
+      .update({ joining_fee_charged_at: new Date().toISOString(), prepay_charged_at: new Date().toISOString() })
+      .eq("id", member.id);
+  } else {
+    await insertSale(admin, ctx, {
+      sold_on: mapped.sold_on,
+      category: "月会費",
+      amount: mapped.amount,
+      tax_included: mapped.tax_included,
+      pay_method: "カード",
+      memo: `Square自動課金（${String(member.member_no ?? "")}）`,
+      customer_name: String(member.name ?? ""),
+      member_kind: "会員",
+      detail: { square_payment_id: mapped.square_payment_id, frunk_member_id: String(member.id) },
+    });
+  }
+
+  // 入会金の後追い請求（#124の旧経路）。Web入会は初回一括に含むので対象外。
+  // 店頭タブレット入会→booking.htmlでカード登録、のような経路だけがここに来る。
+  if (kind === "initial" && !wasWebJoin && !member.joining_fee_waived && !member.joining_fee_charged_at) {
     const feeExTax = Number(member.frunk_plans?.joining_fee ?? 0);
     if (feeExTax > 0 && raw.customer_id) {
       const feeTax = monthlyFeeTaxIncluded(feeExTax);
@@ -340,19 +388,24 @@ async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown
   }
   await admin.from("frunk_members").update(patch).eq("id", member.id);
 
-  // 前取り入会（#131）: 2か月分を先にいただいているので、直近1回の自動課金をスキップする。
-  // subscription.created はサブスクIDが分かる最初のタイミング＝ここで1周期pause（自動で再開される）。
-  if (member.join_campaign && !member.prepay_pause_done_at && ["ACTIVE", "PENDING"].includes(status)) {
-    const r = await pauseSubscriptionCycles(sub.id, 1);
-    if (r.ok) {
+  // Web入会の後始末（#131b）。入会時は「入会金＋前取り月数分」を1回でお支払いいただくため、
+  // 決済リンクの金額＝総額。Squareはこれをサブスクの price_override_money として引き継ぐので、
+  //   (1) 価格上書きを消してプラン月額に戻す（放置すると毎月その総額を請求してしまう）
+  //   (2) 前取りした月数ぶんは自動課金をスキップ（二重取りの防止）
+  // をこの1か所で行う。prepay_pause_done_at で1回だけ実行する。
+  if (!member.prepay_pause_done_at && ["ACTIVE", "PENDING"].includes(status)) {
+    const version = typeof (sub as { version?: number }).version === "number" ? (sub as { version?: number }).version : undefined;
+    const cleared = await clearSubscriptionPriceOverride(sub.id, version);
+    const paused = await pauseSubscriptionCycles(sub.id, JOIN_PREPAID_MONTHS);
+    if (cleared.ok && paused.ok) {
       await admin
         .from("frunk_members")
         .update({ prepay_pause_done_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq("id", member.id);
     } else {
       await logEvent(String(member.company_id), {
-        event_type: "billing.prepay_pause_failed",
-        title: `前取りのサブスク1周期スキップに失敗: ${member.name}様（${member.member_no}）来月の自動課金が二重になります — Squareで手動停止してください`.slice(0, 120),
+        event_type: "billing.prepay_setup_failed",
+        title: `入会後の継続課金の設定に失敗: ${member.name}様（${member.member_no}）${cleared.ok ? "" : "月額が初回一括の金額のままです。"}${paused.ok ? "" : "前取り分の停止ができていません。"}Squareで確認してください`.slice(0, 120),
         source: "frank_billing",
         source_type: "system",
         severity: "warning",

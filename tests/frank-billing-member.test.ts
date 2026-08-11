@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { validCoupon, planChangeProration, taxIncl, isJoinCampaignActive, joinEstimate } from "../apps/member-os/src/lib/frank-billing-pure.ts";
 import { isJoiningFeeNote } from "../apps/genesis/src/lib/frank-pos-pure.ts";
+import { joinInitialTotal } from "../apps/genesis/src/lib/frank-join-pure.ts";
 
 /* ============================================================
    FRANK GOLF 入会金・クーポン・プラン変更（#124）
@@ -72,4 +73,31 @@ test("入会見積: キャンペーン後は入会金5,500円を請求（前取�
   assert.equal(e.joiningFeeCharged, 5500);
   assert.equal(e.totalDueNow, 5500 + 15180 * 2);
   assert.equal(e.minMonths, 0);
+});
+
+// ===== 見積（member-os）と決済額（genesis）の一致（#131b） =====
+// ここがズレると「見積と決済画面の金額が違う」事故になる。両実装を突き合わせて固定する。
+test("見積と決済額が一致する（キャンペーン中/後・全プラン）", () => {
+  const plans = [
+    { monthly: 9800, fee: 5000 },   // ライト
+    { monthly: 13800, fee: 5000 },  // レギュラー
+    { monthly: 19800, fee: 5000 },  // マスター
+    { monthly: 39800, fee: 5000 },  // 法人ライト
+    { monthly: 59800, fee: 5000 },  // 法人プレミアム
+  ];
+  for (const day of ["2026-09-11", "2026-12-31", "2027-01-01"]) {
+    for (const p of plans) {
+      const est = joinEstimate({ monthlyExTax: p.monthly, joiningFeeExTax: p.fee, applyDateYmd: day });
+      const pay = joinInitialTotal({ monthlyExTax: p.monthly, joiningFeeExTax: p.fee, applyDateYmd: day });
+      assert.equal(pay.total, est.totalDueNow, `${day} ${p.monthly}`);
+      assert.equal(pay.prepaidMonths, est.prepaidMonths);
+      assert.equal(pay.joiningFee, est.joiningFeeCharged);
+    }
+  }
+});
+
+test("クーポン適用は入会金0＝決済額も前取り分のみ", () => {
+  const pay = joinInitialTotal({ monthlyExTax: 13800, joiningFeeExTax: 5000, applyDateYmd: "2027-02-01", joiningFeeWaived: true });
+  assert.equal(pay.joiningFee, 0);
+  assert.equal(pay.total, 15180 * 2);
 });

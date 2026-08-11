@@ -3,6 +3,8 @@ import { randomUUID } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { verifyMember } from "@/lib/frank-booking";
 import { monthlyFeeTaxIncluded, toE164Jp } from "@/lib/frank-pos-pure";
+import { joinInitialTotal } from "@/lib/frank-join-pure";
+import { jstYmd } from "@/lib/jst";
 
 /**
  * FRANK GOLF 月会費の継続課金（Square）#123 / migration 0105
@@ -54,8 +56,8 @@ async function squarePost(token: string, path: string, body: Record<string, unkn
 
 /**
  * サブスクを指定周期ぶんスキップ（#131・前取り用）。
- * 入会時に2か月分を前取りするため、直近1回の自動課金を止める
- * （止めないと前取り分と翌月の自動課金が二重になる）。cycles 経過後は自動で再開される。
+ * 入会時に前取りした月数ぶんは自動課金を止める（止めないと二重取りになる）。
+ * cycles 経過後は自動で再開される。
  */
 export async function pauseSubscriptionCycles(
   subscriptionId: string,
@@ -70,6 +72,40 @@ export async function pauseSubscriptionCycles(
     return { ok: true };
   } catch (e) {
     console.error("[frank-square-billing] pause cycles failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}
+
+/**
+ * サブスクの価格上書きを消してプラン価格に戻す（#131b）。
+ *
+ * 入会時は「入会金＋前取り月数分」を1回でお支払いいただくため、決済リンクの金額を
+ * プラン月額と変えている。Squareはこの金額をサブスクの price_override_money として
+ * 引き継ぐ（＝放置すると毎月その金額を請求してしまう）ので、初回入金を確認したら
+ * null にしてプラン価格へ戻す。UpdateSubscription は「null を渡す＝その項目を消す」仕様。
+ */
+export async function clearSubscriptionPriceOverride(
+  subscriptionId: string,
+  version?: number,
+): Promise<{ ok: boolean; error?: string }> {
+  const token = accessToken();
+  if (!token) return { ok: false, error: "square_env_missing" };
+  try {
+    const body: Record<string, unknown> = { price_override_money: null };
+    if (typeof version === "number") body.version = version;
+    const res = await fetch(`${SQUARE_API}/subscriptions/${subscriptionId}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: body }),
+    });
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (!res.ok) {
+      const errs = (json.errors as Array<{ detail?: string; code?: string }> | undefined) ?? [];
+      throw new Error(errs.map((e) => e.detail ?? e.code).join("; ") || `Square PUT /subscriptions (${res.status})`);
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square-billing] clear price override failed:", e);
     return { ok: false, error: String(e) };
   }
 }
@@ -90,7 +126,7 @@ export async function createJoinCheckoutForMember(
 
   const { data: row } = await admin
     .from("frunk_members")
-    .select("id, name, email, phone, status, billing_status, frunk_plans(name, monthly_price, square_variation_id)")
+    .select("id, name, email, phone, status, billing_status, joining_fee_waived, frunk_plans(name, monthly_price, joining_fee, square_variation_id)")
     .eq("id", memberId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -99,20 +135,29 @@ export async function createJoinCheckoutForMember(
   if (String(row.billing_status) === "active") return { ok: false, error: "already_active" };
 
   const plan = (row as unknown as {
-    frunk_plans: { name: string; monthly_price: number | null; square_variation_id: string | null } | null;
+    frunk_plans: { name: string; monthly_price: number | null; joining_fee: number | null; square_variation_id: string | null } | null;
   }).frunk_plans;
   const priceExTax = Number(plan?.monthly_price ?? 0);
   if (!plan || priceExTax <= 0) return { ok: false, error: "plan_free" };
   const variationId = plan.square_variation_id;
   if (!variationId) return { ok: false, error: "square_env_missing" };
 
-  const amount = monthlyFeeTaxIncluded(priceExTax);
+  // 入会時のお支払いは「入会金＋月会費×前取り月数」の1回払い（#131b）。
+  // 決済リンクの金額をプラン月額と変えると、Squareはそれをサブスクの price_override_money
+  // として引き継ぐため、初回入金のWebhookで必ず null に戻す（frank-pos.ts）。
+  const est = joinInitialTotal({
+    monthlyExTax: priceExTax,
+    joiningFeeExTax: Number(plan.joining_fee ?? 0),
+    applyDateYmd: jstYmd(),
+    joiningFeeWaived: !!row.joining_fee_waived,
+  });
+  const amount = est.total;
   try {
     const phone = toE164Jp(row.phone ? String(row.phone) : null);
     const json = await squarePost(token, "/online-checkout/payment-links", {
       idempotency_key: randomUUID(),
       quick_pay: {
-        name: `FRANK GOLF 月会費（${plan.name}・税込）`,
+        name: `FRANK GOLF ご入会（${plan.name}）初回一括・税込`,
         price_money: { amount, currency: "JPY" },
         location_id: locationId,
       },
@@ -125,7 +170,7 @@ export async function createJoinCheckoutForMember(
         ...(row.email ? { buyer_email: String(row.email) } : {}),
         ...(phone ? { buyer_phone_number: phone } : {}),
       },
-      payment_note: `FRANK月会費 Web入会（${String(row.name ?? "")}）`,
+      payment_note: `FRANK入会初回一括 ${String(row.name ?? "")}`,
     });
     const link = json.payment_link as { url?: string; order_id?: string } | undefined;
     if (!link?.url || !link.order_id) throw new Error("payment_link missing url/order_id");

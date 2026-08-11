@@ -447,3 +447,10 @@
   **(f) ライト会員** — 表記を月8回→**月4回**に修正（DB note・HPは元から月4回）。※月次回数の上限はシステム強制ではなく表記のみ（従来どおり）。
   **(g) HP** — index/planに入会金5,000円税抜（税込5,500円）表記＋年内キャンペーン説明を追加。**体験予約の日付選択を横スクロール14日→月ごとカレンダー・60日先まで**（advance_days=60に変更・gn_site_content）。
   ⚠残: Squareレジ商品「入会金」（11,000円）の価格改定はSquareダッシュボードでの手作業。pause_cycle_durationの実挙動は実カードテストで要確認（失敗時はeventsに警告が出て手動対応可能）。
+- #131b (2026-08-11) **入会の決済を「見積と同額の1回払い」に修正**（#131の実装バグ。migrationなし）。症状: 見積は「入会金＋前取り2か月」なのに、Squareの決済画面はプラン月額1か月分しか出ず、残りは決済後にカードへ別途請求していた＝**見積と決済額が一致しない**（ユーザー指摘）。
+  **(a) 原因** — サブスク決済リンク（Checkout API + subscription_plan_id）は「price_money はプランのフェーズ価格と一致させる」のが前提で、月額1か月ぶんしか出せないと解釈していた。実際は**一致しない金額を渡すと price override として通る**（Square公式ドキュメント: Subscription Plan Checkout）。
+  **(b) 対応** — 決済リンクの price_money を **入会金＋月会費×前取り月数（＝見積の合計）** に変更。お客様はSquareのページで**1回だけ**支払う。カードはSquareがそのまま customer に保存する（サブスク決済リンクの仕様）。
+  **(c) 上書きの後始末（重要）** — Squareはこの金額を**サブスクの price_override_money として引き継ぐ**ため、放置すると毎月その総額を請求してしまう。subscription.created の Webhook で ①`UpdateSubscription {price_override_money: null}` でプラン価格へ戻し ②`PauseSubscription {pause_cycle_duration: 2}` で前取り月数ぶんスキップ、を1回だけ実行（prepay_pause_done_at）。どちらか失敗したら events に警告（金額が総額のままになる＝実害が大きいので severity=warning で必ず気づける）。
+  **(d) 廃止** — 決済後の「2か月目のカード課金」と、Web入会での「入会金の後追い課金」（初回一括に含めたため）。店頭タブレット入会→booking.htmlでカード登録の経路は従来どおり後追い課金が動く。
+  **(e) 記帳** — 初回一括は1行の「月会費」にせず、**入会金／月会費（前取りNか月分）に分割**して mon_sales に入れる（入会金が売上分類から消えないように）。金額が見積と一致しないときは分割せず従来どおり1行（安全側）。
+  **(f) 見積と決済額の一致をテストで固定** — genesis `lib/frank-join-pure.ts`（joinInitialTotal）と member-os `lib/frank-billing-pure.ts`（joinEstimate）を全プラン×キャンペーン内外で突き合わせる（tests 278件通過）。**片方だけ直すと再発するので、料金ロジックを変えるときは必ず両方**。

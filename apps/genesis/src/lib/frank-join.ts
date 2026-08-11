@@ -185,34 +185,9 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
 
   // ---- ここからベストエフォート（失敗しても入会は確定済み） ----
 
-  // 月会費の前取り（#131）: 決済リンクで翌月分は支払い済み。翌々月分をカードへ続けて課金する。
-  // 二重課金ガードは prepay_charged_at（この課金のWebhookは金額=プラン税込月額で「月会費」として記帳される）。
+  // 月会費は「入会金＋前取り月数分」を決済ページで1回いただいている（#131b）。
+  // 以前あった「決済後に2回目をカード課金」は廃止（見積と決済額がズレる原因だった）。
   const monthly = monthlyFeeTaxIncluded(Number(m.frunk_plans?.monthly_price ?? 0));
-  let prepayOk = false;
-  if (campaign && monthly > 0 && m.square_customer_id) {
-    const { data: cur } = await admin.from("frunk_members").select("prepay_charged_at").eq("id", m.id).maybeSingle();
-    if (!cur?.prepay_charged_at) {
-      const r = await chargeCardOnFile({
-        customerId: m.square_customer_id,
-        amountTaxIncluded: monthly,
-        note: `FRANK月会費前取り（${memberNo}）`,
-      });
-      if (r.ok) {
-        prepayOk = true;
-        await admin.from("frunk_members").update({ prepay_charged_at: new Date().toISOString() }).eq("id", m.id);
-      } else {
-        await logEvent(m.company_id, {
-          event_type: "billing.prepay_failed",
-          title: `前取り2か月目の課金に失敗: ${m.name}様（${memberNo}）${monthly.toLocaleString()}円 — 店頭で徴収するか再課金してください`.slice(0, 120),
-          source: "frank_billing",
-          source_type: "system",
-          severity: "warning",
-        });
-      }
-    } else {
-      prepayOk = true;
-    }
-  }
 
   let karteToken: string | null = null;
   try {
@@ -235,12 +210,14 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
           ["入会金（年内入会キャンペーン）", "0円"],
         ]
       : [
-          [`${planName}（初回月会費）`, `${monthly.toLocaleString()}円（税込）`],
           ...(joinFee > 0
             ? ([["入会金", `${joinFee.toLocaleString()}円（税込）`]] as Array<[string, string]>)
             : ([["入会金（クーポン適用）", "0円"]] as Array<[string, string]>)),
+          [`月会費 前取り（${m1}分）`, `${monthly.toLocaleString()}円（税込）`],
+          [`月会費 前取り（${m2}分）`, `${monthly.toLocaleString()}円（税込）`],
         ];
-    const totalDue = campaign ? monthly * 2 : monthly + joinFee;
+    // 決済額と必ず一致させる（frank-join-pure の joinInitialTotal と同じ式）
+    const totalDue = joinFee + monthly * 2;
     let attachments: Array<{ filename: string; content: string }> | undefined;
     try {
       const pdf = await buildJoinPdf({
@@ -297,11 +274,14 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
       ...(campaign
         ? [
             `年内入会キャンペーンの適用で、入会金（5,500円税込）と入会月（${m0}分）の月会費は無料です。`,
-            `本日、${m1}分・${m2}分の月会費2か月分（${(monthly * 2).toLocaleString()}円税込）をお支払いいただきました${prepayOk ? "" : "（2か月目分の決済確認中です）"}。`,
+            `本日、${m1}分・${m2}分の月会費2か月分（${(monthly * 2).toLocaleString()}円税込）を1回でお支払いいただきました。`,
             `${m2}分より後の月会費は、毎月${Number(today.slice(8, 10))}日ごろにご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, 2).replaceAll("-", "/")} 予定）。`,
             `※ キャンペーンでのご入会は6か月間（${addMonthsYmd(today, 6).replaceAll("-", "/")}まで）の継続をお願いしています。`,
           ]
-        : ["ご登録のカードで毎月自動でお支払いになります。"]),
+        : [
+            `本日、入会金と${m1}分・${m2}分の月会費を1回でお支払いいただきました。`,
+            `${m2}分より後の月会費は、毎月ご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, 2).replaceAll("-", "/")} 予定）。`,
+          ]),
       ...(attachments ? ["", "入会申込書の控え（PDF）を添付しています。"] : []),
       "",
       "ご不明な点はこのメールにご返信ください。",
