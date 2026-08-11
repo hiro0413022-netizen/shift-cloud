@@ -35,7 +35,8 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublic) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
-  if (user && path === "/login") {
+  // denied=1（権限なしで弾かれた）のときは / に戻さない — 戻すと無限リダイレクト（2026-08-11 member-osで実障害）
+  if (user && path === "/login" && !request.nextUrl.searchParams.has("denied")) {
     return NextResponse.redirect(new URL("/", request.url));
   }
   return response;

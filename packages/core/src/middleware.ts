@@ -42,7 +42,10 @@ export function createAuthMiddleware(options: { publicPrefixes: string[] }) {
     if (!user && !isPublic) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    if (user && path === "/login") {
+    // ログイン済みで /login に来たらホームへ。ただし denied=1（権限なしで弾かれた）は除く —
+    // 弾く側は /login?denied=1 へ飛ばすため、ここで / に戻すと無限リダイレクトになる（実障害 2026-08-11）。
+    // denied のときはログイン画面を表示し、正しいアカウントで入り直してもらう。
+    if (user && path === "/login" && !request.nextUrl.searchParams.has("denied")) {
       return NextResponse.redirect(new URL("/", request.url));
     }
     return response;

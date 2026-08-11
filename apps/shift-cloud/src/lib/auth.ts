@@ -144,7 +144,9 @@ export function isAdmin(actor: Actor) {
 /** 認証必須。permを渡すと権限チェックも行う */
 export async function requireActor(perm?: Permission): Promise<Actor> {
   const actor = await getActor();
-  if (!actor) redirect("/login");
+  // denied=1: セッションはあるがスタッフ照合に失敗（権限なし・別会社等）。
+  // 素の /login へ飛ばすと middleware が / に戻して無限ループするため denied を付ける
+  if (!actor) redirect("/login?denied=1");
   if (perm && !can(actor, perm)) throw new Error("FORBIDDEN: " + perm);
   return actor;
 }
