@@ -23,11 +23,25 @@ function reqLabel(r: Request, tmap: Map<string, Template>) {
   return "メモ";
 }
 
+/** 希望を「開始/終了の時刻」に落とす。テンプレ希望でも時間に展開して微調整できるようにする */
+function reqTimes(r: Request, tmap: Map<string, Template>): { start: string; end: string } | null {
+  if (r.start_time && r.end_time) return { start: r.start_time.slice(0, 5), end: r.end_time.slice(0, 5) };
+  if (r.template_id) {
+    const t = tmap.get(r.template_id);
+    if (t && !t.is_day_off && t.start_time && t.end_time) {
+      return { start: t.start_time.slice(0, 5), end: t.end_time.slice(0, 5) };
+    }
+  }
+  return null;
+}
+
 export function ShiftBuilder({
-  storeId, ym, days, staff, templates, shifts, requests,
+  storeId, ym, days, staff, templates, shifts, requests, timeOff,
 }: {
   storeId: string; ym: string; days: string[];
   staff: StaffRow[]; templates: Template[]; shifts: Shift[]; requests: Request[];
+  /** "staffId|date" → 休み希望（approved=承認済み / submitted=申請中） */
+  timeOff: Record<string, { status: string; reason: string | null }>;
 }) {
   const init: Record<string, Cell> = {};
   for (const s of shifts) init[`${s.staff_id}|${s.date}`] = { template_id: s.template_id, start_time: s.start_time, end_time: s.end_time, status: s.status };
@@ -110,6 +124,41 @@ export function ShiftBuilder({
     markDirty(key);
   }
 
+  /**
+   * 提出された希望をそのセルに落とす（クリック1回）。
+   * 落とした先は時刻の入力欄なので、そこから任意の時間へ打ち替えられる。
+   */
+  function applyRequest(staffId: string, date: string) {
+    const key = `${staffId}|${date}`;
+    const req = reqMap.get(key);
+    if (!req) return;
+    if (grid[key]?.status === "published") return; // 確定済みは触らない
+    const times = reqTimes(req, tmap);
+    if (!times) return;
+    setGrid((p) => ({ ...p, [key]: { template_id: null, start_time: times.start, end_time: times.end, status: "draft" } }));
+    markDirty(key);
+  }
+
+  /** 空いているセルにだけ希望をまとめて反映（入力済み・確定済みは上書きしない） */
+  function applyAllRequests() {
+    const next: Record<string, Cell> = {};
+    const keys: string[] = [];
+    for (const r of requests) {
+      const key = `${r.staff_id}|${r.date}`;
+      const cur = grid[key];
+      if (cur?.status === "published") continue;
+      if (cur?.template_id || cur?.start_time) continue; // 既に入っているものは尊重する
+      const times = reqTimes(r, tmap);
+      if (!times) continue;
+      next[key] = { template_id: null, start_time: times.start, end_time: times.end, status: "draft" };
+      keys.push(key);
+    }
+    if (keys.length === 0) { setMsg("反映できる希望がありません（すでに入力済みです）"); return; }
+    setGrid((p) => ({ ...p, ...next }));
+    setDirty((p) => { const s = new Set(p); for (const k of keys) s.add(k); return s; });
+    setMsg(`${keys.length}件の希望を反映しました（時間はこのあと自由に変えられます）`);
+  }
+
   const save = useCallback((silent = false) => {
     const snapshot = dirty;
     if (snapshot.size === 0) return;
@@ -152,6 +201,7 @@ export function ShiftBuilder({
         <Button onClick={() => save(false)} disabled={pending || dirty.size === 0}>
           {pending ? "処理中…" : `ドラフト保存（${dirty.size}件）`}
         </Button>
+        <Button variant="secondary" onClick={applyAllRequests} disabled={pending}>希望を一括反映</Button>
         <Button variant="secondary" onClick={publish} disabled={pending}>期間内ドラフトを確定・通知</Button>
         {dirty.size > 0 && <span className="text-xs text-amber-600">● 未保存の変更あり（15秒ごとに自動保存）</span>}
         {restored && <span className="text-xs text-blue-600">前回の編集内容を復元しました</span>}
@@ -183,8 +233,13 @@ export function ShiftBuilder({
                   const req = reqMap.get(key);
                   const t = cell?.template_id ? tmap.get(cell.template_id) : null;
                   const isCustom = !cell?.template_id && !!(cell?.start_time || cell?.end_time);
+                  const off = timeOff[key];
+                  const bg = off?.status === "approved" ? "bg-rose-50"
+                    : cell?.status === "published" ? "bg-emerald-50/60"
+                    : dirty.has(key) ? "bg-amber-50"
+                    : off ? "bg-rose-50/40" : "";
                   return (
-                    <td key={d} className={`border-b border-zinc-100 p-0.5 align-top ${cell?.status === "published" ? "bg-emerald-50/60" : dirty.has(key) ? "bg-amber-50" : ""}`}>
+                    <td key={d} className={`border-b border-zinc-100 p-0.5 align-top ${bg}`}>
                       <select
                         value={isCustom ? CUSTOM : cell?.template_id ?? ""}
                         onChange={(e) => setTemplate(s.id, d, e.target.value)}
@@ -204,11 +259,25 @@ export function ShiftBuilder({
                             className="w-full rounded border border-zinc-200 px-0.5 py-0.5 text-[10px]" />
                         </div>
                       )}
-                      {req && (
-                        <p className="truncate px-1 pb-0.5 text-[10px] text-zinc-400"
-                          title={`希望: ${reqLabel(req, tmap)}${req.memo ? ` / ${req.memo}` : ""}`}>
-                          希望: {reqLabel(req, tmap)}{req.memo ? " 📝" : ""}
+                      {off && (
+                        <p className={`truncate px-1 pb-0.5 text-[10px] font-medium ${off.status === "approved" ? "text-rose-600" : "text-rose-400"}`}
+                          title={`${off.status === "approved" ? "承認済みの休み" : "休み希望（未処理）"}${off.reason ? `: ${off.reason}` : ""}`}>
+                          {off.status === "approved" ? "🛌 休み確定" : "🛌 休み希望"}
                         </p>
+                      )}
+                      {req && (
+                        reqTimes(req, tmap) ? (
+                          <button type="button" onClick={() => applyRequest(s.id, d)}
+                            className="w-full truncate rounded px-1 pb-0.5 text-left text-[10px] text-zinc-400 hover:bg-brand-light hover:text-brand"
+                            title={`クリックでこの希望を反映（あとから時間を変えられます）\n希望: ${reqLabel(req, tmap)}${req.memo ? ` / ${req.memo}` : ""}`}>
+                            希望: {reqLabel(req, tmap)}{req.memo ? " 📝" : ""}
+                          </button>
+                        ) : (
+                          <p className="truncate px-1 pb-0.5 text-[10px] text-zinc-400"
+                            title={`希望: ${reqLabel(req, tmap)}${req.memo ? ` / ${req.memo}` : ""}`}>
+                            希望: {reqLabel(req, tmap)}{req.memo ? " 📝" : ""}
+                          </p>
+                        )
                       )}
                     </td>
                   );
@@ -218,7 +287,10 @@ export function ShiftBuilder({
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-zinc-400">緑=確定済み / 黄=未保存。「⌚ 時間指定」で任意の時間を入力できます。セル下の「希望」はスタッフの提出内容（📝=メモ、ホバーで表示）。</p>
+      <p className="mt-2 text-xs text-zinc-400">
+        緑=確定済み / 黄=未保存 / 桃=休み希望。「⌚ 時間指定」で任意の時間を入力できます。
+        セル下の「希望」はスタッフの提出内容で、<span className="font-medium text-zinc-500">クリックするとその時間が入り、そこから自由に打ち替えられます</span>（📝=メモ、ホバーで表示）。
+      </p>
     </div>
   );
 }

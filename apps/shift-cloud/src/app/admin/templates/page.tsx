@@ -1,4 +1,4 @@
-import { requireActor } from "@/lib/auth";
+import { requireActor, visibleStores } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -8,6 +8,8 @@ import { hm } from "@/lib/util";
 export default async function TemplatesPage() {
   const actor = await requireActor("manage_templates");
   const admin = createAdmin();
+  const stores = await visibleStores(actor);
+  const storeName = new Map(stores.map((s) => [s.id, s.name]));
   const { data: templates } = await admin
     .from("shift_templates")
     .select("*")
@@ -20,6 +22,10 @@ export default async function TemplatesPage() {
     const a = await requireActor("manage_templates");
     const ad = createAdmin();
     const isDayOff = formData.get("is_day_off") === "on";
+    // 店舗を選ぶとその店舗だけに出る。空 = 全店共通
+    const scopeStore = String(formData.get("scope_store_id") || "");
+    const allowed = await visibleStores(a);
+    const scopeId = allowed.some((s) => s.id === scopeStore) ? scopeStore : null;
     const row = {
       name: String(formData.get("name")),
       start_time: isDayOff ? null : String(formData.get("start_time") || "") || null,
@@ -27,6 +33,8 @@ export default async function TemplatesPage() {
       is_day_off: isDayOff,
       color: String(formData.get("color") || "#0F6B4F"),
       sort_order: Number(formData.get("sort_order") || 0),
+      scope_type: scopeId ? ("store" as const) : ("company" as const),
+      scope_id: scopeId,
     };
     const { data } = await ad.from("shift_templates").insert({ ...row, company_id: a.companyId }).select("id").single();
     await logAudit(a, "template.create", "shift_templates", data?.id ?? null, null, row);
@@ -46,13 +54,16 @@ export default async function TemplatesPage() {
   return (
     <>
       <PageTitle>シフトテンプレート</PageTitle>
-      <p className="mb-4 -mt-4 text-sm text-zinc-500">スタッフはこのテンプレートをワンタップで選んでシフト希望を提出します。</p>
+      <p className="mb-4 -mt-4 text-sm text-zinc-500">
+        スタッフはこのテンプレートをワンタップで選んでシフト希望を提出します。
+        店舗によって営業時間が違うので、時間の入るテンプレートは「対象店舗」を指定してください（全店共通にすると別店舗の画面にも出ます）。
+      </p>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {!templates?.length ? (
             <Empty>テンプレートがありません</Empty>
           ) : (
-            <Table headers={["名前", "時間", "種別", "並び順", ""]}>
+            <Table headers={["名前", "時間", "対象店舗", "種別", "並び順", ""]}>
               {templates.map((t) => (
                 <tr key={t.id} className="hover:bg-zinc-50">
                   <Td className="font-medium">
@@ -60,6 +71,11 @@ export default async function TemplatesPage() {
                     {t.name}
                   </Td>
                   <Td>{t.is_day_off ? "—" : t.start_time ? `${hm(t.start_time)}〜${hm(t.end_time)}` : "時間指定なし"}</Td>
+                  <Td>
+                    {t.scope_type === "store"
+                      ? <Badge color="blue">{storeName.get(t.scope_id) ?? "他店舗"}</Badge>
+                      : <Badge color="zinc">全店共通</Badge>}
+                  </Td>
                   <Td>{t.is_day_off ? <Badge color="zinc">休み</Badge> : <Badge color="green">勤務</Badge>}</Td>
                   <Td>{t.sort_order}</Td>
                   <Td>
@@ -89,6 +105,15 @@ export default async function TemplatesPage() {
                 <Label>終了</Label>
                 <Input name="end_time" type="time" />
               </div>
+            </div>
+            <div>
+              <Label>対象店舗</Label>
+              <select name="scope_store_id" defaultValue=""
+                className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm focus:border-brand focus:outline-none">
+                <option value="">全店共通</option>
+                {stores.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+              </select>
+              <p className="mt-1 text-xs text-zinc-400">営業時間が店舗で違う場合は必ず店舗を選んでください。</p>
             </div>
             <label className="flex items-center gap-2 text-sm text-zinc-600">
               <input type="checkbox" name="is_day_off" /> 休み希望用テンプレート

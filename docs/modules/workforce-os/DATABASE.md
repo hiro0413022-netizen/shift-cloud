@@ -23,6 +23,10 @@
 - `shift_request_periods` — target_month(date), deadline(date), status(open/closed), store_id(null=全店)
 - `shift_requests` — period_id, staff_id, date, template_id(null=休み等), memo, status(submitted/withdrawn)
 - `shifts` — staff_id, store_id, date, start_time, end_time, template_id, schedule_type_id, status(draft/published), published_at, note
+- `staff_time_off_requests` — staff_id, store_id, start_date, end_date, kind(day_off/vacation/other), reason, status(submitted/approved/rejected/withdrawn), decided_by/at, decision_note（0111）
+  **募集期間(period_id)を持たない**のが要点。長期休暇のように募集がまだ無い先の休みを受けるため
+- `shift_templates.scope_type/scope_id` — 'company'=全店共通 / 'store'=その店舗だけ（0111で既存の勤務テンプレをGOLF WING宝塚に寄せた）。
+  絞り込みは `apps/shift-cloud/src/lib/shift-scope.ts` に集約（画面ごとに書くと出し分け漏れが起きる）
 
 ## 勤怠（Phase 4）
 

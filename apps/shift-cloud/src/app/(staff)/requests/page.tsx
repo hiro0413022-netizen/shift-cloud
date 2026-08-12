@@ -2,7 +2,9 @@ import { requireActor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Empty, Card, Badge, Button } from "@/components/ui";
 import { daysOfMonth, daysBetween, fmtDateJP, todayJST, hm, dowJP } from "@/lib/util";
+import { templatesForStores } from "@/lib/shift-scope";
 import { RequestForm } from "./request-form";
+import { TimeOffSection } from "./time-off-section";
 import { applyHelp } from "./actions";
 
 export default async function RequestsPage() {
@@ -10,7 +12,7 @@ export default async function RequestsPage() {
   const supabase = await createClient();
   const today = todayJST();
 
-  const [{ data: periods }, { data: helps }, { data: myApps }] = await Promise.all([
+  const [{ data: periods }, { data: helps }, { data: myApps }, { data: myTimeOff }] = await Promise.all([
     supabase.from("shift_request_periods").select("*")
       .eq("status", "open").is("deleted_at", null)
       .gte("deadline", today).order("target_month"),
@@ -20,6 +22,11 @@ export default async function RequestsPage() {
       .gte("date", today).order("date"),
     supabase.from("help_applications").select("help_request_id, status")
       .eq("staff_id", actor.staffId),
+    // 休み希望は募集期間と無関係。これから先の分＋直近に出したものを見せる
+    supabase.from("staff_time_off_requests")
+      .select("id, start_date, end_date, kind, reason, status, decision_note")
+      .eq("staff_id", actor.staffId).is("deleted_at", null)
+      .gte("end_date", today).order("start_date"),
   ]);
 
   // 自分に該当する募集のうち、店舗個別を全店舗共通より優先（重複時の取り違え防止）
@@ -70,6 +77,8 @@ export default async function RequestsPage() {
         </section>
       )}
 
+      <TimeOffSection mine={myTimeOff ?? []} today={today} />
+
       <section>
         <h2 className="text-lg font-semibold">シフト提出</h2>
         {!period ? (
@@ -91,6 +100,7 @@ export default async function RequestsPage() {
               startDate={period.start_date}
               endDate={period.end_date}
               staffId={actor.staffId}
+              storeIds={period.store_id ? [period.store_id] : actor.storeIds}
             />
           </>
         )}
@@ -99,16 +109,20 @@ export default async function RequestsPage() {
   );
 }
 
-async function RequestFormLoader({ periodId, ym, startDate, endDate, staffId }: { periodId: string; ym: string; startDate: string | null; endDate: string | null; staffId: string }) {
+async function RequestFormLoader({ periodId, ym, startDate, endDate, staffId, storeIds }: {
+  periodId: string; ym: string; startDate: string | null; endDate: string | null; staffId: string; storeIds: string[];
+}) {
   const supabase = await createClient();
   const days = startDate && endDate ? daysBetween(startDate, endDate) : daysOfMonth(ym);
   const [{ data: templates }, { data: existing }] = await Promise.all([
-    supabase.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color")
+    supabase.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color, scope_type, scope_id")
       .is("deleted_at", null).order("sort_order"),
     supabase.from("shift_requests").select("date, template_id, memo, start_time, end_time")
       .eq("period_id", periodId).eq("staff_id", staffId).is("deleted_at", null),
   ]);
+  // 店舗ごとに営業時間が違うので、自分の店舗のテンプレだけ見せる（DECISIONS #131）
+  const visible = templatesForStores(templates ?? [], storeIds);
   return (
-    <RequestForm periodId={periodId} days={days} templates={templates ?? []} existing={existing ?? []} />
+    <RequestForm periodId={periodId} days={days} templates={visible} existing={existing ?? []} />
   );
 }

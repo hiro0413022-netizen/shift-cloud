@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
+import { validateTimeOff } from "@/lib/shift-scope";
+import { todayJST } from "@/lib/util";
 
 export type RequestEntry = { date: string; template_id: string | null; memo: string; start_time?: string | null; end_time?: string | null };
 
@@ -95,6 +97,75 @@ export async function submitRequests(periodId: string, entries: RequestEntry[]):
   await logAudit(actor, "shift_request.submit", "shift_requests", null, null, { periodId, count: rows.length });
   revalidatePath("/requests");
   return {};
+}
+
+/**
+ * 休み希望を出す（募集期間に関係なくいつでも）。
+ * 長期休暇のように「先に決まっている休み」を運営が早めに把握するための入口。
+ * 期間(period)に紐づけないので、募集がまだ無い月でも入れられる。
+ */
+export async function submitTimeOff(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const admin = createAdmin();
+
+  const start = String(formData.get("start_date") || "");
+  const end = String(formData.get("end_date") || "") || start;
+  const kind = String(formData.get("kind") || "day_off");
+  const reason = String(formData.get("reason") || "").trim() || null;
+
+  if (validateTimeOff(start, end, todayJST())) return;
+
+  const { data } = await admin.from("staff_time_off_requests").insert({
+    company_id: actor.companyId,
+    staff_id: actor.staffId,
+    store_id: actor.primaryStoreId ?? actor.storeIds[0] ?? null,
+    start_date: start,
+    end_date: end,
+    kind,
+    reason,
+    status: "submitted",
+  }).select("id").single();
+
+  // 承認する人（シフト作成権限を持つスタッフ）へ通知
+  const { data: approvers } = await admin
+    .from("staff_roles")
+    .select("staff_id, roles!inner(permissions)")
+    .is("deleted_at", null);
+  const targets = [...new Set(
+    (approvers ?? [])
+      .filter((r) => (r as unknown as { roles: { permissions: Record<string, boolean> } }).roles?.permissions?.create_shifts)
+      .map((r) => r.staff_id)
+      .filter((id) => id !== actor.staffId),
+  )];
+  if (targets.length) {
+    await admin.from("notifications").insert(targets.map((sid) => ({
+      company_id: actor.companyId,
+      staff_id: sid,
+      kind: "time_off_request",
+      title: `${actor.name}さんから休み希望`,
+      body: `${start}${end !== start ? `〜${end}` : ""}${reason ? ` / ${reason}` : ""}`,
+      link: "/admin/time-off",
+    })));
+  }
+
+  await logAudit(actor, "time_off.submit", "staff_time_off_requests", data?.id ?? null, null, { start, end, kind });
+  revalidatePath("/requests");
+}
+
+/** 自分の休み希望を取り下げる（承認済みでも取り下げ可＝予定は変わるもの） */
+export async function withdrawTimeOff(formData: FormData): Promise<void> {
+  const actor = await requireActor();
+  const admin = createAdmin();
+  const id = String(formData.get("id"));
+
+  await admin.from("staff_time_off_requests")
+    .update({ status: "withdrawn" })
+    .eq("id", id)
+    .eq("staff_id", actor.staffId)          // 他人の申請は触れない
+    .eq("company_id", actor.companyId);
+
+  await logAudit(actor, "time_off.withdraw", "staff_time_off_requests", id);
+  revalidatePath("/requests");
 }
 
 /** 出勤募集に応募する */

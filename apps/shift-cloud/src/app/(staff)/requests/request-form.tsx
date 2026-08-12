@@ -59,9 +59,16 @@ export function RequestForm({
   }
 
   const filled = Object.values(entries).filter((e) => e.template_id || (e.custom && e.start_time && e.end_time)).length;
+  // 勤務テンプレが1つも無い店舗（例: FRANK GOLF）では時間の直接入力が主役になる
+  const noWorkTemplate = templates.every((t) => t.is_day_off);
 
   return (
     <div className="space-y-2 pb-24">
+      {noWorkTemplate && (
+        <p className="rounded-lg bg-zinc-100 px-3 py-2 text-xs text-zinc-500">
+          この店舗はシフトのテンプレートが未設定です。「⌚ 時間を指定」から出勤できる時間を入れてください。
+        </p>
+      )}
       {days.map((d) => {
         const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
         const cur = entries[d];

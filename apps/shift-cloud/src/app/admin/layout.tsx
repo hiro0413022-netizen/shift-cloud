@@ -10,6 +10,7 @@ const MENU: { href: string; label: string; perm: Permission }[] = [
   { href: "/admin/templates", label: "シフトテンプレート", perm: "manage_templates" },
   { href: "/admin/schedule-types", label: "予定種別", perm: "manage_templates" },
   { href: "/admin/shifts", label: "シフト作成", perm: "create_shifts" },
+  { href: "/admin/time-off", label: "休み希望", perm: "create_shifts" },
   { href: "/admin/help", label: "出勤募集", perm: "create_shifts" },
   { href: "/admin/attendance", label: "勤怠管理", perm: "edit_attendance" },
   { href: "/admin/kiosk-messages", label: "打刻端末メモ", perm: "edit_attendance" },
