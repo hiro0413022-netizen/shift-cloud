@@ -78,8 +78,9 @@ export type DayView = {
   lessons: LessonRow[];
 };
 
-/** 1日ぶんの予約状況（打席・予約・レッスン枠をまとめて取る） */
-export async function loadDay(dateStr: string): Promise<DayView> {
+/** 1日ぶんの予約状況（打席・予約・レッスン枠をまとめて取る）
+ *  companyId は必須（#134）: 会社・店舗で必ず絞る。呼び出し側で FRANK 店舗のアクセス検証も行うこと。 */
+export async function loadDay(dateStr: string, companyId: string): Promise<DayView> {
   const admin = createAdmin();
   const cfg = await loadBookingCfg(admin);
   const hours = businessHours(dateStr, cfg);
@@ -88,17 +89,22 @@ export async function loadDay(dateStr: string): Promise<DayView> {
     admin
       .from("frunk_bays")
       .select("id, code, name, floor, equipment, is_lefty, active")
+      .eq("company_id", companyId)
       .is("deleted_at", null)
       .order("sort"),
     admin
       .from("frunk_bookings")
       .select(BOOKING_COLS)
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
       .eq("booked_date", dateStr)
       .is("deleted_at", null)
       .order("start_time"),
     admin
       .from("frunk_lesson_slots")
       .select("id, bay_id, slot_date, start_time, end_time, status, staff(name)")
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
       .eq("slot_date", dateStr)
       .eq("status", "open")
       .is("deleted_at", null)
@@ -117,12 +123,14 @@ export async function loadDay(dateStr: string): Promise<DayView> {
   };
 }
 
-/** 未収金（全期間・キャンセル分は除く） */
-export async function loadUnpaid(): Promise<BookingRow[]> {
+/** 未収金（全期間・キャンセル分は除く）。companyId は必須（#134） */
+export async function loadUnpaid(companyId: string): Promise<BookingRow[]> {
   const admin = createAdmin();
   const { data } = await admin
     .from("frunk_bookings")
     .select(BOOKING_COLS)
+    .eq("company_id", companyId)
+    .eq("store_id", FRANK_STORE_ID)
     .in("payment_status", ["unpaid", "partial"])
     .neq("status", "cancelled")
     .not("amount", "is", null)

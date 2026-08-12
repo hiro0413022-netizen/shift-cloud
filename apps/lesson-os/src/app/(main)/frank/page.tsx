@@ -1,4 +1,4 @@
-import { requireLessonActor } from "@/lib/auth";
+import { requireFrankActor, FRANK_STORE_ID as FRANK_STORE } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { FrankClient, type SlotView, type CoachOpt, type BayOpt } from "./frank-client";
 
@@ -7,14 +7,15 @@ export const dynamic = "force-dynamic";
 /**
  * FRANK レッスンカレンダー（#88 §3-4）
  * プロ別・打席別の枠管理＋予約状況＋申し送り（前回→次回に自動表示）＋カルテ連携。
+ *
+ * この画面は FRANK（姫路）の枠と予約者名がそのまま出るため、
+ * FRANK に配属されている人とオーナーだけが開ける（#134 / DECISIONS #128）。
  */
-
-const FRANK_STORE = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
 
 const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 
 export default async function FrankLessonPage() {
-  const actor = await requireLessonActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const from = jstToday();
   const to = new Date(Date.now() + 9 * 3600_000 + 30 * 86400_000).toISOString().slice(0, 10);

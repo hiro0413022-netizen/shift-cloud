@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireInventoryActor } from "@/lib/auth";
-import { getSession, listStock, listCounts, lastClosedQty, yen } from "@/lib/inventory";
+import {
+  getSession,
+  listStock,
+  listCounts,
+  lastClosedQty,
+  yen,
+  storeScopeOf,
+  scopeOfStore,
+} from "@/lib/inventory";
 import { Panel, Badge } from "@/components/ui";
 import { CountSheet, type SheetItem } from "./count-sheet";
 import { fillUnchanged, closeCount } from "../actions";
@@ -11,11 +19,12 @@ export const dynamic = "force-dynamic";
 export default async function CountDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const actor = await requireInventoryActor();
-  const session = await getSession(actor.companyId, id);
+  // URL直打ちで他店舗の棚卸を開けないようにスコープを渡す（#134）
+  const session = await getSession(actor.companyId, id, storeScopeOf(actor));
   if (!session) notFound();
 
   const [stock, counts, prev] = await Promise.all([
-    listStock(actor.companyId, { storeId: session.store_id }),
+    listStock(actor.companyId, { scope: scopeOfStore(session.store_id) }),
     listCounts(session.id),
     lastClosedQty(actor.companyId, session.store_id, session.counted_on),
   ]);

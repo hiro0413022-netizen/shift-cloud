@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireActor, can } from "@/lib/auth";
+import { requireActor, can, isOwner, scopedStoreIds, NO_STORE } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { hasPayrollAccess } from "@/lib/reauth";
 import { PageTitle, Table, Td, Badge, Button, Empty, Card } from "@/components/ui";
@@ -35,14 +35,35 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const { data: period } = await admin.from("payroll_periods")
     .select("*").eq("company_id", actor.companyId).eq("target_month", `${ym}-01`).maybeSingle();
 
-  const { data: items } = period
-    ? await admin.from("payroll_items")
-        .select("*, staff(name, employment_type)")
-        .eq("period_id", period.id).order("total_amount", { ascending: false })
+  // 店舗スコープ（#134・#128 店舗またぎ廃止）
+  // payroll_periods / payroll_items は「会社×月」で店舗次元を持たない。
+  // 非オーナーには自店舗に配属されているスタッフの明細だけを見せる（他店の給与が丸見えだった）。
+  const owner = isOwner(actor);
+  let scopedStaffIds: string[] | null = null;
+  if (!owner) {
+    const storeIds = await scopedStoreIds(actor);
+    const { data: assigns } = await admin
+      .from("staff_store_assignments")
+      .select("staff_id")
+      .eq("company_id", actor.companyId)
+      .in("store_id", storeIds)
+      .is("deleted_at", null);
+    const ids = [...new Set((assigns ?? []).map((a) => a.staff_id))];
+    scopedStaffIds = ids.length > 0 ? ids : [NO_STORE];
+  }
+
+  let itemsQuery = period
+    ? admin.from("payroll_items").select("*, staff(name, employment_type)").eq("period_id", period.id)
+    : null;
+  if (itemsQuery && scopedStaffIds) itemsQuery = itemsQuery.in("staff_id", scopedStaffIds);
+  const { data: items } = itemsQuery
+    ? await itemsQuery.order("total_amount", { ascending: false })
     : { data: [] };
 
   // レッスン手当の内訳（money-os売上台帳から集計 / DECISIONS #105）
   // 「集計を実行」でこの payroll 区分が payroll_allowances に取り込まれる
+  // TODO(#134): personal_lesson_counts は会社単位（売上台帳に店舗次元がない）。
+  //   パーソナルレッスンは現状GOLF WINGのみなので実害はないが、姫路でも始めたら店舗で分ける必要がある。
   const { from: mFrom, to: mTo } = monthRange(ym);
   const { data: lessonRows } = await admin.rpc("personal_lesson_counts", {
     p_company_id: actor.companyId,

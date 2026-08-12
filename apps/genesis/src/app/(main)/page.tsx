@@ -1,7 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { requireGenesisActor } from "@/lib/auth";
-import { getCockpitData, computeGenesisScore, applyJudgmentPenalties, buildJudgmentList, alertKey, getAckedAlertKeys } from "@/lib/kernel";
+import { requireGenesisActor, storeScope } from "@/lib/auth";
+import {
+  getCockpitData,
+  computeGenesisScore,
+  applyJudgmentPenalties,
+  buildJudgmentList,
+  alertKey,
+  getAckedAlertKeys,
+  kpiScopeOf,
+  kpiScopeLabel,
+} from "@/lib/kernel";
 import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { getOpenSuggestions } from "@/lib/suggestions";
@@ -25,10 +34,13 @@ export const dynamic = "force-dynamic";
 // REDESIGN_2026-07 §3-1: ホーム = スコア＋一言 / 判断フィード（その場で完結） / 5大KPI / AI活動ティッカー
 export default async function HomePage() {
   const actor = await requireGenesisActor();
+  // #134 店舗またぎ廃止: オーナーは全社（null）、それ以外は自分の配属店舗だけ。
+  // ライブラリ側は storeIds を引数で受けるので、cron（actor無し＝全社）は従来どおり動く。
+  const scope = storeScope(actor);
   const [d, suggestions, feed, ackedKeys] = await Promise.all([
-    getCockpitData(actor.companyId),
+    getCockpitData(actor.companyId, scope),
     getOpenSuggestions(actor.companyId, 3).catch(() => []),
-    getJudgmentFeed(actor.companyId).catch(() => [] as JudgmentItem[]),
+    getJudgmentFeed(actor.companyId, scope).catch(() => [] as JudgmentItem[]),
     getAckedAlertKeys(actor.companyId).catch(() => new Set<string>()),
   ]);
   const [integrity, legal] = await Promise.all([
@@ -50,6 +62,9 @@ export default async function HomePage() {
   const kpis = kpiOrder
     .map((code) => d.kpis.find((k) => k.code === code))
     .filter((k): k is NonNullable<typeof k> => k != null);
+  // #134: kpis に store_id が入る（migration 0112・別作業）までは全KPIが全店合算。
+  // 合算を店舗の数字のように見せないため、カードに範囲ラベルを出し、全店合算が混じる時は注記する。
+  const hasCompanyWideKpi = kpis.some((k) => kpiScopeOf(k) === "company");
 
   const scoreColor = grade === "good" ? "text-emerald-300" : grade === "watch" ? "text-amber-300" : "text-red-300";
   const aiEvents = d.recentEvents.filter((e) => String(e.source_type) === "ai").slice(0, 5);
@@ -223,18 +238,31 @@ export default async function HomePage() {
       </Panel>
 
       {/* 5大KPI */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {kpis.map((k) => (
-          <KpiCard
-            key={String(k.code)}
-            name={String(k.name)}
-            value={k.current_value != null ? Number(k.current_value) : null}
-            unit={String(k.unit ?? "")}
-            trend={k.trend}
-            target={k.target_value != null ? Number(k.target_value) : null}
-            note={k.notes != null ? String(k.notes) : null}
-          />
-        ))}
+      <div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {kpis.map((k) => (
+            <KpiCard
+              key={`${String(k.code)}-${String(k.store_id ?? "all")}`}
+              name={String(k.name)}
+              value={k.current_value != null ? Number(k.current_value) : null}
+              unit={String(k.unit ?? "")}
+              trend={k.trend}
+              target={k.target_value != null ? Number(k.target_value) : null}
+              note={k.notes != null ? String(k.notes) : null}
+              scopeLabel={kpiScopeLabel(k)}
+            />
+          ))}
+        </div>
+        {/* #134: 体験予約数・入会率は kpis に store_id が無い間、GOLF WING と FRANK の合算になる */}
+        {hasCompanyWideKpi && (
+          <p className="mt-2 text-[11px] text-(--color-dim)">
+            「全店合算」のKPIは GOLF WING と FRANK GOLF を足した数字です（店舗別はまだ取れません）。店舗ごとの内訳は
+            <Link href="/finance" className="mx-1 text-sky-300 hover:underline">
+              事業別パフォーマンス
+            </Link>
+            を見てください。
+          </p>
+        )}
       </div>
 
       {/* AI活動ティッカー */}

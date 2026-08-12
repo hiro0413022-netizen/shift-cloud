@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireLessonActor } from "@/lib/auth";
+import { requireLessonActor, canAccessStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import type { Annotations } from "@/lib/lesson";
 import type { Phases } from "@/lib/phases";
@@ -16,12 +16,14 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
 
   const { data: student } = await admin
     .from("lsn_students")
-    .select("id, name, name_kana, member_code, goal, memo, photo_path, profile, skill")
+    .select("id, store_id, name, name_kana, member_code, goal, memo, photo_path, profile, skill")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
     .maybeSingle();
   if (!student) notFound();
+  // URL直打ちで他店舗のカルテを開けないようにする（#134）
+  if (!canAccessStore(actor, (student as { store_id: string | null }).store_id)) notFound();
 
   const [{ data: videos }, { data: items }, { data: prog }, { data: models }] = await Promise.all([
     admin

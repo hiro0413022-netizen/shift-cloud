@@ -8,6 +8,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { generateToken, hashToken } from "@/lib/intake";
 import { logAudit } from "@/lib/kernel";
 import { FRUNK_STORE_CODE } from "@/lib/frunk";
+import { requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
 import { buildApprovalMail, sendFrankMail } from "@/lib/frank-mail";
 import { pauseSubscription, resumeSubscription, swapSubscriptionPlan, chargeCardOnFile } from "@/lib/frank-square";
 import { planChangeProration } from "@/lib/frank-billing-pure";
@@ -33,9 +34,17 @@ async function frunkStoreId(admin: ReturnType<typeof createAdmin>, companyId: st
   return (data?.id as string | undefined) ?? null;
 }
 
+/** FRANK姫路に配属された人だけがこの画面を操作できる（#134・店舗またぎ廃止）。
+ *  UIを隠すだけでは守れないので、全アクションの先頭で必ず通す。 */
+async function requireFrankActor() {
+  const actor = await requireReceptionActor();
+  requireStoreAccess(actor, FRANK_STORE_ID);
+  return actor;
+}
+
 // ---- プラン管理 ----
 export async function createPlan(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const name = str(formData.get("name"));
   if (!name) redirect("/frunk?err=" + encodeURIComponent("プラン名を入力してください"));
@@ -54,7 +63,7 @@ export async function createPlan(formData: FormData) {
 }
 
 export async function updatePlan(formData: FormData) {
-  await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
@@ -67,16 +76,17 @@ export async function updatePlan(formData: FormData) {
     sort_order: intOrNull(formData.get("sort_order")) ?? 0,
     active: str(formData.get("active")) === "1",
     note: orNull(formData.get("note")),
-  }).eq("id", id);
+  }).eq("id", id).eq("company_id", actor.companyId); // 会社スコープ（#134）
   revalidatePath("/frunk");
 }
 
 export async function deletePlan(formData: FormData) {
-  await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
-  await admin.from("frunk_plans").update({ deleted_at: new Date().toISOString(), active: false }).eq("id", id);
+  await admin.from("frunk_plans").update({ deleted_at: new Date().toISOString(), active: false })
+    .eq("id", id).eq("company_id", actor.companyId); // 会社スコープ（#134）
   revalidatePath("/frunk");
 }
 
@@ -94,6 +104,7 @@ async function sendApprovalMailTo(
     .from("frunk_members")
     .select("name, email, joining_fee_waived, frunk_plans(name, monthly_price, joining_fee)")
     .eq("id", memberId)
+    .eq("store_id", FRANK_STORE_ID) // 店舗スコープ（#134）
     .maybeSingle();
   const email = (m?.email as string | null) ?? null;
   if (!email) return { ok: false, reason: "メールアドレスが登録されていないため送れません（電話・LINEでお伝えください）" };
@@ -118,7 +129,7 @@ async function sendApprovalMailTo(
 
 // ---- 入会申込の承認 / 却下 ----
 export async function approveSignup(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
@@ -126,7 +137,7 @@ export async function approveSignup(formData: FormData) {
   if (!memberNo) {
     const { count } = await admin
       .from("frunk_members").select("id", { count: "exact", head: true })
-      .eq("company_id", actor.companyId).not("member_no", "is", null);
+      .eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).not("member_no", "is", null);
     memberNo = `FR${String((count ?? 0) + 1).padStart(4, "0")}`;
   }
   await admin.from("frunk_members").update({
@@ -135,7 +146,7 @@ export async function approveSignup(formData: FormData) {
     join_date: str(formData.get("start_date")) || today(),
     reviewed_by: actor.staffId,
     reviewed_at: new Date().toISOString(),
-  }).eq("id", id);
+  }).eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
   await logAudit(actor, "frunk.signup_approve", "frunk_members", null, null, { id, member_no: memberNo });
 
   // 承認メール（会員番号の通知＋カード登録の案内 #123）。送信失敗で承認は落とさないが、
@@ -151,7 +162,7 @@ export async function approveSignup(formData: FormData) {
 
 /** 承認メール（会員番号の案内）の再送。承認は1回きりなので、届かなかった時の救済用 */
 export async function resendApprovalMail(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
@@ -160,6 +171,8 @@ export async function resendApprovalMail(formData: FormData) {
     .from("frunk_members")
     .select("member_no, name, status")
     .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID) // 店舗スコープ（#134）
     .maybeSingle();
   const memberNo = m?.member_no ? String(m.member_no) : "";
   if (!memberNo) {
@@ -176,19 +189,19 @@ export async function resendApprovalMail(formData: FormData) {
 }
 
 export async function rejectSignup(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
   await admin.from("frunk_members").update({
     status: "rejected", reviewed_by: actor.staffId, reviewed_at: new Date().toISOString(),
-  }).eq("id", id);
+  }).eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
   revalidatePath("/frunk");
 }
 
 /** 重要説明事項（#129）: 入力があると予約カレンダーの予約セルに⚠が付く。空で保存=解除 */
 export async function saveAlertNote(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
@@ -197,7 +210,8 @@ export async function saveAlertNote(formData: FormData) {
     .from("frunk_members")
     .update({ alert_note: note || null, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .eq("company_id", actor.companyId);
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
   await logAudit(actor, "frunk.alert_note.save", "frunk_members", id, null, { alert_note: note || null });
   revalidatePath("/frunk");
   revalidatePath("/dashboard");
@@ -206,7 +220,7 @@ export async function saveAlertNote(formData: FormData) {
 // ---- 会員ステータス変更（休会・復帰・退会） ----
 // 休会=Squareの月会費自動課金を一時停止（休会費2,200円税込は店頭で徴収）／復帰=再開（#124）
 export async function setMemberStatus(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   const to = str(formData.get("to"));
@@ -214,7 +228,8 @@ export async function setMemberStatus(formData: FormData) {
   // キャンペーン入会は6か月継続（#131）: 期間内の退会はスタッフに警告（ブロックはしない・特例対応可）
   let minTermWarn = "";
   if (to === "left") {
-    const { data: pre } = await admin.from("frunk_members").select("min_term_until").eq("id", id).maybeSingle();
+    const { data: pre } = await admin.from("frunk_members").select("min_term_until")
+      .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle(); // 店舗スコープ（#134）
     if (pre?.min_term_until && String(pre.min_term_until) > today()) {
       minTermWarn = `⚠ この会員はキャンペーン入会の継続期間中です（${String(pre.min_term_until)}まで）。`;
     }
@@ -224,13 +239,16 @@ export async function setMemberStatus(formData: FormData) {
   if (to === "suspended") patch.suspend_start = today();
   if (to === "active") patch.suspend_end = today();
   if (to === "left") patch.leave_date = today();
-  await admin.from("frunk_members").update(patch).eq("id", id);
+  await admin.from("frunk_members").update(patch)
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
 
   // Square側の追従（失敗してもステータス変更は成立。結果は画面のメッセージで伝える）
   const { data: m } = await admin
     .from("frunk_members")
     .select("member_no, square_subscription_id, billing_status")
     .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID) // 店舗スコープ（#134）
     .maybeSingle();
   const subId = m?.square_subscription_id ? String(m.square_subscription_id) : null;
   if (subId) {
@@ -259,7 +277,7 @@ export async function setMemberStatus(formData: FormData) {
 // 翌請求から新プラン満額（Squareのスワップは入会金なしバリエーション＝入会金を二重請求しない）。
 // 値下げは請求0円（返金しない）。カード未登録なら差額は店頭徴収の案内を出す。
 export async function changePlan(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const id = str(formData.get("id"));
   const newPlanId = str(formData.get("plan_id"));
@@ -268,7 +286,7 @@ export async function changePlan(formData: FormData) {
   const [{ data: m }, { data: newPlan }] = await Promise.all([
     admin.from("frunk_members")
       .select("id, member_no, name, plan_id, square_subscription_id, square_customer_id, billing_status, frunk_plans(monthly_price)")
-      .eq("id", id).maybeSingle(),
+      .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle(), // 店舗スコープ（#134）
     admin.from("frunk_plans")
       .select("id, name, monthly_price, square_variation_nofee_id")
       .eq("id", newPlanId).eq("company_id", actor.companyId).is("deleted_at", null).maybeSingle(),
@@ -281,7 +299,8 @@ export async function changePlan(formData: FormData) {
   const jstDay = Number(new Date(Date.now() + 9 * 3600_000).toISOString().slice(8, 10));
   const pro = planChangeProration({ oldMonthlyExTax: oldPrice, newMonthlyExTax: newPrice, jstDayOfMonth: jstDay });
 
-  await admin.from("frunk_members").update({ plan_id: newPlan.id, updated_at: new Date().toISOString() }).eq("id", id);
+  await admin.from("frunk_members").update({ plan_id: newPlan.id, updated_at: new Date().toISOString() })
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
   await logAudit(actor, "frunk.plan_change", "frunk_members", null, null, {
     id, from: m.plan_id, to: newPlan.id, charge: pro.chargeTaxIncluded, weeks: pro.weeks,
   });
@@ -324,7 +343,7 @@ export async function changePlan(formData: FormData) {
 
 // ---- 入会フォームURL発行 ----
 export async function issueSignupToken(formData: FormData) {
-  const actor = await requireReceptionActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const storeId = await frunkStoreId(admin, actor.companyId);
   await admin.from("frunk_signup_tokens").update({ active: false })

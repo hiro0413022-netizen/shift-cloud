@@ -6,6 +6,7 @@ import {
   applyJudgmentPenalties,
   buildJudgmentList,
   logEvent,
+  storeInValues,
   type CockpitData,
 } from "@/lib/kernel";
 import { summarizeInquiriesForReport, getInquiryStats, applyFilterRules, generateMissingDrafts } from "@/lib/secretary";
@@ -210,13 +211,19 @@ async function saveInstructions(companyId: string, analysis: CeoAnalysis): Promi
   return created;
 }
 
-/** 日次レポート本体（VISION §1/§3の型）。actor無しでも実行可（Cron用） */
+/**
+ * 日次レポート本体（VISION §1/§3の型）。actor無しでも実行可（Cron用）
+ * @param opts.storeIds 店舗スコープ（#134）。null/未指定＝会社全体（cron・オーナー）。
+ *                      画面から人が叩くときだけ、その人の配属店舗を渡す。
+ */
 export async function runDailyCeoReport(
   companyId: string,
   triggeredBy: "human" | "cron",
-  opts: { afterworkBudgetMs?: number } = {}
+  opts: { afterworkBudgetMs?: number; storeIds?: string[] | null } = {}
 ): Promise<{ score: number; reportId: string | null; engine: string }> {
   const admin = createAdmin();
+  // #134: 店舗またぎ廃止。cron は actor が無いので null＝全社のまま走る（cronを壊さない）
+  const allowedStores = Array.isArray(opts.storeIds) ? new Set(opts.storeIds) : null;
 
   // 1. KPI再集計（労務＋財務＋会員系。会員系はmigration 0011適用後に有効化される — 未適用ならエラーを無視）
   await admin.rpc("refresh_shift_cloud_kpis", { p_company_id: companyId });
@@ -229,7 +236,7 @@ export async function runDailyCeoReport(
   await applyFilterRules(companyId).catch(() => 0);
 
   // 2. データ収集 → 分析（Claude → フォールバック: ルール）
-  const d = await getCockpitData(companyId);
+  const d = await getCockpitData(companyId, opts.storeIds ?? null); // #134: 店舗スコープ（cronはnull＝全社）
   // KPI整合性チェック（経費0円月/予測残存/売上急変/目標未設定）を判断リストの先頭に合流
   // — 「間違った数字でCEO AIが判断する」事故を止める（AUDIT_2026-07-11 D-4）
   const integrity = await runKpiIntegrityChecks(companyId, d.kpis).catch(() => []);
@@ -391,14 +398,21 @@ export async function runDailyCeoReport(
         .is("deleted_at", null)
         .order("date", { ascending: true })
         .limit(10),
-      admin
-        .from("shifts")
-        .select("staff_id, store_id, start_time, end_time, is_day_off")
-        .eq("company_id", companyId)
-        .eq("date", ymd)
-        .eq("is_day_off", false)
-        .is("deleted_at", null),
-      admin.from("stores").select("id, name").eq("company_id", companyId).is("deleted_at", null),
+      // #134: 出勤・店舗名はスコープ内だけ（allowedStores が null＝全社＝cron/オーナー）
+      (() => {
+        const q = admin
+          .from("shifts")
+          .select("staff_id, store_id, start_time, end_time, is_day_off")
+          .eq("company_id", companyId)
+          .eq("date", ymd)
+          .eq("is_day_off", false)
+          .is("deleted_at", null);
+        return allowedStores ? q.in("store_id", storeInValues(allowedStores)) : q;
+      })(),
+      (() => {
+        const q = admin.from("stores").select("id, name").eq("company_id", companyId).is("deleted_at", null);
+        return allowedStores ? q.in("id", storeInValues(allowedStores)) : q;
+      })(),
       admin.from("staff").select("id, name").eq("company_id", companyId).is("deleted_at", null),
     ]);
     const storeName = new Map((storesRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
@@ -419,7 +433,10 @@ export async function runDailyCeoReport(
       for (const [store, names] of byStore) briefLines.push(`・${store}: ${names.join(" / ")}`);
     }
 
-    const tasks = tasksRes.data ?? [];
+    // #134: タスクもスコープ内だけ。store_id が無い行＝全社共通なので残す
+    const inScope = (storeId: unknown) =>
+      !allowedStores || storeId == null || allowedStores.has(String(storeId));
+    const tasks = (tasksRes.data ?? []).filter((t) => inScope(t.store_id));
     if (tasks.length > 0) {
       briefLines.push("", "▼今日のやることリスト");
       for (const t of tasks) {
@@ -432,7 +449,7 @@ export async function runDailyCeoReport(
     }
 
     // 未完了の再指示（#84）: 済にならない限り毎朝出続ける
-    const carryover = carryoverRes.data ?? [];
+    const carryover = (carryoverRes.data ?? []).filter((t) => inScope(t.store_id));
     if (carryover.length > 0) {
       briefLines.push("", "▼持ち越し（未完了・完了したら済にしてください）");
       for (const t of carryover) {
@@ -448,10 +465,19 @@ export async function runDailyCeoReport(
       companyId,
       actionType: "staff_directive",
       title: `スタッフ朝連絡 ${today}（出勤${shifts.length}名・タスク${tasks.length}件${carryover.length > 0 ? `・持ち越し${carryover.length}件` : ""}）`,
-      payload: { body: briefLines.join("\n"), target: "all" }, // #85: 登録済み全スタッフグループへ（GW/FRANK両方）
+      // #85: 既定は登録済み全スタッフグループへ（GW/FRANK両方）。
+      // #134: 1店舗にスコープされている場合は、その店舗のグループにだけ送る（他店に他店の話を流さない）
+      payload:
+        allowedStores && allowedStores.size === 1
+          ? { body: briefLines.join("\n"), store_id: Array.from(allowedStores)[0] }
+          : { body: briefLines.join("\n"), target: "all" },
       originKind: "ceo_ai_daily",
       originId: report?.id ?? null,
-      dedupeKey: `staff-brief-${ymd}`,
+      // 店舗別に出す場合はキーも分ける（全社版と潰し合わないように）
+      dedupeKey:
+        allowedStores && allowedStores.size === 1
+          ? `staff-brief-${ymd}-${Array.from(allowedStores)[0]}`
+          : `staff-brief-${ymd}`,
       createdBy: null,
     });
   } catch {

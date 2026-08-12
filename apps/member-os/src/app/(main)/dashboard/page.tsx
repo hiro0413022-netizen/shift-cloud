@@ -4,7 +4,8 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Panel } from "@/components/ui";
 import { StatCard, type StatGroup } from "./stat-card";
 import { FrankCalendarDashboard } from "./frank-calendar";
-import { FRANK_STORE_ID, jstToday } from "@yozan/core/frank-booking";
+import { jstToday } from "@yozan/core/frank-booking";
+import { FRANK_STORE_ID, canAccessFrank, golfWingStoreId, canAccessStore } from "@/lib/store-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -38,39 +39,69 @@ export default async function DashboardPage({
   const admin = createAdmin();
   const sp = await searchParams;
 
-  // 店舗分岐（#129）: FRANK姫路の店舗アカウントは予約カレンダーが最初の画面。
-  // GOLF WING宝塚は従来の月次KPI。オーナーは ?store= で行き来できる（既定はFRANKカレンダー）。
-  const isFrankStaff = !actor.isOwner && actor.primaryStoreId === FRANK_STORE_ID;
-  const showFrank =
-    sp.store === "gw" ? false : sp.store === "frank" ? true : isFrankStaff || actor.isOwner;
-  if (showFrank && actor.storeIds.includes(FRANK_STORE_ID)) {
+  // 店舗分岐（#129 / #134）: FRANK姫路の店舗アカウントは予約カレンダーが最初の画面。
+  // GOLF WING宝塚は従来の月次KPI。?store= の直打ちでは越境できない（見える店舗だけを選べる）。
+  const gwStoreId = await golfWingStoreId(actor.companyId);
+  const canFrank = canAccessFrank(actor);
+  const canGw = canAccessStore(actor, gwStoreId);
+  const bothStores = canFrank && canGw;
+
+  let showFrank: boolean;
+  if (!canGw) showFrank = canFrank;            // FRANK専任（宝塚は見せない）
+  else if (!canFrank) showFrank = false;       // GOLF WING専任（姫路は見せない）
+  else if (sp.store === "gw") showFrank = false;
+  else if (sp.store === "frank") showFrank = true;
+  else showFrank = actor.isOwner || actor.primaryStoreId === FRANK_STORE_ID; // 既定（#129）
+
+  if (!canFrank && !canGw) {
+    return (
+      <Panel title="表示できる店舗がありません">
+        <p className="text-sm text-(--color-dim)">
+          配属店舗が設定されていないため、ダッシュボードに表示できるデータがありません。
+          Shift Cloud の「スタッフ」画面で配属店舗を設定してください。
+        </p>
+      </Panel>
+    );
+  }
+
+  if (showFrank) {
     const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : jstToday();
     const view = sp.view === "week" ? ("week" as const) : ("day" as const);
     return (
       <div className="space-y-4">
-        {actor.isOwner && (
+        {bothStores && (
           <p className="text-right text-xs">
             <Link href="/dashboard?store=gw" className="text-(--color-dim) underline hover:text-(--color-txt)">GOLF WING 宝塚の月次サマリーを見る →</Link>
           </p>
         )}
-        <FrankCalendarDashboard date={date} view={view} extraQuery={actor.isOwner ? "&store=frank" : ""} />
+        <FrankCalendarDashboard
+          date={date}
+          view={view}
+          companyId={actor.companyId}
+          extraQuery={bothStores ? "&store=frank" : ""}
+        />
       </div>
     );
   }
 
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
   const { start, end, prev, next, label } = monthBounds(month);
-  const storeQ = actor.isOwner ? "&store=gw" : "";
+  const storeQ = bothStores ? "&store=gw" : "";
+
+  // 見出しは「GOLF WING 宝塚」なので、姫路の来店が混ざらないよう店舗で必ず絞る（#134）
+  let gwVisitsQ = admin
+    .from("mbr_walkin_visits")
+    .select("visit_type, result, repeat_date, discount, referral_source, visited_on, mbr_guests(name)")
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .gte("visited_on", start)
+    .lt("visited_on", end)
+    .order("visited_on", { ascending: true });
+  if (gwStoreId) gwVisitsQ = gwVisitsQ.eq("store_id", gwStoreId);
 
   const [{ data: visits }, { data: joins }, { data: leaves }] = await Promise.all([
-    admin
-      .from("mbr_walkin_visits")
-      .select("visit_type, result, repeat_date, discount, referral_source, visited_on, mbr_guests(name)")
-      .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .gte("visited_on", start)
-      .lt("visited_on", end)
-      .order("visited_on", { ascending: true }),
+    gwVisitsQ,
+    // mbr_members（Smart Hello取込の会員名簿）はGOLF WING専用で店舗列を持たない（#134・来店検索と同じ扱い）
     admin
       .from("mbr_members")
       .select("name, member_type, join_date")
@@ -162,12 +193,12 @@ export default async function DashboardPage({
           <p className="mt-0.5 text-sm text-(--color-dim)">GOLF WING 宝塚 ・ 月次サマリー</p>
         </div>
         <div className="flex items-center gap-2">
-          {actor.isOwner && (
+          {bothStores && (
             <Link href="/dashboard?store=frank" className="mr-2 text-xs text-(--color-dim) underline hover:text-(--color-txt)">← FRANK姫路のカレンダー</Link>
           )}
           <Link href={`/dashboard?month=${prev}${storeQ}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="前月">←</Link>
           <form>
-            {actor.isOwner && <input type="hidden" name="store" value="gw" />}
+            {bothStores && <input type="hidden" name="store" value="gw" />}
             <input
               type="month"
               name="month"

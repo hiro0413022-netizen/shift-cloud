@@ -124,6 +124,34 @@ export async function visibleStores(actor: Actor): Promise<Array<{ id: string; n
   return (data ?? []) as Array<{ id: string; name: string }>;
 }
 
+/** .in() に空配列を渡すとクエリが壊れるため、絶対に一致しないUUIDを使う（#134） */
+export const NO_STORE = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * 一覧の絞り込みに使う店舗ID（#134）。
+ * オーナー = 自社の全店舗 / それ以外 = 配属店舗のみ（visibleStores と同じ判定）。
+ * 該当なしのときは NO_STORE を1件返す（空配列を .in() に渡すと全件になる/壊れるため）。
+ */
+export async function scopedStoreIds(actor: Actor): Promise<string[]> {
+  const ids = (await visibleStores(actor)).map((s) => s.id);
+  return ids.length > 0 ? ids : [NO_STORE];
+}
+
+/**
+ * クライアントから渡ってきた store_id の検証（#134）。
+ * サーバーアクションは UI の出し分けを信用してはいけない（フォームの hidden も引数も改竄できる）。
+ * オーナー = 自社の店舗ならOK / それ以外 = 配属店舗のみ。外れたら例外で止める。
+ */
+export async function assertStoreAccess(actor: Actor, storeId: string | null | undefined): Promise<string> {
+  const id = (storeId ?? "").trim();
+  // オーナーも「自社の店舗か」はDBで確認する（他テナントの店舗IDを差し込まれないように）
+  const ok = id !== "" && (isOwner(actor)
+    ? (await visibleStores(actor)).some((s) => s.id === id)
+    : actor.storeIds.includes(id));
+  if (!ok) throw new Error("FORBIDDEN: store");
+  return id;
+}
+
 /** ?store= の直打ち対策: 見せてよい店舗に含まれる値だけ採用（外れは主店舗→先頭） */
 export function pickStore(
   stores: Array<{ id: string; name: string }>,

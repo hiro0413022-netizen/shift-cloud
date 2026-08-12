@@ -8,8 +8,17 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/kernel";
 import { splitPrefecture } from "@/lib/address";
+import { canAccessGolfWing, golfWingStoreId } from "@/lib/store-scope";
 
 export type ImportState = { ok?: boolean; error?: string; message?: string };
+
+/**
+ * 取込は3本ともGOLF WING宝塚（Smart Hello / 一時利用者名簿）のデータで、書き込み先も宝塚固定。
+ * FRANK姫路の専任スタッフが押すと宝塚の台帳を洗い替えてしまうため、宝塚の配属者だけに限る（#134）。
+ */
+const IMPORT_DENIED: ImportState = {
+  error: "この取込はGOLF WING 宝塚のデータです。宝塚に配属されたアカウントで実行してください。",
+};
 
 function cellText(v: ExcelJS.CellValue): string | null {
   if (v == null) return null;
@@ -134,6 +143,7 @@ async function loadSheet(formData: FormData): Promise<ExcelJS.Worksheet | null> 
 /** Smart Hello「会員名簿」取込（全件スナップショット洗い替え・機微列は取り込まない） */
 export async function importMembers(_prev: ImportState, formData: FormData): Promise<ImportState> {
   const actor = await requireReceptionActor();
+  if (!(await canAccessGolfWing(actor))) return IMPORT_DENIED; // 店舗またぎ廃止（#134）
   const ws = await loadSheet(formData);
   if (!ws) return { error: "会員名簿ファイルを選択してください" };
   const admin = createAdmin();
@@ -262,6 +272,7 @@ export async function importMembers(_prev: ImportState, formData: FormData): Pro
 /** Smart Hello「予約一覧」取込（予約番号で重複防止・個人情報は取り込まない） */
 export async function importReservations(_prev: ImportState, formData: FormData): Promise<ImportState> {
   const actor = await requireReceptionActor();
+  if (!(await canAccessGolfWing(actor))) return IMPORT_DENIED; // 店舗またぎ廃止（#134）
   const ws = await loadSheet(formData);
   if (!ws) return { error: "予約一覧ファイルを選択してください" };
   const admin = createAdmin();
@@ -354,19 +365,14 @@ function compact(o: Record<string, unknown>): Record<string, unknown> {
  */
 export async function importWalkins(_prev: ImportState, formData: FormData): Promise<ImportState> {
   const actor = await requireReceptionActor();
+  if (!(await canAccessGolfWing(actor))) return IMPORT_DENIED; // 店舗またぎ廃止（#134）
   const ws = await loadSheet(formData);
   if (!ws) return { error: "一時利用者名簿ファイルを選択してください" };
   const admin = createAdmin();
   const C = (row: ExcelJS.Row, i: number) => row.getCell(i).value;
 
-  // 宝塚店（code=takarazuka）を優先。無ければ null。
-  const { data: store } = await admin
-    .from("stores")
-    .select("id")
-    .eq("company_id", actor.companyId)
-    .eq("code", "takarazuka")
-    .maybeSingle();
-  const storeId = (store?.id as string | undefined) ?? null;
+  // 取込先は宝塚店（stores.code='takarazuka'）固定。上のガードで宝塚の配属者しかここへ来ない（#134）
+  const storeId = await golfWingStoreId(actor.companyId);
 
   type GuestRow = Record<string, unknown> & { id: string };
   type VisitRow = Record<string, unknown> & { _on: string };

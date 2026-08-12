@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireManager } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { createItem } from "@/lib/inventory";
+import { createItem, canAccessStore } from "@/lib/inventory";
 
 const num = (v: FormDataEntryValue | null) => {
   const s = String(v ?? "").trim();
@@ -47,6 +47,18 @@ export async function updateItem(formData: FormData) {
   const actor = await requireManager();
   const id = String(formData.get("id"));
   const admin = createAdmin();
+
+  // 他店舗の品番は編集させない（#134。company_id だけでは店舗またぎを止められない）
+  const { data: target } = await admin
+    .from("inv_items")
+    .select("id, store_id")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const t = target as { id: string; store_id: string | null } | null;
+  if (!t || !canAccessStore(actor, t.store_id)) redirect("/items?denied=1");
+
   await admin
     .from("inv_items")
     .update({

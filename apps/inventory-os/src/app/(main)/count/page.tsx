@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireInventoryActor } from "@/lib/auth";
-import { listSessions, yen } from "@/lib/inventory";
+import { listSessions, yen, storeScopeOf, scopeLabel } from "@/lib/inventory";
 import { jstYmd } from "@/lib/jst";
 import { Panel, Badge, Empty, inputCls } from "@/components/ui";
 import { startCount } from "./actions";
@@ -14,7 +14,8 @@ export default async function CountIndexPage({
 }) {
   const { error } = await searchParams;
   const actor = await requireInventoryActor();
-  const sessions = await listSessions(actor.companyId, 24);
+  // 棚卸の一覧も自店舗だけ（#134）
+  const sessions = await listSessions(actor.companyId, storeScopeOf(actor), 24);
   const open = sessions.find((s) => s.status === "open");
 
   // 既定の基準日は「今日」。月末棚卸が主だが、実際は数日ずれて数えるので変更できるようにする
@@ -23,7 +24,10 @@ export default async function CountIndexPage({
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <header>
-        <h1 className="text-xl font-bold">棚卸</h1>
+        <h1 className="flex items-center gap-2 text-xl font-bold">
+          棚卸
+          <Badge tone={actor.isOwner ? "ok" : "default"}>{scopeLabel(actor)}</Badge>
+        </h1>
         <p className="text-sm text-(--color-dim)">
           保管場所ごとに歩きながら数えます。数が変わっていない品番は触らなくて構いません
         </p>

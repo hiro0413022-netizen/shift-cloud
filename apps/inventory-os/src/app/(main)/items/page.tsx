@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireInventoryActor } from "@/lib/auth";
-import { listStock, yen } from "@/lib/inventory";
+import { listStock, yen, storeScopeOf, scopeLabel } from "@/lib/inventory";
 import { Panel, Badge, Empty } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,8 @@ export default async function ItemsPage({
 }) {
   const sp = await searchParams;
   const actor = await requireInventoryActor();
-  const all = await listStock(actor.companyId, { includeDiscontinued: true });
+  // 品番マスタも自店舗だけ（#134）
+  const all = await listStock(actor.companyId, { scope: storeScopeOf(actor), includeDiscontinued: true });
 
   const categories = [...new Set(all.map((r) => r.category))].sort();
   const term = (sp.q ?? "").trim().toLowerCase();
@@ -28,7 +29,10 @@ export default async function ItemsPage({
     <div className="space-y-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">品番マスタ</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold">
+            品番マスタ
+            <Badge tone={actor.isOwner ? "ok" : "default"}>{scopeLabel(actor)}</Badge>
+          </h1>
           <p className="text-sm text-(--color-dim)">
             管理番号は「品目略号-メーカー略号-連番」。採番はシステムが行います
           </p>

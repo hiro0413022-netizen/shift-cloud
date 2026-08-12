@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireGenesisActor } from "@/lib/auth";
+import { requireGenesisActor, assertStoreAccess } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit, logEvent } from "@/lib/kernel";
 import { jstYmd } from "@/lib/jst";
@@ -24,11 +24,13 @@ export async function decideJoinRequest(formData: FormData) {
   const admin = createAdmin();
   const { data: before } = await admin
     .from("frunk_members")
-    .select("id, name, status, member_no")
+    .select("id, name, status, member_no, store_id")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .single();
   if (!before || before.status !== "pending") return;
+  // #134: 他店舗の入会申込を承認できないようサーバー側で検証（画面に出ていなくても弾く）
+  assertStoreAccess(actor, (before as { store_id: string | null }).store_id);
 
   if (decision === "approved") {
     const { count } = await admin
@@ -75,11 +77,13 @@ export async function decideTrialRequest(formData: FormData) {
   const admin = createAdmin();
   const { data: before } = await admin
     .from("mbr_trial_requests")
-    .select("id, name, status")
+    .select("id, name, status, store_id")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .single();
   if (!before || before.status !== "pending") return;
+  // #134: 他店舗の体験申込を確定/キャンセルできないようサーバー側で検証
+  assertStoreAccess(actor, (before as { store_id: string | null }).store_id);
 
   await admin
     .from("mbr_trial_requests")

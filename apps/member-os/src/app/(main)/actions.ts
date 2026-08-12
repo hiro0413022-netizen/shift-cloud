@@ -8,6 +8,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit, logEvent } from "@/lib/kernel";
 import { hashToken, generateToken } from "@/lib/intake";
 import { normalizeAddress } from "@/lib/address";
+import { scopedStoreId, requireStoreAccess } from "@/lib/store-scope";
 
 async function refreshMemberKpis(companyId: string) {
   const admin = createAdmin();
@@ -26,14 +27,23 @@ function intOrNull(v: FormDataEntryValue | null): number | null {
   return s === "" ? null : parseInt(s, 10);
 }
 
-/** 店舗またぎ事故の防止（#128）: オーナー以外はフォームの store_id が配属店舗でなければ主店舗に差し替える */
-function scopedStoreId(
-  actor: { isOwner: boolean; storeIds: string[]; primaryStoreId: string | null },
-  requested: string | null,
-): string | null {
-  if (actor.isOwner) return requested;
-  if (requested && actor.storeIds.includes(requested)) return requested;
-  return actor.primaryStoreId;
+/** 対象の来店行が自分の店舗のものか確かめる（#134）。
+ *  company_id だけでは他店舗の行を平気で書き換えられてしまうため、更新前に store_id を読んで検証する。 */
+async function loadOwnVisit(
+  admin: ReturnType<typeof createAdmin>,
+  actor: { isOwner: boolean; storeIds: string[]; primaryStoreId: string | null; companyId: string },
+  id: string,
+): Promise<{ id: string; guest_id: string | null; store_id: string | null } | null> {
+  const { data } = await admin
+    .from("mbr_walkin_visits")
+    .select("id, guest_id, store_id")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!data) return null;
+  requireStoreAccess(actor, data.store_id as string | null);
+  return data as { id: string; guest_id: string | null; store_id: string | null };
 }
 
 const VISIT_TYPES = ["trial", "fitting", "bay", "visitor_bay", "other"];
@@ -131,6 +141,8 @@ export async function updateVisit(formData: FormData) {
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
+  // 他店舗の来店行を書き換えさせない（#134）
+  if (!(await loadOwnVisit(admin, actor, id))) return;
 
   const patch: Record<string, unknown> = {};
   if (formData.has("fee")) patch.fee = intOrNull(formData.get("fee"));
@@ -177,14 +189,8 @@ export async function updateGuest(formData: FormData) {
   const visitId = str(formData.get("visit_id"));
   if (!visitId) return;
 
-  // 対象visitとguest_idを会社スコープで取得
-  const { data: visit } = await admin
-    .from("mbr_walkin_visits")
-    .select("id, guest_id, store_id")
-    .eq("id", visitId)
-    .eq("company_id", actor.companyId)
-    .is("deleted_at", null)
-    .maybeSingle();
+  // 対象visitとguest_idを会社＋店舗スコープで取得（#134・guestは紐づくvisit経由で店舗を判定する）
+  const visit = await loadOwnVisit(admin, actor, visitId);
   if (!visit) return;
 
   const gender = str(formData.get("gender"));
@@ -247,6 +253,8 @@ export async function deleteVisit(formData: FormData) {
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
+  // 他店舗の来店行を消させない（#134）
+  if (!(await loadOwnVisit(admin, actor, id))) return;
   await admin
     .from("mbr_walkin_visits")
     .update({ deleted_at: new Date().toISOString() })

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireGenesisActor } from "@/lib/auth";
+import { requireGenesisActor, storeScope } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls, Sparkline } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
@@ -26,7 +26,8 @@ function yen(n: number): string {
 export default async function FinancePage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const actor = await requireGenesisActor();
   // 事業別ドリルダウン（#78でホームから移設。REDESIGN §3-4）
-  const business = await getBusinessBreakdown(actor.companyId).catch(() => null);
+  // #134: オーナーは全店比較を見てよい（storeScope=null）。それ以外は自分の配属店舗のみ
+  const business = await getBusinessBreakdown(actor.companyId, storeScope(actor)).catch(() => null);
   const admin = createAdmin();
   const sp = await searchParams;
   let ym = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : "";
@@ -119,6 +120,9 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
             monthLabel={business.monthLabel}
             forecastMonthLabel={business.forecastMonthLabel}
             forecastTotal={business.forecastTotal}
+            unmatchedMembers={business.unmatchedMembers}
+            unmatchedStoreNames={business.unmatchedStoreNames}
+            scoped={business.scoped}
           />
         </Panel>
       )}

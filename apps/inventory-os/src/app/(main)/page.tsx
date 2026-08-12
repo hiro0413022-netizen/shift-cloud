@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { requireInventoryActor } from "@/lib/auth";
-import { listStock, listSessions, yen, groupByLocation } from "@/lib/inventory";
+import { listStock, listSessions, yen, groupByLocation, storeScopeOf, scopeLabel } from "@/lib/inventory";
 import { Panel, Badge, Empty } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const actor = await requireInventoryActor();
-  const [stock, sessions] = await Promise.all([listStock(actor.companyId), listSessions(actor.companyId, 8)]);
+  // 店舗スコープを必ず通す（#134）。以前は companyId だけで inv_stock 全件＝両店合算だった
+  const scope = storeScopeOf(actor);
+  const [stock, sessions] = await Promise.all([
+    listStock(actor.companyId, { scope }),
+    listSessions(actor.companyId, scope, 8),
+  ]);
 
   const totalQty = stock.reduce((s, r) => s + r.qty, 0);
   const totalValue = stock.reduce((s, r) => s + r.value, 0);
@@ -28,7 +33,11 @@ export default async function DashboardPage() {
     <div className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">在庫状況</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold">
+            在庫状況
+            {/* どの範囲の数字かを必ず出す（#134。オーナーだけ「全店」になる） */}
+            <Badge tone={actor.isOwner ? "ok" : "default"}>{scopeLabel(actor)}</Badge>
+          </h1>
           <p className="text-sm text-(--color-dim)">
             理論在庫＝直近の確定棚卸（{latest ? latest.counted_on : "—"}）＋それ以降の入出庫
           </p>
@@ -46,6 +55,14 @@ export default async function DashboardPage() {
           </Link>
         )}
       </header>
+
+      {/* 原因を名指しし、その場で直せる導線まで出す（#122の方針） */}
+      {!actor.isOwner && actor.stores.length === 0 && (
+        <p className="rounded-lg border border-(--color-danger)/40 bg-(--color-danger)/5 px-3 py-2 text-sm text-(--color-danger)">
+          あなたに配属店舗が設定されていないため、在庫を表示できません（#134）。
+          Shift Cloud のスタッフ設定で店舗を配属してください。
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="品番数（有効）" value={stock.length.toLocaleString("ja-JP")} sub={`うち在庫ゼロ ${zero.length}`} />

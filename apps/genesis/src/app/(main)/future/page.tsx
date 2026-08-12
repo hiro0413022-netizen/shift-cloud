@@ -1,5 +1,6 @@
-import { requireGenesisActor } from "@/lib/auth";
+import { requireGenesisActor, storeScope } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
+import { getKpisForScope, kpiScopeLabel } from "@/lib/kernel";
 import { Panel, Badge, Empty, KpiCard } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -7,8 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function FuturePage() {
   const actor = await requireGenesisActor();
   const admin = createAdmin();
-  const [{ data: kpis }, { data: devStatuses }, { data: sims }] = await Promise.all([
-    admin.from("kpis").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("code"),
+  const [kpis, { data: devStatuses }, { data: sims }] = await Promise.all([
+    // #134: オーナー=全社 / それ以外=自店舗。store_id が入る（0112）までは全社行＝「全店合算」ラベル付き
+    getKpisForScope(actor.companyId, storeScope(actor)),
     admin.from("development_statuses").select("*").eq("company_id", actor.companyId).is("deleted_at", null),
     admin.from("simulations").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
   ]);
@@ -36,7 +38,7 @@ export default async function FuturePage() {
 
       {/* KPI（カウントアップ＋スパークライン） */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {(kpis ?? []).map((k) => (
+        {kpis.map((k) => (
           <KpiCard
             key={String(k.id)}
             name={String(k.name)}
@@ -45,6 +47,7 @@ export default async function FuturePage() {
             trend={k.trend}
             target={k.target_value != null ? Number(k.target_value) : null}
             note={k.notes != null ? String(k.notes) : null}
+            scopeLabel={kpiScopeLabel(k)}
           />
         ))}
       </div>

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireGenesisActor } from "@/lib/auth";
+import { requireGenesisActor, assertStoreAccess } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { runIncidentAnalysis } from "@/lib/incident-analysis";
 
@@ -10,6 +10,22 @@ export async function updateInsightStatus(id: string, status: string, note: stri
   const actor = await requireGenesisActor();
   if (!["open", "doing", "done", "dismissed"].includes(status)) return { error: "状態が不正です" };
   const admin = createAdmin();
+
+  // #134: 他店舗の対策を書き換えられないようサーバー側で検証（UIに出ていないIDを直接叩かれても止める）
+  const { data: target } = await admin
+    .from("sp_incident_insights")
+    .select("store_id")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!target) return { error: "対象が見つかりません" };
+  try {
+    assertStoreAccess(actor, (target as { store_id: string | null }).store_id);
+  } catch {
+    return { error: "他店舗のデータは変更できません" };
+  }
+
   const { error } = await admin
     .from("sp_incident_insights")
     .update({ status, status_note: note.trim().slice(0, 1000) || null, updated_at: new Date().toISOString() })

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireGenesisActor } from "@/lib/auth";
+import { requireGenesisActor, storeScope } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit, logEvent } from "@/lib/kernel";
 import { runDailyCeoReport } from "@/lib/ceo-ai";
@@ -164,7 +164,8 @@ export async function updateKpiManual(formData: FormData) {
 /** 日次レポート生成（本体は lib/ceo-ai.ts — Cronと同一ロジック。VISION §3） */
 export async function generateDailyReport() {
   const actor = await requireGenesisActor();
-  const result = await runDailyCeoReport(actor.companyId, "human");
+  // #134: オーナーは全社（storeScope=null）。それ以外は自分の配属店舗の範囲で生成する
+  const result = await runDailyCeoReport(actor.companyId, "human", { storeIds: storeScope(actor) });
   await logAudit(actor, "report.generate", "reports", result.reportId);
   revalidatePath("/command");
   revalidatePath("/");

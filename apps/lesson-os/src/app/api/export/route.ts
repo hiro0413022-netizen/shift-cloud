@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireLessonActor } from "@/lib/auth";
+import { requireLessonActor, withStoreScope } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 
 /** CSVエクスポート（データはいつでも持ち出せる = WING NOTEの弱み対応 / DECISIONS #50） */
@@ -13,12 +13,14 @@ export async function GET(request: Request) {
   let filename = "export.csv";
 
   if (kind === "students") {
-    const { data } = await admin
+    // CSVも店舗スコープを通す（#134。画面で隠しても持ち出せたら意味がない）
+    let q = admin
       .from("lsn_students")
       .select("name, name_kana, member_code, goal, memo, status, created_at")
       .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .order("name");
+      .is("deleted_at", null);
+    q = withStoreScope(q, actor);
+    const { data } = await q.order("name");
     rows = [
       ["名前", "かな", "会員番号", "目標", "メモ", "状態", "登録日"].map(esc).join(","),
       ...(data ?? []).map((s) =>
@@ -27,24 +29,49 @@ export async function GET(request: Request) {
     ];
     filename = "students.csv";
   } else {
-    const { data } = await admin
-      .from("lsn_videos")
-      .select("shot_at, club, distance_yd, note, is_best, created_at, student:student_id(name), staff:uploaded_by(name)")
+    // lsn_videos に店舗列は無いので、まず自店舗の生徒に絞ってから動画を引く（#134）
+    let sq = admin
+      .from("lsn_students")
+      .select("id")
       .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(5000);
+      .is("deleted_at", null);
+    sq = withStoreScope(sq, actor);
+    const { data: scoped } = await sq;
+    const studentIds = ((scoped ?? []) as Array<{ id: string }>).map((s) => s.id);
+
+    type VideoRow = {
+      shot_at: string | null;
+      club: string | null;
+      distance_yd: number | null;
+      note: string | null;
+      is_best: boolean | null;
+      created_at: string | null;
+      student: { name: string } | null;
+      staff: { name: string } | null;
+    };
+    let vids: VideoRow[] = [];
+    if (studentIds.length) {
+      const { data } = await admin
+        .from("lsn_videos")
+        .select("shot_at, club, distance_yd, note, is_best, created_at, student:student_id(name), staff:uploaded_by(name)")
+        .eq("company_id", actor.companyId)
+        .in("student_id", studentIds)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      vids = (data ?? []) as unknown as VideoRow[];
+    }
     rows = [
       ["生徒", "撮影日", "クラブ", "飛距離yd", "メモ", "ベスト", "担当", "登録日時"].map(esc).join(","),
-      ...(data ?? []).map((v) =>
+      ...vids.map((v) =>
         [
-          (v.student as unknown as { name: string } | null)?.name,
+          v.student?.name,
           v.shot_at,
           v.club,
           v.distance_yd,
           v.note,
           v.is_best ? "★" : "",
-          (v.staff as unknown as { name: string } | null)?.name,
+          v.staff?.name,
           v.created_at,
         ].map(esc).join(",")
       ),

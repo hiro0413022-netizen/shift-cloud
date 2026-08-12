@@ -42,15 +42,17 @@ const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-o
 export async function FrankCalendarDashboard({
   date,
   view,
+  companyId,
   extraQuery = "",
 }: {
   date: string;
   view: "day" | "week";
+  companyId: string; // 会社＋FRANK店舗で必ず絞るため（#134）
   extraQuery?: string; // オーナーの店舗切替(?store=frank)を維持するため
 }) {
   const today = jstToday();
   const days = view === "day" ? [date] : Array.from({ length: 7 }, (_, i) => addDays(date, i));
-  const views: DayView[] = await Promise.all(days.map((d) => loadDay(d)));
+  const views: DayView[] = await Promise.all(days.map((d) => loadDay(d, companyId)));
 
   const step = view === "day" ? 1 : 7;
   const href = (d: string, v: string) => `/dashboard?date=${d}&view=${v}${extraQuery}`;

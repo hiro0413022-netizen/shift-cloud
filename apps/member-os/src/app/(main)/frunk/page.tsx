@@ -1,4 +1,6 @@
+import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
+import { canAccessFrank, FRANK_STORE_ID } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
@@ -16,12 +18,16 @@ export default async function FrunkPage({
   searchParams: Promise<{ signup_url?: string; err?: string; msg?: string }>;
 }) {
   const actor = await requireReceptionActor();
+  // 店舗またぎ廃止（#134）: FRANK姫路に配属されていない人には存在ごと見せない
+  if (!canAccessFrank(actor)) notFound();
   const admin = createAdmin();
   const sp = await searchParams;
 
   const [{ data: plans }, { data: members }] = await Promise.all([
     admin.from("frunk_plans").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
-    admin.from("frunk_members").select("*").eq("company_id", actor.companyId).is("deleted_at", null)
+    // 会員はFRANK姫路の店舗で必ず絞る（#134）
+    admin.from("frunk_members").select("*").eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false }),
   ]);
 

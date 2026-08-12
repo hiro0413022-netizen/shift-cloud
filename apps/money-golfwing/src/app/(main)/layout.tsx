@@ -7,7 +7,12 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   const store = await getCurrentStore(actor);
   return (
     <div className="flex min-h-screen flex-col">
-      <TopBar userName={actor.name} stores={actor.stores} currentStoreId={store?.id ?? null} />
+      <TopBar
+        userName={actor.name}
+        stores={actor.stores}
+        currentStoreId={store?.id ?? null}
+        canManageAll={actor.canManageAll}
+      />
       <main className="min-w-0 flex-1 p-6">{children}</main>
     </div>
   );

@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { requireLessonActor } from "@/lib/auth";
+import { requireLessonActor, withStoreScope, scopeLabel } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { AddStudentForm } from "./add-student";
 
 /** 生徒一覧（レッスンノート）— 顔写真・検索・最終レッスン日順（DECISIONS #50） */
-export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ q?: string; denied?: string }> }) {
   const actor = await requireLessonActor();
   const admin = createAdmin();
   const sp = await searchParams;
@@ -15,10 +15,12 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
     .select("id, name, name_kana, member_code, goal, status, photo_path")
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
-    .eq("status", "active")
-    .order("name");
+    .eq("status", "active");
+  // 店舗スコープ（#134）。これが無いと FRANK のWeb入会で自動生成されたカルテ（#129）が
+  // GOLF WING のレッスンノートに並ぶ。複数の or() は PostgREST 側で AND 結合される
+  query = withStoreScope(query, actor);
   if (q) query = query.or(`name.ilike.%${q}%,name_kana.ilike.%${q}%,member_code.ilike.%${q}%`);
-  const { data: students } = await query.limit(300);
+  const { data: students } = await query.order("name").limit(300);
 
   const ids = (students ?? []).map((s) => s.id);
   const { data: vids } = ids.length
@@ -49,6 +51,10 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <h1 className="text-xl font-semibold tracking-tight">
           レッスンノート <span className="text-sm font-normal text-(--color-dim)">{students?.length ?? 0}人</span>
+          {/* どの範囲の名簿かを必ず出す（#134） */}
+          <span className="ml-2 rounded-full border border-(--color-line) px-2 py-0.5 text-[11px] font-normal text-(--color-dim)">
+            {scopeLabel(actor)}
+          </span>
         </h1>
         <div className="flex items-center gap-2">
           <form className="flex gap-2">
@@ -58,6 +64,12 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
           <a href="/api/export?kind=lessons" className="btn-ghost hidden whitespace-nowrap text-xs md:block" title="レッスン記録をCSVで保存">⬇ CSV</a>
         </div>
       </div>
+
+      {sp.denied === "frank" && (
+        <p className="rounded-xl border border-rose-500/40 bg-rose-500/5 p-3 text-sm text-rose-300">
+          FRANK GOLF のレッスンカレンダーは FRANK 配属のスタッフとオーナーだけが開けます（#134）。
+        </p>
+      )}
 
       <AddStudentForm />
 

@@ -1,4 +1,6 @@
+import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
+import { canAccessFrank } from "@/lib/store-scope";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { loadDay, loadUnpaid, occupancy, lessonOccupancy, type BookingRow } from "@/lib/frank-reservation";
 import {
@@ -39,11 +41,16 @@ export default async function ReservationsPage({
 }: {
   searchParams: Promise<{ date?: string }>;
 }) {
-  await requireReceptionActor();
+  const actor = await requireReceptionActor();
+  // 店舗またぎ廃止（#134）: FRANK姫路に配属されていない人には存在ごと見せない
+  if (!canAccessFrank(actor)) notFound();
   const sp = await searchParams;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : jstToday();
 
-  const [view, unpaidRows] = await Promise.all([loadDay(date), loadUnpaid()]);
+  const [view, unpaidRows] = await Promise.all([
+    loadDay(date, actor.companyId),
+    loadUnpaid(actor.companyId),
+  ]);
   const bays = view.bays.filter((b) => b.active);
   const closedBays = view.bays.filter((b) => !b.active);
   const cells = occupancy(view);

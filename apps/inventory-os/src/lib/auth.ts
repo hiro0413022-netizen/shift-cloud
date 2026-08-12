@@ -6,6 +6,8 @@ import { createAdmin } from "@/lib/supabase/admin";
 
 export type InventoryRole = "manager" | "counter";
 
+export type InventoryStore = { id: string; name: string; isPrimary: boolean };
+
 export type InventoryActor = {
   staffId: string;
   authUserId: string;
@@ -14,8 +16,17 @@ export type InventoryActor = {
   role: InventoryRole;
   /** 品番マスタの編集・棚卸の確定・入出庫の手動記録ができる */
   canManage: boolean;
-  /** 棚卸のカウント入力ができる（全員） */
+  /**
+   * オーナー（manage_company）。全店舗を横断して在庫を見られる唯一の立場（#128/#134）。
+   * view_hq は「本部」も持つのでオーナー判定には使わない。
+   */
+  isOwner: boolean;
+  /** 見てよい店舗。オーナー＝会社の全店舗 / それ以外＝配属店舗のみ（#134） */
+  stores: InventoryStore[];
+  /** stores のID（既存呼び出しの互換用） */
   storeIds: string[];
+  /** 主配属（is_primary）。無ければ先頭。新規登録の既定店舗になる（#134） */
+  primaryStoreId: string | null;
 };
 
 /**
@@ -67,13 +78,50 @@ export const getInventoryActor = cache(async (): Promise<InventoryActor | null> 
   else if (hasUse) role = "counter";
   if (!role) return null;
 
-  // 配属店舗（無ければ全店＝本部扱い）
-  const { data: assign } = await admin
-    .from("staff_store_assignments")
-    .select("store_id")
-    .eq("staff_id", staff.id)
-    .eq("status", "active")
-    .is("deleted_at", null);
+  // オーナー判定は manage_company のみ（#128）。view_hq は本部スタッフも持つので使えない
+  const isOwner = roleRows.some((row) => {
+    const perms = row.roles?.permissions;
+    return !!perms && !perms.read_only && !!perms.manage_company;
+  });
+
+  // 見てよい店舗（#134）。
+  // ここは以前 staff_store_assignments に `.eq("status","active")` を付けており、
+  // その列が存在しないためクエリが常に失敗して storeIds が必ず [] になっていた
+  // ＝店舗スコープが効かず全店合算になっていた。存在する列（deleted_at）で絞る。
+  let stores: InventoryStore[] = [];
+  if (isOwner) {
+    const { data } = await admin
+      .from("stores")
+      .select("id, name")
+      .eq("company_id", staff.company_id)
+      .is("deleted_at", null)
+      .order("name");
+    stores = ((data ?? []) as Array<{ id: string; name: string }>).map((s) => ({
+      id: String(s.id),
+      name: String(s.name),
+      isPrimary: false,
+    }));
+  } else {
+    const { data } = await admin
+      .from("staff_store_assignments")
+      .select("is_primary, stores(id, name, deleted_at)")
+      .eq("staff_id", staff.id)
+      .is("deleted_at", null);
+    type AssignRow = {
+      is_primary: boolean | null;
+      stores: { id: string; name: string; deleted_at: string | null } | null;
+    };
+    stores = ((data ?? []) as unknown as AssignRow[])
+      .map((a) =>
+        a.stores && !a.stores.deleted_at
+          ? { id: String(a.stores.id), name: String(a.stores.name), isPrimary: !!a.is_primary }
+          : null
+      )
+      .filter((s): s is InventoryStore => s !== null)
+      .sort((a, b) => a.name.localeCompare(b.name, "ja"));
+  }
+
+  const storeIds = stores.map((s) => s.id);
 
   return {
     staffId: staff.id,
@@ -82,7 +130,10 @@ export const getInventoryActor = cache(async (): Promise<InventoryActor | null> 
     name: staff.name,
     role,
     canManage: role === "manager",
-    storeIds: (assign ?? []).map((a) => (a as { store_id: string }).store_id),
+    isOwner,
+    stores,
+    storeIds,
+    primaryStoreId: stores.find((s) => s.isPrimary)?.id ?? storeIds[0] ?? null,
   };
 });
 

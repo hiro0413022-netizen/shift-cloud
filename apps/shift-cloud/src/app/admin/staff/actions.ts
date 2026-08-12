@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireActor, authEmailFor } from "@/lib/auth";
+import { requireActor, authEmailFor, isOwner, scopedStoreIds, type Actor } from "@/lib/auth";
 import { todayJST } from "@/lib/util";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
@@ -23,6 +23,23 @@ const staffSchema = z.object({
   hourly_wage: z.coerce.number().int().min(0).optional(),
   commute_allowance: z.coerce.number().int().min(0).default(0),
 });
+
+/**
+ * 対象スタッフを編集してよいか（#134・#128 店舗またぎ廃止）。
+ * 画面に出していなくても id を差し替えれば他店スタッフのパスワードまで変えられたので、サーバーで止める。
+ * 無所属（役員・本部）スタッフを触れるのはオーナーだけ。
+ */
+async function canManageStaff(actor: Actor, staffId: string): Promise<boolean> {
+  if (isOwner(actor)) return true;
+  const admin = createAdmin();
+  const allowed = await scopedStoreIds(actor);
+  const { data } = await admin
+    .from("staff_store_assignments")
+    .select("store_id")
+    .eq("staff_id", staffId)
+    .is("deleted_at", null);
+  return (data ?? []).some((a) => allowed.includes(a.store_id));
+}
 
 export async function saveStaff(formData: FormData): Promise<{ error?: string }> {
   const actor = await requireActor("manage_staff");
@@ -79,6 +96,8 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
     staffId = staff.id;
     await logAudit(actor, "staff.create", "staff", staffId, null, d);
   } else {
+    // 他店スタッフの編集（氏名・ログインID・パスワード変更）を止める（#134）
+    if (!(await canManageStaff(actor, staffId))) return { error: "このスタッフを編集する権限がありません" };
     const { data: before } = await admin.from("staff").select("*").eq("id", staffId).single();
     const { error } = await admin
       .from("staff")
@@ -116,9 +135,23 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
   }
 
   // 店舗割当を置き換え（店舗なし=役員・本部は割当ゼロでOK）
-  await admin.from("staff_store_assignments").delete().eq("staff_id", staffId);
+  //
+  // 店舗スコープ（#134・#128 店舗またぎ廃止）:
+  //   ・store_ids はフォームから来る＝改竄できるので、許可店舗（オーナー=全店/それ以外=配属店舗）だけを通す。
+  //   ・delete も許可店舗に限定する。以前は staff_id だけで全配属を消していたため、
+  //     姫路の店長が兼務スタッフを編集すると宝塚の配属まで消えていた。
+  const allowedStoreIds = await scopedStoreIds(actor);
+  if (d.store_ids.some((sid) => !allowedStoreIds.includes(sid))) {
+    return { error: "権限のない店舗が含まれています" };
+  }
+  await admin.from("staff_store_assignments").delete().eq("staff_id", staffId).in("store_id", allowedStoreIds);
   if (d.store_ids.length > 0) {
     const primary = d.primary_store_id && d.store_ids.includes(d.primary_store_id) ? d.primary_store_id : d.store_ids[0];
+    // 残した他店の配属に主店舗フラグがあると2つになるので降ろす（主店舗は1つ）
+    await admin.from("staff_store_assignments")
+      .update({ is_primary: false })
+      .eq("staff_id", staffId)
+      .not("store_id", "in", `(${allowedStoreIds.join(",")})`);
     await admin.from("staff_store_assignments").insert(
       d.store_ids.map((sid) => ({
         company_id: actor.companyId,
@@ -187,6 +220,7 @@ export async function deactivateStaff(formData: FormData) {
   const actor = await requireActor("manage_staff");
   const admin = createAdmin();
   const id = String(formData.get("id"));
+  if (!(await canManageStaff(actor, id))) return; // 他店スタッフは停止/再開できない（#134）
   const { data: before } = await admin.from("staff").select("status").eq("id", id).single();
   const next = before?.status === "active" ? "inactive" : "active";
   await admin.from("staff").update({ status: next }).eq("id", id).eq("company_id", actor.companyId);

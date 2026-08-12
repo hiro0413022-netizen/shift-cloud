@@ -1,22 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireLessonActor } from "@/lib/auth";
+import { requireFrankActor, FRANK_STORE_ID as FRANK_STORE } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 
 /**
  * FRANK レッスン管理（#88 §3-4）
  * 枠の公開・クローズ、レッスン記録＋申し送りの保存。
+ * 実行できるのは FRANK 配属のスタッフとオーナーだけ（#134 / DECISIONS #128）。
+ * 画面を隠すだけでは Server Action を直接叩けるため、各アクションで確認する。
  */
-
-const FRANK_STORE = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
 const toTime = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
 /** 枠の一括公開: コーチ×日付×開始〜終了をレッスン時間で分割して作成 */
 export async function createSlots(formData: FormData): Promise<{ error?: string; created?: number }> {
-  const actor = await requireLessonActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const coachId = String(formData.get("coach_staff_id") ?? "");
   const date = String(formData.get("date") ?? "");
@@ -57,7 +57,7 @@ export async function createSlots(formData: FormData): Promise<{ error?: string;
 
 /** 枠のクローズ/再公開/削除（予約が入っている枠は削除不可） */
 export async function setSlotStatus(formData: FormData): Promise<{ error?: string }> {
-  await requireLessonActor();
+  await requireFrankActor();
   const admin = createAdmin();
   const slotId = String(formData.get("slot_id") ?? "");
   const op = String(formData.get("op") ?? ""); // 'close' | 'open' | 'delete'
@@ -84,7 +84,7 @@ export async function setSlotStatus(formData: FormData): Promise<{ error?: strin
 
 /** スタッフによる予約キャンセル（会員都合の電話連絡など） */
 export async function cancelLessonByStaff(formData: FormData): Promise<{ error?: string }> {
-  await requireLessonActor();
+  await requireFrankActor();
   const admin = createAdmin();
   const bookingId = String(formData.get("booking_id") ?? "");
   if (!bookingId) return { error: "不正な操作です" };
@@ -99,7 +99,7 @@ export async function cancelLessonByStaff(formData: FormData): Promise<{ error?:
 
 /** レッスン記録＋次回への申し送りを保存（保存で実施済み=done） */
 export async function saveLessonRecord(formData: FormData): Promise<{ error?: string }> {
-  const actor = await requireLessonActor();
+  const actor = await requireFrankActor();
   const admin = createAdmin();
   const bookingId = String(formData.get("booking_id") ?? "");
   const record = String(formData.get("record_note") ?? "").trim().slice(0, 2000);

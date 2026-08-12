@@ -1,4 +1,4 @@
-import { requireActor } from "@/lib/auth";
+import { requireActor, isOwner, scopedStoreIds } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Card, Badge } from "@/components/ui";
 import { incidentCategoryLabel, INCIDENT_SEVERITY_LABEL, normalizeSeverity } from "@yozan/core/incidents";
@@ -17,17 +17,24 @@ export default async function ReportsPage() {
   const admin = createAdmin();
   const { date, time } = nowPartsJST();
 
+  // 「みんなの報告」も自店舗だけ（#134・#128 店舗またぎ廃止）。
+  // 以前は company_id だけだったので、宝塚のスタッフに姫路のクレーム内容まで見えていた。
+  // 店舗未設定（store_id null）の報告と全店分を見られるのはオーナーのみ。
+  const owner = isOwner(actor);
+  const storeIds = await scopedStoreIds(actor);
+
+  let incidentQuery = admin
+    .from("sp_incidents")
+    .select("id, category, severity, occurred_at, place, involved, body, action_taken, status, resolution_note, staff:staff_id(name), stores:store_id(name)")
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null);
+  if (!owner) incidentQuery = incidentQuery.in("store_id", storeIds);
+
   const [{ data: stores }, { data: recent }] = await Promise.all([
     actor.storeIds.length
       ? admin.from("stores").select("id, name").in("id", actor.storeIds).order("name")
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    admin
-      .from("sp_incidents")
-      .select("id, category, severity, occurred_at, place, involved, body, action_taken, status, resolution_note, staff:staff_id(name), stores:store_id(name)")
-      .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .order("occurred_at", { ascending: false })
-      .limit(30),
+    incidentQuery.order("occurred_at", { ascending: false }).limit(30),
   ]);
 
   const rows = recent ?? [];

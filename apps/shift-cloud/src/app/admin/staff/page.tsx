@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireActor, visibleStores } from "@/lib/auth";
+import { requireActor, visibleStores, isOwner } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Badge, Button, Empty } from "@/components/ui";
 import { StaffForm, type StaffEdit } from "./staff-form";
@@ -31,7 +31,12 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         admin.from("staff_wages").select("hourly_wage, commute_allowance").eq("staff_id", sp.edit).is("deleted_at", null)
           .order("effective_from", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
-      if (s) {
+      // 他店のスタッフはURL直打ちでも編集させない（#134）。
+      // 無所属（役員・本部）スタッフを触れるのはオーナーだけ。
+      const assignedStoreIds = (assigns ?? []).map((a) => a.store_id);
+      const canEdit =
+        isOwner(actor) || assignedStoreIds.some((id) => stores.some((st) => st.id === id));
+      if (s && canEdit) {
         edit = {
           id: s.id, name: s.name, name_kana: s.name_kana, email: s.email, login_id: s.login_id,
           employment_type: s.employment_type, position: s.position,
@@ -51,12 +56,26 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
     );
   }
 
-  const { data: staffList } = await admin
+  // 一覧は配属店舗で絞る（#134）。
+  // 以前は company_id だけだったので、姫路の画面に宝塚のスタッフと **時給** まで出ていた。
+  // 非オーナーは staff_store_assignments を !inner にして許可店舗の配属がある人だけに限定する
+  // （＝無所属の役員・本部スタッフは出ない。全員を見られるのはオーナーだけ / #128a）。
+  const owner = isOwner(actor);
+  const assignSelect = owner
+    ? "staff_store_assignments(store_id, is_primary, stores(name))"
+    : "staff_store_assignments!inner(store_id, is_primary, stores(name))";
+  let staffQuery = admin
     .from("staff")
-    .select("id, name, email, login_id, employment_type, position, status, staff_store_assignments(store_id, is_primary, stores(name)), staff_roles(roles(name)), staff_wages(hourly_wage, effective_from, created_at)")
+    .select(`id, name, email, login_id, employment_type, position, status, ${assignSelect}, staff_roles(roles(name)), staff_wages(hourly_wage, effective_from, created_at)`)
     .eq("company_id", actor.companyId)
-    .is("deleted_at", null)
-    .order("name");
+    .is("deleted_at", null);
+  if (!owner) {
+    staffQuery = staffQuery.in(
+      "staff_store_assignments.store_id",
+      stores.length > 0 ? stores.map((s) => s.id) : ["00000000-0000-0000-0000-000000000000"],
+    );
+  }
+  const { data: staffList } = await staffQuery.order("name");
 
   return (
     <>

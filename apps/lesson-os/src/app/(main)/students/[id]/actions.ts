@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
-import { requireLessonActor } from "@/lib/auth";
+import { requireLessonActor, canAccessStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { encSeg } from "@/lib/libkey";
 import type { Annotations } from "@/lib/lesson";
@@ -16,17 +16,22 @@ const BUCKET = "lesson-videos";
 const MAX_VIDEO = 200 * 1024 * 1024; // 200MB（Storageグローバル上限に合わせる）
 const MAX_PHOTO = 10 * 1024 * 1024;
 
+/**
+ * このカルテを触ってよいか。すべての書き込みアクションがここを通る。
+ * 会社だけでなく店舗も見る（#134 / DECISIONS #128。FRANK のカルテを GOLF WING から編集させない）
+ */
 async function ownStudent(studentId: string) {
   const actor = await requireLessonActor();
   const admin = createAdmin();
   const { data } = await admin
     .from("lsn_students")
-    .select("id")
+    .select("id, store_id")
     .eq("id", studentId)
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
     .maybeSingle();
-  return { actor, admin, ok: !!data };
+  const row = data as { id: string; store_id: string | null } | null;
+  return { actor, admin, ok: !!row && canAccessStore(actor, row.store_id) };
 }
 
 export async function createVideoUploadUrl(

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireManager } from "@/lib/auth";
-import { addMovement, type MovementKind } from "@/lib/inventory";
+import { addMovement, deleteMovementById, canAccessStore, type MovementKind } from "@/lib/inventory";
 import { createAdmin } from "@/lib/supabase/admin";
 
 export async function recordMovement(_prev: { error?: string; ok?: string }, formData: FormData) {
@@ -25,6 +25,8 @@ export async function recordMovement(_prev: { error?: string; ok?: string }, for
     .maybeSingle();
   if (!item) return { error: `管理番号「${code}」の品番が見つかりません` };
   const it = item as { id: string; store_id: string | null; name: string; unit: string; cost_price: number | null };
+  // 管理番号を直接打てば他店舗の在庫も動かせてしまうため、ここで店舗を確認する（#134）
+  if (!canAccessStore(actor, it.store_id)) return { error: `管理番号「${code}」は自店舗の品番ではありません` };
 
   const r = await addMovement(actor, {
     itemId: it.id,
@@ -43,11 +45,11 @@ export async function recordMovement(_prev: { error?: string; ok?: string }, for
 }
 
 export async function deleteMovement(formData: FormData) {
-  await requireManager();
+  const actor = await requireManager();
   const id = String(formData.get("id"));
-  const admin = createAdmin();
-  // 論理削除。理論在庫の計算からは即座に外れる
-  await admin.from("inv_movements").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+  // 論理削除。理論在庫の計算からは即座に外れる。
+  // 会社・店舗の確認は deleteMovementById 側で行う（#134。以前は id だけで消せた）
+  await deleteMovementById(actor, id);
   revalidatePath("/movements");
   revalidatePath("/");
 }

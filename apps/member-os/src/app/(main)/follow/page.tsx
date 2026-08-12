@@ -1,4 +1,5 @@
 import { requireReceptionActor } from "@/lib/auth";
+import { storeFilterIds } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, inputCls, btnCls } from "@/components/ui";
 import { markFollowUp, undoFollowUp } from "./actions";
@@ -26,7 +27,9 @@ export default async function FollowPage() {
   const admin = createAdmin();
   const since = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
 
-  const { data } = await admin
+  // 店舗またぎ廃止（#134）: オーナー以外は配属店舗のみ。所属ゼロは何も見えない
+  const scopeIds = storeFilterIds(actor);
+  let q = admin
     .from("mbr_walkin_visits")
     .select("id, visited_on, result, survey, follow_up_at, follow_up_note, mbr_guests(name, phone, email)")
     .eq("company_id", actor.companyId)
@@ -34,6 +37,8 @@ export default async function FollowPage() {
     .is("deleted_at", null)
     .gte("visited_on", since)
     .order("visited_on", { ascending: true });
+  if (scopeIds) q = q.in("store_id", scopeIds);
+  const { data } = await q;
 
   const trials = (data ?? []) as Row[];
   const guestOf = (v: Row) => (v.mbr_guests ?? null) as { name?: string; phone?: string; email?: string } | null;

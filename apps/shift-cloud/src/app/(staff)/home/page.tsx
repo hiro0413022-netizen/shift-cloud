@@ -36,7 +36,9 @@ export default async function HomePage() {
       .eq("staff_id", actor.staffId).gte("date", monthRange(ym).from).lte("date", monthRange(ym).to),
     supabase.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary, created_at")
       .eq("staff_id", actor.staffId).is("deleted_at", null),
+    // 会社で絞る（#134）。無いとテナント跨ぎで他社のお知らせが混ざる
     supabase.from("announcements").select("id, title, body, created_at")
+      .eq("company_id", actor.companyId)
       .is("deleted_at", null)
       .or(`publish_from.is.null,publish_from.lte.${today}`)
       .or(`publish_to.is.null,publish_to.gte.${today}`)

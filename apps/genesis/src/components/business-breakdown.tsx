@@ -153,17 +153,43 @@ export function BusinessBreakdown({
   monthLabel,
   forecastMonthLabel,
   forecastTotal,
+  unmatchedMembers = 0,
+  unmatchedStoreNames = [],
+  scoped = false,
 }: {
   segments: SegmentMetric[];
   monthLabel: string;
   forecastMonthLabel?: string;
   forecastTotal?: number;
+  /** 店舗を特定できず集計から外した会員数（#134） */
+  unmatchedMembers?: number;
+  unmatchedStoreNames?: string[];
+  /** true＝自分の店舗だけの数字（オーナー以外） */
+  scoped?: boolean;
 }) {
   if (segments.length === 0) {
     return <p className="py-6 text-center text-sm text-(--color-dim)">事業データなし</p>;
   }
   return (
     <div>
+      {/* #134: 見ている範囲を明示。数字は黙って合算しない */}
+      <p className="mb-2 text-[11px] text-(--color-dim)">
+        {scoped ? "表示範囲: あなたの所属店舗のみ" : "表示範囲: 全店（GOLF WING / FRANK GOLF）"}
+      </p>
+      {/* #134: 会員名簿の store_name から店舗を特定できなかった分。黙って宝塚に足さず、ここで見せて直す */}
+      {unmatchedMembers > 0 && (
+        <div className="mb-3 rounded-lg border border-amber-700/50 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-200">
+          店舗を特定できない会員 {unmatchedMembers} 名を集計から除外しています。
+          {unmatchedStoreNames.length > 0 && (
+            <span className="ml-1 text-amber-200/80">
+              （名簿の店舗名: {unmatchedStoreNames.join(" / ")}）
+            </span>
+          )}
+          <span className="ml-1 text-amber-200/80">
+            会員名簿の店舗名を GOLF WING / FRANK GOLF のどちらかに直すと数字に入ります。
+          </span>
+        </div>
+      )}
       {forecastTotal != null && forecastTotal > 0 && (
         <div className="mb-3 flex items-center justify-between rounded-lg border border-sky-800/50 bg-sky-950/30 px-3 py-2">
           <span className="text-[11px] text-(--color-dim)">

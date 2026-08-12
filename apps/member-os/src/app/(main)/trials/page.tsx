@@ -1,4 +1,6 @@
+import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
+import { canAccessFrank, FRANK_STORE_ID } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Badge, Empty, fmtDate } from "@/components/ui";
 import { TRIAL_STATUS_LABEL, TRIAL_STATUS_TONE } from "@/lib/trial";
@@ -9,11 +11,14 @@ type Row = Record<string, unknown>;
 
 export default async function TrialsPage() {
   const actor = await requireReceptionActor();
+  // 体験申込はFRANK GOLF 姫路の画面。配属外には存在ごと見せない（#134）
+  if (!canAccessFrank(actor)) notFound();
   const admin = createAdmin();
   const { data } = await admin
     .from("mbr_trial_requests")
     .select("*")
     .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(300);

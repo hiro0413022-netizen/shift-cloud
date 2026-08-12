@@ -3,15 +3,20 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS = [
-  { href: "/dashboard", label: "ダッシュボード" },
-  { href: "/", label: "受付台帳" },
-  { href: "/search", label: "来店検索" },
-  { href: "/follow", label: "体験フォロー" },
-  { href: "/trials", label: "体験申込" },
-  { href: "/reservations", label: "予約（姫路）" },
-  { href: "/frunk", label: "FRANK会員" },
-  { href: "/import", label: "データ取込" },
+/**
+ * ナビの出し分け（#134・店舗またぎ廃止）
+ * scope: "all" = 全員 / "frank" = FRANK姫路の配属者だけ / "gw" = GOLF WING宝塚の配属者だけ。
+ * ★ 隠すだけでは守れない。各画面・各アクションのサーバー側でも必ず検証すること。
+ */
+const LINKS: Array<{ href: string; label: string; scope: "all" | "frank" | "gw" }> = [
+  { href: "/dashboard", label: "ダッシュボード", scope: "all" },
+  { href: "/", label: "受付台帳", scope: "all" },
+  { href: "/search", label: "来店検索", scope: "all" },
+  { href: "/follow", label: "体験フォロー", scope: "all" },
+  { href: "/trials", label: "体験申込", scope: "frank" },
+  { href: "/reservations", label: "予約（姫路）", scope: "frank" },
+  { href: "/frunk", label: "FRANK会員", scope: "frank" },
+  { href: "/import", label: "データ取込", scope: "gw" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -19,8 +24,19 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function TopBar({ userName }: { userName: string }) {
+export function TopBar({
+  userName,
+  canFrank,
+  canGolfWing,
+}: {
+  userName: string;
+  canFrank: boolean;
+  canGolfWing: boolean;
+}) {
   const pathname = usePathname() || "/";
+  const links = LINKS.filter(
+    (l) => l.scope === "all" || (l.scope === "frank" ? canFrank : canGolfWing),
+  );
   return (
     <header className="sticky top-0 z-20 border-b border-(--color-line) bg-(--color-panel)/85 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
@@ -30,7 +46,7 @@ export function TopBar({ userName }: { userName: string }) {
             <span className="text-base font-bold tracking-tight text-(--color-txt)">Member OS</span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
-            {LINKS.map((l) => {
+            {links.map((l) => {
               const active = isActive(pathname, l.href);
               return (
                 <Link
@@ -59,7 +75,7 @@ export function TopBar({ userName }: { userName: string }) {
       </div>
       {/* モバイル用ナビ */}
       <nav className="flex items-center gap-1 overflow-x-auto px-4 pb-2 md:hidden">
-        {LINKS.map((l) => {
+        {links.map((l) => {
           const active = isActive(pathname, l.href);
           return (
             <Link

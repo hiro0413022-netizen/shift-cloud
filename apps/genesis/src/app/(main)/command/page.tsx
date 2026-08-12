@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireGenesisActor } from "@/lib/auth";
+import { requireGenesisActor, storeScope } from "@/lib/auth";
 import { getCockpitData, CORE_KPI_CODES } from "@/lib/kernel";
 import { getInquiryStats } from "@/lib/secretary";
 import { createAdmin } from "@/lib/supabase/admin";
@@ -14,7 +14,7 @@ export default async function CommandPage() {
   const actor = await requireGenesisActor();
   const admin = createAdmin();
   const [d, promptsRes, reportsRes, inquiryStats] = await Promise.all([
-    getCockpitData(actor.companyId),
+    getCockpitData(actor.companyId, storeScope(actor)), // #134: オーナー=全社 / それ以外=自店舗のKPI
     admin.from("prompts").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at", { ascending: false }).limit(5),
     admin.from("reports").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at", { ascending: false }).limit(1),
     getInquiryStats(actor.companyId),

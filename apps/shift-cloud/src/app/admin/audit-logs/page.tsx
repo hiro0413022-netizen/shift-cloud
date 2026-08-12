@@ -1,4 +1,4 @@
-import { requireActor } from "@/lib/auth";
+import { requireActor, isOwner, scopedStoreIds, NO_STORE } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Empty } from "@/components/ui";
 
@@ -9,14 +9,35 @@ export default async function AuditLogsPage({ searchParams }: { searchParams: Pr
   const page = Number(sp.page ?? 1);
   const per = 50;
 
+  // 店舗スコープ（#134・#128 店舗またぎ廃止）
+  // audit_logs は店舗次元を持たない（company_id と操作者しかない）ため、
+  // 「オーナー限定にする」か「操作者の配属で絞る」かの二択になる。
+  //   → 店長が自店の操作履歴（時給変更・打刻修正など）を追えないと運用が回らないので、後者を採用。
+  //   → 副作用として、システム/AI の操作（actor_staff_id が null）は店舗に紐づけようがないため
+  //     非オーナーには出ない。全件を見られるのはオーナーだけ。
+  const owner = isOwner(actor);
+  let actorStaffIds: string[] | null = null;
+  if (!owner) {
+    const storeIds = await scopedStoreIds(actor);
+    const { data: assigns } = await admin
+      .from("staff_store_assignments")
+      .select("staff_id")
+      .eq("company_id", actor.companyId)
+      .in("store_id", storeIds)
+      .is("deleted_at", null);
+    const ids = [...new Set((assigns ?? []).map((a) => a.staff_id))];
+    actorStaffIds = ids.length > 0 ? ids : [NO_STORE];
+  }
+
   let q = admin
     .from("audit_logs")
     .select("*, staff(name)")
-    .eq("company_id", actor.companyId)
+    .eq("company_id", actor.companyId);
+  if (actorStaffIds) q = q.in("actor_staff_id", actorStaffIds);
+  if (sp.table) q = q.eq("table_name", sp.table);
+  const { data: logs } = await q
     .order("created_at", { ascending: false })
     .range((page - 1) * per, page * per - 1);
-  if (sp.table) q = q.eq("table_name", sp.table);
-  const { data: logs } = await q;
 
   return (
     <>

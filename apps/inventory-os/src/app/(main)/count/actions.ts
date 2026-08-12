@@ -10,11 +10,15 @@ import {
   closeCountSession,
   getSession,
   listStock,
+  storeScopeOf,
+  scopeOfStore,
 } from "@/lib/inventory";
 
 export async function startCount(formData: FormData) {
   const actor = await requireInventoryActor();
-  const storeId = (formData.get("storeId") as string) || null;
+  // 店舗の指定が無ければ自分の主配属で起票する（#134。オーナーだけ全社=nullを許す）
+  const requested = (formData.get("storeId") as string) || null;
+  const storeId = requested ?? (actor.isOwner ? null : actor.primaryStoreId);
   const countedOn = (formData.get("countedOn") as string) || undefined;
   const r = await openCountSession(actor, storeId, countedOn);
   // 失敗（例: その基準日は確定済み）はクエリで戻す。フォームのactionは値を返せないため
@@ -28,7 +32,8 @@ export async function startCount(formData: FormData) {
  */
 export async function saveOne(sessionId: string, itemId: string, qty: number): Promise<{ error?: string }> {
   const actor = await requireInventoryActor();
-  const session = await getSession(actor.companyId, sessionId);
+  // 他店舗の棚卸には書けない（#134）
+  const session = await getSession(actor.companyId, sessionId, storeScopeOf(actor));
   if (!session) return { error: "棚卸が見つかりません" };
   if (session.status === "closed") return { error: "この棚卸は確定済みです" };
   return saveCount(actor, sessionId, itemId, qty);
@@ -38,9 +43,9 @@ export async function saveOne(sessionId: string, itemId: string, qty: number): P
 export async function fillUnchanged(formData: FormData) {
   const actor = await requireInventoryActor();
   const sessionId = String(formData.get("sessionId"));
-  const session = await getSession(actor.companyId, sessionId);
+  const session = await getSession(actor.companyId, sessionId, storeScopeOf(actor));
   if (!session || session.status === "closed") return;
-  const stock = await listStock(actor.companyId, { storeId: session.store_id });
+  const stock = await listStock(actor.companyId, { scope: scopeOfStore(session.store_id) });
   await carryOverUnfilled(
     actor,
     session,

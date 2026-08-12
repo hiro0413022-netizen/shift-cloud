@@ -1,4 +1,4 @@
-import { requireActor } from "@/lib/auth";
+import { requireActor, isOwner, visibleStores, NO_STORE } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Card, Table, Td, Badge, Button } from "@/components/ui";
 import { currentYM, fmtMinutes, yen } from "@/lib/util";
@@ -13,6 +13,11 @@ import Link from "next/link";
  * 労働時間・人件費は **給与計算と同一ロジック**（lib/labor-summary.ts → payroll-calc.ts）。
  * 画面側で work_minutes を合計したり hourly_wage を掛けたりしない（DECISIONS #53）。
  * 旧実装は独自集計で、15分丸めなし・月給者0円扱い・交通費/手当なし・`${ym}-31` 固定のバグがあった。
+ *
+ * 店舗スコープ（#134・#128a）:
+ *   view_hq は「本部」「役員」も持つため、全店横断の判定には使わない。
+ *   全店（GOLF WING 宝塚 と FRANK 姫路）を並べてよいのはオーナー（manage_company）だけで、
+ *   それ以外は visibleStores＝自分の配属店舗だけを集計・表示する。
  */
 export default async function HqDashboard() {
   const actor = await requireActor("view_hq");
@@ -20,25 +25,56 @@ export default async function HqDashboard() {
   const ym = currentYM();
   const { from, to } = monthRange(ym);
 
-  const [{ data: stores }, { data: days }, { data: wages }, { data: company }, { data: staffRows }, { data: assignments }, { data: period }, { data: pendingSuggestions }] =
+  const stores = await visibleStores(actor); // オーナー=全店 / それ以外=配属店舗のみ（#128）
+  const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [NO_STORE];
+  const owner = isOwner(actor);
+
+  // 非オーナーは「自店舗に配属されているスタッフ」だけを人件費・在籍数の対象にする
+  let scopedStaffIds: string[] | null = null;
+  if (!owner) {
+    const { data: scopedAssigns } = await admin
+      .from("staff_store_assignments")
+      .select("staff_id")
+      .eq("company_id", actor.companyId)
+      .in("store_id", storeIds)
+      .is("deleted_at", null);
+    const ids = [...new Set((scopedAssigns ?? []).map((a) => a.staff_id))];
+    scopedStaffIds = ids.length > 0 ? ids : [NO_STORE];
+  }
+
+  const daysQuery = admin.from("attendance_days")
+    .select("store_id, staff_id, date, work_minutes, overtime_minutes, is_missing_clock")
+    .eq("company_id", actor.companyId).in("store_id", storeIds).gte("date", from).lte("date", to);
+
+  let wagesQuery = admin.from("staff_wages")
+    .select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary, created_at")
+    .eq("company_id", actor.companyId).is("deleted_at", null);
+  let staffQuery = admin.from("staff").select("id, status")
+    .eq("company_id", actor.companyId).is("deleted_at", null);
+  const assignQuery = admin.from("staff_store_assignments").select("staff_id, store_id, is_primary")
+    .eq("company_id", actor.companyId).in("store_id", storeIds).is("deleted_at", null);
+  if (scopedStaffIds) {
+    wagesQuery = wagesQuery.in("staff_id", scopedStaffIds);
+    staffQuery = staffQuery.in("id", scopedStaffIds);
+  }
+
+  const [{ data: days }, { data: wages }, { data: company }, { data: staffRows }, { data: assignments }, { data: period }, { data: pendingSuggestions }] =
     await Promise.all([
-      admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
-      admin.from("attendance_days").select("store_id, staff_id, date, work_minutes, overtime_minutes, is_missing_clock")
-        .eq("company_id", actor.companyId).gte("date", from).lte("date", to),
-      admin.from("staff_wages").select("staff_id, hourly_wage, commute_allowance, effective_from, wage_type, monthly_salary, created_at")
-        .eq("company_id", actor.companyId).is("deleted_at", null).order("effective_from", { ascending: false }),
+      daysQuery,
+      wagesQuery.order("effective_from", { ascending: false }),
       admin.from("companies").select("settings").eq("id", actor.companyId).single(),
-      admin.from("staff").select("id, status").eq("company_id", actor.companyId).is("deleted_at", null),
-      admin.from("staff_store_assignments").select("staff_id, store_id, is_primary")
-        .eq("company_id", actor.companyId).is("deleted_at", null),
+      staffQuery,
+      assignQuery,
       admin.from("payroll_periods").select("id").eq("company_id", actor.companyId).eq("target_month", from).maybeSingle(),
       admin.from("ai_suggestions").select("id, severity").eq("company_id", actor.companyId).eq("approval_status", "pending"),
     ]);
 
-  // 手当は給与集計を実行した月だけ存在する（未実行なら0）
-  const { data: allowances } = period
-    ? await admin.from("payroll_allowances").select("staff_id, kind, amount").eq("period_id", period.id).is("deleted_at", null)
-    : { data: [] as AllowanceRow[] };
+  // 手当は給与集計を実行した月だけ存在する（未実行なら0）。非オーナーは自店舗スタッフ分のみ（#134）
+  let allowanceQuery = period
+    ? admin.from("payroll_allowances").select("staff_id, kind, amount").eq("period_id", period.id).is("deleted_at", null)
+    : null;
+  if (allowanceQuery && scopedStaffIds) allowanceQuery = allowanceQuery.in("staff_id", scopedStaffIds);
+  const { data: allowances } = allowanceQuery ? await allowanceQuery : { data: [] as AllowanceRow[] };
 
   const settings = (company?.settings ?? {}) as { rounding_minutes?: number; overtime_rate?: number };
   const rounding = settings.rounding_minutes ?? 0;
@@ -102,9 +138,10 @@ export default async function HqDashboard() {
         給与計算（/admin/payroll）と同じ基準で算出しています。店舗別の人件費は、月給など実働に紐づかない支給を主店舗へ計上した按分値です。
       </p>
 
-      <h2 className="mb-3 text-sm font-semibold text-zinc-500">店舗比較</h2>
+      {/* 全店を並べられるのはオーナーだけ（#134・#128a）。それ以外は自店舗の1行だけになる */}
+      <h2 className="mb-3 text-sm font-semibold text-zinc-500">{owner ? "店舗比較" : "店舗の状況"}</h2>
       <Table headers={["店舗", "稼働スタッフ", "労働時間", "残業", "人件費見込み", "打刻漏れ"]}>
-        {(stores ?? []).map((s) => {
+        {stores.map((s) => {
           const v = summary.byStore.get(s.id);
           return (
             <tr key={s.id} className="hover:bg-zinc-50">

@@ -1,36 +1,20 @@
-"use client";
+import { notFound } from "next/navigation";
+import { requireReceptionActor } from "@/lib/auth";
+import { canAccessGolfWing } from "@/lib/store-scope";
+import { importMembers, importReservations, importWalkins } from "./actions";
+import { UploadCard } from "./upload-card";
 
-import { useActionState } from "react";
-import { importMembers, importReservations, importWalkins, type ImportState } from "./actions";
-import { Panel, inputCls, btnCls } from "@/components/ui";
+export const dynamic = "force-dynamic";
 
-function UploadCard({
-  title, desc, action, accept,
-}: {
-  title: string;
-  desc: string;
-  action: (prev: ImportState, fd: FormData) => Promise<ImportState>;
-  accept: string;
-}) {
-  const [state, formAction, pending] = useActionState<ImportState, FormData>(action, {});
-  return (
-    <Panel title={title} className="d1">
-      <p className="mb-3 text-sm text-(--color-dim)">{desc}</p>
-      <form action={formAction} className="flex flex-wrap items-center gap-3">
-        <input type="file" name="file" accept={accept} className={inputCls} required />
-        <button disabled={pending} className={btnCls}>{pending ? "取込中..." : "取込む"}</button>
-      </form>
-      {state.error && <p className="mt-2 text-sm text-red-400">{state.error}</p>}
-      {state.ok && <p className="mt-2 text-sm text-emerald-300">✓ {state.message}</p>}
-    </Panel>
-  );
-}
+export default async function ImportPage() {
+  const actor = await requireReceptionActor();
+  // 取込先はGOLF WING宝塚固定。宝塚に配属されていない人には画面ごと出さない（#134）
+  if (!(await canAccessGolfWing(actor))) notFound();
 
-export default function ImportPage() {
   return (
     <div className="space-y-4">
       <header className="reveal">
-        <h1 className="text-xl font-bold">データ取込</h1>
+        <h1 className="text-xl font-bold">データ取込 — GOLF WING 宝塚</h1>
         <p className="text-sm text-(--color-dim)">
           Smart Hello の Excel（会員名簿 / 予約一覧）と、現行の一時利用者名簿を取込み、各KPIを自動更新します。
           口座番号・クレジットカード等の機微情報は取り込みません。

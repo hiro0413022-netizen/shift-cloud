@@ -24,6 +24,8 @@ export {
 
 export type Stock = {
   item_id: string;
+  /** 店舗（null = 未設定。0086時点の移行データは全部これ）#134 */
+  store_id: string | null;
   code: string;
   category: string;
   maker: string;
@@ -67,43 +69,113 @@ export type CountRow = {
 };
 
 // ============================================================
+// 店舗スコープ（#134 / DECISIONS #128「店舗またぎ廃止」）
+// ============================================================
+
+/**
+ * FRANK GOLF 姫路の店舗ID（genesis / lesson-os と同じ定数）。
+ * 「store_id 未設定の在庫をどちらの店舗のものと見なすか」を決めるためだけに使う。
+ */
+const FRANK_STORE_ID = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
+
+/** storeIds が null＝全店（オーナー）。includeUnassigned＝store_id 未設定の行を含めるか */
+export type StoreScope = { storeIds: string[] | null; includeUnassigned: boolean };
+
+/**
+ * その人が見てよい在庫の範囲（#134）。
+ *
+ * inv_* の store_id は 0086 の時点で nullable のまま入り、エクセルから移行した
+ * 362品番は全部 未設定（＝実体は GOLF WING 宝塚の棚）。
+ * 「未設定＝自店舗」と見なすと FRANK GOLF から宝塚の在庫が丸見えになるため、
+ * 未設定行は FRANK 以外の店舗に配属されている人にだけ見せる。
+ * 恒久対応は store_id のバックフィル＋NOT NULL 化（要マイグレーション 0112）。
+ */
+export function storeScopeOf(actor: InventoryActor): StoreScope {
+  if (actor.isOwner) return { storeIds: null, includeUnassigned: true };
+  return {
+    storeIds: actor.storeIds,
+    includeUnassigned: actor.storeIds.some((id) => id !== FRANK_STORE_ID),
+  };
+}
+
+/** 棚卸セッション等「その行の店舗」だけを対象にするスコープ */
+export function scopeOfStore(storeId: string | null): StoreScope {
+  return storeId ? { storeIds: [storeId], includeUnassigned: false } : { storeIds: [], includeUnassigned: true };
+}
+
+/** 対象行の store_id を触ってよいか。UIの出し分けではなくサーバー側の最終防衛に使う（#134） */
+export function canAccessStore(actor: InventoryActor, storeId: string | null): boolean {
+  const scope = storeScopeOf(actor);
+  if (storeId == null) return scope.includeUnassigned;
+  if (scope.storeIds == null) return true;
+  return scope.storeIds.includes(storeId);
+}
+
+/** 店舗の見出し（オーナーは「全店」） */
+export function scopeLabel(actor: InventoryActor): string {
+  if (actor.isOwner) return "全店";
+  if (actor.stores.length === 0) return "店舗未設定";
+  return actor.stores.map((s) => s.name).join("・");
+}
+
+/** store_id で絞る共通フィルタ。PostgrestFilterBuilder を構造的に受ける（型依存を避ける） */
+type StoreFilterable<Q> = {
+  in(column: string, values: readonly string[]): Q;
+  is(column: string, value: null): Q;
+  or(filters: string): Q;
+};
+/** 何にも一致しない店舗ID（配属ゼロの人に全件を見せないための番人） */
+const NO_STORE = "00000000-0000-0000-0000-000000000000";
+function withStoreScope<Q extends StoreFilterable<Q>>(q: Q, scope: StoreScope): Q {
+  if (scope.storeIds == null) return q; // 全店（オーナー）
+  if (scope.storeIds.length === 0)
+    return scope.includeUnassigned ? q.is("store_id", null) : q.in("store_id", [NO_STORE]);
+  return scope.includeUnassigned
+    ? q.or(`store_id.in.(${scope.storeIds.join(",")}),store_id.is.null`)
+    : q.in("store_id", scope.storeIds);
+}
+
+// ============================================================
 // 参照
 // ============================================================
 
 /** 理論在庫（inv_stock ビュー）。location でグルーピングしやすい順に返す */
 export async function listStock(
   companyId: string,
-  opts: { storeId?: string | null; includeDiscontinued?: boolean } = {}
+  opts: { scope?: StoreScope; includeDiscontinued?: boolean } = {}
 ): Promise<Stock[]> {
   const admin = createAdmin();
   let q = admin.from("inv_stock").select("*").eq("company_id", companyId);
-  if (opts.storeId) q = q.eq("store_id", opts.storeId);
+  // 店舗スコープは必ず通す（#134。付け忘れると両店合算になる）
+  if (opts.scope) q = withStoreScope(q, opts.scope);
   if (!opts.includeDiscontinued) q = q.eq("status", "active");
   const { data } = await q.order("code");
   return (data ?? []) as Stock[];
 }
 
-export async function listSessions(companyId: string, limit = 24): Promise<CountSession[]> {
+export async function listSessions(companyId: string, scope: StoreScope, limit = 24): Promise<CountSession[]> {
   const admin = createAdmin();
-  const { data } = await admin
+  let q = admin
     .from("inv_count_sessions")
     .select("id, store_id, counted_on, label, status, closed_at, total_qty, total_value, note")
     .eq("company_id", companyId)
-    .is("deleted_at", null)
-    .order("counted_on", { ascending: false })
-    .limit(limit);
+    .is("deleted_at", null);
+  q = withStoreScope(q, scope);
+  const { data } = await q.order("counted_on", { ascending: false }).limit(limit);
   return (data ?? []) as CountSession[];
 }
 
-export async function getSession(companyId: string, id: string): Promise<CountSession | null> {
+/** 棚卸1件。scope を渡すと他店舗の棚卸は null になる（URL直打ち対策 #134） */
+export async function getSession(companyId: string, id: string, scope?: StoreScope): Promise<CountSession | null> {
   const admin = createAdmin();
-  const { data } = await admin
+  let q = admin
     .from("inv_count_sessions")
     .select("id, store_id, counted_on, label, status, closed_at, total_qty, total_value, note")
     .eq("company_id", companyId)
     .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
+    .is("deleted_at", null);
+  if (scope) q = withStoreScope(q, scope);
+  const { data } = await q.maybeSingle();
   return (data as CountSession) ?? null;
 }
 
@@ -119,6 +191,55 @@ export async function getOpenSession(companyId: string, storeId: string | null):
   q = storeId ? q.eq("store_id", storeId) : q.is("store_id", null);
   const { data } = await q.order("counted_on", { ascending: false }).limit(1).maybeSingle();
   return (data as CountSession) ?? null;
+}
+
+export type MovementRow = {
+  id: string;
+  occurred_on: string;
+  kind: MovementKind;
+  qty: number;
+  memo: string | null;
+  source_app: string | null;
+  store_id: string | null;
+  inv_items: { code: string; name: string; unit: string } | null;
+};
+
+/** 入出庫の履歴（店舗スコープ必須 #134） */
+export async function listMovements(companyId: string, scope: StoreScope, limit = 120): Promise<MovementRow[]> {
+  const admin = createAdmin();
+  let q = admin
+    .from("inv_movements")
+    .select("id, occurred_on, kind, qty, memo, source_app, store_id, inv_items(code, name, unit)")
+    .eq("company_id", companyId)
+    .is("deleted_at", null);
+  q = withStoreScope(q, scope);
+  const { data } = await q
+    .order("occurred_on", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data ?? []) as unknown as MovementRow[];
+}
+
+/** 入出庫1件の取消（論理削除）。自店舗の行しか消せない（#134） */
+export async function deleteMovementById(actor: InventoryActor, id: string): Promise<{ error?: string }> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("inv_movements")
+    .select("id, store_id, kind")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const row = data as { id: string; store_id: string | null; kind: MovementKind } | null;
+  if (!row) return { error: "対象の入出庫が見つかりません" };
+  if (!canAccessStore(actor, row.store_id)) return { error: "FORBIDDEN: 他店舗の入出庫は取り消せません" };
+  if (row.kind === "adjust") return { error: "棚卸調整は取り消せません" };
+  const { error } = await admin
+    .from("inv_movements")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+  return error ? { error: error.message } : {};
 }
 
 export async function listCounts(sessionId: string): Promise<Map<string, CountRow>> {
@@ -165,17 +286,22 @@ export async function openCountSession(
   storeId: string | null,
   countedOn?: string
 ): Promise<{ id: string } | { error: string }> {
+  // 他店舗の棚卸を勝手に立てられないようにする（#134）
+  if (!canAccessStore(actor, storeId)) return { error: "FORBIDDEN: この店舗の棚卸は開けません" };
+
   const admin = createAdmin();
   const on = countedOn ?? jstYmd(); // 「今日」はJSTで解決する（#73）
   const label = `${on.slice(0, 4)}年${Number(on.slice(5, 7))}月 棚卸`;
 
-  const { data: existing } = await admin
+  // 重複チェックは同じ店舗の中だけで見る（#134。店舗をまたぐと片方の棚卸がもう片方を塞ぐ）
+  let existQ = admin
     .from("inv_count_sessions")
     .select("id, status")
     .eq("company_id", actor.companyId)
     .eq("counted_on", on)
-    .is("deleted_at", null)
-    .maybeSingle();
+    .is("deleted_at", null);
+  existQ = withStoreScope(existQ, scopeOfStore(storeId));
+  const { data: existing } = await existQ.maybeSingle();
   if (existing) {
     if ((existing as { status: string }).status === "closed") {
       return { error: `${on} の棚卸はすでに確定済みです` };
@@ -245,6 +371,10 @@ export async function closeCountSession(
   actor: InventoryActor,
   sessionId: string
 ): Promise<{ adjusted: number; total_qty: number; total_value: number } | { error: string }> {
+  // 確定は在庫が動く操作。他店舗の棚卸を締められないようにサーバー側でも確認する（#134）
+  const session = await getSession(actor.companyId, sessionId, storeScopeOf(actor));
+  if (!session) return { error: "FORBIDDEN: この棚卸は確定できません" };
+
   const admin = createAdmin();
   const { data, error } = await admin.rpc("inv_close_count", {
     p_session_id: sessionId,
@@ -269,6 +399,8 @@ export async function addMovement(
 ): Promise<{ error?: string }> {
   const signed = signedQty(input.kind, input.qty);
   if (signed === 0) return { error: "数量に0は指定できません" };
+  // 他店舗の在庫を動かせないようにする（#134）
+  if (!canAccessStore(actor, input.storeId)) return { error: "FORBIDDEN: この品番は自店舗のものではありません" };
   const admin = createAdmin();
   const { error } = await admin.from("inv_movements").insert({
     company_id: actor.companyId,
@@ -303,6 +435,11 @@ export async function createItem(
     storeId?: string | null;
   }
 ): Promise<{ code: string } | { error: string }> {
+  // 店舗は「指定があればそれ／無ければ自分の主配属」（#134）。
+  // 未設定のまま増やすと、あとで店舗を分けられない品番が増え続ける
+  const storeId = input.storeId ?? (actor.isOwner ? null : actor.primaryStoreId);
+  if (!canAccessStore(actor, storeId)) return { error: "FORBIDDEN: この店舗には登録できません" };
+
   const admin = createAdmin();
   const { data: code, error: codeErr } = await admin.rpc("inv_next_code", {
     p_company_id: actor.companyId,
@@ -313,7 +450,7 @@ export async function createItem(
 
   const { error } = await admin.from("inv_items").insert({
     company_id: actor.companyId,
-    store_id: input.storeId ?? null,
+    store_id: storeId,
     code,
     category: input.category,
     maker: input.maker,

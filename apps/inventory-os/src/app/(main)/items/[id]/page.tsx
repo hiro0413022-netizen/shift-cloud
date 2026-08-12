@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireInventoryActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { yen, MOVEMENT_LABEL, type MovementKind, type Stock } from "@/lib/inventory";
+import { yen, MOVEMENT_LABEL, canAccessStore, type MovementKind, type Stock } from "@/lib/inventory";
 import { Panel, Badge, Empty, Field, inputCls, btnCls } from "@/components/ui";
 import { updateItem } from "../actions";
 
@@ -28,6 +28,8 @@ export default async function ItemDetailPage({
     .maybeSingle();
   if (!stock) notFound();
   const s = stock as Stock;
+  // URL直打ちで他店舗の品番を開けないようにする（#134）
+  if (!canAccessStore(actor, s.store_id)) notFound();
 
   const [{ data: movs }, { data: hist }] = await Promise.all([
     admin

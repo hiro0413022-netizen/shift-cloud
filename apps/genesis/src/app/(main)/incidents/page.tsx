@@ -1,4 +1,4 @@
-import { requireGenesisActor } from "@/lib/auth";
+import { requireGenesisActor, visibleStores } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, inputCls } from "@/components/ui";
 import {
@@ -24,24 +24,48 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
   const days = [30, 90, 365].includes(Number(sp.days)) ? Number(sp.days) : 90;
   const since = new Date(Date.now() - days * 86400_000).toISOString();
 
-  const [{ data: incidents }, { data: insights }, { data: stores }] = await Promise.all([
-    admin
-      .from("sp_incidents")
-      .select("id, category, severity, occurred_at, place, involved, body, action_taken, status, store_id, staff:staff_id(name), stores:store_id(name)")
-      .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .gte("occurred_at", since)
-      .order("occurred_at", { ascending: false })
-      .limit(200),
-    admin
-      .from("sp_incident_insights")
-      .select("id, title, pattern, cause, prevention, categories, incident_count, status, status_note, generated_by, store_id, created_at, stores:store_id(name)")
-      .eq("company_id", actor.companyId)
-      .is("deleted_at", null)
-      .order("status", { ascending: true })
-      .order("created_at", { ascending: false })
-      .limit(50),
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId),
+  // #134 店舗またぎ廃止: オーナー＝全店 / それ以外＝自分の配属店舗のみ。
+  // 店舗未設定（store_id is null）の報告はどの店のものか分からないので全員に見せる（隠すと迷子になる）。
+  const stores = await visibleStores(actor);
+  const scopeIds = actor.isOwner ? null : stores.map((s) => s.id);
+  const scopeIncidents = <T,>(q: T): T =>
+    scopeIds
+      ? (q as unknown as { or: (f: string) => T }).or(`store_id.in.(${scopeIds.join(",")}),store_id.is.null`)
+      : q;
+
+  // 自店舗が1つも無い人には何も見せない（UI非表示ではなくサーバー側で0件にする）
+  if (scopeIds && scopeIds.length === 0) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <h1 className="text-xl font-semibold tracking-tight">イレギュラー分析</h1>
+        <p className="mt-4 text-sm text-(--color-dim)">
+          あなたに店舗が割り当てられていないため、表示できる報告がありません。店舗の配属を設定してください（#134）。
+        </p>
+      </div>
+    );
+  }
+
+  const [{ data: incidents }, { data: insights }] = await Promise.all([
+    scopeIncidents(
+      admin
+        .from("sp_incidents")
+        .select("id, category, severity, occurred_at, place, involved, body, action_taken, status, store_id, staff:staff_id(name), stores:store_id(name)")
+        .eq("company_id", actor.companyId)
+        .is("deleted_at", null)
+        .gte("occurred_at", since)
+        .order("occurred_at", { ascending: false })
+        .limit(200)
+    ),
+    scopeIncidents(
+      admin
+        .from("sp_incident_insights")
+        .select("id, title, pattern, cause, prevention, categories, incident_count, status, status_note, generated_by, store_id, created_at, stores:store_id(name)")
+        .eq("company_id", actor.companyId)
+        .is("deleted_at", null)
+        .order("status", { ascending: true })
+        .order("created_at", { ascending: false })
+        .limit(50)
+    ),
   ]);
 
   const rows = incidents ?? [];
@@ -55,7 +79,7 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
   const highCount = rows.filter((r) => normalizeSeverity(String(r.severity)) === "high").length;
 
   // 店舗別（どの店で起きているか）
-  const storeMap = new Map((stores ?? []).map((s) => [String(s.id), String(s.name)]));
+  const storeMap = new Map(stores.map((s) => [String(s.id), String(s.name)]));
   const byStore = [...rows.reduce((m, r) => {
     const key = r.store_id ? String(r.store_id) : "unknown";
     m.set(key, (m.get(key) ?? 0) + 1);
@@ -88,6 +112,10 @@ export default async function IncidentsPage({ searchParams }: { searchParams: Pr
       </div>
       <p className="mb-6 text-sm text-(--color-dim)">
         店舗スタッフが上げた「いつもと違うこと」の記録と、同じことを繰り返さないための対策です。
+        {/* #134: どの範囲の集計かを必ず書く */}
+        <span className="ml-1">
+          表示範囲: {actor.isOwner ? "全店" : stores.map((s) => s.name).join(" / ") || "所属店舗なし"}
+        </span>
       </p>
 
       {/* サマリー */}

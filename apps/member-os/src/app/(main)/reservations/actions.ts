@@ -5,6 +5,7 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/kernel";
 import { FRANK_STORE_ID, toMin, toTime } from "@/lib/frank-reservation";
+import { requireStoreAccess } from "@/lib/store-scope";
 import { loadBookingCfg, businessHours } from "@yozan/core/frank-booking";
 
 /**
@@ -32,6 +33,7 @@ function back(date: string) {
 /** 電話・店頭で受けた予約を作る（会員 / 都度利用） */
 export async function createBooking(formData: FormData) {
   const actor = await requireReceptionActor();
+  requireStoreAccess(actor, FRANK_STORE_ID); // FRANK姫路の予約はFRANKに配属された人だけ（#134）
   const admin = createAdmin();
 
   const date = str(formData.get("booking_date"));
@@ -58,6 +60,8 @@ export async function createBooking(formData: FormData) {
     const { data: m } = await admin
       .from("frunk_members")
       .select("id")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", FRANK_STORE_ID)
       .eq("member_no", memberNo)
       .is("deleted_at", null)
       .maybeSingle();
@@ -69,6 +73,8 @@ export async function createBooking(formData: FormData) {
   const { data: same } = await admin
     .from("frunk_bookings")
     .select("start_time, end_time")
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
     .eq("bay_id", bayId)
     .eq("booked_date", date)
     .neq("status", "cancelled")
@@ -101,6 +107,7 @@ export async function createBooking(formData: FormData) {
 /** 来店 / 無断欠 / 取消 */
 export async function setBookingStatus(formData: FormData) {
   const actor = await requireReceptionActor();
+  requireStoreAccess(actor, FRANK_STORE_ID); // #134
   const admin = createAdmin();
   const id = str(formData.get("id"));
   const status = str(formData.get("status"));
@@ -112,6 +119,7 @@ export async function setBookingStatus(formData: FormData) {
     .select("id, trial_request_id")
     .eq("id", id)
     .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
     .maybeSingle();
   if (!bk) return;
 
@@ -133,6 +141,7 @@ export async function setBookingStatus(formData: FormData) {
 /** 予約を消す（誤入力の取り消し） */
 export async function deleteBooking(formData: FormData) {
   const actor = await requireReceptionActor();
+  requireStoreAccess(actor, FRANK_STORE_ID); // #134
   const admin = createAdmin();
   const id = str(formData.get("id"));
   const date = str(formData.get("date"));
@@ -143,6 +152,7 @@ export async function deleteBooking(formData: FormData) {
     .select("id, trial_request_id")
     .eq("id", id)
     .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
     .maybeSingle();
   if (!bk) return;
 
@@ -158,6 +168,7 @@ export async function deleteBooking(formData: FormData) {
 /** 入金の記録（記録 / 全額入金 / 免除） */
 export async function recordPayment(formData: FormData) {
   const actor = await requireReceptionActor();
+  requireStoreAccess(actor, FRANK_STORE_ID); // #134
   const admin = createAdmin();
   const id = str(formData.get("id"));
   const mode = str(formData.get("mode"));
@@ -179,7 +190,8 @@ export async function recordPayment(formData: FormData) {
     patch = { amount, paid_amount: paid, payment_status: status, payment_method: method, paid_at: paid > 0 ? now : null };
   }
 
-  await admin.from("frunk_bookings").update({ ...patch, updated_at: now }).eq("id", id).eq("company_id", actor.companyId);
+  await admin.from("frunk_bookings").update({ ...patch, updated_at: now })
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
   await logAudit(actor, "frank.booking.payment", "frunk_bookings", id, null, patch);
   back(date);
 }

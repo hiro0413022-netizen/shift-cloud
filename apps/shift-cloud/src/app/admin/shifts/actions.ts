@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActor } from "@/lib/auth";
+import { requireActor, isOwner, assertStoreAccess, type Actor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 
@@ -27,6 +27,20 @@ function computeRange(periodType: string, ym: string, startRaw: string, endRaw: 
   }
 }
 
+/**
+ * 募集期間が「触ってよい店舗」のものか確認する（#134・#128 店舗またぎ廃止）。
+ * id は画面のフォームから来る＝改竄できるので、company_id だけでは他店の期間を締切／削除できてしまう。
+ * store_id が null（全店舗共通）の期間を触れるのはオーナーだけ。
+ */
+async function assertPeriodAccess(actor: Actor, id: string): Promise<boolean> {
+  const admin = createAdmin();
+  const { data } = await admin.from("shift_request_periods")
+    .select("store_id").eq("id", id).eq("company_id", actor.companyId).is("deleted_at", null).maybeSingle();
+  if (!data) return false;
+  if (!data.store_id) return isOwner(actor);
+  return assertStoreAccess(actor, data.store_id).then(() => true).catch(() => false);
+}
+
 /** 募集期間を開く（月 / 前半 / 後半 / 任意期間） */
 export async function openPeriod(formData: FormData) {
   const actor = await requireActor("create_shifts");
@@ -40,10 +54,14 @@ export async function openPeriod(formData: FormData) {
   );
   const deadline = String(formData.get("deadline"));
   const title = String(formData.get("title") || "") || null;
+  // フォームの hidden は信用しない（#134）。空 = 全店舗共通の募集で、これを作れるのはオーナーだけ
+  const rawStoreId = String(formData.get("store_id") || "");
+  const storeId = rawStoreId ? await assertStoreAccess(actor, rawStoreId) : null;
+  if (!storeId && !isOwner(actor)) throw new Error("FORBIDDEN: store");
   const { data } = await admin.from("shift_request_periods")
     .insert({
       company_id: actor.companyId,
-      store_id: String(formData.get("store_id") || "") || null,
+      store_id: storeId,
       target_month: `${start.slice(0, 7)}-01`,
       period_type: periodType,
       start_date: start,
@@ -61,6 +79,7 @@ export async function closePeriod(formData: FormData) {
   const actor = await requireActor("create_shifts");
   const admin = createAdmin();
   const id = String(formData.get("id"));
+  if (!(await assertPeriodAccess(actor, id))) return; // 他店の募集期間は締め切れない（#134）
   await admin.from("shift_request_periods").update({ status: "closed" }).eq("id", id).eq("company_id", actor.companyId);
   await logAudit(actor, "request_period.close", "shift_request_periods", id);
   revalidatePath("/admin/shifts");
@@ -71,6 +90,7 @@ export async function reopenPeriod(formData: FormData) {
   const actor = await requireActor("create_shifts");
   const admin = createAdmin();
   const id = String(formData.get("id"));
+  if (!(await assertPeriodAccess(actor, id))) return; // 他店の募集期間は戻せない（#134）
   await admin.from("shift_request_periods").update({ status: "open" }).eq("id", id).eq("company_id", actor.companyId);
   await logAudit(actor, "request_period.reopen", "shift_request_periods", id);
   revalidatePath("/admin/shifts");
@@ -83,10 +103,8 @@ export async function deletePeriod(formData: FormData) {
   const id = String(formData.get("id"));
   const now = new Date().toISOString();
 
-  // 対象期間が自社のものか確認
-  const { data: period } = await admin.from("shift_request_periods")
-    .select("id").eq("id", id).eq("company_id", actor.companyId).is("deleted_at", null).single();
-  if (!period) return;
+  // 対象期間が自社かつ触ってよい店舗のものか確認（#134）
+  if (!(await assertPeriodAccess(actor, id))) return;
 
   // 紐づく提出希望の件数を先に取得（監査ログ用）
   const { count } = await admin.from("shift_requests")
@@ -108,6 +126,8 @@ export async function deletePeriod(formData: FormData) {
 /** ドラフト保存（グリッド全体を反映） */
 export async function saveDraft(storeId: string, cells: CellShift[]): Promise<{ error?: string }> {
   const actor = await requireActor("create_shifts");
+  // storeId はクライアント引数＝改竄できる。他店のシフトを書き換えられないよう必ず検証（#134）
+  await assertStoreAccess(actor, storeId);
   const admin = createAdmin();
 
   const { data: templates } = await admin.from("shift_templates")
@@ -158,6 +178,8 @@ export async function saveDraft(storeId: string, cells: CellShift[]): Promise<{ 
 /** 対象期間の全ドラフトを確定し、スタッフへ通知 */
 export async function publishShifts(storeId: string, from: string, to: string): Promise<{ error?: string; published?: number }> {
   const actor = await requireActor("create_shifts");
+  // 他店のドラフトを勝手に確定＆通知できないよう検証（#134）
+  await assertStoreAccess(actor, storeId);
   const admin = createAdmin();
 
   const { data: drafts } = await admin.from("shifts")

@@ -173,6 +173,7 @@ export function KpiCard({
   trend,
   target,
   note,
+  scopeLabel,
 }: {
   name: string;
   value: number | null;
@@ -180,10 +181,19 @@ export function KpiCard({
   trend?: unknown;
   target?: number | null;
   note?: string | null;
+  /** どの範囲の数字か（#134: 「全店合算」を隠さない）。null なら表示しない */
+  scopeLabel?: string | null;
 }) {
   return (
     <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
-      <p className="text-xs tracking-wide text-(--color-dim)">{name}</p>
+      <p className="flex items-center gap-1 text-xs tracking-wide text-(--color-dim)">
+        <span className="min-w-0 truncate">{name}</span>
+        {scopeLabel && (
+          <span className="shrink-0 rounded-full border border-(--color-line) px-1.5 py-px text-[9px] leading-tight">
+            {scopeLabel}
+          </span>
+        )}
+      </p>
       {/* 桁の多い金額でカードから溢れないよう、狭い時は1段小さく */}
       <p className="mt-1 text-xl font-bold tabular-nums break-all lg:text-2xl">
         {value != null ? (

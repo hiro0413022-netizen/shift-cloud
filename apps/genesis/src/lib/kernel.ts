@@ -68,8 +68,59 @@ export type CockpitData = {
   kpis: Record<string, unknown>[];
 };
 
-/** Cockpit/Command Center用の横断データ取得 */
-export async function getCockpitData(companyId: string): Promise<CockpitData> {
+/**
+ * KPI 1行が「全社合算」なのか「その店舗の数字」なのか（#134）。
+ * kpis に store_id が入る前（migration 0112 適用前）は必ず "company"＝全店合算になる。
+ * 画面はこれをラベルで見せること。合算を黙って店舗の数字のように出さない。
+ */
+export type KpiScope = "company" | "store";
+
+export function kpiScopeOf(k: Record<string, unknown>): KpiScope {
+  return k.store_id ? "store" : "company";
+}
+
+/** KPIカードに出す範囲ラベル（#134） */
+export function kpiScopeLabel(k: Record<string, unknown>): string {
+  return kpiScopeOf(k) === "store" ? "店舗" : "全店合算";
+}
+
+/**
+ * kpis を店舗スコープで選び直す（#134）。
+ * - storeIds が null（cron・オーナー）→ 全社行（store_id なし）を優先し、無ければ全行
+ * - storeIds あり → その店舗の行。無いコードは全社行にフォールバックする（＝ラベルが「全店合算」になる）
+ * kpis.store_id は migration 0112（別作業）で入る。列が無い間も動くよう、JS側で選別している。
+ */
+function pickKpisForScope(rows: Record<string, unknown>[], storeIds: string[] | null): Record<string, unknown>[] {
+  const hasStoreColumn = rows.some((r) => Object.prototype.hasOwnProperty.call(r, "store_id"));
+  if (!hasStoreColumn) return rows; // 0112適用前＝全社行しか無い
+
+  const companyRows = rows.filter((r) => r.store_id == null);
+  if (!storeIds) {
+    // 全社ビュー: 全社行があればそれだけ（店舗行と二重に並べない）
+    return companyRows.length > 0 ? companyRows : rows;
+  }
+  const allowed = new Set(storeIds);
+  const storeRows = rows.filter((r) => r.store_id != null && allowed.has(String(r.store_id)));
+  const covered = new Set(storeRows.map((r) => String(r.code)));
+  // 店舗別が無いコードだけ全社行で補う（数字が消えるより「全店合算」と分かって出るほうがよい）
+  return [...storeRows, ...companyRows.filter((r) => !covered.has(String(r.code)))];
+}
+
+/** KPIだけを店舗スコープで取る（#134）。KPIカードだけ出す画面用 */
+export async function getKpisForScope(
+  companyId: string,
+  storeIds?: string[] | null
+): Promise<Record<string, unknown>[]> {
+  const admin = createAdmin();
+  const { data } = await admin.from("kpis").select("*").eq("company_id", companyId).is("deleted_at", null).order("code");
+  return pickKpisForScope((data ?? []) as Record<string, unknown>[], Array.isArray(storeIds) ? storeIds : null);
+}
+
+/**
+ * Cockpit/Command Center用の横断データ取得
+ * @param storeIds 店舗スコープ（#134）。null/未指定＝会社全体（cron・AI実行系・オーナー）
+ */
+export async function getCockpitData(companyId: string, storeIds?: string[] | null): Promise<CockpitData> {
   const admin = createAdmin();
   const [devStatuses, risks, blockers, approvals, agents, modules, recentEvents, kpis] =
     await Promise.all([
@@ -90,7 +141,8 @@ export async function getCockpitData(companyId: string): Promise<CockpitData> {
     agents: agents.data ?? [],
     modules: modules.data ?? [],
     recentEvents: recentEvents.data ?? [],
-    kpis: kpis.data ?? [],
+    // #134: 店舗スコープで選び直す（0112で store_id が入るまでは全社行のまま返る）
+    kpis: pickKpisForScope((kpis.data ?? []) as Record<string, unknown>[], Array.isArray(storeIds) ? storeIds : null),
   };
 }
 
@@ -319,6 +371,12 @@ export type BusinessBreakdown = {
   segments: SegmentMetric[];
   forecastMonthLabel: string; // 当月（進行中）
   forecastTotal: number; // 当月の予測売上合計（source='forecast'、主に月会費予測）
+  /** 店舗を特定できず集計から外した会員数（#134: 静かに宝塚へ寄せるのをやめ、見える化する） */
+  unmatchedMembers: number;
+  /** 店舗名が分からなかった store_name の実例（最大5件・表記ゆれの手当てをするための手がかり） */
+  unmatchedStoreNames: string[];
+  /** この結果が actor の所属店舗で絞られているか（false＝全店＝オーナー/cron） */
+  scoped: boolean;
 };
 
 /** 事業(fin_segment)コード → 配下店舗の判定（DBにマッピングが無いため名称で対応付け） */
@@ -332,18 +390,57 @@ function storesForSegment(code: string, stores: { id: string; name: string }[]) 
 /**
  * 会員名簿の store_name（Smart Hello由来のテキスト）→ store.id へ対応付け。
  * store_id列が無いためアプリ層で正規化。新店舗名が増えたらここに追記する。
+ *
+ * #134: 以前は「該当しなければGOLF WING」を既定にしていたため、FRANK会員が宝塚に混ざっていた。
+ * 表記ゆれで判定できないものは null（＝不明）を返し、集計から外して件数を見せる。
+ * 数字を静かに間違えるより、分からないことを見えるようにする。
  */
-function storeIdForMemberStoreName(storeName: string | null, stores: { id: string; name: string }[]): string | null {
+export function storeIdForMemberStoreName(storeName: string | null, stores: { id: string; name: string }[]): string | null {
   const n = (storeName ?? "").trim();
+  if (!n) return null;
   const find = (kw: string) => stores.find((s) => s.name.includes(kw))?.id ?? null;
-  if (n.includes("FRANK") || n.includes("FRUNK") || n.includes("姫路"))
+  // 姫路（FRANK GOLF）— FRANK が正・DB上は FRUNK の旧名が残る場合あり
+  if (n.includes("FRANK") || n.includes("FRUNK") || n.includes("フランク") || n.includes("姫路"))
     return find("FRANK") ?? find("FRUNK") ?? find("姫路");
-  // 既定はGOLF WING（"ゴルフウィング" / "GOLF WING" / "宝塚" などを宝塚店に集約）
-  return find("GOLF WING") ?? find("宝塚");
+  // 宝塚（GOLF WING）— 明示的に一致した場合のみ寄せる（既定にはしない）
+  if (
+    n.toUpperCase().includes("GOLF WING") ||
+    n.toUpperCase().includes("GOLFWING") ||
+    n.includes("ゴルフウィング") ||
+    n.includes("ゴルフウイング") ||
+    n.includes("宝塚")
+  )
+    return find("GOLF WING") ?? find("宝塚");
+  // 店舗名そのものと一致するなら採用（新店舗が増えても拾える保険）
+  return stores.find((s) => n.includes(s.name) || s.name.includes(n))?.id ?? null;
 }
 
-export async function getBusinessBreakdown(companyId: string): Promise<BusinessBreakdown> {
+/**
+ * 店舗スコープの共通適用（#134）。allowed が null なら素通し＝会社全体（cron・AI実行系はactorが無い）。
+ * UI非表示ではなくクエリ段階で切るための共通口。
+ */
+function scopeStore<T>(q: T, allowed: Set<string> | null, column = "store_id"): T {
+  if (!allowed) return q;
+  return (q as unknown as { in: (c: string, v: string[]) => T }).in(column, storeInValues(allowed));
+}
+
+/**
+ * `.in()` に渡す値。配属店舗ゼロのときに空配列を渡すと PostgREST が構文エラーになるため、
+ * 「絶対に一致しないID」を1つ入れて 0件 にする（#134）。エラーで画面を落とさない。
+ */
+export function storeInValues(allowed: Set<string>): string[] {
+  return allowed.size > 0 ? Array.from(allowed) : ["00000000-0000-0000-0000-000000000000"];
+}
+
+/**
+ * 事業別 → 店舗ドリルダウン。
+ * @param storeIds 見てよい店舗（#134）。null/未指定＝会社全体（cron・AI実行系はactorが無いのでこちら）。
+ *                 オーナーは全店比較を見てよいので画面側も null を渡す。
+ */
+export async function getBusinessBreakdown(companyId: string, storeIds?: string[] | null): Promise<BusinessBreakdown> {
   const admin = createAdmin();
+  const scoped = Array.isArray(storeIds);
+  const allowed = scoped ? new Set(storeIds) : null;
 
   // 財務の最新入力月を特定
   // PL表示は「最新の完了月」＝進行中の当月(monthStart以降)を除外した最新月
@@ -373,17 +470,24 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     month
       ? admin.from("fin_entries").select("segment_id,category_id,amount").eq("company_id", companyId).eq("target_month", month).is("deleted_at", null)
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    // stores だけは会社全件を取る（会員名簿の store_name 突き合わせに全店の名前が要るため）。
+    // 表示に使う店舗は下で allowed に絞る（#134）
     admin.from("stores").select("id,name,brand_id").eq("company_id", companyId).is("deleted_at", null),
-    admin.from("staff_store_assignments").select("store_id").eq("company_id", companyId),
-    admin.from("shifts").select("store_id,date").eq("company_id", companyId).gte("date", monthStart()),
+    // #134: 店舗またぎ廃止。allowed が指定されていれば、店舗に紐づくデータはその範囲だけを取る
+    scopeStore(admin.from("staff_store_assignments").select("store_id").eq("company_id", companyId).is("deleted_at", null), allowed),
+    scopeStore(admin.from("shifts").select("store_id,date").eq("company_id", companyId).gte("date", monthStart()), allowed),
     // 体験は一時利用者名簿（0018で mbr_trial_bookings から移行済・#93）。当月来店分のみ
-    admin
-      .from("mbr_walkin_visits")
-      .select("store_id")
-      .eq("company_id", companyId)
-      .eq("visit_type", "trial")
-      .is("deleted_at", null)
-      .gte("visited_on", monthStart()),
+    scopeStore(
+      admin
+        .from("mbr_walkin_visits")
+        .select("store_id")
+        .eq("company_id", companyId)
+        .eq("visit_type", "trial")
+        .is("deleted_at", null)
+        .gte("visited_on", monthStart()),
+      allowed
+    ),
+    // 会員名簿には store_id が無い（store_nameのテキストのみ）ので、店舗の絞りはアプリ側で行う
     admin.from("mbr_members").select("store_name,member_type,join_date,leave_date,leave_reason").eq("company_id", companyId),
   ]);
 
@@ -394,7 +498,9 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     catKind.set(c.id, c.kind);
     catName.set(c.id, c.name);
   }
-  const stores = (storeRes.data ?? []) as { id: string; name: string }[];
+  // allStores＝名寄せ用（会社全店）／stores＝表示・集計に使う店舗（actorのスコープ・#134）
+  const allStores = (storeRes.data ?? []) as { id: string; name: string }[];
+  const stores = allowed ? allStores.filter((s) => allowed.has(s.id)) : allStores;
 
   // 店舗別カウント
   const countBy = (rows: { store_id: string | null }[] | undefined) => {
@@ -421,6 +527,9 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
   const reasonsByStore = new Map<string, Set<string>>();
   const bump = (m: Map<string, number>, id: string) => m.set(id, (m.get(id) ?? 0) + 1);
   // 会員の分類ルール（スタッフ除外・トライアル区別・退会理由の除外語）の正典は @yozan/core/members（#84）
+  // #134: 店舗を特定できない会員は「不明」として集計から外し、件数と実例を返す（黙って宝塚に足さない）
+  let unmatchedMembers = 0;
+  const unmatchedNames = new Set<string>();
 
   for (const mem of (memberRes.data ?? []) as {
     store_name: string | null;
@@ -429,9 +538,16 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     leave_date: string | null;
     leave_reason: string | null;
   }[]) {
-    const sid = storeIdForMemberStoreName(mem.store_name, stores);
-    if (!sid) continue;
-    if (isStaffMember(mem.member_type)) continue; // スタッフは顧客会員から除外
+    if (isStaffMember(mem.member_type)) continue; // スタッフは顧客会員から除外（不明カウントにも入れない）
+    // 名寄せは会社全店の名前で行う（スコープで店舗を減らすと「不明」が増えて数字が歪むため）
+    const sid = storeIdForMemberStoreName(mem.store_name, allStores);
+    if (!sid) {
+      unmatchedMembers += 1;
+      const raw = (mem.store_name ?? "").trim();
+      if (unmatchedNames.size < 5) unmatchedNames.add(raw || "(店舗名なし)");
+      continue;
+    }
+    if (allowed && !allowed.has(sid)) continue; // 自店舗以外は集計しない（#134）
     const isTrial = isTrialMember(mem.member_type);
 
     if (!mem.leave_date && !isTrial) bump(memberByStore, sid); // 在籍（本会員）
@@ -527,6 +643,9 @@ export async function getBusinessBreakdown(companyId: string): Promise<BusinessB
     segments: result,
     forecastMonthLabel: fmtMonth(monthStart()),
     forecastTotal,
+    unmatchedMembers,
+    unmatchedStoreNames: Array.from(unmatchedNames),
+    scoped,
   };
 }
 

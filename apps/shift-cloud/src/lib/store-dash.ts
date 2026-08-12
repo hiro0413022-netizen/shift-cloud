@@ -52,15 +52,22 @@ export async function verifyStoreDevice(token: string): Promise<StoreDevice | nu
   };
 }
 
-/** 会社の店舗一覧（切替タブ用） */
-export async function listStores(companyId: string): Promise<StoreInfo[]> {
+/**
+ * 切替タブ用の店舗一覧（#134）。
+ * 店舗ダッシュボードは「認証で解決した店舗」に固定するのが正典（#128 店舗またぎ廃止）。
+ * allowedIds を渡すとその店舗だけを返す。全店を返してよいのはオーナー（manage_company）のときだけ。
+ */
+export async function listStores(companyId: string, allowedIds?: string[]): Promise<StoreInfo[]> {
   const admin = createAdmin();
-  const { data } = await admin
+  let q = admin
     .from("stores")
     .select("id, name")
     .eq("company_id", companyId)
     .is("deleted_at", null)
     .order("name");
+  // 空配列を .in() に渡すと壊れるので、絶対に一致しないUUIDに置き換える
+  if (allowedIds) q = q.in("id", allowedIds.length > 0 ? allowedIds : ["00000000-0000-0000-0000-000000000000"]);
+  const { data } = await q;
   return (data ?? []) as StoreInfo[];
 }
 
@@ -154,9 +161,13 @@ export async function getStoreKpis(companyId: string, store: StoreInfo, ym: stri
   let memberCard: KpiCard;
   if (gw) {
     // 会員集計の正典は @yozan/core/members（#84・kernel.tsと共通）
+    // TODO(#134): mbr_members は store_id を持たず店舗はテキスト（store_name）なので、
+    //   会社で絞るところまでしかできない。姫路(FRANK)は frunk_members 側なので現状は実害なしだが、
+    //   GOLF WING 2号店が出たら合算になる。会員名簿に store_id を持たせて .eq("store_id", store.id) に差し替える。
     const { data: rows } = await admin
       .from("mbr_members")
-      .select("member_type, join_date, leave_date");
+      .select("member_type, join_date, leave_date")
+      .eq("company_id", companyId);
     const { active, joins, leavesCore, leavesTrial } = memberStats(
       (rows ?? []) as { member_type: string | null; join_date: string | null; leave_date: string | null }[],
       from,

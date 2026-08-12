@@ -1,4 +1,5 @@
 import { createAdmin } from "@/lib/supabase/admin";
+import { storeInValues } from "@/lib/kernel";
 
 /**
  * 判断フィード（REDESIGN_2026-07 §3-1 / §5a）
@@ -143,10 +144,17 @@ function buildPlan(
   return null;
 }
 
-export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]> {
+/**
+ * @param storeIds 店舗スコープ（#134）。null/未指定＝会社全体（cron・AI実行系・オーナー）。
+ *                 画面からは storeScope(actor) を渡す。店舗に紐づく系統（体験申込・Web入会）だけが絞られる。
+ */
+export async function getJudgmentFeed(companyId: string, storeIds?: string[] | null): Promise<JudgmentItem[]> {
   const admin = createAdmin();
+  const allowedStores = Array.isArray(storeIds) ? new Set(storeIds) : null;
+  const scopeStore = <T,>(q: T, column = "store_id"): T =>
+    allowedStores ? (q as unknown as { in: (c: string, v: string[]) => T }).in(column, storeInValues(allowedStores)) : q;
 
-  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes, hotRes, prospectRes, chRes, grpRes] = await Promise.all([
+  const [queueRes, delivRes, inqRes, trialRes, joinRes, resvRes, hotRes, prospectRes, chRes, grpRes, storeRes] = await Promise.all([
     admin
       .from("ai_action_queue")
       .select("id, title, action_type, status, created_at, scheduled_at, payload")
@@ -169,20 +177,28 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       .is("deleted_at", null)
       .order("received_at", { ascending: false })
       .limit(5),
-    admin
-      .from("mbr_trial_requests")
-      .select("id, name, pref1, experience, created_at")
-      .eq("company_id", companyId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: true })
-      .limit(10),
-    admin
-      .from("frunk_members")
-      .select("id, name, created_at")
-      .eq("company_id", companyId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: true })
-      .limit(10),
+    // #134: 体験申込は GOLF WING / FRANK 両方が入る。店舗で絞り、タイトルに店舗名を出す
+    scopeStore(
+      admin
+        .from("mbr_trial_requests")
+        .select("id, name, pref1, experience, created_at, store_id")
+        .eq("company_id", companyId)
+        .eq("status", "pending")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true })
+        .limit(10)
+    ),
+    // #134: Web入会は FRANK のみだが、同様に店舗で絞る（他店の人には出さない）
+    scopeStore(
+      admin
+        .from("frunk_members")
+        .select("id, name, created_at, store_id")
+        .eq("company_id", companyId)
+        .eq("status", "pending")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: true })
+        .limit(10)
+    ),
     admin
       .from("res_requests")
       .select("id, name, service_name, created_at")
@@ -219,10 +235,15 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       .select("id", { count: "exact", head: true })
       .eq("company_id", companyId)
       .is("deleted_at", null),
+    // 店舗名（#134: 「どの店の申込か」をカードに明記するため）
+    admin.from("stores").select("id, name").eq("company_id", companyId).is("deleted_at", null),
   ]);
 
   const channels = new Map<string, string>(((chRes.data ?? []) as Row[]).map((c) => [String(c.code), String(c.name)]));
   const staffGroupCount = grpRes.count ?? 0;
+  const storeName = new Map<string, string>(((storeRes.data ?? []) as Row[]).map((s) => [String(s.id), String(s.name)]));
+  /** 店舗ラベル（#134）。未設定は「店舗未設定」＝黙って寄せない */
+  const storeLabel = (id: unknown) => (id ? storeName.get(String(id)) ?? "店舗未設定" : "店舗未設定");
 
   const items: JudgmentItem[] = [];
 
@@ -282,7 +303,8 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       id: String(r.id),
       source: "trial",
       tag: "体験申込",
-      title: `${s(r.name) ?? "お客様"} 様の体験申込`,
+      // #134: どの店の体験申込か分かるようにする（GW/FRANKが混ざっていた）
+      title: `【${storeLabel(r.store_id)}】${s(r.name) ?? "お客様"} 様の体験申込`,
       detail: [s(r.pref1) && `第1希望: ${s(r.pref1)}`, s(r.experience)].filter(Boolean).join(" ・ ") || null,
       createdAt: s(r.created_at),
       href: `${MEMBER_OS_URL}/trials`,
@@ -295,7 +317,8 @@ export async function getJudgmentFeed(companyId: string): Promise<JudgmentItem[]
       id: String(r.id),
       source: "join",
       tag: "Web入会",
-      title: `${s(r.name) ?? "お客様"} 様の入会申込（FRANK）`,
+      // #134: 店舗名はDBの値を出す（"FRANK"決め打ちにしない）
+      title: `【${storeLabel(r.store_id)}】${s(r.name) ?? "お客様"} 様の入会申込`,
       detail: "承認すると会員番号を発行して在籍化します",
       createdAt: s(r.created_at),
       href: `${MEMBER_OS_URL}/frunk`,

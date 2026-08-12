@@ -1,40 +1,24 @@
 import Link from "next/link";
 import { requireInventoryActor } from "@/lib/auth";
-import { createAdmin } from "@/lib/supabase/admin";
-import { MOVEMENT_LABEL, type MovementKind } from "@/lib/inventory";
+import { MOVEMENT_LABEL, listMovements, storeScopeOf, scopeLabel } from "@/lib/inventory";
 import { Panel, Badge, Empty } from "@/components/ui";
 import { MovementForm } from "./form";
 import { deleteMovement } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-type Row = {
-  id: string;
-  occurred_on: string;
-  kind: MovementKind;
-  qty: number;
-  memo: string | null;
-  source_app: string | null;
-  inv_items: { code: string; name: string; unit: string } | null;
-};
-
 export default async function MovementsPage() {
   const actor = await requireInventoryActor();
-  const admin = createAdmin();
-  const { data } = await admin
-    .from("inv_movements")
-    .select("id, occurred_on, kind, qty, memo, source_app, inv_items(code, name, unit)")
-    .eq("company_id", actor.companyId)
-    .is("deleted_at", null)
-    .order("occurred_on", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(120);
-  const rows = (data ?? []) as unknown as Row[];
+  // 入出庫の履歴も自店舗だけ（#134。以前は companyId だけで両店合算だった）
+  const rows = await listMovements(actor.companyId, storeScopeOf(actor), 120);
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <header>
-        <h1 className="text-xl font-bold">入出庫</h1>
+        <h1 className="flex items-center gap-2 text-xl font-bold">
+          入出庫
+          <Badge tone={actor.isOwner ? "ok" : "default"}>{scopeLabel(actor)}</Badge>
+        </h1>
         <p className="text-sm text-(--color-dim)">
           入荷・販売・工房使用・破損を記録すると、次の棚卸まで理論在庫が自動で追従します
         </p>

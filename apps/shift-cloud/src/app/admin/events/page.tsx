@@ -1,4 +1,4 @@
-import { requireActor, visibleStores } from "@/lib/auth";
+import { requireActor, visibleStores, assertStoreAccess, NO_STORE } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -8,11 +8,13 @@ import { hm, dowJP, todayJST } from "@/lib/util";
 export default async function EventsPage() {
   const actor = await requireActor("manage_announcements");
   const admin = createAdmin();
-  const [{ data: events }, stores, { data: types }] = await Promise.all([
+  const stores = await visibleStores(actor); // オーナー=全店 / それ以外=配属店舗のみ（#128）
+  const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [NO_STORE];
+  const [{ data: events }, { data: types }] = await Promise.all([
+    // 一覧も店舗で絞る（#134）。以前は company_id だけで、姫路のイベントが宝塚の画面に出ていた
     admin.from("store_events").select("*, stores(name), schedule_types(name, color)")
-      .eq("company_id", actor.companyId).is("deleted_at", null)
+      .eq("company_id", actor.companyId).in("store_id", storeIds).is("deleted_at", null)
       .gte("date", todayJST()).order("date").limit(100),
-    visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("schedule_types").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
   ]);
 
@@ -20,8 +22,10 @@ export default async function EventsPage() {
     "use server";
     const a = await requireActor("manage_announcements");
     const ad = createAdmin();
+    // セレクトの選択肢はサーバー側で信用しない。許可店舗でなければ止める（#134）
+    const storeId = await assertStoreAccess(a, String(formData.get("store_id")));
     const row = {
-      store_id: String(formData.get("store_id")),
+      store_id: storeId,
       schedule_type_id: String(formData.get("schedule_type_id") || "") || null,
       title: String(formData.get("title")),
       date: String(formData.get("date")),
@@ -39,6 +43,11 @@ export default async function EventsPage() {
     const a = await requireActor("manage_announcements");
     const ad = createAdmin();
     const id = String(formData.get("id"));
+    // 他店のイベントを消せないよう、対象の店舗を確認してから削除する（#134）
+    const { data: target } = await ad.from("store_events").select("store_id")
+      .eq("id", id).eq("company_id", a.companyId).is("deleted_at", null).maybeSingle();
+    if (!target) return;
+    await assertStoreAccess(a, target.store_id);
     await ad.from("store_events").update({ deleted_at: new Date().toISOString() }).eq("id", id).eq("company_id", a.companyId);
     await logAudit(a, "store_event.delete", "store_events", id);
     revalidatePath("/admin/events");

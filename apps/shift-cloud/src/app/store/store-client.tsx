@@ -75,19 +75,26 @@ export function StoreDashClient({
       {/* ヘッダー: 店舗切替 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">店舗ダッシュボード</h1>
-        <div className="flex rounded-xl border border-zinc-200 bg-white p-1 shadow-sm">
-          {stores.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => go({ store: s.id })}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-                s.id === store.id ? "bg-brand text-white" : "text-zinc-500 active:bg-zinc-50"
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
+        {/* 切替タブはオーナーのみ（stores が2件以上）。それ以外は自店舗名の表示だけ（#134・#128 店舗またぎ廃止） */}
+        {stores.length > 1 ? (
+          <div className="flex rounded-xl border border-zinc-200 bg-white p-1 shadow-sm">
+            {stores.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => go({ store: s.id })}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+                  s.id === store.id ? "bg-brand text-white" : "text-zinc-500 active:bg-zinc-50"
+                }`}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span className="rounded-xl border border-zinc-200 bg-white px-4 py-1.5 text-sm font-medium text-zinc-600 shadow-sm">
+            {store.name}
+          </span>
+        )}
       </div>
 
       {/* KPIカード（今月） */}

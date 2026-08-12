@@ -1,5 +1,8 @@
+import { notFound } from "next/navigation";
 import { loadDay, occupancy, lessonOccupancy, type BookingRow } from "@/lib/frank-reservation";
 import { toMin, outstanding, CUSTOMER_KIND_LABEL } from "@yozan/core/frank-booking";
+import { requireReceptionActor } from "@/lib/auth";
+import { canAccessFrank } from "@/lib/store-scope";
 import { BoardAutoRefresh } from "./refresh";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +11,11 @@ export const dynamic = "force-dynamic";
  * 店頭カレンダー（ロビー掲示・常設タブレット）
  * 台帳は frunk_bookings 一本（#93）。会員・体験・都度・レッスン枠がこの1画面に出る。
  *
- * 店舗アカウントでログインして開く（middleware の認可対象）。
+ * 店舗アカウントでログインして開く（middleware の認可対象・publicPrefixes には入れないこと）。
  * 以前あったトークンURL `/board/<token>` は廃止した。
+ *
+ * ★ 店舗またぎ廃止（#134）: ログインしたアカウントがFRANK姫路に配属されていなければ見せない。
+ *   ロビー掲示なのでレイアウトは (main) の外だが、認可はここで自分で行う必要がある。
  */
 
 function jstNow(): { date: string; hhmm: string } {
@@ -26,8 +32,10 @@ function shortName(b: BookingRow): string {
 }
 
 export default async function BoardPage() {
+  const actor = await requireReceptionActor();
+  if (!canAccessFrank(actor)) notFound();
   const jst = jstNow();
-  const view = await loadDay(jst.date);
+  const view = await loadDay(jst.date, actor.companyId);
   const bays = view.bays.filter((b) => b.active);
   const cells = occupancy(view);
   const lessonCells = lessonOccupancy(view);

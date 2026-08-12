@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { requireLessonActor } from "@/lib/auth";
+import { requireLessonActor, canAccessStore, FRANK_STORE_ID } from "@/lib/auth";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireLessonActor();
+  // FRANKに入れない人にはタブ自体を出さない（実際の遮断は /frank 側のサーバー検証 #134）
+  const canFrank = canAccessStore(actor, FRANK_STORE_ID);
   return (
     <div className="flex min-h-screen flex-col">
       {/* 紺ヘッダ（PGA NOTE準拠） */}
@@ -15,7 +17,9 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           <nav className="flex items-center gap-1 text-sm">
             <Link href="/" className="rounded-lg px-3 py-1.5 hover:bg-white/10">レッスンノート</Link>
             <Link href="/models" className="rounded-lg px-3 py-1.5 hover:bg-white/10">お手本スイング</Link>
-            <Link href="/frank" className="rounded-lg px-3 py-1.5 hover:bg-white/10">FRANK</Link>
+            {canFrank && (
+              <Link href="/frank" className="rounded-lg px-3 py-1.5 hover:bg-white/10">FRANK</Link>
+            )}
           </nav>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-white/70 sm:inline">担当: {actor.name}</span>

@@ -2,13 +2,14 @@ import Link from "next/link";
 import { StoreSwitcher } from "@/components/store-switcher";
 import type { AccessibleStore } from "@/lib/auth";
 
+/** ownerOnly: 全社の数字を扱う画面。現場アカウントには出さない（#134・遮断はサーバー側） */
 const LINKS = [
   { href: "/", label: "ダッシュボード" },
   { href: "/sales", label: "売上" },
   { href: "/analysis", label: "売上分析" },
   { href: "/cash", label: "現金出納" },
   { href: "/count", label: "金種棚卸" },
-  { href: "/import", label: "カード・口座取込" },
+  { href: "/import", label: "カード・口座取込", ownerOnly: true },
   { href: "/receipts", label: "証憑" },
   { href: "/settings", label: "設定" },
 ];
@@ -17,10 +18,12 @@ export function TopBar({
   userName,
   stores,
   currentStoreId,
+  canManageAll = false,
 }: {
   userName: string;
   stores: AccessibleStore[];
   currentStoreId: string | null;
+  canManageAll?: boolean;
 }) {
   return (
     <header className="flex flex-wrap items-center justify-between gap-2 border-b border-(--color-line) bg-(--color-panel) px-6 py-3">
@@ -31,7 +34,7 @@ export function TopBar({
         </div>
         <StoreSwitcher stores={stores} currentId={currentStoreId} />
         <nav className="flex items-center gap-4 text-sm">
-          {LINKS.map((l) => (
+          {LINKS.filter((l) => canManageAll || !l.ownerOnly).map((l) => (
             <Link key={l.href} href={l.href} className="text-(--color-dim) hover:text-(--color-txt)">
               {l.label}
             </Link>
