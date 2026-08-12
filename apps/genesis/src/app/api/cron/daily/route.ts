@@ -8,6 +8,7 @@ import { runAiScorecard } from "@/lib/ai-scorecard";
 import { runMorningDigest } from "@/lib/morning-digest";
 import { runContentLoop, refreshContentMetrics } from "@/lib/content-loop";
 import { runFrankReminders } from "@/lib/frank-mail";
+import { listOperatingCompanyIds } from "@/lib/operating-companies";
 
 export const dynamic = "force-dynamic";
 // 60秒だとAI社員の成果物生成が入った時点で504になり、レポートが丸ごと欠落した（2026-07-15〜17）。
@@ -26,9 +27,12 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdmin();
-  const { data: companies } = await admin.from("companies").select("id").is("deleted_at", null);
+  // 店舗を持つ会社だけ回す（#134c）。SWING CORTEX の外販テナントは店舗を持たないので、
+  // 中身の無い日次レポート・AIループを毎朝作らない。
+  const companyIds = await listOperatingCompanyIds(admin);
   const results = [];
-  for (const c of companies ?? []) {
+  for (const id of companyIds) {
+    const c = { id };
     try {
       // 後工程の予算180秒。maxDuration(300秒)より十分短くする（レポート本体は数秒で終わる）。
       const r = await runDailyCeoReport(String(c.id), "cron", {

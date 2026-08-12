@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdmin } from "@/lib/supabase/admin";
 import { runDueActions } from "@/lib/ai-execution";
 import { publishDueContent } from "@/lib/content-loop";
+import { listOperatingCompanyIds } from "@/lib/operating-companies";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,9 +20,11 @@ export async function GET(req: NextRequest) {
   }
 
   const admin = createAdmin();
-  const { data: companies } = await admin.from("companies").select("id").is("deleted_at", null);
+  // 店舗を持つ会社だけ回す（#134c・cron/daily と同じ理由）
+  const companyIds = await listOperatingCompanyIds(admin);
   const results = [];
-  for (const c of companies ?? []) {
+  for (const id of companyIds) {
+    const c = { id };
     try {
       const r = await runDueActions(admin, String(c.id));
       // 承認済みSNS投稿の時刻到来分をInstagramへ（#101・IG未設定なら注記のみでスキップ）
