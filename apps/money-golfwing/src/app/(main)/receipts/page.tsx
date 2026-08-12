@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { monthRange } from "@/lib/money-util";
 import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen } from "@/components/ui";
 import { uploadReceipt, updateReceipt, deleteReceipt } from "./actions";
+import { matchesQuery } from "@/lib/table-filter";
 
 /* 経理証憑（請求書・見積・領収書・レシート）— mon_receipts / DECISIONS #29a・#41
    電子帳簿保存法対応の保管＋金額突合の土台。契約書はLegal OS（別担当）。 */
@@ -40,7 +41,7 @@ type ReceiptRow = {
 export default async function ReceiptsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string; kind?: string }>;
+  searchParams: Promise<{ ym?: string; kind?: string; q?: string; status?: string; all?: string }>;
 }) {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
@@ -48,6 +49,9 @@ export default async function ReceiptsPage({
 
   const ym = sp.ym ?? new Date().toISOString().slice(0, 7);
   const { from, to } = monthRange(ym);
+  /** 探すときは月をまたぎたいことが多いので「全期間」を用意する */
+  const allPeriod = sp.all === "1";
+  const keyword = (sp.q ?? "").trim();
 
   let q = admin
     .from("mon_receipts")
@@ -56,12 +60,18 @@ export default async function ReceiptsPage({
     .is("deleted_at", null)
     .order("issue_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(allPeriod ? 1000 : 200);
   // 発行日が入っている行は月で絞る。未入力(null)の行は常に表示（入力促し）
-  q = q.or(`issue_date.is.null,and(issue_date.gte.${from},issue_date.lt.${to})`);
+  if (!allPeriod) q = q.or(`issue_date.is.null,and(issue_date.gte.${from},issue_date.lt.${to})`);
   if (sp.kind) q = q.eq("kind", sp.kind);
+  if (sp.status) q = q.eq("status", sp.status);
   const { data } = await q;
-  const rows = (data ?? []) as unknown as ReceiptRow[];
+  let rows = (data ?? []) as unknown as ReceiptRow[];
+
+  // キーワード検索（発行元・メモ・ファイル名・金額）。表記ゆれはアプリ側で吸収する
+  if (keyword) {
+    rows = rows.filter((r) => matchesQuery([r.counterparty, r.memo, r.file_name, r.amount, r.issue_date], keyword));
+  }
 
   // 閲覧用の署名付きURL（1時間有効）
   const signed = new Map<string, string>();
@@ -85,15 +95,28 @@ export default async function ReceiptsPage({
             電子帳簿保存法の保管＋経費突合の土台。契約書はLegal OSへ（こちらは経理系のみ）
           </p>
         </div>
-        <form className="flex items-center gap-2">
-          <input type="month" name="ym" defaultValue={ym} className={inputCls} />
+        <form className="flex flex-wrap items-center gap-2">
+          <input name="q" defaultValue={keyword} placeholder="検索（発行元・メモ・金額）" aria-label="証憑を検索" className={`${inputCls} min-w-48`} />
+          <input type="month" name="ym" defaultValue={ym} className={inputCls} disabled={allPeriod} />
+          <label className="flex items-center gap-1 text-sm text-(--color-dim)">
+            <input type="checkbox" name="all" value="1" defaultChecked={allPeriod} /> 全期間
+          </label>
           <select name="kind" defaultValue={sp.kind ?? ""} className={inputCls}>
             <option value="">全種別</option>
             {Object.entries(KIND_LABEL).map(([v, l]) => (
               <option key={v} value={v}>{l}</option>
             ))}
           </select>
+          <select name="status" defaultValue={sp.status ?? ""} className={inputCls}>
+            <option value="">全状態</option>
+            {Object.entries(STATUS_LABEL).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
           <button className={btnGhostCls}>表示</button>
+          {(keyword || sp.kind || sp.status || allPeriod) && (
+            <a href="/receipts" className="text-sm text-(--color-dim) underline">解除</a>
+          )}
         </form>
       </div>
 
@@ -116,7 +139,7 @@ export default async function ReceiptsPage({
         </p>
       </Panel>
 
-      <Panel title={`${ym} の証憑 ${rows.length}件${total > 0 ? `（金額計 ${yen(total)}）` : ""}`}>
+      <Panel title={`${allPeriod ? "全期間" : ym} の証憑 ${rows.length}件${keyword ? `（「${keyword}」で検索）` : ""}${total > 0 ? `（金額計 ${yen(total)}）` : ""}`}>
         {rows.length === 0 ? (
           <Empty>この条件の証憑はありません</Empty>
         ) : (

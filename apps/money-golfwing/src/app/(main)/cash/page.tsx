@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { getCurrentStore, latestCashBalance, monthRange } from "@/lib/money";
+import { getCurrentStore, latestCashBalance } from "@/lib/money";
 import { Panel, Empty, yen, inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { addCashEntry, deleteCashEntry } from "./actions";
+import { addCashEntry } from "./actions";
+import CashTable from "./CashTable";
+import RangePicker from "@/components/RangePicker";
+import { resolveRange, type RangePreset } from "@/lib/table-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -15,21 +18,35 @@ type Row = {
 function ym(d: Date) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; }
 function shift(y: string, n: number) { const [a, m] = y.split("-").map(Number); return ym(new Date(a, m - 1 + n, 1)); }
 
-export default async function CashPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+export default async function CashPage({ searchParams }: {
+  searchParams: Promise<{ month?: string; range?: string; from?: string; to?: string }>;
+}) {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
   const store = await getCurrentStore(actor);
   const sp = await searchParams;
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
-  const { from, to } = monthRange(month);
+  const preset: RangePreset = (["month", "3m", "6m", "year", "all", "custom"] as const)
+    .includes(sp.range as RangePreset) ? (sp.range as RangePreset) : "month";
+  const range = resolveRange({ preset, month, from: sp.from, to: sp.to });
+  const { from, to } = range;
 
   const { data } = store
     ? await admin.from("mon_cash_ledger").select("*")
         .eq("company_id", actor.companyId).eq("store_id", store.id)
         .gte("entry_date", from).lt("entry_date", to).is("deleted_at", null)
         .order("entry_date", { ascending: true }).order("created_at", { ascending: true })
+        .limit(4000)
     : { data: [] };
   const rows = (data ?? []) as Row[];
+  /** 前月/翌月リンクで期間の指定を落とさない */
+  const qs = (over: { month?: string }) => {
+    const p = new URLSearchParams();
+    p.set("month", over.month ?? month);
+    if (preset !== "month") p.set("range", preset);
+    if (preset === "custom") { if (sp.from) p.set("from", sp.from); if (sp.to) p.set("to", sp.to); }
+    return `/cash?${p.toString()}`;
+  };
   const balance = store ? await latestCashBalance(actor.companyId, store.id) : 0;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -41,14 +58,18 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           <p className="text-sm text-(--color-dim)">入金・出金を入力すると残高が自動計算されます</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/cash?month=${shift(month, -1)}`} className={btnGhostCls}>← 前月</Link>
+          <Link href={qs({ month: shift(month, -1) })} className={btnGhostCls}>← 前月</Link>
           <span className="min-w-24 text-center font-bold tabular-nums">{month}</span>
-          <Link href={`/cash?month=${shift(month, 1)}`} className={btnGhostCls}>翌月 →</Link>
+          <Link href={qs({ month: shift(month, 1) })} className={btnGhostCls}>翌月 →</Link>
         </div>
       </header>
 
       <Panel title="現在の現金残高">
         <p className="text-3xl font-bold tabular-nums">{yen(balance)} 円</p>
+      </Panel>
+
+      <Panel title="表示する期間">
+        <RangePicker basePath="/cash" month={month} preset={preset} from={sp.from ?? null} to={sp.to ?? null} />
       </Panel>
 
       <Panel title="出納を追加">
@@ -68,44 +89,11 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         )}
       </Panel>
 
-      <Panel title={`出納帳（${month}）`}>
+      <Panel title={`出納帳（${range.label}）`}>
         {rows.length === 0 ? (
-          <Empty>この月の記録はまだありません</Empty>
+          <Empty>この期間の記録はまだありません</Empty>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
-                  <th className="py-2 pr-2 text-left font-medium">日付</th>
-                  <th className="px-2 py-2 text-left font-medium">摘要 / 内容</th>
-                  <th className="px-2 py-2 text-right font-medium">入金</th>
-                  <th className="px-2 py-2 text-right font-medium">出金</th>
-                  <th className="px-2 py-2 text-right font-medium">残高</th>
-                  <th className="px-2 py-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b border-(--color-line)">
-                    <td className="py-2 pr-2 tabular-nums text-(--color-dim)">{r.entry_date}</td>
-                    <td className="px-2 py-2">
-                      {r.summary ?? "—"}{r.description ? ` / ${r.description}` : ""}
-                      {r.source === "sales" && <span className="ml-1 text-xs text-(--color-gold)">売上</span>}
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums text-(--color-ok)">{r.in_amount ? yen(Number(r.in_amount)) : ""}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{r.out_amount ? yen(Number(r.out_amount)) : ""}</td>
-                    <td className="px-2 py-2 text-right tabular-nums font-medium">{r.balance == null ? "—" : yen(Number(r.balance))}</td>
-                    <td className="px-2 py-2 text-right">
-                      <form action={deleteCashEntry}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
-                      </form>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CashTable rows={rows} />
         )}
       </Panel>
     </div>

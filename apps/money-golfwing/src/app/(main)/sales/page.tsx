@@ -5,6 +5,8 @@ import { getCurrentStore, monthRange } from "@/lib/money";
 import { Panel, Empty, yen, btnGhostCls } from "@/components/ui";
 import SalesEntry, { type Preset } from "./SalesEntry";
 import SalesTable, { type SaleRow } from "./SalesTable";
+import RangePicker from "@/components/RangePicker";
+import { resolveRange, type RangePreset } from "@/lib/table-filter";
 import type { InvPick } from "./ProductPicker";
 
 export const dynamic = "force-dynamic";
@@ -50,32 +52,58 @@ function uniqTop(items: string[], n: number): string[] {
   return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([v]) => v);
 }
 
-export default async function SalesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+/** 明細の読み込み上限。これを超えると画面が重くなるので、超えたことを画面で伝える */
+const ROW_LIMIT = 4000;
+
+export default async function SalesPage({ searchParams }: {
+  searchParams: Promise<{ month?: string; range?: string; from?: string; to?: string }>;
+}) {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
   const store = await getCurrentStore(actor);
   const sp = await searchParams;
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
-  const { from, to } = monthRange(month);
+
+  // 期間（当月／3か月／6か月／今年／全期間／任意）。商品ごとの動きは1か月では見えない
+  const preset: RangePreset = (["month", "3m", "6m", "year", "all", "custom"] as const)
+    .includes(sp.range as RangePreset) ? (sp.range as RangePreset) : "month";
+  const range = resolveRange({ preset, month, from: sp.from, to: sp.to });
+  const { from, to } = range;
+  /** 当月の集計（PL計上合計）は従来どおり「表示中の月」で出す */
+  const cur = monthRange(month);
+  /** 前月/翌月リンクで選んだ期間の条件を落とさない */
+  const qs = (over: { month?: string }) => {
+    const p = new URLSearchParams();
+    p.set("month", over.month ?? month);
+    if (preset !== "month") p.set("range", preset);
+    if (preset === "custom") {
+      if (sp.from) p.set("from", sp.from);
+      if (sp.to) p.set("to", sp.to);
+    }
+    return `/sales?${p.toString()}`;
+  };
 
   const [{ data }, { data: lineData }] = store
     ? await Promise.all([
         admin.from("mon_sales").select("*")
           .eq("company_id", actor.companyId).eq("store_id", store.id)
           .gte("sold_on", from).lt("sold_on", to).is("deleted_at", null)
-          .order("sold_on", { ascending: false }),
+          .order("sold_on", { ascending: false }).limit(ROW_LIMIT),
         // 台帳明細（Excel取込）。過去期の明細はmon_salesではなくここにある
         admin.from("mon_sales_lines")
           .select("id, sold_on, customer_name, member_kind, item_category, item_type, maker, product_name, list_price, discount, qty, amount, tax_included, pay_method, pro, memo")
           .eq("company_id", actor.companyId).eq("store_id", store.id)
           .gte("sold_on", from).lt("sold_on", to).is("deleted_at", null)
-          .order("sold_on", { ascending: false }),
+          .order("sold_on", { ascending: false }).limit(ROW_LIMIT),
       ])
     : [{ data: [] }, { data: [] }];
   const rows = (data ?? []) as Sale[];
   const ledgerLines = (lineData ?? []) as LedgerLine[];
-  /** PL計上合計（月次まるめ・月会費予測等を含む） */
-  const total = rows.reduce((a, r) => a + Number(r.amount), 0);
+  const truncated = rows.length >= ROW_LIMIT || ledgerLines.length >= ROW_LIMIT;
+  /** PL計上合計（月次まるめ・月会費予測等を含む）。表示中の月のぶんだけ */
+  const total = rows
+    .filter((r) => r.sold_on >= cur.from && r.sold_on < cur.to)
+    .reduce((a, r) => a + Number(r.amount), 0);
   // 「今日」はJSTで解決（UTCだと朝9時まで前日になる。#73）
   const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
@@ -237,9 +265,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           <p className="text-sm text-(--color-dim)">日々の売上を入力。現金はそのまま現金出納にも反映されます</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/sales?month=${shift(month, -1)}`} className={btnGhostCls}>← 前月</Link>
+          <Link href={qs({ month: shift(month, -1) })} className={btnGhostCls}>← 前月</Link>
           <span className="min-w-24 text-center font-bold tabular-nums">{month}</span>
-          <Link href={`/sales?month=${shift(month, 1)}`} className={btnGhostCls}>翌月 →</Link>
+          <Link href={qs({ month: shift(month, 1) })} className={btnGhostCls}>翌月 →</Link>
           {/* 売上データ.xlsx と同じレイアウトで書き出す（そのまま既存ブックへ貼れる） */}
           <a href={`/api/sales/export?month=${month}`} className={btnGhostCls} title="この月の明細を売上データ.xlsxと同じ形式で書き出します">
             Excel出力
@@ -247,7 +275,11 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         </div>
       </header>
 
-      <Panel title={`当月売上（税抜）`}>
+      <Panel title="表示する期間">
+        <RangePicker month={month} preset={preset} from={sp.from ?? null} to={sp.to ?? null} />
+      </Panel>
+
+      <Panel title={`売上（税抜）・${range.label}`}>
         <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
           <div>
             <p className="text-3xl font-bold tabular-nums">{yen(detailTotal)} 円</p>
@@ -256,10 +288,15 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
           {total > 0 && (
             <div>
               <p className="text-xl font-bold tabular-nums text-(--color-dim)">{yen(total)} 円</p>
-              <p className="mt-1 text-xs text-(--color-dim)">月次計上合計（月会費予測・自動計上を含む）</p>
+              <p className="mt-1 text-xs text-(--color-dim)">{month} の月次計上合計（月会費予測・自動計上を含む）</p>
             </div>
           )}
         </div>
+        {truncated && (
+          <p className="mt-2 text-xs text-(--color-accent)">
+            件数が多いため最新 {ROW_LIMIT.toLocaleString("ja-JP")} 件までを読み込んでいます。期間を短くすると全件見られます
+          </p>
+        )}
       </Panel>
 
       <Panel title="売上を追加">
@@ -283,9 +320,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         )}
       </Panel>
 
-      <Panel title={`明細（${month}）`}>
+      <Panel title={`明細（${range.label}）`}>
         {saleRows.length === 0 ? (
-          <Empty>この月の売上はまだありません</Empty>
+          <Empty>この期間の売上はまだありません</Empty>
         ) : (
           <SalesTable rows={saleRows} categories={CATEGORIES} memberKinds={MEMBER_KINDS} payMethods={PAY_METHODS} pros={pros} />
         )}

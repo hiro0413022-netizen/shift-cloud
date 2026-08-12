@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { inputCls, btnCls, btnGhostCls, yen } from "@/components/ui";
 import { updateSale, deleteSaleById } from "./actions";
 import CustomerHistoryDialog from "./CustomerHistoryDialog";
+import { matchesQuery, optionCounts, summarize, BLANK_LABEL } from "@/lib/table-filter";
 
 /** 一覧・編集用の1明細（サーバーで整形して渡す） */
 export type SaleRow = {
@@ -103,6 +104,29 @@ function recalcFrom(f: Form, p: Partial<Form>, start: "price" | "unit" | "amount
   return next;
 }
 
+/** 絞り込みの対象列。Excelのオートフィルタと同じ考え方で「列＝1つの条件」にする */
+type FilterKey = "category" | "productName" | "customerName" | "pro" | "payMethod" | "memberKind" | "maker";
+
+const FILTERS: Array<{ key: FilterKey; label: string }> = [
+  { key: "category", label: "区分" },
+  { key: "productName", label: "品名" },
+  { key: "customerName", label: "お客様" },
+  { key: "pro", label: "担当" },
+  { key: "maker", label: "メーカー" },
+  { key: "payMethod", label: "支払" },
+  { key: "memberKind", label: "会員区分" },
+];
+
+/** 集計（ピボット）の切り口 */
+const PIVOTS: Array<{ key: FilterKey; label: string }> = [
+  { key: "productName", label: "商品別" },
+  { key: "customerName", label: "お客様別" },
+  { key: "pro", label: "担当別" },
+  { key: "category", label: "区分別" },
+  { key: "maker", label: "メーカー別" },
+  { key: "payMethod", label: "支払別" },
+];
+
 export default function SalesTable({
   rows,
   categories,
@@ -135,11 +159,62 @@ export default function SalesTable({
       setSortDesc(key === "amount" || key === "soldOn");
     }
   }
+  // 検索と絞り込み（Excelのオートフィルタ相当）。URLに出さず画面内で完結させる＝打った瞬間に絞れる
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<Partial<Record<FilterKey, string>>>({});
+  const [pivotKey, setPivotKey] = useState<FilterKey | null>(null);
+
+  const filteredRows = useMemo(() => {
+    const entries = Object.entries(picked).filter(([, v]) => v) as Array<[FilterKey, string]>;
+    return rows.filter((r) => {
+      for (const [k, v] of entries) {
+        const cur = String(r[k] ?? "").trim() || BLANK_LABEL;
+        if (cur !== v) return false;
+      }
+      return matchesQuery(
+        [r.soldOn, r.category, r.customerName, r.memberKind, r.productName, r.itemType, r.maker,
+         r.seller, r.pro, r.payMethod, r.memo, r.amount],
+        query,
+      );
+    });
+  }, [rows, picked, query]);
+
   const sortedRows = useMemo(() => {
-    const arr = [...rows].sort((a, b) => compareRows(a, b, sortKey));
+    const arr = [...filteredRows].sort((a, b) => compareRows(a, b, sortKey));
     if (sortDesc) arr.reverse();
     return arr;
-  }, [rows, sortKey, sortDesc]);
+  }, [filteredRows, sortKey, sortDesc]);
+
+  /**
+   * プルダウンの候補。
+   * 「その列以外の条件を適用した結果」から作る＝すでに選んだ条件で候補が減り、
+   * 選ぶと0件になる選択肢が出ない（Excelのフィルタと同じ挙動）。
+   */
+  const optionsFor = useMemo(() => {
+    const cache = {} as Record<FilterKey, Array<{ value: string; count: number }>>;
+    for (const f of FILTERS) {
+      const others = Object.entries(picked).filter(([k, v]) => v && k !== f.key) as Array<[FilterKey, string]>;
+      const base = rows.filter((r) => {
+        for (const [k, v] of others) {
+          const cur = String(r[k] ?? "").trim() || BLANK_LABEL;
+          if (cur !== v) return false;
+        }
+        return true;
+      });
+      cache[f.key] = optionCounts(base, (r) => String(r[f.key] ?? "").trim() || BLANK_LABEL);
+    }
+    return cache;
+  }, [rows, picked]);
+
+  const pivotRows = useMemo(
+    () => (pivotKey ? summarize(filteredRows, (r) => String(r[pivotKey] ?? ""), (r) => r.amount, (r) => r.qty ?? 1) : []),
+    [filteredRows, pivotKey],
+  );
+
+  const filteredTotal = filteredRows.reduce((a, r) => a + r.amount, 0);
+  const filteredQty = filteredRows.reduce((a, r) => a + (r.qty ?? 1), 0);
+  const activeCount = Object.values(picked).filter(Boolean).length + (query.trim() ? 1 : 0);
+  function clearAll() { setPicked({}); setQuery(""); }
 
   /** ソート可能な見出しセル */
   function sortableTh(key: SortKey, label: string, className: string) {
@@ -205,8 +280,116 @@ export default function SalesTable({
   const opts = (base: string[], cur: string) => (cur && !base.includes(cur) ? [cur, ...base] : base);
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       {historyName && <CustomerHistoryDialog name={historyName} onClose={() => setHistoryName(null)} />}
+
+      {/* 探す・絞る */}
+      <div className="mb-3 space-y-2 rounded-xl border border-(--color-line) bg-(--color-bg) p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="検索（品名・お客様・担当・備考…／スペースでAND、-で除外）"
+            aria-label="明細を検索"
+            className={`${inputCls} min-w-64 flex-1`}
+          />
+          {activeCount > 0 && (
+            <button type="button" onClick={clearAll} className={btnGhostCls}>絞り込みを解除</button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map((f) => {
+            const opts = optionsFor[f.key] ?? [];
+            if (opts.length === 0 && !picked[f.key]) return null;
+            return (
+              <select
+                key={f.key}
+                value={picked[f.key] ?? ""}
+                onChange={(e) => setPicked((p) => ({ ...p, [f.key]: e.target.value }))}
+                aria-label={`${f.label}で絞り込む`}
+                className={`${inputCls} !w-auto max-w-52 ${picked[f.key] ? "border-(--color-gold) font-medium" : ""}`}
+              >
+                <option value="">{f.label}（すべて）</option>
+                {opts.map((o) => (
+                  <option key={o.value} value={o.value}>{o.value}（{o.count}）</option>
+                ))}
+              </select>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="font-medium">
+            {filteredRows.length}件
+            {filteredRows.length !== rows.length && <span className="text-(--color-dim)">／全{rows.length}件</span>}
+          </span>
+          <span className="tabular-nums">合計 <strong>{yen(filteredTotal)}</strong> 円（税抜）</span>
+          <span className="text-(--color-dim) tabular-nums">個数 {filteredQty}</span>
+          <span className="ml-auto flex flex-wrap items-center gap-1">
+            <span className="text-xs text-(--color-dim)">集計:</span>
+            {PIVOTS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => setPivotKey((cur) => (cur === p.key ? null : p.key))}
+                className={
+                  pivotKey === p.key
+                    ? "rounded-lg bg-(--color-gold) px-2.5 py-1 text-xs font-medium text-white"
+                    : `${btnGhostCls} !px-2.5 !py-1 !text-xs`
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </span>
+        </div>
+      </div>
+
+      {/* 集計表（Excelのピボット相当）。行を押すとその値で明細を絞る */}
+      {pivotKey && (
+        <div className="mb-3 overflow-x-auto rounded-xl border border-(--color-line)">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-(--color-line) bg-(--color-bg) text-xs text-(--color-dim)">
+                <th className="px-3 py-2 text-left">{PIVOTS.find((p) => p.key === pivotKey)?.label}</th>
+                <th className="px-3 py-2 text-right">件数</th>
+                <th className="px-3 py-2 text-right">個数</th>
+                <th className="px-3 py-2 text-right">金額（税抜）</th>
+                <th className="px-3 py-2 text-right">構成比</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pivotRows.map((s) => (
+                <tr key={s.key} className="border-b border-(--color-line) last:border-0">
+                  <td className="px-3 py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPicked((p) => ({ ...p, [pivotKey]: p[pivotKey] === s.key ? "" : s.key }))}
+                      className={`underline decoration-dotted underline-offset-2 hover:text-(--color-gold) ${picked[pivotKey] === s.key ? "font-bold text-(--color-gold)" : ""}`}
+                      title="この行だけに絞り込む"
+                    >{s.key}</button>
+                  </td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-(--color-dim)">{s.count}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-(--color-dim)">{s.qty}</td>
+                  <td className="px-3 py-1.5 text-right font-medium tabular-nums">{yen(s.amount)}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums text-(--color-dim)">
+                    {filteredTotal ? `${Math.round((s.amount / filteredTotal) * 100)}%` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {sortedRows.length === 0 && (
+        <p className="mb-3 rounded-lg bg-(--color-bg) px-3 py-4 text-center text-sm text-(--color-dim)">
+          この条件に合う明細はありません。「絞り込みを解除」で戻せます
+        </p>
+      )}
+
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
@@ -313,6 +496,7 @@ export default function SalesTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
