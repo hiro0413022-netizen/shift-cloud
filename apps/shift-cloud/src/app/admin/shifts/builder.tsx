@@ -36,9 +36,15 @@ function reqTimes(r: Request, tmap: Map<string, Template>): { start: string; end
 }
 
 export function ShiftBuilder({
-  storeId, ym, days, staff, templates, shifts, requests, timeOff,
+  storeId, days, rangeLabel, rangeShort, staff, templates, shifts, requests, timeOff,
 }: {
-  storeId: string; ym: string; days: string[];
+  storeId: string;
+  /** 表示する日付（日/週/半月/月。範囲は lib/shift-span.ts が決める・#135） */
+  days: string[];
+  /** 見出し用「2026年9月1日（火） 〜 9月15日（火）」 */
+  rangeLabel: string;
+  /** ボタン用の短いラベル「9月前半」など */
+  rangeShort: string;
   staff: StaffRow[]; templates: Template[]; shifts: Shift[]; requests: Request[];
   /** "staffId|date" → 休み希望（approved=承認済み / submitted=申請中） */
   timeOff: Record<string, { status: string; reason: string | null }>;
@@ -51,7 +57,11 @@ export function ShiftBuilder({
   const [msg, setMsg] = useState("");
   const [restored, setRestored] = useState(false);
   const [pending, start] = useTransition();
-  const lsKey = `shiftdraft:${storeId}:${ym}`;
+  // 退避キーは「店舗」だけ。表示範囲（日/週/半月/月）や月を混ぜると、
+  // 期間を切り替えたとたんに未保存のドラフトが行方不明になる（#135）。
+  // セルは "staffId|date" で持っているので、範囲外の未保存ぶんもそのまま保存できる。
+  const lsKey = `shiftdraft:${storeId}`;
+  const inRange = new Set(days);
 
   // 未保存編集の集合を常に最新で参照できるようにする
   const dirtyRef = useRef(dirty);
@@ -78,12 +88,24 @@ export function ShiftBuilder({
   // ① 未保存の編集を localStorage から復元
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(lsKey);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as { grid: Record<string, Cell>; dirty: string[] };
-      if (saved.dirty?.length) {
-        setGrid((p) => ({ ...p, ...saved.grid }));
-        setDirty(new Set(saved.dirty));
+      // #135以前は "shiftdraft:店舗:年月" だった。取りこぼさないよう拾って新キーへ寄せる
+      const merged: Record<string, Cell> = {};
+      const keys: string[] = [];
+      const lsKeys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && (k === lsKey || k.startsWith(`${lsKey}:`))) lsKeys.push(k);
+      }
+      for (const k of lsKeys) {
+        const raw = localStorage.getItem(k);
+        if (!raw) continue;
+        const saved = JSON.parse(raw) as { grid: Record<string, Cell>; dirty: string[] };
+        for (const dk of saved.dirty ?? []) if (saved.grid?.[dk]) { merged[dk] = saved.grid[dk]; keys.push(dk); }
+        if (k !== lsKey) localStorage.removeItem(k);
+      }
+      if (keys.length) {
+        setGrid((p) => ({ ...p, ...merged }));
+        setDirty(new Set(keys));
         setRestored(true);
       }
     } catch { /* ignore */ }
@@ -139,11 +161,15 @@ export function ShiftBuilder({
     markDirty(key);
   }
 
-  /** 空いているセルにだけ希望をまとめて反映（入力済み・確定済みは上書きしない） */
+  /**
+   * 空いているセルにだけ希望をまとめて反映（入力済み・確定済みは上書きしない）。
+   * 対象は**画面に見えている期間だけ**。見えていない日を勝手に埋めない（#135）
+   */
   function applyAllRequests() {
     const next: Record<string, Cell> = {};
     const keys: string[] = [];
     for (const r of requests) {
+      if (!inRange.has(r.date)) continue; // 表示範囲外は触らない
       const key = `${r.staff_id}|${r.date}`;
       const cur = grid[key];
       if (cur?.status === "published") continue;
@@ -153,10 +179,10 @@ export function ShiftBuilder({
       next[key] = { template_id: null, start_time: times.start, end_time: times.end, status: "draft" };
       keys.push(key);
     }
-    if (keys.length === 0) { setMsg("反映できる希望がありません（すでに入力済みです）"); return; }
+    if (keys.length === 0) { setMsg(`${rangeShort}に反映できる希望がありません（すでに入力済みです）`); return; }
     setGrid((p) => ({ ...p, ...next }));
     setDirty((p) => { const s = new Set(p); for (const k of keys) s.add(k); return s; });
-    setMsg(`${keys.length}件の希望を反映しました（時間はこのあと自由に変えられます）`);
+    setMsg(`${rangeShort}に${keys.length}件の希望を反映しました（時間はこのあと自由に変えられます）`);
   }
 
   const save = useCallback((silent = false) => {
@@ -185,15 +211,18 @@ export function ShiftBuilder({
     return () => clearInterval(id);
   }, [dirty]);
 
+  /** 確定・通知の対象は**表示中の期間だけ**。押す前に何が起きるか分かるようにする（#135） */
   function publish() {
-    if (!confirm(`${ym.replace("-", "年")}月のドラフトをすべて確定し、スタッフに通知します。よろしいですか？`)) return;
+    if (!confirm(`${rangeLabel}（${days.length}日ぶん）のドラフトをすべて確定し、スタッフに通知します。\nこの範囲の外は変わりません。よろしいですか？`)) return;
     start(async () => {
       const res = await publishShifts(storeId, days[0], days[days.length - 1]);
-      setMsg(res.error ?? `${res.published}件のシフトを確定しました ✓`);
+      setMsg(res.error ?? `${rangeShort}の${res.published}件のシフトを確定しました ✓`);
     });
   }
 
   const dow = ["日", "月", "火", "水", "木", "金", "土"];
+  // 未保存だが今は画面に出ていないセル（期間を切り替えたあと）。保存対象には入るので件数だけ伝える
+  const dirtyOutside = [...dirty].filter((k) => !inRange.has(k.split("|")[1])).length;
 
   return (
     <div>
@@ -201,22 +230,31 @@ export function ShiftBuilder({
         <Button onClick={() => save(false)} disabled={pending || dirty.size === 0}>
           {pending ? "処理中…" : `ドラフト保存（${dirty.size}件）`}
         </Button>
-        <Button variant="secondary" onClick={applyAllRequests} disabled={pending}>希望を一括反映</Button>
-        <Button variant="secondary" onClick={publish} disabled={pending}>期間内ドラフトを確定・通知</Button>
+        <Button variant="secondary" onClick={applyAllRequests} disabled={pending} title={`${rangeLabel}の空いているセルにだけ希望を入れます`}>
+          希望を一括反映（{rangeShort}）
+        </Button>
+        <Button variant="secondary" onClick={publish} disabled={pending} title={`${rangeLabel}のドラフトだけを確定します`}>
+          {rangeShort}のドラフトを確定・通知
+        </Button>
         {dirty.size > 0 && <span className="text-xs text-amber-600">● 未保存の変更あり（15秒ごとに自動保存）</span>}
+        {dirtyOutside > 0 && <span className="text-xs text-zinc-400">うち{dirtyOutside}件は表示範囲の外（保存すると一緒に反映されます）</span>}
         {restored && <span className="text-xs text-blue-600">前回の編集内容を復元しました</span>}
         {msg && <p className="text-sm font-medium text-brand">{msg}</p>}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
-        <table className="text-xs">
+        {/* 列が少ない期間（日/週/半月）は横幅いっぱいに広げる＝横スクロールが要らない（#135） */}
+        <table className={`text-xs ${days.length <= 16 ? "w-full" : ""}`}>
           <thead>
             <tr className="bg-gradient-to-r from-brand-light to-white">
               <th className="sticky left-0 z-10 min-w-28 border-b border-r border-zinc-200 bg-brand-light px-3 py-2 text-left font-semibold text-brand">スタッフ</th>
-              {days.map((d) => {
+              {days.map((d, di) => {
                 const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
+                // 週表示は月をまたぐので、月初と先頭には「◯月」を出す
+                const showMonth = di === 0 || d.slice(8) === "01";
                 return (
                   <th key={d} className={`min-w-24 border-b border-zinc-200 px-1 py-2 font-medium ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-500"}`}>
+                    {showMonth && <span className="block text-[10px] font-normal text-zinc-400">{Number(d.slice(5, 7))}月</span>}
                     {d.slice(8)}<span className="block text-[10px]">（{w}）</span>
                   </th>
                 );

@@ -1,0 +1,337 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
+import {
+  buildTimeline,
+  groupBySlot,
+  unionSlots,
+  timeRange,
+  labelJa,
+  TIMELINE_KINDS,
+  TIMELINE_TONE,
+  toMin,
+  type TimelineItem,
+  type UnplacedReason,
+} from "@/lib/bay-timeline-pure";
+
+/**
+ * FRANK GOLF 予約タイムライン（#135）
+ *
+ * ★ 縦＝時間（上から下へ）・横＝打席。Smart Hello（GOLF WINGの現行システム）と同じ向き。
+ *   ユーザー指示（2026-08-13）で転置した。以前は横が時間だったため、
+ *   「1日ぶんを縦にスクロールして読む」という店頭の使い方に合っていなかった。
+ *
+ * ★ iPad横向き（店頭タブレット）前提
+ *   - 時間の列は sticky left-0、打席のヘッダは sticky top-0。
+ *   - 打席が増えても横スクロールで耐える（打席列は固定幅）。
+ *
+ * ★ 色は @/lib/bay-timeline-pure の TIMELINE_TONE だけを使う。ここで直書きしないこと。
+ */
+
+/** 1コマの高さ。30分刻みでiPadでもタップしやすい高さ（rowSpanでn倍になる） */
+const ROW_H = "h-12";
+
+export type TimelineBay = {
+  id: string;
+  name: string;
+  floor?: number;
+  equipment?: string | null;
+  is_lefty?: boolean;
+};
+
+function BlockBody({ item, span }: { item: TimelineItem; span: number }) {
+  return (
+    <>
+      <span className="block truncate text-[10px] font-semibold tabular-nums opacity-80">{timeRange(item)}</span>
+      <span className="block truncate text-xs font-bold leading-tight">
+        {item.alert ? <span title={item.alertNote}>⚠</span> : null}
+        {item.title}
+      </span>
+      {span >= 2 && item.sub ? (
+        <span className="block truncate text-[10px] leading-tight opacity-70">{item.sub}</span>
+      ) : null}
+    </>
+  );
+}
+
+export function BayTimeline({
+  slots,
+  step,
+  bays,
+  items,
+  nowMin = null,
+  emptyHref,
+  maxHeightClass = "max-h-[72vh]",
+}: {
+  slots: string[];
+  step: number;
+  bays: TimelineBay[];
+  items: TimelineItem[];
+  /** 今日のときだけ現在時刻（JSTの分）。現在のコマに印を出す */
+  nowMin?: number | null;
+  /** 空きコマを押したときの遷移先（/reservations で予約作成フォームに流し込む）。
+   *  undefined を返すとただの空き枠として描く（例: 15分表示中の10:15は予約の刻みに乗らない） */
+  emptyHref?: (bayId: string, slot: string) => string | undefined;
+  maxHeightClass?: string;
+}) {
+  const layout = buildTimeline(slots, step, bays.map((b) => b.id), items);
+
+  return (
+    <div className="space-y-2">
+      <div className={`overflow-auto rounded-xl border border-(--color-line) ${maxHeightClass}`}>
+        <table className="w-full border-separate border-spacing-0 bg-(--color-panel)">
+          <thead>
+            <tr>
+              <th className="sticky top-0 left-0 z-30 w-16 min-w-16 border-r border-b border-(--color-line) bg-(--color-panel-2) px-1 py-2 text-[10px] font-semibold text-(--color-dim)">
+                時間
+              </th>
+              {bays.map((b) => (
+                <th
+                  key={b.id}
+                  className="sticky top-0 z-20 min-w-32 border-r border-b border-(--color-line) bg-(--color-panel-2) px-2 py-1.5 text-center"
+                >
+                  <span className="block text-sm font-bold whitespace-nowrap">{b.name}</span>
+                  <span className="block text-[10px] font-normal text-(--color-dim) whitespace-nowrap">
+                    {[b.floor ? `${b.floor}F` : null, b.equipment, b.is_lefty ? "左右打席" : null]
+                      .filter(Boolean)
+                      .join("・") || "　"}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {layout.rows.map((row) => {
+              const isNow = nowMin != null && toMin(row.slot) <= nowMin && nowMin < toMin(row.slot) + step;
+              // 1時間の区切りだけ線を濃くする（30分刻みだと線だらけで読めないため）
+              const hourTop = toMin(row.slot) % 60 === 0;
+              return (
+                <tr key={row.slot} className={ROW_H}>
+                  <th
+                    scope="row"
+                    className={`sticky left-0 z-10 border-r border-(--color-line) bg-(--color-panel-2) px-1 text-[11px] font-semibold tabular-nums ${
+                      hourTop ? "border-t" : ""
+                    } ${isNow ? "text-accent" : "text-(--color-dim)"}`}
+                  >
+                    {row.slot.slice(0, 5)}
+                  </th>
+                  {row.cells.map((cell, i) => {
+                    if (cell.kind === "covered") return null; // 上のブロックのrowSpanが飲み込んでいる
+                    const base = `border-r border-(--color-line) p-0.5 align-top ${hourTop ? "border-t" : ""} ${isNow ? "bg-accent/5" : ""}`;
+                    if (cell.kind === "empty") {
+                      const href = emptyHref?.(cell.bayId, cell.slot);
+                      return (
+                        <td key={bays[i].id} className={base}>
+                          {href ? (
+                            <Link
+                              href={href}
+                              className="flex h-full min-h-10 items-center justify-center rounded-md border border-dashed border-(--color-line) bg-(--color-panel-2) text-[10px] text-transparent transition-colors hover:border-accent hover:text-accent"
+                            >
+                              ＋
+                            </Link>
+                          ) : (
+                            <div className="h-full min-h-10 rounded-md border border-dashed border-(--color-line) bg-(--color-panel-2)" />
+                          )}
+                        </td>
+                      );
+                    }
+                    const { item, span, cutTop, cutBottom } = cell.block;
+                    // 営業時間からはみ出しているブロックは角を落として「まだ続いている」ことを示す
+                    const cut = `${cutTop ? "rounded-t-none " : ""}${cutBottom ? "rounded-b-none" : ""}`;
+                    return (
+                      <td key={bays[i].id} rowSpan={span} className={base}>
+                        <div
+                          className={`flex h-full flex-col justify-start overflow-hidden rounded-md border px-1.5 py-1 ${TIMELINE_TONE[item.kind].block} ${cut}`}
+                          title={`${timeRange(item)} ${item.title}${item.sub ? `（${item.sub}）` : ""}${item.alertNote ? ` ⚠${item.alertNote}` : ""}`}
+                        >
+                          <BlockBody item={item} span={span} />
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <UnplacedList unplaced={layout.unplaced} />
+    </div>
+  );
+}
+
+const REASON_LABEL: Record<UnplacedReason, string> = {
+  no_bay: "打席の指定なし",
+  outside_hours: "営業時間の外",
+  conflict: "同じ打席・同じ時間に重なっています",
+};
+
+/** 表に置けなかったものは黙って消さない（消すと「予約したのに画面に無い」になる） */
+export function UnplacedList({ unplaced }: { unplaced: { item: TimelineItem; reason: UnplacedReason }[] }) {
+  if (unplaced.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) px-3 py-2">
+      <p className="mb-1.5 text-[11px] font-semibold text-(--color-dim)">表に入らなかった予定 {unplaced.length}件</p>
+      <div className="flex flex-wrap gap-1.5">
+        {unplaced.map(({ item, reason }) => (
+          <span
+            key={item.id}
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] ${TIMELINE_TONE[item.kind].block}`}
+            title={REASON_LABEL[reason]}
+          >
+            <span className="tabular-nums">{timeRange(item)}</span>
+            <span className="font-semibold">{item.title}</span>
+            <span className="opacity-70">/ {REASON_LABEL[reason]}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 凡例（4種の色をここでしか持たない） */
+export function TimelineLegend({ children }: { children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-xs text-(--color-dim)">
+      {TIMELINE_KINDS.map((k) => (
+        <span key={k} className="flex items-center gap-1.5">
+          <i className={`inline-block h-3 w-3 rounded ${TIMELINE_TONE[k].dot}`} />
+          {TIMELINE_TONE[k].label}
+        </span>
+      ))}
+      <span className="flex items-center gap-1.5">
+        <i className="inline-block h-3 w-3 rounded border border-dashed border-(--color-line) bg-(--color-panel-2)" />
+        空き
+      </span>
+      {children}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------
+// 週表示
+// ------------------------------------------------------------------
+
+export type WeekDay = {
+  date: string;
+  closed: boolean;
+  slots: string[];
+  items: TimelineItem[];
+};
+
+/**
+ * 週表示：縦＝時間・横＝曜日（7列）。打席は合算する。
+ *
+ * ★ なぜ「日×打席」にしなかったか
+ *   打席3〜4面 × 7日 = 21〜28列になり、iPad横向き(1180px)では1列40pxを切って何も読めない。
+ *   週にスタッフが知りたいのは「どの時間帯が埋まっているか／空いているか」なので、
+ *   打席は合算して件数と色で密度を見せ、細かい打席割りは日表示で見る、という分担にした。
+ *   日付の見出しを押すとその日の日表示（縦＝時間・横＝打席）へ飛ぶ。
+ */
+export function WeekTimeline({
+  days,
+  step,
+  bayCount,
+  hrefDay,
+  today,
+}: {
+  days: WeekDay[];
+  step: number;
+  /** 稼働している打席の数。満席かどうかの判定に使う */
+  bayCount: number;
+  hrefDay: (date: string) => string;
+  today: string;
+}) {
+  const slots = unionSlots(days.map((d) => d.slots));
+  const columns = days.map((d) => ({
+    day: d,
+    open: new Set(d.slots.map((s) => s.slice(0, 5))),
+    bySlot: groupBySlot(slots, step, d.items),
+  }));
+
+  if (slots.length === 0) {
+    return (
+      <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-10 text-center text-sm text-(--color-dim)">
+        この週は営業日がありません
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-auto rounded-xl border border-(--color-line) max-h-[72vh]">
+      <table className="w-full border-separate border-spacing-0 bg-(--color-panel)">
+        <thead>
+          <tr>
+            <th className="sticky top-0 left-0 z-30 w-16 min-w-16 border-r border-b border-(--color-line) bg-(--color-panel-2) px-1 py-2 text-[10px] font-semibold text-(--color-dim)">
+              時間
+            </th>
+            {columns.map(({ day }) => (
+              <th
+                key={day.date}
+                className={`sticky top-0 z-20 min-w-28 border-r border-b border-(--color-line) px-2 py-2 text-center ${
+                  day.date === today ? "bg-accent/10" : "bg-(--color-panel-2)"
+                }`}
+              >
+                <Link href={hrefDay(day.date)} className="text-sm font-bold whitespace-nowrap hover:text-accent">
+                  {labelJa(day.date)}
+                </Link>
+                <span className="block text-[10px] font-normal text-(--color-dim)">
+                  {day.closed ? "定休日" : `${day.items.length}件`}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {slots.map((slot, r) => {
+            const hourTop = toMin(slot) % 60 === 0;
+            return (
+              <tr key={slot} className="h-10">
+                <th
+                  scope="row"
+                  className={`sticky left-0 z-10 border-r border-(--color-line) bg-(--color-panel-2) px-1 text-[11px] font-semibold tabular-nums text-(--color-dim) ${hourTop ? "border-t" : ""}`}
+                >
+                  {slot}
+                </th>
+                {columns.map(({ day, open, bySlot }) => {
+                  const cellCls = `border-r border-(--color-line) p-0.5 align-top ${hourTop ? "border-t" : ""}`;
+                  if (!open.has(slot)) {
+                    // その日の営業時間外（火曜定休・土日は20時まで、など）
+                    return <td key={day.date} className={`${cellCls} bg-(--color-panel-2)`} />;
+                  }
+                  const list = bySlot[r];
+                  if (list.length === 0) {
+                    return (
+                      <td key={day.date} className={cellCls}>
+                        <div className="h-full min-h-8 rounded border border-dashed border-(--color-line) bg-(--color-panel-2)" />
+                      </td>
+                    );
+                  }
+                  const full = bayCount > 0 && list.filter((i) => i.kind !== "lesson").length >= bayCount;
+                  return (
+                    <td key={day.date} className={cellCls}>
+                      <div className="flex h-full min-h-8 flex-col gap-0.5">
+                        {list.slice(0, 2).map((it) => (
+                          <span
+                            key={it.id}
+                            className={`truncate rounded border px-1 text-[10px] leading-4 ${TIMELINE_TONE[it.kind].block}`}
+                            title={`${timeRange(it)} ${it.title}`}
+                          >
+                            {it.start.slice(0, 5)} {it.title}
+                          </span>
+                        ))}
+                        {list.length > 2 && (
+                          <span className="px-1 text-[10px] leading-4 text-(--color-dim)">他{list.length - 2}件</span>
+                        )}
+                        {full && <span className="px-1 text-[10px] leading-4 font-semibold text-rose-600">満席</span>}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

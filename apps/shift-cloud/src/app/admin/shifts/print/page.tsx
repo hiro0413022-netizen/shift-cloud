@@ -6,6 +6,17 @@ import { PrintButton } from "./print-button";
 
 type Shift = { staff_id: string; date: string; start_time: string | null; end_time: string | null; is_day_off: boolean; template_id: string | null };
 
+/**
+ * 印刷の range → シフト作成画面の span/d へ変換（#135）。
+ * half1/half2 は shift-span.ts の「半月」と同じ区切り（1〜15 / 16〜末）なのでそのまま対応する。
+ */
+function backHref(storeId: string, range: string, start: string, end: string): string {
+  const q = (span: string, d: string) => `/admin/shifts?store=${storeId}&span=${span}&d=${d}`;
+  if (range === "half1" || range === "half2") return q("half", start);
+  if (range === "custom") return q(start === end ? "day" : "week", start);
+  return q("month", start);
+}
+
 export default async function ShiftPrintPage({
   searchParams,
 }: {
@@ -95,7 +106,8 @@ export default async function ShiftPrintPage({
     <div className="print-root bg-white text-black">
       {/* 操作バー（印刷では非表示） */}
       <div className="no-print mb-4 flex flex-wrap items-center gap-3 border-b border-zinc-200 pb-4">
-        <Link href={`/admin/shifts?store=${storeId}&ym=${ym}`} className="text-sm text-zinc-500 hover:underline">← シフト作成に戻る</Link>
+        {/* 印刷で見ている範囲のままシフト作成へ戻す（#135） */}
+        <Link href={backHref(storeId, range, start, end)} className="text-sm text-zinc-500 hover:underline">← シフト作成に戻る</Link>
         <div className="flex items-center gap-1">
           <Link href={`/admin/shifts/print?store=${storeId}&ym=${addMonths(ym, -1)}&range=${range}`} className="px-1.5 text-zinc-400">←</Link>
           <span className="text-sm font-semibold">{ym.replace("-", "年")}月</span>

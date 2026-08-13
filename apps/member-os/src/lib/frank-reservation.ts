@@ -9,6 +9,7 @@ import {
   FRANK_STORE_ID,
   type BookingCfg,
 } from "@yozan/core/frank-booking";
+import { monthRange, EMPTY_DAY_COUNT, type DayCount } from "@/lib/bay-timeline-pure";
 
 /**
  * スタッフ画面（member-os）から FRANK の予約台帳を読む（#93 台帳一本化）
@@ -121,6 +122,60 @@ export async function loadDay(dateStr: string, companyId: string): Promise<DayVi
     bookings: ((bookings ?? []) as unknown as BookingRow[]),
     lessons: ((lessons ?? []) as unknown as LessonRow[]),
   };
+}
+
+/**
+ * 月カレンダー用の「その日に何件あるか」（#135）
+ *
+ * ★ loadDay を35回まわすと 100 クエリを超えるので、件数は1クエリで取る。
+ *   月表示に時間軸は作らない（字が小さすぎて読めないため。細かくは日表示で見る）。
+ */
+export async function loadMonthCounts(
+  month: string,
+  companyId: string,
+): Promise<{ cfg: BookingCfg; counts: Map<string, DayCount> }> {
+  const admin = createAdmin();
+  const { from, to } = monthRange(month);
+  const [cfg, { data: bookings }, { data: lessons }] = await Promise.all([
+    loadBookingCfg(admin),
+    admin
+      .from("frunk_bookings")
+      .select("booked_date, customer_kind")
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .gte("booked_date", from)
+      .lt("booked_date", to)
+      .neq("status", "cancelled")
+      .is("deleted_at", null),
+    admin
+      .from("frunk_lesson_slots")
+      .select("slot_date")
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .gte("slot_date", from)
+      .lt("slot_date", to)
+      .eq("status", "open")
+      .is("deleted_at", null),
+  ]);
+
+  const counts = new Map<string, DayCount>();
+  const at = (d: string): DayCount => {
+    const cur = counts.get(d) ?? { ...EMPTY_DAY_COUNT };
+    counts.set(d, cur);
+    return cur;
+  };
+  for (const b of (bookings ?? []) as Array<{ booked_date: string; customer_kind: string }>) {
+    const c = at(b.booked_date);
+    const k = b.customer_kind === "trial" ? "trial" : b.customer_kind === "member" ? "member" : "dropin";
+    c[k] += 1;
+    c.total += 1;
+  }
+  for (const l of (lessons ?? []) as Array<{ slot_date: string }>) {
+    const c = at(l.slot_date);
+    c.lesson += 1;
+    c.total += 1;
+  }
+  return { cfg, counts };
 }
 
 /** 未収金（全期間・キャンセル分は除く）。companyId は必須（#134） */

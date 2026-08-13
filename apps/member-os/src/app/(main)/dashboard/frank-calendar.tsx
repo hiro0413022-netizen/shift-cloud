@@ -1,241 +1,199 @@
 import Link from "next/link";
-import { loadDay, occupancy, lessonOccupancy, type BookingRow, type DayView } from "@/lib/frank-reservation";
-import { toMin, jstToday } from "@yozan/core/frank-booking";
+import { loadDay, loadMonthCounts, type DayView } from "@/lib/frank-reservation";
+import { businessHours, genSlots, jstToday } from "@yozan/core/frank-booking";
+import {
+  addDaysStr,
+  addMonths,
+  labelJa,
+  monthOf,
+  toTimelineItems,
+  weekStart,
+  type TimelineItem,
+} from "@/lib/bay-timeline-pure";
+import { BayTimeline, WeekTimeline, TimelineLegend, type WeekDay } from "@/components/bay-timeline";
+import { MonthMiniCalendar, CalendarViewSwitch, MonthCalendar, type CalendarView } from "@/components/month-picker";
 
 /**
- * FRANK GOLF 姫路 予約カレンダー（店舗ダッシュボード・#129）
- * - 日/週の切替、打席×時間帯で誰が入っているかを表示（体験/会員/都度/レッスン）
- * - 会員に重要説明事項（alert_note）があると ⚠ を付ける
- * - iPad想定: 横スクロール可・タップしやすい高さ
+ * FRANK GOLF 姫路 予約カレンダー（店舗ダッシュボード・#129 → #135で作り直し）
+ *
+ * ★ #135: Smart Hello（GOLF WINGの現行システム）と同じ見た目にした（ユーザー指示 2026-08-13）
+ *   - 縦＝時間・横＝打席（それまでは横が時間だった＝転置）
+ *   - 左に月のミニカレンダー、その下に 月/週/日 の切替・表示時刻（粒度）・表示方法
+ *   - 予約は所要時間ぶんの高さを持つ色付きブロック（rowSpan）
+ *   描画そのものは @/components/bay-timeline に集約（/reservations と共通・色も1か所）
  */
 
-// 正午JST(=同日03:00Z)を基準にするとUTC変換で日付がズレない（JST日付ルール #73）
-function addDays(dateStr: string, n: number): string {
-  const d = new Date(`${dateStr}T12:00:00+09:00`);
-  d.setUTCDate(d.getUTCDate() + n);
-  return d.toISOString().slice(0, 10);
-}
-const DOW = ["日", "月", "火", "水", "木", "金", "土"];
-function labelJa(dateStr: string): string {
-  const d = new Date(`${dateStr}T12:00:00+09:00`);
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${DOW[d.getUTCDay()]}）`;
-}
-
-function who(b: BookingRow): string {
-  if (b.frunk_members) return b.frunk_members.name;
-  if (b.mbr_trial_requests) return b.mbr_trial_requests.name;
-  return b.guest_name ?? "ご予約";
-}
-function hasAlert(b: BookingRow): boolean {
-  return !!b.frunk_members?.alert_note?.trim();
-}
-function toneOf(b: BookingRow): string {
-  return b.customer_kind === "trial"
-    ? "bg-amber-100 text-amber-900 border-amber-300"
-    : b.customer_kind === "member"
-      ? "bg-sky-100 text-sky-900 border-sky-300"
-      : "bg-emerald-100 text-emerald-900 border-emerald-300";
-}
-
 const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
+
+const btn =
+  "rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm text-(--color-dim) hover:text-(--color-txt)";
 
 export async function FrankCalendarDashboard({
   date,
   view,
+  step,
   companyId,
   extraQuery = "",
 }: {
   date: string;
-  view: "day" | "week";
+  view: CalendarView;
+  /** 縦軸の刻み（分）。?step= で切り替える */
+  step: number;
   companyId: string; // 会社＋FRANK店舗で必ず絞るため（#134）
   extraQuery?: string; // オーナーの店舗切替(?store=frank)を維持するため
 }) {
   const today = jstToday();
-  const days = view === "day" ? [date] : Array.from({ length: 7 }, (_, i) => addDays(date, i));
-  const views: DayView[] = await Promise.all(days.map((d) => loadDay(d, companyId)));
+  const month = monthOf(date);
 
-  const step = view === "day" ? 1 : 7;
-  const href = (d: string, v: string) => `/dashboard?date=${d}&view=${v}${extraQuery}`;
+  // 週は日曜はじまり（Smart Helloと同じ）。日表示なら当日だけ。
+  const weekFrom = weekStart(date);
+  const days =
+    view === "week" ? Array.from({ length: 7 }, (_, i) => addDaysStr(weekFrom, i)) : view === "day" ? [date] : [];
 
-  const btn =
-    "rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm text-(--color-dim) hover:text-(--color-txt)";
-  const btnActive = "rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-white";
+  const [dayViews, monthData] = await Promise.all([
+    Promise.all(days.map((d) => loadDay(d, companyId))),
+    loadMonthCounts(month, companyId),
+  ]);
+  const { cfg, counts } = monthData;
+  const isClosed = (d: string) => businessHours(d, cfg) === null;
+
+  const href = (p: { date?: string; view?: CalendarView; month?: string; step?: number }) => {
+    const d = p.date ?? date;
+    const v = p.view ?? view;
+    const s = p.step ?? step;
+    return `/dashboard?date=${d}&view=${v}&step=${s}${extraQuery}`;
+  };
+  // 「前へ/次へ」の刻みは表示中の単位に合わせる（日=1日・週=7日・月=1か月）
+  const prevHref =
+    view === "month"
+      ? href({ date: `${addMonths(month, -1)}-01`, month: addMonths(month, -1) })
+      : href({ date: addDaysStr(date, view === "week" ? -7 : -1) });
+  const nextHref =
+    view === "month"
+      ? href({ date: `${addMonths(month, 1)}-01`, month: addMonths(month, 1) })
+      : href({ date: addDaysStr(date, view === "week" ? 7 : 1) });
+
+  const hidden = extraQuery.includes("store=frank") ? [{ name: "store", value: "frank" }] : [];
 
   return (
     <div className="space-y-4">
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">予約カレンダー</h1>
-          <p className="mt-0.5 text-sm text-(--color-dim)">FRANK GOLF 姫路 ・ 体験/会員/レッスンの予約状況</p>
+          <p className="mt-0.5 text-sm text-(--color-dim)">FRANK GOLF 姫路 ・ 体験/会員/都度/レッスンの予約状況</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link href={href(addDays(date, -step), view)} className={btn} aria-label="前へ">←</Link>
+          <Link href={prevHref} className={btn} aria-label="前へ">←</Link>
           <form className="flex items-center gap-2">
             <input type="hidden" name="view" value={view} />
-            {extraQuery.includes("store=frank") && <input type="hidden" name="store" value="frank" />}
-            <input type="date" name="date" defaultValue={date} className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm" />
+            <input type="hidden" name="step" value={String(step)} />
+            {hidden.map((h) => (
+              <input key={h.name} type="hidden" name={h.name} value={h.value} />
+            ))}
+            <input
+              type="date"
+              name="date"
+              defaultValue={date}
+              className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm"
+            />
             <button className={btn}>表示</button>
           </form>
-          <Link href={href(addDays(date, step), view)} className={btn} aria-label="次へ">→</Link>
-          <Link href={href(today, view)} className={btn}>今日</Link>
-          <span className="mx-1 h-6 w-px bg-(--color-line)" />
-          <Link href={href(date, "day")} className={view === "day" ? btnActive : btn}>日</Link>
-          <Link href={href(date, "week")} className={view === "week" ? btnActive : btn}>週</Link>
+          <Link href={nextHref} className={btn} aria-label="次へ">→</Link>
+          <Link href={href({ date: today, month: monthOf(today) })} className={btn}>今日</Link>
         </div>
       </header>
 
-      <div className="reveal flex flex-wrap gap-2 text-xs">
-        <a href={`${LESSON_OS_URL}/frank`} target="_blank" rel="noreferrer" className={btn}>🎯 レッスン管理システム ↗</a>
-        <Link href={`/reservations?date=${date}`} className={btn}>予約の登録・入金（予約管理）</Link>
-        <Link href="/frunk" className={btn}>FRANK会員（重要説明事項の記入）</Link>
-        <Link href="/board" target="_blank" className={btn}>ロビー掲示用カレンダー ↗</Link>
-      </div>
+      <div className="flex flex-col gap-4 lg:flex-row">
+        {/* 左サイド: 月ミニカレンダー → 月/週/日 → 表示時刻 → 表示方法（Smart Helloと同じ並び） */}
+        <aside className="reveal w-full shrink-0 space-y-3 lg:w-60">
+          <MonthMiniCalendar
+            month={month}
+            selected={date}
+            today={today}
+            href={href}
+            view={view}
+            counts={counts}
+            isClosed={isClosed}
+          />
+          <CalendarViewSwitch view={view} step={step} date={date} href={href} hidden={hidden} />
+          <div className="flex flex-col gap-1.5 text-xs">
+            <a href={`${LESSON_OS_URL}/frank`} target="_blank" rel="noreferrer" className={btn}>🎯 レッスン管理システム ↗</a>
+            <Link href={`/reservations?date=${date}`} className={btn}>予約の登録・入金（予約管理）</Link>
+            <Link href="/frunk" className={btn}>FRANK会員（重要説明事項の記入）</Link>
+            <Link href="/board" target="_blank" className={btn}>ロビー掲示用カレンダー ↗</Link>
+          </div>
+        </aside>
 
-      {view === "day" ? <DayGrid view0={views[0]} isToday={date === today} /> : <WeekGrid views={views} today={today} />}
+        <div className="reveal min-w-0 flex-1 space-y-3">
+          <h2 className="text-sm font-semibold">
+            {view === "month"
+              ? `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`
+              : view === "week"
+                ? `${labelJa(weekFrom)} 〜 ${labelJa(addDaysStr(weekFrom, 6))}`
+                : labelJa(date)}
+            {view !== "month" && date === today && (
+              <span className="ml-2 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-white">今日</span>
+            )}
+          </h2>
 
-      <div className="flex flex-wrap items-center gap-4 text-xs text-(--color-dim)">
-        <span className="flex items-center gap-1.5"><i className="inline-block h-3 w-3 rounded bg-sky-400" />会員</span>
-        <span className="flex items-center gap-1.5"><i className="inline-block h-3 w-3 rounded bg-amber-400" />体験</span>
-        <span className="flex items-center gap-1.5"><i className="inline-block h-3 w-3 rounded bg-emerald-400" />都度利用</span>
-        <span className="flex items-center gap-1.5"><i className="inline-block h-3 w-3 rounded bg-violet-400" />レッスン枠</span>
-        <span>⚠ = 重要説明事項あり（FRANK会員画面で記入・確認）</span>
+          {view === "month" ? (
+            <MonthCalendar month={month} today={today} counts={counts} href={href} isClosed={isClosed} />
+          ) : view === "week" ? (
+            <WeekTimeline
+              days={dayViews.map(toWeekDay)}
+              step={step}
+              bayCount={dayViews[0]?.bays.filter((b) => b.active).length ?? 0}
+              hrefDay={(d) => href({ date: d, view: "day", month: monthOf(d) })}
+              today={today}
+            />
+          ) : (
+            <DayCalendar view0={dayViews[0]} step={step} isToday={date === today} />
+          )}
+
+          <TimelineLegend>
+            <span>⚠ = 重要説明事項あり（FRANK会員画面で記入・確認）</span>
+          </TimelineLegend>
+        </div>
       </div>
     </div>
   );
 }
 
-function DayGrid({ view0, isToday }: { view0: DayView; isToday: boolean }) {
-  if (view0.closed) {
+function toWeekDay(v: DayView): WeekDay {
+  return {
+    date: v.date,
+    closed: v.closed,
+    slots: v.slots,
+    items: toTimelineItems(v.bookings, v.lessons),
+  };
+}
+
+/** 現在時刻（JSTの分）。サーバーはUTCなので +9h してから読む（JST日付ルール #73） */
+function jstNowMin(): number {
+  const now = new Date(Date.now() + 9 * 3600_000);
+  return now.getUTCHours() * 60 + now.getUTCMinutes();
+}
+
+function DayCalendar({ view0, step, isToday }: { view0: DayView; step: number; isToday: boolean }) {
+  if (view0.closed || !view0.hours) {
     return (
-      <div className="reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-10 text-center text-lg text-(--color-dim)">
+      <div className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-10 text-center text-lg text-(--color-dim)">
         {labelJa(view0.date)} は定休日です
       </div>
     );
   }
   const bays = view0.bays.filter((b) => b.active);
-  const cells = occupancy(view0);
-  const lessonCells = lessonOccupancy(view0);
-  const now = new Date(Date.now() + 9 * 3600_000);
-  const nowMin = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const step = view0.cfg.slot_minutes;
+  // 表示粒度（?step=）は予約設定の刻みと独立。15分表示にしても予約は30分刻みのまま。
+  const slots = genSlots(view0.hours, step);
+  const items: TimelineItem[] = toTimelineItems(view0.bookings, view0.lessons);
 
   return (
-    <div className="reveal overflow-x-auto rounded-2xl border border-(--color-line) bg-(--color-panel) p-3">
-      <table className="w-full border-collapse text-center">
-        <thead>
-          <tr>
-            <th className="sticky left-0 z-10 bg-(--color-panel) p-2 text-left text-xs text-(--color-dim)">打席</th>
-            {view0.slots.map((s) => {
-              const isNow = isToday && toMin(s) <= nowMin && nowMin < toMin(s) + step;
-              return (
-                <th key={s} className={`min-w-16 p-1.5 text-xs font-semibold ${isNow ? "text-accent" : "text-(--color-dim)"}`}>{s}</th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {bays.map((r) => (
-            <tr key={r.id} className="border-t border-(--color-line)">
-              <td className="sticky left-0 z-10 bg-(--color-panel) p-2 text-left text-sm font-bold whitespace-nowrap">{r.name}</td>
-              {view0.slots.map((s) => {
-                const b = cells.get(`${r.id}|${s}`);
-                const l = lessonCells.get(`${r.id}|${s}`);
-                if (!b && !l) return <td key={s} className="p-1 text-(--color-line)">―</td>;
-                if (!b && l) {
-                  return (
-                    <td key={s} className="p-1">
-                      <div className="rounded-md border border-violet-300 bg-violet-100 px-1 py-1.5 text-xs font-semibold text-violet-900">レッスン</div>
-                    </td>
-                  );
-                }
-                const bk = b as BookingRow;
-                return (
-                  <td key={s} className="p-1">
-                    <div className={`rounded-md border px-1 py-1.5 text-xs font-semibold leading-tight ${toneOf(bk)}`}>
-                      {hasAlert(bk) ? <span title={bk.frunk_members?.alert_note ?? ""}>⚠</span> : null}
-                      {who(bk)}
-                      {bk.party_size && bk.party_size > 1 ? <span className="ml-0.5 opacity-70">{bk.party_size}名</span> : null}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function WeekGrid({ views, today }: { views: DayView[]; today: string }) {
-  // 週表示: 行=日付 × 列=打席。セルには「開始時刻 名前」を時系列で並べる
-  const bays = views[0].bays.filter((b) => b.active);
-  return (
-    <div className="reveal overflow-x-auto rounded-2xl border border-(--color-line) bg-(--color-panel) p-3">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr>
-            <th className="p-2 text-left text-xs text-(--color-dim)">日付</th>
-            {bays.map((b) => (
-              <th key={b.id} className="min-w-40 p-2 text-xs font-semibold text-(--color-dim)">{b.name}</th>
-            ))}
-            <th className="min-w-32 p-2 text-xs font-semibold text-violet-600">レッスン枠</th>
-          </tr>
-        </thead>
-        <tbody>
-          {views.map((v) => {
-            const live = v.bookings.filter((b) => b.status !== "cancelled");
-            return (
-              <tr key={v.date} className={`border-t border-(--color-line) align-top ${v.date === today ? "bg-accent/5" : ""}`}>
-                <td className="whitespace-nowrap p-2 text-sm font-bold">
-                  <Link href={`/dashboard?date=${v.date}&view=day`} className="hover:text-accent">{labelJa(v.date)}</Link>
-                  {v.date === today && <span className="ml-1 rounded bg-accent px-1 text-[10px] font-bold text-white">今日</span>}
-                </td>
-                {v.closed ? (
-                  <td colSpan={bays.length + 1} className="p-2 text-sm text-(--color-dim)">定休日</td>
-                ) : (
-                  <>
-                    {bays.map((bay) => {
-                      const list = live
-                        .filter((b) => b.bay_id === bay.id)
-                        .sort((a, b) => a.start_time.localeCompare(b.start_time));
-                      return (
-                        <td key={bay.id} className="p-1.5">
-                          {list.length === 0 ? (
-                            <span className="text-xs text-(--color-line)">―</span>
-                          ) : (
-                            <div className="space-y-1">
-                              {list.map((b) => (
-                                <div key={b.id} className={`rounded-md border px-1.5 py-1 text-xs font-medium leading-tight ${toneOf(b)}`}>
-                                  {b.start_time.slice(0, 5)} {hasAlert(b) ? <span title={b.frunk_members?.alert_note ?? ""}>⚠</span> : null}
-                                  {who(b)}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="p-1.5">
-                      {v.lessons.length === 0 ? (
-                        <span className="text-xs text-(--color-line)">―</span>
-                      ) : (
-                        <div className="space-y-1">
-                          {v.lessons.map((l) => (
-                            <div key={l.id} className="rounded-md border border-violet-300 bg-violet-100 px-1.5 py-1 text-xs font-medium text-violet-900">
-                              {l.start_time.slice(0, 5)} {l.staff?.name ?? "レッスン"}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                  </>
-                )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <BayTimeline
+      slots={slots}
+      step={step}
+      bays={bays}
+      items={items}
+      nowMin={isToday ? jstNowMin() : null}
+    />
   );
 }

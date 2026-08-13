@@ -2,15 +2,20 @@ import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank } from "@/lib/store-scope";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { loadDay, loadUnpaid, occupancy, lessonOccupancy, type BookingRow } from "@/lib/frank-reservation";
+import { loadDay, loadUnpaid, loadMonthCounts, type BookingRow } from "@/lib/frank-reservation";
 import {
   BOOKING_STATUS_LABEL,
   CUSTOMER_KIND_LABEL,
   PAYMENT_STATUS_LABEL,
   PAY_METHODS,
+  businessHours,
+  genSlots,
   jstToday,
   outstanding,
 } from "@yozan/core/frank-booking";
+import { toTimelineItems, monthOf, labelJa } from "@/lib/bay-timeline-pure";
+import { BayTimeline, TimelineLegend } from "@/components/bay-timeline";
+import { MonthMiniCalendar, STEP_OPTIONS } from "@/components/month-picker";
 import { createBooking, setBookingStatus, deleteBooking, recordPayment } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -39,23 +44,34 @@ function who(b: BookingRow): string {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; step?: string; bay?: string; start?: string }>;
 }) {
   const actor = await requireReceptionActor();
   // 店舗またぎ廃止（#134）: FRANK姫路に配属されていない人には存在ごと見せない
   if (!canAccessFrank(actor)) notFound();
   const sp = await searchParams;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : jstToday();
+  // 縦軸の刻み（#135）。既定は30分＝予約の刻みと同じ
+  const step = STEP_OPTIONS.includes(Number(sp.step)) ? Number(sp.step) : 30;
 
-  const [view, unpaidRows] = await Promise.all([
+  const [view, unpaidRows, monthData] = await Promise.all([
     loadDay(date, actor.companyId),
     loadUnpaid(actor.companyId),
+    loadMonthCounts(monthOf(date), actor.companyId),
   ]);
   const bays = view.bays.filter((b) => b.active);
   const closedBays = view.bays.filter((b) => !b.active);
-  const cells = occupancy(view);
-  const lessonCells = lessonOccupancy(view);
   const live = view.bookings.filter((b) => b.status !== "cancelled");
+
+  // 縦＝時間・横＝打席のタイムライン（#135・/dashboard と同じ部品・同じ色）
+  const gridSlots = view.hours ? genSlots(view.hours, step) : [];
+  const items = toTimelineItems(view.bookings, view.lessons);
+  const bookableSlots = new Set(view.slots); // 予約を作れる開始時刻（表示粒度とは別）
+  const emptyHref = (bayId: string, slot: string) =>
+    bookableSlots.has(slot) ? `/reservations?date=${date}&step=${step}&bay=${bayId}&start=${slot}#booking-form` : undefined;
+  // 空きコマを押して来たときは、予約作成フォームに打席と開始時刻を入れておく
+  const preBay = bays.some((b) => b.id === sp.bay) ? (sp.bay as string) : (bays[0]?.id ?? "");
+  const preStart = view.slots.includes(sp.start ?? "") ? (sp.start as string) : (view.slots[0] ?? "");
 
   const unpaidList = unpaidRows
     .map((b) => ({ b, out: outstanding(b.amount, b.paid_amount, b.payment_status) }))
@@ -75,6 +91,9 @@ export default async function ReservationsPage({
         </div>
         <form className="flex items-center gap-2">
           <input type="date" name="date" defaultValue={date} className={inputCls} />
+          <select name="step" defaultValue={String(step)} className={`${inputCls} !w-24`} aria-label="表示時刻">
+            {STEP_OPTIONS.map((s) => <option key={s} value={s}>{s}分</option>)}
+          </select>
           <button className={btnGhostCls}>表示</button>
         </form>
       </header>
@@ -131,94 +150,57 @@ export default async function ReservationsPage({
 
       {/* 空き状況グリッド */}
       <Panel
-        title={`空き状況（${date}）${view.closed ? "　定休日" : `　${view.hours?.open}〜${view.hours?.close}`}`}
+        title={`空き状況　${labelJa(date)}${view.closed ? "　定休日" : `　${view.hours?.open}〜${view.hours?.close}`}`}
         className="d2"
       >
-        {view.closed ? (
-          <Empty>この日は定休日です（営業時間・定休日は Genesis の /site-admin で変更できます）</Empty>
-        ) : (
-          <>
-            <div className="overflow-x-auto pb-1">
-              <div className="min-w-max">
-                <div className="flex">
-                  <div className="sticky left-0 z-10 w-32 shrink-0 bg-(--color-panel) px-2 py-2 text-xs font-semibold text-(--color-dim)">打席 ＼ 時間</div>
-                  {view.slots.map((s) => (
-                    <div key={s} className="w-16 shrink-0 px-1 py-2 text-center text-xs font-semibold text-(--color-dim)">{s}</div>
-                  ))}
-                </div>
-                {bays.map((r) => (
-                  <div key={r.id} className="flex border-t border-(--color-line)">
-                    <div className="sticky left-0 z-10 flex w-32 shrink-0 flex-col justify-center bg-(--color-panel) px-2 py-1.5 whitespace-nowrap">
-                      <span className="text-sm font-semibold">{r.name}</span>
-                      <span className="text-[10px] text-(--color-dim)">
-                        {[`${r.floor}F`, r.equipment, r.is_lefty ? "左右打席" : null].filter(Boolean).join("・")}
-                      </span>
-                    </div>
-                    {view.slots.map((s) => {
-                      const b = cells.get(`${r.id}|${s}`);
-                      const l = lessonCells.get(`${r.id}|${s}`);
-                      if (!b && !l) {
-                        return (
-                          <div key={s} className="w-16 shrink-0 px-0.5 py-1.5">
-                            <div className="h-11 rounded-lg border border-dashed border-(--color-line) bg-(--color-panel-2)" />
-                          </div>
-                        );
-                      }
-                      if (!b && l) {
-                        return (
-                          <div key={s} className="w-16 shrink-0 px-0.5 py-1.5">
-                            <div className="flex h-11 flex-col justify-center overflow-hidden rounded-lg bg-violet-100 px-1 text-[10px] leading-tight text-violet-800">
-                              <span className="truncate font-semibold">レッスン</span>
-                              <span className="truncate opacity-70">{l.staff?.name ?? ""}</span>
-                            </div>
-                          </div>
-                        );
-                      }
-                      const bk = b as BookingRow;
-                      const tone =
-                        bk.customer_kind === "trial" ? "bg-amber-100 text-amber-900"
-                        : bk.customer_kind === "member" ? "bg-indigo-100 text-indigo-800"
-                        : "bg-emerald-100 text-emerald-800";
-                      return (
-                        <div key={s} className="w-16 shrink-0 px-0.5 py-1.5">
-                          <div className={`flex h-11 flex-col justify-center overflow-hidden rounded-lg px-1 text-[10px] leading-tight ${tone}`}>
-                            <span className="truncate font-semibold">{who(bk)}</span>
-                            <span className="truncate opacity-70">
-                              {CUSTOMER_KIND_LABEL[bk.customer_kind]}
-                              {bk.mbr_trial_requests?.lefty ? "・左" : ""}
-                              {bk.status === "visited" ? "・来店" : bk.status === "no_show" ? "・欠" : ""}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-4 text-xs text-(--color-dim)">
-              <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-indigo-100" />会員</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-amber-100" />体験</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-emerald-100" />都度</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded bg-violet-100" />レッスン枠</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded border border-dashed border-(--color-line) bg-(--color-panel-2)" />空き</span>
-              {closedBays.length > 0 && <span>休止中: {closedBays.map((b) => b.name).join("・")}</span>}
-            </div>
-          </>
-        )}
+        {/* 縦＝時間・横＝打席（#135）。左の月カレンダーで日を選び、空きコマを押すと下の作成フォームに入る */}
+        <div className="flex flex-col gap-4 lg:flex-row">
+          <aside className="w-full shrink-0 lg:w-56">
+            <MonthMiniCalendar
+              month={monthOf(date)}
+              selected={date}
+              today={jstToday()}
+              view="day"
+              counts={monthData.counts}
+              isClosed={(d) => businessHours(d, monthData.cfg) === null}
+              href={(p) => `/reservations?date=${p.date ?? date}&step=${p.step ?? step}`}
+            />
+          </aside>
+          <div className="min-w-0 flex-1 space-y-2">
+            {view.closed ? (
+              <Empty>この日は定休日です（営業時間・定休日は Genesis の /site-admin で変更できます）</Empty>
+            ) : (
+              <>
+                <BayTimeline
+                  slots={gridSlots}
+                  step={step}
+                  bays={bays}
+                  items={items}
+                  emptyHref={emptyHref}
+                  maxHeightClass="max-h-[68vh]"
+                />
+                <TimelineLegend>
+                  <span>空きコマを押すと下の作成フォームに入ります</span>
+                  {closedBays.length > 0 && <span>休止中: {closedBays.map((b) => b.name).join("・")}</span>}
+                </TimelineLegend>
+              </>
+            )}
+          </div>
+        </div>
       </Panel>
 
       {/* 予約作成 */}
       <Panel title="予約を作成（電話・店頭で受けたぶん）" className="d2">
-        <form action={createBooking} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* 上のタイムラインで空きコマを押すと #booking-form へ飛び、打席と開始時刻が入った状態になる（#135） */}
+        <form id="booking-form" action={createBooking} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <input type="hidden" name="booking_date" value={date} />
           <Field label="打席">
-            <select name="bay_id" className={inputCls}>
+            <select name="bay_id" defaultValue={preBay} className={inputCls}>
               {bays.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </Field>
           <Field label="開始時刻">
-            <select name="start_time" className={inputCls}>
+            <select name="start_time" defaultValue={preStart} className={inputCls}>
               {view.slots.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </Field>

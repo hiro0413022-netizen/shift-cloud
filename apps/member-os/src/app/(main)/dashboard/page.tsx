@@ -4,6 +4,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Panel } from "@/components/ui";
 import { StatCard, type StatGroup } from "./stat-card";
 import { FrankCalendarDashboard } from "./frank-calendar";
+import { STEP_OPTIONS } from "@/components/month-picker";
 import { jstToday } from "@yozan/core/frank-booking";
 import { FRANK_STORE_ID, canAccessFrank, golfWingStoreId, canAccessStore } from "@/lib/store-scope";
 
@@ -33,7 +34,7 @@ function rate(n: number, d: number): string {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; date?: string; view?: string; store?: string }>;
+  searchParams: Promise<{ month?: string; date?: string; view?: string; step?: string; store?: string }>;
 }) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
@@ -66,7 +67,9 @@ export default async function DashboardPage({
 
   if (showFrank) {
     const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : jstToday();
-    const view = sp.view === "week" ? ("week" as const) : ("day" as const);
+    // 月/週/日（#135）。既定は日。表示時刻の刻みは 15/30/60 分だけ許す（既定30分＝予約の刻みと同じ）
+    const view = sp.view === "week" ? ("week" as const) : sp.view === "month" ? ("month" as const) : ("day" as const);
+    const step = STEP_OPTIONS.includes(Number(sp.step)) ? Number(sp.step) : 30;
     return (
       <div className="space-y-4">
         {bothStores && (
@@ -77,6 +80,7 @@ export default async function DashboardPage({
         <FrankCalendarDashboard
           date={date}
           view={view}
+          step={step}
           companyId={actor.companyId}
           extraQuery={bothStores ? "&store=frank" : ""}
         />
