@@ -65,12 +65,17 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
 
   const { data: plan } = await admin
     .from("frunk_plans")
-    .select("id, name")
+    .select("id, name, active")
     .eq("id", str(formData.get("plan_id")))
     .eq("company_id", store.companyId)
     .is("deleted_at", null)
     .maybeSingle();
   if (!plan) return { error: "選択されたプランが無効です。画面を更新して再度お試しください。" };
+  // 非公開プランは受け付けない。ただし「テスト会員」だけは通しテスト用に許可
+  // （/join-web?test=1 のときだけ画面に出る。一般公開はしない #136）
+  if (!plan.active && String(plan.name) !== "テスト会員") {
+    return { error: "選択されたプランは現在お申し込みいただけません。画面を更新して再度お試しください。" };
+  }
 
   const values = {
     company_id: store.companyId,
@@ -105,17 +110,22 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     status: "pending" as const,
   };
 
-  // 決済未完了の申込が残っていれば行を使い回す（同じ人が2行にならないように）
+  // 決済未完了の申込が残っていれば行を使い回す（同じ人が2行にならないように）。
+  // キーは電話＋メールの両一致（#136。電話だけだと家族の固定電話などで
+  // 別人の申込行を上書きしてしまう）。2行以上あっても最新1件だけを使う（maybeSingleのエラー化防止）
   let memberId: string | null = null;
   {
-    const { data: existing } = await admin
+    const { data: existingRows } = await admin
       .from("frunk_members")
       .select("id")
       .eq("company_id", store.companyId)
       .eq("status", "pending")
       .eq("phone", phone)
+      .eq("email", email)
       .is("deleted_at", null)
-      .maybeSingle();
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const existing = (existingRows ?? [])[0] ?? null;
     if (existing) {
       const { error } = await admin
         .from("frunk_members")

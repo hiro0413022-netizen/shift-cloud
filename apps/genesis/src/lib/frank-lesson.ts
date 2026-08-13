@@ -2,6 +2,7 @@ import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { verifyMember } from "@/lib/frank-booking";
+import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 
 /**
  * FRANK GOLF レッスン管理 v1（#88 §3-4）
@@ -13,7 +14,8 @@ import { verifyMember } from "@/lib/frank-booking";
 
 type Admin = ReturnType<typeof createAdmin>;
 
-const FRANK_STORE = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
+// 店舗UUIDのハードコード重複をやめ @yozan/core の定数に一本化（#134 残タスク④）
+const FRANK_STORE = FRANK_STORE_ID;
 
 const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 
@@ -25,6 +27,7 @@ export async function listOpenLessonSlots() {
   const { data: slots } = await admin
     .from("frunk_lesson_slots")
     .select("id, slot_date, start_time, end_time, note, coach_staff_id, staff(name), frunk_bays(name)")
+    .eq("store_id", FRANK_STORE) // 店舗スコープ（#134: 公開APIは自店舗の枠だけを出す）
     .eq("status", "open")
     .gte("slot_date", from)
     .lte("slot_date", to)
@@ -98,6 +101,10 @@ export async function bookLesson(input: {
     .is("deleted_at", null)
     .maybeSingle();
   if (!slot || slot.status !== "open") return { ok: false, error: "この枠は現在予約できません" };
+  // 会社・店舗スコープの検証（#134: id直打ちで他社・他店舗の枠を取れないように）
+  if (String(slot.company_id) !== String(member.company_id) || String(slot.store_id) !== FRANK_STORE) {
+    return { ok: false, error: "この枠は現在予約できません" };
+  }
   if (String(slot.slot_date) < jstToday()) return { ok: false, error: "過去の枠は予約できません" };
 
   const { data: taken } = await admin

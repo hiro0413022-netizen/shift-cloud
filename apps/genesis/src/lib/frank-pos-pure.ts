@@ -110,6 +110,13 @@ export const JOINING_FEE_NOTE_PREFIX = "FRANK入会金";
 export const isJoiningFeeNote = (note: string | null | undefined) => (note ?? "").startsWith(JOINING_FEE_NOTE_PREFIX);
 
 /**
+ * Web入会 初回一括の payment_note 接頭辞（frank-square-billing.createJoinCheckoutForMember が付ける）。
+ * ⚠ "FRANK入会金" と先頭7文字が同じで、8文字目だけで判定が分かれる。文言を変えるときは
+ *   isJoiningFeeNote と衝突しないか必ず tests/frank-pos.test.ts で確認すること（#136）。
+ */
+export const JOIN_CHECKOUT_NOTE_PREFIX = "FRANK入会初回一括";
+
+/**
  * Square払いを「月会費」か「店頭売上」かへ振り分ける。
  * - 決済リンクの注文ID一致＝初回の月会費（金額はリンク作成時にプラン額で固定済み）
  * - 顧客ID一致は、金額がプランの税込月額と一致するときだけ継続課金の月会費と判定する。

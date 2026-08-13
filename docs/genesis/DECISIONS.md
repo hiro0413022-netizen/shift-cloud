@@ -494,3 +494,14 @@
   **(h) 検証** — tests **344件通過**（shift-span 21・bay-timeline 23を追加）、shift-cloud / member-os の tsc クリーン。※`next build` はサンドボックスのマウント経由だと3分を超えて完走しないため未実施＝**Vercelのデプロイが実質のビルド検証**になります。
   ⚠ `/board`（ロビー掲示）と `sites/frank-golf/booking.html`（お客様向け）は今回スコープ外＝**まだ横＝時間のまま**。揃えるなら `components/bay-timeline.tsx` を使い回せます。
 
+- #136 (2026-08-13) **FRANK入会フローの通しテスト環境＋入会・課金まわりの堅牢化＋集客LP2枚**（migration 0113・適用済）。ユーザー指定（2026-08-13「少額のテストプランを作って」「関連システムを見直して追加機能やバグ修正」「集客での改善・HP編集やLP作成」）。
+  **(a) テスト会員プラン** — frunk_plans に「テスト会員」（月100円税抜＝110円税込・入会金0・active=false）。`/join-web?test=1` のときだけ画面に出す（actions側は「テスト会員」に限り非activeでも受理）。実カードで入会フロー全体（決済→Webhook→採番→PDF→カルテ）を220円で通しテストできる。手順の正典 OPERATIONS §14-1「入会フローの通しテスト」。後始末＝Squareでサブスク解約＋会員退会＋売上テスト行削除。
+  **(b) Squareプラン同期API** — `/api/public/frank/admin/square-plan-sync`（POST）。square_variation_id 未設定のプランに Square バリエーションを自動作成して紐付け（setup.mjs のプラン部分と同じ・冪等）。認証は `gn_ops_tokens`（0113・sha256のみ保存・期限つき）＝SQUARE_ACCESS_TOKENを知らないAI/運用ツールがプラン追加を完結できる。
+  **(c) 決済リンクの迷子入金対策** — `square_checkout_order_ids`（履歴）＋`square_checkout_breakdown`（発行時に確定した内訳）を0113で追加。再送信で古いリンクから支払われても履歴で会員特定。Webhookの売上分割・控えPDF・完了メールは**入金日で再計算せず breakdown を正とする**（年またぎ・キャンペーン境界のズレ根絶。frank-join.ts の独自計算も削除）。
+  **(d) 二重計上の最終防衛** — mon_sales の square_payment_id / square_refund_id に部分ユニークインデックス（Web入会の分割2行があるため part 込み）。insertSale は23505を「既記録」として握り現金出納も追記しない。check-then-act のレースを DB で塞ぐ。
+  **(e) 予約まわりのバグ修正** — ①ライト会員の月8日上限が31日の無い月で素通り（`lte -31`が不正dateでエラー→握り潰し→空集合。翌月1日 `lt` に修正・取得失敗は安全側で予約拒否）②打席codeでの予約作成に deleted_at 除外が無かった③booking.html 予約ボタンの二重送信ガード④レッスン枠に店舗・会社スコープ検証が無かった（他社/他店枠をid直打ちで取れた）＋FRANK店舗UUIDのハードコードを @yozan/core 定数へ。
+  **(f) 認証の総当たり対策** — 公開API（打席/レッスン/課金）の「会員番号＋電話下4桁」に形式チェック＋15分10回失敗ロック（frunk_auth_attempts 0113。テーブル未適用環境では従来どおり通る）。
+  **(g) member-os 修正** — ①会員マイページの氏名が旧台帳 mbr_members 参照で「FR0001様」表示→frunk_members 参照に修正＋退会/却下はセッション無効化 ②スタッフ操作日付が素のUTC→lib/jst.ts 新設（JST日付ルール） ③承認時の採番にエラー処理・23505リトライが無く番号の母数もgenesisと不一致（company単位に統一） ④タブレット入会が plan_id 無検証（存在・会社・active検証を追加） ⑤pending使い回しキーを電話→電話+メールに・maybeSingle複数行エラー回避 ⑥見積にクーポン未反映＋前取り月数ハードコード修正。
+  **(h) HP/LP（集客）** — LP2枚を _build.py に追加: `lp-trial.html`（無料体験55分に一点集中・FAQ構造化データ付き）と `lp-campaign.html`（年内入会キャンペーン＝入会金0円+入会月0円→Web入会直行）。広告・SNS・LINEの飛び先用。NEWSにキャンペーン告知を追加、booking.html の入会金旧表記（11,000円）を5,500円+年内無料に修正、sitemapへLP追加。
+  **(i) 検証** — tests 343件通過、genesis / member-os の tsc クリーン、_build.py 再生成18ページ。
+  ⚠残: ①ライト会員「平日昼間（月4回）」はサイト表記のみでサーバー強制なし（#131fの決定どおり。強制するなら要実装＝ユーザー判断）②公開APIのIP単位レート制限は未実装（member_no単位のみ）③テスト入会の後始末はユーザー実施 or Claude依頼。

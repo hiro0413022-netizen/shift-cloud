@@ -5,6 +5,7 @@ import { jstYmd } from "@/lib/jst";
 import { sendFrankMail } from "@/lib/frank-mail";
 import { buildJoinPdf } from "@/lib/frank-join-pdf";
 import { monthlyFeeTaxIncluded } from "@/lib/frank-pos-pure";
+import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { chargeCardOnFile } from "@/lib/frank-square-billing";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import { logEvent } from "@/lib/kernel";
@@ -35,12 +36,19 @@ export async function assignMemberNo(admin: Admin, companyId: string, memberId: 
       .eq("company_id", companyId)
       .not("member_no", "is", null);
     const memberNo = `FR${String((count ?? 0) + 1 + attempt).padStart(4, "0")}`;
-    const { error } = await admin
+    const { data: updated, error } = await admin
       .from("frunk_members")
       .update({ member_no: memberNo, updated_at: new Date().toISOString() })
       .eq("id", memberId)
-      .is("member_no", null);
-    if (!error) return memberNo;
+      .is("member_no", null)
+      .select("member_no");
+    if (!error) {
+      if ((updated ?? []).length > 0) return memberNo;
+      // 0行更新＝並行処理が先に採番済み。実際の番号を読み直して返す
+      // （ここで memberNo を返すと「存在しない番号」がメール・PDFに載る）
+      const { data: cur } = await admin.from("frunk_members").select("member_no").eq("id", memberId).maybeSingle();
+      return cur?.member_no ? String(cur.member_no) : null;
+    }
     // 一意制約違反（23505）だけリトライ。他のエラーは打ち切り
     if (!String(error.code ?? "").includes("23505")) {
       console.error("[frank-join] member_no assign failed:", error);
@@ -114,6 +122,13 @@ export type WebJoinMemberRow = {
   joining_fee_waived: boolean | null;
   join_campaign: string | null;
   square_customer_id: string | null;
+  square_checkout_breakdown: {
+    total?: number;
+    joiningFee?: number;
+    monthly?: number;
+    prepaidMonths?: number;
+    campaign?: boolean;
+  } | null;
   frunk_plans: { name: string | null; monthly_price: number | null; joining_fee: number | null } | null;
 };
 
@@ -142,7 +157,7 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   const { data } = await admin
     .from("frunk_members")
     .select(
-      "id, company_id, status, name, name_kana, gender, birth_date, phone, email, postal_code, address1, start_date, signature, joining_fee_waived, join_campaign, square_customer_id, frunk_plans(name, monthly_price, joining_fee)"
+      "id, company_id, status, name, name_kana, gender, birth_date, phone, email, postal_code, address1, start_date, signature, joining_fee_waived, join_campaign, square_customer_id, square_checkout_breakdown, frunk_plans(name, monthly_price, joining_fee)"
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -163,7 +178,25 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   }
 
   const today = jstYmd();
-  const campaign = !!m.join_campaign;
+  // 金額の内訳は「決済リンク発行時に確定したもの」（square_checkout_breakdown）を正とする。
+  // 無い場合（旧データ）は申込フラグ＋本日日付で再計算（#136。二重定義で控えPDFと決済額がズレた事故の防止）
+  const bd = m.square_checkout_breakdown;
+  const est =
+    bd && Number(bd.total ?? 0) > 0 && Number(bd.monthly ?? 0) > 0
+      ? {
+          total: Number(bd.total),
+          joiningFee: Number(bd.joiningFee ?? 0),
+          monthly: Number(bd.monthly),
+          prepaidMonths: Number(bd.prepaidMonths ?? 2),
+          campaign: !!bd.campaign,
+        }
+      : joinInitialTotal({
+          monthlyExTax: Number(m.frunk_plans?.monthly_price ?? 0),
+          joiningFeeExTax: Number(m.frunk_plans?.joining_fee ?? 0),
+          applyDateYmd: today,
+          joiningFeeWaived: !!m.joining_fee_waived,
+        });
+  const campaign = est.campaign || !!m.join_campaign;
   await admin
     .from("frunk_members")
     .update({
@@ -187,7 +220,7 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
 
   // 月会費は「入会金＋前取り月数分」を決済ページで1回いただいている（#131b）。
   // 以前あった「決済後に2回目をカード課金」は廃止（見積と決済額がズレる原因だった）。
-  const monthly = monthlyFeeTaxIncluded(Number(m.frunk_plans?.monthly_price ?? 0));
+  const monthly = est.monthly > 0 ? est.monthly : monthlyFeeTaxIncluded(Number(m.frunk_plans?.monthly_price ?? 0));
 
   let karteToken: string | null = null;
   try {
@@ -197,8 +230,8 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   }
 
   if (m.email) {
-    const joinFeeEx = Number(m.frunk_plans?.joining_fee ?? 0);
-    const joinFee = m.joining_fee_waived ? 0 : monthlyFeeTaxIncluded(joinFeeEx);
+    // 実際に決済した内訳（est）と必ず一致させる。ここで独自計算しない（#136）
+    const joinFee = est.joiningFee;
     const [m0, m1, m2] = monthLabels3(today);
     const planName = String(m.frunk_plans?.name ?? "");
     // 控えPDFの費用欄（キャンペーンは 入会金0・入会月0・前取り2か月分を明示）
@@ -216,8 +249,8 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
           [`月会費 前取り（${m1}分）`, `${monthly.toLocaleString()}円（税込）`],
           [`月会費 前取り（${m2}分）`, `${monthly.toLocaleString()}円（税込）`],
         ];
-    // 決済額と必ず一致させる（frank-join-pure の joinInitialTotal と同じ式）
-    const totalDue = joinFee + monthly * 2;
+    // 決済額と必ず一致させる（決済リンク発行時に確定した内訳＝est.total）
+    const totalDue = est.total;
     let attachments: Array<{ filename: string; content: string }> | undefined;
     try {
       const pdf = await buildJoinPdf({

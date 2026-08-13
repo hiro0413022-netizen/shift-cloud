@@ -12,6 +12,7 @@ import { requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
 import { buildApprovalMail, sendFrankMail } from "@/lib/frank-mail";
 import { pauseSubscription, resumeSubscription, swapSubscriptionPlan, chargeCardOnFile } from "@/lib/frank-square";
 import { planChangeProration } from "@/lib/frank-billing-pure";
+import { jstYmd } from "@/lib/jst";
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
@@ -26,7 +27,8 @@ function intOrNull(v: FormDataEntryValue | null): number | null {
   const n = parseInt(s, 10);
   return Number.isFinite(n) ? n : null;
 }
-const today = () => new Date().toISOString().slice(0, 10);
+// JST基準の「今日」。toISOString() は UTC のため JST 0:00〜9:00 に前日となるバグがあった（#136）
+const today = () => jstYmd();
 
 async function frunkStoreId(admin: ReturnType<typeof createAdmin>, companyId: string): Promise<string | null> {
   const { data } = await admin
@@ -133,20 +135,37 @@ export async function approveSignup(formData: FormData) {
   const admin = createAdmin();
   const id = str(formData.get("id"));
   if (!id) return;
-  let memberNo = str(formData.get("member_no"));
-  if (!memberNo) {
-    const { count } = await admin
-      .from("frunk_members").select("id", { count: "exact", head: true })
-      .eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).not("member_no", "is", null);
-    memberNo = `FR${String((count ?? 0) + 1).padStart(4, "0")}`;
+  // 採番と更新（genesis assignMemberNo と同様、unique index 衝突は次番号でリトライ #136）。
+  // 番号の母数は genesis と同じ company 単位で数える（store で数えると2つの実装が同じ番号を発行しうる）
+  const manualNo = str(formData.get("member_no"));
+  let memberNo = "";
+  let updateErr: string | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (manualNo) {
+      memberNo = manualNo;
+    } else {
+      const { count } = await admin
+        .from("frunk_members").select("id", { count: "exact", head: true })
+        .eq("company_id", actor.companyId).not("member_no", "is", null);
+      memberNo = `FR${String((count ?? 0) + 1 + attempt).padStart(4, "0")}`;
+    }
+    const { error } = await admin.from("frunk_members").update({
+      status: "active",
+      member_no: memberNo,
+      join_date: str(formData.get("start_date")) || today(),
+      reviewed_by: actor.staffId,
+      reviewed_at: new Date().toISOString(),
+    }).eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
+    if (!error) { updateErr = null; break; }
+    updateErr = error.message;
+    // 一意制約（同じ番号を並行採番）だけリトライ。手入力番号の衝突はそのまま伝える
+    if (manualNo || !String(error.code ?? "").includes("23505")) break;
   }
-  await admin.from("frunk_members").update({
-    status: "active",
-    member_no: memberNo,
-    join_date: str(formData.get("start_date")) || today(),
-    reviewed_by: actor.staffId,
-    reviewed_at: new Date().toISOString(),
-  }).eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
+  if (updateErr) {
+    redirect("/frunk?err=" + encodeURIComponent(
+      `承認に失敗しました（${memberNo ? `会員番号 ${memberNo} で` : ""}保存できませんでした: ${updateErr}）。もう一度お試しください。`,
+    ));
+  }
   await logAudit(actor, "frunk.signup_approve", "frunk_members", null, null, { id, member_no: memberNo });
 
   // 承認メール（会員番号の通知＋カード登録の案内 #123）。送信失敗で承認は落とさないが、

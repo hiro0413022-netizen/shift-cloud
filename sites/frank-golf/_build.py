@@ -35,6 +35,7 @@ PAGE_FILE = {
     "plan": "plan.html", "beginner": "beginner.html", "corporate": "corporate.html",
     "access": "access.html", "faq": "faq.html", "trial": "trial.html",
     "trial-booking": "trial-booking.html",
+    "lp-trial": "lp-trial.html", "lp-campaign": "lp-campaign.html",
     "tokushoho": "tokushoho.html", "privacy": "privacy.html", "terms": "terms.html", "404": "404.html",
 }
 
@@ -48,6 +49,7 @@ PAGE_LABEL = {
     "lounge": "バー・ラウンジ", "community": "コミュニティ", "plan": "料金・会員プラン",
     "beginner": "はじめての方へ", "corporate": "法人でのご利用", "access": "アクセス",
     "faq": "よくあるご質問", "trial": "体験のご予約", "trial-booking": "体験予約フォーム",
+    "lp-trial": "無料体験レッスン", "lp-campaign": "年内入会キャンペーン",
     "tokushoho": "特定商取引法に基づく表記", "privacy": "プライバシーポリシー", "terms": "会員規約",
 }
 
@@ -2034,6 +2036,169 @@ def build_trial_booking():
     write("trial-booking.html", b)
 
 
+def build_lp_trial():
+    """無料体験LP（広告・SNS・LINEの飛び先用 #136）。
+    体験1点に絞ったランディングページ。導線は 体験予約 と 公式LINE のみを推す。"""
+    faq = jsonld_faq([
+        ("本当に無料ですか？", "はい。通常3,300円（税込）の体験レッスン（約55分）を、プレオープン記念で無料でご案内しています。当日いただく費用はありません。"),
+        ("ゴルフをやったことがなくても大丈夫ですか？", "大丈夫です。クラブを握ったことがない方も歓迎です。プロがマンツーマンで、その方のペースに合わせてご案内します。"),
+        ("持ち物は必要ですか？", "手ぶらでお越しください。動きやすい服装であれば大丈夫です。"),
+        ("体験に行ったら入会しないといけませんか？", "いいえ。強引な勧誘は一切いたしません。料金のご説明のみで、お持ち帰りでのご検討も歓迎です。"),
+    ])
+    b = head("【無料】プロの体験レッスン55分｜姫路・土山のインドアゴルフ FRANK GOLF",
+             "姫路・土山のインドアゴルフ FRANK GOLF。ツアープロのマンツーマン体験レッスン（約55分・通常3,300円）がいまなら無料。最新シミュレーター完備・手ぶらでOK・強引な勧誘なし。",
+             "lp-trial", jsonld=faq)
+    b += f"""
+<section class="page-head">
+  <div class="wrap rv">
+    <p class="crumb">姫路・土山｜{PREOPEN} プレオープン</p>
+    <h1 class="h-en">まず、1球打ってみませんか。</h1>
+    <p class="h-jp">プロのマンツーマン体験レッスン（約55分）が、いまなら無料。</p>
+    <p class="lead">通常3,300円（税込）の体験レッスンを、プレオープン記念で無料でご案内しています。
+    最新シミュレーターでスイングを数字で見ながら、ツアープロがその場でひとつ、変化をつくります。
+    手ぶらでOK・強引な勧誘は一切ありません。</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap" style="max-width:820px">
+    <div class="rv">
+      {offer_badge()}
+      <div class="cta__btns" style="justify-content:flex-start;margin-top:26px">
+        <a class="btn btn--brass" href="#" data-cta="trial">無料体験を予約する（30秒）</a>
+        <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
+      </div>
+    </div>
+
+    <div class="rv" style="margin-top:56px">
+      <p class="eyebrow">Why FRANK GOLF</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">選ばれる3つの理由</h2>
+      <div class="flow" style="margin-top:24px">
+        <div class="flow__i"><p class="flow__n">01</p><div><h3 class="flow__t">ツアープロが常駐</h3><p class="flow__b">レッスンは<span data-frank="lesson.coaches" data-frank-fallback="ツアープロ">ツアープロ</span>が担当。会員は「求めたときに5〜10分」のワンポイント指導を受け放題感覚で。</p></div></div>
+        <div class="flow__i"><p class="flow__n">02</p><div><h3 class="flow__t">最新シミュレーター×完全予約制</h3><p class="flow__b"><span data-frank="store.simulator" data-frank-fallback="最新シミュレーター4打席">最新シミュレーター4打席</span>。完全予約制なので待ち時間ゼロ。天候も日焼けも関係なく、データで上達できます。</p></div></div>
+        <div class="flow__i"><p class="flow__n">03</p><div><h3 class="flow__t">バーラウンジ併設</h3><p class="flow__b">元ゴルフバーのカウンターを承継した交流空間。練習の前後に一杯、ゴルフ談義まで楽しめる「大人のゴルフ基地」です。</p></div></div>
+      </div>
+    </div>
+
+    <div class="rv" style="margin-top:56px">
+      <p class="eyebrow">Trial Program</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">体験当日の流れ（約55分）</h2>
+      <div class="flow" style="margin-top:24px" data-trial-steps></div>
+      <p class="lead" style="font-size:13.5px;margin-top:14px" data-frank="trial.note" data-frank-hide></p>
+    </div>
+
+    <div class="rv" style="margin-top:56px">
+      <p class="eyebrow">Access</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">アクセス</h2>
+      <p class="lead" style="margin-top:14px">
+        <span data-frank="store.address">兵庫県姫路市土山6-6-1</span>／駐車場 <span data-frank="store.parking" data-frank-fallback="無料">最大20台・無料</span><br>
+        営業時間 <span data-frank="store.hours" data-frank-fallback="近日公開">平日 10:00〜22:00 ／ 土日祝 9:00〜20:00</span>（<span data-frank="store.holiday" data-frank-fallback="定休日">毎週火曜日</span> 定休）
+      </p>
+      <p style="margin-top:12px"><a class="btn btn--ghost btn--sm" data-link="store.mapUrl" target="_blank" rel="noopener">Googleマップで見る ↗</a></p>
+    </div>
+
+    <div class="rv" style="margin-top:56px">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">よくあるご質問</h2>
+      <div style="margin-top:20px">
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 本当に無料ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">はい。通常3,300円（税込）の体験レッスン（約55分）を、プレオープン記念で無料でご案内しています。当日いただく費用はありません。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 初心者でも大丈夫ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">大丈夫です。クラブを握ったことがない方も歓迎。プロがその方のペースに合わせてご案内します。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 持ち物は？</p><p style="margin-top:6px;font-size:14px;opacity:.85">手ぶらでお越しください。動きやすい服装であれば大丈夫です。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 入会の勧誘はありますか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">強引な勧誘は一切いたしません。最後に料金のご説明のみで、お持ち帰りでのご検討も歓迎です。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+"""
+    b += cta_block()
+    b += foot()
+    write("lp-trial.html", b)
+
+
+def build_lp_campaign():
+    """年内入会キャンペーンLP（#131のキャンペーンを1枚で伝える #136）。
+    Web入会（即決済・会員番号即発行）へ直行させる導線。"""
+    faq = jsonld_faq([
+        ("キャンペーンの内容は？", "2026年12月31日までのご入会で、入会金5,500円（税込）が無料、さらに入会月の月会費も無料になります。"),
+        ("支払いはどうなりますか？", "クレジットカードのみです。お申し込み時に翌月・翌々月の月会費2か月分を1回でお支払いいただき、以後は毎月自動でのお支払いになります。"),
+        ("すぐに使えますか？", "はい。Web入会は決済完了と同時に会員番号が発行され、その場でWeb打席予約をご利用いただけます。"),
+        ("条件はありますか？", "キャンペーンでのご入会は6か月間の継続をお願いしています。休会・退会の規定は会員規約をご確認ください。"),
+    ])
+    b = head("入会金0円・入会月0円｜年内入会キャンペーン｜FRANK GOLF 姫路・土山",
+             "FRANK GOLF の年内入会キャンペーン。2026年内のご入会で入会金5,500円が無料＋入会月の月会費も無料。Web入会は決済完了と同時に会員番号を即発行。姫路・土山のインドアゴルフ。",
+             "lp-campaign", jsonld=faq)
+    b += f"""
+<section class="page-head">
+  <div class="wrap rv">
+    <p class="crumb">姫路・土山｜{PREOPEN} プレオープン</p>
+    <h1 class="h-en">年内入会で、入会金0円・入会月0円。</h1>
+    <p class="h-jp">オープン記念・年内入会キャンペーン（2026年12月31日まで）</p>
+    <p class="lead">入会金5,500円（税込）が無料、さらに入会月の月会費も無料。
+    Webからのご入会なら、決済完了と同時に会員番号が発行され、その日からWeb予約で練習を始められます。</p>
+    <div class="cta__btns" style="justify-content:flex-start;margin-top:22px">
+      <a class="btn btn--brass" data-link="links.joinWeb">Webで入会する（会員番号を即発行）</a>
+      <a class="btn btn--ghost" href="#" data-cta="trial">まずは無料体験から</a>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap" style="max-width:860px">
+    <div class="rv">
+      <p class="eyebrow">Campaign</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">キャンペーン内容</h2>
+      <div class="flow" style="margin-top:24px">
+        <div class="flow__i"><p class="flow__n">特典 1</p><div><h3 class="flow__t">入会金 5,500円 → <b style="color:var(--brass-2)">0円</b></h3><p class="flow__b">2026年12月31日までのお申し込みで、入会金（税込5,500円）が無料になります。</p></div></div>
+        <div class="flow__i"><p class="flow__n">特典 2</p><div><h3 class="flow__t">入会月の月会費 → <b style="color:var(--brass-2)">0円</b></h3><p class="flow__b">ご入会月の月会費は無料。お支払いは翌月分からのスタートです。</p></div></div>
+        <div class="flow__i"><p class="flow__n">おねがい</p><div><h3 class="flow__t">6か月間の継続</h3><p class="flow__b">キャンペーンでのご入会は、6か月間の継続をお願いしています（休会・退会の規定は会員規約をご覧ください）。</p></div></div>
+      </div>
+      <p class="lead" style="font-size:13px;margin-top:14px">※ お申し込み時に、翌月・翌々月の月会費2か月分を1回でお支払いいただきます（以後は毎月自動でのお支払い）。</p>
+    </div>
+
+    <div class="rv" style="margin-top:56px">
+      <p class="eyebrow">Plans</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">会員プラン</h2>
+      <p class="h-jp">表示金額はすべて税抜です。</p>
+      <div class="flow" style="margin-top:24px">
+        <div class="flow__i"><p class="flow__n">LIGHT</p><div><h3 class="flow__t">ライト会員 9,800円/月</h3><p class="flow__b">平日昼間の利用中心（月4回まで）。日中ゆったり練習したい方に。</p></div></div>
+        <div class="flow__i"><p class="flow__n">REGULAR</p><div><h3 class="flow__t">レギュラー会員 13,800円/月（一番人気）</h3><p class="flow__b">全営業日ご利用可能・1日1時間通い放題。毎日練習して上達したい方に。</p></div></div>
+        <div class="flow__i"><p class="flow__n">MASTER</p><div><h3 class="flow__t">マスター会員 19,800円/月</h3><p class="flow__b">全営業日ご利用可能・1日最大2時間まで。たっぷり練習したい熱心な方に。</p></div></div>
+      </div>
+      <p style="margin-top:14px"><a class="btn btn--ghost btn--sm" href="plan.html">プランの詳しい比較を見る ↗</a></p>
+    </div>
+
+    <div class="rv" style="margin-top:56px">
+      <p class="eyebrow">How to Join</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">ご入会は3ステップ・Webで完結</h2>
+      <div class="flow" style="margin-top:24px">
+        <div class="flow__i"><p class="flow__n">STEP 01</p><div><h3 class="flow__t">プランを選んでフォーム入力</h3><p class="flow__b">お名前・ご連絡先を入力し、会員規約に同意して電子サイン。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 02</p><div><h3 class="flow__t">カードでお支払い</h3><p class="flow__b">安全な決済ページ（Square）で、前取り月会費2か月分を1回でお支払い。</p></div></div>
+        <div class="flow__i"><p class="flow__n">STEP 03</p><div><h3 class="flow__t">その場で会員番号発行</h3><p class="flow__b">決済完了と同時に会員番号をメールでお届け。すぐにWeb打席予約が使えます。</p></div></div>
+      </div>
+      <div class="cta__btns" style="justify-content:flex-start;margin-top:26px">
+        <a class="btn btn--brass" data-link="links.joinWeb">Webで入会する</a>
+        <a class="btn btn--line" href="#" data-cta="line">公式LINEで相談</a>
+      </div>
+    </div>
+
+    <div class="rv" style="margin-top:56px">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">よくあるご質問</h2>
+      <div style="margin-top:20px">
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. いつまでのキャンペーンですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">2026年12月31日のお申し込み分までです。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 支払い方法は？</p><p style="margin-top:6px;font-size:14px;opacity:.85">クレジットカードのみです。毎月自動でのお支払いになります（口座振替をご希望の方は店頭でご相談ください）。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 入会前に見学・体験できますか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">はい。無料の体験レッスン（約55分）をご用意しています。まずは体験からがおすすめです。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 休会・退会はできますか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">できます。手続き・費用の規定は会員規約（休会・退会規定）をご確認ください。キャンペーン入会は6か月間の継続をお願いしています。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+"""
+    b += cta_block()
+    b += foot()
+    write("lp-campaign.html", b)
+
+
 def build_tokushoho():
     b = head("特定商取引法に基づく表記｜FRANK GOLF",
              "FRANK GOLF の特定商取引法に基づく表記。",
@@ -2236,6 +2401,7 @@ def build_sitemap():
     urls = ["index.html", "concept.html", "facility.html", "lesson.html", "lounge.html",
             "community.html", "plan.html", "beginner.html", "corporate.html",
             "access.html", "faq.html", "trial.html", "trial-booking.html",
+            "lp-trial.html", "lp-campaign.html",
             "tokushoho.html", "privacy.html", "terms.html"]
     body = "\n".join(
         f"  <url><loc>{abs_url(u)}</loc><priority>{'1.0' if u == 'index.html' else '0.7'}</priority></url>"
@@ -2266,6 +2432,8 @@ if __name__ == "__main__":
     build_faq()
     build_trial()
     build_trial_booking()
+    build_lp_trial()
+    build_lp_campaign()
     build_tokushoho()
     build_privacy()
     build_terms()

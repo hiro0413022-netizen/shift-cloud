@@ -93,6 +93,8 @@ async function insertSale(
   const { data: sale, error } = await admin
     .from("mon_sales")
     .insert({
+      // NOTE: (detail->>'square_payment_id', detail->>'part') に部分ユニークインデックスあり（0113）。
+      // Webhookの同時到達（created/updated）はここで弾かれる＝二重計上の最終防衛。
       company_id: ctx.companyId,
       store_id: ctx.storeId,
       segment_id: ctx.segmentId,
@@ -110,7 +112,15 @@ async function insertSale(
     })
     .select("id")
     .single();
-  if (error) throw new Error(`mon_sales insert failed: ${error.message}`);
+  if (error) {
+    // 23505 = すでに記録済み（並行Webhookに先を越された）。二重計上させないため
+    // ここで静かに終わる（現金出納への追記もしない）。
+    if (String(error.code ?? "").includes("23505")) {
+      console.warn(`[frank-pos] duplicate sale skipped: ${JSON.stringify(row.detail)}`);
+      return;
+    }
+    throw new Error(`mon_sales insert failed: ${error.message}`);
+  }
 
   // 現金はFRANK店舗の現金出納にも自動反映（Money OSの売上入力と同じ動き）
   if (row.pay_method === "現金" && row.amount > 0) {
@@ -158,21 +168,35 @@ type MemberRow = {
   joining_fee_charged_at: string | null;
   join_campaign: string | null;
   prepay_pause_done_at: string | null;
+  square_checkout_breakdown: {
+    total?: number;
+    joiningFee?: number;
+    monthly?: number;
+    prepaidMonths?: number;
+    campaign?: boolean;
+  } | null;
   frunk_plans: { monthly_price: number | null; joining_fee: number | null } | null;
 };
 
 const MEMBER_COLS =
-  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, frunk_plans(monthly_price, joining_fee)";
+  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, square_checkout_breakdown, frunk_plans(monthly_price, joining_fee)";
 
 async function memberByCheckoutOrder(admin: Admin, orderId: string | null | undefined): Promise<MemberRow | null> {
   if (!orderId) return null;
-  const { data } = await admin.from("frunk_members").select(MEMBER_COLS).eq("square_checkout_order_id", orderId).maybeSingle();
+  // 最新の order_id（square_checkout_order_id）に加えて履歴（square_checkout_order_ids）も見る。
+  // 再送信後に古いリンクで支払われた入金を迷子にしないため（#136）。
+  const { data } = await admin
+    .from("frunk_members")
+    .select(MEMBER_COLS)
+    .or(`square_checkout_order_id.eq.${orderId},square_checkout_order_ids.cs.${JSON.stringify([orderId])}`)
+    .limit(1)
+    .maybeSingle();
   return (data as unknown as MemberRow) ?? null;
 }
 
 async function memberBySquareCustomer(admin: Admin, customerId: string | null | undefined): Promise<MemberRow | null> {
   if (!customerId) return null;
-  const { data } = await admin.from("frunk_members").select(MEMBER_COLS).eq("square_customer_id", customerId).maybeSingle();
+  const { data } = await admin.from("frunk_members").select(MEMBER_COLS).eq("square_customer_id", customerId).limit(1).maybeSingle();
   return (data as unknown as MemberRow) ?? null;
 }
 
@@ -240,13 +264,24 @@ async function tryRecordMonthlyFee(
   // ---- 売上への記帳 ----
   // Web入会の初回は「入会金＋月会費×前取り月数」の一括入金（#131b）。
   // 1行の「月会費」で丸ごと記帳すると入会金が売上分類から消えるので、内訳に割って入れる。
+  // 内訳は決済リンク発行時に保存したもの（square_checkout_breakdown）を正とする。
+  // 入金日で再計算すると、年またぎ（キャンペーン境界）やプラン価格変更で金額が合わなくなる（#136）。
+  const bd = member.square_checkout_breakdown;
   const est = wasWebJoin
-    ? joinInitialTotal({
-        monthlyExTax: Number(member.frunk_plans?.monthly_price ?? 0),
-        joiningFeeExTax: Number(member.frunk_plans?.joining_fee ?? 0),
-        applyDateYmd: mapped.sold_on,
-        joiningFeeWaived: !!member.joining_fee_waived,
-      })
+    ? bd && Number(bd.total ?? 0) > 0 && Number(bd.monthly ?? 0) > 0
+      ? {
+          total: Number(bd.total),
+          joiningFee: Number(bd.joiningFee ?? 0),
+          monthly: Number(bd.monthly),
+          prepaidMonths: Number(bd.prepaidMonths ?? JOIN_PREPAID_MONTHS),
+          campaign: !!bd.campaign,
+        }
+      : joinInitialTotal({
+          monthlyExTax: Number(member.frunk_plans?.monthly_price ?? 0),
+          joiningFeeExTax: Number(member.frunk_plans?.joining_fee ?? 0),
+          applyDateYmd: mapped.sold_on,
+          joiningFeeWaived: !!member.joining_fee_waived,
+        })
     : null;
   const splitOk = !!est && est.total === mapped.tax_included && est.monthly > 0;
 

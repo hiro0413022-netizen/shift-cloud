@@ -89,11 +89,26 @@ export async function getMemberSession(): Promise<MemberSession | null> {
       .eq("company_id", companyId).eq("member_no", memberNo).maybeSingle();
     if (m?.name) name = m.name as string;
   } else {
-    const { data: m } = await admin
-      .from("mbr_members")
-      .select("name")
-      .eq("company_id", companyId).eq("member_no", memberNo).maybeSingle();
-    if (m?.name) name = m.name as string;
+    // FRANK会員の台帳は frunk_members 一本（#93）。以前は旧台帳 mbr_members を見ており、
+    // Web入会・タブレット入会の会員は氏名が出ず「FR0001 様」表示になっていた（#136）
+    const { data: fm } = await admin
+      .from("frunk_members")
+      .select("name, status")
+      .eq("company_id", companyId).eq("member_no", memberNo)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (fm) {
+      // 退会・却下済みはセッションを無効化（60日cookieだけで居座れないように）
+      if (["left", "rejected"].includes(String(fm.status))) return null;
+      if (fm.name) name = fm.name as string;
+    } else {
+      const { data: m } = await admin
+        .from("mbr_members")
+        .select("name")
+        .eq("company_id", companyId).eq("member_no", memberNo).maybeSingle();
+      if (m?.name) name = m.name as string;
+    }
   }
   return { companyId, memberNo, name, isProvisional };
 }

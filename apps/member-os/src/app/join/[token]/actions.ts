@@ -32,6 +32,24 @@ export async function submitSignup(_prev: SignupState, formData: FormData): Prom
 
   const { name, nameKana } = readName(formData);
   if (!name) return { error: "お名前（姓・名）を入力してください" };
+
+  // プランの実在・会社スコープ検証（#136。/join-web と同等。POST直打ちで
+  // 他社・削除済み・非公開プランのIDを指定できてしまっていた）
+  let planId: string | null = null;
+  {
+    const raw = orNull(formData.get("plan_id"));
+    if (raw) {
+      const { data: plan } = await admin
+        .from("frunk_plans")
+        .select("id, active")
+        .eq("id", raw)
+        .eq("company_id", tok.company_id as string)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!plan || !plan.active) return { error: "選択されたプランが無効です。画面を更新して再度お試しください" };
+      planId = String(plan.id);
+    }
+  }
   if (str(formData.get("consent_privacy")) !== "1") return { error: "個人情報の取扱いへの同意が必要です" };
   if (str(formData.get("consent_terms")) !== "1")
     return { error: "会員規約（休会・退会規定を含む）への同意が必要です" };
@@ -41,7 +59,7 @@ export async function submitSignup(_prev: SignupState, formData: FormData): Prom
   const { error } = await admin.from("frunk_members").insert({
     company_id: tok.company_id as string,
     store_id: tok.store_id as string | null,
-    plan_id: orNull(formData.get("plan_id")),
+    plan_id: planId,
     name,
     name_kana: nameKana,
     birth_date: orNull(formData.get("birth_date")),

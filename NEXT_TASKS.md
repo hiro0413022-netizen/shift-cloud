@@ -13,6 +13,9 @@ A-00. **FRANK GOLF 9/2オープンの残作業（#118→#123更新・2026-08-10�
       Developer でアプリ作成・Production Access Token 取得 → `scripts/frank-square-setup.mjs` 実行
       （プラン5種・ドリンク24品・入会金/休会費のレジ商品・Webhookを自動作成）→
       Vercel env（yozan-genesis に3つ＋**member-os に SQUARE_ACCESS_TOKEN**）＋frunk_plans 更新 → §14-1のテスト
+      ※ **✅Square側は設定済み（プラン5種にvariation紐付け済み・2026-08-10）**
+      ※ **#136: 通しテストは `https://member-os-tau.vercel.app/join-web?test=1` の「テスト会員」（実カード220円）で。**
+        手順と後始末は OPERATIONS §14-1「入会フローの通しテスト」
       ※ Stripe の本番切替・sk_live 差替えは**不要になりました**
       ※ 入会金10,000円/クーポン6種/休会2,000円/プラン変更週割は #124 で実装済み（手順も §14-1）
    2. **Square端末（Terminal 約4.6万円）の調達**（お盆前推奨）。導入までは店頭台帳運用

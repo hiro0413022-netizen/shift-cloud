@@ -50,16 +50,52 @@ async function lessonBaySlots(admin: Admin, dateStr: string): Promise<{ bay_id: 
   return (data ?? []).map((s) => ({ bay_id: String(s.bay_id), start_time: String(s.start_time), end_time: String(s.end_time) }));
 }
 
+const AUTH_LOCK_WINDOW_MIN = 15;
+const AUTH_LOCK_MAX_FAILS = 10;
+
+/** 直近15分の失敗回数がしきい値を超えていたらロック（総当たり対策 #136） */
+async function authLocked(admin: Admin, memberNo: string): Promise<boolean> {
+  const since = new Date(Date.now() - AUTH_LOCK_WINDOW_MIN * 60_000).toISOString();
+  const { count, error } = await admin
+    .from("frunk_auth_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("member_no", memberNo)
+    .eq("success", false)
+    .gte("attempted_at", since);
+  // テーブル未作成（migration 0113 未適用）等は従来どおり通す（機能を壊さない）
+  if (error) return false;
+  return (count ?? 0) >= AUTH_LOCK_MAX_FAILS;
+}
+
+async function recordAuthAttempt(admin: Admin, memberNo: string, success: boolean): Promise<void> {
+  await admin
+    .from("frunk_auth_attempts")
+    .insert({ member_no: memberNo, success })
+    .then(() => undefined, () => undefined); // 記録失敗で本処理は止めない
+}
+
 export async function verifyMember(admin: Admin, memberNo: string, phoneLast4: string) {
+  const no = memberNo.trim();
+  const last4 = phoneLast4.trim();
+  // 形式チェック（公開APIから直接呼ばれるためサーバー側でも必ず行う）
+  if (!/^[A-Za-z0-9-]{2,16}$/.test(no) || !/^\d{4}$/.test(last4)) return null;
+  if (await authLocked(admin, no)) return null;
+
   const { data } = await admin
     .from("frunk_members")
     .select("id, company_id, name, member_no, phone, status, plan_id, frunk_plans(name, max_bookings_per_day)")
-    .eq("member_no", memberNo.trim())
+    .eq("member_no", no)
     .is("deleted_at", null)
     .maybeSingle();
-  if (!data) return null;
+  if (!data) {
+    await recordAuthAttempt(admin, no, false);
+    return null;
+  }
   const digits = String(data.phone ?? "").replace(/\D/g, "");
-  if (digits.slice(-4) !== phoneLast4.trim()) return null;
+  if (digits.slice(-4) !== last4) {
+    await recordAuthAttempt(admin, no, false);
+    return null;
+  }
   if (!["active", "approved"].includes(String(data.status))) return null;
   return data;
 }
@@ -149,19 +185,35 @@ export async function createBooking(input: {
   }
   if (plan?.name === "ライト会員") {
     const monthStart = `${input.date.slice(0, 7)}-01`;
-    const { data: monthRows } = await admin
+    // 翌月1日を正しく計算する（"-31" 固定は 2月等で不正な日付になり、
+    // クエリがエラー→空配列扱い→上限チェックが素通りしていた）
+    const y = Number(input.date.slice(0, 4));
+    const mo = Number(input.date.slice(5, 7));
+    const nextMonthStart = `${mo === 12 ? y + 1 : y}-${String(mo === 12 ? 1 : mo + 1).padStart(2, "0")}-01`;
+    const { data: monthRows, error: monthErr } = await admin
       .from("frunk_bookings")
       .select("booked_date")
       .eq("member_id", member.id)
       .gte("booked_date", monthStart)
-      .lte("booked_date", `${input.date.slice(0, 7)}-31`)
+      .lt("booked_date", nextMonthStart)
       .neq("status", "cancelled")
       .is("deleted_at", null);
+    if (monthErr) {
+      // 取得に失敗したら安全側（予約を通さない）。黙って上限を無効化しない
+      console.error("[frank-booking] month cap query failed:", monthErr);
+      return { ok: false, error: "予約状況の確認に失敗しました。時間をおいてお試しください" };
+    }
     const days = new Set((monthRows ?? []).map((r) => String(r.booked_date)));
     if (!days.has(input.date) && days.size >= 8) return { ok: false, error: "ライト会員は月8日までのご利用です" };
   }
 
-  const { data: bay } = await admin.from("frunk_bays").select("id, name").eq("code", input.bayCode).eq("active", true).maybeSingle();
+  const { data: bay } = await admin
+    .from("frunk_bays")
+    .select("id, name")
+    .eq("code", input.bayCode)
+    .eq("active", true)
+    .is("deleted_at", null)
+    .maybeSingle();
   if (!bay) return { ok: false, error: "打席が見つかりません" };
 
   // 枠の重複（unique indexが最終防衛。ここでは連続枠すべて確認）

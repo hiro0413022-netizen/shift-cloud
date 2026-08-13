@@ -3,7 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { submitWebSignup, type WebSignupState } from "./actions";
 import { yen } from "@/lib/frunk";
-import { joinEstimate, JOIN_CAMPAIGN } from "@/lib/frank-billing-pure";
+import { joinEstimate, validCoupon, JOIN_CAMPAIGN } from "@/lib/frank-billing-pure";
 import { FRANK_TERMS_TEXT, FRANK_PRIVACY_URL } from "@/lib/frank-terms";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
@@ -39,6 +39,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
   const [state, action, pending] = useActionState<WebSignupState, FormData>(submitWebSignup, {});
   const [planId, setPlanId] = useState(plans.find((p) => p.name.includes("レギュラー"))?.id ?? plans[0]?.id ?? "");
   const [signature, setSignature] = useState("");
+  const [coupon, setCoupon] = useState("");
   const [step, setStep] = useState<"input" | "estimate">("input");
   const formRef = useRef<HTMLFormElement | null>(null);
 
@@ -150,7 +151,8 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         </div>
         <div>
           <label className={label}>クーポンコード（お持ちの方のみ）</label>
-          <input name="coupon" autoCapitalize="none" autoCorrect="off" placeholder="例: FRANKGOLF2026" className={field} />
+          <input name="coupon" autoCapitalize="none" autoCorrect="off" placeholder="例: FRANKGOLF2026" className={field}
+            value={coupon} onChange={(e) => setCoupon(e.target.value)} />
           <p className="mt-1 text-xs text-(--color-dim)">ご紹介などのクーポンコードをお持ちの方はご入力ください（入会金が無料になります）</p>
         </div>
       </div>
@@ -185,6 +187,8 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           monthlyExTax: Number(plan.monthly_price ?? 0),
           joiningFeeExTax: Number(plan.joining_fee ?? 0),
           applyDateYmd: todayYmd,
+          // クーポン入力を見積に反映（#136。実決済側と同じ分岐。キャンペーン終了後にズレていた）
+          couponWaivesJoiningFee: !!validCoupon(coupon),
         });
         const [m0, m1, m2] = monthLabels(todayYmd);
         const row = "flex items-baseline justify-between gap-3 py-2 border-b border-(--color-line)/60";
@@ -216,7 +220,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
               )}
               <div className={row}>
                 <span>月会費 前取り（{m1}分＋{m2}分）</span>
-                <span className="font-bold">{est.monthlyTaxIncluded.toLocaleString()}円 × 2 ＝ {(est.monthlyTaxIncluded * 2).toLocaleString()}円（税込）</span>
+                <span className="font-bold">{est.monthlyTaxIncluded.toLocaleString()}円 × {est.prepaidMonths} ＝ {(est.monthlyTaxIncluded * est.prepaidMonths).toLocaleString()}円（税込）</span>
               </div>
               <div className="flex items-baseline justify-between gap-3 pt-3">
                 <span className="font-bold">本日のお支払い合計</span>

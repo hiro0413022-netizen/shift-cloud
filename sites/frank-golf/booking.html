@@ -118,7 +118,7 @@
       <p style="margin-top:8px;font-size:13px;opacity:.8">クレジットカードを登録すると、月会費が毎月自動でお支払いになります（安全な決済ページ Square に移動します）。<br>上の会員番号・電話番号下4桁を入力のうえ、ボタンを押してください。</p>
       <p id="bk-bill-status" style="margin-top:10px;font-size:13px"></p>
       <p style="margin-top:12px"><button id="bk-bill" class="btn btn--brass" type="button">カードで継続課金を登録する</button></p>
-      <p style="margin-top:10px;font-size:11px;opacity:.55">初回のみ、月会費のお支払いに続けて入会金11,000円（税込）を同じカードへ自動でご請求します（入会金無料クーポンをご利用の方を除く）。<br>口座振替をご希望の方は店頭でお手続きください。モニター会員（月会費0円）の方は登録不要です。</p>
+      <p style="margin-top:10px;font-size:11px;opacity:.55">初回のみ、月会費のお支払いに続けて入会金5,500円（税込）を同じカードへ自動でご請求します（2026年内のご入会は入会金無料キャンペーン中。入会金無料クーポンをご利用の方も請求されません）。<br>口座振替をご希望の方は店頭でお手続きください。モニター会員（月会費0円）の方は登録不要です。</p>
     </div>
   </div>
 </section>
@@ -278,11 +278,16 @@
   }
   function book(){
     var a=auth(); if(!a||!sel) return;
+    // 二重送信ガード（連打で同じ枠へ複数POSTしない）
+    var wrap=$("bk-go"); var btn=wrap?wrap.querySelector("button"):null;
+    if(btn){ if(btn.disabled) return; btn.disabled=true; }
+    var done=function(){ if(btn) btn.disabled=false; };
     fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"book",member_no:a.no,phone_last4:a.tel,date:$("bk-date").value,bay_code:sel.bay,start:sel.t,minutes:Number($("bk-min").value)})})
       .then(function(r){return r.json()}).then(function(j){
+        done();
         if(j.ok){alert("予約が完了しました！\n"+$("bk-date").value+" "+sel.t+"〜");load();my()}
         else alert(j.error||"予約できませんでした");
-      });
+      }).catch(function(){done();alert("通信に失敗しました。時間をおいてお試しください")});
   }
   function my(){
     var a=auth(); if(!a) return;

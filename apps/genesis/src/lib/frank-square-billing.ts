@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { verifyMember } from "@/lib/frank-booking";
-import { monthlyFeeTaxIncluded, toE164Jp } from "@/lib/frank-pos-pure";
+import { monthlyFeeTaxIncluded, toE164Jp, JOIN_CHECKOUT_NOTE_PREFIX } from "@/lib/frank-pos-pure";
 import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { jstYmd } from "@/lib/jst";
 
@@ -34,6 +34,38 @@ import { jstYmd } from "@/lib/jst";
 
 const SQUARE_API = "https://connect.squareup.com/v2";
 const SITE = "https://frankgolf.jp";
+
+/**
+ * 決済リンクの order_id を会員に控える（#136）。
+ * square_checkout_order_id（最新）に加えて square_checkout_order_ids（履歴）へも追記する。
+ * 再送信でリンクを作り直したあと、お客様が古いタブのリンクで支払っても
+ * Webhook が履歴側で会員を特定できるようにするため（上書きだけだと迷子の入金になる）。
+ */
+async function recordCheckoutOrder(
+  admin: ReturnType<typeof createAdmin>,
+  memberId: string,
+  orderId: string,
+  breakdown?: Record<string, unknown>,
+): Promise<void> {
+  const { data: cur } = await admin
+    .from("frunk_members")
+    .select("square_checkout_order_ids")
+    .eq("id", memberId)
+    .maybeSingle();
+  const history = Array.isArray(cur?.square_checkout_order_ids) ? (cur?.square_checkout_order_ids as unknown[]) : [];
+  if (!history.includes(orderId)) history.push(orderId);
+  await admin
+    .from("frunk_members")
+    .update({
+      square_checkout_order_id: orderId,
+      square_checkout_order_ids: history,
+      ...(breakdown ? { square_checkout_breakdown: breakdown } : {}),
+      billing_status: "checkout",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", memberId)
+    .neq("billing_status", "active");
+}
 
 function accessToken(): string | null {
   const t = process.env.SQUARE_ACCESS_TOKEN;
@@ -145,10 +177,11 @@ export async function createJoinCheckoutForMember(
   // 入会時のお支払いは「入会金＋月会費×前取り月数」の1回払い（#131b）。
   // 決済リンクの金額をプラン月額と変えると、Squareはそれをサブスクの price_override_money
   // として引き継ぐため、初回入金のWebhookで必ず null に戻す（frank-pos.ts）。
+  const applyDateYmd = jstYmd();
   const est = joinInitialTotal({
     monthlyExTax: priceExTax,
     joiningFeeExTax: Number(plan.joining_fee ?? 0),
-    applyDateYmd: jstYmd(),
+    applyDateYmd,
     joiningFeeWaived: !!row.joining_fee_waived,
   });
   const amount = est.total;
@@ -170,16 +203,20 @@ export async function createJoinCheckoutForMember(
         ...(row.email ? { buyer_email: String(row.email) } : {}),
         ...(phone ? { buyer_phone_number: phone } : {}),
       },
-      payment_note: `FRANK入会初回一括 ${String(row.name ?? "")}`,
+      payment_note: `${JOIN_CHECKOUT_NOTE_PREFIX} ${String(row.name ?? "")}`,
     });
     const link = json.payment_link as { url?: string; order_id?: string } | undefined;
     if (!link?.url || !link.order_id) throw new Error("payment_link missing url/order_id");
 
-    await admin
-      .from("frunk_members")
-      .update({ square_checkout_order_id: link.order_id, billing_status: "checkout", updated_at: new Date().toISOString() })
-      .eq("id", memberId)
-      .neq("billing_status", "active");
+    // 内訳も一緒に保存: Webhook・控えPDFは「入金日で再計算」せずこれを正とする（#136）
+    await recordCheckoutOrder(admin, memberId, link.order_id, {
+      total: est.total,
+      joiningFee: est.joiningFee,
+      monthly: est.monthly,
+      prepaidMonths: est.prepaidMonths,
+      campaign: est.campaign,
+      applyDateYmd,
+    });
     return { ok: true, url: String(link.url) };
   } catch (e) {
     console.error("[frank-square-billing] join checkout failed:", e);
@@ -246,11 +283,7 @@ export async function createSquareBillingCheckout(
     if (!link?.url || !link.order_id) throw new Error("payment_link missing url/order_id");
 
     // 注文IDを控える＝Webhookで初回決済を会員に結ぶ鍵。billing_statusはWebhookでactiveへ。
-    await admin
-      .from("frunk_members")
-      .update({ square_checkout_order_id: link.order_id, billing_status: "checkout", updated_at: new Date().toISOString() })
-      .eq("id", member.id)
-      .neq("billing_status", "active");
+    await recordCheckoutOrder(admin, String(member.id), link.order_id);
     return { ok: true, url: String(link.url) };
   } catch (e) {
     console.error("[frank-square-billing] checkout failed:", e);
