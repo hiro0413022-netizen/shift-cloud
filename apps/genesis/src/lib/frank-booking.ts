@@ -14,7 +14,7 @@ import {
  * FRANK GOLF 打席予約（#86 §3-3・台帳一本化 #93）
  * - 30分単位。営業時間・定休日は @yozan/core/frank-booking（gn_site_content で上書き可）
  * - 会員認証: 会員番号＋電話番号下4桁（Web完結・パスワードレス）
- * - プラン上限: レギュラー=1日60分／マスター=1日120分／ライト=1日60分+月8日まで
+ * - プラン上限: レギュラー=1日60分／マスター=1日120分／ライト=1日60分+月4回まで（#136b・ユーザー確定）
  * ★ 設定と営業時間の判定はスタッフ画面(member-os)と共通。ここで独自定義しないこと。
  */
 
@@ -204,7 +204,8 @@ export async function createBooking(input: {
       return { ok: false, error: "予約状況の確認に失敗しました。時間をおいてお試しください" };
     }
     const days = new Set((monthRows ?? []).map((r) => String(r.booked_date)));
-    if (!days.has(input.date) && days.size >= 8) return { ok: false, error: "ライト会員は月8日までのご利用です" };
+    // 正の仕様は「月4回」（2026-08-13 ユーザー確定 #136b。旧実装の8日はHP表記とも食い違っていた）
+    if (!days.has(input.date) && days.size >= 4) return { ok: false, error: "ライト会員は月4回までのご利用です（同じ日の追加予約は回数に含みません）" };
   }
 
   const { data: bay } = await admin
