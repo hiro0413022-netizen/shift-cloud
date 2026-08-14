@@ -76,10 +76,10 @@ type SortKey = "soldOn" | "category" | "customerName" | "productName" | "pro" | 
  * 明細のソート比較。文字列は日本語ロケールで比較（濁点・カナの並びを自然に）。
  * 同値のときは日付降順→金額降順で安定させる（毎回同じ並びになる）。
  */
-function compareRows(a: SaleRow, b: SaleRow, key: SortKey): number {
+function compareRows(a: SaleRow, b: SaleRow, key: SortKey, amountOf: (r: SaleRow) => number): number {
   let c = 0;
   if (key === "amount") {
-    c = a.amount - b.amount;
+    c = amountOf(a) - amountOf(b);
   } else if (key === "soldOn") {
     c = a.soldOn.localeCompare(b.soldOn);
   } else {
@@ -164,6 +164,15 @@ export default function SalesTable({
   const [picked, setPicked] = useState<Partial<Record<FilterKey, string>>>({});
   const [pivotKey, setPivotKey] = useState<FilterKey | null>(null);
 
+  // 表示金額の切り替え: 税抜(既定)⇄税込。金額列・合計・集計がまとめて切り替わる。
+  // 税込欄が未記録の明細は税抜×1.1(切り捨て)で補完＝入力フォームの自動計算と同じ式
+  const [showTax, setShowTax] = useState(false);
+  const taxLabel = showTax ? "税込" : "税抜";
+  const amountOf = useMemo(
+    () => (r: SaleRow) => (showTax ? (r.taxIncluded ?? Math.floor(r.amount * 1.1)) : r.amount),
+    [showTax],
+  );
+
   const filteredRows = useMemo(() => {
     const entries = Object.entries(picked).filter(([, v]) => v) as Array<[FilterKey, string]>;
     return rows.filter((r) => {
@@ -180,10 +189,10 @@ export default function SalesTable({
   }, [rows, picked, query]);
 
   const sortedRows = useMemo(() => {
-    const arr = [...filteredRows].sort((a, b) => compareRows(a, b, sortKey));
+    const arr = [...filteredRows].sort((a, b) => compareRows(a, b, sortKey, amountOf));
     if (sortDesc) arr.reverse();
     return arr;
-  }, [filteredRows, sortKey, sortDesc]);
+  }, [filteredRows, sortKey, sortDesc, amountOf]);
 
   /**
    * プルダウンの候補。
@@ -207,11 +216,11 @@ export default function SalesTable({
   }, [rows, picked]);
 
   const pivotRows = useMemo(
-    () => (pivotKey ? summarize(filteredRows, (r) => String(r[pivotKey] ?? ""), (r) => r.amount, (r) => r.qty ?? 1) : []),
-    [filteredRows, pivotKey],
+    () => (pivotKey ? summarize(filteredRows, (r) => String(r[pivotKey] ?? ""), amountOf, (r) => r.qty ?? 1) : []),
+    [filteredRows, pivotKey, amountOf],
   );
 
-  const filteredTotal = filteredRows.reduce((a, r) => a + r.amount, 0);
+  const filteredTotal = filteredRows.reduce((a, r) => a + amountOf(r), 0);
   const filteredQty = filteredRows.reduce((a, r) => a + (r.qty ?? 1), 0);
   const activeCount = Object.values(picked).filter(Boolean).length + (query.trim() ? 1 : 0);
   function clearAll() { setPicked({}); setQuery(""); }
@@ -324,7 +333,22 @@ export default function SalesTable({
             {filteredRows.length}件
             {filteredRows.length !== rows.length && <span className="text-(--color-dim)">／全{rows.length}件</span>}
           </span>
-          <span className="tabular-nums">合計 <strong>{yen(filteredTotal)}</strong> 円（税抜）</span>
+          <span className="tabular-nums">合計 <strong>{yen(filteredTotal)}</strong> 円（{taxLabel}）</span>
+          <span
+            className="inline-flex overflow-hidden rounded-lg border border-(--color-line) text-xs"
+            title="金額列・合計・集計の表示を税抜⇄税込で切り替えます（税込欄が未記録の明細は税抜×1.1で補完）"
+          >
+            <button
+              type="button"
+              onClick={() => setShowTax(false)}
+              className={`px-2.5 py-1 ${!showTax ? "bg-(--color-gold) font-medium text-white" : "text-(--color-dim) hover:text-(--color-gold)"}`}
+            >税抜</button>
+            <button
+              type="button"
+              onClick={() => setShowTax(true)}
+              className={`px-2.5 py-1 ${showTax ? "bg-(--color-gold) font-medium text-white" : "text-(--color-dim) hover:text-(--color-gold)"}`}
+            >税込</button>
+          </span>
           <span className="text-(--color-dim) tabular-nums">個数 {filteredQty}</span>
           <span className="ml-auto flex flex-wrap items-center gap-1">
             <span className="text-xs text-(--color-dim)">集計:</span>
@@ -355,7 +379,7 @@ export default function SalesTable({
                 <th className="px-3 py-2 text-left">{PIVOTS.find((p) => p.key === pivotKey)?.label}</th>
                 <th className="px-3 py-2 text-right">件数</th>
                 <th className="px-3 py-2 text-right">個数</th>
-                <th className="px-3 py-2 text-right">金額（税抜）</th>
+                <th className="px-3 py-2 text-right">金額（{taxLabel}）</th>
                 <th className="px-3 py-2 text-right">構成比</th>
               </tr>
             </thead>
@@ -398,7 +422,7 @@ export default function SalesTable({
             {sortableTh("customerName", "お客様名", "px-2 py-2 text-left")}
             {sortableTh("productName", "品名・内容", "px-2 py-2 text-left")}
             {sortableTh("pro", "担当", "px-2 py-2 text-left")}
-            {sortableTh("amount", "金額", "px-2 py-2 text-right")}
+            {sortableTh("amount", `金額(${taxLabel})`, "px-2 py-2 text-right")}
             {sortableTh("payMethod", "支払", "px-2 py-2 text-left")}
             <th className="px-2 py-2"></th>
           </tr>
@@ -476,8 +500,11 @@ export default function SalesTable({
                   )}
                 </td>
                 <td className="px-2 py-2 text-(--color-dim)">{r.pro || "—"}</td>
-                <td className="px-2 py-2 text-right tabular-nums">
-                  {yen(Number(r.amount))}
+                <td
+                  className="px-2 py-2 text-right tabular-nums"
+                  title={showTax && r.taxIncluded == null ? "税込欄が未記録のため税抜×1.1で表示しています" : undefined}
+                >
+                  {yen(amountOf(r))}
                   {r.discount ? <span className="ml-1 text-xs text-(--color-accent)" title={`定価 ${yen(Number(r.listPrice ?? 0))} から値引き`}>{yen(Number(r.discount))}</span> : null}
                 </td>
                 <td className="px-2 py-2 text-(--color-dim)">{r.payMethod || "—"}</td>
