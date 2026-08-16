@@ -150,6 +150,8 @@ export type TrialInput = {
   experience?: string;
   message?: string;
   consent: boolean;
+  /** 流入元タグ（広告・SNSのURL ?src=）。英数とハイフン/アンダースコアのみ許可 */
+  src?: string;
 };
 
 export type TrialResult =
@@ -164,6 +166,12 @@ export type TrialResult =
       minutes: number;
     }
   | { ok: false; error: string };
+
+/** 流入元タグを source 列の値へ（不正値は無視して従来どおり web-self） */
+function trialSource(src?: string): string {
+  const s = (src ?? "").trim().toLowerCase();
+  return /^[a-z0-9_-]{1,32}$/.test(s) ? `web-self:${s}` : "web-self";
+}
 
 /** 体験を即時確定する */
 export async function createTrialBooking(input: TrialInput): Promise<TrialResult> {
@@ -243,7 +251,7 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
       experience: input.experience?.trim() || null,
       message: input.message?.trim() || null,
       consent_privacy: true,
-      source: "web-self",
+      source: trialSource(input.src),
       status: "confirmed",
       booked_date: input.date,
       start_time: input.start,

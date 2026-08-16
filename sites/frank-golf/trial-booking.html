@@ -376,7 +376,8 @@
     fetch(API, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({
       action:"book", name:name, name_kana:kana, phone:phone,
       email:$("tb-email").value.trim(), date:state.date, start:state.start,
-      lefty:state.lefty, experience:$("tb-exp").value, message:$("tb-msg").value.trim(), consent:true
+      lefty:state.lefty, experience:$("tb-exp").value, message:$("tb-msg").value.trim(), consent:true,
+      src:(function(){ try { return sessionStorage.getItem("frank_src") || new URLSearchParams(location.search).get("src") || undefined } catch(e){ return undefined } })()
     })}).then(function(r){ return r.json() }).then(function(j){
       btn.disabled = false;
       if (!j.ok) {

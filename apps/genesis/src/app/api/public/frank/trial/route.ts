@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
     experience: body.experience ? String(body.experience) : undefined,
     message: body.message ? String(body.message) : undefined,
     consent: Boolean(body.consent),
+    src: body.src ? String(body.src) : undefined,
   });
   return NextResponse.json(r, { status: r.ok ? 200 : 400, headers: CORS });
 }

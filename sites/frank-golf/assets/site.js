@@ -481,3 +481,18 @@
     init();
   }
 })();
+
+
+/* ============================================================
+   流入元（?src= / ?utm_source=）の記憶
+   広告・SNS・チラシQRのURLに ?src=gads などを付けると、
+   どのページに着地しても sessionStorage に保持され、
+   体験予約の確定時に申込へ記録される（効果測定用）。
+   ============================================================ */
+(function () {
+  try {
+    var q = new URLSearchParams(location.search);
+    var s = q.get("src") || q.get("utm_source");
+    if (s && /^[A-Za-z0-9_-]{1,32}$/.test(s)) sessionStorage.setItem("frank_src", s);
+  } catch (e) { /* プライベートモード等で storage 不可でも動作継続 */ }
+})();
