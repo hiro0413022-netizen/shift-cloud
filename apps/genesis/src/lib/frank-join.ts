@@ -308,12 +308,13 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
         ? [
             `年内入会キャンペーンの適用で、入会金（5,500円税込）と入会月（${m0}分）の月会費は無料です。`,
             `本日、${m1}分・${m2}分の月会費2か月分（${(monthly * 2).toLocaleString()}円税込）を1回でお支払いいただきました。`,
-            `${m2}分より後の月会費は、毎月${Number(today.slice(8, 10))}日ごろにご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, 2).replaceAll("-", "/")} 予定）。`,
+            // 前取りした月（m1・m2）の自動課金はスキップするため、次回の請求は「前取り最終月の翌月」＝入会日+（前取り月数+1）か月（#137）
+            `${m2}分より後の月会費は、毎月${Number(today.slice(8, 10))}日ごろにご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, est.prepaidMonths + 1).replaceAll("-", "/")} 予定）。`,
             `※ キャンペーンでのご入会は6か月間（${addMonthsYmd(today, 6).replaceAll("-", "/")}まで）の継続をお願いしています。`,
           ]
         : [
             `本日、入会金と${m1}分・${m2}分の月会費を1回でお支払いいただきました。`,
-            `${m2}分より後の月会費は、毎月ご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, 2).replaceAll("-", "/")} 予定）。`,
+            `${m2}分より後の月会費は、毎月ご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, est.prepaidMonths + 1).replaceAll("-", "/")} 予定）。`,
           ]),
       ...(attachments ? ["", "入会申込書の控え（PDF）を添付しています。"] : []),
       "",

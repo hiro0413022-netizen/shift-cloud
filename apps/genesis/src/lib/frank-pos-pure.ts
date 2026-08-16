@@ -134,6 +134,32 @@ export function classifySquareMonthlyPayment(i: {
   return null;
 }
 
+/**
+ * メール一致による初回入金のフォールバック判定（#137）。
+ * Squareのサブスク付き決済リンクは、入金 payment が「リンク作成時に控えた order_id」と
+ * 別の注文IDで届くことがある（2026-08-15のテスト入会で、注文ID不一致→店頭売上に誤記録）。
+ * 注文IDで結べなかったときだけ、
+ *   申込中（pending）× 決済リンク発行済（billing_status='checkout'）× メール一致 × 金額が見積どおり
+ * の4条件が揃った場合に限り「Web入会の初回入金」と判定する。
+ * 金額一致まで要求するのは、同じメールの人が店頭で別の買い物をした決済を入会と誤認しないため。
+ */
+export function classifyJoinPaymentByEmail(i: {
+  emailMatched: boolean;
+  memberStatus: string | null;
+  billingStatus: string | null;
+  amount: number; // 税込・円
+  breakdownTotal: number | null; // square_checkout_breakdown.total（決済リンク発行時に確定）
+}): boolean {
+  return (
+    i.emailMatched &&
+    i.memberStatus === "pending" &&
+    i.billingStatus === "checkout" &&
+    i.breakdownTotal !== null &&
+    i.breakdownTotal > 0 &&
+    i.amount === i.breakdownTotal
+  );
+}
+
 export type SquareRefund = {
   id?: string;
   status?: string;

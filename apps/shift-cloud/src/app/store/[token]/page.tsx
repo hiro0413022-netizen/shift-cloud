@@ -12,7 +12,7 @@ export default async function StoreDashTokenPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ ym?: string; store?: string }>;
+  searchParams: Promise<{ ym?: string; store?: string; h?: string }>;
 }) {
   const { token } = await params;
   const sp = await searchParams;

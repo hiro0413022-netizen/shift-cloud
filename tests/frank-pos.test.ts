@@ -11,6 +11,7 @@ import {
   monthlyFeeTaxIncluded,
   toE164Jp,
   classifySquareMonthlyPayment,
+  classifyJoinPaymentByEmail,
 } from "../apps/genesis/src/lib/frank-pos-pure.ts";
 import { buildTrialConfirmMail, buildReminderMail } from "../apps/genesis/src/lib/frank-mail-pure.ts";
 
@@ -133,6 +134,20 @@ test("月会費の振り分け: 注文ID一致=初回・顧客ID一致は金額�
   assert.equal(classifySquareMonthlyPayment({ orderMatched: false, customerMatched: false, amount: 10780, planTaxIncluded: null }), null);
   // モニター会員（月会費0円＝planTaxIncluded null）は継続課金と判定しない
   assert.equal(classifySquareMonthlyPayment({ orderMatched: false, customerMatched: true, amount: 10780, planTaxIncluded: null }), null);
+});
+
+test("メール一致フォールバック(#137): pending×checkout×見積どおりの金額のときだけ初回入金と判定", () => {
+  const base = { emailMatched: true, memberStatus: "pending", billingStatus: "checkout", amount: 220, breakdownTotal: 220 };
+  // 4条件が揃えば初回入金（2026-08-15のテスト入会: 注文ID不一致で店頭売上に誤記録された実障害の再発防止）
+  assert.equal(classifyJoinPaymentByEmail(base), true);
+  // メール不一致・入会確定済み・リンク未発行は対象外
+  assert.equal(classifyJoinPaymentByEmail({ ...base, emailMatched: false }), false);
+  assert.equal(classifyJoinPaymentByEmail({ ...base, memberStatus: "active" }), false);
+  assert.equal(classifyJoinPaymentByEmail({ ...base, billingStatus: "active" }), false);
+  // 金額が見積とズレる＝同じメールの人の店頭決済かもしれない→誤って入会にしない
+  assert.equal(classifyJoinPaymentByEmail({ ...base, amount: 500 }), false);
+  assert.equal(classifyJoinPaymentByEmail({ ...base, breakdownTotal: null }), false);
+  assert.equal(classifyJoinPaymentByEmail({ ...base, breakdownTotal: 0, amount: 0 }), false);
 });
 
 /* ============================================================

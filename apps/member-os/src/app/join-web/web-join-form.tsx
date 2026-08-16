@@ -24,15 +24,15 @@ const field =
 const label = "mb-1 block text-sm font-medium text-(--color-dim)";
 const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5";
 
-/** 「2026-09-11」→ その月・翌月・翌々月の「9月」「10月」「11月」表記 */
-function monthLabels(baseYmd: string): [string, string, string] {
+/** 「2026-09-11」→ その月から4か月分の「9月」「10月」「11月」「12月」表記 */
+function monthLabels(baseYmd: string): [string, string, string, string] {
   const d = new Date(`${baseYmd}T12:00:00+09:00`);
   const names: string[] = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1));
     names.push(`${m.getUTCMonth() + 1}月`);
   }
-  return names as [string, string, string];
+  return names as [string, string, string, string];
 }
 
 export function WebJoinForm({ plans }: { plans: Plan[] }) {
@@ -190,7 +190,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           // クーポン入力を見積に反映（#136。実決済側と同じ分岐。キャンペーン終了後にズレていた）
           couponWaivesJoiningFee: !!validCoupon(coupon),
         });
-        const [m0, m1, m2] = monthLabels(todayYmd);
+        const [m0, m1, m2, m3] = monthLabels(todayYmd);
         const row = "flex items-baseline justify-between gap-3 py-2 border-b border-(--color-line)/60";
         return (
           <div id="join-estimate" className={`${cardCls} space-y-3 border-(--color-gold)/60`}>
@@ -228,7 +228,8 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
               </div>
             </div>
             <ul className="space-y-1 rounded-xl bg-(--color-panel-2) p-3 text-xs text-(--color-dim)">
-              <li>・{m2}以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります。</li>
+              {/* 前取りした{m1}{m2}分の自動課金はスキップされるため、カードへの自動請求は{m3}分から（#137） */}
+              <li>・{m3}以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります（{m1}分・{m2}分は本日お支払い済みのため請求されません）。</li>
               <li>・キャンペーンでのご入会は、<span className="font-semibold text-(--color-txt)">{JOIN_CAMPAIGN.minMonths}か月間の継続</span>をお願いしています。</li>
               <li>・上記の合計を、決済ページで<span className="font-semibold text-(--color-txt)">1回でお支払い</span>いただきます（分割されません）。</li>
               <li>・決済は安全な決済ページ（Square）で行います。決済完了と同時に会員番号を発行します。</li>

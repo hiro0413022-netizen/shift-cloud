@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import {
+  classifyJoinPaymentByEmail,
   classifySquareMonthlyPayment,
   exTax,
   isJoiningFeeNote,
@@ -13,7 +14,13 @@ import {
   type SquarePayment,
   type SquareRefund,
 } from "@/lib/frank-pos-pure";
-import { chargeCardOnFile, pauseSubscriptionCycles, clearSubscriptionPriceOverride } from "@/lib/frank-square-billing";
+import {
+  chargeCardOnFile,
+  pauseSubscriptionCycles,
+  clearSubscriptionPriceOverride,
+  getSquareCustomerEmail,
+  findSubscriptionForCustomer,
+} from "@/lib/frank-square-billing";
 import { activateWebJoin } from "@/lib/frank-join";
 import { JOIN_PREPAID_MONTHS, joinInitialTotal } from "@/lib/frank-join-pure";
 
@@ -185,13 +192,75 @@ async function memberByCheckoutOrder(admin: Admin, orderId: string | null | unde
   if (!orderId) return null;
   // 最新の order_id（square_checkout_order_id）に加えて履歴（square_checkout_order_ids）も見る。
   // 再送信後に古いリンクで支払われた入金を迷子にしないため（#136）。
+  // .or() に JSON を埋め込む書き方はフィルタ文字列が壊れやすいので、2回に分けて素直に引く（#137）。
+  const { data: latest } = await admin
+    .from("frunk_members")
+    .select(MEMBER_COLS)
+    .eq("square_checkout_order_id", orderId)
+    .limit(1)
+    .maybeSingle();
+  if (latest) return latest as unknown as MemberRow;
+  const { data: hist } = await admin
+    .from("frunk_members")
+    .select(MEMBER_COLS)
+    .contains("square_checkout_order_ids", JSON.stringify([orderId]))
+    .limit(1)
+    .maybeSingle();
+  return (hist as unknown as MemberRow) ?? null;
+}
+
+/**
+ * メールでの照合（#137・第2の鍵）。
+ * Web入会の初回入金 payment が「控えた注文ID」と別の注文IDで届いたときのフォールバック。
+ * 決済リンク発行済（billing_status='checkout'）の pending 会員に限って、メール完全一致で引く。
+ * 2件以上一致（同じメールで二重申込）なら曖昧なので null＝店頭売上に落として人間に任せる。
+ */
+async function memberPendingWebJoinByEmail(admin: Admin, email: string | null): Promise<MemberRow | null> {
+  if (!email) return null;
   const { data } = await admin
     .from("frunk_members")
     .select(MEMBER_COLS)
-    .or(`square_checkout_order_id.eq.${orderId},square_checkout_order_ids.cs.${JSON.stringify([orderId])}`)
-    .limit(1)
-    .maybeSingle();
-  return (data as unknown as MemberRow) ?? null;
+    .eq("status", "pending")
+    .eq("billing_status", "checkout")
+    .ilike("email", email)
+    .is("deleted_at", null)
+    .order("updated_at", { ascending: false })
+    .limit(2);
+  const rows = (data ?? []) as unknown as MemberRow[];
+  return rows.length === 1 ? rows[0] : null;
+}
+
+/**
+ * Web入会の後始末（#131b/#137）: 価格上書きの解除＋前取り分の課金スキップ。
+ * 決済リンクの金額（入会金＋前取り月数分）を Square がサブスクの price_override_money として
+ * 引き継ぐため、(1) 上書きを消してプラン月額へ戻し、(2) 前取りした月数ぶん自動課金を止める。
+ * 前取りが無い会員（booking.htmlからのカード登録など）は対象外＝何もしない。
+ * prepay_pause_done_at で1回だけ実行。payment側・subscription側のどちらから呼んでも冪等。
+ */
+async function ensurePrepaySetup(admin: Admin, member: MemberRow, subId: string, version?: number): Promise<void> {
+  const months = Number(member.square_checkout_breakdown?.prepaidMonths ?? 0);
+  if (member.prepay_pause_done_at || months <= 0) return;
+  const cleared = await clearSubscriptionPriceOverride(subId, version);
+  const paused = await pauseSubscriptionCycles(subId, months);
+  if (cleared.ok && paused.ok) {
+    await admin
+      .from("frunk_members")
+      .update({
+        square_subscription_id: subId,
+        prepay_pause_done_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", member.id);
+    member.prepay_pause_done_at = new Date().toISOString();
+  } else {
+    await logEvent(String(member.company_id), {
+      event_type: "billing.prepay_setup_failed",
+      title: `入会後の継続課金の設定に失敗: ${member.name}様（${member.member_no ?? "採番前"}）${cleared.ok ? "" : "月額が初回一括の金額のままです。"}${paused.ok ? "" : "前取り分の停止ができていません。"}Squareで確認してください`.slice(0, 120),
+      source: "frank_billing",
+      source_type: "system",
+      severity: "warning",
+    });
+  }
 }
 
 async function memberBySquareCustomer(admin: Admin, customerId: string | null | undefined): Promise<MemberRow | null> {
@@ -213,13 +282,41 @@ async function tryRecordMonthlyFee(
   mapped: { sold_on: string; amount: number; tax_included: number; square_payment_id: string },
 ): Promise<boolean> {
   const byOrder = await memberByCheckoutOrder(admin, raw.order_id);
-  const member = byOrder ?? (await memberBySquareCustomer(admin, raw.customer_id));
-  const kind = classifySquareMonthlyPayment({
+  let member = byOrder ?? (await memberBySquareCustomer(admin, raw.customer_id));
+  let kind = classifySquareMonthlyPayment({
     orderMatched: !!byOrder,
     customerMatched: !byOrder && !!member,
     amount: mapped.tax_included,
     planTaxIncluded: planTaxIncludedOf(member),
   });
+
+  // #137: サブスク付き決済リンクの入金は、控えた注文IDと別の注文IDで届くことがある
+  // （2026-08-15のテスト入会で実証: 注文ID不一致→店頭売上「利用料」に誤記録され、入会が確定しなかった）。
+  // 注文IDで結べなかったときは、Square顧客のメール＋見積どおりの金額で pending 会員に結ぶ。
+  if (!kind && raw.customer_id) {
+    const email = await getSquareCustomerEmail(raw.customer_id);
+    const cand = await memberPendingWebJoinByEmail(admin, email);
+    if (
+      cand &&
+      classifyJoinPaymentByEmail({
+        emailMatched: true,
+        memberStatus: String(cand.status ?? ""),
+        billingStatus: String(cand.billing_status ?? ""),
+        amount: mapped.tax_included,
+        breakdownTotal: cand.square_checkout_breakdown?.total != null ? Number(cand.square_checkout_breakdown.total) : null,
+      })
+    ) {
+      member = cand;
+      kind = "initial";
+      await logEvent(String(cand.company_id), {
+        event_type: "billing.matched_by_email",
+        title: `初回入金を注文IDでなくメール一致で紐付け: ${cand.name}様（Square注文ID不一致・#137）`.slice(0, 120),
+        source: "frank_billing",
+        source_type: "system",
+        severity: "notice",
+      });
+    }
+  }
   if (!kind || !member) return false;
 
   // Web入会（/join-web）からの初回入金か。activateWebJoin が status を active に変えてしまうので先に控える
@@ -246,6 +343,17 @@ async function tryRecordMonthlyFee(
         if (issued) member.member_no = issued; // 以降の売上メモ・入会金noteに新番号を使う
       } catch (e) {
         console.error("[frank-pos] activateWebJoin failed:", e);
+      }
+    }
+
+    // #137: subscription.created/updated のWebhookに頼らず、入金側からもサブスクの後始末を行う。
+    // （イベントの到着順は保証されず、subscription側が先に来ると顧客ID未紐付けで空振りしていた）
+    if (raw.customer_id) {
+      try {
+        const sub = await findSubscriptionForCustomer(raw.customer_id);
+        if (sub) await ensurePrepaySetup(admin, member, sub.id, sub.version);
+      } catch (e) {
+        console.error("[frank-pos] prepay setup from payment failed:", e);
       }
     }
     if (String(member.billing_status) !== "active") {
@@ -403,8 +511,20 @@ async function markPastDueOnFailure(admin: Admin, raw: SquarePayment): Promise<v
 async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown>): Promise<void> {
   const sub = (obj.subscription ?? obj) as { id?: string; status?: string; customer_id?: string | null };
   if (!sub?.id) return;
-  const member = await memberBySquareCustomer(admin, sub.customer_id);
-  if (!member) return; // 初回決済のWebhookが先に届いて顧客IDが入ってから追従できる（順序は保証されない）
+  let member = await memberBySquareCustomer(admin, sub.customer_id);
+  // #137: 顧客IDがまだ紐付いていない（payment側の処理が済んでいない/失敗した）場合は
+  // メールで pending 会員に結び、顧客IDもここで控える（イベントの到着順は保証されない）。
+  if (!member && sub.customer_id) {
+    const email = await getSquareCustomerEmail(sub.customer_id);
+    member = await memberPendingWebJoinByEmail(admin, email);
+    if (member) {
+      await admin
+        .from("frunk_members")
+        .update({ square_customer_id: sub.customer_id, updated_at: new Date().toISOString() })
+        .eq("id", member.id);
+    }
+  }
+  if (!member) return; // 初回決済のWebhookが先に届いて顧客IDが入ってから追従できる
   const status = (sub.status ?? "").toUpperCase();
   const patch: Record<string, unknown> = { square_subscription_id: sub.id, updated_at: new Date().toISOString() };
   if (status === "CANCELED" || status === "DEACTIVATED") {
@@ -423,29 +543,11 @@ async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown
   }
   await admin.from("frunk_members").update(patch).eq("id", member.id);
 
-  // Web入会の後始末（#131b）。入会時は「入会金＋前取り月数分」を1回でお支払いいただくため、
-  // 決済リンクの金額＝総額。Squareはこれをサブスクの price_override_money として引き継ぐので、
-  //   (1) 価格上書きを消してプラン月額に戻す（放置すると毎月その総額を請求してしまう）
-  //   (2) 前取りした月数ぶんは自動課金をスキップ（二重取りの防止）
-  // をこの1か所で行う。prepay_pause_done_at で1回だけ実行する。
-  if (!member.prepay_pause_done_at && ["ACTIVE", "PENDING"].includes(status)) {
+  // Web入会の後始末（#131b/#137）: 価格上書きの解除＋前取り分のスキップ（ensurePrepaySetup・冪等）。
+  // 前取りの無い会員（booking.htmlからのカード登録など）は breakdown が無いので何もしない。
+  if (["ACTIVE", "PENDING"].includes(status)) {
     const version = typeof (sub as { version?: number }).version === "number" ? (sub as { version?: number }).version : undefined;
-    const cleared = await clearSubscriptionPriceOverride(sub.id, version);
-    const paused = await pauseSubscriptionCycles(sub.id, JOIN_PREPAID_MONTHS);
-    if (cleared.ok && paused.ok) {
-      await admin
-        .from("frunk_members")
-        .update({ prepay_pause_done_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq("id", member.id);
-    } else {
-      await logEvent(String(member.company_id), {
-        event_type: "billing.prepay_setup_failed",
-        title: `入会後の継続課金の設定に失敗: ${member.name}様（${member.member_no}）${cleared.ok ? "" : "月額が初回一括の金額のままです。"}${paused.ok ? "" : "前取り分の停止ができていません。"}Squareで確認してください`.slice(0, 120),
-        source: "frank_billing",
-        source_type: "system",
-        severity: "warning",
-      });
-    }
+    await ensurePrepaySetup(admin, member, sub.id, version);
   }
 }
 

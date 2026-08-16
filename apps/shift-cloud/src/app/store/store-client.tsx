@@ -8,7 +8,7 @@ import { toggleStoreTask, addStoreTask, logoutStore } from "./actions";
 
 /**
  * 店舗ダッシュボード（店頭PC共有表示）
- * PC想定の2カラム: 左=月間カレンダー（出勤者名チップ＋●）/ 右=選択日詳細（出勤者・体験予約・店舗やること）
+ * PC想定の2カラム: 左=シフト表グリッド（Airシフト風・スタッフ×日付の半月表示）/ 右=選択日詳細（出勤者・体験予約・店舗やること）
  * 上: 今月KPIカード4種 / 下: 業務リンク集
  * 5分ごとに自動リフレッシュ（置きっぱなし運用）。狭い画面では縦積みに落ちる
  *
@@ -22,6 +22,7 @@ export function StoreDashClient({
   kioskToken,
   showLogout,
   ym,
+  half,
   today,
   store,
   stores,
@@ -34,6 +35,7 @@ export function StoreDashClient({
   kioskToken: string | null;
   showLogout: boolean;
   ym: string;
+  half: 1 | 2 | null; // URLの?h=（半月ページング）。null=今日の位置から自動
   today: string;
   store: StoreInfo;
   stores: StoreInfo[];
@@ -54,21 +56,33 @@ export function StoreDashClient({
     return () => clearInterval(t);
   }, [router]);
 
-  const go = (params: { ym?: string; store?: string }) => {
+  const go = (params: { ym?: string; store?: string; h?: 1 | 2 }) => {
     const q = new URLSearchParams();
     q.set("ym", params.ym ?? ym);
     q.set("store", params.store ?? store.id);
+    if (params.h) q.set("h", String(params.h));
     router.push(`${basePath}?${q.toString()}`);
   };
 
-  // 週配置（(staff)/calendar と同方式・TZ非依存）
-  const [fy, fm, fd] = days[0].split("-").map(Number);
-  const firstDow = new Date(Date.UTC(fy, fm - 1, fd)).getUTCDay();
-  const cells: (string | null)[] = [...Array(firstDow).fill(null), ...days];
-  while (cells.length % 7 !== 0) cells.push(null);
+  // ===== シフト表グリッド（Airシフト風・#137） =====
+  // 表示は半月単位（1〜15日 / 16〜末日）。指定が無ければ「今日」が入っている側を出す
+  const curHalf: 1 | 2 = half ?? (today.slice(0, 7) === ym && Number(today.slice(8)) >= 16 ? 2 : 1);
+  const gridDays = days.filter((d) => (curHalf === 1 ? Number(d.slice(8)) <= 15 : Number(d.slice(8)) >= 16));
+  // 行=当月のシフト（出勤・休み）に登場するスタッフ（登場順）
+  const staffNames: string[] = [];
+  for (const d of days) for (const s of feed[d].shifts) if (!staffNames.includes(s.staff_name)) staffNames.push(s.staff_name);
+  // 半月の前後ページング（月をまたぐ）
+  const goHalf = (dir: -1 | 1) => {
+    if (dir === 1) {
+      if (curHalf === 1) go({ h: 2 });
+      else go({ ym: addMonths(ym, 1), h: 1 });
+    } else {
+      if (curHalf === 2) go({ h: 1 });
+      else go({ ym: addMonths(ym, -1), h: 2 });
+    }
+  };
 
   const day = feed[selected];
-  const shortName = (n: string) => n.replace(/[\s　].*$/, ""); // 姓のみ表示
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 p-4 pb-10 lg:p-6">
@@ -108,68 +122,105 @@ export function StoreDashClient({
         ))}
       </div>
 
-      {/* カレンダー＋選択日詳細（PCは2カラム・狭い画面は縦積み） */}
+      {/* シフト表グリッド＋選択日詳細（PCは2カラム・狭い画面は縦積み） */}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
       <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <button onClick={() => go({ ym: addMonths(ym, -1) })} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-500">←</button>
-        <p className="text-lg font-semibold tracking-tight">{ym.replace("-", "年")}月</p>
-        <button onClick={() => go({ ym: addMonths(ym, 1) })} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-500">→</button>
+        <button onClick={() => goHalf(-1)} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-500">←</button>
+        <p className="text-lg font-semibold tracking-tight">
+          {ym.replace("-", "年")}月 <span className="text-sm font-medium text-zinc-500">{curHalf === 1 ? "前半（1〜15日）" : "後半（16日〜末日）"}</span>
+        </p>
+        <button onClick={() => goHalf(1)} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-500">→</button>
         <span className="ml-auto text-xs text-zinc-400">{store.name}の出勤・予定</span>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-        <div className="grid grid-cols-7 border-b border-zinc-100 bg-gradient-to-r from-brand-light to-white text-center text-[11px] font-medium">
-          {["日", "月", "火", "水", "木", "金", "土"].map((w) => (
-            <div key={w} className={`py-2 ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-500"}`}>{w}</div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7">
-          {cells.map((d, i) => {
-            if (!d) return <div key={`e${i}`} className="min-h-20 border-b border-r border-zinc-50 lg:min-h-24" />;
-            const f = feed[d];
-            const dow = dowJP(d);
-            const isToday = d === today;
-            const isSel = d === selected;
-            const working = f.shifts.filter((s) => !s.is_day_off);
-            return (
-              <button
-                key={d}
-                onClick={() => { setSelected(d); setMsg(null); }}
-                className={`min-h-20 border-b border-r border-zinc-50 lg:min-h-24 p-1 text-left align-top transition-colors ${
-                  isSel ? "bg-brand-light" : "bg-white active:bg-zinc-50"
-                }`}
-              >
-                <span
-                  className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] ${
-                    isToday ? "bg-brand font-semibold text-white" : dow === "日" ? "text-red-500" : dow === "土" ? "text-blue-500" : "text-zinc-600"
-                  }`}
-                >
-                  {Number(d.slice(8))}
-                </span>
-                {/* 出勤者チップ（最大3名＋残数） */}
-                <span className="mt-0.5 block space-y-px">
-                  {working.slice(0, 3).map((s, j) => (
-                    <span
-                      key={j}
-                      className="block truncate rounded px-1 py-px text-[9px] font-medium text-white"
-                      style={{ background: s.template_color ?? "var(--color-brand)" }}
+      {/* Airシフト風: 行=スタッフ / 列=日付 / セル=出勤時刻 or 休み（#137） */}
+      <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <table className="w-full border-separate border-spacing-0 text-xs">
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-10 min-w-24 border-b border-r border-zinc-200 bg-zinc-50 px-2 py-2 text-left text-[11px] font-medium text-zinc-500">
+                スタッフ
+              </th>
+              {gridDays.map((d) => {
+                const dow = dowJP(d);
+                const f = feed[d];
+                const isToday = d === today;
+                const isSel = d === selected;
+                return (
+                  <th key={d} className={`min-w-14 border-b border-r border-zinc-100 p-0 last:border-r-0 ${isSel ? "bg-brand-light" : "bg-zinc-50"}`}>
+                    <button onClick={() => { setSelected(d); setMsg(null); }} className="w-full px-1 py-1.5 text-center">
+                      <span
+                        className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-semibold ${
+                          isToday ? "bg-brand text-white" : dow === "日" ? "text-red-500" : dow === "土" ? "text-blue-500" : "text-zinc-600"
+                        }`}
+                      >
+                        {Number(d.slice(8))}
+                      </span>
+                      <span className={`block text-[10px] font-normal ${dow === "日" ? "text-red-400" : dow === "土" ? "text-blue-400" : "text-zinc-400"}`}>
+                        （{dow}）
+                      </span>
+                      <span className="flex h-2 items-center justify-center gap-0.5">
+                        {f.events.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="イベント" />}
+                        {f.reservations.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" title="体験予約" />}
+                        {f.tasks.some((t) => t.status === "open") && <span className="h-1.5 w-1.5 rounded-full bg-red-400" title="未完了タスク" />}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {staffNames.length === 0 && (
+              <tr>
+                <td colSpan={gridDays.length + 1} className="px-3 py-6 text-center text-zinc-400">
+                  この月の確定シフトはまだありません
+                </td>
+              </tr>
+            )}
+            {staffNames.map((name) => (
+              <tr key={name}>
+                <th className="sticky left-0 z-10 whitespace-nowrap border-b border-r border-zinc-200 bg-white px-2 py-1.5 text-left text-xs font-semibold text-zinc-700">
+                  {name}
+                </th>
+                {gridDays.map((d) => {
+                  const cellShifts = feed[d].shifts.filter((s) => s.staff_name === name);
+                  const isSel = d === selected;
+                  return (
+                    <td
+                      key={d}
+                      onClick={() => { setSelected(d); setMsg(null); }}
+                      className={`cursor-pointer border-b border-r border-zinc-100 p-0.5 align-middle last:border-r-0 ${
+                        isSel ? "bg-brand-light/60" : d === today ? "bg-amber-50/60" : ""
+                      }`}
                     >
-                      {shortName(s.staff_name)}
-                    </span>
-                  ))}
-                  {working.length > 3 && <span className="block px-1 text-[9px] text-zinc-400">他{working.length - 3}名</span>}
-                </span>
-                <span className="mt-0.5 flex gap-0.5 px-0.5">
-                  {f.events.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="イベント" />}
-                  {f.reservations.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" title="体験予約" />}
-                  {f.tasks.some((t) => t.status === "open") && <span className="h-1.5 w-1.5 rounded-full bg-red-400" title="未完了タスク" />}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                      <span className="block space-y-0.5">
+                        {cellShifts.map((s, j) =>
+                          s.is_day_off ? (
+                            <span key={j} className="block rounded bg-rose-500 px-0.5 py-1 text-center text-[10px] font-semibold text-white">
+                              休み
+                            </span>
+                          ) : (
+                            <span
+                              key={j}
+                              className="block rounded border border-sky-300 bg-sky-50 px-0.5 py-1 text-center text-[10px] font-semibold tabular-nums text-sky-700"
+                            >
+                              {hm(s.start_time)}-{hm(s.end_time)}
+                            </span>
+                          ),
+                        )}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
         <div className="flex flex-wrap gap-3 border-t border-zinc-100 px-3 py-2 text-[10px] text-zinc-400">
+          <span><span className="mr-1 inline-block rounded border border-sky-300 bg-sky-50 px-1 text-[9px] font-semibold text-sky-700">10:45-19:45</span>出勤（確定シフト）</span>
+          <span><span className="mr-1 inline-block rounded bg-rose-500 px-1 text-[9px] font-semibold text-white">休み</span>休み</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />イベント</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-400" />体験予約</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-red-400" />やること</span>

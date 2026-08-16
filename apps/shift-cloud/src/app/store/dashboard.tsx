@@ -24,7 +24,7 @@ export async function StoreDashboard({
 }: {
   companyId: string;
   defaultStoreId: string | null;
-  sp: { ym?: string; store?: string };
+  sp: { ym?: string; store?: string; h?: string };
   basePath: string; // ナビゲーション用。"/store" または `/store/${token}`
   token: string | null; // デバイストークン（Cookie方式では null）
   kioskToken: string | null; // 打刻キオスク導線（トークン方式のみ表示）
@@ -60,6 +60,7 @@ export async function StoreDashboard({
       kioskToken={kioskToken}
       showLogout={showLogout}
       ym={ym}
+      half={sp.h === "2" ? 2 : sp.h === "1" ? 1 : null}
       today={today}
       store={store}
       stores={stores}

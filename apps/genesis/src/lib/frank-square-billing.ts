@@ -109,6 +109,62 @@ export async function pauseSubscriptionCycles(
 }
 
 /**
+ * Square顧客のメールアドレスを取得（#137・Web入会Webhookのフォールバック照合用）。
+ * 決済リンク（サブスク付き）の入金 payment は、リンク作成時に控えた order_id と
+ * 別の注文IDで届くことがあり、注文IDだけでは会員に結べない（2026-08-15のテスト入会で実証）。
+ * pre_populated_data.buyer_email で作られる顧客のメールは申込フォームの値と同一なので、
+ * これを第2の鍵にする。
+ */
+export async function getSquareCustomerEmail(customerId: string): Promise<string | null> {
+  const token = accessToken();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${SQUARE_API}/customers/${encodeURIComponent(customerId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const json = (await res.json().catch(() => ({}))) as { customer?: { email_address?: string | null } };
+    if (!res.ok) return null;
+    const email = json.customer?.email_address;
+    return email && email.trim() ? email.trim() : null;
+  } catch (e) {
+    console.error("[frank-square-billing] get customer failed:", e);
+    return null;
+  }
+}
+
+/**
+ * 顧客の生きているサブスクを1件返す（#137）。
+ * 初回入金の payment Webhook が subscription.created より先に処理を終えると、
+ * 「前取り分のスキップ」と「価格上書きの解除」を行う相手（サブスクID）がまだDBに無い。
+ * 入金側からも Square に問い合わせて後始末できるようにする。
+ */
+export async function findSubscriptionForCustomer(
+  customerId: string,
+): Promise<{ id: string; status: string; version?: number } | null> {
+  const token = accessToken();
+  if (!token) return null;
+  try {
+    const json = await squarePost(token, "/subscriptions/search", {
+      query: { filter: { customer_ids: [customerId] } },
+    });
+    const subs =
+      (json.subscriptions as Array<{ id?: string; status?: string; version?: number; created_at?: string }> | undefined) ?? [];
+    const live = subs.filter((s) => s.id && !["CANCELED", "DEACTIVATED"].includes((s.status ?? "").toUpperCase()));
+    live.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+    const top = live[0];
+    if (!top?.id) return null;
+    return {
+      id: String(top.id),
+      status: String(top.status ?? ""),
+      version: typeof top.version === "number" ? top.version : undefined,
+    };
+  } catch (e) {
+    console.error("[frank-square-billing] subscription search failed:", e);
+    return null;
+  }
+}
+
+/**
  * サブスクの価格上書きを消してプラン価格に戻す（#131b）。
  *
  * 入会時は「入会金＋前取り月数分」を1回でお支払いいただくため、決済リンクの金額を

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function StoreDashPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ym?: string; store?: string }>;
+  searchParams: Promise<{ ym?: string; store?: string; h?: string }>;
 }) {
   const session = await getStoreSession();
   if (!session) redirect("/login");
