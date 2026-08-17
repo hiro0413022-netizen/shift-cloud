@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireActor, isOwner, assertStoreAccess, type Actor } from "@/lib/auth";
+import { requireActor, assertStoreAccess } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 
@@ -13,136 +13,79 @@ export type CellShift = {
   end_time?: string | null;
 };
 
-/** period_type + 対象月から募集期間の範囲を算出 */
-function computeRange(periodType: string, ym: string, startRaw: string, endRaw: string) {
-  const [y, m] = ym.split("-").map(Number);
-  const lastDay = new Date(y, m, 0).getDate();
-  const p2 = (n: number) => String(n).padStart(2, "0");
-  switch (periodType) {
-    case "half1": return { start: `${ym}-01`, end: `${ym}-15` };
-    case "half2": return { start: `${ym}-16`, end: `${ym}-${p2(lastDay)}` };
-    case "custom": return { start: startRaw, end: endRaw };
-    case "month":
-    default:       return { start: `${ym}-01`, end: `${ym}-${p2(lastDay)}` };
+/** 1マス（誰の・いつ）の指定。確定／確定解除で使う */
+export type CellRef = { staff_id: string; date: string };
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** 通知の本文用「9/3・9/4 ほか2日」 */
+function datesLabel(dates: string[]): string {
+  const sorted = [...dates].sort();
+  const head = sorted.slice(0, 3).map((d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`).join("・");
+  return sorted.length > 3 ? `${head} ほか${sorted.length - 3}日` : head;
+}
+
+function groupByStaff(cells: CellRef[]): Map<string, string[]> {
+  const m = new Map<string, string[]>();
+  for (const c of cells) {
+    if (!c?.staff_id || !DATE_RE.test(c?.date ?? "")) continue;
+    const a = m.get(c.staff_id) ?? [];
+    if (!a.includes(c.date)) a.push(c.date);
+    m.set(c.staff_id, a);
   }
+  return m;
+}
+
+async function notifyStaff(
+  companyId: string,
+  perStaff: Map<string, string[]>,
+  make: (label: string) => { kind: string; title: string; body: string },
+): Promise<void> {
+  const rows = [...perStaff.entries()].filter(([, dates]) => dates.length).map(([staffId, dates]) => {
+    const n = make(datesLabel(dates));
+    return { company_id: companyId, staff_id: staffId, kind: n.kind, title: n.title, body: n.body, link: "/shifts" };
+  });
+  if (rows.length) await createAdmin().from("notifications").insert(rows);
 }
 
 /**
- * 募集期間が「触ってよい店舗」のものか確認する（#134・#128 店舗またぎ廃止）。
- * id は画面のフォームから来る＝改竄できるので、company_id だけでは他店の期間を締切／削除できてしまう。
- * store_id が null（全店舗共通）の期間を触れるのはオーナーだけ。
+ * シフトの保存（グリッドの編集ぶんを反映）。
+ *
+ * 【#138】確定(published)済みのマスを編集しても確定のまま更新する。
+ * 「直したら勝手に未確定へ戻っていた」＝スタッフの画面から消える、を起こさないため。
+ * 代わりに、確定済みを書き換えたときは本人に変更通知を出す（黙って変えない）。
  */
-async function assertPeriodAccess(actor: Actor, id: string): Promise<boolean> {
-  const admin = createAdmin();
-  const { data } = await admin.from("shift_request_periods")
-    .select("store_id").eq("id", id).eq("company_id", actor.companyId).is("deleted_at", null).maybeSingle();
-  if (!data) return false;
-  if (!data.store_id) return isOwner(actor);
-  return assertStoreAccess(actor, data.store_id).then(() => true).catch(() => false);
-}
-
-/** 募集期間を開く（月 / 前半 / 後半 / 任意期間） */
-export async function openPeriod(formData: FormData) {
-  const actor = await requireActor("create_shifts");
-  const admin = createAdmin();
-  const periodType = String(formData.get("period_type") || "month");
-  const ym = String(formData.get("target_month"));
-  const { start, end } = computeRange(
-    periodType, ym,
-    String(formData.get("start_date") || `${ym}-01`),
-    String(formData.get("end_date") || `${ym}-01`),
-  );
-  const deadline = String(formData.get("deadline"));
-  const title = String(formData.get("title") || "") || null;
-  // フォームの hidden は信用しない（#134）。空 = 全店舗共通の募集で、これを作れるのはオーナーだけ
-  const rawStoreId = String(formData.get("store_id") || "");
-  const storeId = rawStoreId ? await assertStoreAccess(actor, rawStoreId) : null;
-  if (!storeId && !isOwner(actor)) throw new Error("FORBIDDEN: store");
-  const { data } = await admin.from("shift_request_periods")
-    .insert({
-      company_id: actor.companyId,
-      store_id: storeId,
-      target_month: `${start.slice(0, 7)}-01`,
-      period_type: periodType,
-      start_date: start,
-      end_date: end,
-      title,
-      deadline,
-      status: "open",
-    })
-    .select("id").single();
-  await logAudit(actor, "request_period.open", "shift_request_periods", data?.id ?? null, null, { periodType, start, end, deadline });
-  revalidatePath("/admin/shifts");
-}
-
-export async function closePeriod(formData: FormData) {
-  const actor = await requireActor("create_shifts");
-  const admin = createAdmin();
-  const id = String(formData.get("id"));
-  if (!(await assertPeriodAccess(actor, id))) return; // 他店の募集期間は締め切れない（#134）
-  await admin.from("shift_request_periods").update({ status: "closed" }).eq("id", id).eq("company_id", actor.companyId);
-  await logAudit(actor, "request_period.close", "shift_request_periods", id);
-  revalidatePath("/admin/shifts");
-}
-
-/** ④ 締め切りを取り消して募集中に戻す */
-export async function reopenPeriod(formData: FormData) {
-  const actor = await requireActor("create_shifts");
-  const admin = createAdmin();
-  const id = String(formData.get("id"));
-  if (!(await assertPeriodAccess(actor, id))) return; // 他店の募集期間は戻せない（#134）
-  await admin.from("shift_request_periods").update({ status: "open" }).eq("id", id).eq("company_id", actor.companyId);
-  await logAudit(actor, "request_period.reopen", "shift_request_periods", id);
-  revalidatePath("/admin/shifts");
-}
-
-/** ⑤ 募集期間を削除（ソフト削除。紐づく提出希望もまとめて削除） */
-export async function deletePeriod(formData: FormData) {
-  const actor = await requireActor("create_shifts");
-  const admin = createAdmin();
-  const id = String(formData.get("id"));
-  const now = new Date().toISOString();
-
-  // 対象期間が自社かつ触ってよい店舗のものか確認（#134）
-  if (!(await assertPeriodAccess(actor, id))) return;
-
-  // 紐づく提出希望の件数を先に取得（監査ログ用）
-  const { count } = await admin.from("shift_requests")
-    .select("*", { count: "exact", head: true })
-    .eq("period_id", id).is("deleted_at", null);
-
-  // 紐づく提出希望をソフト削除
-  await admin.from("shift_requests")
-    .update({ deleted_at: now }).eq("period_id", id).is("deleted_at", null);
-
-  // 期間本体をソフト削除
-  await admin.from("shift_request_periods")
-    .update({ deleted_at: now }).eq("id", id).eq("company_id", actor.companyId);
-
-  await logAudit(actor, "request_period.delete", "shift_request_periods", id, null, { requestsDeleted: count ?? 0 });
-  revalidatePath("/admin/shifts");
-}
-
-/** ドラフト保存（グリッド全体を反映） */
-export async function saveDraft(storeId: string, cells: CellShift[]): Promise<{ error?: string }> {
+export async function saveShifts(storeId: string, cells: CellShift[]): Promise<{ error?: string; changedPublished?: number }> {
   const actor = await requireActor("create_shifts");
   // storeId はクライアント引数＝改竄できる。他店のシフトを書き換えられないよう必ず検証（#134）
   await assertStoreAccess(actor, storeId);
   const admin = createAdmin();
 
-  const { data: templates } = await admin.from("shift_templates")
-    .select("id, start_time, end_time, is_day_off")
-    .eq("company_id", actor.companyId);
+  const staffIds = [...new Set(cells.map((c) => c.staff_id))];
+  const dates = [...new Set(cells.map((c) => c.date))];
+  if (!staffIds.length || !dates.length) return {};
+
+  const [{ data: templates }, { data: existingRows }] = await Promise.all([
+    admin.from("shift_templates").select("id, start_time, end_time, is_day_off").eq("company_id", actor.companyId),
+    admin.from("shifts").select("staff_id, date, status, published_at, template_id, start_time, end_time, is_day_off")
+      .eq("company_id", actor.companyId).eq("store_id", storeId)
+      .in("staff_id", staffIds).in("date", dates).is("deleted_at", null),
+  ]);
   const tmap = new Map((templates ?? []).map((t) => [t.id, t]));
+  const emap = new Map((existingRows ?? []).map((s) => [`${s.staff_id}|${s.date}`, s]));
+
+  const changed = new Map<string, string[]>();   // 確定済みを書き換えた staff → 日付
 
   for (const c of cells) {
-    // テンプレも任意時刻も無い → クリア（draftのみ削除。published は解除しない）
+    const prev = emap.get(`${c.staff_id}|${c.date}`);
+
+    // テンプレも任意時刻も無い → クリア（draftのみ削除。published は解除しない＝確定解除ボタンで明示的に）
     if (!c.template_id && !(c.start_time && c.end_time)) {
       await admin.from("shifts").delete()
         .eq("staff_id", c.staff_id).eq("store_id", storeId).eq("date", c.date).eq("status", "draft");
       continue;
     }
-    // 任意時刻（テンプレ未使用）
+
     let start_time: string | null, end_time: string | null, is_day_off: boolean;
     if (c.template_id) {
       const t = tmap.get(c.template_id);
@@ -151,6 +94,8 @@ export async function saveDraft(storeId: string, cells: CellShift[]): Promise<{ 
     } else {
       start_time = c.start_time ?? null; end_time = c.end_time ?? null; is_day_off = false;
     }
+
+    const keepPublished = prev?.status === "published";
     const { error } = await admin.from("shifts").upsert(
       {
         company_id: actor.companyId,
@@ -161,21 +106,40 @@ export async function saveDraft(storeId: string, cells: CellShift[]): Promise<{ 
         start_time,
         end_time,
         is_day_off,
-        status: "draft",
-        published_at: null,
+        status: keepPublished ? "published" : "draft",
+        published_at: keepPublished ? prev?.published_at ?? new Date().toISOString() : null,
         deleted_at: null,
       },
       { onConflict: "staff_id,store_id,date" }
     );
     if (error) return { error: error.message };
+
+    if (keepPublished) {
+      const same = (prev?.start_time ?? null) === start_time
+        && (prev?.end_time ?? null) === end_time
+        && (prev?.template_id ?? null) === (c.template_id ?? null)
+        && prev?.is_day_off === is_day_off;
+      if (!same) {
+        const a = changed.get(c.staff_id) ?? [];
+        a.push(c.date);
+        changed.set(c.staff_id, a);
+      }
+    }
   }
 
-  await logAudit(actor, "shifts.save_draft", "shifts", null, null, { storeId, count: cells.length });
+  await notifyStaff(actor.companyId, changed, (label) => ({
+    kind: "shift_changed",
+    title: "確定済みシフトが変更されました",
+    body: `${label} の内容が変わりました。シフト画面で確認してください。`,
+  }));
+
+  const changedCount = [...changed.values()].reduce((n, a) => n + a.length, 0);
+  await logAudit(actor, "shifts.save", "shifts", null, null, { storeId, count: cells.length, changedPublished: changedCount });
   revalidatePath("/admin/shifts");
-  return {};
+  return { changedPublished: changedCount };
 }
 
-/** 対象期間の全ドラフトを確定し、スタッフへ通知 */
+/** 対象期間（半月/月など表示中の範囲）のドラフトをまとめて確定し、スタッフへ通知 */
 export async function publishShifts(storeId: string, from: string, to: string): Promise<{ error?: string; published?: number }> {
   const actor = await requireActor("create_shifts");
   // 他店のドラフトを勝手に確定＆通知できないよう検証（#134）
@@ -217,4 +181,81 @@ export async function publishShifts(storeId: string, from: string, to: string): 
   await logAudit(actor, "shifts.publish", "shifts", null, null, { storeId, from, to, count: drafts.length });
   revalidatePath("/admin/shifts");
   return { published: drafts.length };
+}
+
+/**
+ * 1マス単位の確定（#138）。
+ * 「この人のこの日だけ先に確定したい」「あとから1日だけ足した」に対応する。
+ */
+export async function publishCells(storeId: string, cells: CellRef[]): Promise<{ error?: string; published?: number }> {
+  const actor = await requireActor("create_shifts");
+  await assertStoreAccess(actor, storeId);
+  const admin = createAdmin();
+
+  const byStaff = groupByStaff(cells);
+  if (!byStaff.size) return { error: "確定する対象がありません" };
+
+  const done = new Map<string, string[]>();
+  for (const [staffId, dates] of byStaff) {
+    const { data, error } = await admin.from("shifts")
+      .update({ status: "published", published_at: new Date().toISOString() })
+      .eq("company_id", actor.companyId).eq("store_id", storeId)
+      .eq("staff_id", staffId).in("date", dates)
+      .eq("status", "draft").is("deleted_at", null)
+      .select("date");
+    if (error) return { error: error.message };
+    if (data?.length) done.set(staffId, data.map((r) => r.date));
+  }
+
+  const count = [...done.values()].reduce((n, a) => n + a.length, 0);
+  if (!count) return { error: "確定できるドラフトがありませんでした（すでに確定済みかもしれません）" };
+
+  await notifyStaff(actor.companyId, done, (label) => ({
+    kind: "shift_published",
+    title: `${label} のシフトが確定しました`,
+    body: "シフト画面から確認してください。",
+  }));
+
+  await logAudit(actor, "shifts.publish_cells", "shifts", null, null, { storeId, count });
+  revalidatePath("/admin/shifts");
+  return { published: count };
+}
+
+/**
+ * 1マス単位の確定解除（#138）。
+ * 確定後に「やっぱりここを直したい」が必ず起きる。直せないと紙やLINEで運用が二重化する。
+ * 解除するとスタッフの画面から消えるので、黙って消さずに本人へ知らせる。
+ */
+export async function unpublishCells(storeId: string, cells: CellRef[]): Promise<{ error?: string; reverted?: number }> {
+  const actor = await requireActor("create_shifts");
+  await assertStoreAccess(actor, storeId);
+  const admin = createAdmin();
+
+  const byStaff = groupByStaff(cells);
+  if (!byStaff.size) return { error: "解除する対象がありません" };
+
+  const done = new Map<string, string[]>();
+  for (const [staffId, dates] of byStaff) {
+    const { data, error } = await admin.from("shifts")
+      .update({ status: "draft", published_at: null })
+      .eq("company_id", actor.companyId).eq("store_id", storeId)
+      .eq("staff_id", staffId).in("date", dates)
+      .eq("status", "published").is("deleted_at", null)
+      .select("date");
+    if (error) return { error: error.message };
+    if (data?.length) done.set(staffId, data.map((r) => r.date));
+  }
+
+  const count = [...done.values()].reduce((n, a) => n + a.length, 0);
+  if (!count) return { error: "確定済みのシフトがありませんでした" };
+
+  await notifyStaff(actor.companyId, done, (label) => ({
+    kind: "shift_unpublished",
+    title: `${label} のシフトを調整中です`,
+    body: "いったん確定前に戻しました。決まりしだい改めてお知らせします。",
+  }));
+
+  await logAudit(actor, "shifts.unpublish_cells", "shifts", null, null, { storeId, count });
+  revalidatePath("/admin/shifts");
+  return { reverted: count };
 }

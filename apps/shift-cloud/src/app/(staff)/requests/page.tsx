@@ -1,44 +1,71 @@
+import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { Empty, Card, Badge, Button } from "@/components/ui";
-import { daysOfMonth, daysBetween, fmtDateJP, todayJST, hm, dowJP } from "@/lib/util";
+import { Card, Badge, Button } from "@/components/ui";
+import { daysOfMonth, todayJST, hm, dowJP, addMonths, currentYM } from "@/lib/util";
 import { templatesForStores } from "@/lib/shift-scope";
 import { RequestForm } from "./request-form";
 import { TimeOffSection } from "./time-off-section";
 import { applyHelp } from "./actions";
 
-export default async function RequestsPage() {
+const YM_RE = /^\d{4}-\d{2}$/;
+
+/**
+ * シフト提出（#138 募集期間の廃止）
+ * 管理者が「募集を開始」しなくても、今日以降ならいつでも・何ヶ月先でも出せる。
+ * 月送り（←/→）で対象月を選ぶだけ。確定済みの日はロックして見せる。
+ */
+export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ ym?: string }> }) {
   const actor = await requireActor();
   const supabase = await createClient();
+  const sp = await searchParams;
   const today = todayJST();
+  const thisYM = currentYM();
+  // 既定は翌月（普段いちばん出す月）。?ym= で今月にも先の月にも移動できる
+  const ym = sp.ym && YM_RE.test(sp.ym) ? sp.ym : addMonths(thisYM, 1);
+  const days = daysOfMonth(ym);
+  const from = days[0];
+  const to = days[days.length - 1];
 
-  const [{ data: periods }, { data: helps }, { data: myApps }, { data: myTimeOff }] = await Promise.all([
-    supabase.from("shift_request_periods").select("*")
-      .eq("status", "open").is("deleted_at", null)
-      .gte("deadline", today).order("target_month"),
-    supabase.from("help_requests").select("*, stores(name)")
-      .eq("status", "open").is("deleted_at", null)
-      .in("store_id", actor.storeIds.length ? actor.storeIds : ["00000000-0000-0000-0000-000000000000"])
-      .gte("date", today).order("date"),
-    supabase.from("help_applications").select("help_request_id, status")
-      .eq("staff_id", actor.staffId),
-    // 休み希望は募集期間と無関係。これから先の分＋直近に出したものを見せる
-    supabase.from("staff_time_off_requests")
-      .select("id, start_date, end_date, kind, reason, status, decision_note")
-      .eq("staff_id", actor.staffId).is("deleted_at", null)
-      .gte("end_date", today).order("start_date"),
-  ]);
+  const [{ data: helps }, { data: myApps }, { data: myTimeOff }, { data: templates }, { data: existing }, { data: myShifts }] =
+    await Promise.all([
+      supabase.from("help_requests").select("*, stores(name)")
+        .eq("status", "open").is("deleted_at", null)
+        .in("store_id", actor.storeIds.length ? actor.storeIds : ["00000000-0000-0000-0000-000000000000"])
+        .gte("date", today).order("date"),
+      supabase.from("help_applications").select("help_request_id, status")
+        .eq("staff_id", actor.staffId),
+      // 休み希望は月に関係なく、これから先の分を見せる
+      supabase.from("staff_time_off_requests")
+        .select("id, start_date, end_date, kind, reason, status, decision_note")
+        .eq("staff_id", actor.staffId).is("deleted_at", null)
+        .gte("end_date", today).order("start_date"),
+      supabase.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color, scope_type, scope_id")
+        .is("deleted_at", null).order("sort_order"),
+      supabase.from("shift_requests").select("date, template_id, memo, start_time, end_time")
+        .eq("staff_id", actor.staffId).eq("status", "submitted").is("deleted_at", null)
+        .gte("date", from).lte("date", to),
+      // 確定済み(published)の日は出し直せない。何時から入っているかも見せる
+      supabase.from("shifts").select("date, start_time, end_time, is_day_off, status")
+        .eq("staff_id", actor.staffId).is("deleted_at", null)
+        .gte("date", from).lte("date", to),
+    ]);
 
-  // 自分に該当する募集のうち、店舗個別を全店舗共通より優先（重複時の取り違え防止）
-  const matched = (periods ?? []).filter((p) => !p.store_id || actor.storeIds.includes(p.store_id));
-  const period = matched.find((p) => p.store_id) ?? matched[0];
   const appMap = new Map((myApps ?? []).map((a) => [a.help_request_id, a.status]));
+  // 店舗ごとに営業時間が違うので、自分の店舗のテンプレだけ見せる（DECISIONS #131）
+  const visibleTemplates = templatesForStores(templates ?? [], actor.storeIds);
+  const locked = Object.fromEntries(
+    (myShifts ?? []).filter((s) => s.status === "published")
+      .map((s) => [s.date, { start_time: s.start_time, end_time: s.end_time, is_day_off: s.is_day_off }]),
+  );
 
   const APP_LABEL: Record<string, { label: string; color: "amber" | "green" | "zinc" }> = {
     pending: { label: "応募済み（審査中）", color: "amber" },
     accepted: { label: "採用されました", color: "green" },
     rejected: { label: "今回は見送り", color: "zinc" },
   };
+
+  const ymLabel = `${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月`;
 
   return (
     <div className="space-y-6">
@@ -81,48 +108,41 @@ export default async function RequestsPage() {
 
       <section>
         <h2 className="text-lg font-semibold">シフト提出</h2>
-        {!period ? (
-          <Empty>現在提出を受付中の期間はありません</Empty>
+        <p className="mb-3 mt-1 text-sm text-zinc-500">
+          いつでも出せます。締切はありません。あとから何度でも直せます（管理者が確定した日をのぞく）。
+        </p>
+
+        {/* 月送り。先の月も自由に開ける＝先に決まっている予定を早めに入れられる（#138） */}
+        <div className="mb-3 flex items-center gap-3">
+          <Link href={`/requests?ym=${addMonths(ym, -1)}`} aria-label="前の月"
+            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-400">←</Link>
+          <p className="font-semibold">{ymLabel}</p>
+          <Link href={`/requests?ym=${addMonths(ym, 1)}`} aria-label="次の月"
+            className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-400">→</Link>
+          {ym !== thisYM && (
+            <Link href={`/requests?ym=${thisYM}`} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-xs text-zinc-500">
+              今月
+            </Link>
+          )}
+        </div>
+
+        {to < today ? (
+          <Card className="!p-4">
+            <p className="text-sm text-zinc-400">{ymLabel}はもう過ぎています。→ で先の月へ移動してください。</p>
+          </Card>
         ) : (
-          <>
-            <p className="mb-4 mt-1 text-sm text-zinc-500">
-              {period.title ? `${period.title} ・ ` : ""}
-              {period.start_date && period.end_date
-                ? `${fmtDateJP(period.start_date)}〜${fmtDateJP(period.end_date)}`
-                : `${period.target_month.slice(0, 7).replace("-", "年")}月分`}
-              {" ・ 締切 "}{period.deadline}
-              <br />
-              <span className="text-xs">提出した内容は管理者の確認後に確定します。</span>
-            </p>
-            <RequestFormLoader
-              periodId={period.id}
-              ym={period.target_month.slice(0, 7)}
-              startDate={period.start_date}
-              endDate={period.end_date}
-              staffId={actor.staffId}
-              storeIds={period.store_id ? [period.store_id] : actor.storeIds}
-            />
-          </>
+          <RequestForm
+            from={from}
+            to={to}
+            days={days}
+            today={today}
+            ymLabel={ymLabel}
+            templates={visibleTemplates}
+            existing={existing ?? []}
+            locked={locked}
+          />
         )}
       </section>
     </div>
-  );
-}
-
-async function RequestFormLoader({ periodId, ym, startDate, endDate, staffId, storeIds }: {
-  periodId: string; ym: string; startDate: string | null; endDate: string | null; staffId: string; storeIds: string[];
-}) {
-  const supabase = await createClient();
-  const days = startDate && endDate ? daysBetween(startDate, endDate) : daysOfMonth(ym);
-  const [{ data: templates }, { data: existing }] = await Promise.all([
-    supabase.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color, scope_type, scope_id")
-      .is("deleted_at", null).order("sort_order"),
-    supabase.from("shift_requests").select("date, template_id, memo, start_time, end_time")
-      .eq("period_id", periodId).eq("staff_id", staffId).is("deleted_at", null),
-  ]);
-  // 店舗ごとに営業時間が違うので、自分の店舗のテンプレだけ見せる（DECISIONS #131）
-  const visible = templatesForStores(templates ?? [], storeIds);
-  return (
-    <RequestForm periodId={periodId} days={days} templates={visible} existing={existing ?? []} />
   );
 }

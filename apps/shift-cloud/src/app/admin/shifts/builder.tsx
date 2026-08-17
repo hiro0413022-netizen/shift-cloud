@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef, useCallback } from "react";
-import { saveDraft, publishShifts, type CellShift } from "./actions";
+import { saveShifts, publishShifts, publishCells, unpublishCells, type CellShift } from "./actions";
 import { Button } from "@/components/ui";
 
 type Template = { id: string; name: string; start_time: string | null; end_time: string | null; is_day_off: boolean; color: string };
@@ -21,6 +21,10 @@ function reqLabel(r: Request, tmap: Map<string, Template>) {
   if (r.start_time && r.end_time) return `${r.start_time.slice(0, 5)}-${r.end_time.slice(0, 5)}`;
   if (r.template_id) { const t = tmap.get(r.template_id); return t ? tLabel(t) : "—"; }
   return "メモ";
+}
+/** "2026-09-03" → "9/3" */
+function md(date: string) {
+  return `${Number(date.slice(5, 7))}/${Number(date.slice(8))}`;
 }
 
 /** 希望を「開始/終了の時刻」に落とす。テンプレ希望でも時間に展開して微調整できるようにする */
@@ -59,13 +63,14 @@ export function ShiftBuilder({
   const [pending, start] = useTransition();
   // 退避キーは「店舗」だけ。表示範囲（日/週/半月/月）や月を混ぜると、
   // 期間を切り替えたとたんに未保存のドラフトが行方不明になる（#135）。
-  // セルは "staffId|date" で持っているので、範囲外の未保存ぶんもそのまま保存できる。
   const lsKey = `shiftdraft:${storeId}`;
   const inRange = new Set(days);
 
-  // 未保存編集の集合を常に最新で参照できるようにする
+  // 未保存編集の集合／最新のグリッドを、非同期処理の中からも参照できるようにする
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  const gridRef = useRef(grid);
+  gridRef.current = grid;
 
   // サーバー側の最新シフト（保存/確定/他者編集の結果）を grid へ同期。
   // 未保存(dirty)のセルだけは上書きせず保持 → リロード不要で反映される。
@@ -131,18 +136,25 @@ export function ShiftBuilder({
 
   function setTemplate(staffId: string, date: string, value: string) {
     const key = `${staffId}|${date}`;
+    // 確定済みを空にするのは「確定解除」でしかできない。ここで消せてしまうと画面だけ空になりDBは確定のまま残る
+    if (!value && grid[key]?.status === "published") {
+      setMsg(`${md(date)} は確定済みです。「🔒 確定済み」を押して確定を解除してから消してください`);
+      return;
+    }
     setGrid((p) => {
       const cur = p[key];
+      // 確定済みのマスを直しても確定のまま（保存時に本人へ変更通知が飛ぶ・#138）
+      const status = cur?.status === "published" ? "published" : "draft";
       if (value === CUSTOM) {
-        return { ...p, [key]: { template_id: null, start_time: cur?.start_time ?? "10:00", end_time: cur?.end_time ?? "19:00", status: "draft" } };
+        return { ...p, [key]: { template_id: null, start_time: cur?.start_time ?? "10:00", end_time: cur?.end_time ?? "19:00", status } };
       }
-      return { ...p, [key]: { template_id: value || null, start_time: null, end_time: null, status: "draft" } };
+      return { ...p, [key]: { template_id: value || null, start_time: null, end_time: null, status } };
     });
     markDirty(key);
   }
   function setCustomTime(staffId: string, date: string, which: "start" | "end", v: string) {
     const key = `${staffId}|${date}`;
-    setGrid((p) => ({ ...p, [key]: { ...p[key], template_id: null, [which === "start" ? "start_time" : "end_time"]: v, status: "draft" } as Cell }));
+    setGrid((p) => ({ ...p, [key]: { ...p[key], template_id: null, [which === "start" ? "start_time" : "end_time"]: v } as Cell }));
     markDirty(key);
   }
 
@@ -154,7 +166,7 @@ export function ShiftBuilder({
     const key = `${staffId}|${date}`;
     const req = reqMap.get(key);
     if (!req) return;
-    if (grid[key]?.status === "published") return; // 確定済みは触らない
+    if (grid[key]?.status === "published") return; // 確定済みは希望で上書きしない（直すなら確定解除から）
     const times = reqTimes(req, tmap);
     if (!times) return;
     setGrid((p) => ({ ...p, [key]: { template_id: null, start_time: times.start, end_time: times.end, status: "draft" } }));
@@ -185,23 +197,36 @@ export function ShiftBuilder({
     setMsg(`${rangeShort}に${keys.length}件の希望を反映しました（時間はこのあと自由に変えられます）`);
   }
 
-  const save = useCallback((silent = false) => {
-    const snapshot = dirty;
+  /** 未保存ぶんをサーバーへ。確定/確定解除の前にも必ず通す＝画面と食い違わない */
+  async function persistDirty(): Promise<{ error?: string; changedPublished?: number } | undefined> {
+    const snapshot = new Set(dirtyRef.current);
     if (snapshot.size === 0) return;
     const cells: CellShift[] = [...snapshot].map((key) => {
       const [staff_id, date] = key.split("|");
-      const c = grid[key];
+      const c = gridRef.current[key];
       return { staff_id, date, template_id: c?.template_id ?? null, start_time: c?.start_time ?? null, end_time: c?.end_time ?? null };
     });
+    const res = await saveShifts(storeId, cells);
+    if (res.error) return res;
+    setDirty(new Set());
+    localStorage.removeItem(lsKey);
+    setRestored(false);
+    return res;
+  }
+
+  const save = useCallback((silent = false) => {
+    if (dirtyRef.current.size === 0) return;
     start(async () => {
-      const res = await saveDraft(storeId, cells);
-      if (res.error) { setMsg(res.error); return; }
-      setDirty(new Set());
-      localStorage.removeItem(lsKey);
-      setRestored(false);
-      setMsg(silent ? "自動保存しました ✓" : "ドラフト保存しました ✓");
+      const res = await persistDirty();
+      if (res?.error) { setMsg(res.error); return; }
+      const changed = res?.changedPublished ?? 0;
+      setMsg(
+        (silent ? "自動保存しました ✓" : "保存しました ✓")
+        + (changed ? `（確定済み${changed}件の変更を本人へ通知）` : ""),
+      );
     });
-  }, [dirty, grid, storeId, lsKey, start]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, lsKey, start]);
 
   // ① 15秒ごとに自動保存
   const saveRef = useRef(save);
@@ -213,29 +238,58 @@ export function ShiftBuilder({
 
   /** 確定・通知の対象は**表示中の期間だけ**。押す前に何が起きるか分かるようにする（#135） */
   function publish() {
-    if (!confirm(`${rangeLabel}（${days.length}日ぶん）のドラフトをすべて確定し、スタッフに通知します。\nこの範囲の外は変わりません。よろしいですか？`)) return;
+    if (!confirm(`${rangeLabel}（${days.length}日ぶん）の未確定シフトをすべて確定し、スタッフに通知します。\nこの範囲の外は変わりません。よろしいですか？`)) return;
     start(async () => {
+      const saved = await persistDirty();
+      if (saved?.error) { setMsg(saved.error); return; }
       const res = await publishShifts(storeId, days[0], days[days.length - 1]);
       setMsg(res.error ?? `${rangeShort}の${res.published}件のシフトを確定しました ✓`);
+    });
+  }
+
+  /** 1マスだけ確定（#138）。あとから1日足した・この人だけ先に決まった、に効く */
+  function publishOne(staffId: string, date: string) {
+    const key = `${staffId}|${date}`;
+    start(async () => {
+      const saved = await persistDirty();
+      if (saved?.error) { setMsg(saved.error); return; }
+      const res = await publishCells(storeId, [{ staff_id: staffId, date }]);
+      if (res.error) { setMsg(res.error); return; }
+      setGrid((p) => (p[key] ? { ...p, [key]: { ...p[key], status: "published" } } : p));
+      setMsg(`${md(date)} を確定しました ✓（本人へ通知）`);
+    });
+  }
+
+  /** 1マスだけ確定解除して編集できるようにする（#138） */
+  function unpublishOne(staffId: string, date: string) {
+    const key = `${staffId}|${date}`;
+    if (!confirm(`${md(date)} の確定を解除します。\nスタッフのシフト画面からいったん消え、本人に「調整中」と通知されます。よろしいですか？`)) return;
+    start(async () => {
+      const res = await unpublishCells(storeId, [{ staff_id: staffId, date }]);
+      if (res.error) { setMsg(res.error); return; }
+      setGrid((p) => (p[key] ? { ...p, [key]: { ...p[key], status: "draft" } } : p));
+      setMsg(`${md(date)} の確定を解除しました（編集できます）`);
     });
   }
 
   const dow = ["日", "月", "火", "水", "木", "金", "土"];
   // 未保存だが今は画面に出ていないセル（期間を切り替えたあと）。保存対象には入るので件数だけ伝える
   const dirtyOutside = [...dirty].filter((k) => !inRange.has(k.split("|")[1])).length;
+  const publishedInRange = days.reduce((n, d) => n + staff.filter((s) => grid[`${s.id}|${d}`]?.status === "published").length, 0);
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <Button onClick={() => save(false)} disabled={pending || dirty.size === 0}>
-          {pending ? "処理中…" : `ドラフト保存（${dirty.size}件）`}
+          {pending ? "処理中…" : `保存（${dirty.size}件）`}
         </Button>
         <Button variant="secondary" onClick={applyAllRequests} disabled={pending} title={`${rangeLabel}の空いているセルにだけ希望を入れます`}>
           希望を一括反映（{rangeShort}）
         </Button>
-        <Button variant="secondary" onClick={publish} disabled={pending} title={`${rangeLabel}のドラフトだけを確定します`}>
-          {rangeShort}のドラフトを確定・通知
+        <Button variant="secondary" onClick={publish} disabled={pending} title={`${rangeLabel}の未確定ぶんだけを確定します`}>
+          {rangeShort}をまとめて確定・通知
         </Button>
+        <span className="text-xs text-zinc-400">{rangeShort}の確定済み {publishedInRange}件</span>
         {dirty.size > 0 && <span className="text-xs text-amber-600">● 未保存の変更あり（15秒ごとに自動保存）</span>}
         {dirtyOutside > 0 && <span className="text-xs text-zinc-400">うち{dirtyOutside}件は表示範囲の外（保存すると一緒に反映されます）</span>}
         {restored && <span className="text-xs text-blue-600">前回の編集内容を復元しました</span>}
@@ -271,9 +325,11 @@ export function ShiftBuilder({
                   const req = reqMap.get(key);
                   const t = cell?.template_id ? tmap.get(cell.template_id) : null;
                   const isCustom = !cell?.template_id && !!(cell?.start_time || cell?.end_time);
+                  const filled = !!(cell?.template_id || (cell?.start_time && cell?.end_time));
+                  const published = cell?.status === "published";
                   const off = timeOff[key];
                   const bg = off?.status === "approved" ? "bg-rose-50"
-                    : cell?.status === "published" ? "bg-emerald-50/60"
+                    : published ? "bg-emerald-50/60"
                     : dirty.has(key) ? "bg-amber-50"
                     : off ? "bg-rose-50/40" : "";
                   return (
@@ -297,6 +353,24 @@ export function ShiftBuilder({
                             className="w-full rounded border border-zinc-200 px-0.5 py-0.5 text-[10px]" />
                         </div>
                       )}
+
+                      {/* 1マスごとの確定 / 確定解除（#138）。まとめ確定を待たずにここだけ決められる */}
+                      {filled && (
+                        published ? (
+                          <button type="button" disabled={pending} onClick={() => unpublishOne(s.id, d)}
+                            className="w-full rounded px-1 py-0.5 text-left text-[10px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                            title="確定済み。クリックすると確定を解除して編集できます（本人へ通知）">
+                            🔒 確定済み
+                          </button>
+                        ) : (
+                          <button type="button" disabled={pending} onClick={() => publishOne(s.id, d)}
+                            className="w-full rounded px-1 py-0.5 text-left text-[10px] text-zinc-400 hover:bg-brand-light hover:text-brand disabled:opacity-50"
+                            title="この日だけ確定して本人に通知します（未保存の変更もまとめて保存されます）">
+                            ✓ この日を確定
+                          </button>
+                        )
+                      )}
+
                       {off && (
                         <p className={`truncate px-1 pb-0.5 text-[10px] font-medium ${off.status === "approved" ? "text-rose-600" : "text-rose-400"}`}
                           title={`${off.status === "approved" ? "承認済みの休み" : "休み希望（未処理）"}${off.reason ? `: ${off.reason}` : ""}`}>
@@ -327,7 +401,10 @@ export function ShiftBuilder({
       </div>
       <p className="mt-2 text-xs text-zinc-400">
         緑=確定済み / 黄=未保存 / 桃=休み希望。「⌚ 時間指定」で任意の時間を入力できます。
-        セル下の「希望」はスタッフの提出内容で、<span className="font-medium text-zinc-500">クリックするとその時間が入り、そこから自由に打ち替えられます</span>（📝=メモ、ホバーで表示）。
+        <span className="font-medium text-zinc-500">「✓ この日を確定」で1日だけ確定</span>、
+        <span className="font-medium text-zinc-500">「🔒 確定済み」を押すと確定を解除して直せます</span>（どちらも本人へ通知）。
+        確定済みのままセルを直して保存した場合も、変更内容が本人へ通知されます。
+        セル下の「希望」はスタッフの提出内容で、クリックするとその時間が入ります。
       </p>
     </div>
   );

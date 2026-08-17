@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 2026-08-17 — Shift Cloud: 募集の開始を廃止（いつでも提出）＋1日単位の確定・編集
+- change(shift-cloud): **「募集を開始する」を削除**（DECISIONS #138）。/admin/shifts の募集期間カード（開始/締切/募集中に戻す/削除）と period-form.tsx・delete-period-button.tsx、server actions（openPeriod・closePeriod・reopenPeriod・deletePeriod）を撤去。管理者が何も押さなくてもスタッフは提出できる
+- feat(shift-cloud): /requests は月送り（既定=翌月・「今月」リンク）で**今日以降ならいつでも・何ヶ月先でも**提出。締切表示は撤去。空にして提出＝その日の取り下げ（ドラフトシフトも削除）。**過去日と確定済みの日はロック**（確定日は実際の時間をバッジ表示・サーバー側でも上書きを拒否）
+- feat(shift-cloud): 提出があるたびに**シフト作成権限者へ通知**（募集の開始/締切という気づきの機会が無くなったため）
+- feat(shift-cloud): シフト作成グリッドに**1マス単位の「✓ この日を確定」「🔒 確定済み→確定解除して編集」**を追加（publishCells / unpublishCells）。半月/月などの期間まとめ確定（#135のspan切替）はそのまま維持。確定解除は本人へ「調整中」を通知
+- fix(shift-cloud): **確定済みのセルを編集して保存すると黙って未確定(draft)に戻り、スタッフのシフト画面から消えていた**のを修正。saveDraft→saveShifts に改名し published を維持、内容が変わった場合は本人へ変更通知（kind=shift_changed）
+- db: migration `0116_shift_requests_periodless.sql`（yozan-shift-cloud・適用済）。shift_requests.period_id を任意化＋一意キーを (staff_id,date) へ。shift_request_periods はテーブル・データとも残置（過去の提出の履歴用）、open の期間は closed に
+- test: 既存354件パス（`npx tsc --noEmit` も通過）
+
+## 2026-08-16 — Shift Cloud: 給与明細PDF（日別出勤簿つき）
+- feat(shift-cloud): /admin/payroll に**「明細PDF（出勤簿つき）」**を追加。1スタッフ=1ページ（A4縦）で「支給見込みの明細（基本給・残業代・交通費・手当・控除・支給見込み）＋その月の日別出勤簿（シフト・出勤・退勤・休憩・実働・残業・備考）」を全員分1つのPDFに出力（/admin/payroll/pdf?ym=）。金額は payroll_items をそのまま印字し再計算しない
+- feat(shift-cloud): 出勤簿は /admin/attendance と同じ考え方で「確定シフトあり・当日以前・勤怠行なし」の日を**打刻なし**（赤字）として行に混ぜる（2026-08-04のBUGFIXと同種の欠落を明細でも見えるように）。遅刻/早退/打刻漏れ/修正済・休憩の手動上書き（＊）も備考に出す
+- sec: 認可はCSVと同じ view_payroll＋パスワード再認証。**非オーナーは自店舗配属スタッフのみサーバー側で絞る**（#134 store-scope-lockdown）。出力は payroll.export_pdf として監査ログに記録
+- impl: pdf-lib＋NotoSansJP（genesis入会控え#129と同じフォントを apps/shift-cloud/src/assets へ複製・**subset埋込禁止**のフル埋込＝1人あたり約1.4MB）。next.config の outputFileTracingIncludes で /admin/payroll/pdf にフォント同梱
+- test: payslip-sheet 3件（打刻なし行・未来/休みシフト除外・JST表示・備考・丸め前合計）
+
 ## 2026-08-11 — FRANK: frankgolf.jp のResendドメイン認証＋承認メール再送ボタン
 - ops: **frankgolf.jp を Resend で Verified に**（お名前.com Navi の DNSレコード設定に DKIM `resend._domainkey` / MX `send`(10) / SPF `send` / DMARC `_dmarc` を追加。既存の A 216.150.1.1・CNAME www は不変）。これまで送信は `403 The frankgolf.jp domain is not verified` で全て落ちており、**Web入会の受付メールも入会承認メールも1通も届いていなかった**（Vercel member-os の Runtime Logs で確認）
 - test: /join-web からテスト申込1件 → `info@frankgolf.jp` の受付メールがGmail受信トレイに到達を確認（テスト行は rejected + deleted_at で退避）。氏名の姓/名分割が name=「姓 名」、name_kana=「セイ メイ」で保存されることも実データで確認

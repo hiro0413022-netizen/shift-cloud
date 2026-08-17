@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { requireActor, visibleStores, pickStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { PageTitle, Card, Badge } from "@/components/ui";
-import { fmtDateJP, todayJST } from "@/lib/util";
+import { PageTitle } from "@/components/ui";
+import { todayJST } from "@/lib/util";
 import { templatesForStore, timeOffIndex } from "@/lib/shift-scope";
-import { resolveSpan, monthsCovered, shiftsHref, printHref, SPAN_KINDS, SPAN_LABELS } from "@/lib/shift-span";
+import { resolveSpan, shiftsHref, printHref, SPAN_KINDS, SPAN_LABELS } from "@/lib/shift-span";
 import { ShiftBuilder } from "./builder";
-import { PeriodForm } from "./period-form";
-import { DeletePeriodButton } from "./delete-period-button";
-import { closePeriod, reopenPeriod } from "./actions";
 
+/**
+ * シフト作成（#138 募集期間の廃止）
+ * 「募集を開始」は無い。スタッフはいつでも提出でき、ここでは日付範囲で希望を読むだけ。
+ * 確定は「表示中の期間まとめて」と「1マスだけ」の両方ができる。
+ */
 export default async function ShiftBuilderPage({
   searchParams,
 }: {
@@ -21,13 +23,13 @@ export default async function ShiftBuilderPage({
   // 表示する期間（日/週/半月/月）。日付計算は lib/shift-span.ts に集約（#135）
   const today = todayJST();
   const range = resolveSpan({ span: sp.span, d: sp.d, ym: sp.ym, today });
-  const { start, end, days, ym } = range;
+  const { start, end, days } = range;
 
   const stores = await visibleStores(actor); // オーナー=全店 / それ以外=配属店舗のみ（#128）
   const storeId = pickStore(stores, sp.store, actor.primaryStoreId);
   if (!storeId) return <PageTitle>シフト作成</PageTitle>;
 
-  const [{ data: staffRows }, { data: templates }, { data: shifts }, { data: periods }] = await Promise.all([
+  const [{ data: staffRows }, { data: templates }, { data: shifts }] = await Promise.all([
     admin.from("staff").select("id, name, staff_store_assignments!inner(store_id)")
       .eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null)
       .eq("staff_store_assignments.store_id", storeId).order("name"),
@@ -36,32 +38,18 @@ export default async function ShiftBuilderPage({
     admin.from("shifts").select("staff_id, date, template_id, status, start_time, end_time")
       .eq("company_id", actor.companyId).eq("store_id", storeId).is("deleted_at", null)
       .gte("date", start).lte("date", end),
-    // この店舗向け＋全店舗共通(store_id=null)の期間のみ表示（他店舗の期間は混ぜない）
-    // 週表示は月をまたぐので、表示範囲がかかる月の募集をすべて拾う（#135）
-    admin.from("shift_request_periods").select("*")
-      .eq("company_id", actor.companyId).is("deleted_at", null)
-      .in("target_month", monthsCovered(start, end))
-      .or(`store_id.eq.${storeId},store_id.is.null`)
-      .order("start_date"),
   ]);
 
-  // 表示範囲にかかる全期間（前半/後半など複数可）の希望を集約。
-  // 日付でも絞る＝「希望を一括反映」の対象が画面に見えている範囲と必ず一致する（#135）
-  const periodIds = (periods ?? []).map((p) => p.id);
-  const { data: requests } = periodIds.length
-    ? await admin.from("shift_requests").select("period_id, staff_id, date, template_id, memo, start_time, end_time")
-        .in("period_id", periodIds).eq("status", "submitted").is("deleted_at", null)
+  // 提出された希望は期間(period)ではなく日付で読む。この店舗のスタッフのぶんだけ（#138）
+  const staffIds = (staffRows ?? []).map((s) => s.id);
+  const { data: requests } = staffIds.length
+    ? await admin.from("shift_requests").select("staff_id, date, template_id, memo, start_time, end_time")
+        .eq("company_id", actor.companyId).in("staff_id", staffIds)
+        .eq("status", "submitted").is("deleted_at", null)
         .gte("date", start).lte("date", end)
     : { data: [] };
-  // 募集期間の削除確認に出す件数は「その期間の全件」。表示範囲で絞ると消える件数を少なく見せてしまう（#135）
-  const { data: reqCountRows } = periodIds.length
-    ? await admin.from("shift_requests").select("period_id")
-        .in("period_id", periodIds).eq("status", "submitted").is("deleted_at", null)
-    : { data: [] };
-  const reqCountByPeriod = new Map<string, number>();
-  for (const r of reqCountRows ?? []) reqCountByPeriod.set(r.period_id, (reqCountByPeriod.get(r.period_id) ?? 0) + 1);
 
-  // 休み希望（募集期間とは無関係に出せる）。表示範囲にかかるものを日付ごとに引けるようにする
+  // 休み希望（いつでも出せる）。表示範囲にかかるものを日付ごとに引けるようにする
   const { data: timeOffRows } = await admin.from("staff_time_off_requests")
     .select("staff_id, start_date, end_date, status, reason")
     .eq("company_id", actor.companyId).is("deleted_at", null)
@@ -125,44 +113,11 @@ export default async function ShiftBuilderPage({
         </div>
       )}
 
-      <Card className="mb-4 !p-4">
-        <p className="mb-3 text-sm font-semibold">希望募集の期間</p>
-        <div className="mb-3 flex flex-wrap gap-2">
-          {(periods ?? []).length === 0 && (
-            <p className="text-sm text-zinc-400">まだ募集期間がありません。下から作成してください。</p>
-          )}
-          {(periods ?? []).map((p) => (
-            <div key={p.id} className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-1.5">
-              <Badge color={p.status === "open" ? "green" : "zinc"}>
-                {p.status === "open" ? "募集中" : "締切済み"}
-              </Badge>
-              <span className="text-xs font-medium">
-                {p.title ? `${p.title}：` : ""}
-                {p.start_date && p.end_date ? `${fmtDateJP(p.start_date)}〜${fmtDateJP(p.end_date)}` : p.target_month.slice(0, 7)}
-              </span>
-              <span className="text-[11px] text-zinc-400">締切 {p.deadline}</span>
-              <Badge color={p.store_id ? "zinc" : "amber"}>{p.store_id ? "この店舗" : "全店舗"}</Badge>
-              {p.status === "open" ? (
-                <form action={closePeriod}>
-                  <input type="hidden" name="id" value={p.id} />
-                  <button className="rounded border border-zinc-300 bg-white px-2 py-0.5 text-[11px] text-zinc-600 hover:bg-zinc-100">締め切る</button>
-                </form>
-              ) : (
-                <form action={reopenPeriod}>
-                  <input type="hidden" name="id" value={p.id} />
-                  <button className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100">↩ 募集中に戻す</button>
-                </form>
-              )}
-              <DeletePeriodButton
-                id={p.id}
-                reqCount={reqCountByPeriod.get(p.id) ?? 0}
-                label={`${p.title ? `${p.title}：` : ""}${p.start_date && p.end_date ? `${fmtDateJP(p.start_date)}〜${fmtDateJP(p.end_date)}` : p.target_month.slice(0, 7)}`}
-              />
-            </div>
-          ))}
-        </div>
-        <PeriodForm ym={ym} storeId={storeId} />
-      </Card>
+      <div className="mb-4 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-500">
+        スタッフはいつでもシフトを提出できます（募集の開始は不要）。
+        <span className="ml-1 font-medium text-zinc-700">{range.shortLabel}の提出は{(requests ?? []).length}件</span>
+        。セルの下に「希望」として出ます。
+      </div>
 
       {!staffRows?.length ? (
         <p className="text-sm text-zinc-400">この店舗に所属スタッフがいません。スタッフ管理から追加してください。</p>

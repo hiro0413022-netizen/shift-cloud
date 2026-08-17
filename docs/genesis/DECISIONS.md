@@ -506,3 +506,23 @@
   **(i) 検証** — tests 343件通過、genesis / member-os の tsc クリーン、_build.py 再生成18ページ。
   ⚠残: ①ライト会員「平日昼間（月4回）」はサイト表記のみでサーバー強制なし（#131fの決定どおり。強制するなら要実装＝ユーザー判断）②公開APIのIP単位レート制限は未実装（member_no単位のみ）③テスト入会の後始末はユーザー実施 or Claude依頼。
 - #136b (2026-08-13) **ライト会員の利用上限＝「月4回」で確定・サーバー強制**（migrationなし）。ユーザー指定（2026-08-13「両方間違えています。月4回です」）。#136⚠残①の解消。旧実装は frank-booking.ts が「月8日」で、HP・DB note の「月4回」と食い違っていた → 予約APIの月次上限を **月4回（利用日数ベース・同一日の追加予約は数えない）** に修正。「平日昼間の利用中心」の表記は削除し「月4回までのご利用（全営業日OK）」に統一（HP・LP・frunk_plans.note。時間帯の制限は設けない＝ユーザー指定）。
+- #137 (2026-08-14) **PRO SITE＝プロゴルファー公式HPの外販SaaSを新設（apps/pro-site・migration 0114適用済・Vercel本番デプロイ済）**。ユーザー指定（2026-08-14「石川遼オフィシャルと同じ構成・スマホで編集・Instagram共有・隠しコマンドでログイン・榎本剛志プロで先行」）。
+  **(a) 構成** — 石川遼オフィシャル（ryo-ishikawa.jp）を踏襲: TOP（HERO/NEWS/MEDIA/RANKING/SCHEDULE/RESULT/INSTAGRAM）・NEWS一覧/詳細・SCHEDULE/RESULT・PROFILE（プロフィール表＋BIOGRAPHY＋主な戦歴＋クラブセッティング）。1プロ=1テナントの `/{slug}` 方式（第1号 /enomoto）。将来は独自ドメイン割当で横展開。
+  **(b) 自己完結アプリ** — @yozan/core 非依存（スタッフ認証と無関係な外販商品のため）。認証はプロごとのパスワード（scrypt）＋HMAC署名Cookie（鍵はSUPABASE_SERVICE_ROLE_KEYから導出＝env追加なし）。テーブルは pgw_* 7本・service_role専用（RLS有効・ポリシー無し）。
+  **(c) 隠しコマンド** — フッターの©表記を3秒以内に5回タップ→ /{slug}/admin ログイン。リンクは一切露出しない。管理画面はスマホ前提（大きい入力欄・タップで開く編集・素のHTML form＝server actions）。
+  **(d) Instagram** — Meta API不使用（#127 Meta登録が端末認証で停止中のため）。プロが投稿の「リンクをコピー」を貼るだけ→公式embed.jsで表示。pgw_instagram にURL保存・新しい順に最大4件をトップ表示。
+  **(e) SCHEDULE/RESULT** — pgw_tournaments 1テーブルを end_date と今日(JST・lib/jst.ts)の比較で自動振り分け。結果欄を後から埋めるだけで SCHEDULE→RESULT に移る。
+  **(f) デプロイ** — Vercel MCP の direct deploy（gitを介さない）で pro-site プロジェクト新規作成・本番 https://pro-site-eight.vercel.app 。⚠残: ①Vercel env 2つ（NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY）が未設定＝設定＋Redeployまで500（ユーザー作業）②写真アップロード機能なし（URL指定のみ・次版でSupabase Storage）③独自ドメイン未取得④榎本プロの戦歴・クラブは本人ヒアリング待ち（プロフィール/経歴はALBA公開情報からシード済・パスワードはVault登録済）。
+- #137b (2026-08-14) **PRO SITEにスポンサーバナー機能を追加（migration 0115適用済・デプロイ済）**。ユーザー指定（2026-08-14「管理画面からスポンサーのバナーを追加・多様なサイズ対応・画像データを挿入・表示形式もきれいに」）。
+  **(a) 画像アップロード** — 管理画面 /{slug}/admin/sponsors からスマホの写真フォルダで直接選択→server action経由で storage バケット `pgw-sponsors`（public読み・書きはservice_roleのみ）へ。5MB上限・image/*のみ・拡張子サニタイズ。next.config の serverActions.bodySizeLimit=8mb。削除時はDB論理削除＋storage実削除。
+  **(b) サイズ混在対応** — pgw_sponsors.size（large=1列/medium=2列/small=3列）をプロが選ぶ。表示は components/sponsor-grid.tsx: 大→中→小の順にグループ化し、白地カード＋object-contain（縦横比を崩さない）＋高さだけサイズ別に統一＝横長ロゴと正方形ロゴが混ざっても揃って見える。TOPのINSTAGRAM下にSPONSORセクション。
+  **(c) 検証** — /tmp単独ビルド通過→direct deploy→仮バナー行を挿入してTOPにSPONSOR表示を実確認→行削除。ついでにIG IDを @eno_tsuyoshi に修正（検索で出る @eno1227golf は旧アカウント・ユーザー指摘）。
+- #137c (2026-08-14) **PRO SITE 第2号テナント＝春馬凡夫プロ（/haruma）を開設**（migrationなし・DB追加のみ）。ユーザー指定（2026-08-14「卜部凡夫プロ、プロ名：春馬凡夫（はるまはんふ）。基本的には春馬凡夫で名前を統一」）。
+  **(a) 表記の統一** — サイト上の表示は全て**プロ名「春馬凡夫」**（ローマ字 HANPU HARUMA）。本名「卜部凡夫」はサイトに一切出さない（staff / mon_pros の社内データとは別扱い＝[[lesson-allowance]] の「春馬」=卜部さんと同一人物）。GOLF WING所属の表記も伏せる（ユーザー判断）。
+  **(b) 中身** — Web上に公開プロフィールが見つからないため、**プロフィール表は項目名（生年月日・身長・出身地など9行）だけ用意し値は空**＝プロ本人が管理画面から入力する運用。ニュースは開設のお知らせ1本をシード。パスワードは vault_systems 登録済み。
+  **(c) 確認** — /haruma の TOP・NEWS・SCHEDULE・PROFILE・admin すべて200。アプリ側は無変更＝**1行INSERTで新テナントが立つ**ことを実証（外販時の手順はこれだけ）。
+- #138 (2026-08-17) **シフトは「募集の開始」なしでいつでも提出・確定は期間まとめ＋1日単位の両方**（migration 0116・yozan-shift-cloud へ適用済）。ユーザー指定（2026-08-17「管理者が開始ボタンなどを押さなくてもシフト提出できるように、募集を開始するは削除」「提出後にこちら側で修正・調整して半月や月ごとに確定」「あとで編集することも考えて1つのシフトごとも確定や編集できるように」）。
+  **(a) 募集期間(shift_request_periods)の廃止** — /admin/shifts の「希望募集の期間」カード（募集を開始／締め切る／募集中に戻す／削除）と period-form.tsx・delete-period-button.tsx、server actions 4本を削除。`shift_requests.period_id` を任意化し、一意キーを (period_id,staff_id,date) → **(staff_id,date)**（1人1日1件）へ。テーブルとデータは残す＝過去の提出の紐付けは壊さない。開いたままの期間は closed に。**開始ボタンの押し忘れ＝現場が1日も出せない、を構造ごと無くす**（休み希望を期間から切り離した [[shift-submission-rules]] #131 と同じ考え方を通常提出にも広げた）。
+  **(b) スタッフ側 /requests** — 月送り（←/→・既定は翌月・「今月」リンク）で**今日以降ならいつでも・何ヶ月先でも**提出。締切の概念は撤去（ユーザー選択）。空にして提出＝その日の取り下げ（ドラフトシフトも消える）。**過去日と確定済みの日はロック**し、確定日は「確定 10:00〜19:00」と実際の時間を表示（ロックはUIだけでなく server action 側でも弾く）。募集の開始・締切という気づきの機会が無くなるので、**提出のたびにシフト作成権限者へ通知**（kind=shift_request_submitted）。
+  **(c) 確定の粒度（1マス単位）** — 期間まとめ確定（日/週/半月/月の表示範囲＝#135のspan）は維持したまま、セルに **「✓ この日を確定」/「🔒 確定済み（押すと確定解除して編集）」** を追加（publishCells / unpublishCells）。確定解除はスタッフのシフト画面から消えるため**本人に「調整中」を通知**＝黙って消さない。
+  **(d) 確定済みを直しても確定のまま** — saveDraft を **saveShifts** に改名し、published のセルを編集して保存しても status は published を維持（旧実装は黙って draft に戻り、**スタッフの画面からシフトが消えていた**）。代わりに内容が変わった確定シフトは本人へ変更通知（kind=shift_changed）。[[alerts-must-be-fixable]] と同じで「直せる」ことと「気づける」ことをセットにする。

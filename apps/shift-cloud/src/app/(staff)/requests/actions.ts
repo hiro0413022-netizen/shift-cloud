@@ -5,80 +5,139 @@ import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/audit";
 import { validateTimeOff } from "@/lib/shift-scope";
-import { todayJST } from "@/lib/util";
+import { todayJST, fmtDateJP } from "@/lib/util";
 
 export type RequestEntry = { date: string; template_id: string | null; memo: string; start_time?: string | null; end_time?: string | null };
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
- * シフト提出（一括）
- * 提出内容はそのままドラフトシフトになり、管理者が確認・確定する（承認制）。
+ * シフト作成権限を持つスタッフ（＝提出を受け取る側）へ通知。
+ * 募集期間を廃止した（#138）ので「開始／締切」で気づく仕組みが無くなった。
+ * 代わりに提出のたびに知らせる＝出したのに気づかれない、を防ぐ。
  */
-export async function submitRequests(periodId: string, entries: RequestEntry[]): Promise<{ error?: string }> {
+async function notifyShiftManagers(
+  companyId: string,
+  exceptStaffId: string,
+  n: { title: string; body: string; link: string },
+): Promise<void> {
+  const admin = createAdmin();
+  const { data: rows } = await admin
+    .from("staff_roles")
+    .select("staff_id, roles!inner(permissions)")
+    .is("deleted_at", null);
+  const targets = [...new Set(
+    (rows ?? [])
+      .filter((r) => (r as unknown as { roles: { permissions: Record<string, boolean> } }).roles?.permissions?.create_shifts)
+      .map((r) => r.staff_id)
+      .filter((id) => id !== exceptStaffId),
+  )];
+  if (!targets.length) return;
+  await admin.from("notifications").insert(targets.map((sid) => ({
+    company_id: companyId,
+    staff_id: sid,
+    kind: "shift_request_submitted",
+    title: n.title,
+    body: n.body,
+    link: n.link,
+  })));
+}
+
+/**
+ * シフト提出（表示中の期間ぶんをまとめて保存）。
+ *
+ * 【#138】募集期間(period_id)は使わない。管理者が「募集を開始」しなくても、
+ * 今日以降ならいつでも・何ヶ月先でも出せる。
+ * - 入力のある日 → shift_requests を upsert（1人1日1件）＋ ドラフトシフトへ反映
+ * - 空にした日   → その日の提出を取り下げ（論理削除）＋ ドラフトシフトも消す
+ * - 確定済み(published)の日 → 触らない。変更は管理者が確定を解除してから（画面でもロック表示）
+ */
+export async function submitRequests(
+  from: string,
+  to: string,
+  entries: RequestEntry[],
+): Promise<{ error?: string; saved?: number; cleared?: number }> {
   const actor = await requireActor();
   const admin = createAdmin();
 
-  const { data: period } = await admin
-    .from("shift_request_periods")
-    .select("id, status, deadline, store_id")
-    .eq("id", periodId)
-    .eq("company_id", actor.companyId)
-    .single();
-  if (!period || period.status !== "open") return { error: "この募集期間は締め切られています" };
+  if (!DATE_RE.test(from) || !DATE_RE.test(to) || from > to) return { error: "対象期間が不正です" };
+  const today = todayJST();
+  // 過去日は出し直せない（もう働いた日を書き換えても意味がない）
+  const editFrom = from < today ? today : from;
+  if (editFrom > to) return { error: "過ぎた日は提出できません" };
 
-  const rows = entries
-    .filter((e) => e.template_id || e.memo || (e.start_time && e.end_time))
-    .map((e) => ({
+  const storeId = actor.primaryStoreId ?? actor.storeIds[0] ?? null;
+
+  // 確定済みの日は上書きしない。ロックは画面(UI)ではなくここで担保する（#134と同じ考え方）
+  const { data: myShifts } = await admin.from("shifts")
+    .select("date, status")
+    .eq("staff_id", actor.staffId).is("deleted_at", null)
+    .gte("date", editFrom).lte("date", to);
+  const locked = new Set((myShifts ?? []).filter((s) => s.status === "published").map((s) => s.date));
+
+  const filled: RequestEntry[] = [];
+  const cleared: string[] = [];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    if (!DATE_RE.test(e.date) || e.date < editFrom || e.date > to) continue;
+    if (locked.has(e.date) || seen.has(e.date)) continue;
+    seen.add(e.date);
+    const hasContent = !!(e.template_id || (e.start_time && e.end_time) || (e.memo ?? "").trim());
+    if (hasContent) filled.push(e); else cleared.push(e.date);
+  }
+
+  if (filled.length === 0 && cleared.length === 0) return { error: "提出できる日がありません" };
+
+  if (filled.length) {
+    const rows = filled.map((e) => ({
       company_id: actor.companyId,
-      period_id: periodId,
+      period_id: null,                      // #138 募集期間は使わない
       staff_id: actor.staffId,
       date: e.date,
       template_id: e.template_id,
       start_time: e.start_time || null,
       end_time: e.end_time || null,
-      memo: e.memo || null,
+      memo: (e.memo ?? "").trim() || null,
       status: "submitted" as const,
+      deleted_at: null,                     // 取り下げた日を出し直したら復活させる
     }));
+    const { error } = await admin.from("shift_requests").upsert(rows, { onConflict: "staff_id,date" });
+    if (error) return { error: error.message };
+  }
 
-  if (rows.length === 0) return { error: "提出するシフトがありません" };
+  if (cleared.length) {
+    await admin.from("shift_requests")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("company_id", actor.companyId)
+      .eq("staff_id", actor.staffId).in("date", cleared).is("deleted_at", null);
+  }
 
-  const { error } = await admin
-    .from("shift_requests")
-    .upsert(rows, { onConflict: "period_id,staff_id,date" });
-  if (error) return { error: error.message };
-
-  // 提出内容をドラフトシフトとして自動作成（確定済みの日は変更しない）
-  const storeId = period.store_id ?? actor.primaryStoreId ?? actor.storeIds[0];
+  // 提出内容をドラフトシフトへ反映（確定済みの日は上でも下でも触らない）
   if (storeId) {
-    const templateIds = [...new Set(rows.map((r) => r.template_id).filter(Boolean))] as string[];
-    const dates = rows.map((r) => r.date);
-
-    const [{ data: templates }, { data: existing }] = await Promise.all([
-      templateIds.length
-        ? admin.from("shift_templates").select("id, start_time, end_time, is_day_off").in("id", templateIds)
-        : Promise.resolve({ data: [] as { id: string; start_time: string | null; end_time: string | null; is_day_off: boolean }[] }),
-      admin.from("shifts").select("date, status")
-        .eq("staff_id", actor.staffId).eq("store_id", storeId).in("date", dates).is("deleted_at", null),
-    ]);
+    const templateIds = [...new Set(filled.map((e) => e.template_id).filter(Boolean))] as string[];
+    const { data: templates } = templateIds.length
+      ? await admin.from("shift_templates").select("id, start_time, end_time, is_day_off").in("id", templateIds)
+      : { data: [] as { id: string; start_time: string | null; end_time: string | null; is_day_off: boolean }[] };
     const tmap = new Map((templates ?? []).map((t) => [t.id, t]));
-    const publishedDates = new Set((existing ?? []).filter((s) => s.status === "published").map((s) => s.date));
 
-    const drafts = rows
-      .filter((r) => (r.template_id || (r.start_time && r.end_time)) && !publishedDates.has(r.date))
-      .map((r) => {
+    const drafts = filled
+      .map((e) => {
         let start_time: string | null, end_time: string | null, is_day_off: boolean;
-        if (r.template_id) {
-          const t = tmap.get(r.template_id);
+        if (e.template_id) {
+          const t = tmap.get(e.template_id);
           if (!t) return null;
           start_time = t.start_time; end_time = t.end_time; is_day_off = t.is_day_off;
+        } else if (e.start_time && e.end_time) {
+          start_time = e.start_time; end_time = e.end_time; is_day_off = false;
         } else {
-          start_time = r.start_time; end_time = r.end_time; is_day_off = false;
+          return null;                      // メモだけの日はシフトにしない
         }
         return {
           company_id: actor.companyId,
           staff_id: actor.staffId,
           store_id: storeId,
-          date: r.date,
-          template_id: r.template_id,
+          date: e.date,
+          template_id: e.template_id,
           start_time,
           end_time,
           is_day_off,
@@ -87,22 +146,41 @@ export async function submitRequests(periodId: string, entries: RequestEntry[]):
           deleted_at: null,
         };
       })
-      .filter(Boolean);
+      .filter(Boolean) as Record<string, unknown>[];
 
     if (drafts.length) {
-      await admin.from("shifts").upsert(drafts as Record<string, unknown>[], { onConflict: "staff_id,store_id,date" });
+      await admin.from("shifts").upsert(drafts, { onConflict: "staff_id,store_id,date" });
+    }
+
+    // 空にした日＋「メモだけ」に変えた日のドラフトは消す（確定済みは status で守られる）
+    const dropDates = [
+      ...cleared,
+      ...filled.filter((e) => !e.template_id && !(e.start_time && e.end_time)).map((e) => e.date),
+    ];
+    if (dropDates.length) {
+      await admin.from("shifts").delete()
+        .eq("staff_id", actor.staffId).eq("store_id", storeId)
+        .in("date", dropDates).eq("status", "draft");
     }
   }
 
-  await logAudit(actor, "shift_request.submit", "shift_requests", null, null, { periodId, count: rows.length });
+  await notifyShiftManagers(actor.companyId, actor.staffId, {
+    title: `${actor.name}さんがシフトを提出しました`,
+    body: `${fmtDateJP(from)}〜${fmtDateJP(to)} ・ ${filled.length}日分${cleared.length ? `（${cleared.length}日は取り下げ）` : ""}`,
+    link: `/admin/shifts?span=month&d=${from}`,
+  });
+
+  await logAudit(actor, "shift_request.submit", "shift_requests", null, null, {
+    from, to, saved: filled.length, cleared: cleared.length,
+  });
   revalidatePath("/requests");
-  return {};
+  revalidatePath("/admin/shifts");
+  return { saved: filled.length, cleared: cleared.length };
 }
 
 /**
  * 休み希望を出す（募集期間に関係なくいつでも）。
  * 長期休暇のように「先に決まっている休み」を運営が早めに把握するための入口。
- * 期間(period)に紐づけないので、募集がまだ無い月でも入れられる。
  */
 export async function submitTimeOff(formData: FormData): Promise<void> {
   const actor = await requireActor();
@@ -126,27 +204,11 @@ export async function submitTimeOff(formData: FormData): Promise<void> {
     status: "submitted",
   }).select("id").single();
 
-  // 承認する人（シフト作成権限を持つスタッフ）へ通知
-  const { data: approvers } = await admin
-    .from("staff_roles")
-    .select("staff_id, roles!inner(permissions)")
-    .is("deleted_at", null);
-  const targets = [...new Set(
-    (approvers ?? [])
-      .filter((r) => (r as unknown as { roles: { permissions: Record<string, boolean> } }).roles?.permissions?.create_shifts)
-      .map((r) => r.staff_id)
-      .filter((id) => id !== actor.staffId),
-  )];
-  if (targets.length) {
-    await admin.from("notifications").insert(targets.map((sid) => ({
-      company_id: actor.companyId,
-      staff_id: sid,
-      kind: "time_off_request",
-      title: `${actor.name}さんから休み希望`,
-      body: `${start}${end !== start ? `〜${end}` : ""}${reason ? ` / ${reason}` : ""}`,
-      link: "/admin/time-off",
-    })));
-  }
+  await notifyShiftManagers(actor.companyId, actor.staffId, {
+    title: `${actor.name}さんから休み希望`,
+    body: `${start}${end !== start ? `〜${end}` : ""}${reason ? ` / ${reason}` : ""}`,
+    link: "/admin/time-off",
+  });
 
   await logAudit(actor, "time_off.submit", "staff_time_off_requests", data?.id ?? null, null, { start, end, kind });
   revalidatePath("/requests");
