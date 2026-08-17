@@ -192,6 +192,21 @@ export const NODES: SystemNode[] = [
     iy: 430,
   },
   {
+    id: "pro-site",
+    name: "PRO SITE",
+    kind: "app",
+    status: "prod",
+    url: "https://pro-site-hironobu-s-projects.vercel.app",
+    healthUrl: "https://pro-site-hironobu-s-projects.vercel.app",
+    schema: "pgw_",
+    description:
+      "プロゴルファー公式HP（外販SaaS #137）。1プロ=1テナント（/{slug}）。プロ本人がスマホから編集（隠しコマンド: フッター©5回タップ→パスワード）。Instagramは投稿URL貼り付け→公式embed.js表示（Meta API不要）。第1号: 榎本剛志プロ（/enomoto）。",
+    flow: "pro-site.svg",
+    aliases: ["prosite", "プロサイト", "榎本"],
+    ix: 1030,
+    iy: 490,
+  },
+  {
     id: "reserve-os",
     name: "Reserve OS",
     kind: "app",
@@ -408,6 +423,7 @@ export const EDGES: SystemEdge[] = [
   { from: "ext-webedi", to: "golfwing", label: "発注CSV", type: "external" },
   { from: "ext-web", to: "reserve-os", label: "予約申込", type: "external" },
   { from: "ext-web", to: "survey-os", label: "匿名回答", type: "external" },
+  { from: "ext-web", to: "pro-site", label: "ファン閲覧/プロ本人編集", type: "external" },
   { from: "ext-web", to: "genesis", label: "問い合わせメール", type: "external" },
   // AI営業 SNSインバウンド（#101）: 投稿は自動、リード流入はLP経由
   { from: "genesis", to: "ext-instagram", label: "SNS自動投稿（cnt_ 承認後）", type: "auto" },
@@ -422,6 +438,7 @@ export const EDGES: SystemEdge[] = [
   { from: "money-golfwing", to: "supabase", label: "mon_", type: "data" },
   { from: "legal-os", to: "supabase", label: "leg_ + Storage", type: "data" },
   { from: "survey-os", to: "supabase", label: "svy_", type: "data" },
+  { from: "pro-site", to: "supabase", label: "pgw_", type: "data" },
   { from: "inventory-os", to: "supabase", label: "inv_", type: "data" },
   // golfwing は別DBのため、入荷確定時に Inventory OS の /api/v1/movements を叩く（#96）
   { from: "golfwing", to: "inventory-os", label: "入荷→入庫(API)", type: "data" },

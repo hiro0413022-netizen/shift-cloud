@@ -7,6 +7,12 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-000. **PRO SITE（榎本剛志オフィシャルHP #137・2026-08-14）のenv設定**（5分・これだけで公開完了）
+   Vercel → プロジェクト `pro-site` → Settings → Environment Variables に2つ追加（値は member-os 等の既存プロジェクトと同じ）:
+   `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+   → Deployments → 最新 → ⋯ → Redeploy。完了すると https://pro-site-eight.vercel.app/enomoto が表示されます。
+   管理ログインのパスワードは Vault（PRO SITE）参照。写真（ヒーロー/プロフィール）と戦歴・クラブは榎本プロからもらって管理画面で入力。
+
 A-00. **FRANK GOLF 9/2オープンの残作業（#118→#123更新・2026-08-10。手順の正典 = OPERATIONS §14）**
    開発側は完了（予約・課金・レッスン・CMS・タブレット・LINE配信・Square一本化・月会費自動計上・確認/リマインダーメール・特別営業日）。残りは全部ユーザー作業:
    1. **Square一本化の仕上げ（最重要・9/2まで・#123/#124でStripeは廃止）**: Square法人確認の完了 →

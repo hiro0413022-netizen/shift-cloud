@@ -7,6 +7,8 @@ import { FrankCalendarDashboard } from "./frank-calendar";
 import { STEP_OPTIONS } from "@/components/month-picker";
 import { jstToday } from "@yozan/core/frank-booking";
 import { FRANK_STORE_ID, canAccessFrank, golfWingStoreId, canAccessStore } from "@/lib/store-scope";
+import { tallyJoins, type LedgerJoin, type RosterJoin } from "@/lib/join-tally-pure";
+import { VISIT_TYPE_LABEL } from "@/lib/walkin";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +97,7 @@ export default async function DashboardPage({
   // 見出しは「GOLF WING 宝塚」なので、姫路の来店が混ざらないよう店舗で必ず絞る（#134）
   let gwVisitsQ = admin
     .from("mbr_walkin_visits")
-    .select("visit_type, result, repeat_date, discount, referral_source, visited_on, mbr_guests(name)")
+    .select("visit_type, result, repeat_date, discount, referral_source, visited_on, mbr_guests(name, name_kana, birth_date)")
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
     .gte("visited_on", start)
@@ -108,7 +110,7 @@ export default async function DashboardPage({
     // mbr_members（Smart Hello取込の会員名簿）はGOLF WING専用で店舗列を持たない（#134・来店検索と同じ扱い）
     admin
       .from("mbr_members")
-      .select("name, member_type, join_date")
+      .select("name, name_kana, birth_date, member_type, join_date")
       .eq("company_id", actor.companyId)
       .gte("join_date", start)
       .lt("join_date", end)
@@ -123,8 +125,10 @@ export default async function DashboardPage({
   ]);
 
   const vs = (visits ?? []) as Row[];
+  type Guest = { name?: string | null; name_kana?: string | null; birth_date?: string | null };
+  const guestOf = (v: Row) => (v.mbr_guests as Guest | null) ?? null;
   const nameOf = (v: Row) => {
-    const g = v.mbr_guests as { name?: string } | null;
+    const g = guestOf(v);
     return g?.name ? String(g.name) : "（氏名未入力）";
   };
   const isRepeat = (v: Row) =>
@@ -138,6 +142,28 @@ export default async function DashboardPage({
 
   const joinList = (joins ?? []) as Row[];
   const leaveList = (leaves ?? []) as Row[];
+
+  // 入会者は名簿（エクセル取込）が正。ただし取り込むまで 0 のままになるので、
+  // 受付台帳の「成約=入会」を突き合わせて暫定値を出す（名簿に載ったら台帳側は自動で落ちる）
+  const roster: RosterJoin[] = joinList.map((m) => ({
+    name: m.name == null ? null : String(m.name),
+    nameKana: m.name_kana == null ? null : String(m.name_kana),
+    birthDate: m.birth_date == null ? null : String(m.birth_date),
+    memberType: m.member_type == null ? null : String(m.member_type),
+  }));
+  const ledger: LedgerJoin[] = vs
+    .filter((v) => v.result === "join")
+    .map((v) => {
+      const g = guestOf(v);
+      return {
+        name: g?.name == null ? null : String(g.name),
+        nameKana: g?.name_kana == null ? null : String(g.name_kana),
+        birthDate: g?.birth_date == null ? null : String(g.birth_date),
+        visitedOn: v.visited_on == null ? null : String(v.visited_on),
+        visitType: v.visit_type == null ? null : String(v.visit_type),
+      };
+    });
+  const joinTally = tallyJoins(roster, ledger);
 
   // ---- カード用グループ ----
   const trialGroups: StatGroup[] = [
@@ -155,10 +181,20 @@ export default async function DashboardPage({
   const joinGroups: StatGroup[] = [
     {
       key: "join",
-      label: "入会者",
+      label: "名簿",
       tone: "emerald",
-      count: joinList.length,
-      items: joinList.map((m) => ({ name: String(m.name), sub: String(m.member_type ?? "—") })),
+      count: joinTally.roster.length,
+      items: joinTally.roster.map((m) => ({ name: String(m.name ?? "（氏名未入力）"), sub: m.memberType ?? "—" })),
+    },
+    {
+      key: "join_ledger",
+      label: "受付台帳（暫定）",
+      tone: "amber",
+      count: joinTally.pending.length,
+      items: joinTally.pending.map((m) => ({
+        name: String(m.name ?? "（氏名未入力）"),
+        sub: `${md(m.visitedOn)}${m.visitType ? `・${VISIT_TYPE_LABEL[m.visitType] ?? m.visitType}` : ""}`,
+      })),
     },
   ];
   const leaveGroups: StatGroup[] = [
@@ -187,7 +223,7 @@ export default async function DashboardPage({
     },
   ];
 
-  const net = joinList.length - leaveList.length;
+  const net = joinTally.total - leaveList.length;
 
   return (
     <div className="space-y-5">
@@ -219,7 +255,17 @@ export default async function DashboardPage({
       {/* 主要4指標（ボタンで内訳展開） */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="体験数" value={trials.length} tone="indigo" hint={`体験→入会率 ${rate(trialJoins.length, trials.length)}`} groups={trialGroups} />
-        <StatCard label="入会者数" value={joinList.length} tone="emerald" hint="今月入会（会員名簿より）" groups={joinGroups} />
+        <StatCard
+          label="入会者数"
+          value={joinTally.total}
+          tone="emerald"
+          hint={
+            joinTally.provisional
+              ? `暫定：名簿 ${joinTally.roster.length} ＋ 受付台帳 ${joinTally.pending.length}`
+              : "今月入会（会員名簿より）"
+          }
+          groups={joinGroups}
+        />
         <StatCard label="退会者数" value={leaveList.length} tone="rose" hint="今月退会（会員名簿の退会日より）" groups={leaveGroups} />
         <StatCard label="フィッティング件数" value={fittings.length} tone="amber" hint={`購入率 ${rate(fittingBuys.length, fittings.length)}`} groups={fittingGroups} />
       </div>
@@ -228,13 +274,14 @@ export default async function DashboardPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MiniStat label="体験→入会率" value={rate(trialJoins.length, trials.length)} sub={`${trialJoins.length} / ${trials.length} 名`} tone="text-indigo-600" />
         <MiniStat label="フィッティング→購入率" value={rate(fittingBuys.length, fittings.length)} sub={`${fittingBuys.length} / ${fittings.length} 名`} tone="text-amber-600" />
-        <MiniStat label="会員 純増" value={`${net >= 0 ? "+" : ""}${net}`} sub={`入会 ${joinList.length} ・ 退会 ${leaveList.length}`} tone={net >= 0 ? "text-emerald-600" : "text-rose-600"} />
+        <MiniStat label="会員 純増" value={`${net >= 0 ? "+" : ""}${net}`} sub={`入会 ${joinTally.total} ・ 退会 ${leaveList.length}`} tone={net >= 0 ? "text-emerald-600" : "text-rose-600"} />
       </div>
 
       <Panel title="この画面について" className="d2">
         <ul className="space-y-1.5 text-sm text-(--color-dim)">
           <li>・各指標の色付きボタンを押すと、名前・プランなどの内訳が展開します。</li>
-          <li>・<span className="text-(--color-txt)">入会者／退会者</span>は会員名簿（Smart Hello取込）から、当月の入会日／退会日で抽出。退会は「6月末退会＝6月」に集計されます。</li>
+          <li>・<span className="text-(--color-txt)">入会者</span>は会員名簿（Smart Hello取込）が正確な人数です。名簿を取り込むまでの間は、受付台帳の「成約＝入会」を足した<span className="text-(--color-txt)">暫定の人数</span>を表示します（氏名・カナで突き合わせるので、名簿を取り込めば二重に数えません）。</li>
+          <li>・<span className="text-(--color-txt)">退会者</span>は会員名簿の退会日から抽出。退会は「6月末退会＝6月」に集計されます。</li>
           <li>・<span className="text-(--color-txt)">体験／フィッティング</span>は一時利用者台帳から集計。再来者は「割引=再来 / 経路=再来 / 再来日あり」で判定。</li>
           <li>・右上の月セレクタ（←／→）で対象月を切り替えられます。</li>
         </ul>

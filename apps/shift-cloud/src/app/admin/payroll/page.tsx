@@ -147,9 +147,15 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
               </form>
             )}
             {period && !!items?.length && (
-              <a href={`/admin/payroll/csv?ym=${ym}`}>
-                <Button type="button" variant="secondary">CSV出力</Button>
-              </a>
+              <>
+                <a href={`/admin/payroll/csv?ym=${ym}`}>
+                  <Button type="button" variant="secondary">CSV出力</Button>
+                </a>
+                {/* 1人1ページ（明細＋日別出勤簿）を全員分まとめたPDF */}
+                <a href={`/admin/payroll/pdf?ym=${ym}`}>
+                  <Button type="button" variant="secondary">明細PDF（出勤簿つき）</Button>
+                </a>
+              </>
             )}
           </div>
         )}
