@@ -36,7 +36,7 @@ function rate(n: number, d: number): string {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; date?: string; view?: string; step?: string; store?: string }>;
+  searchParams: Promise<{ month?: string; date?: string; view?: string; step?: string; store?: string; sel?: string }>;
 }) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
@@ -85,6 +85,7 @@ export default async function DashboardPage({
           step={step}
           companyId={actor.companyId}
           extraQuery={bothStores ? "&store=frank" : ""}
+          sel={sp.sel ?? null}
         />
       </div>
     );

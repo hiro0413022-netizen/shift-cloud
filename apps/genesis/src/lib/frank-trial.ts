@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { loadBookingCfg, businessHours } from "@/lib/frank-booking";
 import { bookableRange } from "@yozan/core/frank-booking";
+import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
 import { buildTrialConfirmMail, sendFrankMail } from "@/lib/frank-mail";
 
 /**
@@ -284,6 +285,19 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
     return { ok: false, error: raced ? "ちょうど今、その時間が埋まりました。別の時間をお選びください。" : `ご予約に失敗しました: ${bookErr.message}` };
   }
 
+  // 受付台帳（一時利用者名簿）へ反映（2026-08-18）。
+  // 台帳が書けなくても予約は成立させる＝お客様側を巻き添えにしない。
+  const ledger = await syncTrialWalkin(admin, req.id);
+  if (!ledger.ok) {
+    await logEvent(bay.company_id, {
+      event_type: "trial.ledger_failed",
+      title: `体験予約を受付台帳に反映できませんでした: ${name} 様 ${input.date} ${input.start}〜（${ledger.error}）`,
+      source: "web",
+      source_type: "external",
+      severity: "warning",
+    });
+  }
+
   await logEvent(bay.company_id, {
     event_type: "trial.booked",
     title: `体験予約が確定: ${name} 様 ${input.date} ${input.start}〜 ${bay.name}${lefty ? "（レフティ）" : ""}`,
@@ -359,6 +373,8 @@ export async function cancelTrialByToken(token: string): Promise<{ ok: boolean; 
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("trial_request_id", req.id)
     .neq("status", "cancelled");
+  // 受付台帳からも下げる（残すと体験数・体験→入会率が実態より多く出る）
+  await removeTrialWalkin(admin, String(req.id));
 
   await logEvent(String(req.company_id), {
     event_type: "trial.cancelled",

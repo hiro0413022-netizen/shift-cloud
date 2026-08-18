@@ -5,6 +5,7 @@ import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/kernel";
 import { requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
+import { syncTrialWalkin } from "@yozan/core/frank-walkin";
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
@@ -26,8 +27,13 @@ export async function setTrialStatus(formData: FormData) {
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID);
+  // 受付台帳（一時利用者名簿）も追随させる。
+  // 「予約が入った瞬間に台帳へ書く」運用なので、キャンセルに戻したら台帳からも下げる（2026-08-18）
+  await syncTrialWalkin(admin, id, { receptionStaffId: actor.staffId });
   await logAudit(actor, "trial.status", "mbr_trial_requests", id, null, { status: to });
   revalidatePath("/trials");
+  revalidatePath("/");
+  revalidatePath("/dashboard");
 }
 
 /** スタッフメモの保存 */

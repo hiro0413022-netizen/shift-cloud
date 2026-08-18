@@ -177,9 +177,11 @@ export default async function ReservationsPage({
                   bays={bays}
                   items={items}
                   emptyHref={emptyHref}
+                  itemHref={(it) => (it.id.startsWith("lesson:") ? undefined : `#bk-${it.id}`)}
                   maxHeightClass="max-h-[68vh]"
                 />
                 <TimelineLegend>
+                  <span>予約の名前を押すと下の一覧（詳細・入金）へ移動します</span>
                   <span>空きコマを押すと下の作成フォームに入ります</span>
                   {closedBays.length > 0 && <span>休止中: {closedBays.map((b) => b.name).join("・")}</span>}
                 </TimelineLegend>
@@ -243,14 +245,20 @@ export default async function ReservationsPage({
               const out = outstanding(b.amount, b.paid_amount, b.payment_status);
               const t = b.mbr_trial_requests;
               return (
-                <div key={b.id} className="space-y-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
+                <div id={`bk-${b.id}`} key={b.id} className="space-y-2 scroll-mt-24 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={b.status === "cancelled" ? "default" : b.status === "visited" ? "ok" : b.status === "no_show" ? "danger" : kindTone(b.customer_kind)}>
                         {b.status === "confirmed" ? CUSTOMER_KIND_LABEL[b.customer_kind] : BOOKING_STATUS_LABEL[b.status]}
                       </Badge>
                       <span className="font-semibold tabular-nums">{b.start_time.slice(0, 5)}〜{b.end_time.slice(0, 5)}</span>
-                      <span className="font-semibold">{who(b)}</span>
+                      {b.frunk_members && b.member_id ? (
+                        <a href={`/frunk/${b.member_id}`} className="font-semibold text-indigo-600 underline">
+                          {who(b)}
+                        </a>
+                      ) : (
+                        <span className="font-semibold">{who(b)}</span>
+                      )}
                       {t?.lefty ? <Badge tone="warn">レフティ</Badge> : null}
                       <span className="text-xs text-(--color-dim)">
                         {[b.frunk_bays?.name, b.guest_phone ?? t?.phone, t?.experience, b.party_size && b.party_size > 1 ? `${b.party_size}名` : null]

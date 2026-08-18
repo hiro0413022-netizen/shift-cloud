@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { VISIT_TYPES, VISIT_TYPE_LABEL } from "@/lib/walkin";
+import { jstYmd } from "@/lib/jst";
 import { createVisitManual, issueStoreToken } from "./actions";
 import { VisitRow } from "./visit-row";
 import { ManualVisitForm } from "./manual-visit-form";
@@ -12,8 +13,18 @@ export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
 
 function monthStart(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  const t = jstYmd();
+  return `${t.slice(0, 7)}-01`;
+}
+/** 翌月1日（当月サマリの上限）。先の日付で入っている体験予約を当月に数えないため（2026-08-18） */
+function nextMonthStart(): string {
+  const [y, m] = monthStart().split("-").map(Number);
+  const d = new Date(Date.UTC(y, m, 1, 12));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
+function md(s: unknown): string {
+  const m = String(s ?? "").match(/^\d{4}-(\d{2})-(\d{2})/);
+  return m ? `${Number(m[1])}/${Number(m[2])}` : String(s ?? "");
 }
 
 export default async function LedgerPage({
@@ -25,7 +36,8 @@ export default async function LedgerPage({
   const admin = createAdmin();
   const sp = await searchParams;
   const from = /^\d{4}-\d{2}-\d{2}$/.test(sp.from ?? "") ? (sp.from as string) : monthStart();
-  const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? (sp.to as string) : new Date().toISOString().slice(0, 10);
+  const today = jstYmd();
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? (sp.to as string) : today;
   const typeFilter = VISIT_TYPES.some((v) => v.value === sp.type) ? sp.type : "";
 
   // 店舗またぎ事故の防止（#128）: オーナー以外は配属店舗のみ。所属ゼロは何も見えない
@@ -50,14 +62,33 @@ export default async function LedgerPage({
   let storesQ = admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name");
   if (scopeIds) storesQ = storesQ.in("id", scopeIds);
   let monthQ = admin.from("mbr_walkin_visits").select("visit_type, result")
-    .eq("company_id", actor.companyId).is("deleted_at", null).gte("visited_on", monthStart());
+    .eq("company_id", actor.companyId).is("deleted_at", null)
+    .gte("visited_on", monthStart()).lt("visited_on", nextMonthStart());
   if (scopeIds) monthQ = monthQ.in("store_id", scopeIds);
 
-  const [{ data: visits }, { data: stores }, { data: monthAll }] = await Promise.all([q, storesQ, monthQ]);
+  // 今後の来店予定（#139）: FRANKの体験はWeb予約が入った瞬間にこの台帳へ載る。
+  // 既定の期間（当月1日〜今日）だと未来日の予約が一覧から漏れるので、期間に関係なく上に出す。
+  let futureQ = admin
+    .from("mbr_walkin_visits")
+    .select("id, visited_on, visit_type, note, source_reservation_no, mbr_guests(name, name_kana, phone, email)")
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .gt("visited_on", today)
+    .order("visited_on", { ascending: true })
+    .limit(100);
+  if (scopeIds) futureQ = futureQ.in("store_id", scopeIds);
+
+  const [{ data: visits }, { data: stores }, { data: monthAll }, { data: future }] = await Promise.all([
+    q,
+    storesQ,
+    monthQ,
+    futureQ,
+  ]);
 
   const list = (visits ?? []) as Row[];
   const storeList = (stores ?? []) as Row[];
   const month = (monthAll ?? []) as Row[];
+  const futureList = (future ?? []) as Row[];
 
   const mTrial = month.filter((v) => v.visit_type === "trial").length;
   const mTrialJoin = month.filter((v) => v.visit_type === "trial" && v.result === "join").length;
@@ -102,6 +133,37 @@ export default async function LedgerPage({
           <div className="flex flex-wrap items-center gap-2">
             <code className="flex-1 break-all rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-xs text-indigo-600">{receptionUrl}</code>
             <a href={receptionUrl} target="_blank" rel="noreferrer" className={btnCls}>受付画面を開く ↗</a>
+          </div>
+        </Panel>
+      )}
+
+      {/* 今後の来店予定（未来日の予約。既定の期間からは外れるのでここに出す） */}
+      {futureList.length > 0 && (
+        <Panel title={`今後の来店予定（${futureList.length}件）`} className="d1">
+          <p className="mb-2 text-xs text-(--color-dim)">
+            公式サイトからの体験予約は、ご予約が入った時点でこの受付台帳に載ります。来店当日に下の一覧で
+            料金・成約結果・アンケートを追記してください。
+          </p>
+          <div className="space-y-1.5">
+            {futureList.map((v) => {
+              const g = (v.mbr_guests ?? null) as Row | null;
+              return (
+                <div
+                  key={String(v.id)}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm"
+                >
+                  <span className="w-14 shrink-0 font-semibold tabular-nums text-indigo-600">{md(v.visited_on)}</span>
+                  <span className="font-semibold">{g?.name ? String(g.name) : "（氏名未入力）"}</span>
+                  <span className="rounded bg-(--color-panel) px-1.5 py-0.5 text-[10px] text-(--color-dim)">
+                    {VISIT_TYPE_LABEL[String(v.visit_type)] ?? String(v.visit_type)}
+                  </span>
+                  <span className="text-xs text-(--color-dim)">
+                    {[g?.phone && String(g.phone), g?.email && String(g.email)].filter(Boolean).join("　")}
+                  </span>
+                  {v.note ? <span className="text-xs text-(--color-dim)">{String(v.note)}</span> : null}
+                </div>
+              );
+            })}
           </div>
         </Panel>
       )}

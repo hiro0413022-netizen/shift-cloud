@@ -68,6 +68,82 @@ const BOOKING_COLS =
   "frunk_members(name, member_no, alert_note), frunk_bays(name), " +
   "mbr_trial_requests(name, phone, lefty, experience, message)";
 
+/** 予約1件の詳細（カレンダーの名前クリックで開く・#139）。
+ *  一覧より広く引く: 会員のプラン/連絡先、体験申込の連絡先や希望、打席名まで1回で取る。 */
+export type BookingDetail = BookingRow & {
+  note: string | null;
+  source: string | null;
+  created_at: string;
+  frunk_members:
+    | (BookingRow["frunk_members"] & {
+        id: string;
+        name_kana: string | null;
+        phone: string | null;
+        email: string | null;
+        status: string;
+        frunk_plans: { name: string } | null;
+      })
+    | null;
+  mbr_trial_requests:
+    | (NonNullable<BookingRow["mbr_trial_requests"]> & {
+        id: string;
+        name_kana: string | null;
+        email: string | null;
+        status: string;
+        source: string | null;
+      })
+    | null;
+  frunk_bays: { name: string; floor: number | null; equipment: string | null; is_lefty: boolean } | null;
+};
+
+const DETAIL_COLS =
+  "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, source, created_at, " +
+  "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
+  "frunk_members(id, name, name_kana, member_no, alert_note, phone, email, status, frunk_plans(name)), " +
+  "frunk_bays(name, floor, equipment, is_lefty), " +
+  "mbr_trial_requests(id, name, name_kana, phone, email, lefty, experience, message, status, source)";
+
+/** 予約1件を引く。会社＋FRANK店舗で必ず絞る（#134）。見つからなければ null */
+export async function loadBookingDetail(id: string, companyId: string): Promise<BookingDetail | null> {
+  if (!/^[0-9a-fA-F-]{36}$/.test(id)) return null;
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("frunk_bookings")
+    .select(DETAIL_COLS)
+    .eq("id", id)
+    .eq("company_id", companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .is("deleted_at", null)
+    .maybeSingle();
+  return (data as unknown as BookingDetail | null) ?? null;
+}
+
+/** レッスン枠1件（カレンダーの「レッスン」ブロックを押したとき） */
+export type LessonDetail = {
+  id: string;
+  slot_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  note: string | null;
+  staff: { name: string } | null;
+  frunk_bays: { name: string } | null;
+};
+
+export async function loadLessonDetail(id: string, companyId: string): Promise<LessonDetail | null> {
+  if (!/^[0-9a-fA-F-]{36}$/.test(id)) return null;
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("frunk_lesson_slots")
+    .select("id, slot_date, start_time, end_time, status, note, staff(name), frunk_bays(name)")
+    .eq("id", id)
+    .eq("company_id", companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .is("deleted_at", null)
+    .maybeSingle();
+  return (data as unknown as LessonDetail | null) ?? null;
+}
+
 export type DayView = {
   date: string;
   cfg: BookingCfg;

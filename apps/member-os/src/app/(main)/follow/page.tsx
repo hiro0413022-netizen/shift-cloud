@@ -1,4 +1,5 @@
 import { requireReceptionActor } from "@/lib/auth";
+import { jstYmd } from "@/lib/jst";
 import { storeFilterIds } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, inputCls, btnCls } from "@/components/ui";
@@ -36,6 +37,8 @@ export default async function FollowPage() {
     .eq("visit_type", "trial")
     .is("deleted_at", null)
     .gte("visited_on", since)
+    // 未来日の体験予約はまだ来店していない＝フォロー対象ではない（2026-08-18・予約が入った時点で受付台帳に載るため）
+    .lte("visited_on", jstYmd())
     .order("visited_on", { ascending: true });
   if (scopeIds) q = q.in("store_id", scopeIds);
   const { data } = await q;

@@ -60,6 +60,8 @@ export function BayTimeline({
   items,
   nowMin = null,
   emptyHref,
+  itemHref,
+  selectedId = null,
   maxHeightClass = "max-h-[72vh]",
 }: {
   slots: string[];
@@ -71,6 +73,10 @@ export function BayTimeline({
   /** 空きコマを押したときの遷移先（/reservations で予約作成フォームに流し込む）。
    *  undefined を返すとただの空き枠として描く（例: 15分表示中の10:15は予約の刻みに乗らない） */
   emptyHref?: (bayId: string, slot: string) => string | undefined;
+  /** 予約ブロックを押したときの遷移先（詳細を開く・#139）。undefined を返すと押せないまま */
+  itemHref?: (item: TimelineItem) => string | undefined;
+  /** いま詳細を開いている予約（枠を太くして「これを見ている」と分かるようにする） */
+  selectedId?: string | null;
   maxHeightClass?: string;
 }) {
   const layout = buildTimeline(slots, step, bays.map((b) => b.id), items);
@@ -137,14 +143,24 @@ export function BayTimeline({
                     const { item, span, cutTop, cutBottom } = cell.block;
                     // 営業時間からはみ出しているブロックは角を落として「まだ続いている」ことを示す
                     const cut = `${cutTop ? "rounded-t-none " : ""}${cutBottom ? "rounded-b-none" : ""}`;
+                    const sel = selectedId != null && selectedId === item.id;
+                    const cls = `flex h-full flex-col justify-start overflow-hidden rounded-md border px-1.5 py-1 ${TIMELINE_TONE[item.kind].block} ${cut} ${
+                      sel ? "ring-2 ring-accent ring-offset-1" : ""
+                    }`;
+                    const title = `${timeRange(item)} ${item.title}${item.sub ? `（${item.sub}）` : ""}${item.alertNote ? ` ⚠${item.alertNote}` : ""}`;
+                    const href = itemHref?.(item);
                     return (
                       <td key={bays[i].id} rowSpan={span} className={base}>
-                        <div
-                          className={`flex h-full flex-col justify-start overflow-hidden rounded-md border px-1.5 py-1 ${TIMELINE_TONE[item.kind].block} ${cut}`}
-                          title={`${timeRange(item)} ${item.title}${item.sub ? `（${item.sub}）` : ""}${item.alertNote ? ` ⚠${item.alertNote}` : ""}`}
-                        >
-                          <BlockBody item={item} span={span} />
-                        </div>
+                        {href ? (
+                          // 名前を押すと詳細が開く（#139）。店頭PC/タブレットはツールチップが出ないため
+                          <Link href={href} scroll={false} className={`${cls} transition-shadow hover:shadow-md`} title={title}>
+                            <BlockBody item={item} span={span} />
+                          </Link>
+                        ) : (
+                          <div className={cls} title={title}>
+                            <BlockBody item={item} span={span} />
+                          </div>
+                        )}
                       </td>
                     );
                   })}
@@ -154,7 +170,7 @@ export function BayTimeline({
           </tbody>
         </table>
       </div>
-      <UnplacedList unplaced={layout.unplaced} />
+      <UnplacedList unplaced={layout.unplaced} itemHref={itemHref} />
     </div>
   );
 }
@@ -166,23 +182,38 @@ const REASON_LABEL: Record<UnplacedReason, string> = {
 };
 
 /** 表に置けなかったものは黙って消さない（消すと「予約したのに画面に無い」になる） */
-export function UnplacedList({ unplaced }: { unplaced: { item: TimelineItem; reason: UnplacedReason }[] }) {
+export function UnplacedList({
+  unplaced,
+  itemHref,
+}: {
+  unplaced: { item: TimelineItem; reason: UnplacedReason }[];
+  itemHref?: (item: TimelineItem) => string | undefined;
+}) {
   if (unplaced.length === 0) return null;
   return (
     <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) px-3 py-2">
       <p className="mb-1.5 text-[11px] font-semibold text-(--color-dim)">表に入らなかった予定 {unplaced.length}件</p>
       <div className="flex flex-wrap gap-1.5">
-        {unplaced.map(({ item, reason }) => (
-          <span
-            key={item.id}
-            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] ${TIMELINE_TONE[item.kind].block}`}
-            title={REASON_LABEL[reason]}
-          >
-            <span className="tabular-nums">{timeRange(item)}</span>
-            <span className="font-semibold">{item.title}</span>
-            <span className="opacity-70">/ {REASON_LABEL[reason]}</span>
-          </span>
-        ))}
+        {unplaced.map(({ item, reason }) => {
+          const cls = `inline-flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px] ${TIMELINE_TONE[item.kind].block}`;
+          const body = (
+            <>
+              <span className="tabular-nums">{timeRange(item)}</span>
+              <span className="font-semibold">{item.title}</span>
+              <span className="opacity-70">/ {REASON_LABEL[reason]}</span>
+            </>
+          );
+          const href = itemHref?.(item);
+          return href ? (
+            <Link key={item.id} href={href} scroll={false} className={cls} title={REASON_LABEL[reason]}>
+              {body}
+            </Link>
+          ) : (
+            <span key={item.id} className={cls} title={REASON_LABEL[reason]}>
+              {body}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -233,6 +264,7 @@ export function WeekTimeline({
   bayCount,
   hrefDay,
   today,
+  itemHref,
 }: {
   days: WeekDay[];
   step: number;
@@ -240,6 +272,8 @@ export function WeekTimeline({
   bayCount: number;
   hrefDay: (date: string) => string;
   today: string;
+  /** 予約チップを押したときの遷移先（詳細を開く・#139） */
+  itemHref?: (item: TimelineItem, date: string) => string | undefined;
 }) {
   const slots = unionSlots(days.map((d) => d.slots));
   const columns = days.map((d) => ({
@@ -310,15 +344,19 @@ export function WeekTimeline({
                   return (
                     <td key={day.date} className={cellCls}>
                       <div className="flex h-full min-h-8 flex-col gap-0.5">
-                        {list.slice(0, 2).map((it) => (
-                          <span
-                            key={it.id}
-                            className={`truncate rounded border px-1 text-[10px] leading-4 ${TIMELINE_TONE[it.kind].block}`}
-                            title={`${timeRange(it)} ${it.title}`}
-                          >
-                            {it.start.slice(0, 5)} {it.title}
-                          </span>
-                        ))}
+                        {list.slice(0, 2).map((it) => {
+                          const chip = `truncate rounded border px-1 text-[10px] leading-4 ${TIMELINE_TONE[it.kind].block}`;
+                          const href = itemHref?.(it, day.date);
+                          return href ? (
+                            <Link key={it.id} href={href} scroll={false} className={chip} title={`${timeRange(it)} ${it.title}`}>
+                              {it.start.slice(0, 5)} {it.title}
+                            </Link>
+                          ) : (
+                            <span key={it.id} className={chip} title={`${timeRange(it)} ${it.title}`}>
+                              {it.start.slice(0, 5)} {it.title}
+                            </span>
+                          );
+                        })}
                         {list.length > 2 && (
                           <span className="px-1 text-[10px] leading-4 text-(--color-dim)">他{list.length - 2}件</span>
                         )}

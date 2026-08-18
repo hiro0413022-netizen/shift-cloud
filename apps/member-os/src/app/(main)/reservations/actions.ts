@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/kernel";
 import { FRANK_STORE_ID, toMin, toTime } from "@/lib/frank-reservation";
 import { requireStoreAccess } from "@/lib/store-scope";
 import { loadBookingCfg, businessHours } from "@yozan/core/frank-booking";
+import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
 
 /**
  * FRANK GOLF 予約管理（スタッフ操作）— 台帳は frunk_bookings 一本（#93 / 0084）
@@ -28,6 +29,8 @@ function back(date: string) {
   revalidatePath("/reservations");
   if (date) revalidatePath(`/reservations?date=${date}`);
   revalidatePath("/trials");
+  revalidatePath("/dashboard");
+  revalidatePath("/"); // 受付台帳（体験は予約と同時に台帳へ載る）
 }
 
 /** 電話・店頭で受けた予約を作る（会員 / 都度利用） */
@@ -132,6 +135,8 @@ export async function setBookingStatus(formData: FormData) {
       .from("mbr_trial_requests")
       .update({ status: trialStatus, reviewed_by: actor.staffId, reviewed_at: new Date().toISOString() })
       .eq("id", bk.trial_request_id);
+    // 受付台帳も追随（キャンセルは台帳から下げる・戻したら復活させる）
+    await syncTrialWalkin(admin, String(bk.trial_request_id), { receptionStaffId: actor.staffId });
   }
 
   await logAudit(actor, "frank.booking.status", "frunk_bookings", id, null, { status });
@@ -160,6 +165,7 @@ export async function deleteBooking(formData: FormData) {
   await admin.from("frunk_bookings").update({ deleted_at: now }).eq("id", id);
   if (bk.trial_request_id) {
     await admin.from("mbr_trial_requests").update({ deleted_at: now }).eq("id", bk.trial_request_id);
+    await removeTrialWalkin(admin, String(bk.trial_request_id)); // 受付台帳からも下げる
   }
   await logAudit(actor, "frank.booking.delete", "frunk_bookings", id, null, null);
   back(date);

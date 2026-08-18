@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, FRANK_STORE_ID } from "@/lib/store-scope";
@@ -5,17 +6,51 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import {
-  createPlan, updatePlan, deletePlan, approveSignup, rejectSignup, setMemberStatus, issueSignupToken, changePlan,
-  resendApprovalMail, saveAlertNote,
-} from "./actions";
+  filterMembers,
+  sortMembers,
+  countByStatus,
+  type FrunkMemberLike,
+  type MemberSort,
+} from "@/lib/frunk-member-search";
+import { jstYmd } from "@/lib/jst";
+import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken } from "./actions";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
 
+/**
+ * FRANK GOLF 姫路 — 会員管理（#139・2026-08-18 作り直し）
+ *
+ * ★ これまでは「承認待ち」と「全会員をベタ並べ」だけで、探す手段が無かった。
+ *   会員が増えると目で探すことになり、店頭でお客様を待たせる。
+ *   一覧＝探す/絞る、詳細＝1人ぶんを深く見る、に画面を分けた。
+ *
+ * ★ 当たり判定は lib/frunk-member-search.ts（純関数・テスト済み）に集約する。
+ *   ここでSQLのilikeを書き足すと、画面ごとに検索の当たり方がズレる。
+ *   会員は多くても数百人なので、まとめて取ってからアプリ側で絞る（表記ゆれを吸収できる）。
+ */
+
+const STATUS_TABS = ["active", "suspended", "left", "pending", "rejected"] as const;
+
+const SORTS: Array<{ value: MemberSort; label: string }> = [
+  { value: "member_no", label: "会員番号順" },
+  { value: "name_kana", label: "カナ順" },
+  { value: "join_date_desc", label: "入会日が新しい順" },
+  { value: "status", label: "状態順" },
+];
+
 export default async function FrunkPage({
   searchParams,
 }: {
-  searchParams: Promise<{ signup_url?: string; err?: string; msg?: string }>;
+  searchParams: Promise<{
+    signup_url?: string;
+    err?: string;
+    msg?: string;
+    q?: string;
+    status?: string;
+    plan?: string;
+    sort?: string;
+  }>;
 }) {
   const actor = await requireReceptionActor();
   // 店舗またぎ廃止（#134）: FRANK姫路に配属されていない人には存在ごと見せない
@@ -26,7 +61,11 @@ export default async function FrunkPage({
   const [{ data: plans }, { data: members }] = await Promise.all([
     admin.from("frunk_plans").select("*").eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
     // 会員はFRANK姫路の店舗で必ず絞る（#134）
-    admin.from("frunk_members").select("*").eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID)
+    admin
+      .from("frunk_members")
+      .select("*")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", FRANK_STORE_ID)
       .is("deleted_at", null)
       .order("created_at", { ascending: false }),
   ]);
@@ -36,13 +75,45 @@ export default async function FrunkPage({
   const planName = (id: unknown) => planList.find((p) => p.id === id)?.name as string | undefined;
 
   const pending = memberList.filter((m) => m.status === "pending");
-  const active = memberList.filter((m) => ["active", "suspended", "left"].includes(String(m.status)));
+  const counts = countByStatus(memberList as unknown as FrunkMemberLike[], [...STATUS_TABS]);
+
+  // ---- 探す・絞る・並べる ----
+  const q = (sp.q ?? "").trim();
+  const status = STATUS_TABS.includes((sp.status ?? "") as (typeof STATUS_TABS)[number]) || sp.status === "all"
+    ? (sp.status as string)
+    : "active"; // 既定は在籍だけ（退会者が混ざると店頭で読み違える）
+  const planId = planList.some((p) => String(p.id) === sp.plan) ? (sp.plan as string) : "";
+  const sort = (SORTS.some((s) => s.value === sp.sort) ? sp.sort : "member_no") as MemberSort;
+
+  const shown = sortMembers(
+    filterMembers(memberList as unknown as FrunkMemberLike[], { q, status, planId }),
+    sort,
+  );
+  const today = jstYmd();
+
+  const qs = (over: Record<string, string>) => {
+    const p = new URLSearchParams();
+    const base: Record<string, string> = { q, status, plan: planId, sort, ...over };
+    for (const [k, v] of Object.entries(base)) if (v) p.set(k, v);
+    return `/frunk?${p.toString()}`;
+  };
 
   return (
     <div className="space-y-5">
-      <header className="reveal">
-        <h1 className="text-2xl font-bold tracking-tight">FRANK GOLF 姫路 — 会員管理</h1>
-        <p className="mt-0.5 text-sm text-(--color-dim)">入会プラン・予約制限の設定、iPad入会申込の承認、会員の休会・退会管理</p>
+      <header className="reveal flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">FRANK GOLF 姫路 — 会員管理</h1>
+          <p className="mt-0.5 text-sm text-(--color-dim)">
+            会員を探す・状態を変える・プランを設定する。名前を押すと会員カード（詳細）が開きます。
+          </p>
+        </div>
+        <div className="text-right text-sm">
+          <span className="text-(--color-dim)">在籍</span>{" "}
+          <span className="text-2xl font-bold tabular-nums text-emerald-600">{counts.active}</span>
+          <span className="ml-2 text-xs text-(--color-dim)">
+            休会 {counts.suspended} ・ 退会 {counts.left}
+          </span>
+        </div>
       </header>
 
       {sp.err && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{sp.err}</p>}
@@ -51,29 +122,40 @@ export default async function FrunkPage({
       {sp.signup_url && (
         <Panel title="入会フォームURL（タブレット/QR掲示・一度だけ表示）" className="d1">
           <div className="flex flex-wrap items-center gap-2">
-            <code className="flex-1 break-all rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-xs text-indigo-600">{sp.signup_url}</code>
-            <a href={sp.signup_url} target="_blank" rel="noreferrer" className={btnCls}>入会フォームを開く ↗</a>
+            <code className="flex-1 break-all rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-xs text-indigo-600">
+              {sp.signup_url}
+            </code>
+            <a href={sp.signup_url} target="_blank" rel="noreferrer" className={btnCls}>
+              入会フォームを開く ↗
+            </a>
           </div>
         </Panel>
       )}
 
-      {/* 入会申込（承認待ち） */}
-      <Panel title={`入会申込（承認待ち ${pending.length}件）`} className="d1">
-        {pending.length === 0 ? (
-          <Empty>承認待ちの申込はありません</Empty>
-        ) : (
+      {/* 入会申込（承認待ち）— Web入会は承認レスで自動、ここは店頭iPad入会と救済用（#129） */}
+      {pending.length > 0 && (
+        <Panel title={`入会申込（承認待ち ${pending.length}件）`} className="d1">
           <div className="space-y-3">
             {pending.map((m) => (
               <div key={String(m.id)} className="rounded-xl border border-(--color-line) bg-(--color-panel-2) p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-semibold">{String(m.name)}</span>
+                      <Link href={`/frunk/${String(m.id)}`} className="text-base font-semibold text-indigo-600 underline">
+                        {String(m.name)}
+                      </Link>
                       {m.name_kana ? <span className="text-xs text-(--color-dim)">{String(m.name_kana)}</span> : null}
                       <Badge tone="accent">{planName(m.plan_id) ?? "プラン未選択"}</Badge>
                     </div>
                     <div className="mt-1 text-xs text-(--color-dim)">
-                      {[m.phone && String(m.phone), m.email && String(m.email), m.payment_method && FRUNK_PAYMENT_LABEL[String(m.payment_method)], m.start_date && `開始 ${String(m.start_date)}`].filter(Boolean).join("　")}
+                      {[
+                        m.phone && String(m.phone),
+                        m.email && String(m.email),
+                        m.payment_method && FRUNK_PAYMENT_LABEL[String(m.payment_method)],
+                        m.start_date && `開始 ${String(m.start_date)}`,
+                      ]
+                        .filter(Boolean)
+                        .join("　")}
                     </div>
                   </div>
                   {m.signature ? (
@@ -98,77 +180,140 @@ export default async function FrunkPage({
               </div>
             ))}
           </div>
-        )}
-      </Panel>
+        </Panel>
+      )}
 
-      {/* 会員一覧 */}
-      <Panel title={`会員一覧（${active.length}名）`} className="d2">
-        {active.length === 0 ? (
-          <Empty>会員はまだいません</Empty>
+      {/* 会員一覧（探す・絞る） */}
+      <Panel title={`会員一覧　${shown.length}名 / 全${memberList.length}名`} className="d2">
+        <form className="mb-3 flex flex-wrap items-end gap-2">
+          <label className="min-w-56 flex-1">
+            <span className="mb-1 block text-xs text-(--color-dim)">
+              探す（氏名・カナ・会員番号・電話・メール・メモ）
+            </span>
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="例: 田中 / たなか / FR0001 / 090-1234"
+              className={inputCls}
+            />
+          </label>
+          <Field label="状態">
+            <select name="status" defaultValue={status} className={`${inputCls} !w-32`}>
+              <option value="all">すべて</option>
+              {STATUS_TABS.map((s) => (
+                <option key={s} value={s}>
+                  {FRUNK_STATUS_LABEL[s]}（{counts[s]}）
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="プラン">
+            <select name="plan" defaultValue={planId} className={`${inputCls} !w-40`}>
+              <option value="">すべて</option>
+              {planList.map((p) => (
+                <option key={String(p.id)} value={String(p.id)}>
+                  {String(p.name)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="並び順">
+            <select name="sort" defaultValue={sort} className={`${inputCls} !w-40`}>
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <button className={btnCls}>絞り込む</button>
+          {(q || planId || status !== "active" || sort !== "member_no") && (
+            <Link href="/frunk" className={btnGhostCls}>
+              条件をクリア
+            </Link>
+          )}
+        </form>
+
+        {/* 状態のショートカット（押すだけで切り替わる） */}
+        <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
+          <Link
+            href={qs({ status: "all" })}
+            className={`rounded-full border px-2.5 py-1 ${status === "all" ? "border-accent bg-accent/10 text-accent" : "border-(--color-line) text-(--color-dim)"}`}
+          >
+            すべて {memberList.length}
+          </Link>
+          {STATUS_TABS.map((s) => (
+            <Link
+              key={s}
+              href={qs({ status: s })}
+              className={`rounded-full border px-2.5 py-1 ${status === s ? "border-accent bg-accent/10 text-accent" : "border-(--color-line) text-(--color-dim)"}`}
+            >
+              {FRUNK_STATUS_LABEL[s]} {counts[s]}
+            </Link>
+          ))}
+        </div>
+
+        {shown.length === 0 ? (
+          <Empty>
+            {memberList.length === 0
+              ? "会員はまだいません"
+              : "条件に合う会員がいません（表記ゆれは自動で吸収します。会員番号・電話の一部でも探せます）"}
+          </Empty>
         ) : (
-          <div className="space-y-2">
-            {active.map((m) => {
-              const st = String(m.status);
-              return (
-                <div key={String(m.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <Badge tone={FRUNK_STATUS_TONE[st] ?? "default"}>{FRUNK_STATUS_LABEL[st] ?? st}</Badge>
-                    <span className="font-semibold">{String(m.name)}</span>
-                    {m.member_no ? <span className="text-xs text-(--color-dim)">{String(m.member_no)}</span> : null}
-                    <span className="text-xs text-(--color-dim)">{planName(m.plan_id) ?? "—"}</span>
-                    {m.join_date ? <span className="text-xs text-(--color-dim)">入会 {String(m.join_date)}</span> : null}
-                    {m.min_term_until && String(m.min_term_until) > new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10) ? (
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800" title="キャンペーン入会・6か月継続の対象">
-                        継続 {String(m.min_term_until)}まで
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {m.member_no && m.email ? (
-                      <form action={resendApprovalMail}>
-                        <input type="hidden" name="id" value={String(m.id)} />
-                        <button className={btnGhostCls} title={`会員番号とカード登録の案内を ${String(m.email)} へ送り直します`}>
-                          会員番号メール再送
-                        </button>
-                      </form>
-                    ) : null}
-                    {st === "active" && (
-                      <form action={changePlan} className="flex items-center gap-1">
-                        <input type="hidden" name="id" value={String(m.id)} />
-                        <select name="plan_id" defaultValue="" className={`${inputCls} !w-auto !py-1 text-xs`}>
-                          <option value="" disabled>プラン変更…</option>
-                          {planList.filter((p) => p.active !== false && p.id !== m.plan_id && Number(p.monthly_price ?? 0) > 0).map((p) => (
-                            <option key={String(p.id)} value={String(p.id)}>{String(p.name)}</option>
-                          ))}
-                        </select>
-                        <button className={btnGhostCls}>変更</button>
-                      </form>
-                    )}
-                    {st !== "suspended" && st !== "left" && (
-                      <form action={setMemberStatus}><input type="hidden" name="id" value={String(m.id)} /><input type="hidden" name="to" value="suspended" /><button className={btnGhostCls}>休会</button></form>
-                    )}
-                    {st === "suspended" && (
-                      <form action={setMemberStatus}><input type="hidden" name="id" value={String(m.id)} /><input type="hidden" name="to" value="active" /><button className={btnGhostCls}>復帰</button></form>
-                    )}
-                    {st !== "left" && (
-                      <form action={setMemberStatus}><input type="hidden" name="id" value={String(m.id)} /><input type="hidden" name="to" value="left" /><button className="text-xs text-(--color-dim) hover:text-rose-600">退会</button></form>
-                    )}
-                  </div>
-                  {/* 重要説明事項（#129）: 入力があると予約カレンダーの予約セルに⚠が付く */}
-                  <form action={saveAlertNote} className="flex w-full items-center gap-2">
-                    <input type="hidden" name="id" value={String(m.id)} />
-                    <span className={`text-sm ${m.alert_note ? "" : "opacity-30"}`}>⚠</span>
-                    <input
-                      name="alert_note"
-                      defaultValue={String(m.alert_note ?? "")}
-                      placeholder="重要説明事項（例: 左打ち・腰痛のため強度注意・未収あり）— 入力するとカレンダーに⚠"
-                      className={`${inputCls} flex-1 !py-1.5 text-xs`}
-                    />
-                    <button className={btnGhostCls}>保存</button>
-                  </form>
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-(--color-line) text-left text-xs text-(--color-dim)">
+                  <th className="px-2 py-2 font-medium">会員番号</th>
+                  <th className="px-2 py-2 font-medium">お名前</th>
+                  <th className="px-2 py-2 font-medium">プラン</th>
+                  <th className="px-2 py-2 font-medium">状態</th>
+                  <th className="px-2 py-2 font-medium">入会日</th>
+                  <th className="px-2 py-2 font-medium">連絡先</th>
+                  <th className="px-2 py-2 font-medium">⚠</th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((m) => {
+                  const st = String(m.status ?? "");
+                  const inMinTerm = m.leave_date == null && String((m as Row).min_term_until ?? "") > today;
+                  return (
+                    <tr key={m.id} className="border-b border-(--color-line)/60 hover:bg-(--color-panel-2)">
+                      <td className="px-2 py-2 tabular-nums text-(--color-dim)">{m.member_no ?? "—"}</td>
+                      <td className="px-2 py-2">
+                        <Link href={`/frunk/${m.id}`} className="font-semibold text-indigo-600 underline">
+                          {m.name ?? "（氏名未入力）"}
+                        </Link>
+                        {m.name_kana ? <div className="text-[11px] text-(--color-dim)">{m.name_kana}</div> : null}
+                      </td>
+                      <td className="px-2 py-2 text-(--color-dim)">{planName((m as Row).plan_id) ?? "—"}</td>
+                      <td className="px-2 py-2">
+                        <Badge tone={FRUNK_STATUS_TONE[st] ?? "default"}>{FRUNK_STATUS_LABEL[st] ?? st}</Badge>
+                        {inMinTerm ? (
+                          <span
+                            className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800"
+                            title="キャンペーン入会・6か月継続の対象"
+                          >
+                            継続中
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-2 py-2 tabular-nums text-(--color-dim)">{m.join_date ?? "—"}</td>
+                      <td className="px-2 py-2 text-xs text-(--color-dim)">
+                        {[m.phone, m.email].filter(Boolean).join("　") || "—"}
+                      </td>
+                      <td className="px-2 py-2">
+                        {m.alert_note ? (
+                          <span title={String(m.alert_note)} className="text-rose-600">
+                            ⚠
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </Panel>
@@ -178,10 +323,16 @@ export default async function FrunkPage({
         <div className="space-y-2">
           {planList.length === 0 && <Empty>プランが未登録です。下のフォームから追加してください。</Empty>}
           {planList.map((p) => (
-            <form key={String(p.id)} action={updatePlan} className="grid grid-cols-2 items-end gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3 sm:grid-cols-7">
+            <form
+              key={String(p.id)}
+              action={updatePlan}
+              className="grid grid-cols-2 items-end gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3 sm:grid-cols-7"
+            >
               <input type="hidden" name="id" value={String(p.id)} />
               <Field label="プラン名"><input name="name" defaultValue={String(p.name)} className={`${inputCls} !py-1.5`} /></Field>
-              <Field label="月額(円)"><input name="monthly_price" inputMode="numeric" defaultValue={p.monthly_price != null ? String(p.monthly_price) : ""} className={`${inputCls} !py-1.5`} /></Field>
+              <Field label={`月額(円)　${yen(p.monthly_price as number | null)}`}>
+                <input name="monthly_price" inputMode="numeric" defaultValue={p.monthly_price != null ? String(p.monthly_price) : ""} className={`${inputCls} !py-1.5`} />
+              </Field>
               <Field label="入会金(円)"><input name="joining_fee" inputMode="numeric" defaultValue={p.joining_fee != null ? String(p.joining_fee) : ""} className={`${inputCls} !py-1.5`} /></Field>
               <Field label="1日の予約上限"><input name="max_bookings_per_day" inputMode="numeric" defaultValue={p.max_bookings_per_day != null ? String(p.max_bookings_per_day) : ""} className={`${inputCls} !py-1.5`} /></Field>
               <Field label="週の予約上限"><input name="max_bookings_per_week" inputMode="numeric" defaultValue={p.max_bookings_per_week != null ? String(p.max_bookings_per_week) : ""} className={`${inputCls} !py-1.5`} /></Field>
@@ -204,7 +355,7 @@ export default async function FrunkPage({
           <form action={createPlan} className="grid grid-cols-2 items-end gap-2 sm:grid-cols-7">
             <Field label="プラン名"><input name="name" placeholder="レギュラー" className={`${inputCls} !py-1.5`} /></Field>
             <Field label="月額(円)"><input name="monthly_price" inputMode="numeric" placeholder="11000" className={`${inputCls} !py-1.5`} /></Field>
-            <Field label="入会金(円)"><input name="joining_fee" inputMode="numeric" placeholder="11000" className={`${inputCls} !py-1.5`} /></Field>
+            <Field label="入会金(円)"><input name="joining_fee" inputMode="numeric" placeholder="5000" className={`${inputCls} !py-1.5`} /></Field>
             <Field label="1日の予約上限"><input name="max_bookings_per_day" inputMode="numeric" placeholder="1" className={`${inputCls} !py-1.5`} /></Field>
             <Field label="週の予約上限"><input name="max_bookings_per_week" inputMode="numeric" placeholder="" className={`${inputCls} !py-1.5`} /></Field>
             <Field label="表示順"><input name="sort_order" inputMode="numeric" placeholder="0" className={`${inputCls} !py-1.5`} /></Field>
@@ -215,7 +366,9 @@ export default async function FrunkPage({
 
       {/* URL発行 */}
       <Panel title="入会フォームURLの発行" className="d4">
-        <p className="mb-3 text-xs text-(--color-dim)">店頭タブレットやHP/QR掲示用の入会フォームURLを発行します（発行すると旧URLは無効化）。</p>
+        <p className="mb-3 text-xs text-(--color-dim)">
+          店頭タブレットやHP/QR掲示用の入会フォームURLを発行します（発行すると旧URLは無効化）。
+        </p>
         <form action={issueSignupToken} className="flex flex-wrap items-end gap-2">
           <Field label="ラベル（任意）"><input name="label" placeholder="FRANK 入会タブレット" className={inputCls} /></Field>
           <button className={btnCls}>入会フォームURLを発行</button>

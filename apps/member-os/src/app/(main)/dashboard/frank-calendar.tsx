@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { loadDay, loadMonthCounts, type DayView } from "@/lib/frank-reservation";
+import { loadDay, loadMonthCounts, loadBookingDetail, loadLessonDetail, type DayView } from "@/lib/frank-reservation";
+import { BookingDetailPanel, LessonDetailPanel } from "@/components/booking-detail";
 import { businessHours, genSlots, jstToday } from "@yozan/core/frank-booking";
 import {
   addDaysStr,
@@ -34,6 +35,7 @@ export async function FrankCalendarDashboard({
   step,
   companyId,
   extraQuery = "",
+  sel = null,
 }: {
   date: string;
   view: CalendarView;
@@ -41,6 +43,8 @@ export async function FrankCalendarDashboard({
   step: number;
   companyId: string; // 会社＋FRANK店舗で必ず絞るため（#134）
   extraQuery?: string; // オーナーの店舗切替(?store=frank)を維持するため
+  /** ?sel= 詳細を開いている予約（#139）。`lesson:<id>` はレッスン枠 */
+  sel?: string | null;
 }) {
   const today = jstToday();
   const month = monthOf(date);
@@ -57,12 +61,16 @@ export async function FrankCalendarDashboard({
   const { cfg, counts } = monthData;
   const isClosed = (d: string) => businessHours(d, cfg) === null;
 
-  const href = (p: { date?: string; view?: CalendarView; month?: string; step?: number }) => {
+  const href = (p: { date?: string; view?: CalendarView; month?: string; step?: number; sel?: string }) => {
     const d = p.date ?? date;
     const v = p.view ?? view;
     const s = p.step ?? step;
-    return `/dashboard?date=${d}&view=${v}&step=${s}${extraQuery}`;
+    const base = `/dashboard?date=${d}&view=${v}&step=${s}${extraQuery}`;
+    return p.sel ? `${base}&sel=${encodeURIComponent(p.sel)}#booking-detail` : base;
   };
+  // カレンダーの名前を押したら詳細（#139）。レッスン枠は id が `lesson:<uuid>` なのでそのまま渡す
+  const itemHref = (item: TimelineItem, d?: string) => href({ date: d ?? date, sel: item.id });
+  const detail = await loadSelection(sel, companyId);
   // 「前へ/次へ」の刻みは表示中の単位に合わせる（日=1日・週=7日・月=1か月）
   const prevHref =
     view === "month"
@@ -136,6 +144,16 @@ export async function FrankCalendarDashboard({
             )}
           </h2>
 
+          {detail && (
+            <div id="booking-detail">
+              {detail.kind === "booking" ? (
+                <BookingDetailPanel b={detail.booking} backHref={href({})} date={detail.booking.booked_date} />
+              ) : (
+                <LessonDetailPanel l={detail.lesson} backHref={href({})} />
+              )}
+            </div>
+          )}
+
           {view === "month" ? (
             <MonthCalendar month={month} today={today} counts={counts} href={href} isClosed={isClosed} />
           ) : view === "week" ? (
@@ -145,12 +163,14 @@ export async function FrankCalendarDashboard({
               bayCount={dayViews[0]?.bays.filter((b) => b.active).length ?? 0}
               hrefDay={(d) => href({ date: d, view: "day", month: monthOf(d) })}
               today={today}
+              itemHref={(item, d) => itemHref(item, d)}
             />
           ) : (
-            <DayCalendar view0={dayViews[0]} step={step} isToday={date === today} />
+            <DayCalendar view0={dayViews[0]} step={step} isToday={date === today} itemHref={itemHref} selectedId={sel} />
           )}
 
           <TimelineLegend>
+            <span>予約の名前を押すと詳細（連絡先・会計・来店処理）が開きます</span>
             <span>⚠ = 重要説明事項あり（FRANK会員画面で記入・確認）</span>
           </TimelineLegend>
         </div>
@@ -174,7 +194,31 @@ function jstNowMin(): number {
   return now.getUTCHours() * 60 + now.getUTCMinutes();
 }
 
-function DayCalendar({ view0, step, isToday }: { view0: DayView; step: number; isToday: boolean }) {
+/** ?sel= の中身を詳細データに変える。`lesson:<uuid>` はレッスン枠、それ以外は予約ID */
+async function loadSelection(sel: string | null | undefined, companyId: string) {
+  const raw = (sel ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("lesson:")) {
+    const l = await loadLessonDetail(raw.slice("lesson:".length), companyId);
+    return l ? ({ kind: "lesson", lesson: l } as const) : null;
+  }
+  const b = await loadBookingDetail(raw, companyId);
+  return b ? ({ kind: "booking", booking: b } as const) : null;
+}
+
+function DayCalendar({
+  view0,
+  step,
+  isToday,
+  itemHref,
+  selectedId,
+}: {
+  view0: DayView;
+  step: number;
+  isToday: boolean;
+  itemHref?: (item: TimelineItem) => string | undefined;
+  selectedId?: string | null;
+}) {
   if (view0.closed || !view0.hours) {
     return (
       <div className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-10 text-center text-lg text-(--color-dim)">
@@ -194,6 +238,8 @@ function DayCalendar({ view0, step, isToday }: { view0: DayView; step: number; i
       bays={bays}
       items={items}
       nowMin={isToday ? jstNowMin() : null}
+      itemHref={itemHref}
+      selectedId={selectedId}
     />
   );
 }

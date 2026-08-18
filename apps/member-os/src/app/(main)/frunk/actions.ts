@@ -13,6 +13,8 @@ import { buildApprovalMail, sendFrankMail } from "@/lib/frank-mail";
 import { pauseSubscription, resumeSubscription, swapSubscriptionPlan, chargeCardOnFile } from "@/lib/frank-square";
 import { planChangeProration } from "@/lib/frank-billing-pure";
 import { jstYmd } from "@/lib/jst";
+import { readName } from "@/lib/name";
+import { normalizeAddress } from "@/lib/address";
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
@@ -42,6 +44,64 @@ async function requireFrankActor() {
   const actor = await requireReceptionActor();
   requireStoreAccess(actor, FRANK_STORE_ID);
   return actor;
+}
+
+/** 操作後に戻る画面（#139）。会員カード（/frunk/<id>）から操作したらそこへ返す。
+ *  戻り先は必ず /frunk 配下に限定する（外部URLへ飛ばされないように）。 */
+function backTo(formData: FormData): string {
+  const b = str(formData.get("back"));
+  return /^\/frunk(\/[0-9a-fA-F-]{36})?$/.test(b) ? b : "/frunk";
+}
+
+/** 一覧・会員カードの両方を作り直す（どちらから操作しても最新になる） */
+function revalidateMember(id?: string) {
+  revalidatePath("/frunk");
+  if (id) revalidatePath(`/frunk/${id}`);
+}
+
+const GENDERS = ["male", "female", "other", "unknown"];
+const PAYMENT_METHODS = ["cash", "credit", "bank", "sb_payment", "other"];
+
+/** 会員カードのプロフィール編集（#139）。
+ *  氏名・住所・生年月日は共通入力（NameFields / AddressFields / BirthDateInput）から受ける。 */
+export async function updateMemberProfile(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  const { name, nameKana } = readName(formData);
+  const addr = normalizeAddress(orNull(formData.get("prefecture")), orNull(formData.get("address1")));
+  const gender = str(formData.get("gender"));
+  const pay = str(formData.get("payment_method"));
+
+  const patch: Record<string, unknown> = {
+    name_kana: nameKana,
+    birth_date: orNull(formData.get("birth_date")),
+    gender: GENDERS.includes(gender) ? gender : null,
+    postal_code: orNull(formData.get("postal_code")),
+    // frunk_members は prefecture 列を持たない（住所1に都道府県から入れる）
+    address1: `${addr.prefecture ?? ""}${addr.address1 ?? ""}`.trim() || null,
+    phone: orNull(formData.get("phone")),
+    email: orNull(formData.get("email")),
+    occupation: orNull(formData.get("occupation")),
+    contact_method: orNull(formData.get("contact_method")),
+    payment_method: PAYMENT_METHODS.includes(pay) ? pay : null,
+    note: orNull(formData.get("note")),
+    updated_at: new Date().toISOString(),
+  };
+  if (name) patch.name = name; // NOT NULL列を空で潰さない
+
+  const { error } = await admin
+    .from("frunk_members")
+    .update(patch)
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
+  await logAudit(actor, "frunk.member.update", "frunk_members", id, null, patch);
+  revalidateMember(id);
+  if (error) redirect(`/frunk/${id}?err=` + encodeURIComponent(`保存できませんでした: ${error.message}`));
+  redirect(`/frunk/${id}?msg=` + encodeURIComponent("会員情報を保存しました"));
 }
 
 // ---- プラン管理 ----
@@ -183,6 +243,7 @@ export async function approveSignup(formData: FormData) {
 export async function resendApprovalMail(formData: FormData) {
   const actor = await requireFrankActor();
   const admin = createAdmin();
+  const dest = backTo(formData); // 会員カードから操作したらそこへ戻す（#139）
   const id = str(formData.get("id"));
   if (!id) return;
 
@@ -195,15 +256,15 @@ export async function resendApprovalMail(formData: FormData) {
     .maybeSingle();
   const memberNo = m?.member_no ? String(m.member_no) : "";
   if (!memberNo) {
-    redirect("/frunk?err=" + encodeURIComponent("会員番号が未発行です。先に入会申込を承認してください"));
+    redirect(`${dest}?err=` + encodeURIComponent("会員番号が未発行です。先に入会申込を承認してください"));
   }
 
   const r = await sendApprovalMailTo(admin, id, memberNo);
   await logAudit(actor, "frunk.approval_mail_resend", "frunk_members", null, null, { id, member_no: memberNo, ok: r.ok });
   redirect(
     r.ok
-      ? "/frunk?msg=" + encodeURIComponent(`${String(m?.name ?? "")}様へ会員番号（${memberNo}）の案内メールを再送しました`)
-      : "/frunk?err=" + encodeURIComponent(`再送できませんでした: ${r.reason ?? ""}`),
+      ? `${dest}?msg=` + encodeURIComponent(`${String(m?.name ?? "")}様へ会員番号（${memberNo}）の案内メールを再送しました`)
+      : `${dest}?err=` + encodeURIComponent(`再送できませんでした: ${r.reason ?? ""}`),
   );
 }
 
@@ -222,6 +283,7 @@ export async function rejectSignup(formData: FormData) {
 export async function saveAlertNote(formData: FormData) {
   const actor = await requireFrankActor();
   const admin = createAdmin();
+  const dest = backTo(formData); // 会員カードから操作したらそこへ戻す（#139）
   const id = str(formData.get("id"));
   if (!id) return;
   const note = str(formData.get("alert_note"));
@@ -232,8 +294,9 @@ export async function saveAlertNote(formData: FormData) {
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
   await logAudit(actor, "frunk.alert_note.save", "frunk_members", id, null, { alert_note: note || null });
-  revalidatePath("/frunk");
+  revalidateMember(id);
   revalidatePath("/dashboard");
+  redirect(`${dest}?msg=` + encodeURIComponent(note ? "重要説明事項を保存しました（カレンダーに⚠が付きます）" : "重要説明事項を解除しました"));
 }
 
 // ---- 会員ステータス変更（休会・復帰・退会） ----
@@ -241,6 +304,7 @@ export async function saveAlertNote(formData: FormData) {
 export async function setMemberStatus(formData: FormData) {
   const actor = await requireFrankActor();
   const admin = createAdmin();
+  const dest = backTo(formData); // 会員カードから操作したらそこへ戻す（#139）
   const id = str(formData.get("id"));
   const to = str(formData.get("to"));
   if (!id || !["active", "suspended", "left"].includes(to)) return;
@@ -277,18 +341,18 @@ export async function setMemberStatus(formData: FormData) {
       : null; // 退会はお客様都合のタイミングがあるため自動解約しない（ダッシュボードで解約）
     await logAudit(actor, "frunk.square_follow", "frunk_members", null, null, { id, to, square: r });
     if (r && !r.ok && !r.skipped) {
-      redirect("/frunk?err=" + encodeURIComponent(
+      redirect(`${dest}?err=` + encodeURIComponent(
         `ステータスは変更しましたが、Square側の${to === "suspended" ? "課金停止" : "課金再開"}に失敗しました。Squareダッシュボードで確認してください（${m?.member_no ?? ""}）`,
       ));
     }
     if (to === "left") {
-      redirect("/frunk?err=" + encodeURIComponent(
+      redirect(`${dest}?err=` + encodeURIComponent(
         `${minTermWarn}退会にしました。月会費の自動課金は自動では止まりません。Squareダッシュボードでサブスクリプションを解約してください（${m?.member_no ?? ""}）`,
       ));
     }
   }
-  if (minTermWarn) redirect("/frunk?err=" + encodeURIComponent(`${minTermWarn}退会にしました。`));
-  revalidatePath("/frunk");
+  if (minTermWarn) redirect(`${dest}?err=` + encodeURIComponent(`${minTermWarn}退会にしました。`));
+  revalidateMember(id);
 }
 
 // ---- プラン変更（#124） ----
@@ -298,6 +362,7 @@ export async function setMemberStatus(formData: FormData) {
 export async function changePlan(formData: FormData) {
   const actor = await requireFrankActor();
   const admin = createAdmin();
+  const dest = backTo(formData); // 会員カードから操作したらそこへ戻す（#139）
   const id = str(formData.get("id"));
   const newPlanId = str(formData.get("plan_id"));
   if (!id || !newPlanId) return;
@@ -310,8 +375,8 @@ export async function changePlan(formData: FormData) {
       .select("id, name, monthly_price, square_variation_nofee_id")
       .eq("id", newPlanId).eq("company_id", actor.companyId).is("deleted_at", null).maybeSingle(),
   ]);
-  if (!m || !newPlan) redirect("/frunk?err=" + encodeURIComponent("会員またはプランが見つかりません"));
-  if (String(m.plan_id) === String(newPlan.id)) redirect("/frunk?err=" + encodeURIComponent("同じプランです"));
+  if (!m || !newPlan) redirect(`${dest}?err=` + encodeURIComponent("会員またはプランが見つかりません"));
+  if (String(m.plan_id) === String(newPlan.id)) redirect(`${dest}?err=` + encodeURIComponent("同じプランです"));
 
   const oldPrice = Number((m as unknown as { frunk_plans: { monthly_price: number | null } | null }).frunk_plans?.monthly_price ?? 0);
   const newPrice = Number(newPlan.monthly_price ?? 0);
@@ -357,7 +422,7 @@ export async function changePlan(formData: FormData) {
   }
 
   const param = notes.some((n) => n.startsWith("⚠")) ? "err" : "msg";
-  redirect(`/frunk?${param}=` + encodeURIComponent(notes.join(" ")));
+  redirect(`${dest}?${param}=` + encodeURIComponent(notes.join(" ")));
 }
 
 // ---- 入会フォームURL発行 ----
