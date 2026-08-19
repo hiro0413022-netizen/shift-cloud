@@ -42,6 +42,7 @@ export default async function AvailabilityPage({ searchParams }: { searchParams:
       .from("cad_dispatches")
       .select("partner_id, dispatch_date")
       .eq("company_id", actor.companyId)
+      .neq("status", "cancelled")
       .gte("dispatch_date", from)
       .lte("dispatch_date", to)
       .is("deleted_at", null)

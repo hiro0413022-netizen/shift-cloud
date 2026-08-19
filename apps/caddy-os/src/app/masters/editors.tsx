@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { saveClient, saveInvoiceSettings, savePartner, saveTransportRate, togglePartnerPicker } from "../actions";
+import {
+  clearPartnerToken,
+  issuePartnerToken,
+  saveClient,
+  saveInvoiceSettings,
+  savePartner,
+  saveTransportRate,
+  togglePartnerPicker,
+} from "../actions";
+import { CSV_FORMATS } from "@/lib/csv";
 
 const cell = "rounded border border-(--color-line) bg-white px-2 py-1 text-sm outline-none focus:border-(--color-accent)";
 
@@ -17,6 +26,10 @@ type Client = {
   address: string | null;
   has_contract: boolean;
   status: string;
+  // migration 0118（ゴルフ場提出CSVの書式と送り先）
+  csv_format: string;
+  contact_name: string | null;
+  contact_email: string | null;
 };
 
 type Partner = {
@@ -28,6 +41,9 @@ type Partner = {
   default_transport: number;
   hourly_wage: number | null;
   main_course: string | null;
+  phone: string | null;
+  email: string | null;
+  submit_token: string | null;
   show_in_picker: boolean;
   status: string;
   memo: string | null;
@@ -73,6 +89,19 @@ function ClientForm({ c }: { c?: Client }) {
           <option value="active">有効</option>
           <option value="inactive">無効</option>
         </select>
+      </div>
+      {/* 提出CSVの書式と送り先（migration 0118）— ゴルフ場ごとに必要な形が違うためここで持つ */}
+      <div className="col-span-12 grid grid-cols-12 items-center gap-1.5 rounded bg-slate-50 p-1.5">
+        <span className="col-span-2 text-[11px] text-(--color-dim)">提出CSV書式</span>
+        <select name="csv_format" defaultValue={c?.csv_format ?? "standard"} className={`${cell} col-span-4`}>
+          {CSV_FORMATS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}（{f.hint}）
+            </option>
+          ))}
+        </select>
+        <input name="contact_name" defaultValue={c?.contact_name ?? ""} placeholder="先方担当者" className={`${cell} col-span-2`} />
+        <input name="contact_email" defaultValue={c?.contact_email ?? ""} placeholder="送付先メール" className={`${cell} col-span-4`} />
       </div>
       <div className="col-span-12 flex items-center gap-2">
         <button disabled={pending} className="rounded-lg bg-(--color-accent) px-3 py-1 text-xs font-medium text-white disabled:opacity-50">
@@ -131,6 +160,14 @@ function PartnerForm({ p }: { p?: Partner }) {
         <option value="inactive">無効</option>
       </select>
       <input name="memo" defaultValue={p?.memo ?? ""} placeholder="備考" className={`${cell} col-span-1`} />
+      {/* 連絡先＋本人提出URL（migration 0118）— LINEでURLを配れば、以後は本人がスマホから希望日を入れられる */}
+      <div className="col-span-12 grid grid-cols-12 items-center gap-1.5 rounded bg-slate-50 p-1.5">
+        <span className="col-span-1 text-[11px] text-(--color-dim)">連絡先</span>
+        <input name="phone" defaultValue={p?.phone ?? ""} placeholder="電話番号" inputMode="tel" className={`${cell} col-span-3`} />
+        <input name="email" defaultValue={p?.email ?? ""} placeholder="メール（任意）" className={`${cell} col-span-4`} />
+        <div className="col-span-4">{p ? <SubmitLink partnerId={p.id} token={p.submit_token} /> : null}</div>
+      </div>
+
       {/* 振込先口座（任意）— キャディ→YOZANの支払請求書に印字される（migration 0090） */}
       <div className="col-span-12 grid grid-cols-12 items-center gap-1.5 rounded bg-slate-50 p-1.5">
         <span className="col-span-1 text-[11px] text-(--color-dim)">振込先口座</span>
@@ -176,6 +213,78 @@ export function PartnerEditor({ partners }: { partners: Partner[] }) {
         <p className="mb-1 text-xs font-medium text-(--color-dim)">＋ 新規追加</p>
         <PartnerForm />
       </div>
+    </div>
+  );
+}
+
+/* ── キャディ本人のシフト希望提出URL（migration 0118） ──
+   フォームの中に置くのでボタンは type="button"（submitさせない）。
+   URLはこのブラウザのオリジンから組み立てる＝環境変数を増やさない。 */
+function SubmitLink({ partnerId, token }: { partnerId: string; token: string | null }) {
+  const [cur, setCur] = useState(token);
+  const [pending, start] = useTransition();
+  const [copied, setCopied] = useState(false);
+  const url = cur && typeof window !== "undefined" ? `${window.location.origin}/s/${cur}` : null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+      {cur ? (
+        <>
+          <input readOnly value={url ?? `/s/${cur}`} className={`${cell} min-w-0 flex-1 text-[11px]`} />
+          <button
+            type="button"
+            onClick={() => {
+              if (url) navigator.clipboard?.writeText(url);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            className="rounded bg-slate-200 px-2 py-1"
+          >
+            {copied ? "コピーしました" : "コピー"}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                const r = await issuePartnerToken(partnerId);
+                if (r.token) setCur(r.token);
+              })
+            }
+            className="rounded bg-slate-100 px-2 py-1 text-(--color-dim)"
+            title="再発行すると今のURLは使えなくなります"
+          >
+            再発行
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                await clearPartnerToken(partnerId);
+                setCur(null);
+              })
+            }
+            className="text-(--color-dim) hover:text-red-600"
+          >
+            停止
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const r = await issuePartnerToken(partnerId);
+              if (r.token) setCur(r.token);
+            })
+          }
+          className="rounded bg-(--color-accent) px-2 py-1 font-medium text-white disabled:opacity-50"
+        >
+          提出URLを発行
+        </button>
+      )}
     </div>
   );
 }

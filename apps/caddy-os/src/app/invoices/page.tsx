@@ -33,6 +33,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
       .from("cad_dispatches")
       .select("client_id, dispatch_date, sales_amount, billing_ym")
       .eq("company_id", actor.companyId)
+      .eq("status", "confirmed") // 請求は確定した派遣だけ（migration 0118）
       .or(`and(dispatch_date.gte.${from},dispatch_date.lte.${to}),billing_ym.eq.${ym}`)
       .is("deleted_at", null)
       .gt("sales_amount", 0),

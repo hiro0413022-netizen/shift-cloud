@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 2026-08-19 — Caddy OS: キャディシフト管理の一元化（カレンダー／確定／台帳／ゴルフ場提出CSV／API）
+- feat(caddy-os): **シフトカレンダー `/calendar`**（DECISIONS #140）。日付×キャディ×ゴルフ場×確定状態の月間表。日をタップ→その日に○/△を出しているキャディだけが候補に並ぶ→ゴルフ場を選んで「仮で追加」/「確定で追加」。確定は1件ずつ・その日まとめて・月まとめての3段階
+- feat(caddy-os): **派遣シフトのステータス（仮／確定／取消）**。仮は台帳に見えるが売上・外注費・請求・提出CSVには入らない。確定を押した瞬間に採番振り直し→財務再集計が走る
+- feat(caddy-os): **キャディ台帳 `/ledger`・`/ledger/[partnerId]`**。確定した派遣がそのまま台帳になる（転記なし）。勤務日/ゴルフ場/勤務区分/委託料・交通費・手当・計。支払請求書へ1クリック
+- feat(caddy-os): **ゴルフ場提出 `/exports`**。ゴルフ場別の月間派遣一覧＋CSV書き出し（確定分のみ）。書式はゴルフ場ごとに設定（標準/シンプル/キャディ別/カレンダー表）。**BOM付きUTF-8**でExcelがそのまま開ける
+- feat(caddy-os): **外部連携API `/api/v1/*`**（partners / clients / availability / dispatches / exports）。`Authorization: Bearer <CADDY_API_TOKEN>`。トークン未設定なら常に401
+- feat(caddy-os): **キャディ本人のシフト希望提出 `/s/[token]`**（ログイン不要・スマホ）。設定画面でURLを発行してLINEで配る。過去日と確定済みの日はロック。再発行で旧URLは即無効
+- feat(caddy-os): 設定画面に「提出CSV書式・先方担当者・送付先メール」（ゴルフ場）と「電話・メール・提出URL」（キャディ）を追加
+- fix(caddy-os): **本番ビルドが `masters/page.tsx` の型エラーでERRORのまま放置されていた**のを修正（Supabaseネスト取得の配列推論。#76と同種）
+- db: migration `0118_caddy_shift_confirm.sql`（yozan-shift-cloud・適用済）。`cad_dispatches.status/confirmed_at/confirmed_by`、`cad_clients.csv_format/contact_name/contact_email`、`cad_partners.phone/email/submit_token`、`cad_availability.source/submitted_at`。`refresh_caddy_finance`・`renumber_caddy_seq` を確定のみに。**既存329行は確定扱い＝数字は1円も動かない**（8ヶ月分をfin_entriesと照合済み）
+- test: 369件パス（`tests/caddy-shift-csv.test.ts` 12件を新規追加）。`npx tsc --noEmit` / `next build`（23ルート）通過
+
 ## 2026-08-17 — Shift Cloud: 募集の開始を廃止（いつでも提出）＋1日単位の確定・編集
 - change(shift-cloud): **「募集を開始する」を削除**（DECISIONS #138）。/admin/shifts の募集期間カード（開始/締切/募集中に戻す/削除）と period-form.tsx・delete-period-button.tsx、server actions（openPeriod・closePeriod・reopenPeriod・deletePeriod）を撤去。管理者が何も押さなくてもスタッフは提出できる
 - feat(shift-cloud): /requests は月送り（既定=翌月・「今月」リンク）で**今日以降ならいつでも・何ヶ月先でも**提出。締切表示は撤去。空にして提出＝その日の取り下げ（ドラフトシフトも削除）。**過去日と確定済みの日はロック**（確定日は実際の時間をバッジ表示・サーバー側でも上書きを拒否）

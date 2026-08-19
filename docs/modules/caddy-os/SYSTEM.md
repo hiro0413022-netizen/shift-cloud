@@ -20,8 +20,12 @@ DECISIONS #45 / migration `0036_caddy_os.sql` / アプリ `apps/caddy-os`（別V
 ```
 cad_clients   取引先（ゴルフ場）  code / name / unit_price / closing_day / payment_day / has_contract
 cad_partners  委託先（キャディ）  code / name / default_fee / default_transport / main_course
-cad_dispatches 派遣（1行=1人1回）  dispatch_date / client_id + sales_amount / (partner_id | staff_id) + fee/transport/special
+cad_dispatches 派遣（1行=1人1回）  dispatch_date / status(仮・確定・取消) / client_id + sales_amount / (partner_id | staff_id) + fee/transport/special
+cad_availability シフト希望         partner_id / date / status(○△×) / source(admin|self|api)
 ```
+
+`status`（#140 / 0118）が入ったことで、**同じ1行が「希望を割り当てた下書き」から「正式な派遣」へ昇格する**形になった。
+下書きと確定を別テーブルに分けていない＝確定時にコピーが起きないので、ズレようがない。
 
 **個人情報は持たない**: 委託先の住所・生年月日・銀行口座はExcelにあるが `cad_partners` には入れていない。
 必要になった時点でVault相当の保護（#26）とセットで設計する（SECURITY.md）。
@@ -63,6 +67,10 @@ DB側の CHECK 制約 `cad_staff_has_no_fee` が、社員行に委託料・特�
 ## 6. 画面
 
 - `/` ダッシュボード — 月次KPI（売上/外注費/粗利/人工）、取引先別、委託先別、6ヶ月推移、財務へ再集計
+- `/calendar` シフトカレンダー — 月間カレンダー＋割当＋**確定**（#140・§11-2）
+- `/ledger` `/ledger/[partnerId]` キャディ台帳 — 確定分から自動生成（#140・§11-3）
+- `/exports` ゴルフ場提出 — ゴルフ場別の派遣一覧・書式切替CSV（#140・§11-4）
+- `/s/[token]` キャディ本人のシフト希望提出（公開・スマホ / #140・§11-6）
 - `/dispatches` 派遣台帳 — 一覧＋**スプレッドシート風の一括入力**（#46）＋**ゴルフウィング勤務（時給）入力**（#62）
 - `/invoices` 請求（受取）— 取引先別の請求サマリ → `/invoices/[clientId]` で請求書（印刷/PDF保存）＋発行記録・入金消込
 - `/invoices/payable` 支払 — 委託先別の支払サマリ → `/invoices/payable/[partnerId]` で**キャディ→YOZAN請求書**（#62）＋振込用CSV
@@ -131,8 +139,83 @@ partner_id を持つため既存 `refresh_caddy_finance` が**キャディ事業
 **追加**: 委託先別の月次支払一覧＋**振込用CSV書き出し**、受取/支払とも `cad_invoices` へ発行記録（snapshot）→ **未入金・未払アラート**と入金消込。
 `cad_invoices` に `kind`（receivable/payable）・`partner_id` を追加、`client_id` を nullable 化。
 
-## 11. 未実装（後続）
+## 11. フェーズ4 — シフト管理の一元化（#140 / migration 0118）
 
-- 委託先からの出勤可否の自己入力（現在はスタッフが代理入力。LINE連携 #29 と相性が良い）
+小川さんの依頼「シフト入力 → 派遣確定 → ゴルフ場提出データ → キャディ台帳」を1つのシステムで完結させる。
+
+**設計の芯**: 新しいテーブルを1本も足していない。**元データは `cad_dispatches` ただ1つ**で、
+台帳もゴルフ場提出CSVも請求も財務も、その行の別の見え方にすぎない。
+台帳テーブルを別に作って同期させる設計は必ずどこかでズレる（Excel運用がまさにそれだった）。
+
+### 11-1. 派遣シフトのステータス（仮・確定・キャンセル）
+
+`cad_dispatches.status` を追加。既存の実績行は `default 'confirmed'` で全て確定扱いになるため、
+**適用前後で請求・財務の数字は1円も動かない**（適用時に8ヶ月分を実データ照合済み）。
+
+| status | 意味 | 台帳 | 提出CSV | 請求・支払 | 財務(fin_entries) |
+|---|---|---|---|---|---|
+| tentative（仮） | カレンダー上の下書き | 表示のみ | ✕ | ✕ | ✕ |
+| confirmed（確定） | 正式な派遣 | ○ | ○ | ○ | ○ |
+| cancelled（取消） | 取り消し（履歴は残す） | 表示のみ | ✕ | ✕ | ✕ |
+
+`refresh_caddy_finance` / `renumber_caddy_seq` も `status='confirmed'` に絞った（0118で置き換え）。
+画面側は `isBillable()`（`lib/shift.ts`）が同じ条件を持つ。**SQLとTSの二重実装なので、条件を変えたら両方直す**（#53と同じ注意）。
+
+### 11-2. シフトカレンダー `/calendar`
+
+月間カレンダーで「日付 × キャディ × ゴルフ場 × 確定状態」が一目で見える。
+日セルをタップするとその日のパネルが開き、**その日に○/△を出しているキャディだけが候補に並ぶ**
+（集めた希望がそのまま割当候補になる＝転記が消える）。
+
+- 金額は割当時にマスタから自動で埋まる（売上単価 / 委託料 #62③ / 交通費単価表 #62②）
+- 同じ日・同じ人の二重割当はサーバー側で拒否（カレンダーは押しやすい＝事故りやすい）
+- 確定は3段階: 1件ずつ / その日まとめて / 月まとめて
+- 確定した瞬間に `renumber_caddy_seq` → `refresh_caddy_finance` が走る（＝台帳・PLへ即反映）
+
+### 11-3. キャディ台帳 `/ledger`・`/ledger/[partnerId]`
+
+確定分から自動生成。個人ページに 勤務日 / ゴルフ場 / 勤務区分 / 委託料・交通費・手当・計 が出る。
+支払請求書（`/invoices/payable/[partnerId]`）へ1クリックで繋がる。**二重入力は発生しない。**
+
+### 11-4. ゴルフ場提出 `/exports`
+
+ゴルフ場ごとの月間派遣一覧をプレビューし、CSVで書き出す。**確定分のみ**。
+
+書式は `cad_clients.csv_format` に持つ（standard / simple / grouped / wide）。
+組み立ては `src/lib/csv.ts` の**純粋関数**なので、画面のプレビューとダウンロード、APIの出力が必ず一致する。
+新書式は `CSV_FORMATS` に1つ足すだけ（画面もAPIも無改修）。Excelで文字化けしないようBOM付きUTF-8で出す。
+
+### 11-5. 外部連携API `/api/v1/*`（API_STANDARD.md準拠）
+
+| メソッド | パス | 用途 |
+|---|---|---|
+| GET | `/api/v1/partners` | キャディマスタ |
+| POST | `/api/v1/partners` | キャディ登録（同名は更新） |
+| GET/POST | `/api/v1/clients` | ゴルフ場マスタ |
+| GET | `/api/v1/availability?month=YYYY-MM` | シフト希望 |
+| POST | `/api/v1/availability` | シフト希望の一括登録（LINE Bot等） |
+| GET | `/api/v1/dispatches?month=&status=&client_id=&partner_id=` | 派遣シフト |
+| POST | `/api/v1/dispatches` | 派遣の作成（仮/確定・金額はマスタから自動補完） |
+| PATCH | `/api/v1/dispatches` | ステータス変更（確定・取消） |
+| GET | `/api/v1/exports?month=&client_id=&format=csv\|json` | ゴルフ場別の派遣一覧 |
+
+認証は `Authorization: Bearer <CADDY_API_TOKEN>`（inventory-os #96 と同方式）。
+**トークン未設定なら常に401**＝設定漏れで口が開くことはない。`company_id` はリクエストから受け取らない。
+将来スコープ別キーが要るなら `integration_configs` へ移す。
+
+### 11-6. キャディ本人のシフト希望提出 `/s/[token]`
+
+`cad_partners.submit_token` を設定画面から発行し、URLをLINEで1回配れば以後は本人がスマホで入力できる。
+
+- ログイン不要。トークンで委託先を特定し、**その人の行しか触れない**（#12/#23と同型）
+- タップで ○ → △ → × → 未回答。今月＋2ヶ月先まで。過去日と確定済みの日はロック
+- 保存先は管理者の代理入力と同じ `cad_availability`（`source='self'` で区別）。カレンダーに `＊` で出る
+- 再発行すると旧URLは即座に無効（漏れたら発行し直すだけ）
+
+## 12. 未実装（後続）
+
 - 年次有給休暇管理簿（林さん）→ Shift Cloud側（勤怠の一部）
-- 支払請求書への委託先の振込先情報（口座＝個人情報のためVault相当の保護とセットで設計）
+- LINE通知（#29）との接続 — 希望提出URLの一斉配信・確定シフトの本人通知
+- ゴルフ場側システムへのAPI送信（現在はCSV書き出し＋メール添付を想定）
+- 給与・請求データへの連携は既に `fin_entries` / `cad_invoices` 経由で繋がっているが、
+  外部会計ソフトへの直接連携は未着手

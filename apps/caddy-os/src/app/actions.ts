@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@yozan/core/supabase/admin";
-import { ymRange } from "@/lib/caddy";
+import { getMasters, ymRange } from "@/lib/caddy";
 import {
   billingRange,
   buildInvoice,
@@ -100,6 +100,7 @@ export async function saveDispatch(fd: FormData): Promise<{ error?: string }> {
       .from("cad_dispatches")
       .select("id", { count: "exact", head: true })
       .eq("company_id", actor.companyId)
+      .eq("status", "confirmed")
       .gte("dispatch_date", `${ym}-01`)
       // 月末日は実在する日で（-31固定は2月等で0件になる / DECISIONS #53）
       .lte("dispatch_date", monthEnd(ym))
@@ -237,11 +238,20 @@ export async function setAvailability(
   const { error } = await admin
     .from("cad_availability")
     .upsert(
-      { company_id: actor.companyId, partner_id: partnerId, date, status, deleted_at: null },
+      {
+        company_id: actor.companyId,
+        partner_id: partnerId,
+        date,
+        status,
+        source: "admin", // 管理者の代理入力。本人提出は submitSelfAvailability が "self" を立てる
+        submitted_at: new Date().toISOString(),
+        deleted_at: null,
+      },
       { onConflict: "partner_id,date" }
     );
   if (error) return { error: error.message };
   revalidatePath("/availability");
+  revalidatePath("/calendar");
   return {};
 }
 
@@ -267,6 +277,10 @@ const clientSchema = z.object({
   address: z.string().max(200).nullable(),
   has_contract: z.coerce.boolean(),
   status: z.enum(["active", "inactive"]).default("active"),
+  // 提出用CSVの書式と送り先（migration 0118）。ゴルフ場ごとに欲しい形が違うため列で持つ
+  csv_format: z.enum(["standard", "simple", "grouped", "wide"]).default("standard"),
+  contact_name: z.string().max(120).nullable(),
+  contact_email: z.string().max(200).nullable(),
 });
 
 function num(fd: FormData, k: string): number | null {
@@ -292,6 +306,9 @@ export async function saveClient(fd: FormData): Promise<{ error?: string }> {
     address: str(fd, "address"),
     has_contract: fd.get("has_contract") === "on" || fd.get("has_contract") === "true",
     status: (str(fd, "status") ?? "active") as "active" | "inactive",
+    csv_format: (str(fd, "csv_format") ?? "standard") as "standard" | "simple" | "grouped" | "wide",
+    contact_name: str(fd, "contact_name"),
+    contact_email: str(fd, "contact_email"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力エラー" };
   const { id, ...row } = parsed.data;
@@ -321,6 +338,9 @@ const partnerSchema = z.object({
   default_transport: z.coerce.number().int().min(0),
   hourly_wage: z.coerce.number().int().min(0).nullable(),
   main_course: z.string().max(120).nullable(),
+  // 連絡先（migration 0118）。LINEで提出URLを配る運用のため電話・メールを持つ
+  phone: z.string().max(40).nullable(),
+  email: z.string().max(200).nullable(),
   show_in_picker: z.coerce.boolean(),
   status: z.enum(["active", "inactive"]).default("active"),
   memo: z.string().max(500).nullable(),
@@ -343,6 +363,8 @@ export async function savePartner(fd: FormData): Promise<{ error?: string }> {
     default_transport: num(fd, "default_transport") ?? 0,
     hourly_wage: num(fd, "hourly_wage"),
     main_course: str(fd, "main_course"),
+    phone: str(fd, "phone"),
+    email: str(fd, "email"),
     show_in_picker: fd.get("show_in_picker") === "on" || fd.get("show_in_picker") === "true",
     status: (str(fd, "status") ?? "active") as "active" | "inactive",
     memo: str(fd, "memo"),
@@ -564,6 +586,7 @@ export async function issueReceivableInvoice(clientId: string, ym: string): Prom
     .from("cad_dispatches")
     .select("dispatch_date, sales_amount")
     .eq("company_id", actor.companyId)
+    .eq("status", "confirmed") // 請求は確定した派遣だけ（migration 0118）
     .eq("client_id", clientId)
     .or(`and(dispatch_date.gte.${from},dispatch_date.lte.${to},billing_ym.is.null),billing_ym.eq.${ym}`)
     .is("deleted_at", null)
@@ -619,6 +642,7 @@ export async function issuePayableInvoice(partnerId: string, ym: string): Promis
       .from("cad_dispatches")
       .select("dispatch_date, kind, fee_amount, transport_amount, special_amount, work_hours, cad_clients(name)")
       .eq("company_id", actor.companyId)
+      .eq("status", "confirmed") // 支払も確定した派遣だけ（migration 0118）
       .eq("partner_id", partnerId)
       .gte("dispatch_date", from)
       .lte("dispatch_date", to)
@@ -685,4 +709,287 @@ export async function markInvoiceStatus(fd: FormData): Promise<void> {
     .eq("id", id)
     .eq("company_id", actor.companyId);
   revalidatePath("/invoices");
+}
+
+/* ============================================================
+   シフトカレンダー / 派遣の確定（DECISIONS #140 / migration 0118）
+
+   小川さん依頼の中核。「〇月〇日・〇〇ゴルフ場・〇〇さん」を作って［確定］を押すだけで、
+   派遣台帳・キャディ台帳・ゴルフ場提出CSV・請求・財務まで全部そこから生成される。
+   ＝ 同じ情報を二度入力しない。新しいテーブルは足していない（元データは cad_dispatches 1本）。
+   ============================================================ */
+
+const assignSchema = z.object({
+  dispatch_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "日付が不正です"),
+  client_id: z.string().uuid().nullable(),
+  assignee: z.string().min(3), // "p:<partnerId>" | "s:<staffId>"
+  status: z.enum(["tentative", "confirmed"]).default("tentative"),
+  memo: z.string().max(500).nullable().optional(),
+});
+
+/**
+ * カレンダーから1件割り当てる。金額はマスタから自動で埋める（#62 ②③の単価表を再利用）:
+ *   売上   = ゴルフ場の売上単価
+ *   委託料 = ゴルフ場の委託料 → 無ければキャディの標準委託料
+ *   交通費 = 交通費単価表（キャディ×ゴルフ場）→ 無ければキャディの標準交通費
+ * 社員（s:）は委託料・手当0（給与側で支給＝二重計上の防止。DBのCHECKでも弾かれる）。
+ */
+export async function assignDispatch(
+  input: z.input<typeof assignSchema>
+): Promise<{ error?: string; id?: string }> {
+  const actor = await requireActor();
+  const parsed = assignSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力エラー" };
+  const v = parsed.data;
+  const { partner_id, staff_id } = parseAssignee(v.assignee);
+  if (!partner_id && !staff_id) return { error: "キャディを選んでください" };
+
+  const admin = createAdmin();
+
+  // 同じ日・同じキャディの二重割当を防ぐ（カレンダーは押しやすい＝事故りやすい）
+  const dupCol = partner_id ? "partner_id" : "staff_id";
+  const { data: dup } = await admin
+    .from("cad_dispatches")
+    .select("id")
+    .eq("company_id", actor.companyId)
+    .eq("dispatch_date", v.dispatch_date)
+    .eq(dupCol, partner_id ?? staff_id!)
+    .neq("status", "cancelled")
+    .is("deleted_at", null)
+    .limit(1);
+  if ((dup ?? []).length > 0) return { error: "この日は既に割り当て済みです" };
+
+  const masters = await getMasters(actor.companyId);
+  const client = v.client_id ? masters.clients.find((c) => c.id === v.client_id) : undefined;
+  const partner = partner_id ? masters.partners.find((p) => p.id === partner_id) : undefined;
+  const refId = partner_id ?? staff_id!;
+  const transport =
+    (v.client_id ? masters.transportRates[`${v.client_id}__${refId}`] : undefined) ??
+    partner?.default_transport ??
+    0;
+
+  const row = {
+    company_id: actor.companyId,
+    dispatch_date: v.dispatch_date,
+    kind: "dispatch",
+    status: v.status,
+    confirmed_at: v.status === "confirmed" ? new Date().toISOString() : null,
+    confirmed_by: v.status === "confirmed" ? actor.staffId : null,
+    client_id: v.client_id,
+    sales_amount: client?.unit_price ?? 0,
+    partner_id,
+    staff_id,
+    fee_amount: staff_id ? 0 : (client?.partner_fee ?? partner?.default_fee ?? 0),
+    transport_amount: transport,
+    special_amount: 0,
+    memo: v.memo ?? null,
+  };
+
+  const { data, error } = await admin.from("cad_dispatches").insert(row).select("id").single();
+  if (error) return { error: error.message };
+
+  const ym = v.dispatch_date.slice(0, 7);
+  if (v.status === "confirmed") await afterConfirm(actor.companyId, ym);
+  revalidateShift();
+  return { id: (data as { id: string }).id };
+}
+
+/** 確定後の後処理: 採番の振り直し → 財務へ再集計。確定を押した瞬間に他データへ波及する */
+async function afterConfirm(companyId: string, ym: string) {
+  const admin = createAdmin();
+  await admin.rpc("renumber_caddy_seq", { p_company_id: companyId, p_month: `${ym}-01` });
+  await refreshFinance(companyId, ym);
+}
+
+function revalidateShift() {
+  revalidatePath("/");
+  revalidatePath("/calendar");
+  revalidatePath("/dispatches");
+  revalidatePath("/ledger");
+  revalidatePath("/exports");
+  revalidatePath("/invoices");
+}
+
+/** 1件のステータス変更（仮 → 確定 / 確定 → 取消）。取消しても履歴は残す（論理削除ではない） */
+export async function setDispatchStatus(
+  id: string,
+  status: "tentative" | "confirmed" | "cancelled"
+): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  const admin = createAdmin();
+  const { data: cur } = await admin
+    .from("cad_dispatches")
+    .select("dispatch_date")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .single();
+  if (!cur) return { error: "対象が見つかりません" };
+
+  const { error } = await admin
+    .from("cad_dispatches")
+    .update({
+      status,
+      confirmed_at: status === "confirmed" ? new Date().toISOString() : null,
+      confirmed_by: status === "confirmed" ? actor.staffId : null,
+    })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+  if (error) return { error: error.message };
+
+  await afterConfirm(actor.companyId, (cur as { dispatch_date: string }).dispatch_date.slice(0, 7));
+  revalidateShift();
+  return {};
+}
+
+/** その日の仮組みをまとめて確定（1日分の割当を作り終えてから1回押す運用） */
+export async function confirmDay(date: string): Promise<{ error?: string; count?: number }> {
+  const actor = await requireActor();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "日付が不正です" };
+  const admin = createAdmin();
+  const { data, error } = await admin
+    .from("cad_dispatches")
+    .update({ status: "confirmed", confirmed_at: new Date().toISOString(), confirmed_by: actor.staffId })
+    .eq("company_id", actor.companyId)
+    .eq("dispatch_date", date)
+    .eq("status", "tentative")
+    .is("deleted_at", null)
+    .select("id");
+  if (error) return { error: error.message };
+
+  await afterConfirm(actor.companyId, date.slice(0, 7));
+  revalidateShift();
+  return { count: (data ?? []).length };
+}
+
+/** 月内の仮組みをまとめて確定（月末に一括で締める運用） */
+export async function confirmMonth(ym: string): Promise<{ error?: string; count?: number }> {
+  const actor = await requireActor();
+  if (!/^\d{4}-\d{2}$/.test(ym)) return { error: "対象月が不正です" };
+  const { from, to } = ymRange(ym);
+  const admin = createAdmin();
+  const { data, error } = await admin
+    .from("cad_dispatches")
+    .update({ status: "confirmed", confirmed_at: new Date().toISOString(), confirmed_by: actor.staffId })
+    .eq("company_id", actor.companyId)
+    .gte("dispatch_date", from)
+    .lte("dispatch_date", to)
+    .eq("status", "tentative")
+    .is("deleted_at", null)
+    .select("id");
+  if (error) return { error: error.message };
+
+  await afterConfirm(actor.companyId, ym);
+  revalidateShift();
+  return { count: (data ?? []).length };
+}
+
+/** カレンダーからの削除（論理削除・戻り値あり版） */
+export async function removeDispatch(id: string): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  const admin = createAdmin();
+  const { data: cur } = await admin
+    .from("cad_dispatches")
+    .select("dispatch_date")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .single();
+  const { error } = await admin
+    .from("cad_dispatches")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+  if (error) return { error: error.message };
+  if (cur) await refreshFinance(actor.companyId, (cur as { dispatch_date: string }).dispatch_date.slice(0, 7));
+  revalidateShift();
+  return {};
+}
+
+/* ============================================================
+   キャディ本人のシフト希望提出（スマホ / migration 0118）
+
+   トークン付きURL（/s/<token>）を LINE で1回配れば、以後は本人がスマホから入れられる。
+   ログイン不要。公開ルートなので service_role の前に必ずトークンで本人を特定する（#12/#23と同型）。
+   ============================================================ */
+
+/** 提出用URLのトークンを発行/再発行する。再発行すると旧URLは即座に無効になる */
+export async function issuePartnerToken(partnerId: string): Promise<{ error?: string; token?: string }> {
+  const actor = await requireActor();
+  const token = randomToken();
+  const admin = createAdmin();
+  const { error } = await admin
+    .from("cad_partners")
+    .update({ submit_token: token })
+    .eq("id", partnerId)
+    .eq("company_id", actor.companyId);
+  if (error) return { error: error.message };
+  revalidatePath("/masters");
+  return { token };
+}
+
+/** 提出URLを止める（退職時など） */
+export async function clearPartnerToken(partnerId: string): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  const admin = createAdmin();
+  const { error } = await admin
+    .from("cad_partners")
+    .update({ submit_token: null })
+    .eq("id", partnerId)
+    .eq("company_id", actor.companyId);
+  if (error) return { error: error.message };
+  revalidatePath("/masters");
+  return {};
+}
+
+function randomToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * 本人からの提出（公開・ログイン不要）。
+ * requireActor() は使えないので、トークンで委託先を特定し、その委託先の行しか触れないようにする。
+ */
+export async function submitSelfAvailability(
+  token: string,
+  date: string,
+  status: "available" | "maybe" | "unavailable" | "",
+  memo?: string | null
+): Promise<{ error?: string }> {
+  if (!/^[0-9a-f]{16,64}$/.test(token)) return { error: "URLが不正です" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "日付が不正です" };
+
+  const admin = createAdmin();
+  const { data: partner } = await admin
+    .from("cad_partners")
+    .select("id, company_id, status")
+    .eq("submit_token", token)
+    .is("deleted_at", null)
+    .single();
+  const p = partner as { id: string; company_id: string; status: string } | null;
+  if (!p || p.status !== "active") return { error: "このURLは無効です。担当者へご連絡ください" };
+
+  if (!status) {
+    await admin.from("cad_availability").delete().eq("partner_id", p.id).eq("date", date);
+  } else {
+    const { error } = await admin.from("cad_availability").upsert(
+      {
+        company_id: p.company_id,
+        partner_id: p.id,
+        date,
+        status,
+        memo: memo ?? null,
+        source: "self",
+        submitted_at: new Date().toISOString(),
+        deleted_at: null,
+      },
+      { onConflict: "partner_id,date" }
+    );
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath("/availability");
+  revalidatePath("/calendar");
+  revalidatePath(`/s/${token}`);
+  return {};
 }

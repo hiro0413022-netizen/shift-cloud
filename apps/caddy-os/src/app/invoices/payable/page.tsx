@@ -21,6 +21,7 @@ export default async function PayablePage({ searchParams }: { searchParams: Prom
       .from("cad_dispatches")
       .select("partner_id, kind, fee_amount, transport_amount, special_amount, cad_partners(code, name)")
       .eq("company_id", actor.companyId)
+      .eq("status", "confirmed") // 支払も確定した派遣だけ（migration 0118）
       .gte("dispatch_date", from)
       .lte("dispatch_date", to)
       .is("deleted_at", null)

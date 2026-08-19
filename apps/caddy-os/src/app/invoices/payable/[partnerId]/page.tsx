@@ -36,6 +36,7 @@ export default async function PayableDetail({
       .from("cad_dispatches")
       .select("dispatch_date, kind, fee_amount, transport_amount, special_amount, work_hours, cad_clients(name)")
       .eq("company_id", actor.companyId)
+      .eq("status", "confirmed") // 支払も確定した派遣だけ（migration 0118）
       .eq("partner_id", partnerId)
       .gte("dispatch_date", from)
       .lte("dispatch_date", to)

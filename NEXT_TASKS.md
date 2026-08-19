@@ -7,6 +7,17 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-001. **Caddy OS 外部連携API のトークン設定**（3分・APIを使うときだけ必要 / DECISIONS #140）
+   Vercel → プロジェクト `caddy-os` → Settings → Environment Variables に追加:
+   `CADDY_API_TOKEN` = ランダムな長い文字列（生成例: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`）
+   → Deployments → 最新 → ⋯ → Redeploy。未設定でも画面は動きます（`/api/v1/*` だけが401になります）。
+   設定後の疎通確認: `curl -H "Authorization: Bearer <トークン>" https://caddy-os-hironobu-s-projects.vercel.app/api/v1/partners`
+
+A-002. **キャディへのシフト希望提出URLの配布**（DECISIONS #140）
+   Caddy OS → 設定 → 委託先（キャディ）の各行にある「提出URLを発行」→ コピー → LINEで本人へ送付。
+   本人はそのURLをスマホのホーム画面に追加しておけば、毎月そこから希望日をタップするだけになります。
+   URLが漏れたときは同じ行の「再発行」を押すと旧URLは即座に無効になります。
+
 A-000. **PRO SITE（榎本剛志オフィシャルHP #137・2026-08-14）のenv設定**（5分・これだけで公開完了）
    Vercel → プロジェクト `pro-site` → Settings → Environment Variables に2つ追加（値は member-os 等の既存プロジェクトと同じ）:
    `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`

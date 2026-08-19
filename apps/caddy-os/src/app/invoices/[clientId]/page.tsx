@@ -52,6 +52,7 @@ export default async function InvoiceDetail({
     .from("cad_dispatches")
     .select("dispatch_date, sales_amount")
     .eq("company_id", actor.companyId)
+    .eq("status", "confirmed") // 請求は確定した派遣だけ（migration 0118）
     .eq("client_id", clientId)
     .or(`and(dispatch_date.gte.${from},dispatch_date.lte.${to},billing_ym.is.null),billing_ym.eq.${ym}`)
     .is("deleted_at", null)

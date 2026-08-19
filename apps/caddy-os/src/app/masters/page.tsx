@@ -14,13 +14,13 @@ export default async function MastersPage() {
   const [{ data: clients }, { data: partners }, { data: rates }, { data: caddyStaff }, { data: company }] = await Promise.all([
     admin
       .from("cad_clients")
-      .select("id, code, name, unit_price, partner_fee, closing_day, payment_day, postal_code, address, has_contract, status")
+      .select("id, code, name, unit_price, partner_fee, closing_day, payment_day, postal_code, address, has_contract, status, csv_format, contact_name, contact_email")
       .eq("company_id", actor.companyId)
       .is("deleted_at", null)
       .order("code"),
     admin
       .from("cad_partners")
-      .select("id, code, name, name_kana, default_fee, default_transport, hourly_wage, main_course, show_in_picker, status, memo, bank_name, bank_branch, bank_account_type, bank_account_no, bank_holder")
+      .select("id, code, name, name_kana, default_fee, default_transport, hourly_wage, main_course, phone, email, submit_token, show_in_picker, status, memo, bank_name, bank_branch, bank_account_type, bank_account_no, bank_holder")
       .eq("company_id", actor.companyId)
       .is("deleted_at", null)
       .order("code"),
@@ -55,7 +55,8 @@ export default async function MastersPage() {
 
   // キャディに入る社員（重複排除）
   const staffMap = new Map<string, string>();
-  for (const d of (caddyStaff ?? []) as Array<{ staff_id: string | null; staff: { name: string } | null }>) {
+  // Supabaseのネスト取得は環境により配列型に推論されるため unknown 経由で確定させる（本番ビルドERROR対策 2026-08-19）
+  for (const d of (caddyStaff ?? []) as unknown as Array<{ staff_id: string | null; staff: { name: string } | null }>) {
     if (d.staff_id && !staffMap.has(d.staff_id)) staffMap.set(d.staff_id, d.staff?.name ?? "（社員）");
   }
   const caddyStaffList = [...staffMap.entries()].map(([id, name]) => ({ id, name }));

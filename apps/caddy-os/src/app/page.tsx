@@ -25,7 +25,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h1 className="text-2xl font-bold tracking-widest">Caddy OS</h1>
           <p className="mt-1 text-sm text-(--color-dim)">キャディ派遣 — 派遣台帳・売上・委託料・収支</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/calendar" className="text-sm font-medium underline">
+            シフトカレンダー
+          </Link>
+          <Link href="/ledger" className="text-sm underline">
+            キャディ台帳
+          </Link>
+          <Link href="/exports" className="text-sm underline">
+            ゴルフ場提出
+          </Link>
           <Link href="/dispatches" className="text-sm underline">
             派遣台帳
           </Link>
