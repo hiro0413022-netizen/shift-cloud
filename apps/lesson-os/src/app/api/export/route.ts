@@ -6,7 +6,10 @@ import { createAdmin } from "@/lib/supabase/admin";
 export async function GET(request: Request) {
   const actor = await requireLessonActor();
   const admin = createAdmin();
-  const kind = new URL(request.url).searchParams.get("kind") ?? "lessons";
+  const params = new URL(request.url).searchParams;
+  const kind = params.get("kind") ?? "lessons";
+  // 画面と同じ既定（退会者は出さない）。?inactive=1 で退会者も含める（2026-08-22）
+  const statuses = params.get("inactive") === "1" ? ["active", "inactive"] : ["active"];
 
   const esc = (s: unknown) => `"${String(s ?? "").replace(/"/g, '""')}"`;
   let rows: string[] = [];
@@ -18,7 +21,8 @@ export async function GET(request: Request) {
       .from("lsn_students")
       .select("name, name_kana, member_code, goal, memo, status, created_at")
       .eq("company_id", actor.companyId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .in("status", statuses);
     q = withStoreScope(q, actor);
     const { data } = await q.order("name");
     rows = [
@@ -34,7 +38,8 @@ export async function GET(request: Request) {
       .from("lsn_students")
       .select("id")
       .eq("company_id", actor.companyId)
-      .is("deleted_at", null);
+      .is("deleted_at", null)
+      .in("status", statuses);
     sq = withStoreScope(sq, actor);
     const { data: scoped } = await sq;
     const studentIds = ((scoped ?? []) as Array<{ id: string }>).map((s) => s.id);

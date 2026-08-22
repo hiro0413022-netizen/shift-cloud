@@ -4,18 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { estimatePhases, type Phases } from "@/lib/phases";
 
 /**
- * 撮影モジュール（DECISIONS #51 / 修正: シャッター常時表示・アングル別ガイド）
+ * 撮影モジュール（DECISIONS #51 / 2026-08-22 ガイド線を廃止）
  *
- * ガイドは撮影の定石に合わせて2種類（後方DTL / 正面フェースオン）を切替。
- * 共通の狙い（各社の撮影ガイドで共通する要件）:
- *   - カメラの高さは手元（腰）の高さ・水平
- *   - 頭の上に余白（トップでクラブが切れない）、足元にボールが入る
- *   - 人物は画面のやや下・中央
- *   - 後方(DTL)はターゲットラインと平行、後ろ足のつま先の延長線上から
- *   - 正面(フェースオン)はスタンス中央に正対
- * 画角が毎回変わると比較再生・フェーズ比較の意味が薄れるため、枠に合わせて撮ってもらう。
+ * ガイド（後方DTL・正面フェースオンの枠線＋説明テキスト）は削除した。
+ * 理由: 実機では説明テキストが枠幅からはみ出て切れ、線も被写体に重なって
+ *       かえって構図が取りづらい、とユーザーから指摘（2026-08-22）。
+ *       画角を揃えたいだけなら、9:16の固定枠に収めてもらえば足りる。
+ * ※ 復活させる場合は、SVGのviewBox幅(90)を超える長さのtextを置かないこと。
  *
- * レイアウト: プレビューは 9:16 固定枠（object-cover）＝ガイドと実映像がズレない。
+ * レイアウト: プレビューは 9:16 固定枠（object-cover）。
  * シャッターはプレビュー上に重ねる（カメラアプリと同じ）ので、スクロールしても必ず押せる。
  */
 
@@ -27,51 +24,7 @@ const MIMES = [
   "video/webm",
 ];
 
-type Angle = "dtl" | "faceon" | "off";
-
 export type Captured = { blob: Blob; url: string; ext: string; phases: Phases | null; duration: number };
-
-/** 後方（DTL）: ターゲットライン・つま先線・シャフトプレーン・頭の位置 */
-function GuideDTL() {
-  return (
-    <svg viewBox="0 0 90 160" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
-      {/* 人物を収める枠（頭上に余白・足元にボール） */}
-      <rect x="22" y="20" width="46" height="118" fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.3" strokeDasharray="3 3" />
-      {/* 頭の目安 */}
-      <circle cx="45" cy="30" r="7" fill="none" stroke="#7CFC66" strokeWidth="0.5" opacity="0.8" />
-      {/* ターゲットライン（足元・水平） */}
-      <line x1="4" y1="132" x2="86" y2="132" stroke="#4dd2ff" strokeWidth="0.6" strokeDasharray="4 3" opacity="0.9" />
-      {/* ボール位置 */}
-      <circle cx="45" cy="128" r="2" fill="none" stroke="#ffffff" strokeWidth="0.6" opacity="0.9" />
-      {/* シャフトプレーン（ボール→肩） */}
-      <line x1="45" y1="128" x2="78" y2="58" stroke="#ffd54d" strokeWidth="0.5" opacity="0.85" />
-      {/* 前傾（背骨）ライン */}
-      <line x1="45" y1="128" x2="38" y2="36" stroke="#ff9d4d" strokeWidth="0.4" opacity="0.6" />
-      <text x="6" y="129" fill="#4dd2ff" fontSize="3.6" opacity="0.9">ターゲットライン</text>
-      <text x="6" y="18" fill="#ffffff" fontSize="3.6" opacity="0.6">後方（DTL）: 後ろ足つま先の延長線上・腰の高さ</text>
-    </svg>
-  );
-}
-
-/** 正面（フェースオン）: 体の中心線・ボール・腰の高さ */
-function GuideFaceOn() {
-  return (
-    <svg viewBox="0 0 90 160" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
-      <rect x="18" y="20" width="54" height="118" fill="none" stroke="#ffffff" strokeWidth="0.4" opacity="0.3" strokeDasharray="3 3" />
-      {/* 体の中心線 */}
-      <line x1="45" y1="20" x2="45" y2="138" stroke="#7CFC66" strokeWidth="0.5" strokeDasharray="3 3" opacity="0.85" />
-      {/* 頭の目安 */}
-      <circle cx="45" cy="30" r="7" fill="none" stroke="#7CFC66" strokeWidth="0.5" opacity="0.8" />
-      {/* 腰の高さ＝カメラの高さの目安 */}
-      <line x1="20" y1="80" x2="70" y2="80" stroke="#ffd54d" strokeWidth="0.4" strokeDasharray="2 2" opacity="0.7" />
-      <text x="20" y="78" fill="#ffd54d" fontSize="3.4" opacity="0.85">この線にカメラの高さを合わせる（腰）</text>
-      {/* 地面・ボール */}
-      <line x1="4" y1="132" x2="86" y2="132" stroke="#4dd2ff" strokeWidth="0.6" strokeDasharray="4 3" opacity="0.9" />
-      <circle cx="45" cy="128" r="2" fill="none" stroke="#ffffff" strokeWidth="0.6" opacity="0.9" />
-      <text x="6" y="18" fill="#ffffff" fontSize="3.6" opacity="0.6">正面（フェースオン）: スタンス中央に正対</text>
-    </svg>
-  );
-}
 
 export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => void; onClose: () => void }) {
   const camRef = useRef<HTMLVideoElement>(null);
@@ -82,7 +35,6 @@ export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => vo
 
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [limit, setLimit] = useState(8);
-  const [angle, setAngle] = useState<Angle>("dtl");
   const [count, setCount] = useState<number | null>(null);
   const [rec, setRec] = useState(false);
   const [left, setLeft] = useState(0);
@@ -204,7 +156,7 @@ export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => vo
       ) : (
         /* ---- 撮影 ---- */
         <div className="flex min-h-0 flex-1 flex-col items-center px-3 pb-3">
-          {/* 9:16固定枠 = ガイドと実映像がズレない */}
+          {/* 9:16固定枠 */}
           <div className="relative mx-auto aspect-[9/16] max-h-full w-full max-w-[440px] shrink overflow-hidden rounded-xl bg-black">
             <video
               ref={camRef}
@@ -214,8 +166,6 @@ export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => vo
               className="absolute inset-0 h-full w-full object-cover"
               style={{ transform: facing === "user" ? "scaleX(-1)" : undefined }}
             />
-            {angle === "dtl" && <GuideDTL />}
-            {angle === "faceon" && <GuideFaceOn />}
 
             {count !== null && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-8xl font-bold text-(--color-gold)">
@@ -266,18 +216,8 @@ export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => vo
 
           {err && <p className="mt-2 text-xs text-(--color-danger)">{err}</p>}
 
-          {/* 設定（下段・シャッターとは別） */}
+          {/* 秒数（シャッターとは別・下段） */}
           <div className="mt-2 flex w-full max-w-[440px] shrink-0 flex-wrap items-center justify-center gap-1.5 text-xs">
-            {([["dtl", "後方"], ["faceon", "正面"], ["off", "ガイドなし"]] as [Angle, string][]).map(([a, lab]) => (
-              <button
-                key={a}
-                onClick={() => setAngle(a)}
-                className={`rounded-lg border px-2.5 py-1.5 ${angle === a ? "border-(--color-active) text-(--color-active)" : "border-(--color-line) text-(--color-dim)"}`}
-              >
-                {lab}
-              </button>
-            ))}
-            <span className="mx-1 text-(--color-line)">|</span>
             {[5, 8, 12].map((s) => (
               <button
                 key={s}

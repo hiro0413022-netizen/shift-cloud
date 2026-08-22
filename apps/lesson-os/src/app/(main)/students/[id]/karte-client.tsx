@@ -8,6 +8,7 @@ import { VideoPlayer } from "./video-player";
 import { CompareView, type CompareSource } from "./compare-view";
 import { ProgressPanel, type ProgressItem } from "./progress-panel";
 import { ProfileForm } from "./profile-form";
+import { MeasurePanel, type MeasurementItem } from "./measure-panel";
 import {
   createVideoUploadUrl,
   registerVideo,
@@ -44,9 +45,10 @@ export type StudentData = {
   skill: Record<string, string>;
 };
 
-type Tab = "lesson" | "progress" | "profile" | "skill" | "compare";
+type Tab = "lesson" | "measure" | "progress" | "profile" | "skill" | "compare";
 const TABS: { id: Tab; label: string }[] = [
   { id: "lesson", label: "本日のレッスン" },
+  { id: "measure", label: "計測" },
   { id: "progress", label: "進捗" },
   { id: "profile", label: "基本情報" },
   { id: "skill", label: "詳細情報" },
@@ -58,11 +60,13 @@ export function KarteClient({
   videos,
   progress,
   compareSources,
+  measurements,
 }: {
   student: StudentData;
   videos: VideoItem[];
   progress: ProgressItem[];
   compareSources: CompareSource[];
+  measurements: MeasurementItem[];
 }) {
   const [tab, setTab] = useState<Tab>("lesson");
   const [msg, setMsg] = useState<string | null>(null);
@@ -184,7 +188,7 @@ export function KarteClient({
       </div>
 
       {/* タブ（PGA NOTE: 本日のレッスン/基本情報/詳細情報…） */}
-      <div className="grid grid-cols-5 gap-1 rounded-xl border border-(--color-line) bg-(--color-panel) p-1 text-center text-xs md:text-sm">
+      <div className="grid grid-cols-3 gap-1 rounded-xl border border-(--color-line) bg-(--color-panel) p-1 text-center text-xs md:grid-cols-6 md:text-sm">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -206,7 +210,7 @@ export function KarteClient({
             {/* 撮影モジュール（アプリ内カメラ） */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <button onClick={() => setRecOpen(true)} className="btn-gold">📹 その場で撮影</button>
-              <span className="text-xs text-(--color-dim)">ガイド線・カウントダウン・自動停止つき。撮ると同時にフェーズを自動マーク</span>
+              <span className="text-xs text-(--color-dim)">カウントダウン・自動停止つき。撮ると同時にフェーズを自動マーク</span>
             </div>
             {captured && (
               <div className="mb-3 flex items-center gap-3 rounded-lg border border-(--color-active) bg-(--color-panel-2) p-2">
@@ -312,6 +316,7 @@ export function KarteClient({
         </div>
       )}
 
+      {tab === "measure" && <MeasurePanel studentId={student.id} items={measurements} />}
       {tab === "progress" && <ProgressPanel studentId={student.id} items={progress} />}
       {tab === "profile" && (
         <ProfileForm

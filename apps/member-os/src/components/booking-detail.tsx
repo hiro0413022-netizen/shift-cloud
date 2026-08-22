@@ -26,6 +26,15 @@ import { setBookingStatus, recordPayment } from "@/app/(main)/reservations/actio
 
 const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
 
+/**
+ * 会員番号でレッスンカルテを開く（2026-08-22 ユーザー依頼）。
+ * lesson-os 側の /m/<会員番号> がカルテIDに解決してリダイレクトする（無ければその場で作る）ので、
+ * member-os は lsn_students を引かない＝アプリ間の結合を増やさない。
+ */
+function karteHref(memberNo: string): string {
+  return `${LESSON_OS_URL}/m/${encodeURIComponent(memberNo)}`;
+}
+
 function yen(n: number | null | undefined): string {
   return n == null ? "—" : `¥${Number(n).toLocaleString("ja-JP")}`;
 }
@@ -108,6 +117,11 @@ export function BookingDetailPanel({
                 <Link href={`/frunk/${m.id}`} className="ml-2 text-xs text-indigo-600 underline">
                   会員カードを開く →
                 </Link>
+                {m.member_no ? (
+                  <a href={karteHref(m.member_no)} target="_blank" rel="noreferrer" className="ml-2 text-xs text-indigo-600 underline">
+                    レッスンカルテ ↗
+                  </a>
+                ) : null}
               </Row>
             ) : null}
             <Row label="電話">{phone ? <a href={`tel:${phone}`} className="text-indigo-600 underline">{phone}</a> : "—"}</Row>
@@ -171,9 +185,9 @@ export function BookingDetailPanel({
               <Link href={`/reservations?date=${b.booked_date}`} className={btnGhostCls}>
                 予約管理で開く →
               </Link>
-              {m ? (
-                <a href={`${LESSON_OS_URL}/frank`} target="_blank" rel="noreferrer" className={btnGhostCls}>
-                  レッスンカルテ ↗
+              {m?.member_no ? (
+                <a href={karteHref(m.member_no)} target="_blank" rel="noreferrer" className={btnGhostCls}>
+                  レッスンカルテを開く ↗
                 </a>
               ) : null}
             </div>
@@ -219,13 +233,20 @@ export function LessonDetailPanel({ l, backHref }: { l: LessonDetail; backHref: 
         <Row label="コーチ">{l.staff?.name ?? "—"}</Row>
         <Row label="打席">{l.frunk_bays?.name ?? "打席指定なし"}</Row>
         <Row label="状態">{l.status === "open" ? "受付中" : l.status}</Row>
+        <Row label="予約者">
+          {l.booking ? `${l.booking.member_name ?? "（氏名未設定）"}　${l.booking.member_no ?? ""}` : "まだ予約が入っていません"}
+        </Row>
         {l.note ? <Row label="備考">{l.note}</Row> : null}
-        <p className="mt-2 text-xs text-(--color-dim)">
-          レッスンの予約者・カルテはレッスン管理システムで確認してください。
-        </p>
-        <a href={`${LESSON_OS_URL}/frank`} target="_blank" rel="noreferrer" className={`${btnGhostCls} mt-2`}>
-          レッスン管理システム ↗
-        </a>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {l.booking?.member_no ? (
+            <a href={karteHref(l.booking.member_no)} target="_blank" rel="noreferrer" className={btnGhostCls}>
+              この生徒のカルテを開く ↗
+            </a>
+          ) : null}
+          <a href={`${LESSON_OS_URL}/frank`} target="_blank" rel="noreferrer" className={btnGhostCls}>
+            レッスン管理システム ↗
+          </a>
+        </div>
       </div>
     </Shell>
   );

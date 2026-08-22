@@ -147,9 +147,16 @@ export default async function FrunkMemberPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* コーチが書く側のカルテ。/m/<会員番号> がカルテIDに解決する（2026-08-22） */}
+          {memberNo && (
+            <a href={`${LESSON_OS_URL}/m/${encodeURIComponent(String(memberNo))}`} target="_blank" rel="noreferrer" className={btnGhostCls}>
+              レッスンカルテ ↗
+            </a>
+          )}
+          {/* 生徒本人に送っているURL（見え方の確認用）。カルテ本体とは別物なのでラベルを分ける */}
           {shareToken && (
             <a href={`${LESSON_OS_URL}/s/${shareToken}`} target="_blank" rel="noreferrer" className={btnGhostCls}>
-              レッスンカルテ ↗
+              生徒の共有ページ ↗
             </a>
           )}
           <Link href={`/reservations?date=${today}`} className={btnGhostCls}>

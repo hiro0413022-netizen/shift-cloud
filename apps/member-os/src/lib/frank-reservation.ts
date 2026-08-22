@@ -128,6 +128,14 @@ export type LessonDetail = {
   note: string | null;
   staff: { name: string } | null;
   frunk_bays: { name: string } | null;
+  /** この枠を予約している会員（居なければ null）。カルテへ直接飛ぶために持つ（2026-08-22） */
+  booking: { id: string; status: string; member_no: string | null; member_name: string | null } | null;
+};
+
+type LessonBookingRow = {
+  id: string;
+  status: string;
+  frunk_members: { name: string | null; member_no: string | null } | null;
 };
 
 export async function loadLessonDetail(id: string, companyId: string): Promise<LessonDetail | null> {
@@ -141,7 +149,31 @@ export async function loadLessonDetail(id: string, companyId: string): Promise<L
     .eq("store_id", FRANK_STORE_ID)
     .is("deleted_at", null)
     .maybeSingle();
-  return (data as unknown as LessonDetail | null) ?? null;
+  if (!data) return null;
+
+  // 予約者（1枠1人・取消は除く）。カレンダーから「誰のレッスンか」を辿れるようにする
+  const { data: bk } = await admin
+    .from("frunk_lesson_bookings")
+    .select("id, status, frunk_members(name, member_no)")
+    .eq("slot_id", id)
+    .eq("company_id", companyId)
+    .in("status", ["confirmed", "done"])
+    .is("deleted_at", null)
+    .limit(1)
+    .maybeSingle();
+  const b = (bk as unknown as LessonBookingRow | null) ?? null;
+
+  return {
+    ...(data as unknown as Omit<LessonDetail, "booking">),
+    booking: b
+      ? {
+          id: b.id,
+          status: b.status,
+          member_no: b.frunk_members?.member_no ?? null,
+          member_name: b.frunk_members?.name ?? null,
+        }
+      : null,
+  };
 }
 
 export type DayView = {

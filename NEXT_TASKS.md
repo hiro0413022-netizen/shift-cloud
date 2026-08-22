@@ -83,8 +83,11 @@ A-1. **小川うららのアカウント発行** — DB上 `staff.auth_user_id` 
    - Shift Cloud管理画面 → スタッフ → 小川うらら編集 → 初期パスワード（8文字以上）設定 → 保存
    - 発行後: GENESIS(/manual・/library)を触ってもらう。共有パック docs/genesis/ONBOARDING_EXEC.md
 
-A-2. **コーチへ `use_lesson` 権限を付与** — この権限を持つロールがDB上に**1つも存在しない**＝Lesson OSはまだ古川さんしか使えない
-   - Shift Cloud → ロール（役員ロールと同様に新ロール or 既存ロールに権限追加）
+A-2. **ロール「コーチング（店舗）」に `use_lesson` を付与** — 2026-08-22の実測: `use_lesson` は「スタッフ / 店舗責任者 / 会社オーナー」の3ロールには付いているが、**実際にレッスンを持つ人が使っている「コーチング（店舗）」には付いていない**＝穴田賢太さん・藤田晃規さん・FRANK店舗アカウントはLesson OSを開けない
+   - Shift Cloud → ロール →「コーチング（店舗）」→ `use_lesson` にチェック（所要1分）
+
+A-2b. **Vercel `lesson-os` に `ANTHROPIC_API_KEY` を追加** → Redeploy（#141・トラックマン写真のAI読取に必要。未設定でも計測タブは手入力で使える）
+   - 値は genesis と同じ。読取精度が足りないときだけ `LESSON_AI_MODEL` でモデルを上げる（既定 `claude-haiku-4-5-20251001`）
 
 A-3. **Reserve OS の通しテスト** — `res_requests` **0件**＝一度も申込が通っていない
    - https://shift-cloud-reserve-os.vercel.app/reserve/shaft-fitting で申込 → GOLF WING宛に通知メール到達 → /login（use_reception|view_hq）→ /requests で確定メール送信 まで
@@ -97,7 +100,9 @@ A-4. ~~LINE公式アカウント Phase 0~~ **✅ 送信側 開通（2026-07-25 /
 
 A-5. **営業利益の目標値** — 5大KPIのうち営業利益だけ target が未設定（会員数/入会率/退会率/月次売上は設定済）
 
-A-6. **Lesson OS 実機確認**（生徒1件・動画1件のみ＝ほぼ未使用）— スマホで 生徒登録→撮影→描画→進捗→共有リンク(/s/) をLINEで自分に送って確認
+A-6. **Lesson OS 実機確認**（2026-08-22時点で生徒1件・動画2件＝ほぼ未使用。FRANK会員4名のカルテは 0119 で自動生成済み）
+   - スマホで 生徒登録→撮影→描画→進捗→共有リンク(/s/) をLINEで自分に送って確認
+   - #141の追加分: member-os の予約カレンダー→予約をタップ→「レッスンカルテを開く」でその会員のカルテが開くか ／「計測」タブでトラックマン写真から数値が入るか（A-2bのenvが前提）／ FRANK会員を退会にすると一覧から消え「退会者も表示」で戻るか
 
 A-7. **AI DEMO SALES のenv設定（Vercel: demo-sales）** — 新アプリのデプロイに必要（#54）
    - Vercelプロジェクト `demo-sales`（Root=apps/demo-sales）に env 3つ: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY（他アプリと同値）＋ NEXT_PUBLIC_SITE_URL（デモURL用・デプロイ後の本番URL）

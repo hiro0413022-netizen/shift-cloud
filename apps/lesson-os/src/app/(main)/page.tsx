@@ -4,18 +4,25 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { AddStudentForm } from "./add-student";
 
 /** 生徒一覧（レッスンノート）— 顔写真・検索・最終レッスン日順（DECISIONS #50） */
-export default async function StudentsPage({ searchParams }: { searchParams: Promise<{ q?: string; denied?: string }> }) {
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; denied?: string; inactive?: string }>;
+}) {
   const actor = await requireLessonActor();
   const admin = createAdmin();
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
+  // 退会者（status='inactive'）は既定で隠す。0119 のトリガーがFRANKの退会を自動で落とす。
+  // 記録そのものは消さないので、チェックを入れれば過去の生徒として開ける（2026-08-22）
+  const showInactive = sp.inactive === "1";
 
   let query = admin
     .from("lsn_students")
     .select("id, name, name_kana, member_code, goal, status, photo_path")
     .eq("company_id", actor.companyId)
-    .is("deleted_at", null)
-    .eq("status", "active");
+    .is("deleted_at", null);
+  query = showInactive ? query.in("status", ["active", "inactive"]) : query.eq("status", "active");
   // 店舗スコープ（#134）。これが無いと FRANK のWeb入会で自動生成されたカルテ（#129）が
   // GOLF WING のレッスンノートに並ぶ。複数の or() は PostgREST 側で AND 結合される
   query = withStoreScope(query, actor);
@@ -57,11 +64,15 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
           </span>
         </h1>
         <div className="flex items-center gap-2">
-          <form className="flex gap-2">
+          <form className="flex flex-wrap items-center gap-2">
             <input name="q" defaultValue={q} placeholder="氏名、かな、会員番号で検索" className="input-dark w-64 max-w-full" />
+            <label className="flex items-center gap-1 whitespace-nowrap text-xs text-(--color-dim)">
+              <input type="checkbox" name="inactive" value="1" defaultChecked={showInactive} className="accent-(--color-gold)" />
+              退会者も表示
+            </label>
             <button className="rounded-lg bg-(--color-header) px-4 py-2 text-sm font-medium text-white">検索</button>
           </form>
-          <a href="/api/export?kind=lessons" className="btn-ghost hidden whitespace-nowrap text-xs md:block" title="レッスン記録をCSVで保存">⬇ CSV</a>
+          <a href={`/api/export?kind=lessons${showInactive ? "&inactive=1" : ""}`} className="btn-ghost hidden whitespace-nowrap text-xs md:block" title="レッスン記録をCSVで保存">⬇ CSV</a>
         </div>
       </div>
 
@@ -72,6 +83,10 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
       )}
 
       <AddStudentForm />
+
+      {showInactive && (
+        <p className="text-xs text-(--color-dim)">退会した生徒も表示しています（カードの「退会」バッジ）</p>
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {sorted.length === 0 && (
@@ -96,6 +111,9 @@ export default async function StudentsPage({ searchParams }: { searchParams: Pro
                   <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-(--color-gold)/60">
                     {s.name.slice(0, 1)}
                   </div>
+                )}
+                {s.status === "inactive" && (
+                  <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-(--color-dim)">退会</span>
                 )}
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2.5 pb-1.5 pt-6">
                   <p className="truncate text-sm font-semibold text-white">{s.name}</p>

@@ -7,6 +7,8 @@ import type { Phases } from "@/lib/phases";
 import { KarteClient, type VideoItem, type StudentData } from "./karte-client";
 import type { CompareSource } from "./compare-view";
 import type { ProgressItem } from "./progress-panel";
+import type { MeasurementItem } from "./measure-panel";
+import type { TrackmanValues } from "@/lib/trackman";
 
 /** 生徒カルテ（DECISIONS #50: PGA NOTE準拠のタブ構成） */
 export default async function StudentPage({ params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +27,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
   // URL直打ちで他店舗のカルテを開けないようにする（#134）
   if (!canAccessStore(actor, (student as { store_id: string | null }).store_id)) notFound();
 
-  const [{ data: videos }, { data: items }, { data: prog }, { data: models }] = await Promise.all([
+  const [{ data: videos }, { data: items }, { data: prog }, { data: models }, { data: measures }] = await Promise.all([
     admin
       .from("lsn_videos")
       .select("id, shot_at, club, distance_yd, note, is_best, annotations, phases, created_at, staff:uploaded_by(name)")
@@ -48,6 +50,14 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(30),
+    // トラックマン計測（2026-08-22）。写真は一覧では出さず、押されたときだけ署名URLを出す
+    admin
+      .from("lsn_measurements")
+      .select("id, measured_at, club, note, data, photo_path")
+      .eq("student_id", id)
+      .is("deleted_at", null)
+      .order("measured_at", { ascending: false })
+      .limit(60),
   ]);
 
   const videoIds = (videos ?? []).map((v) => v.id);
@@ -78,6 +88,15 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
         coach: (c.staff as unknown as { name: string } | null)?.name ?? "",
         at: c.created_at.slice(0, 16).replace("T", " "),
       })),
+  }));
+
+  const measurements: MeasurementItem[] = (measures ?? []).map((m) => ({
+    id: String(m.id),
+    measuredAt: m.measured_at ? String(m.measured_at).slice(0, 10) : "",
+    club: (m.club as string | null) ?? null,
+    note: (m.note as string | null) ?? null,
+    hasPhoto: Boolean(m.photo_path),
+    values: ((m.data as TrackmanValues | null) ?? {}) as TrackmanValues,
   }));
 
   const progMap = new Map((prog ?? []).map((p) => [p.item_id, p.percent]));
@@ -125,7 +144,13 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
         <span>›</span>
         <span className="text-(--color-txt)">{student.name}</span>
       </div>
-      <KarteClient student={studentData} videos={videoItems} progress={progressItems} compareSources={compareSources} />
+      <KarteClient
+        student={studentData}
+        videos={videoItems}
+        progress={progressItems}
+        compareSources={compareSources}
+        measurements={measurements}
+      />
     </div>
   );
 }
