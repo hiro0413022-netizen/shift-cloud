@@ -76,13 +76,21 @@ export function CalendarBoard({
     return { tentative, confirmed };
   }, [dispatches]);
 
-  const run = (fn: () => Promise<{ error?: string; count?: number }>, okText: string) =>
+  type ActionResult = { error?: string; count?: number; updated?: boolean; unchanged?: boolean };
+  const run = (fn: () => Promise<ActionResult>, okText: string | ((r: ActionResult) => string), onOk?: () => void) =>
     start(async () => {
       const r = await fn();
-      setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: okText });
-      if (!r.error) router.refresh();
-      setTimeout(() => setMsg(null), 3000);
+      setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: typeof okText === "function" ? okText(r) : okText });
+      if (!r.error) onOk?.();
+      // 成功・失敗にかかわらずサーバーの最新状態を取り直す。
+      // （失敗＝「既に割り当て済み」等はサーバー側の実態と画面がズレている合図なので、むしろ再取得が要る）
+      router.refresh();
+      setTimeout(() => setMsg(null), r.error ? 6000 : 3000);
     });
+
+  // 追加フォームの結果メッセージ（新規 / 仮→確定の更新 / 既に同内容）
+  const assignText = (label: "仮" | "確定") => (r: ActionResult) =>
+    r.unchanged ? `既に${label}で入っています（変更なし）` : r.updated ? `${label}に更新しました` : `${label}で追加しました`;
 
   // 月初の曜日ぶんだけ先頭に空セルを入れて、日曜始まりの表にする
   const lead = new Date(`${days[0]}T00:00:00Z`).getUTCDay();
@@ -93,16 +101,23 @@ export function CalendarBoard({
 
   // 候補は「その日 ○/△ を出していて、まだ割り当てられていないキャディ」を先頭に出す
   const candidates = useMemo(() => {
-    const assigned = new Set(
-      dayDispatches.filter((d) => d.status !== "cancelled").map((d) => d.partner_id ?? d.staff_id)
-    );
+    // 割当済みの判定は「同じ日 × 同じキャディ」（取消は除く）＝サーバー側の重複判定と同じ条件
+    const assigned = new Map<string, BoardDispatch>();
+    for (const d of dayDispatches) if (d.status !== "cancelled") assigned.set(d.partner_id ?? d.staff_id ?? "", d);
     const avail = new Map(dayAvailability.map((a) => [a.partner_id, a.status]));
     const rank = (id: string) => (avail.get(id) === "available" ? 0 : avail.get(id) === "maybe" ? 1 : 3);
     return partners
       .filter((p) => avail.get(p.id) !== "unavailable")
-      .map((p) => ({ ...p, mark: AV_MARK[avail.get(p.id) ?? ""] ?? "", rank: rank(p.id), taken: assigned.has(p.id) }))
+      .map((p) => ({ ...p, mark: AV_MARK[avail.get(p.id) ?? ""] ?? "", rank: rank(p.id), taken: assigned.get(p.id) ?? null }))
       .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name, "ja"));
   }, [partners, dayAvailability, dayDispatches]);
+
+  // いま選んでいるキャディがその日に既に入っているか（仮なら［確定］で更新できる）
+  const selectedExisting = useMemo(() => {
+    if (!assignee) return null;
+    const id = assignee.slice(2);
+    return dayDispatches.find((d) => d.status !== "cancelled" && (d.partner_id ?? d.staff_id) === id) ?? null;
+  }, [assignee, dayDispatches]);
 
   return (
     <div>
@@ -222,10 +237,10 @@ export function CalendarBoard({
               <option value="">キャディを選ぶ</option>
               <optgroup label="キャディ（出勤希望順）">
                 {candidates.map((p) => (
-                  <option key={p.id} value={`p:${p.id}`} disabled={p.taken}>
+                  <option key={p.id} value={`p:${p.id}`} disabled={p.taken?.status === "confirmed"}>
                     {p.mark ? `${p.mark} ` : ""}
                     {p.name}
-                    {p.taken ? "（割当済）" : ""}
+                    {p.taken ? `（${STATUS_LABEL[p.taken.status]}で割当済）` : ""}
                   </option>
                 ))}
               </optgroup>
@@ -241,11 +256,12 @@ export function CalendarBoard({
             </select>
             <button
               type="button"
-              disabled={pending || !assignee}
+              disabled={pending || !assignee || !!selectedExisting}
               onClick={() =>
                 run(
                   () => assignDispatch({ dispatch_date: selected, client_id: clientId || null, assignee, status: "tentative" }),
-                  "仮で追加しました"
+                  assignText("仮"),
+                  () => setAssignee("")
                 )
               }
               className="rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm disabled:opacity-50"
@@ -254,18 +270,27 @@ export function CalendarBoard({
             </button>
             <button
               type="button"
-              disabled={pending || !assignee}
+              disabled={pending || !assignee || selectedExisting?.status === "confirmed"}
               onClick={() =>
                 run(
                   () => assignDispatch({ dispatch_date: selected, client_id: clientId || null, assignee, status: "confirmed" }),
-                  "確定で追加しました"
+                  assignText("確定"),
+                  () => setAssignee("")
                 )
               }
               className="rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
-              確定で追加
+              {selectedExisting?.status === "tentative" ? "確定" : "確定で追加"}
             </button>
           </div>
+          {selectedExisting ? (
+            <p className="-mt-2 mb-4 text-xs text-(--color-dim)">
+              {selectedExisting.caddie_name} はこの日すでに<b>{STATUS_LABEL[selectedExisting.status]}</b>で入っています
+              {selectedExisting.status === "tentative"
+                ? "。［確定］を押すとその割当が確定になります（二重登録はされません）"
+                : "。変更する場合は下の一覧から「仮に戻す」「取消」をしてください"}
+            </p>
+          ) : null}
 
           {/* ── 既存の割当 ── */}
           {dayDispatches.length === 0 ? (

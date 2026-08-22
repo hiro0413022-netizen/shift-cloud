@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { getMasters, ymRange } from "@/lib/caddy";
+import type { DispatchStatus } from "@/lib/shift";
 import {
   billingRange,
   buildInvoice,
@@ -736,7 +737,7 @@ const assignSchema = z.object({
  */
 export async function assignDispatch(
   input: z.input<typeof assignSchema>
-): Promise<{ error?: string; id?: string }> {
+): Promise<{ error?: string; id?: string; updated?: boolean; unchanged?: boolean }> {
   const actor = await requireActor();
   const parsed = assignSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "入力エラー" };
@@ -745,28 +746,65 @@ export async function assignDispatch(
   if (!partner_id && !staff_id) return { error: "キャディを選んでください" };
 
   const admin = createAdmin();
+  const ym = v.dispatch_date.slice(0, 7);
 
-  // 同じ日・同じキャディの二重割当を防ぐ（カレンダーは押しやすい＝事故りやすい）
+  // 重複判定は「同じ日 × 同じキャディ（partner_id / staff_id）」。日付だけでは判定しない。
+  // 取消・削除済みは対象外（取消した後に同じ人を入れ直せる）。
   const dupCol = partner_id ? "partner_id" : "staff_id";
-  const { data: dup } = await admin
+  const { data: dupRows, error: dupErr } = await admin
     .from("cad_dispatches")
-    .select("id")
+    .select("id, status, client_id")
     .eq("company_id", actor.companyId)
     .eq("dispatch_date", v.dispatch_date)
     .eq(dupCol, partner_id ?? staff_id!)
     .neq("status", "cancelled")
     .is("deleted_at", null)
+    .order("created_at", { ascending: false })
     .limit(1);
-  if ((dup ?? []).length > 0) return { error: "この日は既に割り当て済みです" };
+  if (dupErr) return { error: dupErr.message };
+  const existing = (dupRows ?? [])[0] as { id: string; status: DispatchStatus; client_id: string | null } | undefined;
 
-  const masters = await getMasters(actor.companyId);
-  const client = v.client_id ? masters.clients.find((c) => c.id === v.client_id) : undefined;
-  const partner = partner_id ? masters.partners.find((p) => p.id === partner_id) : undefined;
-  const refId = partner_id ?? staff_id!;
-  const transport =
-    (v.client_id ? masters.transportRates[`${v.client_id}__${refId}`] : undefined) ??
-    partner?.default_transport ??
-    0;
+  // ── 既に同じキャディがその日に入っている → 新規登録ではなく「更新」に分岐 ──
+  //   仮 →［確定で追加］ : その行を確定にする（以前は「既に割り当て済みです」で止まり、確定できなかった）
+  //   確定 →［確定で追加］: 二重登録せず、そのまま成功扱い（冪等）
+  //   仮 →［仮で追加］   : 二重登録せず、そのまま成功扱い
+  //   ゴルフ場を変えて押した場合は、仮なら差し替え（金額も再計算）、確定済みなら止める
+  if (existing) {
+    const sameClient = (existing.client_id ?? null) === (v.client_id ?? null);
+    if (existing.status === "confirmed") {
+      if (!sameClient) {
+        return { error: "この日は別のゴルフ場で確定済みです。先に「仮に戻す」か「取消」をしてください" };
+      }
+      return { id: existing.id, unchanged: true };
+    }
+    // existing.status === "tentative"
+    if (sameClient && v.status === "tentative") return { id: existing.id, unchanged: true };
+
+    const patch: Record<string, unknown> = {
+      status: v.status,
+      confirmed_at: v.status === "confirmed" ? new Date().toISOString() : null,
+      confirmed_by: v.status === "confirmed" ? actor.staffId : null,
+    };
+    if (!sameClient) {
+      // ゴルフ場の差し替え: 売上・委託料・交通費をマスタから引き直す（仮なので請求には未反映）
+      const amounts = await amountsFromMasters(actor.companyId, v.client_id, partner_id, staff_id);
+      Object.assign(patch, { client_id: v.client_id, ...amounts });
+    }
+    if (v.memo !== undefined) patch.memo = v.memo ?? null;
+
+    const { error } = await admin
+      .from("cad_dispatches")
+      .update(patch)
+      .eq("id", existing.id)
+      .eq("company_id", actor.companyId);
+    if (error) return { error: error.message };
+
+    if (v.status === "confirmed") await afterConfirm(actor.companyId, ym);
+    revalidateShift();
+    return { id: existing.id, updated: true };
+  }
+
+  const amounts = await amountsFromMasters(actor.companyId, v.client_id, partner_id, staff_id);
 
   const row = {
     company_id: actor.companyId,
@@ -776,11 +814,9 @@ export async function assignDispatch(
     confirmed_at: v.status === "confirmed" ? new Date().toISOString() : null,
     confirmed_by: v.status === "confirmed" ? actor.staffId : null,
     client_id: v.client_id,
-    sales_amount: client?.unit_price ?? 0,
     partner_id,
     staff_id,
-    fee_amount: staff_id ? 0 : (client?.partner_fee ?? partner?.default_fee ?? 0),
-    transport_amount: transport,
+    ...amounts,
     special_amount: 0,
     memo: v.memo ?? null,
   };
@@ -788,10 +824,35 @@ export async function assignDispatch(
   const { data, error } = await admin.from("cad_dispatches").insert(row).select("id").single();
   if (error) return { error: error.message };
 
-  const ym = v.dispatch_date.slice(0, 7);
   if (v.status === "confirmed") await afterConfirm(actor.companyId, ym);
   revalidateShift();
   return { id: (data as { id: string }).id };
+}
+
+/**
+ * 金額をマスタから自動で埋める（#62 ②③の単価表を再利用）:
+ *   売上   = ゴルフ場の売上単価
+ *   委託料 = ゴルフ場の委託料 → 無ければキャディの標準委託料
+ *   交通費 = 交通費単価表（キャディ×ゴルフ場）→ 無ければキャディの標準交通費
+ * 社員（staff_id）は委託料0（給与側で支給＝二重計上の防止。DBのCHECKでも弾かれる）。
+ */
+async function amountsFromMasters(
+  companyId: string,
+  clientId: string | null,
+  partnerId: string | null,
+  staffId: string | null
+): Promise<{ sales_amount: number; fee_amount: number; transport_amount: number }> {
+  const masters = await getMasters(companyId);
+  const client = clientId ? masters.clients.find((c) => c.id === clientId) : undefined;
+  const partner = partnerId ? masters.partners.find((p) => p.id === partnerId) : undefined;
+  const refId = partnerId ?? staffId!;
+  const transport =
+    (clientId ? masters.transportRates[`${clientId}__${refId}`] : undefined) ?? partner?.default_transport ?? 0;
+  return {
+    sales_amount: client?.unit_price ?? 0,
+    fee_amount: staffId ? 0 : (client?.partner_fee ?? partner?.default_fee ?? 0),
+    transport_amount: transport,
+  };
 }
 
 /** 確定後の後処理: 採番の振り直し → 財務へ再集計。確定を押した瞬間に他データへ波及する */
