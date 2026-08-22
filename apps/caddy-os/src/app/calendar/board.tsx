@@ -2,12 +2,26 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { assignDispatch, confirmDay, confirmMonth, removeDispatch, setDispatchStatus } from "../actions";
+import { assignDispatch, confirmDay, confirmMonth, removeDispatch, setAvailability, setDispatchStatus } from "../actions";
 import { STATUS_LABEL, STATUS_TONE, type BoardAvailability, type BoardDispatch } from "@/lib/shift";
 
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
 
 const AV_MARK: Record<string, string> = { available: "○", maybe: "△", unavailable: "×" };
+
+/** 名前を押すたびに 空欄 → ○ → △ → × → 空欄 と一巡する（/availability の表と同じ操作感） */
+const AV_NEXT: Record<string, "available" | "maybe" | "unavailable" | ""> = {
+  "": "available",
+  available: "maybe",
+  maybe: "unavailable",
+  unavailable: "",
+};
+const AV_CHIP: Record<string, string> = {
+  available: "border-emerald-300 bg-emerald-50 text-emerald-800",
+  maybe: "border-amber-300 bg-amber-50 text-amber-800",
+  unavailable: "border-slate-300 bg-slate-100 text-slate-500 line-through",
+  "": "border-(--color-line) bg-white text-(--color-dim)",
+};
 
 type Named = { id: string; name: string };
 
@@ -15,8 +29,10 @@ type Named = { id: string; name: string };
  * 月間カレンダー（クライアント）。
  *
  * 設計の意図:
- *  - 「見る」と「決める」を1画面に置く。日セルをタップすると下のパネルにその日の詳細が出て、
- *    出勤可能なキャディだけが候補に並ぶ（LINEで集めた希望が、そのまま割当候補になる）。
+ *  - 「見る」と「決める」を1画面に置く。日セルをタップすると下のパネルにその日の詳細が出る。
+ *  - **希望が来ていないキャディも必ず候補に出す**（希望提出は任意。電話で押さえた分を
+ *    こちらから入れられないと現場が回らない）。並び順だけ ○ → △ → 未回答 → × とし、
+ *    どの状態かはラベルで分かるようにする。この日の希望はパネル内で代理入力もできる。
  *  - 保存は Server Action。押した直後に router.refresh() で確定状態を取り直す
  *    （楽観更新にすると「確定したつもりで確定していない」が一番怖いため、あえてサーバ確定を待つ）。
  */
@@ -64,7 +80,6 @@ export function CalendarBoard({
     return m;
   }, [availability]);
 
-  const partnerName = useMemo(() => new Map(partners.map((p) => [p.id, p.name])), [partners]);
 
   const counts = useMemo(() => {
     let tentative = 0;
@@ -98,19 +113,38 @@ export function CalendarBoard({
 
   const dayDispatches = useMemo(() => (selected ? (byDay.get(selected) ?? []) : []), [selected, byDay]);
   const dayAvailability = useMemo(() => (selected ? (avByDay.get(selected) ?? []) : []), [selected, avByDay]);
+  const avSource = useMemo(() => new Map(dayAvailability.map((a) => [a.partner_id, a.source])), [dayAvailability]);
 
-  // 候補は「その日 ○/△ を出していて、まだ割り当てられていないキャディ」を先頭に出す
+  // 候補は「稼働中のキャディ全員」。希望を出していない人も必ず出す（#144）。
+  // 並びは ○ → △ → 未回答 → × 。× の人も選べるが、選ぶと確認文が出る。
   const candidates = useMemo(() => {
     // 割当済みの判定は「同じ日 × 同じキャディ」（取消は除く）＝サーバー側の重複判定と同じ条件
     const assigned = new Map<string, BoardDispatch>();
     for (const d of dayDispatches) if (d.status !== "cancelled") assigned.set(d.partner_id ?? d.staff_id ?? "", d);
     const avail = new Map(dayAvailability.map((a) => [a.partner_id, a.status]));
-    const rank = (id: string) => (avail.get(id) === "available" ? 0 : avail.get(id) === "maybe" ? 1 : 3);
+    const rank = (id: string) =>
+      avail.get(id) === "available" ? 0 : avail.get(id) === "maybe" ? 1 : avail.get(id) === "unavailable" ? 3 : 2;
     return partners
-      .filter((p) => avail.get(p.id) !== "unavailable")
-      .map((p) => ({ ...p, mark: AV_MARK[avail.get(p.id) ?? ""] ?? "", rank: rank(p.id), taken: assigned.get(p.id) ?? null }))
+      .map((p) => ({
+        ...p,
+        av: avail.get(p.id) ?? "",
+        mark: AV_MARK[avail.get(p.id) ?? ""] ?? "",
+        rank: rank(p.id),
+        taken: assigned.get(p.id) ?? null,
+      }))
       .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name, "ja"));
   }, [partners, dayAvailability, dayDispatches]);
+
+  // ドロップダウンの見出し（希望の有無で分ける。未回答でもそのまま選べることを文言で示す）
+  const candidateGroups = useMemo(
+    () =>
+      [
+        { key: "yes", label: "出勤希望あり（○ / △）", rows: candidates.filter((p) => p.rank <= 1) },
+        { key: "none", label: "希望なし・未回答（そのまま割り当てできます）", rows: candidates.filter((p) => p.rank === 2) },
+        { key: "no", label: "×（不可と回答）※どうしてもの時だけ", rows: candidates.filter((p) => p.rank === 3) },
+      ].filter((g) => g.rows.length > 0),
+    [candidates]
+  );
 
   // いま選んでいるキャディがその日に既に入っているか（仮なら［確定］で更新できる）
   const selectedExisting = useMemo(() => {
@@ -235,15 +269,17 @@ export function CalendarBoard({
               className="rounded-lg border border-(--color-line) bg-white px-2 py-2 text-sm"
             >
               <option value="">キャディを選ぶ</option>
-              <optgroup label="キャディ（出勤希望順）">
-                {candidates.map((p) => (
-                  <option key={p.id} value={`p:${p.id}`} disabled={p.taken?.status === "confirmed"}>
-                    {p.mark ? `${p.mark} ` : ""}
-                    {p.name}
-                    {p.taken ? `（${STATUS_LABEL[p.taken.status]}で割当済）` : ""}
-                  </option>
-                ))}
-              </optgroup>
+              {candidateGroups.map((g) => (
+                <optgroup key={g.key} label={g.label}>
+                  {g.rows.map((p) => (
+                    <option key={p.id} value={`p:${p.id}`} disabled={p.taken?.status === "confirmed"}>
+                      {p.mark ? `${p.mark} ` : ""}
+                      {p.name}
+                      {p.taken ? `（${STATUS_LABEL[p.taken.status]}で割当済）` : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
               {staff.length > 0 ? (
                 <optgroup label="自社スタッフ（委託料なし）">
                   {staff.map((s) => (
@@ -354,32 +390,48 @@ export function CalendarBoard({
             </ul>
           )}
 
-          {/* ── その日の出勤希望（LINE等で集めた分・本人提出分） ── */}
+          {/* ── その日の出勤希望（管理者がその場で代理入力できる・#144） ── */}
           <div>
-            <p className="mb-1 text-xs font-medium text-(--color-dim)">この日の出勤希望</p>
-            {dayAvailability.length === 0 ? (
-              <p className="text-xs text-(--color-dim)">まだ希望が入っていません</p>
+            <div className="mb-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <p className="text-xs font-medium text-(--color-dim)">この日の出勤希望</p>
+              <p className="text-[11px] text-(--color-dim)">
+                名前を押すたびに 空欄 → ○ → △ → × と変わります（電話やLINEで聞いた分をここに入れられます）
+              </p>
+            </div>
+            {candidates.length === 0 ? (
+              <p className="text-xs text-(--color-dim)">稼働中のキャディが登録されていません（設定 ＞ 委託先）</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
-                {dayAvailability.map((a) => (
-                  <span
-                    key={a.partner_id}
-                    className={`rounded px-2 py-0.5 text-xs ${
-                      a.status === "available"
-                        ? "bg-emerald-50 text-emerald-700"
-                        : a.status === "maybe"
-                          ? "bg-amber-50 text-amber-700"
-                          : "bg-slate-100 text-slate-400"
-                    }`}
-                    title={a.source === "self" ? "本人がスマホから提出" : "管理者が代理入力"}
+                {candidates.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={pending}
+                    title={
+                      avSource.get(p.id) === "self"
+                        ? "本人がスマホから提出"
+                        : avSource.get(p.id)
+                          ? "管理者が代理入力"
+                          : "未回答（押すと ○ になります）"
+                    }
+                    onClick={() =>
+                      run(
+                        () => setAvailability(p.id, selected, AV_NEXT[p.av] ?? "available"),
+                        `${p.name} の希望を「${AV_MARK[AV_NEXT[p.av] ?? "available"] ?? "未回答"}」にしました`
+                      )
+                    }
+                    className={`rounded border px-2 py-1 text-xs disabled:opacity-50 ${AV_CHIP[p.av] ?? AV_CHIP[""]}`}
                   >
-                    {AV_MARK[a.status]} {partnerName.get(a.partner_id) ?? "（不明）"}
-                    {a.source === "self" ? "＊" : ""}
-                  </span>
+                    {p.mark || "－"} {p.name}
+                    {avSource.get(p.id) === "self" ? "＊" : ""}
+                  </button>
                 ))}
               </div>
             )}
-            <p className="mt-1 text-[11px] text-(--color-dim)">＊ はキャディ本人がスマホから提出したものです</p>
+            <p className="mt-1.5 text-[11px] text-(--color-dim)">
+              ＊ はキャディ本人がスマホから提出したものです。
+              <b>希望が来ていなくても、上の「キャディを選ぶ」からそのまま割り当てできます。</b>
+            </p>
           </div>
         </div>
       ) : null}
