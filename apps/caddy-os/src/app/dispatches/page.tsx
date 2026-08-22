@@ -3,6 +3,8 @@ import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
 import { getDispatches, getMasters, getMonthCounts, summarize, byStaff, currentYm, yen, dispatchCost } from "@/lib/caddy";
 import { MonthNav } from "@/components/month-nav";
+import { clientTone, dispatchChipCls } from "@/lib/client-colors";
+import { STATUS_LABEL } from "@/lib/shift";
 import { BulkGrid } from "./bulk-grid";
 import { GolfwingGrid } from "./golfwing-grid";
 import { deleteDispatch } from "../actions";
@@ -45,6 +47,19 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
       </header>
 
       <MonthNav base="/dispatches" ym={ym} counts={monthCounts} />
+
+      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
+        <span className="text-(--color-dim)">色＝ゴルフ場</span>
+        {masters.clients.map((c) => (
+          <span key={c.id} className="flex items-center gap-1">
+            <span className={`inline-block h-2.5 w-2.5 rounded-sm ${clientTone(c.id).dot}`} />
+            {c.name}
+          </span>
+        ))}
+        <span className="ml-2 text-(--color-dim)">形＝状態</span>
+        <span className="inline-block rounded border border-slate-400 bg-slate-100 px-1.5 leading-4">確定</span>
+        <span className="inline-block rounded border border-dashed border-slate-400 bg-white px-1.5 leading-4">仮</span>
+      </div>
 
       <section className={`${cardCls} mb-6`}>
         <h2 className="mb-3 font-semibold">派遣をまとめて登録</h2>
@@ -145,8 +160,19 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                       <td className="py-1.5">
                         {isGw ? (
                           <span className="rounded bg-emerald-100 px-1 text-[10px] text-emerald-800">ゴルフウィング</span>
+                        ) : r.cad_clients?.name ? (
+                          <span
+                            className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs ${dispatchChipCls(
+                              r.client_id,
+                              r.status
+                            )}`}
+                          >
+                            <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(r.client_id).dot}`} />
+                            {r.cad_clients.name}
+                            {r.status === "tentative" ? <span className="font-medium">・仮</span> : null}
+                          </span>
                         ) : (
-                          (r.cad_clients?.name ?? <span className="text-(--color-dim)">—</span>)
+                          <span className="text-(--color-dim)">—</span>
                         )}
                       </td>
                       <td className="py-1.5 text-right tabular-nums">

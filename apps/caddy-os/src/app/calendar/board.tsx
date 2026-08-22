@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { assignDispatch, confirmDay, confirmMonth, removeDispatch, setAvailability, setDispatchStatus } from "../actions";
 import { STATUS_LABEL, STATUS_TONE, type BoardAvailability, type BoardDispatch } from "@/lib/shift";
+import { clientTone, dispatchChipCls } from "@/lib/client-colors";
 
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -155,6 +156,30 @@ export function CalendarBoard({
 
   return (
     <div>
+      {/* 凡例: 色=ゴルフ場 / 形=状態（#146） */}
+      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
+        <span className="text-(--color-dim)">色＝ゴルフ場</span>
+        {clients.map((c) => (
+          <span key={c.id} className="flex items-center gap-1">
+            <span className={`inline-block h-2.5 w-2.5 rounded-sm ${clientTone(c.id).dot}`} />
+            {c.name}
+          </span>
+        ))}
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px]">
+        <span className="text-(--color-dim)">形＝状態</span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block rounded border border-slate-400 bg-slate-100 px-1.5 leading-4">確定</span>
+          塗りつぶし＋実線
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="inline-block rounded border border-dashed border-slate-400 bg-white px-1.5 leading-4">
+            仮
+          </span>
+          白地＋破線
+        </span>
+      </div>
+
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
         <span className="rounded bg-emerald-100 px-2 py-1 text-emerald-800">確定 {counts.confirmed}</span>
         <span className="rounded bg-amber-100 px-2 py-1 text-amber-800">仮 {counts.tentative}</span>
@@ -210,9 +235,10 @@ export function CalendarBoard({
                 {list.slice(0, 4).map((x) => (
                   <div
                     key={x.id}
-                    className={`truncate rounded px-1 text-[10px] leading-4 ${STATUS_TONE[x.status]}`}
-                    title={`${x.caddie_name} / ${x.client_name ?? "未定"} / ${STATUS_LABEL[x.status]}`}
+                    className={`truncate rounded px-1 text-[10px] leading-4 ${dispatchChipCls(x.client_id, x.status)}`}
+                    title={`${x.caddie_name} / ${x.client_name ?? "ゴルフ場未定"} / ${STATUS_LABEL[x.status]}`}
                   >
+                    {x.status === "tentative" ? <span className="font-medium">仮 </span> : null}
                     {x.caddie_name}
                     {x.client_name ? <span className="opacity-70"> {x.client_name}</span> : null}
                   </div>
@@ -342,7 +368,15 @@ export function CalendarBoard({
                     {STATUS_LABEL[d.status]}
                   </span>
                   <span className="font-medium">{d.caddie_name}</span>
-                  <span className="text-(--color-dim)">{d.client_name ?? "ゴルフ場未定"}</span>
+                  <span
+                    className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${dispatchChipCls(
+                      d.client_id,
+                      d.status
+                    )}`}
+                  >
+                    <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(d.client_id).dot}`} />
+                    {d.client_name ?? "ゴルフ場未定"}
+                  </span>
                   {d.staff_id ? (
                     <span className="rounded bg-sky-100 px-1 text-[10px] text-sky-800">自社</span>
                   ) : null}

@@ -1,21 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { buildCsv, csvFileName, CSV_FORMATS, jpDate, withBom, type CsvFormat, type ExportRow } from "@/lib/csv";
+import {
+  buildCsv,
+  exportFileName,
+  CSV_FORMATS,
+  isTentative,
+  jpDate,
+  withBom,
+  type CsvFormat,
+  type ExportRow,
+} from "@/lib/csv";
+import { clientTone } from "@/lib/client-colors";
 
 /**
- * 1ゴルフ場ぶんのプレビュー＋CSVダウンロード。
+ * 1ゴルフ場ぶんのプレビュー＋CSV／PDFダウンロード。
+ *
  * CSVの組み立ては純粋関数（lib/csv.ts）なので、サーバーに問い合わせず画面でそのまま作れる。
  * ＝ プレビューとダウンロードが必ず一致する（別々に組み立てるとズレる）。
+ * PDFはフォント埋め込みが要るのでサーバー（/exports/pdf）で作る。元データは同じなので中身は一致する。
  */
 export function ExportPanel({
   ym,
   client,
   rows,
+  withTentative,
 }: {
   ym: string;
   client: { id: string; name: string; csv_format: CsvFormat; contact_name: string | null; contact_email: string | null };
   rows: ExportRow[];
+  withTentative: boolean;
 }) {
   const [format, setFormat] = useState<CsvFormat>(client.csv_format ?? "standard");
   const [open, setOpen] = useState(false);
@@ -25,21 +39,27 @@ export function ExportPanel({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = csvFileName(client.name, ym);
+    a.download = exportFileName(client.name, ym, "csv", withTentative);
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const days = new Set(rows.map((r) => r.date)).size;
   const caddies = new Set(rows.map((r) => r.caddie_name)).size;
+  const kari = rows.filter(isTentative).length;
+  const pdfHref = `/exports/pdf?ym=${ym}&client=${client.id}${withTentative ? "&kari=1" : ""}`;
 
   return (
     <div className="rounded-lg border border-(--color-line) p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-medium">{client.name}</p>
+          <p className="flex items-center gap-1.5 font-medium">
+            <span className={`inline-block h-3 w-3 rounded-sm ${clientTone(client.id).dot}`} />
+            {client.name}
+          </p>
           <p className="text-xs text-(--color-dim)">
-            確定 {rows.length} 人工 / {days} 日 / キャディ {caddies} 名
+            {rows.length} 人工 / {days} 日 / キャディ {caddies} 名
+            {kari > 0 ? <span className="ml-1 text-amber-700">（うち仮 {kari}）</span> : null}
             {client.contact_name ? ` ・ 担当 ${client.contact_name}` : ""}
           </p>
         </div>
@@ -70,6 +90,20 @@ export function ExportPanel({
           >
             CSV
           </button>
+          {rows.length === 0 ? (
+            <span className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm text-(--color-dim) opacity-50">
+              PDF
+            </span>
+          ) : (
+            <a
+              href={pdfHref}
+              target="_blank"
+              rel="noopener"
+              className="rounded-lg border border-(--color-accent) px-3 py-1.5 text-sm font-medium text-(--color-accent)"
+            >
+              PDF
+            </a>
+          )}
           {client.contact_email ? (
             <a
               href={`mailto:${client.contact_email}?subject=${encodeURIComponent(
@@ -85,7 +119,9 @@ export function ExportPanel({
 
       {open ? (
         rows.length === 0 ? (
-          <p className="mt-3 text-sm text-(--color-dim)">この月の確定した派遣はありません</p>
+          <p className="mt-3 text-sm text-(--color-dim)">
+            この月に出せる派遣はありません{withTentative ? "" : "（仮のままの分は「仮も含めて出す」で入ります）"}
+          </p>
         ) : (
           <div className="mt-3 max-h-72 overflow-auto rounded border border-(--color-line)">
             <table className="w-full text-xs">
@@ -93,6 +129,7 @@ export function ExportPanel({
                 <tr>
                   <th className="p-1.5">日付</th>
                   <th className="p-1.5">キャディ名</th>
+                  {kari > 0 ? <th className="p-1.5">状態</th> : null}
                   <th className="p-1.5">備考</th>
                 </tr>
               </thead>
@@ -101,6 +138,11 @@ export function ExportPanel({
                   <tr key={`${r.date}-${r.caddie_name}-${i}`} className="border-t border-(--color-line)">
                     <td className="p-1.5 whitespace-nowrap">{jpDate(r.date)}</td>
                     <td className="p-1.5">{r.caddie_name}</td>
+                    {kari > 0 ? (
+                      <td className={`p-1.5 whitespace-nowrap ${isTentative(r) ? "text-amber-700" : "text-(--color-dim)"}`}>
+                        {isTentative(r) ? "仮" : "確定"}
+                      </td>
+                    ) : null}
                     <td className="p-1.5 text-(--color-dim)">{r.memo ?? ""}</td>
                   </tr>
                 ))}

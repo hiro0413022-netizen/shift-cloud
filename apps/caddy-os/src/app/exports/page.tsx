@@ -11,13 +11,20 @@ export const dynamic = "force-dynamic";
 /**
  * ゴルフ場へ送る派遣日一覧（DECISIONS #140 / 小川さん依頼 4.）
  *
- * 出すのは **確定した派遣だけ**。仮組みをゴルフ場に送ってしまう事故が構造的に起きない。
+ * 既定は **確定した派遣だけ**。ただし「先に予定として送っておきたい」現場があるので（#145・
+ * 小川さん依頼 2026-08-22）、チェックひとつで **仮も含める** ことができる。
+ * 仮を混ぜたときは状態列・表題・注記の3か所で「予定」と明示する＝黙って混ざることはない。
  * 書式はゴルフ場ごとに設定（cad_clients.csv_format）。ここでは一時的に切り替えて試せる。
  */
-export default async function ExportsPage({ searchParams }: { searchParams: Promise<{ ym?: string }> }) {
+export default async function ExportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ym?: string; kari?: string }>;
+}) {
   const actor = await requireActor();
   const sp = await searchParams;
   const ym = sp.ym ?? currentYm();
+  const withTentative = sp.kari === "1";
 
   const admin = createAdmin();
   const [board, { data: clients }] = await Promise.all([
@@ -39,9 +46,12 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
     contact_email: string | null;
   }>;
 
-  const confirmed = board.dispatches.filter((d) => d.status === "confirmed" && d.kind !== "golfwing");
-  const byClient = new Map<string, typeof confirmed>();
-  for (const d of confirmed) {
+  // 自社ゴルフウィング勤務は提出対象外。取消も当然出さない
+  const target = board.dispatches.filter(
+    (d) => d.kind !== "golfwing" && (withTentative ? d.status !== "cancelled" : d.status === "confirmed")
+  );
+  const byClient = new Map<string, typeof target>();
+  for (const d of target) {
     if (!d.client_id) continue;
     const cur = byClient.get(d.client_id) ?? [];
     cur.push(d);
@@ -59,27 +69,46 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
           </Link>
           <h1 className="text-2xl font-bold tracking-widest">ゴルフ場提出</h1>
           <p className="mt-1 text-sm text-(--color-dim)">
-            ゴルフ場ごとの月間派遣一覧。そのままメール添付できるCSV（Excelで文字化けしないBOM付き）で書き出せます。
+            ゴルフ場ごとの月間派遣一覧。そのままメール添付できる <b>CSV</b>（Excelで文字化けしないBOM付き）と{" "}
+            <b>PDF</b>（印刷・回覧用）で書き出せます。
           </p>
         </div>
-        <form method="get" className="flex items-center gap-2">
+        <form method="get" className="flex flex-wrap items-center gap-2">
           <input
             type="month"
             name="ym"
             defaultValue={ym}
             className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm"
           />
+          <label className="flex items-center gap-1.5 rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm">
+            <input type="checkbox" name="kari" value="1" defaultChecked={withTentative} />
+            仮も含めて出す
+          </label>
           <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm">表示</button>
         </form>
       </header>
 
       {tentativeCount > 0 ? (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-          この月には<b>仮のまま</b>の割当が {tentativeCount} 件あります。CSVには入りません。
-          <Link href={`/calendar?ym=${ym}`} className="ml-1 underline">
-            カレンダーで確定する
-          </Link>
-        </div>
+        withTentative ? (
+          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+            <b>仮の割当 {tentativeCount} 件を含めて</b>出しています。CSV・PDFとも「仮」と分かる形で入ります
+            （表題は「予定表」・状態列は「仮」・カレンダー表は△）。確定後にもう一度送り直してください。
+            <Link href={`/exports?ym=${ym}`} className="ml-1 underline">
+              確定分だけに戻す
+            </Link>
+          </div>
+        ) : (
+          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+            この月には<b>仮のまま</b>の割当が {tentativeCount} 件あります。いまの設定では入りません。
+            <Link href={`/exports?ym=${ym}&kari=1`} className="ml-1 underline">
+              仮も含めて出す
+            </Link>
+            <span className="mx-1">／</span>
+            <Link href={`/calendar?ym=${ym}`} className="underline">
+              カレンダーで確定する
+            </Link>
+          </div>
+        )
       ) : null}
 
       <section className={cardCls}>
@@ -100,11 +129,13 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
                   key={c.id}
                   ym={ym}
                   client={c}
+                  withTentative={withTentative}
                   rows={rows.map((r) => ({
                     date: r.dispatch_date,
                     client_name: c.name,
                     caddie_name: r.caddie_name,
                     memo: r.memo,
+                    status: r.status,
                   }))}
                 />
               );
