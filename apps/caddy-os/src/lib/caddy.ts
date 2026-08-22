@@ -90,6 +90,29 @@ export function yen(n: number): string {
   return `¥${Math.round(n).toLocaleString("ja-JP")}`;
 }
 
+/**
+ * 月ごとの派遣件数（新しい順）。
+ *
+ * 派遣台帳もシフトカレンダーも「表示中の1か月」しか出さないため、月がずれているだけなのに
+ * 「過去の分が消えた」「登録したのに出ない」に見える（2026-08-22 小川さん報告）。
+ * どの月に何件あるかを常に画面に出して、1タップで移動できるようにするための集計。
+ * 行数は数百なので日付だけ引いてJS側で数える（RPCを増やさない）。
+ */
+export async function getMonthCounts(companyId: string): Promise<Array<{ ym: string; count: number }>> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("cad_dispatches")
+    .select("dispatch_date")
+    .eq("company_id", companyId)
+    .is("deleted_at", null);
+  const m = new Map<string, number>();
+  for (const r of (data ?? []) as Array<{ dispatch_date: string }>) {
+    const ym = String(r.dispatch_date).slice(0, 7);
+    m.set(ym, (m.get(ym) ?? 0) + 1);
+  }
+  return [...m.entries()].map(([ym, count]) => ({ ym, count })).sort((a, b) => b.ym.localeCompare(a.ym));
+}
+
 export async function getDispatches(companyId: string, ym: string): Promise<DispatchRow[]> {
   const admin = createAdmin();
   const { from, to } = ymRange(ym);

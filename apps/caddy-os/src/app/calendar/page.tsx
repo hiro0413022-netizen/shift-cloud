@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
-import { currentYm, getMasters, getMonthBoard } from "@/lib/caddy";
+import { currentYm, getMasters, getMonthBoard, getMonthCounts } from "@/lib/caddy";
+import { MonthNav } from "@/components/month-nav";
 import { CalendarBoard } from "./board";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const ym = sp.ym ?? currentYm();
 
-  const [board, masters] = await Promise.all([getMonthBoard(actor.companyId, ym), getMasters(actor.companyId)]);
+  const [board, masters, monthCounts] = await Promise.all([
+    getMonthBoard(actor.companyId, ym),
+    getMasters(actor.companyId),
+    getMonthCounts(actor.companyId),
+  ]);
 
   return (
     <main className="mx-auto max-w-[1400px] p-4 md:p-6">
@@ -42,6 +47,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <button className="rounded-lg border border-(--color-line) px-3 py-1.5 text-sm">表示</button>
         </form>
       </header>
+
+      <MonthNav base="/calendar" ym={ym} counts={monthCounts} />
 
       <section className={cardCls}>
         <CalendarBoard

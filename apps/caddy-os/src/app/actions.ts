@@ -1,6 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
+/**
+ * 派遣（cad_dispatches）は 派遣台帳・シフトカレンダー・キャディ台帳・提出CSV・請求 の
+ * 5画面が同じ1行を見ている。どこか1つで足した/消したのに他の画面が古いままだと
+ * 「登録できたはずなのに出ていない」になる（2026-08-22 小川さん報告）。
+ * 触ったら必ず全部を作り直す。
+ */
+function revalidateDispatchViews() {
+  revalidatePath("/");
+  revalidatePath("/dispatches");
+  revalidatePath("/calendar");
+  revalidatePath("/ledger");
+  revalidatePath("/exports");
+  revalidatePath("/invoices");
+}
 import { z } from "zod";
 import { requireActor } from "@/lib/auth";
 import { createAdmin } from "@yozan/core/supabase/admin";
@@ -112,8 +127,7 @@ export async function saveDispatch(fd: FormData): Promise<{ error?: string }> {
   }
 
   await refreshFinance(actor.companyId, v.dispatch_date.slice(0, 7));
-  revalidatePath("/");
-  revalidatePath("/dispatches");
+  revalidateDispatchViews();
   return {};
 }
 
@@ -175,9 +189,7 @@ export async function saveDispatchesBulk(
     await refreshFinance(actor.companyId, ym);
   }
 
-  revalidatePath("/");
-  revalidatePath("/dispatches");
-  revalidatePath("/invoices");
+  revalidateDispatchViews();
   return { count: rows.length };
 }
 
@@ -200,8 +212,7 @@ export async function deleteDispatch(fd: FormData): Promise<void> {
     .eq("company_id", actor.companyId);
 
   await refreshFinance(actor.companyId, ym);
-  revalidatePath("/");
-  revalidatePath("/dispatches");
+  revalidateDispatchViews();
 }
 
 /** 台帳 → fin_entries（月次PL）へ集計。Genesisの事業別PL・KPIがこれを読む */
@@ -446,8 +457,7 @@ export async function setDispatchBillingYm(id: string, billingYm: string | null)
     .eq("id", id)
     .eq("company_id", actor.companyId);
   if (error) return { error: error.message };
-  revalidatePath("/dispatches");
-  revalidatePath("/invoices");
+  revalidateDispatchViews();
   return {};
 }
 

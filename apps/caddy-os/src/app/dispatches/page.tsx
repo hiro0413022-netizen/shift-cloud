@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireActor } from "@/lib/auth";
 import { cardCls } from "@/components/ui";
-import { getDispatches, getMasters, summarize, byStaff, currentYm, yen, dispatchCost } from "@/lib/caddy";
+import { getDispatches, getMasters, getMonthCounts, summarize, byStaff, currentYm, yen, dispatchCost } from "@/lib/caddy";
+import { MonthNav } from "@/components/month-nav";
 import { BulkGrid } from "./bulk-grid";
 import { GolfwingGrid } from "./golfwing-grid";
 import { deleteDispatch } from "../actions";
@@ -14,7 +15,11 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const ym = sp.ym ?? currentYm();
 
-  const [rows, masters] = await Promise.all([getDispatches(actor.companyId, ym), getMasters(actor.companyId)]);
+  const [rows, masters, monthCounts] = await Promise.all([
+    getDispatches(actor.companyId, ym),
+    getMasters(actor.companyId),
+    getMonthCounts(actor.companyId),
+  ]);
   const s = summarize(rows, ym);
   const staffTransport = byStaff(rows).filter((x) => x.transport > 0);
   const staffTransportTotal = staffTransport.reduce((a, x) => a + x.transport, 0);
@@ -39,8 +44,14 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
         </form>
       </header>
 
+      <MonthNav base="/dispatches" ym={ym} counts={monthCounts} />
+
       <section className={`${cardCls} mb-6`}>
         <h2 className="mb-3 font-semibold">派遣をまとめて登録</h2>
+        <p className="mb-3 text-xs text-(--color-dim)">
+          日付は表示中の月（{ym.replace("-", "/")}）以外も入れられます。別の月で登録すると、
+          その月に切り替えるまで下の一覧には出ません。
+        </p>
         <BulkGrid
           clients={masters.clients}
           partners={masters.partners}
@@ -102,7 +113,9 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
         </div>
 
         {rows.length === 0 ? (
-          <p className="text-sm text-(--color-dim)">この月の派遣はまだありません</p>
+          <p className="text-sm text-(--color-dim)">
+            この月の派遣はまだありません（上の「登録のある月」から他の月を開けます）
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
