@@ -32,7 +32,7 @@ export default async function MastersPage() {
     // 交通費単価表に出す社員 = これまでキャディに入った社員（林さん等）
     admin
       .from("cad_dispatches")
-      .select("staff_id, staff(name)")
+      .select("staff_id, staff!cad_dispatches_staff_id_fkey(name)")
       .eq("company_id", actor.companyId)
       .not("staff_id", "is", null)
       .is("deleted_at", null),

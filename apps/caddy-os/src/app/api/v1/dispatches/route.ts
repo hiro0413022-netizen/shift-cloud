@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     let q = admin
       .from("cad_dispatches")
       .select(
-        "id, seq, dispatch_date, kind, status, confirmed_at, client_id, partner_id, staff_id, sales_amount, fee_amount, transport_amount, special_amount, work_hours, memo, billing_ym, cad_clients(name), cad_partners(name), staff(name)"
+        "id, seq, dispatch_date, kind, status, confirmed_at, client_id, partner_id, staff_id, sales_amount, fee_amount, transport_amount, special_amount, work_hours, memo, billing_ym, cad_clients(name), cad_partners(name), staff!cad_dispatches_staff_id_fkey(name)"
       )
       .eq("company_id", companyId)
       .gte("dispatch_date", range.from)

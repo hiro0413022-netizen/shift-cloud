@@ -31,7 +31,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await admin
       .from("cad_dispatches")
-      .select("dispatch_date, memo, cad_partners(name), staff(name)")
+      .select("dispatch_date, memo, cad_partners(name), staff!cad_dispatches_staff_id_fkey(name)")
       .eq("company_id", companyId)
       .eq("client_id", clientId)
       .eq("status", "confirmed")

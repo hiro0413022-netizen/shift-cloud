@@ -74,6 +74,17 @@ export function dispatchCost(d: {
   return d.fee_amount + d.transport_amount + d.special_amount;
 }
 
+/**
+ * cad_dispatches から staff を引くときの埋め込み指定（#144c）
+ *
+ * migration 0118（#140）で `confirmed_by → staff(id)` が増え、staff への外部キーが
+ * staff_id と confirmed_by の2本になった。この状態で PostgREST に `staff(name)` と書くと
+ * 「どちらの関係か決められない」でクエリ自体がエラーになる。
+ * 呼び出し側が error を見ていないと **黙って0件** になり、台帳が空に見える（2026-08-22の実障害）。
+ * 関係名を固定して曖昧さを消す。cad_dispatches に staff への外部キーを足したら必ずここを見直す。
+ */
+const STAFF_EMBED = "staff!cad_dispatches_staff_id_fkey(name)";
+
 export function ymRange(ym: string): { from: string; to: string } {
   const [y, m] = ym.split("-").map(Number);
   const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -116,16 +127,17 @@ export async function getMonthCounts(companyId: string): Promise<Array<{ ym: str
 export async function getDispatches(companyId: string, ym: string): Promise<DispatchRow[]> {
   const admin = createAdmin();
   const { from, to } = ymRange(ym);
-  const { data } = await admin
+  const { data, error } = await admin
     .from("cad_dispatches")
     .select(
-      "id, seq, dispatch_date, kind, status, sales_amount, fee_amount, transport_amount, special_amount, work_hours, memo, billing_ym, client_id, partner_id, staff_id, cad_clients(name), cad_partners(name), staff(name)"
+      `id, seq, dispatch_date, kind, status, sales_amount, fee_amount, transport_amount, special_amount, work_hours, memo, billing_ym, client_id, partner_id, staff_id, cad_clients(name), cad_partners(name), ${STAFF_EMBED}`
     )
     .eq("company_id", companyId)
     .gte("dispatch_date", from)
     .lte("dispatch_date", to)
     .is("deleted_at", null)
     .order("dispatch_date", { ascending: true });
+  if (error) throw new Error(`派遣台帳の取得に失敗しました: ${error.message}`);
   return (data ?? []) as unknown as DispatchRow[];
 }
 
@@ -305,11 +317,11 @@ export async function getMonthBoard(companyId: string, ym: string): Promise<Mont
   const admin = createAdmin();
   const { from, to } = ymRange(ym);
 
-  const [{ data: ds }, { data: av }] = await Promise.all([
+  const [{ data: ds, error: dsErr }, { data: av, error: avErr }] = await Promise.all([
     admin
       .from("cad_dispatches")
       .select(
-        "id, dispatch_date, status, kind, client_id, partner_id, staff_id, sales_amount, fee_amount, transport_amount, special_amount, memo, cad_clients(name), cad_partners(name), staff(name)"
+        `id, dispatch_date, status, kind, client_id, partner_id, staff_id, sales_amount, fee_amount, transport_amount, special_amount, memo, cad_clients(name), cad_partners(name), ${STAFF_EMBED}`
       )
       .eq("company_id", companyId)
       .gte("dispatch_date", from)
@@ -324,6 +336,8 @@ export async function getMonthBoard(companyId: string, ym: string): Promise<Mont
       .lte("date", to)
       .is("deleted_at", null),
   ]);
+  if (dsErr) throw new Error(`シフトカレンダーの取得に失敗しました: ${dsErr.message}`);
+  if (avErr) throw new Error(`出勤希望の取得に失敗しました: ${avErr.message}`);
 
   type Raw = {
     id: string;
