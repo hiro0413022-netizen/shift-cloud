@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  /* PRO SITE — プロゴルファー公式サイト（黒×白×ゴールドのアスリートプレミアム） */
+  --color-bg: #ffffff;
+  --color-ink: #0a0a0a;        /* ヒーロー・フッターの黒 */
+  --color-ink-2: #161616;
+  --color-txt: #1a1a1a;
+  --color-dim: #737373;
+  --color-line: #e5e5e5;
+  --color-gold: #b08d3f;       /* アクセント（勝利の金） */
+  --color-gold-2: #d4b46a;
+  --color-panel: #f7f6f3;
+  --color-danger: #dc2626;
+  --color-ok: #059669;
+}
+
+html, body {
+  background: var(--color-bg);
+}
+
+body {
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  @apply text-(--color-txt) antialiased;
+}
+
+/* 見出し（英字セクションタイトル） */
+.sec-title {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0.18em;
+}
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.reveal { animation: reveal-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* 管理画面: スマホ前提の大きめタップ領域 */
+.adm-input {
+  @apply w-full rounded-lg border border-(--color-line) bg-white px-3 py-3 text-base;
+}
+.adm-btn {
+  @apply inline-flex w-full items-center justify-center rounded-lg px-4 py-3 text-base font-bold;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

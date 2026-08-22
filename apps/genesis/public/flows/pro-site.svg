@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 320" font-family="system-ui, 'Hiragino Sans', sans-serif">
+  <style>
+    .box { fill: #ffffff; stroke: #cbd5e1; rx: 10; }
+    .dark { fill: #0a0a0a; stroke: #0a0a0a; }
+    .t { font-size: 14px; fill: #111827; font-weight: 700; }
+    .tw { font-size: 14px; fill: #ffffff; font-weight: 700; }
+    .s { font-size: 11px; fill: #6b7280; }
+    .arrow { stroke: #94a3b8; stroke-width: 2; fill: none; marker-end: url(#a); }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#94a3b8" />
+    </marker>
+  </defs>
+
+  <text x="20" y="30" font-size="16" font-weight="800" fill="#111827">PRO SITE — プロゴルファー公式HP（外販SaaS）</text>
+
+  <!-- プロ本人 -->
+  <rect class="box" x="20" y="70" width="180" height="70" rx="10" />
+  <text class="t" x="35" y="98">プロ本人（スマホ）</text>
+  <text class="s" x="35" y="118">フッター©を5回タップ→ログイン</text>
+
+  <!-- 管理画面 -->
+  <rect class="box" x="270" y="70" width="190" height="70" rx="10" />
+  <text class="t" x="285" y="98">/{slug}/admin</text>
+  <text class="s" x="285" y="118">ニュース・成績・IG URL編集</text>
+
+  <!-- Supabase -->
+  <rect class="box" x="530" y="70" width="160" height="70" rx="10" />
+  <text class="t" x="545" y="98">Supabase</text>
+  <text class="s" x="545" y="118">pgw_*（1プロ=1テナント）</text>
+
+  <!-- 公開サイト -->
+  <rect class="dark" x="530" y="200" width="160" height="70" rx="10" />
+  <text class="tw" x="545" y="228">公開サイト /{slug}</text>
+  <text class="s" x="545" y="248" fill="#d1d5db">NEWS/SCHEDULE/PROFILE</text>
+
+  <!-- ファン -->
+  <rect class="box" x="20" y="200" width="180" height="70" rx="10" />
+  <text class="t" x="35" y="228">ファン・スポンサー</text>
+  <text class="s" x="35" y="248">閲覧のみ</text>
+
+  <!-- Instagram -->
+  <rect class="box" x="740" y="200" width="140" height="70" rx="10" />
+  <text class="t" x="755" y="228">Instagram</text>
+  <text class="s" x="755" y="248">embed.js表示</text>
+
+  <path class="arrow" d="M200,105 L268,105" />
+  <path class="arrow" d="M460,105 L528,105" />
+  <text class="s" x="470" y="98">保存</text>
+  <path class="arrow" d="M610,142 L610,198" />
+  <text class="s" x="620" y="172">即時反映</text>
+  <path class="arrow" d="M200,235 L528,235" />
+  <text class="s" x="330" y="228">https://…/{slug}</text>
+  <path class="arrow" d="M692,235 L738,235" />
+</svg>
