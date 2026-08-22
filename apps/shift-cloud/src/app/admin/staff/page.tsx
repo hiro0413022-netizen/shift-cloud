@@ -3,7 +3,7 @@ import { requireActor, visibleStores, isOwner } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { PageTitle, Table, Td, Badge, Button, Empty } from "@/components/ui";
 import { StaffForm, type StaffEdit } from "./staff-form";
-import { deactivateStaff } from "./actions";
+import { deactivateStaff, moveStaffOrder } from "./actions";
 import { yen } from "@/lib/util";
 
 const EMP_LABEL: Record<string, string> = {
@@ -15,9 +15,12 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const admin = createAdmin();
   const sp = await searchParams;
 
-  const [stores, { data: roles }] = await Promise.all([
+  const [stores, { data: roles }, { data: workTypes }] = await Promise.all([
     visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("roles").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name"),
+    // シフト作成のプルダウンに出せる業務区分（#147）
+    admin.from("schedule_types").select("id, name").eq("company_id", actor.companyId)
+      .is("deleted_at", null).order("sort_order").order("name"),
   ]);
 
   if (sp.new !== undefined || sp.edit) {
@@ -31,6 +34,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
         admin.from("staff_wages").select("hourly_wage, commute_allowance").eq("staff_id", sp.edit).is("deleted_at", null)
           .order("effective_from", { ascending: false }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       ]);
+      const { data: myTypes } = await admin.from("staff_schedule_types")
+        .select("schedule_type_id").eq("staff_id", sp.edit).is("deleted_at", null);
       // 他店のスタッフはURL直打ちでも編集させない（#134）。
       // 無所属（役員・本部）スタッフを触れるのはオーナーだけ。
       const assignedStoreIds = (assigns ?? []).map((a) => a.store_id);
@@ -45,13 +50,15 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
           role_id: role?.role_id ?? null,
           hourly_wage: wage?.hourly_wage ?? null,
           commute_allowance: wage?.commute_allowance ?? 0,
+          schedule_type_ids: (myTypes ?? []).map((t) => t.schedule_type_id),
+          sort_order: s.sort_order ?? 0,
         };
       }
     }
     return (
       <>
         <PageTitle>{edit ? `スタッフ編集: ${edit.name}` : "スタッフ追加"}</PageTitle>
-        <StaffForm stores={stores ?? []} roles={roles ?? []} edit={edit} />
+        <StaffForm stores={stores ?? []} roles={roles ?? []} workTypes={workTypes ?? []} edit={edit} />
       </>
     );
   }
@@ -75,7 +82,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
       stores.length > 0 ? stores.map((s) => s.id) : ["00000000-0000-0000-0000-000000000000"],
     );
   }
-  const { data: staffList } = await staffQuery.order("name");
+  // 並び順は staff.sort_order（紙シフト・シフト作成と同じ）。同値なら氏名順（#147）
+  const { data: staffList } = await staffQuery.order("sort_order").order("name");
 
   return (
     <>
@@ -85,8 +93,8 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
       {!staffList?.length ? (
         <Empty>スタッフが登録されていません</Empty>
       ) : (
-        <Table headers={["氏名", "主店舗", "雇用形態", "役職", "ロール", "時給", "状態", ""]}>
-          {staffList.map((s) => {
+        <Table headers={["並び", "氏名", "主店舗", "雇用形態", "役職", "ロール", "時給", "状態", ""]}>
+          {staffList.map((s, idx) => {
             const primary = (s.staff_store_assignments as unknown as { is_primary: boolean; stores: { name: string } | null }[])?.find((a) => a.is_primary);
             const wages = (s.staff_wages as unknown as { hourly_wage: number | null; effective_from: string; created_at: string }[]) ?? [];
             // 同じ effective_from が並ぶことがあるので created_at でタイブレーク（最後に保存した値を表示）
@@ -95,6 +103,33 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
             )[0];
             return (
               <tr key={s.id} className="hover:bg-zinc-50">
+                <Td>
+                  {/* 紙シフト出力の行順。数字ではなく▲▼で入れ替える（#147） */}
+                  <div className="flex flex-col leading-none">
+                    <form action={moveStaffOrder}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="dir" value="up" />
+                      <button
+                        disabled={idx === 0}
+                        title="1つ上へ（紙シフトの並び順）"
+                        className="px-1 text-zinc-400 hover:text-brand disabled:opacity-20"
+                      >
+                        ▲
+                      </button>
+                    </form>
+                    <form action={moveStaffOrder}>
+                      <input type="hidden" name="id" value={s.id} />
+                      <input type="hidden" name="dir" value="down" />
+                      <button
+                        disabled={idx === staffList.length - 1}
+                        title="1つ下へ（紙シフトの並び順）"
+                        className="px-1 text-zinc-400 hover:text-brand disabled:opacity-20"
+                      >
+                        ▼
+                      </button>
+                    </form>
+                  </div>
+                </Td>
                 <Td className="font-medium">
                   {s.name}
                   {/* 実際にログインに使うID（ログインID優先）。メールは連絡先なので後ろに小さく */}

@@ -22,7 +22,49 @@ const staffSchema = z.object({
   role_id: z.string().uuid(),
   hourly_wage: z.coerce.number().int().min(0).optional(),
   commute_allowance: z.coerce.number().int().min(0).default(0),
+  // シフト作成のプルダウンに出す業務区分（#147）。0件＝出さない
+  schedule_type_ids: z.array(z.string().uuid()).default([]),
 });
+
+/**
+ * 紙シフト・シフト作成の行順を1つ入れ替える（#147）。
+ * 数字を意識させず▲▼だけで並べ替えられるよう、**表示順の隣同士で sort_order を交換**する。
+ * 全員が0（初期値）のときは、いまの表示順どおりに 10,20,30… を振り直してから交換する。
+ */
+export async function moveStaffOrder(fd: FormData): Promise<void> {
+  const actor = await requireActor("manage_staff");
+  const staffId = String(fd.get("id") ?? "");
+  const dir = String(fd.get("dir") ?? "");
+  if (!staffId || (dir !== "up" && dir !== "down")) return;
+  if (!(await canManageStaff(actor, staffId))) return;
+  const admin = createAdmin();
+
+  const { data: rows } = await admin
+    .from("staff").select("id, sort_order, name")
+    .eq("company_id", actor.companyId).is("deleted_at", null)
+    .order("sort_order").order("name");
+  const list = (rows ?? []) as Array<{ id: string; sort_order: number; name: string }>;
+  const i = list.findIndex((r) => r.id === staffId);
+  if (i < 0) return;
+  const j = dir === "up" ? i - 1 : i + 1;
+  if (j < 0 || j >= list.length) return;
+
+  // 同値だらけだと交換しても順番が変わらないので、まず現在の並びで振り直す
+  const needsRenumber = new Set(list.map((r) => r.sort_order)).size !== list.length;
+  if (needsRenumber) {
+    for (let k = 0; k < list.length; k += 1) {
+      list[k].sort_order = (k + 1) * 10;
+      await admin.from("staff").update({ sort_order: list[k].sort_order }).eq("id", list[k].id);
+    }
+  }
+  const a = list[i];
+  const b = list[j];
+  await admin.from("staff").update({ sort_order: b.sort_order }).eq("id", a.id);
+  await admin.from("staff").update({ sort_order: a.sort_order }).eq("id", b.id);
+  await logAudit(actor, "staff.reorder", "staff", a.id, { sort_order: a.sort_order }, { sort_order: b.sort_order });
+  revalidatePath("/admin/staff");
+  revalidatePath("/admin/shifts");
+}
 
 /**
  * 対象スタッフを編集してよいか（#134・#128 店舗またぎ廃止）。
@@ -59,6 +101,7 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
     role_id: formData.get("role_id"),
     hourly_wage: formData.get("hourly_wage") || undefined,
     commute_allowance: formData.get("commute_allowance") || 0,
+    schedule_type_ids: formData.getAll("schedule_type_ids"),
   });
   if (!parsed.success) return { error: "入力内容を確認してください" };
   const d = parsed.data;
@@ -160,6 +203,21 @@ export async function saveStaff(formData: FormData): Promise<{ error?: string }>
         is_primary: sid === primary,
       }))
     );
+  }
+
+  // シフトで選べる業務を置き換え（#147）。マスタに無いIDは弾く
+  {
+    const { data: validTypes } = await admin
+      .from("schedule_types").select("id")
+      .eq("company_id", actor.companyId).is("deleted_at", null);
+    const validIds = new Set((validTypes ?? []).map((t) => t.id));
+    const picked = d.schedule_type_ids.filter((id) => validIds.has(id));
+    await admin.from("staff_schedule_types").delete().eq("staff_id", staffId);
+    if (picked.length > 0) {
+      await admin.from("staff_schedule_types").insert(
+        picked.map((id) => ({ company_id: actor.companyId, staff_id: staffId, schedule_type_id: id }))
+      );
+    }
   }
 
   // ロールを置き換え

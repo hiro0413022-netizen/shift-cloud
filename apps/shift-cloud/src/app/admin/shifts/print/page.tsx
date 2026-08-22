@@ -4,7 +4,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { currentYM, addMonths, daysOfMonth, daysBetween, halfMonthRange, dowJP, hm } from "@/lib/util";
 import { PrintButton } from "./print-button";
 
-type Shift = { staff_id: string; date: string; start_time: string | null; end_time: string | null; is_day_off: boolean; template_id: string | null };
+type Shift = { staff_id: string; date: string; start_time: string | null; end_time: string | null; is_day_off: boolean; template_id: string | null; schedule_type_id: string | null };
 
 /**
  * 印刷の range → シフト作成画面の span/d へ変換（#135）。
@@ -41,18 +41,38 @@ export default async function ShiftPrintPage({
   if (!storeId) return <p className="p-8">店舗がありません</p>;
   const store = stores?.find((s) => s.id === storeId);
 
-  const [{ data: staffRows }, { data: templates }, { data: shifts }] = await Promise.all([
-    admin.from("staff").select("id, name, position, staff_store_assignments!inner(store_id)")
+  const [{ data: staffRows }, { data: templates }, { data: shifts }, { data: workTypes }] = await Promise.all([
+    // 並び順は staff.sort_order（スタッフ管理の▲▼で決める・#147）。同値なら氏名順
+    admin.from("staff").select("id, name, position, sort_order, staff_store_assignments!inner(store_id)")
       .eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null)
-      .eq("staff_store_assignments.store_id", storeId).order("position").order("name"),
+      .eq("staff_store_assignments.store_id", storeId).order("sort_order").order("name"),
     admin.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color")
       .eq("company_id", actor.companyId).is("deleted_at", null),
-    admin.from("shifts").select("staff_id, date, start_time, end_time, is_day_off, template_id")
+    admin.from("shifts").select("staff_id, date, start_time, end_time, is_day_off, template_id, schedule_type_id")
       .eq("company_id", actor.companyId).eq("store_id", storeId).is("deleted_at", null)
       .gte("date", start).lte("date", end),
+    admin.from("schedule_types").select("id, name, color")
+      .eq("company_id", actor.companyId).is("deleted_at", null),
   ]);
 
   const tmap = new Map((templates ?? []).map((t) => [t.id, t] as const));
+  const wtMap = new Map((workTypes ?? []).map((w) => [w.id, w] as const));
+
+  // Caddy OS で確定した派遣。シフトが入っていない日でも「⛳」で外勤が分かるようにする（#147）
+  const staffIdList = (staffRows ?? []).map((r) => r.id);
+  const { data: caddyRows } = staffIdList.length
+    ? await admin.from("cad_dispatches")
+        .select("dispatch_date, staff_id, cad_partners!cad_dispatches_partner_id_fkey(staff_id)")
+        .eq("company_id", actor.companyId).eq("status", "confirmed").neq("kind", "golfwing")
+        .is("deleted_at", null).gte("dispatch_date", start).lte("dispatch_date", end)
+    : { data: [] };
+  const caddySet = new Set<string>();
+  for (const r of (caddyRows ?? []) as unknown as Array<{
+    dispatch_date: string; staff_id: string | null; cad_partners: { staff_id: string | null } | null;
+  }>) {
+    const sid = r.staff_id ?? r.cad_partners?.staff_id ?? null;
+    if (sid) caddySet.add(`${sid}|${r.dispatch_date}`);
+  }
   const shiftMap = new Map<string, Shift>();
   for (const s of (shifts ?? []) as Shift[]) shiftMap.set(`${s.staff_id}|${s.date}`, s);
 
@@ -69,8 +89,16 @@ export default async function ShiftPrintPage({
   type Cell = { kind: "off" } | { kind: "time"; from: string; to: string } | { kind: "label"; text: string; color?: string } | null;
   function cell(staffId: string, date: string): Cell {
     const sh = shiftMap.get(`${staffId}|${date}`);
-    if (!sh) return null;
+    if (!sh) {
+      // シフト未入力でも、Caddy OSで確定した派遣がある日は外勤として出す（#147）
+      return caddySet.has(`${staffId}|${date}`) ? { kind: "label", text: "キャディ", color: "#b45309" } : null;
+    }
     if (sh.is_day_off) return { kind: "off" };
+    // 業務区分（キャディ等）は時刻を持たないので名前をそのまま出す
+    if (sh.schedule_type_id) {
+      const w = wtMap.get(sh.schedule_type_id);
+      if (w) return { kind: "label", text: w.name, color: w.color };
+    }
     if (sh.start_time && sh.end_time) return { kind: "time", from: hm(sh.start_time), to: hm(sh.end_time) };
     if (sh.template_id) {
       const t = tmap.get(sh.template_id);

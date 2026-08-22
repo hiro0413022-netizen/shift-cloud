@@ -8,9 +8,11 @@ import { logAudit } from "@/lib/audit";
 export type CellShift = {
   staff_id: string;
   date: string;
-  template_id: string | null;          // null = クリア または 任意時刻
+  template_id: string | null;          // null = クリア / 任意時刻 / 業務区分
   start_time?: string | null;          // 任意時刻（テンプレ未使用時）"HH:MM"
   end_time?: string | null;
+  /** 業務区分（キャディ等・schedule_types）。時刻は持たず「終日その業務」の扱い（#147） */
+  schedule_type_id?: string | null;
 };
 
 /** 1マス（誰の・いつ）の指定。確定／確定解除で使う */
@@ -67,7 +69,7 @@ export async function saveShifts(storeId: string, cells: CellShift[]): Promise<{
 
   const [{ data: templates }, { data: existingRows }] = await Promise.all([
     admin.from("shift_templates").select("id, start_time, end_time, is_day_off").eq("company_id", actor.companyId),
-    admin.from("shifts").select("staff_id, date, status, published_at, template_id, start_time, end_time, is_day_off")
+    admin.from("shifts").select("staff_id, date, status, published_at, template_id, schedule_type_id, start_time, end_time, is_day_off")
       .eq("company_id", actor.companyId).eq("store_id", storeId)
       .in("staff_id", staffIds).in("date", dates).is("deleted_at", null),
   ]);
@@ -79,8 +81,8 @@ export async function saveShifts(storeId: string, cells: CellShift[]): Promise<{
   for (const c of cells) {
     const prev = emap.get(`${c.staff_id}|${c.date}`);
 
-    // テンプレも任意時刻も無い → クリア（draftのみ削除。published は解除しない＝確定解除ボタンで明示的に）
-    if (!c.template_id && !(c.start_time && c.end_time)) {
+    // テンプレも任意時刻も業務区分も無い → クリア（draftのみ削除。published は解除しない＝確定解除ボタンで明示的に）
+    if (!c.template_id && !c.schedule_type_id && !(c.start_time && c.end_time)) {
       await admin.from("shifts").delete()
         .eq("staff_id", c.staff_id).eq("store_id", storeId).eq("date", c.date).eq("status", "draft");
       continue;
@@ -91,6 +93,9 @@ export async function saveShifts(storeId: string, cells: CellShift[]): Promise<{
       const t = tmap.get(c.template_id);
       if (!t) continue;
       start_time = t.start_time; end_time = t.end_time; is_day_off = t.is_day_off;
+    } else if (c.schedule_type_id) {
+      // 業務区分は終日扱い。時刻を入れたいときは「⌚ 時間指定」を使う
+      start_time = null; end_time = null; is_day_off = false;
     } else {
       start_time = c.start_time ?? null; end_time = c.end_time ?? null; is_day_off = false;
     }
@@ -103,6 +108,7 @@ export async function saveShifts(storeId: string, cells: CellShift[]): Promise<{
         store_id: storeId,
         date: c.date,
         template_id: c.template_id,
+        schedule_type_id: c.schedule_type_id ?? null,
         start_time,
         end_time,
         is_day_off,
@@ -117,6 +123,7 @@ export async function saveShifts(storeId: string, cells: CellShift[]): Promise<{
     if (keepPublished) {
       const same = (prev?.start_time ?? null) === start_time
         && (prev?.end_time ?? null) === end_time
+        && (prev?.schedule_type_id ?? null) === (c.schedule_type_id ?? null)
         && (prev?.template_id ?? null) === (c.template_id ?? null)
         && prev?.is_day_off === is_day_off;
       if (!same) {

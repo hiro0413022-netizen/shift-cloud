@@ -54,8 +54,8 @@ const COLS = [
   { key: "memo", label: "備考", w: CW - 86 - 42 - 245 },
 ] as const;
 
-const LINE_H = 13; // 行内の1行ぶんの高さ
-const ROW_PAD = 7; // 上下の余白
+const LINE_H = 14; // 行内の1行ぶんの高さ
+const ROW_PAD = 8; // 上下の余白（上下に半分ずつ）
 const ROW_H = LINE_H + ROW_PAD; // 1行だけのときの高さ
 
 /** 同じ日付をまとめた1行 */
@@ -199,8 +199,11 @@ function drawPage(
       borderWidth: 0.7,
       ...(header ? { color: HEAD } : {}),
     });
+    // ベースラインは「セル上端 → 余白の半分 → i行ぶん下 → その行の中で少し持ち上げる」。
+    // ここを間違えると罫線が文字を貫通する（2026-08-22の実障害）
     lines.forEach((ln, i) => {
-      page.drawText(ln, { x: x + 6, y: top - ROW_PAD - LINE_H * i + 3.5, size, font, color: TXT });
+      const baseline = top - ROW_PAD / 2 - LINE_H * (i + 1) + (LINE_H - size) / 2 + size * 0.22;
+      page.drawText(ln, { x: x + 6, y: baseline, size, font, color: TXT });
     });
   };
 

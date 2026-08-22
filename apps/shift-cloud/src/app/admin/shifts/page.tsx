@@ -29,15 +29,19 @@ export default async function ShiftBuilderPage({
   const storeId = pickStore(stores, sp.store, actor.primaryStoreId);
   if (!storeId) return <PageTitle>シフト作成</PageTitle>;
 
-  const [{ data: staffRows }, { data: templates }, { data: shifts }] = await Promise.all([
-    admin.from("staff").select("id, name, staff_store_assignments!inner(store_id)")
+  const [{ data: staffRows }, { data: templates }, { data: shifts }, { data: workTypes }] = await Promise.all([
+    // 並び順は staff.sort_order（紙シフトと同じ・#147）。同値なら氏名順
+    admin.from("staff").select("id, name, sort_order, staff_store_assignments!inner(store_id)")
       .eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null)
-      .eq("staff_store_assignments.store_id", storeId).order("name"),
+      .eq("staff_store_assignments.store_id", storeId).order("sort_order").order("name"),
     admin.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color, scope_type, scope_id")
       .eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
-    admin.from("shifts").select("staff_id, date, template_id, status, start_time, end_time")
+    admin.from("shifts").select("staff_id, date, template_id, schedule_type_id, status, start_time, end_time")
       .eq("company_id", actor.companyId).eq("store_id", storeId).is("deleted_at", null)
       .gte("date", start).lte("date", end),
+    // 業務区分（キャディ等）。誰に出すかは staff_schedule_types で決まる（#147）
+    admin.from("schedule_types").select("id, name, color, sort_order")
+      .eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order").order("name"),
   ]);
 
   // 提出された希望は期間(period)ではなく日付で読む。この店舗のスタッフのぶんだけ（#138）
@@ -48,6 +52,38 @@ export default async function ShiftBuilderPage({
         .eq("status", "submitted").is("deleted_at", null)
         .gte("date", start).lte("date", end)
     : { data: [] };
+
+  // 「この人のシフトに出す業務」。行が無い人には業務のプルダウンを出さない（#147）
+  const { data: staffWorkTypes } = staffIds.length
+    ? await admin.from("staff_schedule_types").select("staff_id, schedule_type_id")
+        .eq("company_id", actor.companyId).in("staff_id", staffIds).is("deleted_at", null)
+    : { data: [] };
+  const allowedTypes: Record<string, string[]> = {};
+  for (const r of (staffWorkTypes ?? []) as Array<{ staff_id: string; schedule_type_id: string }>) {
+    (allowedTypes[r.staff_id] ??= []).push(r.schedule_type_id);
+  }
+
+  // Caddy OS で確定した派遣を、その人のシフトに自動で出す（二度入力しないため・#147）
+  // 紐付けは cad_partners.staff_id（氏名一致では結ばない）。自社スタッフが入った分は staff_id 直。
+  const { data: caddyRows } = staffIds.length
+    ? await admin.from("cad_dispatches")
+        .select("dispatch_date, staff_id, partner_id, cad_clients(name), cad_partners!cad_dispatches_partner_id_fkey(staff_id, name)")
+        .eq("company_id", actor.companyId).eq("status", "confirmed").neq("kind", "golfwing")
+        .is("deleted_at", null).gte("dispatch_date", start).lte("dispatch_date", end)
+    : { data: [] };
+  const caddyDays: Record<string, string> = {};
+  for (const r of (caddyRows ?? []) as unknown as Array<{
+    dispatch_date: string;
+    staff_id: string | null;
+    cad_clients: { name: string } | null;
+    cad_partners: { staff_id: string | null; name: string } | null;
+  }>) {
+    const sid = r.staff_id ?? r.cad_partners?.staff_id ?? null;
+    if (!sid || !staffIds.includes(sid)) continue;
+    const key = `${sid}|${r.dispatch_date}`;
+    const course = r.cad_clients?.name ?? "ゴルフ場未定";
+    caddyDays[key] = caddyDays[key] ? `${caddyDays[key]} / ${course}` : course;
+  }
 
   // 休み希望（いつでも出せる）。表示範囲にかかるものを日付ごとに引けるようにする
   const { data: timeOffRows } = await admin.from("staff_time_off_requests")
@@ -129,6 +165,9 @@ export default async function ShiftBuilderPage({
           rangeShort={range.shortLabel}
           staff={staffRows.map((s) => ({ id: s.id, name: s.name }))}
           templates={storeTemplates}
+          workTypes={workTypes ?? []}
+          allowedTypes={allowedTypes}
+          caddyDays={caddyDays}
           shifts={shifts ?? []}
           requests={requests ?? []}
           timeOff={timeOff}

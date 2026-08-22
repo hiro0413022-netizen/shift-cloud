@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 
 type Store = { id: string; name: string };
 type Role = { id: string; name: string };
+type WorkType = { id: string; name: string };
 export type StaffEdit = {
   id: string;
   name: string;
@@ -20,6 +21,10 @@ export type StaffEdit = {
   role_id: string | null;
   hourly_wage: number | null;
   commute_allowance: number;
+  /** シフト作成のプルダウンに出す業務区分（#147） */
+  schedule_type_ids: string[];
+  /** 紙シフト・シフト作成の行順。小さいほど上 */
+  sort_order: number;
 };
 
 const EMP = [
@@ -29,11 +34,14 @@ const EMP = [
   ["lesson_pro", "レッスンプロ"],
 ] as const;
 
-export function StaffForm({ stores, roles, edit }: { stores: Store[]; roles: Role[]; edit?: StaffEdit }) {
+export function StaffForm({
+  stores, roles, workTypes, edit,
+}: { stores: Store[]; roles: Role[]; workTypes: WorkType[]; edit?: StaffEdit }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const [selStores, setSelStores] = useState<string[]>(edit?.store_ids ?? []);
+  const [selTypes, setSelTypes] = useState<string[]>(edit?.schedule_type_ids ?? []);
 
   function submit(formData: FormData) {
     start(async () => {
@@ -89,6 +97,34 @@ export function StaffForm({ stores, roles, edit }: { stores: Store[]; roles: Rol
             ))}
           </Select>
         </div>
+        <div className="col-span-2">
+          <Label>シフトで選べる業務（この人のプルダウンに出るもの）</Label>
+          <p className="mb-2 text-[11px] text-zinc-400">
+            チェックした業務だけが、この人のシフト作成のプルダウンに「業務」として並びます。
+            何も選ばなければ従来どおり（時間帯のテンプレートと時間指定だけ）です。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {workTypes.map((w) => (
+              <label
+                key={w.id}
+                className={`cursor-pointer rounded-md border px-3 py-1.5 text-sm ${selTypes.includes(w.id) ? "border-brand bg-brand-light text-brand" : "border-zinc-300 text-zinc-600"}`}
+              >
+                <input
+                  type="checkbox"
+                  name="schedule_type_ids"
+                  value={w.id}
+                  checked={selTypes.includes(w.id)}
+                  onChange={(e) =>
+                    setSelTypes((p) => (e.target.checked ? [...p, w.id] : p.filter((x) => x !== w.id)))
+                  }
+                  className="mr-1.5"
+                />
+                {w.name}
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="col-span-2">
           <Label>所属店舗（複数可）</Label>
           <div className="flex flex-wrap gap-2">

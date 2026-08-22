@@ -6,11 +6,14 @@ import { Button } from "@/components/ui";
 
 type Template = { id: string; name: string; start_time: string | null; end_time: string | null; is_day_off: boolean; color: string };
 type StaffRow = { id: string; name: string };
-type Shift = { staff_id: string; date: string; template_id: string | null; status: string; start_time: string | null; end_time: string | null };
+type WorkType = { id: string; name: string; color: string };
+type Shift = { staff_id: string; date: string; template_id: string | null; schedule_type_id: string | null; status: string; start_time: string | null; end_time: string | null };
 type Request = { staff_id: string; date: string; template_id: string | null; memo: string | null; start_time: string | null; end_time: string | null };
-type Cell = { template_id: string | null; start_time: string | null; end_time: string | null; status: string };
+type Cell = { template_id: string | null; schedule_type_id: string | null; start_time: string | null; end_time: string | null; status: string };
 
 const CUSTOM = "__custom__";
+/** 業務区分は "wt:<schedule_type_id>" で表す（テンプレIDと混ざらないように） */
+const WT_PREFIX = "wt:";
 
 function tLabel(t: Template) {
   if (t.is_day_off) return "休み";
@@ -40,7 +43,7 @@ function reqTimes(r: Request, tmap: Map<string, Template>): { start: string; end
 }
 
 export function ShiftBuilder({
-  storeId, days, rangeLabel, rangeShort, staff, templates, shifts, requests, timeOff,
+  storeId, days, rangeLabel, rangeShort, staff, templates, workTypes, allowedTypes, caddyDays, shifts, requests, timeOff,
 }: {
   storeId: string;
   /** 表示する日付（日/週/半月/月。範囲は lib/shift-span.ts が決める・#135） */
@@ -50,11 +53,21 @@ export function ShiftBuilder({
   /** ボタン用の短いラベル「9月前半」など */
   rangeShort: string;
   staff: StaffRow[]; templates: Template[]; shifts: Shift[]; requests: Request[];
+  /** 業務区分マスタ（キャディ / レッスン / 会議 …）。schedule_types */
+  workTypes: WorkType[];
+  /** staffId → 出してよい業務区分ID。行が無い人にはプルダウンを出さない（#147） */
+  allowedTypes: Record<string, string[]>;
+  /** "staffId|date" → Caddy OSで確定した派遣のゴルフ場名（自動表示・#147） */
+  caddyDays: Record<string, string>;
   /** "staffId|date" → 休み希望（approved=承認済み / submitted=申請中） */
   timeOff: Record<string, { status: string; reason: string | null }>;
 }) {
   const init: Record<string, Cell> = {};
-  for (const s of shifts) init[`${s.staff_id}|${s.date}`] = { template_id: s.template_id, start_time: s.start_time, end_time: s.end_time, status: s.status };
+  for (const s of shifts)
+    init[`${s.staff_id}|${s.date}`] = {
+      template_id: s.template_id, schedule_type_id: s.schedule_type_id,
+      start_time: s.start_time, end_time: s.end_time, status: s.status,
+    };
 
   const [grid, setGrid] = useState(init);
   const [dirty, setDirty] = useState<Set<string>>(new Set());
@@ -77,7 +90,11 @@ export function ShiftBuilder({
   const shiftsSig = JSON.stringify(shifts);
   useEffect(() => {
     const base: Record<string, Cell> = {};
-    for (const s of shifts) base[`${s.staff_id}|${s.date}`] = { template_id: s.template_id, start_time: s.start_time, end_time: s.end_time, status: s.status };
+    for (const s of shifts)
+      base[`${s.staff_id}|${s.date}`] = {
+        template_id: s.template_id, schedule_type_id: s.schedule_type_id,
+        start_time: s.start_time, end_time: s.end_time, status: s.status,
+      };
     setGrid((prev) => {
       const next: Record<string, Cell> = { ...base };
       for (const k of dirtyRef.current) if (prev[k]) next[k] = prev[k];
@@ -89,6 +106,10 @@ export function ShiftBuilder({
   const reqMap = new Map<string, Request>();
   for (const r of requests) reqMap.set(`${r.staff_id}|${r.date}`, r);
   const tmap = new Map(templates.map((t) => [t.id, t]));
+  const wtMap = new Map(workTypes.map((w) => [w.id, w]));
+  /** その人に出す業務区分だけを返す（#147） */
+  const typesFor = (staffId: string) =>
+    (allowedTypes[staffId] ?? []).map((id) => wtMap.get(id)).filter((w): w is WorkType => !!w);
 
   // ① 未保存の編集を localStorage から復元
   useEffect(() => {
@@ -146,15 +167,19 @@ export function ShiftBuilder({
       // 確定済みのマスを直しても確定のまま（保存時に本人へ変更通知が飛ぶ・#138）
       const status = cur?.status === "published" ? "published" : "draft";
       if (value === CUSTOM) {
-        return { ...p, [key]: { template_id: null, start_time: cur?.start_time ?? "10:00", end_time: cur?.end_time ?? "19:00", status } };
+        return { ...p, [key]: { template_id: null, schedule_type_id: null, start_time: cur?.start_time ?? "10:00", end_time: cur?.end_time ?? "19:00", status } };
       }
-      return { ...p, [key]: { template_id: value || null, start_time: null, end_time: null, status } };
+      // 業務区分（キャディ等）。時刻は持たせない＝終日その業務、という扱い
+      if (value.startsWith(WT_PREFIX)) {
+        return { ...p, [key]: { template_id: null, schedule_type_id: value.slice(WT_PREFIX.length), start_time: null, end_time: null, status } };
+      }
+      return { ...p, [key]: { template_id: value || null, schedule_type_id: null, start_time: null, end_time: null, status } };
     });
     markDirty(key);
   }
   function setCustomTime(staffId: string, date: string, which: "start" | "end", v: string) {
     const key = `${staffId}|${date}`;
-    setGrid((p) => ({ ...p, [key]: { ...p[key], template_id: null, [which === "start" ? "start_time" : "end_time"]: v } as Cell }));
+    setGrid((p) => ({ ...p, [key]: { ...p[key], template_id: null, schedule_type_id: null, [which === "start" ? "start_time" : "end_time"]: v } as Cell }));
     markDirty(key);
   }
 
@@ -169,7 +194,7 @@ export function ShiftBuilder({
     if (grid[key]?.status === "published") return; // 確定済みは希望で上書きしない（直すなら確定解除から）
     const times = reqTimes(req, tmap);
     if (!times) return;
-    setGrid((p) => ({ ...p, [key]: { template_id: null, start_time: times.start, end_time: times.end, status: "draft" } }));
+    setGrid((p) => ({ ...p, [key]: { template_id: null, schedule_type_id: null, start_time: times.start, end_time: times.end, status: "draft" } }));
     markDirty(key);
   }
 
@@ -185,10 +210,10 @@ export function ShiftBuilder({
       const key = `${r.staff_id}|${r.date}`;
       const cur = grid[key];
       if (cur?.status === "published") continue;
-      if (cur?.template_id || cur?.start_time) continue; // 既に入っているものは尊重する
+      if (cur?.template_id || cur?.schedule_type_id || cur?.start_time) continue; // 既に入っているものは尊重する
       const times = reqTimes(r, tmap);
       if (!times) continue;
-      next[key] = { template_id: null, start_time: times.start, end_time: times.end, status: "draft" };
+      next[key] = { template_id: null, schedule_type_id: null, start_time: times.start, end_time: times.end, status: "draft" };
       keys.push(key);
     }
     if (keys.length === 0) { setMsg(`${rangeShort}に反映できる希望がありません（すでに入力済みです）`); return; }
@@ -204,7 +229,13 @@ export function ShiftBuilder({
     const cells: CellShift[] = [...snapshot].map((key) => {
       const [staff_id, date] = key.split("|");
       const c = gridRef.current[key];
-      return { staff_id, date, template_id: c?.template_id ?? null, start_time: c?.start_time ?? null, end_time: c?.end_time ?? null };
+      return {
+        staff_id, date,
+        template_id: c?.template_id ?? null,
+        schedule_type_id: c?.schedule_type_id ?? null,
+        start_time: c?.start_time ?? null,
+        end_time: c?.end_time ?? null,
+      };
     });
     const res = await saveShifts(storeId, cells);
     if (res.error) return res;
@@ -324,8 +355,11 @@ export function ShiftBuilder({
                   const cell = grid[key];
                   const req = reqMap.get(key);
                   const t = cell?.template_id ? tmap.get(cell.template_id) : null;
-                  const isCustom = !cell?.template_id && !!(cell?.start_time || cell?.end_time);
-                  const filled = !!(cell?.template_id || (cell?.start_time && cell?.end_time));
+                  const wt = cell?.schedule_type_id ? wtMap.get(cell.schedule_type_id) : null;
+                  const isCustom = !cell?.template_id && !cell?.schedule_type_id && !!(cell?.start_time || cell?.end_time);
+                  const filled = !!(cell?.template_id || cell?.schedule_type_id || (cell?.start_time && cell?.end_time));
+                  const myTypes = typesFor(s.id);
+                  const caddy = caddyDays[key];
                   const published = cell?.status === "published";
                   const off = timeOff[key];
                   const bg = off?.status === "approved" ? "bg-rose-50"
@@ -335,14 +369,25 @@ export function ShiftBuilder({
                   return (
                     <td key={d} className={`border-b border-zinc-100 p-0.5 align-top ${bg}`}>
                       <select
-                        value={isCustom ? CUSTOM : cell?.template_id ?? ""}
+                        value={
+                          isCustom ? CUSTOM
+                            : cell?.schedule_type_id ? `${WT_PREFIX}${cell.schedule_type_id}`
+                            : cell?.template_id ?? ""
+                        }
                         onChange={(e) => setTemplate(s.id, d, e.target.value)}
                         className="w-full cursor-pointer rounded border-0 bg-transparent px-1 py-1 text-[11px] focus:outline-none"
-                        style={t ? { color: t.color, fontWeight: 600 } : undefined}
+                        style={wt ? { color: wt.color, fontWeight: 600 } : t ? { color: t.color, fontWeight: 600 } : undefined}
                       >
                         <option value="">—</option>
                         {templates.map((tp) => (<option key={tp.id} value={tp.id}>{tLabel(tp)}</option>))}
                         <option value={CUSTOM}>⌚ 時間指定</option>
+                        {myTypes.length > 0 && (
+                          <optgroup label="業務">
+                            {myTypes.map((w) => (
+                              <option key={w.id} value={`${WT_PREFIX}${w.id}`}>{w.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
                       </select>
                       {isCustom && (
                         <div className="flex items-center gap-0.5 px-0.5 pb-0.5">
@@ -369,6 +414,14 @@ export function ShiftBuilder({
                             ✓ この日を確定
                           </button>
                         )
+                      )}
+
+                      {/* Caddy OS で確定した派遣。ここでは入力させず「その日は外に出ている」と分かるだけ（#147） */}
+                      {caddy && (
+                        <p className="truncate px-1 pb-0.5 text-[10px] font-medium text-amber-700"
+                          title={`Caddy OSで確定済みのキャディ派遣: ${caddy}`}>
+                          ⛳ {caddy}
+                        </p>
                       )}
 
                       {off && (
