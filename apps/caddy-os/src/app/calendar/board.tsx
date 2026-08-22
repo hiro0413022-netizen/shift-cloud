@@ -161,7 +161,7 @@ export function CalendarBoard({
         <span className="text-(--color-dim)">色＝ゴルフ場</span>
         {clients.map((c) => (
           <span key={c.id} className="flex items-center gap-1">
-            <span className={`inline-block h-2.5 w-2.5 rounded-sm ${clientTone(c.id).dot}`} />
+            <span className={`inline-block h-2.5 w-2.5 rounded-sm ${clientTone(c.id, c.name).dot}`} />
             {c.name}
           </span>
         ))}
@@ -235,7 +235,7 @@ export function CalendarBoard({
                 {list.slice(0, 4).map((x) => (
                   <div
                     key={x.id}
-                    className={`truncate rounded px-1 text-[10px] leading-4 ${dispatchChipCls(x.client_id, x.status)}`}
+                    className={`truncate rounded px-1 text-[10px] leading-4 ${dispatchChipCls(x.client_id, x.status, x.client_name)}`}
                     title={`${x.caddie_name} / ${x.client_name ?? "ゴルフ場未定"} / ${STATUS_LABEL[x.status]}`}
                   >
                     {x.status === "tentative" ? <span className="font-medium">仮 </span> : null}
@@ -371,10 +371,11 @@ export function CalendarBoard({
                   <span
                     className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${dispatchChipCls(
                       d.client_id,
-                      d.status
+                      d.status,
+                      d.client_name
                     )}`}
                   >
-                    <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(d.client_id).dot}`} />
+                    <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(d.client_id, d.client_name).dot}`} />
                     {d.client_name ?? "ゴルフ場未定"}
                   </span>
                   {d.staff_id ? (

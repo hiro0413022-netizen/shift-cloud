@@ -91,8 +91,10 @@ export default async function ExportsPage({
       {tentativeCount > 0 ? (
         withTentative ? (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-            <b>仮の割当 {tentativeCount} 件を含めて</b>出しています。CSV・PDFとも「仮」と分かる形で入ります
-            （表題は「予定表」・状態列は「仮」・カレンダー表は△）。確定後にもう一度送り直してください。
+            <b>仮の割当 {tentativeCount} 件を含めて</b>出しています。
+            <b>提出するCSV・PDFに「仮」の印は入りません</b>（ゴルフ場からは通常の予定として見えます。
+            表題とファイル名だけ「予定」になります）。下の「内容を見る」では社内確認用に仮を表示しています。
+            確定後にもう一度送り直してください。
             <Link href={`/exports?ym=${ym}`} className="ml-1 underline">
               確定分だけに戻す
             </Link>

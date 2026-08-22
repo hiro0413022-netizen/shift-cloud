@@ -52,7 +52,7 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
         <span className="text-(--color-dim)">色＝ゴルフ場</span>
         {masters.clients.map((c) => (
           <span key={c.id} className="flex items-center gap-1">
-            <span className={`inline-block h-2.5 w-2.5 rounded-sm ${clientTone(c.id).dot}`} />
+            <span className={`inline-block h-2.5 w-2.5 rounded-sm ${clientTone(c.id, c.name).dot}`} />
             {c.name}
           </span>
         ))}
@@ -164,10 +164,11 @@ export default async function DispatchesPage({ searchParams }: { searchParams: P
                           <span
                             className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs ${dispatchChipCls(
                               r.client_id,
-                              r.status
+                              r.status,
+                              r.cad_clients.name
                             )}`}
                           >
-                            <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(r.client_id).dot}`} />
+                            <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(r.client_id, r.cad_clients.name).dot}`} />
                             {r.cad_clients.name}
                             {r.status === "tentative" ? <span className="font-medium">・仮</span> : null}
                           </span>

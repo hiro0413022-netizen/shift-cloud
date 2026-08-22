@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
-import { isTentative, jpDate, type ExportRow } from "@/lib/csv";
+import { jpDate, type ExportRow } from "@/lib/csv";
 
 /**
  * ゴルフ場提出用「月間派遣一覧」PDF（小川さん依頼 2026-08-22 / #145）
@@ -12,8 +12,10 @@ import { isTentative, jpDate, type ExportRow } from "@/lib/csv";
  * 罫線つきの1枚もの（A4縦）にする。中身の元データはCSVと同じ ExportRow なので、
  * CSVとPDFで内容がズレることはない。
  *
- * 仮（tentative）を含めて出す場合は、状態列と表題と注記の3か所で「予定」と明示する。
- * 黙って混ぜると「確定したはず」の事故になるため、混ぜるなら必ず見えるようにする。
+ * ⚠ **仮かどうかはゴルフ場に出さない**（小川さん指示 2026-08-22 / #145b）。
+ * ゴルフ場から見ればこれは「提出された予定」であって、確定/仮はYOZAN社内の管理状態でしかない。
+ * 表題だけ「予定表」にして、行ごとの状態も件数も出さない。社内画面（カレンダー・派遣台帳）では
+ * 引き続き 破線＋「仮」で区別できる。
  *
  * フォント: src/assets/NotoSansJP-Regular.ttf（genesis の入会控え・給与明細PDFと同じファイル）。
  * ⚠ embedFont の subset:true は使わない — このフォントでグリフが欠落する（#129 で確認済み）。
@@ -42,10 +44,9 @@ export type ExportPdfInput = {
 };
 
 const COLS = [
-  { key: "date", label: "日付", w: 92 },
-  { key: "caddie", label: "キャディ名", w: 190 },
-  { key: "status", label: "状態", w: 56 },
-  { key: "memo", label: "備考", w: CW - 92 - 190 - 56 },
+  { key: "date", label: "日付", w: 100 },
+  { key: "caddie", label: "キャディ名", w: 210 },
+  { key: "memo", label: "備考", w: CW - 100 - 210 },
 ] as const;
 
 const ROW_H = 20;
@@ -106,18 +107,12 @@ function drawPage(
     // ===== 集計
     const days = new Set(input.rows.map((r) => r.date)).size;
     const caddies = new Set(input.rows.map((r) => r.caddie_name)).size;
-    const kari = input.rows.filter(isTentative).length;
     text(`合計 ${input.rows.length} 人工 ／ ${days} 日 ／ キャディ ${caddies} 名`, MX, y, 10);
     y -= 16;
 
-    if (input.withTentative && kari > 0) {
-      text(
-        `※ このうち ${kari} 件は「仮」です。予定のため変更になる場合があります。確定後にあらためてお送りします。`,
-        MX,
-        y,
-        9,
-        WARN
-      );
+    if (input.withTentative) {
+      // 何件が仮かは書かない。あくまで「予定なので変わることがある」だけを伝える
+      text("※ 予定のため変更になる場合があります。変更が生じた際はあらためてご連絡いたします。", MX, y, 9, WARN);
       y -= 16;
     }
     y -= 4;
@@ -154,7 +149,7 @@ function drawPage(
   y -= ROW_H;
 
   for (const r of rows) {
-    drawRow([jpDate(r.date), r.caddie_name, isTentative(r) ? "仮" : "確定", r.memo ?? ""], y, false);
+    drawRow([jpDate(r.date), r.caddie_name, r.memo ?? ""], y, false);
     y -= ROW_H;
   }
 

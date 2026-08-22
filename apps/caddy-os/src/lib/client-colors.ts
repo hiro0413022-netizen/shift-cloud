@@ -4,10 +4,12 @@
    カレンダーや台帳を開いた瞬間に「どのゴルフ場か」「確定か仮か」が分かるようにする。
 
    決めごと:
-   - **色 = ゴルフ場**。色は取引先IDから決めるので、並び替えても月が変わっても同じ色のまま。
+   - **色 = ゴルフ場**。主要4社は小川さん指定の色で固定（下の NAMED）。
+     それ以外は取引先IDから決めるので、並び替えても月が変わっても同じ色のまま。
      （表示順で割り当てると、取引先が1つ増えた瞬間に全部の色がずれて覚え直しになる）
    - **形 = 状態**。確定は塗りつぶし＋実線、仮は白地＋**破線**＋「仮」の文字。
      色だけで状態を表さない（色覚特性・印刷・見づらい照明の店頭を考えると、色だけの区別は危険）。
+     ※ ゴルフ場へ提出するPDF/CSVには仮の印を出さない（#145b・社内だけの情報）。ここは社内画面用。
    - Tailwind v4 は class 名を静的に走査するので、**クラス文字列はここにベタ書き**する。
      `bg-${color}-100` のような組み立ては CSS が生成されず無色になる。
    ============================================================ */
@@ -23,13 +25,48 @@ export type ClientTone = {
   text: string;
 };
 
-/** 10色。ゴルフ場が10を超えたら先頭から一巡する（実運用は7社） */
+const YELLOW: ClientTone = {
+  solid: "bg-yellow-100 text-yellow-900 border-yellow-400",
+  outline: "bg-white text-yellow-800 border-yellow-500",
+  dot: "bg-yellow-400",
+  text: "text-yellow-800",
+};
+const RED: ClientTone = {
+  solid: "bg-red-100 text-red-900 border-red-300",
+  outline: "bg-white text-red-800 border-red-400",
+  dot: "bg-red-500",
+  text: "text-red-800",
+};
+const BLUE: ClientTone = {
+  solid: "bg-blue-100 text-blue-900 border-blue-300",
+  outline: "bg-white text-blue-800 border-blue-400",
+  dot: "bg-blue-500",
+  text: "text-blue-800",
+};
+const PINK: ClientTone = {
+  solid: "bg-pink-100 text-pink-900 border-pink-300",
+  outline: "bg-white text-pink-700 border-pink-400",
+  dot: "bg-pink-400",
+  text: "text-pink-700",
+};
+
+/**
+ * 小川さん指定の固定色（2026-08-22）。
+ * 表記ゆれ（倶/俱・法人名の有無）で外れないよう、**名前に含まれるかどうか**で判定する。
+ * 上から順に見て最初に当たったものを使う。
+ */
+const NAMED: Array<{ match: string; tone: ClientTone }> = [
+  { match: "マスターズ", tone: YELLOW }, // 延田エンタープライズ マスターズゴルフ倶楽部
+  { match: "加古川", tone: RED },
+  { match: "西宮高原", tone: BLUE },
+  { match: "芦屋", tone: PINK },
+];
+
+/** 指定のない取引先用。上の4色とかぶらない色だけを並べる */
 const PALETTE: ClientTone[] = [
-  { solid: "bg-sky-100 text-sky-900 border-sky-300", outline: "bg-white text-sky-800 border-sky-400", dot: "bg-sky-400", text: "text-sky-800" },
   { solid: "bg-emerald-100 text-emerald-900 border-emerald-300", outline: "bg-white text-emerald-800 border-emerald-400", dot: "bg-emerald-400", text: "text-emerald-800" },
   { solid: "bg-violet-100 text-violet-900 border-violet-300", outline: "bg-white text-violet-800 border-violet-400", dot: "bg-violet-400", text: "text-violet-800" },
   { solid: "bg-orange-100 text-orange-900 border-orange-300", outline: "bg-white text-orange-800 border-orange-400", dot: "bg-orange-400", text: "text-orange-800" },
-  { solid: "bg-rose-100 text-rose-900 border-rose-300", outline: "bg-white text-rose-800 border-rose-400", dot: "bg-rose-400", text: "text-rose-800" },
   { solid: "bg-teal-100 text-teal-900 border-teal-300", outline: "bg-white text-teal-800 border-teal-400", dot: "bg-teal-400", text: "text-teal-800" },
   { solid: "bg-indigo-100 text-indigo-900 border-indigo-300", outline: "bg-white text-indigo-800 border-indigo-400", dot: "bg-indigo-400", text: "text-indigo-800" },
   { solid: "bg-lime-100 text-lime-900 border-lime-300", outline: "bg-white text-lime-800 border-lime-400", dot: "bg-lime-400", text: "text-lime-800" },
@@ -52,7 +89,15 @@ function hashIndex(id: string, mod: number): number {
   return h % mod;
 }
 
-export function clientTone(clientId: string | null | undefined): ClientTone {
+/**
+ * 取引先の色。名前が分かるときは必ず渡すこと（指定色の判定に使う）。
+ * 名前が無い呼び出しでも落ちないよう、ID だけでも動くようにしてある。
+ */
+export function clientTone(clientId: string | null | undefined, clientName?: string | null): ClientTone {
+  if (clientName) {
+    const hit = NAMED.find((n) => clientName.includes(n.match));
+    if (hit) return hit.tone;
+  }
   if (!clientId) return NEUTRAL;
   return PALETTE[hashIndex(clientId, PALETTE.length)];
 }
@@ -61,8 +106,12 @@ export function clientTone(clientId: string | null | undefined): ClientTone {
  * 割当1件の見た目。色=ゴルフ場、形=状態。
  * 取消は状態を最優先（グレーの取り消し線）。
  */
-export function dispatchChipCls(clientId: string | null | undefined, status: string): string {
+export function dispatchChipCls(
+  clientId: string | null | undefined,
+  status: string,
+  clientName?: string | null
+): string {
   if (status === "cancelled") return "border border-slate-200 bg-slate-50 text-slate-400 line-through";
-  const t = clientTone(clientId);
+  const t = clientTone(clientId, clientName);
   return status === "tentative" ? `border border-dashed ${t.outline}` : `border ${t.solid}`;
 }

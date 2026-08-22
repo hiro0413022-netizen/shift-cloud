@@ -54,7 +54,7 @@ export function ExportPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="flex items-center gap-1.5 font-medium">
-            <span className={`inline-block h-3 w-3 rounded-sm ${clientTone(client.id).dot}`} />
+            <span className={`inline-block h-3 w-3 rounded-sm ${clientTone(client.id, client.name).dot}`} />
             {client.name}
           </p>
           <p className="text-xs text-(--color-dim)">
