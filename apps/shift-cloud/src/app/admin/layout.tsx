@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 /** ownerOnly: オーナー（manage_company）だけに見せる項目（#134） */
 const MENU: { href: string; label: string; perm: Permission; ownerOnly?: boolean }[] = [
   { href: "/admin/staff", label: "スタッフ", perm: "manage_staff" },
+  // ロールの権限は会社全体に効く（店舗の概念が無い）ためオーナー限定（#142）
+  { href: "/admin/roles", label: "ロール・権限", perm: "manage_company", ownerOnly: true },
   { href: "/admin/stores", label: "店舗", perm: "manage_org" },
   { href: "/admin/brands", label: "ブランド", perm: "manage_org" },
   { href: "/admin/company", label: "会社設定", perm: "manage_company" },
