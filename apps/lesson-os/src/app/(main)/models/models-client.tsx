@@ -2,7 +2,8 @@
 
 import { useRef, useState, useTransition } from "react";
 import { CLUBS } from "@/lib/lesson";
-import { createModelUploadUrl, registerModel, modelPlayUrl, removeModel } from "./actions";
+import { capturePoster } from "@/lib/poster";
+import { createModelUploadUrl, createModelPosterUploadUrl, registerModel, modelPlayUrl, removeModel } from "./actions";
 
 export type ModelItem = {
   id: string;
@@ -33,8 +34,21 @@ export function ModelsClient({ items }: { items: ModelItem[] }) {
       if (!r.url || !r.path) { setMsg(r.error ?? "URL発行に失敗しました"); return; }
       const res = await fetch(r.url, { method: "PUT", headers: { "Content-Type": file.type || "video/mp4" }, body: file });
       if (!res.ok) { setMsg(`アップロード失敗（${res.status}）`); return; }
+      // サムネイル（1コマ目）。取れなくても登録は続ける
+      let posterPath: string | null = null;
+      try {
+        const poster = await capturePoster(file);
+        if (poster) {
+          const pu = await createModelPosterUploadUrl(poster.size);
+          if (pu.url && pu.path) {
+            const pr = await fetch(pu.url, { method: "PUT", headers: { "Content-Type": "image/jpeg" }, body: poster });
+            if (pr.ok) posterPath = pu.path;
+          }
+        }
+      } catch { /* サムネ無しでも動く */ }
       const reg = await registerModel({
         path: r.path,
+        posterPath,
         club: clubRef.current?.value || undefined,
         distanceYd: distRef.current?.value ? Number(distRef.current.value) : undefined,
         note: noteRef.current?.value || undefined,

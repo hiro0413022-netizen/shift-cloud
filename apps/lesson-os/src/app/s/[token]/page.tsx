@@ -33,7 +33,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
   const [{ data: videos }, { data: items }, { data: prog }, { data: models }] = await Promise.all([
     admin
       .from("lsn_videos")
-      .select("id, storage_path, shot_at, club, distance_yd, note, is_best, phases, created_at")
+      .select("id, storage_path, poster_path, shot_at, club, distance_yd, note, is_best, phases, created_at")
       .eq("student_id", student.id)
       .is("deleted_at", null)
       .order("shot_at", { ascending: false })
@@ -43,7 +43,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
     admin.from("lsn_progress").select("item_id, percent").eq("student_id", student.id),
     admin
       .from("lsn_model_videos")
-      .select("id, storage_path, club, distance_yd, note, staff:coach_staff_id(name)")
+      .select("id, storage_path, poster_path, club, distance_yd, note, staff:coach_staff_id(name)")
       .eq("company_id", share.company_id)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -60,20 +60,44 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
         .order("created_at")
     : { data: [] };
 
-  // 署名URL（1時間）— 生徒はこのページを開くたびに新しいURLが発行される
-  const sign = async (path: string) =>
-    (await admin.storage.from("lesson-videos").createSignedUrl(path, 3600)).data?.signedUrl ?? null;
-  const videoUrls = new Map<string, string>();
+  /**
+   * 署名URL（1時間）。2026-08-22: 1本ずつ発行していたのを一括に変えた。
+   * 生徒のスマホで「レッスン記録20本＋お手本6本」を開くと往復が26回発生し、
+   * ページが出るまで数秒かかっていた（createSignedUrls なら1回）。
+   */
+  const paths: string[] = [];
   for (const v of videos ?? []) {
-    const u = await sign(v.storage_path);
+    paths.push(v.storage_path as string);
+    if (v.poster_path) paths.push(v.poster_path as string);
+  }
+  for (const m of models ?? []) {
+    paths.push(m.storage_path as string);
+    if (m.poster_path) paths.push(m.poster_path as string);
+  }
+  if (student.photo_path) paths.push(student.photo_path);
+
+  const signed = new Map<string, string>();
+  if (paths.length) {
+    const { data: urls } = await admin.storage.from("lesson-videos").createSignedUrls(paths, 3600);
+    for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+  }
+  const videoUrls = new Map<string, string>();
+  const videoPosters = new Map<string, string>();
+  for (const v of videos ?? []) {
+    const u = signed.get(v.storage_path as string);
     if (u) videoUrls.set(v.id, u);
+    const pu = v.poster_path ? signed.get(v.poster_path as string) : null;
+    if (pu) videoPosters.set(v.id, pu);
   }
   const modelUrls = new Map<string, string>();
+  const modelPosters = new Map<string, string>();
   for (const m of models ?? []) {
-    const u = await sign(m.storage_path);
+    const u = signed.get(m.storage_path as string);
     if (u) modelUrls.set(m.id, u);
+    const pu = m.poster_path ? signed.get(m.poster_path as string) : null;
+    if (pu) modelPosters.set(m.id, pu);
   }
-  const photoUrl = student.photo_path ? await sign(student.photo_path) : null;
+  const photoUrl = student.photo_path ? signed.get(student.photo_path) ?? null : null;
 
   const progMap = new Map((prog ?? []).map((p) => [p.item_id, p.percent]));
   const radarItems = (items ?? []).map((it) => ({ name: it.name, percent: progMap.get(it.id) ?? 0 }));
@@ -140,7 +164,11 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
                 {v.is_best && <span className="ml-auto text-[#c9a545]">★ ベストスイング</span>}
               </div>
               {videoUrls.get(v.id) && (
-                <ShareVideo src={videoUrls.get(v.id)!} phases={(v.phases as Phases | null) ?? null} />
+                <ShareVideo
+                  src={videoUrls.get(v.id)!}
+                  poster={videoPosters.get(v.id) ?? null}
+                  phases={(v.phases as Phases | null) ?? null}
+                />
               )}
               <div className="space-y-2 px-4 py-3">
                 {v.note && <p className="text-xs text-gray-500">{v.note}</p>}
@@ -163,7 +191,14 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
               {(models ?? []).map((m) => (
                 <div key={m.id} className="overflow-hidden rounded-xl bg-white shadow-sm">
                   {modelUrls.get(m.id) && (
-                    <video src={modelUrls.get(m.id)!} controls playsInline preload="metadata" className="max-h-60 w-full bg-black" />
+                    <video
+                      src={modelUrls.get(m.id)!}
+                      poster={modelPosters.get(m.id) ?? undefined}
+                      controls
+                      playsInline
+                      preload={modelPosters.get(m.id) ? "none" : "metadata"}
+                      className="max-h-60 w-full bg-black"
+                    />
                   )}
                   <div className="px-3 py-2 text-xs text-gray-600">
                     {(m.staff as unknown as { name: string } | null)?.name}

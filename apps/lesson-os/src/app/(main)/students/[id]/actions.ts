@@ -83,10 +83,25 @@ export async function createVideoUploadUrl(
   return { url: data.signedUrl, path };
 }
 
+/** サムネイル（1コマ目JPEG）のアップロードURL。失敗しても登録は止めない前提の任意処理 */
+export async function createPosterUploadUrl(
+  studentId: string,
+  size: number
+): Promise<{ url?: string; path?: string; error?: string }> {
+  const { actor, admin, ok } = await ownStudent(studentId);
+  if (!ok) return { error: "生徒が見つかりません" };
+  if (size > 2 * 1024 * 1024) return { error: "サムネイルが大きすぎます" };
+  const path = `${actor.companyId}/posters/${studentId}_${Date.now()}.jpg`;
+  const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URLの発行に失敗しました" };
+  return { url: data.signedUrl, path };
+}
+
 export async function registerVideo(
   studentId: string,
   input: {
     path: string;
+    posterPath?: string | null;
     shotAt?: string;
     club?: string;
     distanceYd?: number;
@@ -100,10 +115,13 @@ export async function registerVideo(
   const { actor, admin, ok } = await ownStudent(studentId);
   if (!ok) return { error: "生徒が見つかりません" };
   if (!input.path.startsWith(`${actor.companyId}/${studentId}/`)) return { error: "不正なパスです" };
+  const poster =
+    input.posterPath && input.posterPath.startsWith(`${actor.companyId}/posters/`) ? input.posterPath : null;
   const { error } = await admin.from("lsn_videos").insert({
     company_id: actor.companyId,
     student_id: studentId,
     storage_path: input.path,
+    poster_path: poster,
     shot_at: input.shotAt || new Date().toISOString().slice(0, 10),
     club: input.club?.trim().slice(0, 20) || null,
     distance_yd: input.distanceYd && input.distanceYd > 0 ? Math.floor(input.distanceYd) : null,

@@ -9,7 +9,7 @@ import { hasPhases, type Phases } from "@/lib/phases";
  * コーチが付けたフェーズにワンタップで移動できる（閲覧のみ・編集不可）。
  * スロー再生とコマ送りも生徒側で使えるようにしている。
  */
-export function ShareVideo({ src, phases }: { src: string; phases: Phases | null }) {
+export function ShareVideo({ src, poster, phases }: { src: string; poster?: string | null; phases: Phases | null }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
@@ -33,10 +33,12 @@ export function ShareVideo({ src, phases }: { src: string; phases: Phases | null
     <div>
       <video
         ref={ref}
-        src={src}
+        src={poster ? src : `${src}#t=0.1`}
+        poster={poster ?? undefined}
         controls
         playsInline
-        preload="metadata"
+        // サムネイルがあるなら本体は押されるまで読まない（生徒のギガを使わない）
+        preload={poster ? "none" : "metadata"}
         onLoadedMetadata={(e) => setDur(e.currentTarget.duration || 0)}
         onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
         onSeeked={(e) => setCur(e.currentTarget.currentTime)}

@@ -30,7 +30,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
   const [{ data: videos }, { data: items }, { data: prog }, { data: models }, { data: measures }] = await Promise.all([
     admin
       .from("lsn_videos")
-      .select("id, shot_at, club, distance_yd, note, is_best, annotations, phases, created_at, staff:uploaded_by(name)")
+      .select("id, shot_at, club, distance_yd, note, is_best, annotations, phases, created_at, storage_path, poster_path, staff:uploaded_by(name)")
       .eq("student_id", id)
       .is("deleted_at", null)
       .order("shot_at", { ascending: false })
@@ -70,6 +70,24 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
         .order("created_at")
     : { data: [] };
 
+  /**
+   * 再生URLとサムネイルをページ表示の時点でまとめて発行する（2026-08-22）。
+   * 以前は「▶ 再生をひらく」を押すたびにサーバーアクションで1本ずつ署名URLを取っていて、
+   * タップしてから読み込みが始まるまで一拍待たされていた。
+   * createSignedUrls なら往復1回で全部出せる（有効30分）。
+   */
+  const signPaths = [
+    ...(videos ?? []).map((v) => v.storage_path as string),
+    ...(videos ?? []).map((v) => v.poster_path as string | null).filter((p): p is string => !!p),
+  ];
+  const signed = new Map<string, string>();
+  if (signPaths.length) {
+    const { data: urls } = await admin.storage.from("lesson-videos").createSignedUrls(signPaths, 1800);
+    for (const u of urls ?? []) {
+      if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+    }
+  }
+
   const videoItems: VideoItem[] = (videos ?? []).map((v) => ({
     id: v.id,
     shotAt: v.shot_at ?? v.created_at.slice(0, 10),
@@ -80,6 +98,8 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     uploadedBy: (v.staff as unknown as { name: string } | null)?.name ?? "",
     annotations: (v.annotations as Annotations | null) ?? null,
     phases: (v.phases as Phases | null) ?? null,
+    url: signed.get(v.storage_path as string) ?? null,
+    posterUrl: v.poster_path ? signed.get(v.poster_path as string) ?? null : null,
     comments: (comments ?? [])
       .filter((c) => c.video_id === v.id)
       .map((c) => ({

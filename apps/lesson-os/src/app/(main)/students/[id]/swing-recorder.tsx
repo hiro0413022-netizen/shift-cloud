@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { estimatePhases, type Phases } from "@/lib/phases";
+import { CLUBS } from "@/lib/lesson";
 
 /**
  * 撮影モジュール（DECISIONS #51 / 2026-08-22 ガイド線を廃止）
@@ -14,6 +15,10 @@ import { estimatePhases, type Phases } from "@/lib/phases";
  *
  * レイアウト: プレビューは 9:16 固定枠（object-cover）。
  * シャッターはプレビュー上に重ねる（カメラアプリと同じ）ので、スクロールしても必ず押せる。
+ *
+ * 2026-08-22: 撮ったあとの「クラブ・飛距離・メモ → 登録」までこの画面で完結させた。
+ * それまでは【この動画を使う】で閉じたあと、カルテを下までスクロールして【⬆登録】を
+ * 押す必要があり、打った直後の現場では確実に忘れる導線だった。
  */
 
 const MIMES = [
@@ -26,7 +31,18 @@ const MIMES = [
 
 export type Captured = { blob: Blob; url: string; ext: string; phases: Phases | null; duration: number };
 
-export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => void; onClose: () => void }) {
+export type RecordMeta = { club: string; distanceYd: string; note: string; shotAt: string };
+
+const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+
+export function SwingRecorder({
+  onRegister,
+  onClose,
+}: {
+  /** 登録処理。エラー文字列を返せば画面に出す。null なら成功でこのモジュールを閉じる */
+  onRegister: (c: Captured, meta: RecordMeta) => Promise<string | null>;
+  onClose: () => void;
+}) {
   const camRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -42,6 +58,11 @@ export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => vo
   const [busy, setBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<Captured | null>(null);
   const [ready, setReady] = useState(false);
+  const [club, setClub] = useState("");
+  const [dist, setDist] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
   const supported =
     typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
@@ -121,6 +142,18 @@ export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => vo
   const retake = () => {
     if (preview) URL.revokeObjectURL(preview.url);
     setPreview(null);
+    setSaveErr(null);
+  };
+
+  const register = async () => {
+    if (!preview) return;
+    setSaveErr(null);
+    setSaving("登録中…");
+    const err = await onRegister(preview, { club, distanceYd: dist, note, shotAt: jstToday() });
+    setSaving(null);
+    if (err) { setSaveErr(err); return; }
+    URL.revokeObjectURL(preview.url);
+    onClose();
   };
 
   return (
@@ -136,21 +169,47 @@ export function SwingRecorder({ onDone, onClose }: { onDone: (c: Captured) => vo
           この端末のブラウザはアプリ内録画に対応していません。カメラアプリで撮影してから「動画を選ぶ」で登録してください。
         </div>
       ) : preview ? (
-        /* ---- 撮り終わり ---- */
-        <div className="flex min-h-0 flex-1 flex-col px-4 pb-4">
-          <div className="mx-auto flex min-h-0 w-full max-w-[440px] flex-1 items-center">
-            <video src={preview.url} controls playsInline autoPlay loop className="max-h-full w-full rounded-lg bg-black" />
-          </div>
-          <p className="mx-auto mt-2 max-w-[440px] text-xs text-(--color-dim)">
-            {preview.phases?._method === "audio"
-              ? "✅ 打球音からインパクトを検出し、アドレス〜フィニッシュを自動マークしました"
-              : preview.phases
-              ? "⚠ 打球音を検出できず、尺から仮の位置を置きました（再生画面で調整できます）"
-              : "⚠ フェーズは自動で置けませんでした（再生画面で手動設定できます）"}
-          </p>
-          <div className="mx-auto mt-3 flex w-full max-w-[440px] gap-2">
-            <button onClick={retake} className="btn-ghost">↺ 撮り直す</button>
-            <button onClick={() => onDone(preview)} className="btn-gold flex-1">この動画を使う</button>
+        /* ---- 撮り終わり: ここで登録まで終わらせる ---- */
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4">
+          <div className="mx-auto w-full max-w-[440px]">
+            <video src={preview.url} controls playsInline autoPlay loop muted className="max-h-[45vh] w-full rounded-lg bg-black" />
+            <p className="mt-2 text-xs text-(--color-dim)">
+              {preview.phases?._method === "audio"
+                ? "✅ 打球音からインパクトを検出し、アドレス〜フィニッシュを自動マークしました"
+                : preview.phases
+                ? "⚠ 打球音を検出できず、尺から仮の位置を置きました（再生画面で調整できます）"
+                : "⚠ フェーズは自動で置けませんでした（再生画面で手動設定できます）"}
+            </p>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <label className="text-xs text-(--color-dim)">
+                クラブ
+                <select value={club} onChange={(e) => setClub(e.target.value)} className="input-dark mt-1 w-full">
+                  <option value="">未選択</option>
+                  {CLUBS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-(--color-dim)">
+                飛距離(yd)
+                <input value={dist} onChange={(e) => setDist(e.target.value)} inputMode="numeric" placeholder="—" className="input-dark mt-1 w-full" />
+              </label>
+              <label className="col-span-2 text-xs text-(--color-dim)">
+                メモ
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="例: 切り返しを緩めた" className="input-dark mt-1 w-full" />
+              </label>
+            </div>
+
+            {saveErr && <p className="mt-2 text-xs text-(--color-danger)">{saveErr}</p>}
+
+            <div className="mt-3 flex gap-2">
+              <button onClick={retake} disabled={!!saving} className="btn-ghost">↺ 撮り直す</button>
+              <button onClick={register} disabled={!!saving} className="btn-gold flex-1">
+                {saving ?? "この動画を登録する"}
+              </button>
+            </div>
+            <p className="mt-2 text-center text-[11px] text-(--color-dim)">
+              クラブ・飛距離はあとからでも直せます。まず登録してしまってください
+            </p>
           </div>
         </div>
       ) : (

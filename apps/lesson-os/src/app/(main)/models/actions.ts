@@ -24,8 +24,20 @@ export async function createModelUploadUrl(
   return { url: data.signedUrl, path };
 }
 
+/** お手本のサムネイル（1コマ目JPEG）。カルテ側と同じ仕組み（2026-08-22） */
+export async function createModelPosterUploadUrl(size: number): Promise<{ url?: string; path?: string; error?: string }> {
+  const actor = await requireLessonActor();
+  const admin = createAdmin();
+  if (size > 2 * 1024 * 1024) return { error: "サムネイルが大きすぎます" };
+  const path = `${actor.companyId}/models/posters/${Date.now()}.jpg`;
+  const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URLの発行に失敗しました" };
+  return { url: data.signedUrl, path };
+}
+
 export async function registerModel(input: {
   path: string;
+  posterPath?: string | null;
   club?: string;
   distanceYd?: number;
   note?: string;
@@ -37,6 +49,8 @@ export async function registerModel(input: {
     company_id: actor.companyId,
     coach_staff_id: actor.staffId,
     storage_path: input.path,
+    poster_path:
+      input.posterPath && input.posterPath.startsWith(`${actor.companyId}/models/posters/`) ? input.posterPath : null,
     club: input.club?.trim().slice(0, 20) || null,
     distance_yd: input.distanceYd && input.distanceYd > 0 ? Math.floor(input.distanceYd) : null,
     note: input.note?.trim().slice(0, 300) || null,
