@@ -608,3 +608,10 @@
   **(c) メール送信は FRANK 店舗の行のみ**。送信元が `FRANK GOLF <info@frankgolf.jp>`（frank-mail.ts / Resend）のため、GOLF WING の文面に FRANK ブランドが混ざらないようサーバー側で店舗名を検証して拒否。GOLF WING 等は従来どおり文面をコピーして公式LINEで送り「フォロー済にする」（channel='line' が入るようになった）。
   **(d) 記録**: `follow_up_channel`（email/line）と `follow_up_message`（送った本文）を台帳に残す。将来のAI店長の学習（どの文面が入会につながったか）の土台。undoFollowUp は channel/message も戻す。
   ⚠ member-os の Vercel env に `RESEND_API_KEY` / `FRANK_MAIL_FROM` が必要（#118のWeb入会メールと共通。未設定なら送信スキップ＝フォロー済にならない）。
+
+- #149 (2026-08-23) **AI店長 第1.5弾: 朝のダイジェストに「店の今」＝昨日の売上・今日の予約・要フォローを追加**（migrationなし・`lib/morning-digest.ts`）。外販の看板「AI店長＝朝のダイジェスト」の実体。新しい配信は作らず、**#83の朝の個人LINEダイジェストに＜AI店長＞ブロックを足しただけ**（配信先・重複防止・gn_loop_runs記録は既存のまま）。
+  **(a) 昨日の売上は mon_sales を店舗別に合算。source='ledger' は除外** — 台帳ロールアップは日次明細の合算行で、当日入力（app等）と混ぜると二重計上になる（/analysis の proSales #98 と同じ理由）。
+  **(b) 今日の予約は frunk_bookings（status<>'cancelled'）** — FRANKのみ（GOLF WING宝塚の予約はSmart Hello側でDBに無いため件数に含めない。表示も「（FRANK）」と明記して誤読を防ぐ）。
+  **(c) 要フォローは /follow と同じ条件**（trial・7日以上経過・未入会・未フォロー・直近60日）。1件以上あるときだけ /follow へのリンクを付け、#148のAI文面下書きへ誘導する＝ループがつながる。
+  **(d) observed に sales_yesterday / bookings_today / follow_due を記録** — 後から「あの朝なんと言ったか」を追える。
+  確認済み: gn_loops(morning_digest) は line_user_id 設定済み・直近7日で8回配信＝翌朝から自動で新ブロックが載る。

@@ -13,6 +13,7 @@ type Admin = ReturnType<typeof createAdmin>;
 
 const LOOP_CODE = "morning_digest";
 const HOME_URL = "https://yozan-genesis.vercel.app/";
+const FOLLOW_URL = "https://member-os-tau.vercel.app/follow";
 
 async function resolveUserId(admin: Admin, companyId: string, loopId: string, config: Record<string, unknown>): Promise<string | null> {
   const existing = config?.line_user_id ? String(config.line_user_id) : null;
@@ -80,7 +81,12 @@ export async function runMorningDigest(companyId: string, storeIds?: string[] | 
   // 判断待ちの件数と先頭タイトル
   // #134: 体験申込（GOLF WING/FRANK 両方が入る）と Web入会（FRANK）を混ぜて「合計◯件」と出すと、
   //       どちらの店の話か分からない。store_id を取って店舗名を明記して並べる。
-  const [queueRes, delivRes, inqRes, trialRes, joinRes, aiEvents, storesRes] = await Promise.all([
+  // ＜AI店長＞（#149）: 判断待ちとは別に「店の今」＝昨日の売上・今日の予約・要フォローを毎朝並べる
+  const yesterday = jstYmd(new Date(Date.now() - 24 * 3600_000));
+  const followDue = jstYmd(new Date(Date.now() - 7 * 24 * 3600_000));
+  const followSince = jstYmd(new Date(Date.now() - 60 * 24 * 3600_000));
+
+  const [queueRes, delivRes, inqRes, trialRes, joinRes, aiEvents, storesRes, salesRes, bookRes, followRes] = await Promise.all([
     admin
       .from("ai_action_queue")
       .select("title")
@@ -106,6 +112,28 @@ export async function runMorningDigest(companyId: string, storeIds?: string[] | 
       .order("occurred_at", { ascending: false })
       .limit(3),
     admin.from("stores").select("id, name").eq("company_id", companyId).is("deleted_at", null),
+    admin
+      .from("mon_sales")
+      .select("store_id, amount, source")
+      .eq("company_id", companyId)
+      .eq("sold_on", yesterday)
+      .is("deleted_at", null),
+    admin
+      .from("frunk_bookings")
+      .select("store_id")
+      .eq("company_id", companyId)
+      .eq("booked_date", today)
+      .neq("status", "cancelled")
+      .is("deleted_at", null),
+    admin
+      .from("mbr_walkin_visits")
+      .select("store_id, result")
+      .eq("company_id", companyId)
+      .eq("visit_type", "trial")
+      .is("deleted_at", null)
+      .is("follow_up_at", null)
+      .gte("visited_on", followSince)
+      .lte("visited_on", followDue),
   ]);
 
   // 店舗名の解決（#134）。store_id が無い行は「店舗未設定」として別に出す＝黙って合算しない
@@ -144,6 +172,32 @@ export async function runMorningDigest(companyId: string, storeIds?: string[] | 
     if ((delivRes.count ?? 0) > 0) others.push(`成果物${delivRes.count}`);
     if (others.length > 0) lines.push(`・その他: ${others.join(" / ")}`);
   }
+  // ＜AI店長＞（#149）: 店の数字。判断リストと分けて毎朝同じ形で出す
+  const salesRows = ((salesRes.data ?? []) as Array<{ store_id: string | null; amount: number | null; source: string | null }>)
+    .filter((r) => inScope(r.store_id))
+    // 台帳ロールアップ（source='ledger'）は日次明細の合算行。当日入力（app等）と混ぜると
+    // 二重計上になるため除外する（/analysis の proSales と同じ理由・money-os #98）
+    .filter((r) => r.source !== "ledger");
+  const salesByStore = new Map<string, number>();
+  for (const r of salesRows) {
+    const key = r.store_id ? storeName.get(String(r.store_id)) ?? "店舗未設定" : "店舗未設定";
+    salesByStore.set(key, (salesByStore.get(key) ?? 0) + Number(r.amount ?? 0));
+  }
+  const bookCount = ((bookRes.data ?? []) as Array<{ store_id: string | null }>).filter((r) => inScope(r.store_id)).length;
+  const followDueRows = ((followRes.data ?? []) as Array<{ store_id: string | null; result: string | null }>)
+    .filter((r) => inScope(r.store_id))
+    // /follow と同じ条件: 入会済みは対象外（resultはnullではなく'none'既定だがJS側でも揃えて弾く）
+    .filter((r) => r.result !== "join");
+  lines.push("", "＜AI店長＞");
+  lines.push(
+    salesByStore.size > 0
+      ? `・昨日の売上: ${[...salesByStore.entries()].map(([st, n]) => `${st} ${n.toLocaleString("ja-JP")}円`).join(" / ")}`
+      : "・昨日の売上: 入力なし"
+  );
+  lines.push(`・今日の予約（FRANK）: ${bookCount}件`);
+  lines.push(`・要フォロー: ${followDueRows.length}件（体験から7日以上・未入会）`);
+  if (followDueRows.length > 0) lines.push(`  文面はAI店長が用意しています → ${FOLLOW_URL}`);
+
   const ev = aiEvents.data ?? [];
   if (ev.length > 0) {
     lines.push("", "昨日のAIの動き:");
@@ -166,6 +220,10 @@ export async function runMorningDigest(companyId: string, storeIds?: string[] | 
       // #134: あとから「どの店の話だったか」を追えるように店舗別も残す
       trials_by_store: Object.fromEntries(trialByStore),
       joins_by_store: Object.fromEntries(joinByStore),
+      // ＜AI店長＞（#149）
+      sales_yesterday: Object.fromEntries(salesByStore),
+      bookings_today: bookCount,
+      follow_due: followDueRows.length,
     },
     decision: "act",
     reason: "毎朝の定期配信",
