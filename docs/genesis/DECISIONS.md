@@ -601,3 +601,10 @@
   **(d) 生徒の共有ページも同じにした** — `/s/[token]` は署名URLを1本ずつ発行しており、記録20本＋お手本6本で **26往復**していた。ここも `createSignedUrls` 1回にまとめ、poster がある動画は `preload="none"`。生徒の通信量を使わずにサムネイルだけ出る。
   **(e) お手本スイングも同様に poster を持つ**（`lsn_model_videos.poster_path`）。
   ⚠残: 既存の動画2本には poster が無い（フォールバック表示になる）。必要なら再登録で付く。
+
+- #148 (2026-08-23) **AI店長 第1弾: 体験フォローの文面下書き＋メール送信を /follow に実装**（migration `0122_walkin_follow_message.sql`・適用済）。外販の看板商品「AI店長」の最初のループ（気づく→下書き→承認で実行→記録）。検知と「要フォロー」表示は既存の /follow をそのまま使い、新概念は足していない。
+  **(a) 文面はルールベースの即時生成**（`lib/follow-draft.ts`・純関数）。demo-sales #54 と同じ「AIより先に高速生成」方針。受付アンケートの体験目的（TRIAL_REASONS）に応じて一文を変える。Claude API には依存しない＝キー未設定でも全店で動く。tests/follow-draft.test.ts（3件）で検証。
+  **(b) 送信＝承認**。スタッフが文面を確認・編集して「メールで送信」を押したときだけ送る（AI店長は自動送信しない、の原則）。**送信が成功したときだけ follow_up_at を立てる**（送れていないのに済になる事故を防ぐ）。二重送信は follow_up_at 既存チェックで防止。
+  **(c) メール送信は FRANK 店舗の行のみ**。送信元が `FRANK GOLF <info@frankgolf.jp>`（frank-mail.ts / Resend）のため、GOLF WING の文面に FRANK ブランドが混ざらないようサーバー側で店舗名を検証して拒否。GOLF WING 等は従来どおり文面をコピーして公式LINEで送り「フォロー済にする」（channel='line' が入るようになった）。
+  **(d) 記録**: `follow_up_channel`（email/line）と `follow_up_message`（送った本文）を台帳に残す。将来のAI店長の学習（どの文面が入会につながったか）の土台。undoFollowUp は channel/message も戻す。
+  ⚠ member-os の Vercel env に `RESEND_API_KEY` / `FRANK_MAIL_FROM` が必要（#118のWeb入会メールと共通。未設定なら送信スキップ＝フォロー済にならない）。

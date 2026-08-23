@@ -3,7 +3,8 @@ import { jstYmd } from "@/lib/jst";
 import { storeFilterIds } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty, inputCls, btnCls } from "@/components/ui";
-import { markFollowUp, undoFollowUp } from "./actions";
+import { markFollowUp, undoFollowUp, sendFollowMail } from "./actions";
+import { buildFollowDraft } from "@/lib/follow-draft";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -32,7 +33,7 @@ export default async function FollowPage() {
   const scopeIds = storeFilterIds(actor);
   let q = admin
     .from("mbr_walkin_visits")
-    .select("id, visited_on, result, survey, follow_up_at, follow_up_note, mbr_guests(name, phone, email)")
+    .select("id, visited_on, result, survey, follow_up_at, follow_up_note, follow_up_channel, store_id, mbr_guests(name, phone, email)")
     .eq("company_id", actor.companyId)
     .eq("visit_type", "trial")
     .is("deleted_at", null)
@@ -44,6 +45,11 @@ export default async function FollowPage() {
   const { data } = await q;
 
   const trials = (data ?? []) as Row[];
+
+  // AI店長のフォロー文面（#148）: 署名・サイトURLを店舗ごとに出し分ける
+  const { data: storeRows } = await admin
+    .from("stores").select("id, name").eq("company_id", actor.companyId);
+  const storeName = new Map<string, string>((storeRows ?? []).map((r) => [String(r.id), String(r.name)]));
   const guestOf = (v: Row) => (v.mbr_guests ?? null) as { name?: string; phone?: string; email?: string } | null;
   const reasonOf = (v: Row) => {
     const s = v.survey as { trial_reason?: string; trial_reasons?: string[] } | null;
@@ -101,6 +107,42 @@ export default async function FollowPage() {
                     <input name="note" placeholder="フォロー内容（例: 公式LINEで再来案内・入会検討中 など）" className={`${inputCls} !py-1.5 flex-1`} />
                     <button className={btnCls}>公式LINEフォロー済にする</button>
                   </form>
+                  {(() => {
+                    const sName = storeName.get(String(v.store_id ?? "")) ?? "当店";
+                    const isFrank = /frank|フランク/i.test(sName);
+                    const email = (g?.email ?? "").trim();
+                    const canMail = isFrank && !!email;
+                    const draft = buildFollowDraft({
+                      guestName: g?.name ?? null,
+                      visitedOn: String(v.visited_on),
+                      trialReason: reason,
+                      storeName: sName,
+                      siteUrl: isFrank ? "https://frankgolf.jp" : null,
+                    });
+                    return (
+                      <details className="mt-2 rounded-lg border border-(--color-line) bg-(--color-panel) px-3 py-2">
+                        <summary className="cursor-pointer select-none text-sm font-semibold text-(--color-dim)">
+                          🤖 AI店長のフォロー文面案{canMail ? "（このままメール送信できます）" : "（コピーして公式LINE等で送信）"}
+                        </summary>
+                        <form action={sendFollowMail} className="mt-2 space-y-2">
+                          <input type="hidden" name="id" value={String(v.id)} />
+                          <textarea name="message" defaultValue={draft.body} rows={9}
+                            className={`${inputCls} w-full !py-2 text-sm leading-relaxed`} />
+                          {canMail ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button className={btnCls}>この文面をメールで送信</button>
+                              <span className="text-xs text-(--color-dim)">宛先: {email} ／ 送信できたら自動でフォロー済になります</span>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-(--color-dim)">
+                              {email ? "メール自動送信はFRANK店舗のみ対応です。" : "メールアドレスが未登録です。"}
+                              文面をコピーして公式LINE等でお送りのうえ、上の「公式LINEフォロー済にする」を押してください。
+                            </p>
+                          )}
+                        </form>
+                      </details>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -119,6 +161,7 @@ export default async function FollowPage() {
                 <div key={String(v.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone="ok">済</Badge>
+                    {v.follow_up_channel === "email" ? <span className="text-xs font-semibold text-emerald-700">🤖メール送信</span> : null}
                     <span className="font-semibold">{g?.name ? String(g.name) : "（氏名未入力）"}</span>
                     <span className="text-xs text-(--color-dim)">体験 {md(v.visited_on)}</span>
                     <span className="text-xs text-(--color-dim)">フォロー {md(v.follow_up_at)}</span>
