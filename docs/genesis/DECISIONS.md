@@ -615,3 +615,10 @@
   **(c) 要フォローは /follow と同じ条件**（trial・7日以上経過・未入会・未フォロー・直近60日）。1件以上あるときだけ /follow へのリンクを付け、#148のAI文面下書きへ誘導する＝ループがつながる。
   **(d) observed に sales_yesterday / bookings_today / follow_due を記録** — 後から「あの朝なんと言ったか」を追える。
   確認済み: gn_loops(morning_digest) は line_user_id 設定済み・直近7日で8回配信＝翌朝から自動で新ブロックが載る。
+
+- #150 (2026-08-23) **member-os を外販テナント対応にし、UIを白基調×深緑×金へ刷新**（migrationなし）。きっかけ＝デモテナント「サンプルゴルフスタジオ」のオーナーに FRANK 予約カレンダー・FRANK会員・GOLF WING月次リンクが出ていた（ユーザー指摘・スクショ）。
+  **(a) 原因はオーナーの無条件true** — `canAccessStore(owner)=true` を前提に `canAccessFrank`/`canAccessGolfWing` が会社を見ていなかった。**「会社がその店舗を持つか × 自分が触れるか」の二段判定**に修正: `companyHasFrank(companyId)`（新設・cache）を AND、`canAccessGolfWing` は gwStoreId が無ければオーナーでも false。YOZAN の見え方は不変。
+  **(b) 汎用ダッシュボード新設** — GOLF WING/FRANK を持たない会社の /dashboard は、受付台帳だけを源泉にした汎用画面（今月の体験・入会・入会率・要フォロー4タイル＋最近の来店＋導線）。「表示できる店舗がありません」は配属未設定の場合だけに残した。外販顧客の最初の画面はこれが標準になる。
+  **(c) ブランド表記の会社対応** — ヘッダーの「GOLF WING」固定を brand prop 化（GOLF WING を持つ会社は従来どおり、それ以外は会社名）。ログインの eyebrow は「YOZAN GOLF BUSINESS SYSTEMS」、metadata から GOLF WING 固有文言を除去。
+  **(d) UI刷新はトークンだけで実施** — globals.css の @theme を indigo 系→**白基調×深緑#14452f×金#a9853b**（LP・AI店長・販促物と同一ブランドトーン）へ。背景radialを緑＋金の2灯に、.hud のホバー影を緑系に、ヘッダー下に金のヘアライン（header.topbar::after）。**コンポーネント側のクラスは未変更**＝全画面が一括で変わる（genesis-font-scale と同じ「1か所で全画面」方式）。
+  検証: 変更6ファイル構文OK。ビルドはCI（member-os はマトリクスに含まれる）。

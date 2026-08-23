@@ -6,7 +6,7 @@ import { StatCard, type StatGroup } from "./stat-card";
 import { FrankCalendarDashboard } from "./frank-calendar";
 import { STEP_OPTIONS } from "@/components/month-picker";
 import { jstToday } from "@yozan/core/frank-booking";
-import { FRANK_STORE_ID, canAccessFrank, golfWingStoreId, canAccessStore } from "@/lib/store-scope";
+import { FRANK_STORE_ID, canAccessFrank, golfWingStoreId, canAccessStore, companyHasFrank, storeFilterIds } from "@/lib/store-scope";
 import { tallyJoins, type LedgerJoin, type RosterJoin } from "@/lib/join-tally-pure";
 import { VISIT_TYPE_LABEL } from "@/lib/walkin";
 
@@ -45,8 +45,11 @@ export default async function DashboardPage({
   // 店舗分岐（#129 / #134）: FRANK姫路の店舗アカウントは予約カレンダーが最初の画面。
   // GOLF WING宝塚は従来の月次KPI。?store= の直打ちでは越境できない（見える店舗だけを選べる）。
   const gwStoreId = await golfWingStoreId(actor.companyId);
-  const canFrank = canAccessFrank(actor);
-  const canGw = canAccessStore(actor, gwStoreId);
+  const hasFrank = await companyHasFrank(actor.companyId);
+  // #150: 会社がその店舗を持っているかを先に見る。旧実装はオーナー=無条件trueで、
+  // 外販テナント（サンプルゴルフスタジオ等）のオーナーにFRANKカレンダーが出ていた
+  const canFrank = hasFrank && canAccessFrank(actor);
+  const canGw = gwStoreId != null && canAccessStore(actor, gwStoreId);
   const bothStores = canFrank && canGw;
 
   let showFrank: boolean;
@@ -57,6 +60,10 @@ export default async function DashboardPage({
   else showFrank = actor.isOwner || actor.primaryStoreId === FRANK_STORE_ID; // 既定（#129）
 
   if (!canFrank && !canGw) {
+    // 会社に GOLF WING / FRANK が無い＝外販テナント。汎用ダッシュボードを出す（#150）
+    if (!gwStoreId && !hasFrank) {
+      return <GenericDashboard companyId={actor.companyId} scopeIds={storeFilterIds(actor)} />;
+    }
     return (
       <Panel title="表示できる店舗がありません">
         <p className="text-sm text-(--color-dim)">
@@ -297,6 +304,103 @@ function MiniStat({ label, value, sub, tone }: { label: string; value: string; s
       <p className="text-sm font-medium text-(--color-dim)">{label}</p>
       <p className={`mt-1 text-3xl font-bold tabular-nums ${tone}`}>{value}</p>
       <p className="mt-1 text-xs text-(--color-dim)">{sub}</p>
+    </div>
+  );
+}
+
+
+/**
+ * 汎用ダッシュボード（#150・外販テナント向け）
+ * GOLF WING / FRANK の店舗を持たない会社の最初の画面。
+ * 受付台帳だけを源泉に、今月の体験・入会・入会率・要フォローを1画面で出す。
+ */
+async function GenericDashboard({ companyId, scopeIds }: { companyId: string; scopeIds: string[] | null }) {
+  const admin = createAdmin();
+  const now = new Date();
+  const { start, end, label } = monthBounds(ym(now));
+  const followDueBefore = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const since60 = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+
+  let monthQ = admin
+    .from("mbr_walkin_visits")
+    .select("visit_type, result, visited_on, mbr_guests(name)")
+    .eq("company_id", companyId)
+    .is("deleted_at", null)
+    .gte("visited_on", start)
+    .lt("visited_on", end)
+    .order("visited_on", { ascending: false });
+  if (scopeIds) monthQ = monthQ.in("store_id", scopeIds);
+
+  let followQ = admin
+    .from("mbr_walkin_visits")
+    .select("id, result")
+    .eq("company_id", companyId)
+    .eq("visit_type", "trial")
+    .is("deleted_at", null)
+    .is("follow_up_at", null)
+    .gte("visited_on", since60)
+    .lte("visited_on", followDueBefore);
+  if (scopeIds) followQ = followQ.in("store_id", scopeIds);
+
+  const [{ data: monthRows }, { data: followRows }] = await Promise.all([monthQ, followQ]);
+  const rows = (monthRows ?? []) as Row[];
+  const trials = rows.filter((v) => v.visit_type === "trial");
+  const joins = trials.filter((v) => v.result === "join");
+  const followDue = ((followRows ?? []) as Row[]).filter((v) => v.result !== "join").length;
+  const recent = rows.slice(0, 8);
+
+  const tiles: Array<{ label: string; value: string; tone?: string; href?: string; hint?: string }> = [
+    { label: `体験（${label}）`, value: String(trials.length) },
+    { label: `入会（${label}）`, value: String(joins.length), tone: "text-emerald-600" },
+    { label: "体験→入会率", value: rate(joins.length, trials.length), tone: "text-(--color-accent)" },
+    { label: "要フォロー", value: String(followDue), tone: followDue > 0 ? "text-rose-600" : undefined, href: "/follow", hint: "体験から7日以上・未入会" },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <header className="reveal">
+        <h1 className="text-2xl font-bold tracking-tight">ダッシュボード</h1>
+        <p className="mt-0.5 text-sm text-(--color-dim)">今月の体験・入会と、フォローが必要なお客様</p>
+      </header>
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {tiles.map((t) => {
+          const body = (
+            <div className="hud reveal h-full rounded-2xl border border-(--color-line) bg-(--color-panel) p-5">
+              <p className="text-sm font-medium text-(--color-dim)">{t.label}</p>
+              <p className={`mt-1 text-3xl font-bold tabular-nums ${t.tone ?? ""}`}>{t.value}</p>
+              {t.hint ? <p className="mt-0.5 text-xs text-(--color-dim)">{t.hint}</p> : null}
+            </div>
+          );
+          return t.href ? <Link key={t.label} href={t.href}>{body}</Link> : <div key={t.label}>{body}</div>;
+        })}
+      </div>
+      <Panel title="最近の来店" className="d1">
+        {recent.length === 0 ? (
+          <p className="text-sm text-(--color-dim)">今月の来店はまだありません。受付台帳から登録できます。</p>
+        ) : (
+          <div className="space-y-1.5">
+            {recent.map((v, i) => {
+              const g = (v.mbr_guests ?? null) as { name?: string } | null;
+              return (
+                <div key={i} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-(--color-dim)">{md(v.visited_on)}</span>
+                    <span className="font-semibold">{g?.name ? String(g.name) : "（氏名未入力）"}</span>
+                    <span className="text-xs text-(--color-dim)">{VISIT_TYPE_LABEL[String(v.visit_type)] ?? String(v.visit_type)}</span>
+                  </div>
+                  {v.result === "join" ? <span className="text-xs font-bold text-emerald-600">入会</span> :
+                   v.result === "purchase" ? <span className="text-xs font-bold text-(--color-gold)">購入</span> : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Panel>
+      <div className="flex flex-wrap gap-3">
+        <Link href="/" className="rounded-lg border border-(--color-line) bg-(--color-panel) px-4 py-2 text-sm font-medium hover:border-(--color-accent)">受付台帳をひらく</Link>
+        <Link href="/follow" className="rounded-lg border border-(--color-line) bg-(--color-panel) px-4 py-2 text-sm font-medium hover:border-(--color-accent)">体験フォローをひらく</Link>
+        <Link href="/search" className="rounded-lg border border-(--color-line) bg-(--color-panel) px-4 py-2 text-sm font-medium hover:border-(--color-accent)">来店検索をひらく</Link>
+      </div>
     </div>
   );
 }

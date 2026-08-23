@@ -26,10 +26,12 @@ function isActive(pathname: string, href: string) {
 
 export function TopBar({
   userName,
+  brand,
   canFrank,
   canGolfWing,
 }: {
   userName: string;
+  brand: string;
   canFrank: boolean;
   canGolfWing: boolean;
 }) {
@@ -38,11 +40,11 @@ export function TopBar({
     (l) => l.scope === "all" || (l.scope === "frank" ? canFrank : canGolfWing),
   );
   return (
-    <header className="sticky top-0 z-20 border-b border-(--color-line) bg-(--color-panel)/85 backdrop-blur">
+    <header className="topbar sticky top-0 z-20 border-b border-(--color-line) bg-(--color-panel)/85 backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-3">
         <div className="flex items-center gap-6">
           <Link href="/dashboard" className="flex items-baseline gap-2">
-            <span className="text-[11px] font-semibold tracking-[0.28em] text-(--color-gold)">GOLF WING</span>
+            <span className="max-w-[10rem] truncate text-[11px] font-semibold tracking-[0.22em] text-(--color-gold)">{brand}</span>
             <span className="text-base font-bold tracking-tight text-(--color-txt)">Member OS</span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">

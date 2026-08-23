@@ -94,7 +94,21 @@ export function canAccessFrank(actor: StoreScopedActor): boolean {
 export async function canAccessGolfWing(
   actor: StoreScopedActor & { companyId: string },
 ): Promise<boolean> {
-  if (actor.isOwner) return true;
   const id = await golfWingStoreId(actor.companyId);
+  // 会社に GOLF WING 店舗が無ければオーナーでも false（外販テナント対応・#150）。
+  // 旧実装は owner を無条件 true にしており、デモ/顧客テナントのオーナーに宝塚のUIが出ていた
+  if (!id) return false;
   return canAccessStore(actor, id);
 }
+
+/** 会社が FRANK GOLF 姫路の店舗を持つか（外販テナント対応・#150）。1リクエスト内でキャッシュ */
+export const companyHasFrank = cache(async (companyId: string): Promise<boolean> => {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("stores")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("id", FRANK_STORE_ID)
+    .maybeSingle();
+  return !!data;
+});

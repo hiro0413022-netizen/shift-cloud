@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "YOZAN 体験受付 — Member OS",
-  description: "GOLF WING 体験受付システム — 予約・来店・入会をここで管理",
+  description: "体験受付・会員管理システム — 予約・来店・入会をここで管理",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -14,7 +14,7 @@ function LoginForm() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <p className="text-xs tracking-[0.4em] text-(--color-gold)">GOLF WING</p>
+          <p className="text-xs tracking-[0.4em] text-(--color-gold)">YOZAN GOLF BUSINESS SYSTEMS</p>
           <h1 className="text-3xl font-bold tracking-widest">体験受付</h1>
           <p className="mt-2 text-sm text-(--color-dim)">Member OS — スタッフログイン</p>
         </div>

@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 @theme {
-  /* Member OS — 明るいクリーンSaaS配色（Stripe/Notion風） */
-  --color-bg: #f6f7f9;
+  /* Member OS — 白基調×深緑×金（#150・LP/AI店長と同じブランドトーンに統一） */
+  --color-bg: #f7f8f6;
   --color-panel: #ffffff;
-  --color-panel-2: #f4f6fa;
-  --color-line: #e6e9ef;
-  --color-txt: #111827;
-  --color-dim: #6b7280;
-  --color-accent: #4f46e5;      /* indigo-600 */
-  --color-accent-2: #6366f1;
-  --color-gold: #b7791f;
+  --color-panel-2: #f3f5f2;
+  --color-line: #e4e7e2;
+  --color-txt: #1a201c;
+  --color-dim: #68716c;
+  --color-accent: #14452f;      /* deep green（ブランド色） */
+  --color-accent-2: #1e5c3f;
+  --color-gold: #a9853b;
   --color-ok: #059669;
   --color-warn: #d97706;
   --color-danger: #dc2626;
@@ -33,7 +33,8 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(60% 40% at 50% -10%, rgba(79, 70, 229, 0.06), transparent 70%),
+    radial-gradient(55% 38% at 50% -10%, rgba(20, 69, 47, 0.07), transparent 70%),
+    radial-gradient(30% 24% at 92% -6%, rgba(169, 133, 59, 0.06), transparent 70%),
     var(--color-bg);
 }
 
@@ -63,12 +64,24 @@ body::before {
    ============================================================ */
 .hud {
   position: relative;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  box-shadow: 0 1px 2px rgba(21, 33, 26, 0.04), 0 1px 3px rgba(21, 33, 26, 0.06);
   transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 .hud:hover {
-  box-shadow: 0 4px 12px -2px rgba(16, 24, 40, 0.1), 0 2px 6px -2px rgba(16, 24, 40, 0.06);
+  box-shadow: 0 6px 16px -4px rgba(20, 69, 47, 0.14), 0 2px 6px -2px rgba(21, 33, 26, 0.06);
   transform: translateY(-1px);
+  border-color: rgba(20, 69, 47, 0.25);
+}
+
+/* ヘッダー下の金のヘアライン（#150・ブランドの署名） */
+header.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-gold), rgba(169, 133, 59, 0) 55%);
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 /* ============================================================
