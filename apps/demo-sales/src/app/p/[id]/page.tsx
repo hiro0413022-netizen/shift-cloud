@@ -10,6 +10,7 @@ import { QuoteBuilder, type OptionRow, type PlanRow } from "@/components/quote-b
 import { createQuote, setQuoteStatus } from "@/app/quote-actions";
 import { ANALYSIS_ITEMS, INDUSTRIES, STATUSES, LOST_REASONS, HERO_STYLES, type AnalysisItemKey, type IndustryKey, type StatusKey } from "@/lib/types";
 import { getTemplate } from "@/lib/templates";
+import { buildFollowUpMail, buildPreCallMail } from "@/lib/sales-docs";
 import { addActivity, generateDemo, generateDocs, revertToNegotiation, setDemoAccess, transferToProject, updateProspect } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +96,22 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
   const upd = updateProspect.bind(null, id);
   const gen = generateDemo.bind(null, id);
   const act = addActivity.bind(null, id);
+
+  // 営業メール（Outlookで開く）— 電話前のご案内（C4）と断られた後の後追い（C7）
+  const siteBase = process.env.NEXT_PUBLIC_SITE_URL ?? "https://demo-sales-delta.vercel.app";
+  const mailInput = {
+    name: p.name,
+    industry: p.industry as IndustryKey,
+    demoUrl: latestDemo ? `${siteBase}/d/${latestDemo.token}` : null,
+    ownerName: p.owner_name ?? actor.name,
+    buildPrice: p.est_build_price ?? 100000,
+    monthlyFee: p.est_monthly_fee ?? 10000,
+  };
+  const preMail = buildPreCallMail(mailInput);
+  const followMail = buildFollowUpMail(mailInput);
+  // mailto: はOutlook等の既定メールソフトで新規作成画面を開く。改行はCRLFで渡す
+  const mailtoHref = (m: { subject: string; body: string }) =>
+    `mailto:${p.email ?? ""}?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body.replace(/\n/g, "\r\n"))}`;
 
   return (
     <main className="mx-auto max-w-6xl p-6">
@@ -511,6 +528,48 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
             ))}
           </div>
         )}
+      </section>
+
+      {/* 営業メール（Outlookで送る） */}
+      <section className={`${cardCls} mt-6`}>
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold">営業メール（押すとOutlookが開きます）</h2>
+          <span className="text-xs text-(--color-dim)">
+            宛先: {p.email ?? "未登録 — 宛先は空で開きます（基本情報にメールを保存すると自動で入ります）"}
+          </span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border border-(--color-line) p-3">
+            <p className="text-sm font-semibold">① 電話前のご案内メール</p>
+            <p className="mb-2 mt-1 text-xs text-(--color-dim)">
+              架電の前や、受付止まりで「資料を送って」と言われた先へ。デモURL・料金入りの本文が入った状態で開きます。
+            </p>
+            <a href={mailtoHref(preMail)} className={btnCls}>Outlookでメール作成</a>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-(--color-accent)">本文を確認・コピー</summary>
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-(--color-panel-2) p-3 text-xs leading-relaxed">{`件名: ${preMail.subject}\n\n${preMail.body}`}</pre>
+            </details>
+          </div>
+          <div className="rounded-lg border border-(--color-line) p-3">
+            <p className="text-sm font-semibold">② 断られた後の後追いメール</p>
+            <p className="mb-2 mt-1 text-xs text-(--color-dim)">
+              電話でお断りされた直後に。売り込まず「いつでも見られるURL」だけを残す型です（追客はここから始まります）。
+            </p>
+            <a href={mailtoHref(followMail)} className={btnCls}>Outlookでメール作成</a>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-xs text-(--color-accent)">本文を確認・コピー</summary>
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-(--color-panel-2) p-3 text-xs leading-relaxed">{`件名: ${followMail.subject}\n\n${followMail.body}`}</pre>
+            </details>
+          </div>
+        </div>
+        {!latestDemo && (
+          <p className="mt-2 text-[11px] text-(--color-danger)">
+            デモが未作成のため、本文のURL欄は仮表記になっています。先に上の「デモを生成する」を実行してください。
+          </p>
+        )}
+        <p className="mt-2 text-[11px] text-(--color-dim)">
+          送信したら下の「活動を記録」に種類=メールで残し、次回連絡日を入れてください（記録しない送信は、送らなかったのと同じ）。
+        </p>
       </section>
 
       {/* 営業履歴・次回アクション */}

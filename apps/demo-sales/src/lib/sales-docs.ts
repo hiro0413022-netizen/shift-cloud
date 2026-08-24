@@ -274,6 +274,76 @@ ${d.planFeatures.map((f) => `- ${f}`).join("\n")}
   };
 }
 
+// ---- 営業メール（Outlookで開く mailto: 用） ----
+// 営業マニュアル C4（電話前・種まきメール）と C7（断られた後の追客）の型。
+// mailto: で渡すため本文は短くする（長すぎるとメールソフト側で本文が切れることがある）。
+// URLは1つだけ・スマホ2スクロール以内・「ご返信不要です」で締める（マニュアルの鉄則）。
+
+export interface MailtoInput {
+  name: string;
+  industry: IndustryKey;
+  demoUrl?: string | null;
+  ownerName: string;
+  buildPrice: number; // 税抜
+  monthlyFee: number; // 税抜
+}
+
+const demoUrlBlock = (url?: string | null) =>
+  url
+    ? `▼スマホでご覧いただけます（60日間有効）\n${url}`
+    : `▼デモサイトのURL\n（デモ生成後にここへURLが入ります。先にデモを生成してください）`;
+
+/** 電話前のご案内メール（C4）— 架電前・受付止まりだった先に「画面案があります」を届ける */
+export function buildPreCallMail(m: MailtoInput): { subject: string; body: string } {
+  return {
+    subject: `【ホームページ画面案のご提案】${m.name}さま専用ページを作成しました（株式会社YOZAN）`,
+    body: `${m.name}
+ご担当者さま
+
+突然のご連絡失礼いたします。
+株式会社YOZAN（兵庫県／ゴルフスクール運営）の${m.ownerName}と申します。
+
+私どもは自社店舗の予約・会員管理システムを開発しており、
+その技術を活かしてホームページ制作を行っております。
+
+このたび勝手ながら、${m.name}さま向けの画面案を作成いたしました。
+
+${demoUrlBlock(m.demoUrl)}
+
+・制作費 ${yen(m.buildPrice)}（税抜）／月額 ${yen(m.monthlyFee)}（税抜・更新作業込み）
+・写真や文章の差し替えは、ご連絡いただければこちらで対応します
+
+ご覧いただき、ご不要であればご返信は不要です。
+ご興味をお持ちいただけましたら、10分ほどお電話でご説明させてください。
+
+株式会社YOZAN　${m.ownerName}`,
+  };
+}
+
+/** 断られた後の後追いメール（C7）— 売り込まない。「今ではないだけ」の先にURLだけ残す */
+export function buildFollowUpMail(m: MailtoInput): { subject: string; body: string } {
+  return {
+    subject: `先ほどはありがとうございました（${m.name}さま・ホームページ画面案のご案内）`,
+    body: `${m.name}
+ご担当者さま
+
+先ほどはお忙しいところ、お電話にご対応いただきありがとうございました。
+株式会社YOZANの${m.ownerName}です。
+
+お電話では十分にお伝えできませんでしたが、
+${m.name}さま向けにお作りした画面案は、下記からいつでもご覧いただけます。
+
+${demoUrlBlock(m.demoUrl)}
+
+・制作費 ${yen(m.buildPrice)}（税抜）／月額 ${yen(m.monthlyFee)}（税抜・更新作業込み）
+
+いますぐのお話ではございませんので、ご返信は不要です。
+今後ホームページのことでお困りの際に、思い出していただけましたら幸いです。
+
+株式会社YOZAN　${m.ownerName}`,
+  };
+}
+
 export const DOC_BUILDERS = {
   proposal: buildProposal,
   phone_talk: buildPhoneTalk,

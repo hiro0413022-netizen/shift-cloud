@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { cardCls, inputCls, btnCls } from "@/components/ui";
+import { ProspectTable } from "@/components/prospect-table";
 import { INDUSTRIES, STATUSES, type IndustryKey, type StatusKey } from "@/lib/types";
 import { createProspect, revertToNegotiation, saveDirective } from "./actions";
 
@@ -12,6 +13,8 @@ type ProspectRow = {
   name: string;
   industry: string;
   city: string | null;
+  address: string | null;
+  phone: string | null;
   status: string;
   score: number | null;
   demo_priority: number | null;
@@ -32,15 +35,6 @@ const FUNNEL: { label: string; keys: StatusKey[] }[] = [
   { label: "失注・保留", keys: ["lost", "hold", "unreachable"] },
 ];
 
-const statusColor = (st: string) =>
-  ["won", "transferred"].includes(st)
-    ? "text-(--color-ok)"
-    : ["lost", "unreachable"].includes(st)
-      ? "text-(--color-danger)"
-      : ["demo_done", "ready", "meeting_set"].includes(st)
-        ? "text-(--color-accent)"
-        : "text-(--color-dim)";
-
 export default async function HomePage() {
   const actor = await requireActor();
   const admin = createAdmin();
@@ -48,7 +42,7 @@ export default async function HomePage() {
   const [{ data: prospects }, { data: demos }, { data: directives }, { data: statusActs }] = await Promise.all([
     admin
       .from("dms_prospects")
-      .select("id,name,industry,city,status,score,demo_priority,next_contact_on,next_action,est_build_price,est_monthly_fee")
+      .select("id,name,industry,city,address,phone,status,score,demo_priority,next_contact_on,next_action,est_build_price,est_monthly_fee")
       .eq("company_id", actor.companyId)
       .is("deleted_at", null)
       .order("demo_priority", { ascending: true, nullsFirst: false })
@@ -227,46 +221,8 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* 営業先一覧 */}
-      <section className={cardCls}>
-        <h2 className="mb-3 font-semibold">営業先一覧（{rows.length}件）</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-(--color-line) text-left text-xs text-(--color-dim)">
-                <th className="py-2 pr-3">院名</th>
-                <th className="py-2 pr-3">業種</th>
-                <th className="py-2 pr-3">地域</th>
-                <th className="py-2 pr-3">ステータス</th>
-                <th className="py-2 pr-3">スコア</th>
-                <th className="py-2 pr-3">デモ</th>
-                <th className="py-2">次のアクション</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-(--color-line) last:border-0">
-                  <td className="py-2 pr-3">
-                    <Link href={`/p/${r.id}`} className="font-medium text-(--color-accent) hover:underline">{r.name}</Link>
-                  </td>
-                  <td className="py-2 pr-3">{INDUSTRIES[r.industry as IndustryKey] ?? r.industry}</td>
-                  <td className="py-2 pr-3">{r.city ?? "—"}</td>
-                  <td className={`py-2 pr-3 ${statusColor(r.status)}`}>{STATUSES[r.status as StatusKey] ?? r.status}</td>
-                  <td className="py-2 pr-3">{r.score ?? "—"}</td>
-                  <td className="py-2 pr-3">
-                    {demoByProspect.has(r.id) ? (
-                      <a href={`/d/${demoByProspect.get(r.id)}?preview=1`} target="_blank" className="text-(--color-ok) hover:underline">表示</a>
-                    ) : (
-                      <span className="text-(--color-dim)">未作成</span>
-                    )}
-                  </td>
-                  <td className="py-2 text-xs text-(--color-dim)">{r.next_action ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {/* 営業先一覧（検索つき・入力するそばから絞り込み） */}
+      <ProspectTable rows={rows} demoTokens={Object.fromEntries(demoByProspect)} />
 
       {/* 営業先の追加 */}
       <section className={`${cardCls} mt-6`}>
