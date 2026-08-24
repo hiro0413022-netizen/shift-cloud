@@ -533,12 +533,12 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
       {/* 営業メール（Outlookで送る） */}
       <section className={`${cardCls} mt-6`}>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-semibold">営業メール（押すとOutlookが開きます）</h2>
+          <h2 className="font-semibold">営業メール・FAX（メールは押すとOutlookが開きます）</h2>
           <span className="text-xs text-(--color-dim)">
             宛先: {p.email ?? "未登録 — 宛先は空で開きます（基本情報にメールを保存すると自動で入ります）"}
           </span>
         </div>
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           <div className="rounded-lg border border-(--color-line) p-3">
             <p className="text-sm font-semibold">① 電話前のご案内メール</p>
             <p className="mb-2 mt-1 text-xs text-(--color-dim)">
@@ -560,6 +560,13 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
               <summary className="cursor-pointer text-xs text-(--color-accent)">本文を確認・コピー</summary>
               <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-(--color-panel-2) p-3 text-xs leading-relaxed">{`件名: ${followMail.subject}\n\n${followMail.body}`}</pre>
             </details>
+          </div>
+          <div className="rounded-lg border border-(--color-line) p-3">
+            <p className="text-sm font-semibold">③ FAX送付状（QRコード付き）</p>
+            <p className="mb-2 mt-1 text-xs text-(--color-dim)">
+              メール未登録の先へ。QRコードをスマホで読むとデモが開くA4・1枚の送付状です。印刷してそのままFAX、または「印刷 → PDFとして保存」でネットFAXに添付できます。
+            </p>
+            <Link href={`/p/${id}/fax`} target="_blank" className={btnCls}>FAX送付状を開く（印刷）</Link>
           </div>
         </div>
         {!latestDemo && (
