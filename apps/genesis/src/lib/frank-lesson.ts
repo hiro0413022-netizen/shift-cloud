@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
-import { verifyMember } from "@/lib/frank-booking";
+import { authMember, type MemberAuth } from "@/lib/frank-booking";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 
 /**
@@ -86,12 +86,11 @@ async function ensureStudent(admin: Admin, member: { id: string; company_id: str
 
 /** レッスン予約 */
 export async function bookLesson(input: {
-  memberNo: string;
-  phoneLast4: string;
+  auth: MemberAuth;
   slotId: string;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const admin = createAdmin();
-  const member = await verifyMember(admin, input.memberNo, input.phoneLast4);
+  const member = await authMember(admin, input.auth);
   if (!member) return { ok: false, error: "会員番号または電話番号下4桁が一致しません（入会承認前の場合はご利用いただけません）" };
 
   const { data: slot } = await admin
@@ -160,9 +159,9 @@ export async function bookLesson(input: {
 }
 
 /** 自分のレッスン予約一覧（今日以降） */
-export async function listMyLessons(memberNo: string, phoneLast4: string) {
+export async function listMyLessons(auth: MemberAuth) {
   const admin = createAdmin();
-  const member = await verifyMember(admin, memberNo, phoneLast4);
+  const member = await authMember(admin, auth);
   if (!member) return null;
   const { data } = await admin
     .from("frunk_lesson_bookings")
@@ -186,9 +185,9 @@ export async function listMyLessons(memberNo: string, phoneLast4: string) {
 }
 
 /** キャンセル */
-export async function cancelLesson(memberNo: string, phoneLast4: string, bookingId: string): Promise<{ ok: boolean; error?: string }> {
+export async function cancelLesson(auth: MemberAuth, bookingId: string): Promise<{ ok: boolean; error?: string }> {
   const admin = createAdmin();
-  const member = await verifyMember(admin, memberNo, phoneLast4);
+  const member = await authMember(admin, auth);
   if (!member) return { ok: false, error: "認証に失敗しました" };
   const { data: bk } = await admin
     .from("frunk_lesson_bookings")

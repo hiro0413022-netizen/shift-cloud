@@ -86,36 +86,40 @@
     </div>
 
     <div class="card rv" style="margin-top:30px;padding:22px" id="bk-app">
+      <!-- 会員ポータルからお越しの場合、この欄はまるごと隠れます（#152） -->
+      <div id="bk-login">
       <p style="font-size:12px;font-weight:700;opacity:.8;margin-bottom:8px">1. 会員情報（このブラウザに保存され、次回から入力不要です）</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <label style="font-size:12px">会員番号<input id="bk-no" type="text" placeholder="例: F0001" autocomplete="off" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
+        <label style="font-size:12px">会員番号<input id="bk-no" type="text" placeholder="例: FR0001" autocomplete="off" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
         <label style="font-size:12px">電話番号 下4桁<input id="bk-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
       </div>
       <p style="margin-top:10px;font-size:12px;opacity:.75">
-        会員番号は、ご入会の承認後にお送りしている <b>F</b> ではじまる番号です（例: F0001）。
+        会員番号は、ご入会の承認後にお送りしている <b>FR</b> ではじまる番号です（例: FR0001）。
         まだ会員でない方・番号がお分かりにならない方は
         <a data-link="links.joinWeb" style="text-decoration:underline">入会のお申し込み ↗</a>
         から、または店舗までお問い合わせください。
       </p>
-      <p style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 8px">2. 日付と利用時間</p>
+      </div>
+      <p id="bk-who" hidden style="font-size:13px;font-weight:700;margin-bottom:10px"></p>
+      <p id="bk-step2" style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 8px">2. 日付と利用時間</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
         <label style="font-size:12px">利用時間<select id="bk-min" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit">
           <option value="30">30分</option><option value="60" selected>1時間</option><option value="90">1時間30分</option><option value="120">2時間</option>
         </select></label>
       </div>
-      <p style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 0">3. 空いている枠（○）をタップ</p>
+      <p id="bk-step3" style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 0">3. 空いている枠（○）をタップ</p>
       <p id="bk-status" style="margin-top:8px;font-size:13px;opacity:.8">日付を選ぶと空き状況が表示されます。</p>
       <div id="bk-grid" style="margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
       <p style="margin-top:14px"><button id="bk-my" class="btn btn--ghost" type="button">自分の予約を確認・キャンセル</button></p>
       <div id="bk-mylist" style="margin-top:10px"></div>
-      <p style="margin-top:18px;font-size:12px;opacity:.6">レッスンのご予約は<a href="lesson-booking.html" style="text-decoration:underline">レッスン予約ページ</a>から。</p>
+      <p style="margin-top:18px;font-size:12px;opacity:.6">レッスンのご予約は<a id="bk-lesson-link" href="lesson-booking.html" style="text-decoration:underline">レッスン予約ページ</a>から。</p>
     </div>
 
     <div class="card rv" style="margin-top:22px;padding:22px" id="bk-billing">
       <p class="eyebrow">Monthly Payment</p>
       <p style="font-size:15px;font-weight:700;margin-top:4px">月会費のお支払い登録（クレジットカード）</p>
-      <p style="margin-top:8px;font-size:13px;opacity:.8">クレジットカードを登録すると、月会費が毎月自動でお支払いになります（安全な決済ページ Square に移動します）。<br>上の会員番号・電話番号下4桁を入力のうえ、ボタンを押してください。</p>
+      <p style="margin-top:8px;font-size:13px;opacity:.8">クレジットカードを登録すると、月会費が毎月自動でお支払いになります（安全な決済ページ Square に移動します）。<br><span id="bk-bill-hint">上の会員番号・電話番号下4桁を入力のうえ、ボタンを押してください。</span></p>
       <p id="bk-bill-status" style="margin-top:10px;font-size:13px"></p>
       <p style="margin-top:12px"><button id="bk-bill" class="btn btn--brass" type="button">カードで継続課金を登録する</button></p>
       <p style="margin-top:10px;font-size:11px;opacity:.55">初回のみ、月会費のお支払いに続けて入会金5,500円（税込）を同じカードへ自動でご請求します（2026年内のご入会は入会金無料キャンペーン中。入会金無料クーポンをご利用の方も請求されません）。<br>口座振替をご希望の方は店頭でお手続きください。モニター会員（月会費0円）の方は登録不要です。</p>
@@ -218,6 +222,46 @@
   }catch(e){}
   function remember(a){try{localStorage.setItem("fg_no",a.no);localStorage.setItem("fg_tel",a.tel)}catch(e){}}
 
+  // ---- 会員ポータル（マイページ）からお越しの場合の引き渡し（#152）
+  //  マイページでログイン済みなのに、ここでもう一度会員番号と下4桁を求めていたのをやめる。
+  //  ?t= の署名付きトークンを受け取ったら、URLからは即座に消してタブ内だけで保持する
+  //  （URLに残すと共有・履歴・Refererに載ってしまうため）。
+  var TOK="";
+  try{TOK=sessionStorage.getItem("fg_t")||""}catch(e){}
+  (function(){
+    var qs=new URLSearchParams(location.search);
+    var t=qs.get("t");
+    if(!t) return;
+    TOK=t; try{sessionStorage.setItem("fg_t",t)}catch(e){}
+    qs.delete("t");
+    try{history.replaceState(null,"",location.pathname+(qs.toString()?"?"+qs.toString():"")+location.hash)}catch(e){}
+  })();
+
+  // トークンで入っているあいだは会員情報の入力欄を隠し、お名前を出す
+  function showLoggedIn(name){
+    $("bk-login").hidden=true;
+    $("bk-who").hidden=false;
+    $("bk-who").textContent=name+" 様としてご予約いただけます（会員番号の入力は不要です）";
+    $("bk-step2").textContent="1. 日付と利用時間";
+    $("bk-step3").textContent="2. 空いている枠（○）をタップ";
+    $("bk-bill-hint").textContent="下のボタンからお進みください。";
+    var ll=$("bk-lesson-link"); if(ll) ll.href="lesson-booking.html?t="+encodeURIComponent(TOK);
+    my();
+  }
+  // トークンが切れていた／無効だったときは、黙って従来の入力フォームに戻す
+  function dropToken(msg){
+    TOK=""; try{sessionStorage.removeItem("fg_t")}catch(e){}
+    $("bk-login").hidden=false;
+    $("bk-who").hidden=true;
+    if(msg) $("bk-who").hidden=false, $("bk-who").textContent=msg;
+  }
+  if(TOK){
+    fetch(API+"?me=1&t="+encodeURIComponent(TOK)).then(function(r){return r.json()}).then(function(j){
+      if(j&&j.ok&&j.name) showLoggedIn(j.name);
+      else dropToken("ログインの有効期限が切れました。会員番号と電話番号下4桁をご入力ください。");
+    }).catch(function(){dropToken("")});
+  }
+
   var start = jst()<OPEN ? OPEN : jst();
   $("bk-date").min=start; $("bk-date").value=start;
 
@@ -271,18 +315,25 @@
     }).catch(function(){$("bk-status").textContent="読み込みに失敗しました。時間をおいてお試しください。"});
   }
   function auth(){
+    if(TOK) return {token:TOK};
     var no=$("bk-no").value.trim(), tel=$("bk-tel").value.trim();
     if(!no||tel.length!==4){alert("会員番号と電話番号下4桁を入力してください");return null}
     var a={no:no,tel:tel}; remember(a);
     return a;
   }
+  /** POST本文に載せる認証部分 */
+  function authBody(a){ return a.token?{t:a.token}:{member_no:a.no,phone_last4:a.tel} }
+  /** GETのクエリに載せる認証部分 */
+  function authQuery(a){ return a.token?("t="+encodeURIComponent(a.token))
+                                       :("member_no="+encodeURIComponent(a.no)+"&phone_last4="+a.tel) }
+  function merge(base,add){ for(var k in add) base[k]=add[k]; return base }
   function book(){
     var a=auth(); if(!a||!sel) return;
     // 二重送信ガード（連打で同じ枠へ複数POSTしない）
     var wrap=$("bk-go"); var btn=wrap?wrap.querySelector("button"):null;
     if(btn){ if(btn.disabled) return; btn.disabled=true; }
     var done=function(){ if(btn) btn.disabled=false; };
-    fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"book",member_no:a.no,phone_last4:a.tel,date:$("bk-date").value,bay_code:sel.bay,start:sel.t,minutes:Number($("bk-min").value)})})
+    fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(merge({action:"book",date:$("bk-date").value,bay_code:sel.bay,start:sel.t,minutes:Number($("bk-min").value)},authBody(a)))})
       .then(function(r){return r.json()}).then(function(j){
         done();
         if(j.ok){alert("予約が完了しました！\n"+$("bk-date").value+" "+sel.t+"〜");load();my()}
@@ -291,7 +342,7 @@
   }
   function my(){
     var a=auth(); if(!a) return;
-    fetch(API+"?my=1&member_no="+encodeURIComponent(a.no)+"&phone_last4="+a.tel).then(function(r){return r.json()}).then(function(j){
+    fetch(API+"?my=1&"+authQuery(a)).then(function(r){return r.json()}).then(function(j){
       if(j.error){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
       if(!j.bookings.length){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後の予約はありません。</p>';return}
       var h='<p style="font-size:13px">'+j.name+"様の予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
@@ -302,7 +353,7 @@
         btn.addEventListener("click",function(){
           if(!confirm("この予約をキャンセルしますか？"))return;
           var a2=auth(); if(!a2)return;
-          fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cancel",member_no:a2.no,phone_last4:a2.tel,booking_id:btn.getAttribute("data-id")})})
+          fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(merge({action:"cancel",booking_id:btn.getAttribute("data-id")},authBody(a2)))})
             .then(function(r){return r.json()}).then(function(j2){ if(j2.ok){my();load()} else alert(j2.error||"キャンセルできませんでした") });
         });
       });
@@ -317,7 +368,7 @@
     var a=auth(); if(!a) return;
     $("bk-bill").disabled=true;
     $("bk-bill-status").textContent="お支払い登録ページを準備しています…";
-    fetch(BILL_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({member_no:a.no,phone_last4:a.tel})})
+    fetch(BILL_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(authBody(a))})
       .then(function(r){return r.json()}).then(function(j){
         if(j.ok&&j.url){location.href=j.url;return}
         $("bk-bill").disabled=false;

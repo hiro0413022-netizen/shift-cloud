@@ -21,7 +21,7 @@ export default function MemberLoginPage() {
       <form action={action} className="space-y-4 rounded-2xl border border-(--color-line) bg-(--color-panel) p-6">
         <div>
           <label className={label}>会員番号</label>
-          <input name="member_no" required placeholder="F0001" className={field} />
+          <input name="member_no" required placeholder="FR0001" className={field} />
           <p className="mt-1 text-xs text-(--color-dim)">ご入会の承認後にお送りしている番号です</p>
         </div>
         <div>

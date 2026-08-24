@@ -9,6 +9,7 @@ import {
   bookableRange,
   type BookingCfg,
 } from "@yozan/core/frank-booking";
+import { handoffSecret, verifyHandoff } from "@yozan/core/frank-handoff";
 
 /**
  * FRANK GOLF 打席予約（#86 §3-3・台帳一本化 #93）
@@ -100,6 +101,37 @@ export async function verifyMember(admin: Admin, memberNo: string, phoneLast4: s
   return data;
 }
 
+/**
+ * 会員ポータル（member-os）からの引き渡しトークンで会員を特定する（#152）
+ *
+ * ログイン済みのお客様に、移動先の予約ページで会員番号＋電話下4桁を **もう一度**
+ * 入力させていたのをやめるための経路。署名の検証だけで済ませる（@yozan/core/frank-handoff）。
+ * 電話番号の照合は member-os のログイン時に済んでいるので、ここでは行わない。
+ */
+export async function verifyMemberByHandoff(admin: Admin, token: string) {
+  const secret = handoffSecret();
+  if (!secret) return null; // 鍵未設定＝引き渡しだけ無効。入力フォームでの予約は従来どおり動く
+  const no = verifyHandoff(token, secret);
+  if (!no) return null;
+  const { data } = await admin
+    .from("frunk_members")
+    .select("id, company_id, name, member_no, phone, status, plan_id, frunk_plans(name, max_bookings_per_day)")
+    .eq("member_no", no)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!data) return null;
+  if (!["active", "approved"].includes(String(data.status))) return null;
+  return data;
+}
+
+/** 予約APIの認証入力。トークンがあればそれを優先し、無ければ従来の会員番号＋下4桁 */
+export type MemberAuth = { memberNo?: string; phoneLast4?: string; token?: string };
+
+export async function authMember(admin: Admin, a: MemberAuth) {
+  if (a.token) return verifyMemberByHandoff(admin, a.token);
+  return verifyMember(admin, a.memberNo ?? "", a.phoneLast4 ?? "");
+}
+
 /** 日別の空き状況 */
 export async function getSlots(dateStr: string) {
   const admin = createAdmin();
@@ -145,15 +177,14 @@ export async function getSlots(dateStr: string) {
 
 /** プラン上限チェック → OKなら予約作成 */
 export async function createBooking(input: {
-  memberNo: string;
-  phoneLast4: string;
+  auth: MemberAuth;
   date: string;
   bayCode: string;
   start: string; // "HH:MM"
   minutes: number; // 30 | 60 | 90 | 120
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const admin = createAdmin();
-  const member = await verifyMember(admin, input.memberNo, input.phoneLast4);
+  const member = await authMember(admin, input.auth);
   if (!member) return { ok: false, error: "会員番号または電話番号下4桁が一致しません（入会承認前の場合はご利用いただけません）" };
 
   const cfg = await loadBookingCfg(admin);
@@ -259,9 +290,9 @@ export async function createBooking(input: {
   return { ok: true, id: String(created.id) };
 }
 
-export async function listMyBookings(memberNo: string, phoneLast4: string) {
+export async function listMyBookings(auth: MemberAuth) {
   const admin = createAdmin();
-  const member = await verifyMember(admin, memberNo, phoneLast4);
+  const member = await authMember(admin, auth);
   if (!member) return null;
   const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const { data } = await admin
@@ -273,12 +304,12 @@ export async function listMyBookings(memberNo: string, phoneLast4: string) {
     .is("deleted_at", null)
     .order("booked_date")
     .order("start_time");
-  return { name: member.name, bookings: data ?? [] };
+  return { name: member.name, member_no: member.member_no, bookings: data ?? [] };
 }
 
-export async function cancelBooking(memberNo: string, phoneLast4: string, bookingId: string): Promise<{ ok: boolean; error?: string }> {
+export async function cancelBooking(auth: MemberAuth, bookingId: string): Promise<{ ok: boolean; error?: string }> {
   const admin = createAdmin();
-  const member = await verifyMember(admin, memberNo, phoneLast4);
+  const member = await authMember(admin, auth);
   if (!member) return { ok: false, error: "認証に失敗しました" };
   const { data: bk } = await admin
     .from("frunk_bookings")

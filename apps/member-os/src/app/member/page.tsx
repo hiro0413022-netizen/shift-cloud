@@ -3,6 +3,7 @@ import { requireMember, resolveHimeji } from "@/lib/member";
 import { createAdmin } from "@/lib/supabase/admin";
 import { BOOKING_STATUS_LABEL, jstToday } from "@yozan/core/frank-booking";
 import { memberLogout, cancelMyBooking } from "./actions";
+import { frankSiteUrl } from "@/lib/frank-site-link";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -81,7 +82,8 @@ export default async function MemberHomePage({
       {notice && <p className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{notice.text}</p>}
       {sp.err && <p className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">{sp.err}</p>}
 
-      <a href="https://frankgolf.jp/booking.html" className="mb-3 block w-full rounded-xl bg-sky-600 py-4 text-center text-lg font-semibold text-white transition-all hover:bg-sky-500">
+      {/* ログイン済みの状態を署名付きトークンで持って行く。移動先で会員番号を打ち直させない（#152） */}
+      <a href={frankSiteUrl("booking.html", member.isProvisional ? null : member.memberNo)} className="mb-3 block w-full rounded-xl bg-sky-600 py-4 text-center text-lg font-semibold text-white transition-all hover:bg-sky-500">
         ＋ Web予約する
       </a>
       {karteUrl && (

@@ -13,6 +13,7 @@ const CORS = {
 /**
  * FRANK GOLF 月会費の継続課金 公開API（#97→#123でSquareへ一本化）
  * POST {member_no, phone_last4} … Squareサブスク決済リンクのURLを返す
+ * POST {t}                       … 会員ポータルからの引き渡しトークンでも可（#152）
  */
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
@@ -21,7 +22,11 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: "JSONが不正です" }, { status: 400, headers: CORS });
   }
-  const r = await createSquareBillingCheckout(String(body.member_no ?? ""), String(body.phone_last4 ?? ""));
+  const r = await createSquareBillingCheckout({
+    memberNo: String(body.member_no ?? ""),
+    phoneLast4: String(body.phone_last4 ?? ""),
+    token: String(body.t ?? ""),
+  });
   return NextResponse.json(r, { status: r.ok ? 200 : 400, headers: CORS });
 }
 

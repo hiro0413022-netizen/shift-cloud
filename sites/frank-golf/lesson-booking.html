@@ -85,15 +85,17 @@
     </div>
 
     <div class="card rv" style="margin-top:30px;padding:22px" id="ls-app">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <label style="font-size:12px">会員番号<input id="ls-no" type="text" inputmode="numeric" placeholder="例: F0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
+      <!-- 会員ポータルからお越しの場合、この欄はまるごと隠れます（#152） -->
+      <div id="ls-login" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label style="font-size:12px">会員番号<input id="ls-no" type="text" placeholder="例: FR0001" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
         <label style="font-size:12px">電話番号 下4桁<input id="ls-tel" type="text" inputmode="numeric" maxlength="4" placeholder="0000" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
       </div>
+      <p id="ls-who" hidden style="font-size:13px;font-weight:700"></p>
       <p id="ls-status" style="margin-top:12px;font-size:13px;opacity:.8">予約可能な枠を読み込んでいます…</p>
       <div id="ls-list" style="margin-top:10px"></div>
       <p style="margin-top:14px"><button id="ls-my" class="btn btn--ghost" type="button">自分の予約を確認・キャンセル</button></p>
       <div id="ls-mylist" style="margin-top:10px"></div>
-      <p style="margin-top:18px;font-size:12px;opacity:.6">打席のご予約は<a href="booking.html" style="text-decoration:underline">打席予約ページ</a>から。</p>
+      <p style="margin-top:18px;font-size:12px;opacity:.6">打席のご予約は<a id="ls-bay-link" href="booking.html" style="text-decoration:underline">打席予約ページ</a>から。</p>
     </div>
   </div>
 </section>
@@ -180,12 +182,51 @@
 <script>
 (function(){
   var API="https://yozan-genesis.vercel.app/api/public/frank/lesson";
+  var ME_API="https://yozan-genesis.vercel.app/api/public/frank/booking";
   var $=function(id){return document.getElementById(id)};
+
+  // ---- 会員ポータル／打席予約ページからの引き渡し（#152）
+  //  ログイン済みのお客様に会員番号を打ち直させない。URLからは即座に消す。
+  var TOK="";
+  try{TOK=sessionStorage.getItem("fg_t")||""}catch(e){}
+  (function(){
+    var qs=new URLSearchParams(location.search);
+    var t=qs.get("t");
+    if(!t) return;
+    TOK=t; try{sessionStorage.setItem("fg_t",t)}catch(e){}
+    qs.delete("t");
+    try{history.replaceState(null,"",location.pathname+(qs.toString()?"?"+qs.toString():"")+location.hash)}catch(e){}
+  })();
+  function showLoggedIn(name){
+    $("ls-login").hidden=true;
+    $("ls-who").hidden=false;
+    $("ls-who").textContent=name+" 様としてご予約いただけます（会員番号の入力は不要です）";
+    var bl=$("ls-bay-link"); if(bl) bl.href="booking.html?t="+encodeURIComponent(TOK);
+    my();
+  }
+  function dropToken(msg){
+    TOK=""; try{sessionStorage.removeItem("fg_t")}catch(e){}
+    $("ls-login").hidden=false;
+    if(msg){$("ls-who").hidden=false;$("ls-who").textContent=msg}
+    else $("ls-who").hidden=true;
+  }
+  if(TOK){
+    fetch(ME_API+"?me=1&t="+encodeURIComponent(TOK)).then(function(r){return r.json()}).then(function(j){
+      if(j&&j.ok&&j.name) showLoggedIn(j.name);
+      else dropToken("ログインの有効期限が切れました。会員番号と電話番号下4桁をご入力ください。");
+    }).catch(function(){dropToken("")});
+  }
+
   function auth(){
+    if(TOK) return {token:TOK};
     var no=$("ls-no").value.trim(), tel=$("ls-tel").value.trim();
     if(!no||tel.length!==4){alert("会員番号と電話番号下4桁を入力してください");return null}
     return {no:no,tel:tel};
   }
+  function authBody(a){ return a.token?{t:a.token}:{member_no:a.no,phone_last4:a.tel} }
+  function authQuery(a){ return a.token?("t="+encodeURIComponent(a.token))
+                                       :("member_no="+encodeURIComponent(a.no)+"&phone_last4="+a.tel) }
+  function merge(base,add){ for(var k in add) base[k]=add[k]; return base }
   var WD=["日","月","火","水","木","金","土"];
   function fmt(d){var p=d.split("-");var dt=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]));return p[1].replace(/^0/,"")+"/"+p[2].replace(/^0/,"")+"("+WD[dt.getUTCDay()]+")"}
   function load(){
@@ -213,7 +254,7 @@
         btn.addEventListener("click",function(){
           var a=auth(); if(!a) return;
           if(!confirm(btn.getAttribute("data-l")+"〜 のレッスンを予約しますか？"))return;
-          fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"book",member_no:a.no,phone_last4:a.tel,slot_id:btn.getAttribute("data-id")})})
+          fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(merge({action:"book",slot_id:btn.getAttribute("data-id")},authBody(a)))})
             .then(function(r){return r.json()}).then(function(j2){
               if(j2.ok){alert("レッスン予約が完了しました！");load();my()}
               else alert(j2.error||"予約できませんでした");
@@ -224,7 +265,7 @@
   }
   function my(){
     var a=auth(); if(!a) return;
-    fetch(API+"?my=1&member_no="+encodeURIComponent(a.no)+"&phone_last4="+a.tel).then(function(r){return r.json()}).then(function(j){
+    fetch(API+"?my=1&"+authQuery(a)).then(function(r){return r.json()}).then(function(j){
       if(j.error){$("ls-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
       if(!j.lessons.length){$("ls-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後のレッスン予約はありません。</p>';return}
       var h='<p style="font-size:13px">'+j.name+"様のレッスン予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
@@ -235,7 +276,7 @@
         btn.addEventListener("click",function(){
           if(!confirm("このレッスン予約をキャンセルしますか？"))return;
           var a2=auth(); if(!a2)return;
-          fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"cancel",member_no:a2.no,phone_last4:a2.tel,booking_id:btn.getAttribute("data-id")})})
+          fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(merge({action:"cancel",booking_id:btn.getAttribute("data-id")},authBody(a2)))})
             .then(function(r){return r.json()}).then(function(j2){ if(j2.ok){my();load()} else alert(j2.error||"キャンセルできませんでした") });
         });
       });

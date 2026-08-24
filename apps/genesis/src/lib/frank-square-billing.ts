@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
-import { verifyMember } from "@/lib/frank-booking";
+import { authMember, type MemberAuth } from "@/lib/frank-booking";
 import { monthlyFeeTaxIncluded, toE164Jp, JOIN_CHECKOUT_NOTE_PREFIX } from "@/lib/frank-pos-pure";
 import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { jstYmd } from "@/lib/jst";
@@ -282,11 +282,12 @@ export async function createJoinCheckoutForMember(
 
 /** 会員認証→Squareサブスク決済リンクのURLを返す（Stripe版 createBillingCheckout の置き換え） */
 export async function createSquareBillingCheckout(
-  memberNo: string,
-  phoneLast4: string,
+  auth: MemberAuth,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   const admin = createAdmin();
-  const member = await verifyMember(admin, memberNo, phoneLast4);
+  // 会員ポータルから来たお客様は署名付きトークンを持っている（#152）。
+  // 予約と同じ入口で認証し、カード登録のためだけに会員番号を打ち直させない。
+  const member = await authMember(admin, auth);
   if (!member) return { ok: false, error: "会員番号または電話番号下4桁が一致しません（入会承認前はご登録いただけません）" };
 
   const token = accessToken();
