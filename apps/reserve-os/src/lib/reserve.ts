@@ -123,7 +123,9 @@ export function bookableDates(h: BookingHours, from: string = todayJST()): { val
     const d = new Date(base.getTime() + i * 86400000);
     // 日付の判定は必ずJSTで行う（UTCのgetDay()だと日付境界がずれる）
     const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: JST, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-    const dow = new Date(`${ymd}T00:00:00+09:00`).getUTCDay(); // +09:00指定なのでUTC曜日=JST曜日
+    // ymd は既にJSTの暦日なので、曜日は必ずUTC(Z)として解釈する。
+    // "+09:00" を付けると絶対時刻が前日15:00Zになり getUTCDay() が1日前の曜日を返す。
+    const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay();
     if (h.closedWeekdays.includes(dow)) continue;
     const [, mm, dd] = ymd.split("-");
     out.push({ value: ymd, label: `${Number(mm)}月${Number(dd)}日(${DOW[dow]})` });
@@ -144,7 +146,7 @@ export function bookableTimes(h: BookingHours, durationMin: number | null): stri
 /** サーバー側の検証（フォームを迂回した送信を弾く） */
 export function isBookable(h: BookingHours, ymd: string, hm: string, durationMin: number | null): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^\d{2}:\d{2}$/.test(hm)) return false;
-  const dow = new Date(`${ymd}T00:00:00+09:00`).getUTCDay();
+  const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay(); // JSTの暦日→曜日はUTCで解釈（bookableDatesと同じ）
   if (h.closedWeekdays.includes(dow)) return false;
   if (!bookableDates(h).some((d) => d.value === ymd)) return false;
   return bookableTimes(h, durationMin).includes(hm);

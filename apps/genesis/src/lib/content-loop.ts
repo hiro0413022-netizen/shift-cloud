@@ -103,7 +103,7 @@ export async function runContentLoop(companyId: string): Promise<Record<string, 
     .maybeSingle();
 
   // 月曜は週次ファネルレポート（生成の前に。既に走った日でも二重にならないようexistingで抑止）
-  const isMonday = new Date(`${today}T00:00:00+09:00`).getUTCDay() === 1;
+  const isMonday = new Date(`${today}T00:00:00Z`).getUTCDay() === 1; // todayはJSTの暦日→曜日はUTCで解釈
   if (isMonday && !existing) {
     await weeklyFunnelReport(admin, companyId).catch(() => null);
   }
