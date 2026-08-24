@@ -10,7 +10,7 @@ import { QuoteBuilder, type OptionRow, type PlanRow } from "@/components/quote-b
 import { createQuote, setQuoteStatus } from "@/app/quote-actions";
 import { ANALYSIS_ITEMS, INDUSTRIES, STATUSES, LOST_REASONS, HERO_STYLES, type AnalysisItemKey, type IndustryKey, type StatusKey } from "@/lib/types";
 import { getTemplate } from "@/lib/templates";
-import { addActivity, generateDemo, generateDocs, setDemoAccess, transferToProject, updateProspect } from "@/app/actions";
+import { addActivity, generateDemo, generateDocs, revertToNegotiation, setDemoAccess, transferToProject, updateProspect } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -556,15 +556,31 @@ export default async function ProspectPage({ params }: { params: Promise<{ id: s
       <section className={`${cardCls} mt-6 ${project ? "border-(--color-ok)" : ""}`}>
         <h2 className="mb-2 font-semibold">成約 → 正式制作へ移行</h2>
         {project ? (
-          <p className="text-sm text-(--color-ok)">
-            ✅ 正式制作案件へ移行済み（{String(project.created_at).slice(0, 10)}・プラン: {project.plan_key}・状態: {project.status}）。
-            顧客情報・分析・デモ・要望・見積は dms_projects.handover に引き継ぎ済み。制作タスクはWEB DEVELOPMENT側で開始できます。
-          </p>
+          <>
+            <p className="text-sm text-(--color-ok)">
+              ✅ 正式制作案件へ移行済み（{String(project.created_at).slice(0, 10)}・プラン: {project.plan_key}・状態: {project.status}）。
+              顧客情報・分析・デモ・要望・見積は dms_projects.handover に引き継ぎ済み。制作タスクはWEB DEVELOPMENT側で開始できます。
+            </p>
+            <form action={revertToNegotiation.bind(null, id)} className="mt-3">
+              <button className="text-xs text-(--color-dim) underline hover:text-(--color-danger)">
+                間違えて押した場合 — 成約を取り消して商談中に戻す（正式制作案件は取り下げ・再成約で復活）
+              </button>
+            </form>
+          </>
         ) : (
-          <form action={transferToProject.bind(null, id)} className="flex items-center gap-3">
-            <button className={`${btnCls} bg-(--color-ok)`}>成約 — 正式制作案件を作成</button>
-            <p className="text-xs text-(--color-dim)">顧客情報・現サイト分析・デモ・営業履歴・見積を再入力なしで引き継ぎます。</p>
-          </form>
+          <>
+            <form action={transferToProject.bind(null, id)} className="flex items-center gap-3">
+              <button className={`${btnCls} bg-(--color-ok)`}>成約 — 正式制作案件を作成</button>
+              <p className="text-xs text-(--color-dim)">顧客情報・現サイト分析・デモ・営業履歴・見積を再入力なしで引き継ぎます。</p>
+            </form>
+            {["won", "transferred"].includes(p.status) && (
+              <form action={revertToNegotiation.bind(null, id)} className="mt-3">
+                <button className="text-xs text-(--color-dim) underline hover:text-(--color-danger)">
+                  間違えて成約にした場合 — 商談中に戻す
+                </button>
+              </form>
+            )}
+          </>
         )}
         {p.status === "lost" && (
           <form action={upd} className="mt-3 flex items-center gap-2">

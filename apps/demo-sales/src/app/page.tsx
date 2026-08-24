@@ -3,7 +3,7 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { cardCls, inputCls, btnCls } from "@/components/ui";
 import { INDUSTRIES, STATUSES, type IndustryKey, type StatusKey } from "@/lib/types";
-import { createProspect, saveDirective } from "./actions";
+import { createProspect, revertToNegotiation, saveDirective } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ export default async function HomePage() {
   const actor = await requireActor();
   const admin = createAdmin();
 
-  const [{ data: prospects }, { data: demos }, { data: directives }] = await Promise.all([
+  const [{ data: prospects }, { data: demos }, { data: directives }, { data: statusActs }] = await Promise.all([
     admin
       .from("dms_prospects")
       .select("id,name,industry,city,status,score,demo_priority,next_contact_on,next_action,est_build_price,est_monthly_fee")
@@ -61,6 +61,14 @@ export default async function HomePage() {
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(3),
+    admin
+      .from("dms_activities")
+      .select("prospect_id,content,created_at")
+      .eq("company_id", actor.companyId)
+      .eq("kind", "status")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
   const rows = (prospects ?? []) as ProspectRow[];
@@ -69,6 +77,15 @@ export default async function HomePage() {
 
   const count = (keys: StatusKey[]) => rows.filter((r) => keys.includes(r.status as StatusKey)).length;
   const won = rows.filter((r) => ["won", "transferred"].includes(r.status));
+  // 成約日 = 履歴の「→ won」または「正式制作案件へ移行」の最新日時（JST表示は日付まで）
+  const wonAt = new Map<string, string>();
+  for (const a of statusActs ?? []) {
+    if (!a.prospect_id || wonAt.has(a.prospect_id)) continue;
+    const c = String(a.content ?? "");
+    if (c.includes("→ won") || c.includes("→ transferred") || c.includes("正式制作案件へ移行")) {
+      wonAt.set(a.prospect_id, String(a.created_at).slice(0, 10));
+    }
+  }
   const wonBuild = won.reduce((a, r) => a + (r.est_build_price ?? 0), 0);
   const wonMonthly = won.reduce((a, r) => a + (r.est_monthly_fee ?? 0), 0);
   const today = new Date().toISOString().slice(0, 10);
@@ -161,6 +178,52 @@ export default async function HomePage() {
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {/* 成約一覧 */}
+      {won.length > 0 && (
+        <section className={`${cardCls} mb-6 border-(--color-ok)`}>
+          <h2 className="mb-3 font-semibold text-(--color-ok)">成約一覧（{won.length}件）</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-(--color-line) text-left text-xs text-(--color-dim)">
+                  <th className="py-2 pr-3">院名</th>
+                  <th className="py-2 pr-3">業種</th>
+                  <th className="py-2 pr-3">地域</th>
+                  <th className="py-2 pr-3">状態</th>
+                  <th className="py-2 pr-3">成約日</th>
+                  <th className="py-2 pr-3">想定制作費</th>
+                  <th className="py-2 pr-3">想定月額</th>
+                  <th className="py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {won.map((r) => (
+                  <tr key={r.id} className="border-b border-(--color-line) last:border-0">
+                    <td className="py-2 pr-3">
+                      <Link href={`/p/${r.id}`} className="font-medium text-(--color-accent) hover:underline">{r.name}</Link>
+                    </td>
+                    <td className="py-2 pr-3">{INDUSTRIES[r.industry as IndustryKey] ?? r.industry}</td>
+                    <td className="py-2 pr-3">{r.city ?? "—"}</td>
+                    <td className="py-2 pr-3 text-(--color-ok)">{STATUSES[r.status as StatusKey] ?? r.status}</td>
+                    <td className="py-2 pr-3">{wonAt.get(r.id) ?? "—"}</td>
+                    <td className="py-2 pr-3">{r.est_build_price != null ? `${r.est_build_price.toLocaleString()}円` : "—"}</td>
+                    <td className="py-2 pr-3">{r.est_monthly_fee != null ? `${r.est_monthly_fee.toLocaleString()}円/月` : "—"}</td>
+                    <td className="py-2 text-right">
+                      <form action={revertToNegotiation.bind(null, r.id)}>
+                        <button className="text-xs text-(--color-dim) underline hover:text-(--color-danger)" title="間違えて成約にしたときの取り消し">商談中に戻す</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-(--color-dim)">
+            「商談中に戻す」は間違えて成約を押したときの取り消しです。正式制作案件は取り下げられ、ステータスは成約前の状態に戻ります（再度成約にすれば引き継ぎごと復活します）。
+          </p>
         </section>
       )}
 

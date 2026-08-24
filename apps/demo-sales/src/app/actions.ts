@@ -8,7 +8,7 @@ import { requireActor } from "@/lib/auth";
 import { renderDemo } from "@/lib/render-demo";
 import { getTemplate } from "@/lib/templates";
 import { DOC_BUILDERS, buildQuote, type DocInput } from "@/lib/sales-docs";
-import type { Analysis, DemoBrief, IndustryKey } from "@/lib/types";
+import { STATUSES, type Analysis, type DemoBrief, type IndustryKey, type StatusKey } from "@/lib/types";
 
 const s = (fd: FormData, k: string) => {
   const v = String(fd.get(k) ?? "").trim();
@@ -404,6 +404,8 @@ export async function transferToProject(prospectId: string) {
       build_price: p.est_build_price,
       monthly_fee: p.est_monthly_fee,
       status: "preparing",
+      deleted_at: null, // 成約取り消し後の再成約で論理削除済みの案件を復活させる
+
       handover: {
         customer: { name: p.name, industry: p.industry, city: p.city, address: p.address, phone: p.phone, email: p.email, contact: p.contact_name, website: p.website_url, gmap: p.gmap_url },
         analysis: p.analysis,
@@ -423,6 +425,62 @@ export async function transferToProject(prospectId: string) {
     prospect_id: prospectId,
     kind: "status",
     content: "成約 → 正式制作案件へ移行（dms_projects）",
+    created_by: actor.name,
+  });
+  revalidatePath(`/p/${prospectId}`);
+  revalidatePath("/");
+}
+
+// ---- 成約の取り消し（間違えて押したとき商談中に戻す） ----
+
+const WON_STATUSES = new Set(["won", "transferred"]);
+
+export async function revertToNegotiation(prospectId: string) {
+  const actor = await requireActor();
+  const admin = createAdmin();
+  const { data: p } = await admin
+    .from("dms_prospects")
+    .select("id,status")
+    .eq("id", prospectId)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .single();
+  if (!p || !WON_STATUSES.has(p.status)) return; // 成約・移行済み以外は何もしない
+
+  // 正式制作案件が作られていれば取り下げる（論理削除。再度成約すれば復活する）
+  await admin
+    .from("dms_projects")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("prospect_id", prospectId)
+    .is("deleted_at", null);
+
+  // 成約前のステータスを履歴から復元（見つからなければ「院内検討中」）
+  const { data: hist } = await admin
+    .from("dms_activities")
+    .select("content")
+    .eq("prospect_id", prospectId)
+    .eq("kind", "status")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  let restore: StatusKey = "considering";
+  outer: for (const h of hist ?? []) {
+    const m = /ステータス変更: (\S+) → (\S+)/.exec(String(h.content ?? ""));
+    if (!m) continue;
+    for (const cand of [m[2], m[1]]) {
+      if (cand in STATUSES && !WON_STATUSES.has(cand)) {
+        restore = cand as StatusKey;
+        break outer;
+      }
+    }
+  }
+
+  await admin.from("dms_prospects").update({ status: restore }).eq("id", prospectId).eq("company_id", actor.companyId);
+  await admin.from("dms_activities").insert({
+    company_id: actor.companyId,
+    prospect_id: prospectId,
+    kind: "status",
+    content: `成約を取り消し: 商談中（${STATUSES[restore]}）に戻しました`,
     created_by: actor.name,
   });
   revalidatePath(`/p/${prospectId}`);
