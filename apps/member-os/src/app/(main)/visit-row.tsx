@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge, Field, inputCls, btnGhostCls } from "@/components/ui";
 import {
+  VISIT_TYPES,
   VISIT_TYPE_LABEL,
   RESULTS,
   DISCOUNTS,
@@ -197,6 +198,21 @@ export function VisitRow({ v, guest, rec }: { v: Row; guest: Row | null; rec: Ro
         className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-6"
       >
         <input type="hidden" name="id" value={s(v.id)} />
+        {/* 来店日と利用区分も直せる（#151）。日付の打ち間違い・体験の振替に対応するため */}
+        <input
+          name="visited_on"
+          type="date"
+          defaultValue={s(v.visited_on ?? "")}
+          title="来店日（間違えたときはここで直せます）"
+          className={`${inputCls} !py-1`}
+        />
+        <select name="visit_type" defaultValue={s(v.visit_type ?? "trial")} title="利用区分" className={`${inputCls} !py-1`}>
+          {VISIT_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </select>
         <select name="result" defaultValue={s(v.result ?? "none")} className={`${inputCls} !py-1`}>
           {RESULTS.map((r) => (
             <option key={r.value} value={r.value}>

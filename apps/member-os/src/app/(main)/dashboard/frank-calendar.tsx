@@ -147,7 +147,12 @@ export async function FrankCalendarDashboard({
           {detail && (
             <div id="booking-detail">
               {detail.kind === "booking" ? (
-                <BookingDetailPanel b={detail.booking} backHref={href({})} date={detail.booking.booked_date} />
+                <BookingDetailPanel
+                  b={detail.booking}
+                  backHref={href({})}
+                  date={detail.booking.booked_date}
+                  bays={(dayViews[0]?.bays ?? []).filter((x) => x.active).map((x) => ({ id: x.id, name: x.name }))}
+                />
               ) : (
                 <LessonDetailPanel l={detail.lesson} backHref={href({})} />
               )}

@@ -145,6 +145,16 @@ export async function updateVisit(formData: FormData) {
   if (!(await loadOwnVisit(admin, actor, id))) return;
 
   const patch: Record<string, unknown> = {};
+  // 来店日・利用区分も直せるようにした（#151）。
+  // 日付を間違えて登録した／体験が別日に振り替わった、が今まで手で直せなかった。
+  if (formData.has("visited_on")) {
+    const d = str(formData.get("visited_on"));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) patch.visited_on = d;
+  }
+  if (formData.has("visit_type")) {
+    const t = str(formData.get("visit_type"));
+    if (VISIT_TYPES.includes(t)) patch.visit_type = t;
+  }
   if (formData.has("fee")) patch.fee = intOrNull(formData.get("fee"));
   if (formData.has("discount")) patch.discount = orNull(formData.get("discount"));
   if (formData.has("payment_method")) {

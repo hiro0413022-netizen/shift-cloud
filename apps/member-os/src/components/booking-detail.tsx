@@ -10,7 +10,7 @@ import {
   PAY_METHODS,
   outstanding,
 } from "@yozan/core/frank-booking";
-import { setBookingStatus, recordPayment } from "@/app/(main)/reservations/actions";
+import { setBookingStatus, recordPayment, updateBooking } from "@/app/(main)/reservations/actions";
 
 /**
  * 予約の詳細（#139・2026-08-18 ユーザー要望）
@@ -33,6 +33,12 @@ const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-o
  */
 function karteHref(memberNo: string): string {
   return `${LESSON_OS_URL}/m/${encodeURIComponent(memberNo)}`;
+}
+
+/** "10:00:00" と "11:30:00" → 90 */
+function minutesOf(start: string, end: string): number {
+  const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  return m(end) - m(start);
 }
 
 function yen(n: number | null | undefined): string {
@@ -72,11 +78,14 @@ export function BookingDetailPanel({
   backHref,
   date,
   canEdit = true,
+  bays = [],
 }: {
   b: BookingDetail;
   backHref: string;
   date: string;
   canEdit?: boolean;
+  /** 打席の選択肢。渡すと「日時・打席を変更」フォームが出る（#151） */
+  bays?: Array<{ id: string; name: string }>;
 }) {
   const kind = b.customer_kind === "trial" ? "trial" : b.customer_kind === "member" ? "member" : "dropin";
   const m = b.frunk_members;
@@ -135,6 +144,9 @@ export function BookingDetailPanel({
             </Row>
             <Row label="日時">
               {b.booked_date}　{b.start_time.slice(0, 5)}〜{b.end_time.slice(0, 5)}
+              {canEdit && bays.length > 0 ? (
+                <span className="ml-2 text-xs text-(--color-dim)">（下の「日時・打席を変更」から直せます）</span>
+              ) : null}
             </Row>
             <Row label="会計">
               <span className="tabular-nums">
@@ -154,6 +166,75 @@ export function BookingDetailPanel({
         {t?.experience ? <Row label="ゴルフ歴">{t.experience}</Row> : null}
         {t?.message ? <Row label="ご要望">{t.message}</Row> : null}
         {b.note ? <Row label="備考">{b.note}</Row> : null}
+
+        {canEdit && bays.length > 0 && (
+          <details className="mt-3 rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3">
+            <summary className="cursor-pointer text-sm font-semibold">日時・打席を変更する</summary>
+            <p className="mt-1 text-xs text-(--color-dim)">
+              お客様から変更の連絡が来たときはここで直します。消して作り直す必要はありません。
+              {b.mbr_trial_requests ? "体験申込と受付台帳の日付も一緒に直ります。" : ""}
+            </p>
+            <form action={updateBooking} className="mt-2 grid gap-2 sm:grid-cols-2">
+              <input type="hidden" name="id" value={b.id} />
+              <input type="hidden" name="date" value={date} />
+              <label className="text-xs text-(--color-dim)">
+                日付
+                <input type="date" name="booking_date" defaultValue={b.booked_date} className={inputCls} />
+              </label>
+              <label className="text-xs text-(--color-dim)">
+                開始時刻
+                <input type="time" name="start_time" defaultValue={b.start_time.slice(0, 5)} step={900} className={inputCls} />
+              </label>
+              <label className="text-xs text-(--color-dim)">
+                所要（分）
+                <input
+                  name="minutes"
+                  inputMode="numeric"
+                  defaultValue={String(Math.max(15, minutesOf(b.start_time, b.end_time)))}
+                  className={inputCls}
+                />
+              </label>
+              <label className="text-xs text-(--color-dim)">
+                打席
+                <select name="bay_id" defaultValue={b.bay_id ?? ""} className={inputCls}>
+                  {bays.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+              </label>
+              {!b.frunk_members ? (
+                <>
+                  <label className="text-xs text-(--color-dim)">
+                    お名前
+                    <input name="guest_name" defaultValue={b.guest_name ?? ""} className={inputCls} />
+                  </label>
+                  <label className="text-xs text-(--color-dim)">
+                    電話
+                    <input name="guest_phone" defaultValue={b.guest_phone ?? ""} className={inputCls} />
+                  </label>
+                </>
+              ) : null}
+              <label className="text-xs text-(--color-dim)">
+                人数
+                <input name="party_size" inputMode="numeric" defaultValue={String(b.party_size ?? 1)} className={inputCls} />
+              </label>
+              <label className="text-xs text-(--color-dim) sm:col-span-2">
+                備考
+                <input name="note" defaultValue={b.note ?? ""} className={inputCls} />
+              </label>
+              <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+                <label className="flex items-center gap-1.5 text-xs text-(--color-dim)">
+                  <input type="checkbox" name="notify" value="1" />
+                  お客様にメールで知らせる
+                </label>
+                <button className={btnCls}>変更を保存</button>
+                <span className="text-[11px] text-(--color-dim)">
+                  ※ 定休日・営業時間外、他の予約やレッスン枠と重なる時間には動かせません
+                </span>
+              </div>
+            </form>
+          </details>
+        )}
 
         {canEdit && (
           <div className="mt-3 space-y-2 border-t border-(--color-line) pt-3">

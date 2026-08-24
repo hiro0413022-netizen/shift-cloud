@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, FRANK_STORE_ID } from "@/lib/store-scope";
@@ -62,11 +63,29 @@ export default async function TrialsPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 grid gap-2 rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 text-sm sm:grid-cols-3">
-                  <div><span className="text-xs text-(--color-dim)">第1希望</span><div>{r.pref1 ? String(r.pref1) : "—"}</div></div>
-                  <div><span className="text-xs text-(--color-dim)">第2希望</span><div>{r.pref2 ? String(r.pref2) : "—"}</div></div>
-                  <div><span className="text-xs text-(--color-dim)">第3希望</span><div>{r.pref3 ? String(r.pref3) : "—"}</div></div>
-                </div>
+                {/* 確定している日時（サイトのカレンダー予約はここが本当の予約・#151）。
+                    今までこの画面は希望日(pref1〜3)しか出しておらず、実際の予約日時が見えなかった。 */}
+                {r.booked_date ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 text-sm">
+                    <span className="text-xs text-(--color-dim)">予約日時</span>
+                    <span className="font-semibold tabular-nums">
+                      {String(r.booked_date)}　{String(r.start_time ?? "").slice(0, 5)}
+                      {r.end_time ? `〜${String(r.end_time).slice(0, 5)}` : ""}
+                    </span>
+                    <Link
+                      href={`/reservations?date=${String(r.booked_date)}#bk-`}
+                      className="text-xs text-indigo-600 underline"
+                    >
+                      予約管理で日時・打席を変更する →
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="mt-3 grid gap-2 rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 text-sm sm:grid-cols-3">
+                    <div><span className="text-xs text-(--color-dim)">第1希望</span><div>{r.pref1 ? String(r.pref1) : "—"}</div></div>
+                    <div><span className="text-xs text-(--color-dim)">第2希望</span><div>{r.pref2 ? String(r.pref2) : "—"}</div></div>
+                    <div><span className="text-xs text-(--color-dim)">第3希望</span><div>{r.pref3 ? String(r.pref3) : "—"}</div></div>
+                  </div>
+                )}
 
                 {r.message ? (
                   <p className="mt-2 rounded-lg bg-(--color-panel-2) px-3 py-2 text-sm text-(--color-txt)">{String(r.message)}</p>

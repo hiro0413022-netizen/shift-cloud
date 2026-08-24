@@ -129,7 +129,7 @@ export async function syncTrialWalkin(
   // いまの台帳行（生きているもの）
   const existingRes = await admin
     .from("mbr_walkin_visits")
-    .select("id, guest_id, visited_on")
+    .select("id, guest_id, visited_on, note")
     .eq("company_id", companyId)
     .eq("source_reservation_no", resNo)
     .is("deleted_at", null)
@@ -151,10 +151,16 @@ export async function syncTrialWalkin(
   const visitedOn = req.booked_date == null ? null : String(req.booked_date);
   if (!visitedOn) return { ok: false, error: "予約日が未設定のため台帳に載せられません" };
 
-  // すでに行があるなら、日付のズレだけ直す（料金・成約・メモには触らない）
+  // すでに行があるなら、日付のズレを直す（料金・成約には触らない）。
+  // メモは **自動生成のまま（「体験予約 …」で始まる）ときだけ** 作り直す。
+  // 日時を変更したのに台帳のメモが古い時刻のまま残る、を防ぐ（#151）。
+  // スタッフが書き換えたメモは尊重して触らない。
   if (existing) {
     const patch: Row = {};
     if (String(existing.visited_on ?? "") !== visitedOn) patch.visited_on = visitedOn;
+    const curNote = String(existing.note ?? "");
+    const nextNote = ledgerNote(req);
+    if (curNote.startsWith("体験予約") && curNote !== nextNote) patch.note = nextNote;
     if (existing.guest_id == null) {
       const gid = await resolveGuestId(admin, companyId, storeId, req);
       if (gid) patch.guest_id = gid;

@@ -16,9 +16,15 @@ import {
 import { toTimelineItems, monthOf, labelJa } from "@/lib/bay-timeline-pure";
 import { BayTimeline, TimelineLegend } from "@/components/bay-timeline";
 import { MonthMiniCalendar, STEP_OPTIONS } from "@/components/month-picker";
-import { createBooking, setBookingStatus, deleteBooking, recordPayment } from "./actions";
+import { createBooking, setBookingStatus, deleteBooking, recordPayment, updateBooking } from "./actions";
 
 export const dynamic = "force-dynamic";
+
+/** "10:00:00" と "11:30:00" → 90（所要分） */
+function durMin(start: string, end: string): number {
+  const m = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  return Math.max(15, m(end) - m(start));
+}
 
 /**
  * FRANK GOLF 予約管理（スタッフ）— 台帳は frunk_bookings 一本（#93）
@@ -294,6 +300,56 @@ export default async function ReservationsPage({
                   {t?.message ? (
                     <p className="text-xs text-(--color-dim)">ご要望: {t.message}</p>
                   ) : null}
+
+                  {/* 日時・打席の変更（#151）。消して作り直さずに直せる */}
+                  <details className="rounded-lg border border-(--color-line) bg-white/60 px-2 py-1.5">
+                    <summary className="cursor-pointer text-xs font-semibold text-(--color-dim)">日時・打席を変更</summary>
+                    <form action={updateBooking} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <input type="hidden" name="id" value={b.id} />
+                      <input type="hidden" name="date" value={date} />
+                      <Field label="日付">
+                        <input type="date" name="booking_date" defaultValue={b.booked_date} className={inputCls} />
+                      </Field>
+                      <Field label="開始">
+                        <input type="time" name="start_time" defaultValue={b.start_time.slice(0, 5)} step={900} className={inputCls} />
+                      </Field>
+                      <Field label="所要（分）">
+                        <input name="minutes" inputMode="numeric" defaultValue={String(durMin(b.start_time, b.end_time))} className={inputCls} />
+                      </Field>
+                      <Field label="打席">
+                        <select name="bay_id" defaultValue={b.bay_id ?? ""} className={inputCls}>
+                          {bays.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                        </select>
+                      </Field>
+                      {!b.frunk_members ? (
+                        <>
+                          <Field label="お名前">
+                            <input name="guest_name" defaultValue={b.guest_name ?? ""} className={inputCls} />
+                          </Field>
+                          <Field label="電話">
+                            <input name="guest_phone" defaultValue={b.guest_phone ?? ""} className={inputCls} />
+                          </Field>
+                        </>
+                      ) : null}
+                      <Field label="人数">
+                        <input name="party_size" inputMode="numeric" defaultValue={String(b.party_size ?? 1)} className={inputCls} />
+                      </Field>
+                      <Field label="備考">
+                        <input name="note" defaultValue={b.note ?? ""} className={inputCls} />
+                      </Field>
+                      <div className="col-span-2 flex flex-wrap items-center gap-3 sm:col-span-4">
+                        <label className="flex items-center gap-1.5 text-xs text-(--color-dim)">
+                          <input type="checkbox" name="notify" value="1" />
+                          お客様にメールで知らせる
+                        </label>
+                        <button className={btnCls}>変更を保存</button>
+                        <span className="text-[11px] text-(--color-dim)">
+                          定休日・営業時間外、ほかの予約やレッスン枠と重なる時間には動かせません
+                          {t ? "／体験は申込と受付台帳の日付も一緒に直ります" : ""}
+                        </span>
+                      </div>
+                    </form>
+                  </details>
 
                   <form action={recordPayment} className="flex flex-wrap items-center gap-2 border-t border-(--color-line) pt-2">
                     <input type="hidden" name="id" value={b.id} />

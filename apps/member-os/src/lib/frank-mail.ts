@@ -59,6 +59,42 @@ export async function sendFrankMail(input: {
 }
 
 /**
+ * 予約の日時・打席を変更したときのお知らせ（#151）。
+ *
+ * スタッフが画面で「お客様にメールで知らせる」にチェックしたときだけ送る。
+ * 勝手に飛ばさないのは、電話で口頭合意した直後にメールが来ると二度手間になる現場があるため。
+ * キャンセル用リンクは元のまま有効なので、そのまま再掲する。
+ */
+export function buildBookingRescheduleMail(input: {
+  name: string;
+  before: string; // "2026-09-05 10:00〜11:00 Aブース"
+  after: string;
+  cancelToken?: string | null;
+  kind: "trial" | "booking";
+}): { subject: string; text: string } {
+  const label = input.kind === "trial" ? "体験レッスン" : "ご予約";
+  const cancel = input.cancelToken ? `${FRANK_SITE}/trial-booking.html?cancel=${input.cancelToken}` : null;
+  return {
+    subject: `【FRANK GOLF】${label}の日時変更のお知らせ`,
+    text: [
+      `${input.name} 様`,
+      "",
+      `${label}の日時を変更いたしましたのでお知らせします。`,
+      "",
+      `変更前: ${input.before}`,
+      `変更後: ${input.after}`,
+      "",
+      "お間違いがないかご確認ください。ご都合が合わない場合はお手数ですがご連絡ください。",
+      ...(cancel ? ["", "ご予約の確認・キャンセルはこちらから", cancel] : []),
+      "",
+      "──────────────",
+      "FRANK GOLF（フランクゴルフ）",
+      FRANK_SITE,
+    ].join("\n"),
+  };
+}
+
+/**
  * 体験申込（希望日時3つの申込型・member-os /trial）の受付メール。
  * サイトのカレンダー予約（即確定）と違い、この時点では日時は確定していない。
  * 「スタッフから連絡して日時を確定する」ことを必ず書く。
