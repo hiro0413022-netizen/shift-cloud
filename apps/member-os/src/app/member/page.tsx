@@ -4,7 +4,7 @@ import { requireMember, resolveHimeji } from "@/lib/member";
 import { createAdmin } from "@/lib/supabase/admin";
 import { BOOKING_STATUS_LABEL, jstToday } from "@yozan/core/frank-booking";
 import { checkinQrPayload } from "@yozan/core/frank-portal";
-import { ensureCheckinToken, currentVisit } from "@/lib/frank-portal";
+import { ensureCheckinToken, currentVisit, karteShareUrl, karteHasNew } from "@/lib/frank-portal";
 import { memberLogout, cancelMyBooking } from "./actions";
 import { frankSiteUrl } from "@/lib/frank-site-link";
 import { VisitPanel } from "./visit-panel";
@@ -60,22 +60,14 @@ export default async function MemberHomePage({
     ? await currentVisit(memberId)
     : { checkedIn: false, bayName: null, bayCode: null, endTime: null };
 
-  // レッスンカルテ（Lesson OS・#129）: member_no ⇄ lsn_students.member_code、閲覧は共有トークン
-  let karteUrl: string | null = null;
-  {
-    const { data: student } = await admin
-      .from("lsn_students").select("id")
-      .eq("company_id", member.companyId).eq("member_code", member.memberNo)
-      .is("deleted_at", null).limit(1).maybeSingle();
-    if (student) {
-      const { data: tok } = await admin
-        .from("lsn_share_tokens").select("token")
-        .eq("student_id", (student as Row).id as string).is("revoked_at", null).limit(1).maybeSingle();
-      if (tok?.token) {
-        const base = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
-        karteUrl = `${base}/s/${String(tok.token)}`;
-      }
-    }
+  // レッスンカルテ（Lesson OS・#129）: member_no ⇄ lsn_students.member_code、閲覧は共有トークン。
+  // リンク先は /member/karte（既読を記録してから飛ばす）。ここでは有無だけ見る。
+  const hasKarte = Boolean(await karteShareUrl(member.companyId, member.memberNo));
+  let karteNew = false;
+  if (hasKarte && memberId) {
+    const { data: seen } = await admin
+      .from("frunk_members").select("karte_seen_at").eq("id", memberId).maybeSingle();
+    karteNew = await karteHasNew(member.companyId, member.memberNo, ((seen as Row | null)?.karte_seen_at as string | null) ?? null);
   }
 
   const { data: bookings } = memberId
@@ -151,10 +143,20 @@ export default async function MemberHomePage({
         </section>
       )}
 
-      {/* ③ レッスンカルテ */}
-      {karteUrl && (
-        <a href={karteUrl} target="_blank" rel="noreferrer" className="mb-3 block w-full rounded-xl border border-(--color-gold)/50 bg-(--color-panel) py-3.5 text-center font-semibold text-(--color-gold) transition-colors hover:bg-(--color-panel-2)">
+      {/* ③ レッスンカルテ（新着があれば目立たせる＝「書いても届かない」を塞ぐ・#155） */}
+      {hasKarte && (
+        <a
+          href="/member/karte"
+          className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-center font-semibold transition-colors ${
+            karteNew
+              ? "bg-(--color-gold) text-white hover:bg-(--color-gold)/90"
+              : "border border-(--color-gold)/50 bg-(--color-panel) text-(--color-gold) hover:bg-(--color-panel-2)"
+          }`}
+        >
           📋 レッスンカルテを見る
+          {karteNew && (
+            <span className="rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-(--color-gold)">新着</span>
+          )}
         </a>
       )}
 

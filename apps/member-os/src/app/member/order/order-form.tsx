@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 import type { MenuItem } from "@yozan/core/frank-portal";
 
 /**
@@ -83,13 +84,7 @@ export function OrderForm({
             <span className="text-(--color-dim)">{bayName ? `${bayName}へお届け` : "お届け先はスタッフが確認します"}</span>
             <span className="text-lg font-bold tabular-nums">¥{total.toLocaleString("ja-JP")}</span>
           </div>
-          <button
-            type="submit"
-            disabled={count === 0}
-            className="w-full rounded-xl bg-accent py-4 text-base font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
-          >
-            {count === 0 ? "商品を選んでください" : `${count}点を注文する`}
-          </button>
+          <SubmitButton count={count} />
           <p className="mt-1.5 text-center text-[11px] text-(--color-dim)">
             {priceKind === "member"
               ? "ご登録のカードから自動でお支払いされます"
@@ -98,5 +93,25 @@ export function OrderForm({
         </div>
       </div>
     </form>
+  );
+}
+
+/**
+ * 送信ボタン（#155）
+ *
+ * ★ 二度押しを必ず止める。 会員の注文はその場でカードに課金が走るので、
+ *   連打すると **注文も決済も2件**できてしまう（Square側の idempotency_key は
+ *   注文IDごとなので、注文が2件になれば別々に通る）。
+ */
+function SubmitButton({ count }: { count: number }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={count === 0 || pending}
+      className="w-full rounded-xl bg-accent py-4 text-base font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
+    >
+      {pending ? "送信しています…" : count === 0 ? "商品を選んでください" : `${count}点を注文する`}
+    </button>
   );
 }

@@ -450,3 +450,60 @@ export async function checkOut(checkinId: string): Promise<void> {
     .update({ checked_out_at: new Date().toISOString() })
     .eq("id", checkinId).is("checked_out_at", null).is("deleted_at", null);
 }
+
+// ---------------------------------------------------------------
+// レッスンカルテ（Lesson OS）
+// ---------------------------------------------------------------
+const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
+
+/** 会員番号 → Lesson OS の共有ページURL（無ければ null） */
+export async function karteShareUrl(companyId: string, memberNo: string): Promise<string | null> {
+  const admin = createAdmin();
+  const { data: student } = await admin
+    .from("lsn_students").select("id")
+    .eq("company_id", companyId).eq("member_code", memberNo)
+    .is("deleted_at", null).limit(1).maybeSingle();
+  if (!student) return null;
+  const { data: tok } = await admin
+    .from("lsn_share_tokens").select("token")
+    .eq("student_id", s((student as Row).id)).is("revoked_at", null).limit(1).maybeSingle();
+  const t = s((tok as Row | null)?.token);
+  return t ? `${LESSON_OS_URL}/s/${t}` : null;
+}
+
+/**
+ * カルテに新着があるか（#155）。
+ *
+ * Lesson OS が稼働しなかった一番の理由は「書いても生徒に届かない」こと。
+ * 動画かコメントが karte_seen_at より後に増えていれば、ポータルのホームで知らせる。
+ * 会員が開いた時点で karte_seen_at を進める（/member/karte）。
+ */
+export async function karteHasNew(companyId: string, memberNo: string, seenAt: string | null): Promise<boolean> {
+  const admin = createAdmin();
+  const { data: student } = await admin
+    .from("lsn_students").select("id")
+    .eq("company_id", companyId).eq("member_code", memberNo)
+    .is("deleted_at", null).limit(1).maybeSingle();
+  if (!student) return false;
+  const studentId = s((student as Row).id);
+
+  const { data: vids } = await admin
+    .from("lsn_videos").select("id, created_at")
+    .eq("student_id", studentId).is("deleted_at", null)
+    .order("created_at", { ascending: false }).limit(50);
+  const videos = (vids ?? []) as Row[];
+  if (videos.length === 0) return false;
+
+  // 一度も開いていない人は、動画が1本でもあれば新着扱い（最初の1回を必ず届ける）
+  if (!seenAt) return true;
+  const seen = new Date(seenAt).getTime();
+  if (videos.some((v) => new Date(s(v.created_at)).getTime() > seen)) return true;
+
+  const { data: cmts } = await admin
+    .from("lsn_comments").select("created_at")
+    .in("video_id", videos.map((v) => s(v.id)))
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false }).limit(1);
+  const latest = s(((cmts ?? []) as Row[])[0]?.created_at);
+  return latest ? new Date(latest).getTime() > seen : false;
+}

@@ -68,6 +68,7 @@ export default async function OrdersPage() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <Link href="/orders/menu" className="text-xs text-(--color-dim) underline underline-offset-4">メニュー管理</Link>
           <Link href="/orders/qr" className="text-xs text-(--color-dim) underline underline-offset-4">打席QRを印刷</Link>
           <OrdersLive signature={signature} unserved={open.length} />
         </div>

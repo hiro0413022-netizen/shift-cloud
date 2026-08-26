@@ -58,6 +58,29 @@ export default async function FrunkMemberPage({
   const sp = await searchParams;
   if (!/^[0-9a-fA-F-]{36}$/.test(id)) notFound();
 
+  // 来店（#154 のチェックイン台帳）。予約の有無に関わらず「実際に来た日」が1日1行で入る。
+  const adminVisits = createAdmin();
+  const todayYmd = jstYmd();
+  const monthStart = `${todayYmd.slice(0, 7)}-01`;
+  const [{ data: visitRows }, { count: visitTotal }, { count: visitThisMonth }] = await Promise.all([
+    adminVisits.from("frunk_checkins")
+      .select("id, visited_on, checked_in_at, checked_out_at, source, frunk_bays(name)")
+      .eq("member_id", id).is("deleted_at", null)
+      .order("visited_on", { ascending: false }).limit(12),
+    adminVisits.from("frunk_checkins").select("id", { count: "exact", head: true })
+      .eq("member_id", id).is("deleted_at", null),
+    adminVisits.from("frunk_checkins").select("id", { count: "exact", head: true })
+      .eq("member_id", id).gte("visited_on", monthStart).is("deleted_at", null),
+  ]);
+  const visits = (visitRows ?? []) as Array<Record<string, unknown>>;
+  const lastVisit = visits[0] ? String(visits[0].visited_on) : null;
+  const daysSinceVisit = lastVisit
+    ? Math.round(
+        (Date.UTC(+todayYmd.slice(0, 4), +todayYmd.slice(5, 7) - 1, +todayYmd.slice(8, 10)) -
+          Date.UTC(+lastVisit.slice(0, 4), +lastVisit.slice(5, 7) - 1, +lastVisit.slice(8, 10))) / 86400000,
+      )
+    : null;
+
   const admin = createAdmin();
   const { data: member } = await admin
     .from("frunk_members")
@@ -371,6 +394,56 @@ export default async function FrunkMemberPage({
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </Panel>
+
+      {/* 来店（#154） */}
+      <Panel title="来店" className="d3">
+        <div className="mb-3 flex flex-wrap gap-6 text-sm">
+          <span>
+            <span className="text-xs text-(--color-dim)">今月</span>{" "}
+            <strong className="text-lg tabular-nums">{visitThisMonth ?? 0}</strong> 回
+          </span>
+          <span>
+            <span className="text-xs text-(--color-dim)">通算</span>{" "}
+            <strong className="text-lg tabular-nums">{visitTotal ?? 0}</strong> 回
+          </span>
+          <span>
+            <span className="text-xs text-(--color-dim)">前回</span>{" "}
+            {lastVisit ? (
+              <>
+                <strong className="tabular-nums">{lastVisit}</strong>
+                {daysSinceVisit != null && daysSinceVisit >= 14 ? (
+                  // 来店が空いている人は退会予兆。声かけの材料としてここで目立たせる
+                  <span className="ml-1 font-semibold text-amber-700">（{daysSinceVisit}日前）</span>
+                ) : daysSinceVisit != null ? (
+                  <span className="ml-1 text-(--color-dim)">（{daysSinceVisit}日前）</span>
+                ) : null}
+              </>
+            ) : (
+              <span className="text-(--color-dim)">記録なし</span>
+            )}
+          </span>
+        </div>
+        {visits.length === 0 ? (
+          <Empty>チェックインの記録はまだありません（QRチェックインの開始前に来店した分は含まれません）</Empty>
+        ) : (
+          <div className="space-y-1">
+            {visits.map((v) => {
+              const bay = (v.frunk_bays ?? null) as { name?: string } | null;
+              const at = String(v.checked_in_at ?? "");
+              const hhmm = at ? new Date(at).toLocaleTimeString("ja-JP", { timeZone: "Asia/Tokyo", hour: "2-digit", minute: "2-digit" }) : "";
+              return (
+                <div key={String(v.id)} className="flex items-center justify-between border-b border-(--color-line)/60 py-1.5 text-sm last:border-0">
+                  <span className="tabular-nums">{String(v.visited_on)} <span className="text-xs text-(--color-dim)">{hhmm}</span></span>
+                  <span className="text-xs text-(--color-dim)">
+                    {bay?.name ?? "打席なし"}
+                    {v.source === "manual" ? " ・手動" : v.source === "bay" ? " ・打席QR" : ""}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </Panel>
