@@ -45,6 +45,8 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
   if (!email) return { error: "メールアドレスをご入力ください（入会の控えとご案内をお送りします）" };
   if (!phone) return { error: "電話番号をご入力ください（会員ページのログインに下4桁を使用します）" };
   if (str(formData.get("consent_privacy")) !== "1") return { error: "個人情報の取扱いへの同意が必要です" };
+  if (str(formData.get("consent_mobile_order")) !== "1")
+    return { error: "会員ポータルからのご注文（登録カードでのお支払い）への同意が必要です" };
   if (str(formData.get("consent_terms")) !== "1")
     return { error: "会員規約（休会・退会規定を含む）への同意が必要です" };
   const signature = str(formData.get("signature"));

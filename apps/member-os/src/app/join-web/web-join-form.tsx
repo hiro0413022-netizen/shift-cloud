@@ -174,6 +174,16 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           <input type="checkbox" name="consent_terms" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
           <span>上記の会員規約（休会・退会の規定を含む）を確認し、同意します。<span className="text-rose-400">*</span></span>
         </label>
+        {/* 決済に関する同意は他の同意とまとめない（構想 §2-2・規約_モバイルオーダー同意条項_案）。
+            まとめると「同意を取った」と言いにくくなるため、独立のチェックボックスにしている */}
+        <label className="flex items-start gap-3 text-sm text-(--color-dim)">
+          <input type="checkbox" name="consent_mobile_order" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
+          <span>
+            <span className="font-medium text-(--color-txt)">会員ポータルからのご注文について同意します。</span>
+            スマホからドリンク等をご注文いただいた場合、ご注文の時点で、月会費のお支払いにご登録いただいたクレジットカードに代金を請求します（注文ごとのカード操作はありません）。
+            カードのご登録がない場合は、退店時に店頭でのお会計となります。<span className="text-rose-400">*</span>
+          </span>
+        </label>
         <div>
           <p className="mb-1 text-sm font-medium text-(--color-dim)">ご署名（電子サイン） <span className="text-rose-400">*</span></p>
           <SignaturePad value={signature} onChange={setSignature} />
