@@ -144,11 +144,11 @@ export function bookableTimes(h: BookingHours, durationMin: number | null): stri
 }
 
 /** サーバー側の検証（フォームを迂回した送信を弾く） */
-export function isBookable(h: BookingHours, ymd: string, hm: string, durationMin: number | null): boolean {
+export function isBookable(h: BookingHours, ymd: string, hm: string, durationMin: number | null, from: string = todayJST()): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd) || !/^\d{2}:\d{2}$/.test(hm)) return false;
   const dow = new Date(`${ymd}T00:00:00Z`).getUTCDay(); // JSTの暦日→曜日はUTCで解釈（bookableDatesと同じ）
   if (h.closedWeekdays.includes(dow)) return false;
-  if (!bookableDates(h).some((d) => d.value === ymd)) return false;
+  if (!bookableDates(h, from).some((d) => d.value === ymd)) return false;
   return bookableTimes(h, durationMin).includes(hm);
 }
 

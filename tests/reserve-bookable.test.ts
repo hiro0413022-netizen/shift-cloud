@@ -43,6 +43,8 @@ test("bookableDates: 定休日（火曜）が正しく除外される", () => {
 
 test("isBookable: 定休日の曜日判定がbookableDatesと一致する", () => {
   const h = { ...HOURS, closedWeekdays: [2] };
-  assert.equal(isBookable(h, "2026-08-25", "11:00", 60), false); // 火曜=定休
-  assert.equal(isBookable(h, "2026-08-26", "11:00", 60), true);  // 水曜=営業
+  // ⚠ 基準日を固定して渡す。省略すると「今日」が基準になり、
+  //   このテストは 2026-08-26 の11時を過ぎた瞬間から落ちる時限爆弾だった（#157で修正）。
+  assert.equal(isBookable(h, "2026-08-25", "11:00", 60, "2026-08-24"), false); // 火曜=定休
+  assert.equal(isBookable(h, "2026-08-26", "11:00", 60, "2026-08-24"), true);  // 水曜=営業
 });
