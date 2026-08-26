@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireMember } from "@/lib/member";
 import { createAdmin } from "@/lib/supabase/admin";
-import { placeOrder, loadMenu, currentVisit, bayByCode } from "@/lib/frank-portal";
+import { placeOrder, loadMenu, currentVisit, bayByCode, frankStore } from "@/lib/frank-portal";
 import { logEvent } from "@/lib/kernel";
 import type { OrderLineInput } from "@yozan/core/frank-portal";
 
@@ -40,9 +40,10 @@ export async function submitOrder(formData: FormData) {
     redirect(`/member/order${bayCodeParam ? `?bay=${encodeURIComponent(bayCodeParam)}` : ""}&err=1`);
   }
 
+  const store = await frankStore();
   const result = await placeOrder({
     companyId: member.companyId,
-    storeId: String(mem.store_id ?? "") || (bay ? bay.companyId : ""),
+    storeId: String(mem.store_id ?? "") || store?.storeId || "",
     bayId,
     member: { id: memberId, memberNo: member.memberNo, squareCustomerId: (mem.square_customer_id as string | null) ?? null },
     checkinId: visit.checkinId,

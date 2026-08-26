@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstYmd } from "@yozan/core/jst";
 import { loadMenu } from "@/lib/frank-portal";
-import { markServed, cancelOrder, addStaffOrder } from "./actions";
+import { markServed, cancelOrder, addStaffOrder, checkOutSeat } from "./actions";
 import { OrdersLive } from "./live";
 
 export const dynamic = "force-dynamic";
@@ -46,12 +47,12 @@ export default async function OrdersPage() {
   // 新しい注文が入ったら音を鳴らすための指紋（件数と最新IDが変われば鳴る）
   const signature = `${open.length}:${s(open[open.length - 1]?.id)}`;
 
-  const seatOf = (bayId: string) => {
+  const seatOf = (bayId: string): { label: string; checkinId: string } | null => {
     const c = checkins.find((x) => s(x.bay_id) === bayId && !s(x.checked_out_at));
     const m = (c?.frunk_members as { member_no?: string; name?: string } | null) ?? null;
-    return m ? `${m.name} 様（${m.member_no}）` : null;
+    return c && m ? { label: `${m.name} 様（${m.member_no}）`, checkinId: s(c.id) } : null;
   };
-  const groups: Array<{ id: string | null; name: string; seat: string | null; rows: Row[] }> = [
+  const groups: Array<{ id: string | null; name: string; seat: ReturnType<typeof seatOf>; rows: Row[] }> = [
     ...bays.map((b) => ({ id: b.id, name: b.name, seat: seatOf(b.id), rows: orders.filter((o) => s(o.bay_id) === b.id) })),
     { id: null, name: "打席なし", seat: null, rows: orders.filter((o) => !s(o.bay_id)) },
   ];
@@ -66,7 +67,10 @@ export default async function OrdersPage() {
             {today} ／ 未提供 {open.length}件
           </p>
         </div>
-        <OrdersLive signature={signature} />
+        <div className="flex items-center gap-4">
+          <Link href="/orders/qr" className="text-xs text-(--color-dim) underline underline-offset-4">打席QRを印刷</Link>
+          <OrdersLive signature={signature} unserved={open.length} />
+        </div>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -77,7 +81,15 @@ export default async function OrdersPage() {
             <section key={g.id ?? "none"} className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-4">
               <div className="mb-3 flex items-baseline justify-between gap-2">
                 <h2 className="text-lg font-bold">{g.name}</h2>
-                <span className="truncate text-xs text-(--color-dim)">{g.seat ?? "—"}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate text-xs text-(--color-dim)">{g.seat?.label ?? "—"}</span>
+                  {g.seat && (
+                    <form action={checkOutSeat}>
+                      <input type="hidden" name="checkin_id" value={g.seat.checkinId} />
+                      <button className="shrink-0 rounded-lg border border-(--color-line) px-2 py-1 text-[11px] text-(--color-dim)">退店</button>
+                    </form>
+                  )}
+                </span>
               </div>
 
               {g.rows.length === 0 ? (

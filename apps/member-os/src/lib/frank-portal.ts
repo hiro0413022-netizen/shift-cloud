@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstYmd } from "@yozan/core/jst";
+import { FRANK_STORE_CODE } from "@yozan/core/frank-booking";
 import {
   newCheckinToken,
   normalizeCheckinScan,
@@ -28,6 +29,16 @@ import { chargeOrderOnFile } from "@/lib/frank-square";
 type Row = Record<string, unknown>;
 const s = (v: unknown): string => (typeof v === "string" ? v : "");
 const n = (v: unknown): number => (typeof v === "number" ? v : Number(v) || 0);
+
+/** JSTの現在時刻 "HH:MM"（サーバーはUTCなので必ずここを通す） */
+function nowHHMM(): string {
+  const d = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
+function addMinutes(hhmm: string, min: number): string {
+  const t = Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5)) + min;
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
 
 export const CHECKIN_MEMBER_STATUS_OK = ["active", "approved", "suspended"] as const;
 
@@ -164,7 +175,8 @@ export async function checkInMember(memberId: string, source: "qr" | "manual" | 
       .update({ bay_id: bayId, booking_id: s(booking?.id) || null })
       .eq("id", checkinId);
   } else {
-    const storeId = s(mem.store_id) || (await resolveFrankStoreId(companyId));
+    const storeId = s(mem.store_id) || (await frankStore())?.storeId || "";
+    if (!storeId) return { ok: false, reason: "unknown", message: "店舗の設定が見つかりません" };
     const { data: ins } = await admin.from("frunk_checkins").insert({
       company_id: companyId,
       store_id: storeId,
@@ -223,10 +235,17 @@ async function bayName(bayId: string): Promise<string | null> {
   return s((data as Row | null)?.name) || null;
 }
 
-async function resolveFrankStoreId(companyId: string): Promise<string> {
+/**
+ * FRANK姫路の会社/店舗を引く。
+ * frunk_members.store_id は古い行で null のことがあるので、必ずここを通して補う。
+ * （store_id に company_id を入れてしまうと frunk_checkins / frunk_orders が別店舗の行として残る）
+ */
+export async function frankStore(): Promise<{ companyId: string; storeId: string } | null> {
   const admin = createAdmin();
-  const { data } = await admin.from("stores").select("id").eq("code", "frunk_himeji").maybeSingle();
-  return s((data as Row | null)?.id) || companyId;
+  const { data } = await admin
+    .from("stores").select("id, company_id").eq("code", FRANK_STORE_CODE).maybeSingle();
+  const r = (data ?? null) as Row | null;
+  return r ? { companyId: s(r.company_id), storeId: s(r.id) } : null;
 }
 
 /** 受付画面にスタッフ向けで出す1〜3行を組み立てる（材料集めだけ。判断は core の純関数） */
@@ -298,6 +317,15 @@ export async function currentVisit(memberId: string): Promise<VisitState> {
   }
   const bay = (c.frunk_bays as { code?: string; name?: string } | null) ?? null;
   const bk = (c.frunk_bookings as { end_time?: string } | null) ?? null;
+
+  // 予約終了+30分を過ぎたら来店中を終える。
+  // DBに書かずに判定だけで閉じるのは、閉じるためのcronを増やしたくないから
+  // （スタッフが伝票から「退店」を押せば checked_out_at が入る）。
+  const end = bk?.end_time ? s(bk.end_time).slice(0, 5) : null;
+  if (end && nowHHMM() > addMinutes(end, 30)) {
+    return { checkedIn: false, checkinId: s(c.id), bayId: null, bayCode: null, bayName: null, endTime: end };
+  }
+
   return {
     checkedIn: true,
     checkinId: s(c.id),
@@ -413,4 +441,12 @@ export async function bayByCode(code: string): Promise<{ id: string; code: strin
     .eq("code", code).eq("active", true).is("deleted_at", null).maybeSingle();
   const b = (data ?? null) as Row | null;
   return b ? { id: s(b.id), code: s(b.code), name: s(b.name), companyId: s(b.company_id) } : null;
+}
+
+/** スタッフが伝票から「退店」を押したとき（来店中モードを閉じ、滞在時間を確定する） */
+export async function checkOut(checkinId: string): Promise<void> {
+  const admin = createAdmin();
+  await admin.from("frunk_checkins")
+    .update({ checked_out_at: new Date().toISOString() })
+    .eq("id", checkinId).is("checked_out_at", null).is("deleted_at", null);
 }

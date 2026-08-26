@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
  * 「音をON」を押してもらう。押していない間は無音で更新だけ続く。
  * 取りこぼし対策として、公式LINEのスタッフ通知も別途走らせる想定（構想 §4）。
  */
-export function OrdersLive({ signature, intervalSec = 10 }: { signature: string; intervalSec?: number }) {
+export function OrdersLive({ signature, unserved, intervalSec = 10 }: { signature: string; unserved: number; intervalSec?: number }) {
   const router = useRouter();
   const prev = useRef(signature);
   const ctx = useRef<AudioContext | null>(null);
@@ -32,6 +32,11 @@ export function OrdersLive({ signature, intervalSec = 10 }: { signature: string;
     const id = setInterval(tick, 20_000);
     return () => clearInterval(id);
   }, []);
+
+  // 音をONにしていない/別タブを見ているときの保険。タブの見出しで未提供件数が分かる
+  useEffect(() => {
+    document.title = unserved > 0 ? `(${unserved}) 電子伝票 — FRANK GOLF` : "電子伝票 — FRANK GOLF";
+  }, [unserved]);
 
   useEffect(() => {
     if (prev.current === signature) return;

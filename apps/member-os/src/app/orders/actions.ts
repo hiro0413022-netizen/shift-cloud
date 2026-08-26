@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
-import { placeOrder, loadMenu } from "@/lib/frank-portal";
+import { placeOrder, loadMenu, checkOut } from "@/lib/frank-portal";
 import { unitPriceOf } from "@yozan/core/frank-portal";
 import { chargeOrderOnFile } from "@/lib/frank-square";
 import { logEvent } from "@/lib/kernel";
@@ -148,5 +148,17 @@ export async function linkOrderToMember(formData: FormData) {
       .update(r.ok ? { payment_status: "paid", square_payment_id: r.paymentId ?? null } : { payment_status: "unpaid", payment_error: r.error ?? null })
       .eq("id", orderId);
   }
+  revalidatePath("/orders");
+}
+
+/**
+ * 退店（#154）。お客様の来店中モードを閉じ、滞在時間を確定する。
+ * 押し忘れても、予約終了+30分で自動的に来店中は終わる（currentVisit）。
+ */
+export async function checkOutSeat(formData: FormData) {
+  await guard();
+  const id = s(formData.get("checkin_id"));
+  if (!id) return;
+  await checkOut(id);
   revalidatePath("/orders");
 }

@@ -6,7 +6,15 @@ import { hashToken, generateToken } from "@/lib/intake";
 import { FRANK_STORE_CODE as HIMEJI_STORE_CODE } from "@yozan/core/frank-booking";
 
 export const MEMBER_COOKIE = "mos_member";
-const SESSION_DAYS = 60;
+/**
+ * 会員ポータルのセッション（#154 で 60日 → 1年）。
+ * ポータルは「来店したら開くもの」にしたいので、来るたびにログインを求めたら習慣にならない。
+ * 短くしても安全は増えない（cookieはhttpOnly/secure、退会・却下は下で即無効化している）ので、
+ * 期限は長くとり、残り半年を切ったら自動で延長する＝実質ログインし続ける。
+ */
+const SESSION_DAYS = 365;
+/** 残りがこれを下回ったら延長する（書き込みは最大でも半年に1回） */
+const SESSION_EXTEND_UNDER_DAYS = 180;
 
 export type MemberSession = {
   companyId: string;
@@ -75,7 +83,26 @@ export async function getMemberSession(): Promise<MemberSession | null> {
     .eq("token_hash", hashToken(raw))
     .maybeSingle();
   if (!sess) return null;
-  if (new Date(sess.expires_at as string).getTime() < Date.now()) return null;
+  const expiresAt = new Date(sess.expires_at as string).getTime();
+  if (expiresAt < Date.now()) return null;
+
+  // 使っている人の期限は自動で延ばす（毎回書かないよう、残り半年を切ったときだけ）
+  if (expiresAt - Date.now() < SESSION_EXTEND_UNDER_DAYS * 24 * 60 * 60 * 1000) {
+    const next = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
+    await admin.from("res_member_sessions")
+      .update({ expires_at: next.toISOString() })
+      .eq("token_hash", hashToken(raw));
+    try {
+      // Next.js ではサーバーコンポーネントの描画中に cookie を書けない（Route Handler と
+      // Server Action だけ）。ここは両方から呼ばれるので、書けない場面は黙って諦める。
+      // ポータルは滞在中ずっと /member/visit（Route Handler）を叩いているので、
+      // cookie の期限はそちらで必ず更新される。
+      const jar = await cookies();
+      jar.set(MEMBER_COOKIE, raw, { httpOnly: true, secure: true, sameSite: "lax", path: "/", expires: next });
+    } catch {
+      /* 描画中の呼び出し。DB側の期限は延びているので次のRoute Handlerで揃う */
+    }
+  }
 
   const companyId = sess.company_id as string;
   const memberNo = sess.member_no as string;
@@ -99,7 +126,7 @@ export async function getMemberSession(): Promise<MemberSession | null> {
       .limit(1)
       .maybeSingle();
     if (fm) {
-      // 退会・却下済みはセッションを無効化（60日cookieだけで居座れないように）
+      // 退会・却下済みはセッションを無効化（長期cookieだけで居座れないように）
       if (["left", "rejected"].includes(String(fm.status))) return null;
       if (fm.name) name = fm.name as string;
     } else {

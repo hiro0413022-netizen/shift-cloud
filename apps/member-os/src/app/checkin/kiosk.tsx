@@ -192,10 +192,14 @@ export function CheckinKiosk({ bays }: { bays: Bay[] }) {
       )}
 
       {!manual && (
-        <button onClick={() => setManual(true)}
-          className="fixed bottom-5 right-6 text-sm text-(--color-dim) underline underline-offset-4">
-          QRが読めないとき
-        </button>
+        <>
+          <button onClick={() => setManual(true)}
+            className="fixed bottom-5 right-6 text-sm text-(--color-dim) underline underline-offset-4">
+            QRが読めないとき
+          </button>
+          {/* 設置時と設定確認のための出口。お客様側を向いている画面なので目立たせない */}
+          <a href="/orders" className="fixed bottom-5 left-6 text-xs text-(--color-dim)/50">受付へ戻る</a>
+        </>
       )}
     </div>
   );

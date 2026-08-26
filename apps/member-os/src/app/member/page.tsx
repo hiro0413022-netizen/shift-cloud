@@ -8,6 +8,7 @@ import { ensureCheckinToken, currentVisit } from "@/lib/frank-portal";
 import { memberLogout, cancelMyBooking } from "./actions";
 import { frankSiteUrl } from "@/lib/frank-site-link";
 import { VisitPanel } from "./visit-panel";
+import { AddToHome } from "./add-to-home";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -111,6 +112,8 @@ export default async function MemberHomePage({
       {notice && <p className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">{notice.text}</p>}
       {sp.ordered && <p className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">{sp.ordered}</p>}
       {sp.err && <p className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-600">{sp.err}</p>}
+
+      {!member.isProvisional && <AddToHome />}
 
       {/* ① 会員証QR ⇄ 来店中モード（かざした瞬間に切り替わる） */}
       {!member.isProvisional && <VisitPanel initial={visit} qrDataUrl={qrDataUrl} token={token} />}
