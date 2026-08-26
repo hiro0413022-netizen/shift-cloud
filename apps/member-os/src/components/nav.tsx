@@ -16,6 +16,7 @@ const LINKS: Array<{ href: string; label: string; scope: "all" | "frank" | "gw" 
   { href: "/trials", label: "体験申込", scope: "frank" },
   { href: "/reservations", label: "予約（姫路）", scope: "frank" },
   { href: "/frunk", label: "FRANK会員", scope: "frank" },
+  { href: "/orders", label: "電子伝票", scope: "frank" },
   { href: "/import", label: "データ取込", scope: "gw" },
 ];
 

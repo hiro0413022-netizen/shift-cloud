@@ -7,6 +7,26 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-154. **FRANK 会員ポータル #154 の稼働に必要な作業（9/2まで）** — 正典 `docs/modules/frank/MEMBER_PORTAL_構想.md`
+   1. ~~Supabase で migration 0123 を流す~~ **✅ 適用済み（2026-08-26・MCP／メニュー24品も投入済み）**
+   2. **`.\deploy-frank-portal-154.ps1` を実行**（このPCで。`npm install` → commit → push）。
+   3. **`my.frankgolf.jp` のDNS設定** — Vercel `member-os` に独自ドメインを追加し、お名前.comで CNAME を向ける。
+      これが済むまでは既存の member-os のURLで動きます（機能に影響はありません）。
+   4. **公式LINEのURLを env に入れる** — Vercel `member-os` → `NEXT_PUBLIC_FRANK_LINE_URL` = 公式LINEの友だち追加URL。
+      未設定ならポータルにLINEボタンが出ないだけです。
+   5. **⚠ 利用規約・入会フォームに「登録カードからの自動決済」の同意条項を追加**（文案はこちらで用意します）。
+      モバイルオーダーは注文した瞬間に登録カードへ課金するので、同意が要ります。**既存会員への周知も必要**。
+   6. **Tera 9200 が届いたら**: 受付PCにUSBで挿す → 付属の設定バーコードで **末尾Enter（Suffix=CR）** を入れる →
+      `/checkin` を開いてスタッフでログイン → 会員のQRをかざして名前が出るか確認。
+      あわせて説明書に「USB COMポート／仮想シリアル／RS232」の設定バーコードがあるか見てください（将来の切替用・今は不要）。
+   7. **打席QRステッカーを作って貼る** — 各打席に `https://my.frankgolf.jp/bay/<打席コード>` のQRを1枚。
+      稼働中の打席コードは **`bay-a`（A打席）/ `bay-b`（B打席・左右打席）/ `bay-c`（C打席）** の3つ（`bay-d` は未設営でclose）。
+   8. **実カード1件でテスト**（月会費の本番切替テストと兼ねられます）: テスト会員でポータルから1品注文 → Square に決済が立つか →
+      Money OS に **category='店内飲食'** で載るか → `/orders` に「決済済」で並ぶか。
+   9. **モバイルオーダーの公開はオペが落ち着いてから**（構想 §7）。まずチェックインと電子伝票だけで数日回してください。
+   10. PayPay 申請（ユーザー）＋ 電子マネー/QR の残り申請、レジ未登録商品（ビジター/体験/レッスン単発/物販）の追加。
+
+
 A-001. **Caddy OS 外部連携API のトークン設定**（3分・APIを使うときだけ必要 / DECISIONS #140）
    Vercel → プロジェクト `caddy-os` → Settings → Environment Variables に追加:
    `CADDY_API_TOKEN` = ランダムな長い文字列（生成例: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`）

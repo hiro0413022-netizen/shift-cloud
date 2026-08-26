@@ -101,3 +101,40 @@ export async function chargeCardOnFile(input: {
     return { ok: false, error: String(e) };
   }
 }
+
+/**
+ * モバイルオーダーの即時決済（#154）。
+ *
+ * chargeCardOnFile との違いは2つだけ:
+ *   - **idempotency_key に注文IDを使う**。randomUUID だとリトライで二重課金になる。
+ *     同じ注文は何度呼んでも Square 側で1回しか通らない。
+ *   - payment.id を返す（frunk_orders.square_payment_id に入れて Webhook と突き合わせる）。
+ *
+ * 失敗しても throw しない。呼び出し側は「未決済のまま伝票に出す」で処理を続ける
+ * ＝お客様の前で注文を失敗させない（構想 §2-4）。
+ */
+export async function chargeOrderOnFile(input: {
+  customerId: string;
+  amountTaxIncluded: number;
+  note: string;
+  idempotencyKey: string;
+}): Promise<SquareOpResult & { paymentId?: string }> {
+  if (!token()) return { ok: false, skipped: true, error: "no_token" };
+  try {
+    const cards = await sq("GET", `/cards?customer_id=${encodeURIComponent(input.customerId)}`);
+    const card = ((cards.cards as Array<{ id?: string; enabled?: boolean }> | undefined) ?? []).find((c) => c.enabled !== false);
+    if (!card?.id) return { ok: false, error: "no_card" };
+    const res = await sq("POST", "/payments", {
+      idempotency_key: `frank-order-${input.idempotencyKey}`,
+      source_id: card.id,
+      customer_id: input.customerId,
+      amount_money: { amount: input.amountTaxIncluded, currency: "JPY" },
+      note: input.note,
+    });
+    const payment = (res.payment as { id?: string } | undefined) ?? undefined;
+    return { ok: true, paymentId: payment?.id };
+  } catch (e) {
+    console.error("[frank-square] order charge failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}

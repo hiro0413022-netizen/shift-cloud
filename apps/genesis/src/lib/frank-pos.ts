@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
+import { parseOrderNote } from "@yozan/core/frank-portal";
 import { logEvent } from "@/lib/kernel";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import {
@@ -466,6 +467,58 @@ async function tryRecordMonthlyFee(
 }
 
 /** 入会金の自動課金（noteの接頭辞で判定）を category=入会金 で記録する。対象外は false */
+/**
+ * モバイルオーダー／打席QR注文（#154）。
+ *
+ * ポータルから注文したときに Payments API で立てた決済がここに戻ってくる。
+ * note が "FRANKオーダー#0826-014" の形なら、その伝票を引いて
+ * **category='店内飲食' と品目の内訳つき**で記帳する。
+ * これが無いと全部 category='利用料' に丸められて、ドリンクの売上が分からなくなる。
+ */
+async function tryRecordMobileOrder(
+  admin: Admin,
+  ctx: { storeId: string; companyId: string; segmentId: string | null },
+  raw: SquarePayment,
+  mapped: { sold_on: string; tax_included: number; square_payment_id: string },
+): Promise<boolean> {
+  const no = parseOrderNote(raw.note);
+  if (!no) return false;
+
+  const { data: order } = await admin
+    .from("frunk_orders")
+    .select("id, order_no, member_id, guest_label, frunk_members(member_no, name), frunk_order_items(name, qty, amount)")
+    .eq("company_id", ctx.companyId)
+    .eq("order_no", no)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  const o = (order ?? null) as Record<string, unknown> | null;
+  const mem = (o?.frunk_members as { member_no?: string; name?: string } | null) ?? null;
+  const items = ((o?.frunk_order_items ?? []) as Array<{ name?: string; qty?: number; amount?: number }>);
+  const memo = items.length
+    ? items.map((i) => `${i.name} x${i.qty}`).join("・").slice(0, 200)
+    : `モバイルオーダー ${no}`;
+
+  await insertSale(admin, ctx, {
+    sold_on: mapped.sold_on,
+    category: "店内飲食",
+    amount: exTax(mapped.tax_included),
+    tax_included: mapped.tax_included,
+    pay_method: "カード",
+    memo,
+    customer_name: mem?.name ?? (typeof o?.guest_label === "string" ? o.guest_label : undefined),
+    member_kind: mem ? "会員" : "ビジター",
+    detail: {
+      square_payment_id: mapped.square_payment_id,
+      frank_order_no: no,
+      ...(o?.id ? { frank_order_id: String(o.id) } : {}),
+      ...(o?.member_id ? { frunk_member_id: String(o.member_id) } : {}),
+      items: items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
+    },
+  });
+  return true;
+}
+
 async function tryRecordJoiningFee(
   admin: Admin,
   ctx: { storeId: string; companyId: string; segmentId: string | null },
@@ -576,6 +629,11 @@ export async function handleSquareEvent(payload: string): Promise<void> {
     const mapped = mapSquarePayment(raw);
     if (!mapped) return;
     if (await alreadyRecorded(admin, "square_payment_id", mapped.square_payment_id)) return;
+    // モバイルオーダー（note接頭辞）→ category=店内飲食・品目の内訳つき
+    if (await tryRecordMobileOrder(admin, ctx, raw, mapped)) {
+      await admin.rpc("refresh_money_to_finance", { p_company_id: ctx.companyId });
+      return;
+    }
     // 入会金の自動課金（note接頭辞）→ category=入会金
     if (await tryRecordJoiningFee(admin, ctx, raw, mapped)) {
       await admin.rpc("refresh_money_to_finance", { p_company_id: ctx.companyId });
