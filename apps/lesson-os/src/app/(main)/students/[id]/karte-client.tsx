@@ -101,7 +101,14 @@ export function KarteClient({
   const registerBlob = async (
     blob: Blob,
     meta: RecordMeta,
-    opts: { fileName?: string; phases?: Phases | null; duration?: number; source: "recorder" | "upload" }
+    opts: {
+      fileName?: string;
+      phases?: Phases | null;
+      duration?: number;
+      source: "recorder" | "upload";
+      /** 撮影モジュールで切り出し済みのサムネ。あれば作り直さない */
+      poster?: Blob | null;
+    }
   ): Promise<string | null> => {
     const name = opts.fileName ?? `swing_${Date.now()}.mp4`;
     setProgressText("準備中…");
@@ -109,14 +116,17 @@ export function KarteClient({
     if (!r.url || !r.path) return r.error ?? "URL発行に失敗しました";
 
     setProgressText(`アップロード中…（${(blob.size / 1024 / 1024).toFixed(1)}MB）`);
-    const res = await fetch(r.url, { method: "PUT", headers: { "Content-Type": blob.type || "video/mp4" }, body: blob });
+    // codecs 付きの Content-Type（video/mp4;codecs=avc1...）で保存すると
+    // iOS Safari が署名URLからの再生に失敗するため、素の type に落とす（2026-08-26）
+    const ctype = (blob.type || "video/mp4").split(";")[0].trim() || "video/mp4";
+    const res = await fetch(r.url, { method: "PUT", headers: { "Content-Type": ctype }, body: blob });
     if (!res.ok) return `アップロードに失敗しました（${res.status}）`;
 
     // サムネイル（任意）
     let posterPath: string | null = null;
     try {
       setProgressText("サムネイルを作成中…");
-      const poster = await capturePoster(blob);
+      const poster = opts.poster ?? (await capturePoster(blob));
       if (poster) {
         const pu = await createPosterUploadUrl(student.id, poster.size);
         if (pu.url && pu.path) {
@@ -154,6 +164,7 @@ export function KarteClient({
         phases: c.phases,
         duration: c.duration,
         source: "recorder",
+        poster: c.poster,
       });
       setMsg(err ?? "スイングを登録しました");
       return err;

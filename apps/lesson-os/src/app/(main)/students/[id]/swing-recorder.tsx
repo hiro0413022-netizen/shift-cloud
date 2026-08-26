@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { estimatePhases, type Phases } from "@/lib/phases";
+import { capturePoster } from "@/lib/poster";
 import { CLUBS } from "@/lib/lesson";
 
 /**
@@ -19,6 +20,20 @@ import { CLUBS } from "@/lib/lesson";
  * 2026-08-22: 撮ったあとの「クラブ・飛距離・メモ → 登録」までこの画面で完結させた。
  * それまでは【この動画を使う】で閉じたあと、カルテを下までスクロールして【⬆登録】を
  * 押す必要があり、打った直後の現場では確実に忘れる導線だった。
+ *
+ * 2026-08-26（現場フィードバック2件）:
+ *  (1) カウントダウンを 0秒／3秒 で選べるようにした。既定は 0秒＝押した瞬間に録画開始。
+ *      理由: 一人で撮るとき以外は3秒待つぶんだけ無駄玉になる。選択は端末に記憶する。
+ *  (2) 撮った直後のプレビューが iPhone/iPad で再生も表示もされない問題を直した。
+ *      原因: Blob の type に codecs パラメータ（video/mp4;codecs=avc1...）が入ったままだと
+ *            iOS Safari が blob: URL のメディアを読み込めない。ここで必ず `video/mp4` /
+ *            `video/webm` の素の type に正規化する。
+ *            ※ この type はそのまま Storage の Content-Type にも渡るので、
+ *              一覧からの再生（署名URL）にも効く。codecs 付きに戻さないこと。
+ *      あわせて、それでも再生できない端末のために
+ *        枠を固定高さにする（メタデータ未取得で高さ0に潰れるのを防ぐ）
+ *        → 失敗したら data: URL で再試行 → それでもだめなら1コマ目の静止画を出す
+ *      の三段構えにして、「何も映らないまま登録することになる」状態を無くした。
  */
 
 const MIMES = [
@@ -29,7 +44,30 @@ const MIMES = [
   "video/webm",
 ];
 
-export type Captured = { blob: Blob; url: string; ext: string; phases: Phases | null; duration: number };
+/** iOS Safari は codecs 付きの type を持つ blob: を再生できない。素の type に落とす */
+const baseMime = (m: string) => (m.split(";")[0] || "video/webm").trim();
+
+/** data: URL 再試行の上限（端末メモリを踏み抜かないため） */
+const DATAURL_MAX = 12 * 1024 * 1024;
+
+const CD_KEY = "lsn.rec.countdown";
+const LIMIT_KEY = "lsn.rec.limit";
+
+const readNum = (key: string, allow: number[], fallback: number) => {
+  if (typeof window === "undefined") return fallback;
+  const v = Number(window.localStorage.getItem(key));
+  return allow.includes(v) ? v : fallback;
+};
+
+export type Captured = {
+  blob: Blob;
+  url: string;
+  ext: string;
+  phases: Phases | null;
+  duration: number;
+  /** 撮影直後に切り出した1コマ目。登録時のサムネにそのまま使う（取れなければ null） */
+  poster: Blob | null;
+};
 
 export type RecordMeta = { club: string; distanceYd: string; note: string; shotAt: string };
 
@@ -44,13 +82,15 @@ export function SwingRecorder({
   onClose: () => void;
 }) {
   const camRef = useRef<HTMLVideoElement>(null);
+  const playRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<BlobPart[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const [facing, setFacing] = useState<"environment" | "user">("environment");
-  const [limit, setLimit] = useState(8);
+  const [limit, setLimit] = useState(() => readNum(LIMIT_KEY, [5, 8, 12], 8));
+  const [countdown, setCountdown] = useState(() => readNum(CD_KEY, [0, 3], 0));
   const [count, setCount] = useState<number | null>(null);
   const [rec, setRec] = useState(false);
   const [left, setLeft] = useState(0);
@@ -63,6 +103,13 @@ export function SwingRecorder({
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
   const [saveErr, setSaveErr] = useState<string | null>(null);
+
+  /* プレビュー再生まわり: playUrl は blob: → data: と切り替わることがある */
+  const [playUrl, setPlayUrl] = useState<string | null>(null);
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [playStage, setPlayStage] = useState<0 | 1 | 2>(0); // 0=blob 1=data 2=あきらめ（静止画）
+  const [playOk, setPlayOk] = useState(false);
+
   const supported =
     typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
@@ -98,37 +145,51 @@ export function SwingRecorder({
     return stopStream;
   }, [supported, preview, start, stopStream]);
 
+  const pick = (key: string, set: (n: number) => void) => (n: number) => {
+    set(n);
+    try { window.localStorage.setItem(key, String(n)); } catch { /* プライベートモード等 */ }
+  };
+
   const record = () => {
     const s = streamRef.current;
     if (!s) return;
     const mime = MIMES.find((m) => MediaRecorder.isTypeSupported(m)) ?? "";
-    const ext = mime.includes("mp4") ? "mp4" : "webm";
+    const type = baseMime(mime || "video/webm");
+    const ext = type.includes("mp4") ? "mp4" : "webm";
     chunks.current = [];
     const mr = new MediaRecorder(s, mime ? { mimeType: mime, videoBitsPerSecond: 6_000_000 } : undefined);
     recRef.current = mr;
     mr.ondataavailable = (e) => e.data.size && chunks.current.push(e.data);
     mr.onstop = async () => {
       setRec(false);
-      const blob = new Blob(chunks.current, { type: mime || "video/webm" });
+      const blob = new Blob(chunks.current, { type }); // ← codecs は付けない（iOS対策）
       setBusy("フェーズを自動推定中…");
       const phases = await estimatePhases(blob, limit);
+      setBusy("サムネイルを作成中…");
+      const poster = await capturePoster(blob).catch(() => null);
       setBusy(null);
-      setPreview({ blob, url: URL.createObjectURL(blob), ext, phases, duration: limit });
+      setPlayStage(0);
+      setPlayOk(false);
+      setPlayUrl(URL.createObjectURL(blob));
+      setPosterUrl(poster ? URL.createObjectURL(poster) : null);
+      setPreview({ blob, url: URL.createObjectURL(blob), ext, phases, duration: limit, poster });
       stopStream();
     };
 
-    setCount(3);
-    [1, 2].forEach((i) => timers.current.push(setTimeout(() => setCount(3 - i), i * 1000)));
-    timers.current.push(
-      setTimeout(() => {
-        setCount(null);
-        setRec(true);
-        setLeft(limit);
-        mr.start();
-        for (let i = 1; i <= limit; i++) timers.current.push(setTimeout(() => setLeft(limit - i), i * 1000));
-        timers.current.push(setTimeout(() => mr.state !== "inactive" && mr.stop(), limit * 1000));
-      }, 3000)
-    );
+    const begin = () => {
+      setCount(null);
+      setRec(true);
+      setLeft(limit);
+      mr.start();
+      for (let i = 1; i <= limit; i++) timers.current.push(setTimeout(() => setLeft(limit - i), i * 1000));
+      timers.current.push(setTimeout(() => mr.state !== "inactive" && mr.stop(), limit * 1000));
+    };
+
+    if (countdown <= 0) { begin(); return; } // 0秒＝押した瞬間に録画開始
+
+    setCount(countdown);
+    for (let i = 1; i < countdown; i++) timers.current.push(setTimeout(() => setCount(countdown - i), i * 1000));
+    timers.current.push(setTimeout(begin, countdown * 1000));
   };
 
   const stopNow = () => {
@@ -139,9 +200,55 @@ export function SwingRecorder({
     else setRec(false);
   };
 
+  /* --- プレビューが再生できないときの段階的フォールバック --- */
+
+  const toDataUrl = useCallback((blob: Blob) => {
+    if (blob.size > DATAURL_MAX) { setPlayStage(2); return; }
+    const fr = new FileReader();
+    fr.onload = () => { setPlayUrl(String(fr.result)); setPlayStage(1); };
+    fr.onerror = () => setPlayStage(2);
+    fr.readAsDataURL(blob);
+  }, []);
+
+  const playFailed = useCallback(() => {
+    if (playOk) return;
+    if (playStage === 0 && preview) toDataUrl(preview.blob);
+    else setPlayStage(2);
+  }, [playOk, playStage, preview, toDataUrl]);
+
+  // 読み込みが始まらないまま黙って固まる端末があるので見張る（onerrorが飛ばないケース）
+  useEffect(() => {
+    if (!preview || playOk || playStage === 2) return;
+    const t = setTimeout(() => {
+      if ((playRef.current?.readyState ?? 0) < 2) playFailed();
+    }, 3500);
+    return () => clearTimeout(t);
+  }, [preview, playOk, playStage, playFailed]);
+
+  const onMeta = () => {
+    const v = playRef.current;
+    if (!v) return;
+    setPlayOk(true);
+    // MediaRecorder の webm は duration が Infinity になることがある（シークバーが効かない）
+    if (!isFinite(v.duration)) {
+      const back = () => { v.removeEventListener("seeked", back); v.currentTime = 0; };
+      v.addEventListener("seeked", back);
+      v.currentTime = 1e6;
+    }
+    void v.play().catch(() => {});
+  };
+
+  const revoke = (c: Captured) => {
+    URL.revokeObjectURL(c.url);
+    if (playUrl?.startsWith("blob:")) URL.revokeObjectURL(playUrl);
+    if (posterUrl) URL.revokeObjectURL(posterUrl);
+  };
+
   const retake = () => {
-    if (preview) URL.revokeObjectURL(preview.url);
+    if (preview) revoke(preview);
     setPreview(null);
+    setPlayUrl(null);
+    setPosterUrl(null);
     setSaveErr(null);
   };
 
@@ -152,7 +259,7 @@ export function SwingRecorder({
     const err = await onRegister(preview, { club, distanceYd: dist, note, shotAt: jstToday() });
     setSaving(null);
     if (err) { setSaveErr(err); return; }
-    URL.revokeObjectURL(preview.url);
+    revoke(preview);
     onClose();
   };
 
@@ -172,7 +279,44 @@ export function SwingRecorder({
         /* ---- 撮り終わり: ここで登録まで終わらせる ---- */
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4">
           <div className="mx-auto w-full max-w-[440px]">
-            <video src={preview.url} controls playsInline autoPlay loop muted className="max-h-[45vh] w-full rounded-lg bg-black" />
+            {/* 高さを固定する: メタデータ未取得のときに高さ0へ潰れて「何も出ない」のを防ぐ */}
+            <div className="relative mx-auto h-[42vh] w-full overflow-hidden rounded-lg bg-black">
+              {playStage !== 2 && playUrl && (
+                <video
+                  ref={playRef}
+                  key={playUrl}
+                  src={playUrl}
+                  poster={posterUrl ?? undefined}
+                  controls
+                  playsInline
+                  autoPlay
+                  loop
+                  muted
+                  preload="auto"
+                  onLoadedMetadata={onMeta}
+                  onError={playFailed}
+                  className="h-full w-full object-contain"
+                />
+              )}
+              {playStage === 2 && (
+                posterUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={posterUrl} alt="撮影した1コマ目" className="h-full w-full object-contain" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center px-6 text-center text-xs text-(--color-dim)">
+                    プレビューを表示できませんでした
+                  </div>
+                )
+              )}
+            </div>
+
+            {playStage === 2 && (
+              <p className="mt-2 rounded-lg border border-(--color-line) bg-(--color-panel) p-2 text-[11px] text-(--color-dim)">
+                この端末では撮影直後のその場再生に対応していないため、1コマ目だけ表示しています。
+                <b className="text-(--color-txt)">登録すればカルテの一覧から通常どおり再生できます。</b>
+              </p>
+            )}
+
             <p className="mt-2 text-xs text-(--color-dim)">
               {preview.phases?._method === "audio"
                 ? "✅ 打球音からインパクトを検出し、アドレス〜フィニッシュを自動マークしました"
@@ -275,21 +419,33 @@ export function SwingRecorder({
 
           {err && <p className="mt-2 text-xs text-(--color-danger)">{err}</p>}
 
-          {/* 秒数（シャッターとは別・下段） */}
+          {/* 秒数・カウントダウン（シャッターとは別・下段） */}
           <div className="mt-2 flex w-full max-w-[440px] shrink-0 flex-wrap items-center justify-center gap-1.5 text-xs">
             {[5, 8, 12].map((s) => (
               <button
                 key={s}
-                onClick={() => setLimit(s)}
+                onClick={() => pick(LIMIT_KEY, setLimit)(s)}
                 disabled={rec || count !== null}
                 className={`rounded-lg border px-2.5 py-1.5 ${limit === s ? "border-(--color-gold) text-(--color-gold)" : "border-(--color-line) text-(--color-dim)"}`}
               >
                 {s}秒
               </button>
             ))}
+            <span className="mx-1 text-(--color-line)">|</span>
+            <span className="text-(--color-dim)">カウント</span>
+            {[0, 3].map((c) => (
+              <button
+                key={c}
+                onClick={() => pick(CD_KEY, setCountdown)(c)}
+                disabled={rec || count !== null}
+                className={`rounded-lg border px-2.5 py-1.5 ${countdown === c ? "border-(--color-gold) text-(--color-gold)" : "border-(--color-line) text-(--color-dim)"}`}
+              >
+                {c === 0 ? "なし" : "3秒"}
+              </button>
+            ))}
           </div>
           <p className="mt-1.5 shrink-0 text-center text-[11px] text-(--color-dim)">
-            3秒カウントダウン後に自動で録画開始・{limit}秒で自動停止 ／ マイクを塞がないでください（打球音でインパクトを検出）
+            {countdown > 0 ? `${countdown}秒カウントダウン後に録画開始` : "押した瞬間に録画開始"}・{limit}秒で自動停止 ／ マイクを塞がないでください（打球音でインパクトを検出）
           </p>
         </div>
       )}
