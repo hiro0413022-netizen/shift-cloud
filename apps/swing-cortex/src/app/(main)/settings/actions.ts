@@ -103,11 +103,16 @@ export async function importExcel(_prev: ImportResult | null, formData: FormData
 
   const skipped = commentRows.filter((c) => isNoise(c.body)).length;
 
-  // 500件ずつinsert
-  for (let i = 0; i < commentRows.length; i += 500) {
-    const chunk = commentRows.slice(i, i + 500);
-    const { error } = await admin.from("sc_comments").insert(chunk);
-    if (error) return { ok: false, message: "コメント保存でエラー: " + error.message };
+  // 1,000件ずつ・4並列でinsert（3万件規模の取込が60秒に収まるように。逐次だと間に合わない）
+  const CHUNK = 1000;
+  const CONCURRENCY = 4;
+  const chunks: (typeof commentRows)[] = [];
+  for (let i = 0; i < commentRows.length; i += CHUNK) chunks.push(commentRows.slice(i, i + CHUNK));
+  for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+    const wave = chunks.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(wave.map((c) => admin.from("sc_comments").insert(c)));
+    const failed = results.find((r) => r.error);
+    if (failed?.error) return { ok: false, message: "コメント保存でエラー: " + failed.error.message };
   }
 
   // 局面×症状の頻度を集計 → 既存に加算してupsert
