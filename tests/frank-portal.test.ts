@@ -18,6 +18,9 @@ import {
   CHECKIN_TOKEN_LENGTH,
   orderNo,
   buildOrderLines,
+  taxOf,
+  withTax,
+  FRANK_TAX_RATE,
   orderNote,
   parseOrderNote,
   greetingLines,
@@ -90,11 +93,57 @@ const coffee: MenuItem = { id: "m1", name: "コーヒー", category: "DRINK", pr
 const redbull: MenuItem = { id: "m2", name: "レッドブル", category: "DRINK", price_general: 500, price_member: 450 };
 const soldout: MenuItem = { ...coffee, id: "m3", name: "炭酸水", sold_out: true };
 
-test("会員価格と一般価格が切り替わる", () => {
+test("会員価格と一般価格が切り替わる（小計は税抜）", () => {
   const m = buildOrderLines([{ item: coffee, qty: 2 }], "member");
-  assert.equal(m.total, 600);
+  assert.equal(m.subtotal, 600);
   const g = buildOrderLines([{ item: coffee, qty: 2 }], "general");
-  assert.equal(g.total, 800);
+  assert.equal(g.subtotal, 800);
+});
+
+// --- 消費税（#166: 内税 → 外税） ---------------------------------
+// メニューの価格は税抜の本体価格。請求するのは税込の total。
+// ここが逆になると、お客様への請求額がそのままずれる。
+test("300円のコーヒー1杯は 300 + 消費税30 = 330円を請求する", () => {
+  const r = buildOrderLines([{ item: coffee, qty: 1 }], "member");
+  assert.equal(r.subtotal, 300);
+  assert.equal(r.tax, 30);
+  assert.equal(r.total, 330);
+  assert.equal(r.taxRate, FRANK_TAX_RATE);
+  assert.equal(r.lines[0].unit_price, 300, "明細の単価は税抜のまま残す");
+});
+
+test("消費税は明細ごとではなく税抜合計に1回だけかける", () => {
+  // 1個ずつ2回 と 2個まとめて で総額が変わってはいけない
+  const once = buildOrderLines([{ item: coffee, qty: 2 }], "member").total;
+  const twice = buildOrderLines([{ item: coffee, qty: 1 }], "member").total * 2;
+  assert.equal(once, 660);
+  assert.equal(twice, 660);
+});
+
+test("店内飲食なので税率は10%（軽減税率8%は持ち帰りの扱い）", () => {
+  assert.equal(FRANK_TAX_RATE, 10);
+});
+
+test("端数は切り捨て、税率は差し替えられる（将来の税率改定に耐える）", () => {
+  assert.equal(taxOf(333), 33);      // 33.3 → 33
+  assert.equal(taxOf(1), 0);         // 0.1 → 0
+  assert.equal(withTax(333), 366);
+  assert.equal(taxOf(1000, 8), 80);
+  assert.equal(withTax(1000, 8), 1080);
+});
+
+test("0円・不正値に税はかからない（0で割る/NaNを請求しない）", () => {
+  assert.equal(taxOf(0), 0);
+  assert.equal(taxOf(-100), 0);
+  assert.equal(taxOf(Number.NaN), 0);
+  assert.equal(withTax(0), 0);
+});
+
+test("何も選ばれていない注文は 0円のまま（空の注文に税だけ立てない）", () => {
+  const r = buildOrderLines([], "member");
+  assert.equal(r.subtotal, 0);
+  assert.equal(r.tax, 0);
+  assert.equal(r.total, 0);
 });
 
 test("明細には注文時点の品名と単価が入る（あとでメニューを直しても伝票は変わらない）", () => {
@@ -110,7 +159,7 @@ test("売り切れと 0以下の数量は落とす", () => {
     "member",
   );
   assert.equal(lines.length, 1);
-  assert.equal(total, 300);
+  assert.equal(total, 330, "税込で返る（税抜300 + 消費税30）");
 });
 
 // --- 声かけカード -----------------------------------------------
@@ -242,4 +291,16 @@ test("hhmmToMin は形の違うものを null にする（壊れた値で誤判�
   for (const bad of ["", "abc", "1400", null, undefined]) {
     assert.equal(hhmmToMin(bad as string | null), null, `${bad} は null`);
   }
+});
+
+// --- 実際の売価（#167・ユーザー確定） ---------------------------
+// 決めたのは「お客様が払う額」のほう:
+//   ソフトドリンク 会員330 / ビジター660、ノンアルコール 会員440 / ビジター880。
+// DBには本体価格（税抜）を入れているので、丸めが変わるとこの額がずれる。
+// ここが落ちたら、メニューの本体価格を入れ直す必要がある（migration 0128）。
+test("決めた売価どおりの税込額になる（本体価格の割り付けが正しい）", () => {
+  assert.equal(withTax(300), 330, "ソフトドリンク 会員");
+  assert.equal(withTax(600), 660, "ソフトドリンク ビジター");
+  assert.equal(withTax(400), 440, "ノンアルコール 会員");
+  assert.equal(withTax(800), 880, "ノンアルコール ビジター");
 });

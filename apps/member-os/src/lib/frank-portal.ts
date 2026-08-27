@@ -392,7 +392,8 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   const today = jstYmd();
   const kind: PriceKind = input.member ? "member" : "general";
 
-  const { lines, total } = buildOrderLines(input.lines, kind);
+  // 明細は税抜、請求は税込（#166）。total を Square に渡すこと。
+  const { lines, subtotal, tax, taxRate, total } = buildOrderLines(input.lines, kind);
   if (lines.length === 0) return { ok: false, message: "商品が選ばれていません" };
 
   // 当日連番（衝突したら採り直す）
@@ -412,6 +413,9 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
       checkin_id: input.checkinId,
       guest_label: input.guestLabel,
       ordered_on: today,
+      subtotal,
+      tax_rate: taxRate,
+      tax_amount: tax,
       amount: total,
       source: input.source,
     }).select("id").maybeSingle();

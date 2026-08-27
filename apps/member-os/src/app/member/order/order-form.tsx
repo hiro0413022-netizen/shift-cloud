@@ -3,11 +3,16 @@
 import { useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 import type { MenuItem } from "@yozan/core/frank-portal";
+import { taxOf, withTax } from "@yozan/core/frank-tax";
 
 /**
  * モバイルオーダーのメニュー（#154）。
  * 迷わせないことを優先: カテゴリごとに並べ、±ボタンだけで数量を決める。
  * 合計は下に固定表示し、押す前に金額が見えている状態にする（決済が即時に走るため）。
+ *
+ * 金額表示は **税込を主**にする（#166）。
+ * メニューの price_* は税抜の本体価格だが、お客様に見せる値段は総額でなければならない
+ * （総額表示義務・消費税法63条）。税抜だけを大きく出す表示に戻さないこと。
  */
 export function OrderForm({
   menu, priceKind, bayCode, bayName, action,
@@ -19,7 +24,10 @@ export function OrderForm({
   action: (formData: FormData) => void;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
-  const price = (m: MenuItem) => (priceKind === "member" ? m.price_member : m.price_general);
+  /** 税抜の本体価格（DBの値） */
+  const net = (m: MenuItem) => (priceKind === "member" ? m.price_member : m.price_general);
+  /** お客様に見せる値段＝税込 */
+  const price = (m: MenuItem) => withTax(net(m));
 
   const groups = useMemo(() => {
     const g = new Map<string, MenuItem[]>();
@@ -30,7 +38,10 @@ export function OrderForm({
     return [...g.entries()];
   }, [menu]);
 
-  const total = menu.reduce((t, m) => t + price(m) * (qty[m.id] ?? 0), 0);
+  // 税は品目ごとではなく税抜合計に1回だけかける（サーバー側 buildOrderLines と同じ計算）
+  const subtotal = menu.reduce((t, m) => t + net(m) * (qty[m.id] ?? 0), 0);
+  const tax = taxOf(subtotal);
+  const total = subtotal + tax;
   const count = Object.values(qty).reduce((a, b) => a + b, 0);
   const bump = (id: string, d: number) =>
     setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(20, (q[id] ?? 0) + d)) }));
@@ -59,7 +70,8 @@ export function OrderForm({
                     <p className="truncate text-sm font-medium">{m.name}</p>
                     <p className="text-xs text-(--color-dim)">
                       ¥{price(m).toLocaleString("ja-JP")}
-                      {m.sold_out ? " ・ 売り切れ" : priceKind === "member" ? " (会員価格)" : ""}
+                      <span className="opacity-70">（税込）</span>
+                      {m.sold_out ? " ・ 売り切れ" : priceKind === "member" ? " ・会員価格" : ""}
                     </p>
                   </div>
                   {!m.sold_out && (
@@ -82,7 +94,14 @@ export function OrderForm({
         <div className="mx-auto max-w-md">
           <div className="mb-2 flex items-baseline justify-between text-sm">
             <span className="text-(--color-dim)">{bayName ? `${bayName}へお届け` : "お届け先はスタッフが確認します"}</span>
-            <span className="text-lg font-bold tabular-nums">¥{total.toLocaleString("ja-JP")}</span>
+            <span className="text-right">
+              <span className="text-lg font-bold tabular-nums">¥{total.toLocaleString("ja-JP")}</span>
+              {subtotal > 0 && (
+                <span className="ml-1.5 text-[11px] text-(--color-dim) tabular-nums">
+                  （税抜 ¥{subtotal.toLocaleString("ja-JP")} ＋ 消費税 ¥{tax.toLocaleString("ja-JP")}）
+                </span>
+              )}
+            </span>
           </div>
           <SubmitButton count={count} />
           <p className="mt-1.5 text-center text-[11px] text-(--color-dim)">

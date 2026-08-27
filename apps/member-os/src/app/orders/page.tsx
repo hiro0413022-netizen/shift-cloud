@@ -37,7 +37,7 @@ export default async function OrdersPage() {
   const [{ data: bayRows }, { data: orderRows }, { data: checkinRows }] = await Promise.all([
     admin.from("frunk_bays").select("id, name").eq("active", true).is("deleted_at", null).order("sort", { ascending: true }),
     admin.from("frunk_orders")
-      .select("id, order_no, bay_id, member_id, guest_label, status, payment_status, amount, ordered_at, payment_error, source, frunk_members(member_no, name), frunk_order_items(id, name, qty, unit_price, amount)")
+      .select("id, order_no, bay_id, member_id, guest_label, status, payment_status, amount, subtotal, tax_amount, ordered_at, payment_error, source, frunk_members(member_no, name), frunk_order_items(id, name, qty, unit_price, amount)")
       .eq("ordered_on", today).neq("status", "cancelled").is("deleted_at", null)
       .order("ordered_at", { ascending: true }),
     admin.from("frunk_checkins")
@@ -171,6 +171,7 @@ export default async function OrdersPage() {
                           {mem ? `${mem.name} 様` : (s(o.guest_label) || "ビジター")}
                           {s(o.source) === "staff" ? " ・ 口頭" : ""}
                         </p>
+                        {/* 明細は税抜（#166）。合計だけが税込＝お客様の請求額 */}
                         <ul className="my-1.5 space-y-0.5 text-sm">
                           {items.map((it) => (
                             <li key={s(it.id)} className="flex justify-between">
@@ -180,7 +181,14 @@ export default async function OrdersPage() {
                           ))}
                         </ul>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-bold tabular-nums">¥{n(o.amount).toLocaleString("ja-JP")}</span>
+                          <span className="text-sm font-bold tabular-nums">
+                            ¥{n(o.amount).toLocaleString("ja-JP")}
+                            {n(o.tax_amount) > 0 && (
+                              <span className="ml-1 text-[11px] font-normal text-(--color-dim)">
+                                （内税 ¥{n(o.tax_amount).toLocaleString("ja-JP")}）
+                              </span>
+                            )}
+                          </span>
                           <div className="flex gap-1.5">
                             {!served && (
                               <form action={markServed}>

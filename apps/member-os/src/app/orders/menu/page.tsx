@@ -4,6 +4,7 @@ import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { toggleSoldOut, toggleActive, updatePrice } from "./actions";
+import { withTax, FRANK_TAX_RATE } from "@yozan/core/frank-tax";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -14,6 +15,7 @@ const n = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
  * メニュー管理（#155）
  *
  * モバイルオーダーに出す品目・価格・売り切れをここで管理する。
+ * ⚠ ここで入力するのは **税抜の本体価格**（#166）。お客様の請求は税込。
  * ⚠ 価格は **Squareのカタログと同じ値に保つこと**。片方だけ直すと、
  *   店頭レジで打つ金額とスマホ注文の金額がズレる（Square側は scripts/frank-square-setup.mjs）。
  */
@@ -44,13 +46,15 @@ export default async function MenuPage() {
           <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF</p>
           <h1 className="text-2xl font-bold tracking-wide">メニュー管理</h1>
           <p className="text-xs text-(--color-dim)">
-            {items.length}品 ／ 売り切れ {soldOut}品 ・ 価格は税込
+            {items.length}品 ／ 売り切れ {soldOut}品 ・ <strong>価格は税抜（本体価格）</strong>で入力
           </p>
         </div>
         <Link href="/orders" className="text-sm text-(--color-dim) underline underline-offset-4">← 電子伝票</Link>
       </header>
 
       <p className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-900">
+        入力するのは <strong>税抜の本体価格</strong>です（#166）。お客様の画面には消費税{FRANK_TAX_RATE}%を足した
+        <strong>税込価格</strong>が出て、請求もその金額になります。各行の「税込 ¥…」が実際にお客様が払う金額です。<br />
         価格を変えたら <strong>Square のカタログも同じ値に直してください</strong>。
         片方だけだと、店頭レジで打つ金額とスマホ注文の金額がズレます。<br />
         価格の変更が影響するのは<strong>これから注文される分だけ</strong>です（過去の伝票は注文時点の金額のまま残ります）。
@@ -83,6 +87,9 @@ export default async function MenuPage() {
                     <input name="price_member" type="number" min={0} defaultValue={n(it.price_member)}
                       className="w-20 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm tabular-nums" />
                     <button className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-xs">保存</button>
+                    <span className="text-[11px] text-(--color-dim) tabular-nums">
+                      税込 ¥{withTax(n(it.price_general)).toLocaleString("ja-JP")} ／ ¥{withTax(n(it.price_member)).toLocaleString("ja-JP")}
+                    </span>
                   </form>
 
                   <form action={toggleSoldOut}>

@@ -6,6 +6,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { CHECKIN_TOKEN_ALPHABET, CHECKIN_TOKEN_LENGTH, CHECKIN_TOKEN_RE } from "./frank-token.ts";
+import { FRANK_TAX_RATE, taxOf } from "./frank-tax.ts";
 
 // ---------------------------------------------------------------
 // 会員証トークン
@@ -71,10 +72,21 @@ export type MenuItem = {
 };
 export type PriceKind = "general" | "member";
 
+/**
+ * メニューの価格は **税抜の本体価格**（#166）。
+ *
+ * それ以前は price_* を税込として扱ってそのまま課金していた。
+ * ユーザー指定で「300円＋消費税」に変更。DBの数値の意味が変わっているので、
+ * 価格を触るときは必ずこの前提を確認すること。
+ */
 /** 会員として注文しているかで単価が変わる。会員価格は「ログイン済みの会員」だけ。 */
 export function unitPriceOf(item: Pick<MenuItem, "price_general" | "price_member">, kind: PriceKind): number {
   return kind === "member" ? item.price_member : item.price_general;
 }
+
+// 消費税の計算は frank-tax.ts（node非依存）に置いてある。
+// 注文画面（クライアント）が同じ計算を読めるようにするため。
+export { FRANK_TAX_RATE, taxOf, withTax } from "./frank-tax.ts";
 
 export type OrderLineInput = { item: MenuItem; qty: number };
 export type OrderLine = { menu_item_id: string; name: string; price_kind: PriceKind; unit_price: number; qty: number; amount: number };
@@ -82,8 +94,14 @@ export type OrderLine = { menu_item_id: string; name: string; price_kind: PriceK
 /**
  * 注文明細と合計を組み立てる。
  * 単価と品名は「注文した時点の値」を明細にコピーする＝あとでメニューを改定しても過去の伝票が変わらない。
+ *
+ * 明細の unit_price / amount は **税抜**。請求するのは total（税込・#166）。
  */
-export function buildOrderLines(inputs: OrderLineInput[], kind: PriceKind): { lines: OrderLine[]; total: number } {
+export function buildOrderLines(
+  inputs: OrderLineInput[],
+  kind: PriceKind,
+  rate: number = FRANK_TAX_RATE,
+): { lines: OrderLine[]; subtotal: number; tax: number; taxRate: number; total: number } {
   const lines: OrderLine[] = [];
   for (const { item, qty } of inputs) {
     const q = Math.floor(qty);
@@ -92,7 +110,11 @@ export function buildOrderLines(inputs: OrderLineInput[], kind: PriceKind): { li
     const unit = unitPriceOf(item, kind);
     lines.push({ menu_item_id: item.id, name: item.name, price_kind: kind, unit_price: unit, qty: q, amount: unit * q });
   }
-  return { lines, total: lines.reduce((s, l) => s + l.amount, 0) };
+  // 明細は税抜のまま持ち、消費税は**合計に1回だけ**かける。
+  // 品目ごとに丸めると、同じものを1個ずつ2回頼んだ人と2個まとめた人で総額がずれる。
+  const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+  const tax = taxOf(subtotal, rate);
+  return { lines, subtotal, tax, taxRate: rate, total: subtotal + tax };
 }
 
 /** Square の note に入れる文字列。Webhook 側はこの接頭辞で店内飲食と判定する。 */

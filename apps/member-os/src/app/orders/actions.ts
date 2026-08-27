@@ -5,7 +5,7 @@ import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
 import { placeOrder, loadMenu, checkOut, assignBay } from "@/lib/frank-portal";
-import { unitPriceOf } from "@yozan/core/frank-portal";
+import { unitPriceOf, taxOf, FRANK_TAX_RATE } from "@yozan/core/frank-portal";
 import { chargeOrderOnFile } from "@/lib/frank-square";
 import { logEvent } from "@/lib/kernel";
 
@@ -125,17 +125,22 @@ export async function linkOrderToMember(formData: FormData) {
   const { data: items } = await admin
     .from("frunk_order_items").select("id, menu_item_id, qty").eq("order_id", orderId);
   const menu = await loadMenu(s((o as Row).company_id));
-  let total = 0;
+  let subtotal = 0;
   for (const it of ((items ?? []) as Row[])) {
     const mi = menu.find((x) => x.id === s(it.menu_item_id));
     if (!mi) continue;
     const unit = unitPriceOf(mi, "member");
     const amount = unit * n(it.qty);
-    total += amount;
+    subtotal += amount;
     await admin.from("frunk_order_items").update({ price_kind: "member", unit_price: unit, amount }).eq("id", s(it.id));
   }
+  // 明細は税抜。請求は税込（#166）。ここで税を足し忘れると会員だけ税抜で請求される。
+  const tax = taxOf(subtotal);
+  const total = subtotal + tax;
 
-  await admin.from("frunk_orders").update({ member_id: memberId, guest_label: null, amount: total }).eq("id", orderId);
+  await admin.from("frunk_orders")
+    .update({ member_id: memberId, guest_label: null, subtotal, tax_rate: FRANK_TAX_RATE, tax_amount: tax, amount: total })
+    .eq("id", orderId);
 
   const customerId = ((m as Row).square_customer_id as string | null) ?? null;
   if (customerId && total > 0) {
