@@ -2,6 +2,8 @@ import { requireCoachActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { loadFeatures } from "@/lib/plan";
 import ImportClient from "./import-client";
+import MethodClient from "./method-client";
+import { getMethodStatus } from "./method-actions";
 
 export const dynamic = "force-dynamic";
 // Excel数千件取込のServer Actionが時間切れしないよう延長（Vercel Pro）
@@ -11,6 +13,7 @@ export default async function SettingsPage() {
   const actor = await requireCoachActor();
   const admin = createAdmin();
   const features = await loadFeatures(actor.companyId);
+  const methodStatus = await getMethodStatus();
   const [{ count: symptomCount }, { count: knowledgeCount }] = await Promise.all([
     admin.from("sc_symptoms").select("id", { count: "exact", head: true }).eq("company_id", actor.companyId),
     admin.from("sc_knowledge").select("id", { count: "exact", head: true }).eq("company_id", actor.companyId),
@@ -51,6 +54,8 @@ export default async function SettingsPage() {
       </div>
 
       <ImportClient />
+
+      <MethodClient status={methodStatus} />
 
       <div className="mt-4 space-y-3">
         <div className="rounded-2xl border border-slate-100 bg-white p-4">

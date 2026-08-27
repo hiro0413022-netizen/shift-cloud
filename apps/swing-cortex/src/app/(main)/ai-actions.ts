@@ -4,6 +4,7 @@ import { requireCoachActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { callAi, extractJson, hasAiKey, resolveProvider, type AiProvider } from "@/lib/ai";
 import { findSimilarComments, loadStudentNotes } from "@/lib/data";
+import { loadStyle, styleLines } from "@/lib/method";
 
 export type DraftInput = {
   symptomId: string;
@@ -96,10 +97,14 @@ export async function draftComment(input: DraftInput): Promise<DraftResult> {
     return { ...templateDraft(input), engine: "template", examplesUsed: examples.length };
   }
 
+  // 店の文体プロファイル（sc_settings.style）。語彙・ドリル名はデータ駆動＝店ごとに変わる
+  const style = await loadStyle(actor.companyId);
+  const styleBlock = styleLines(style);
+
   const system =
     "あなたはこのゴルフスクールのベテランレッスンコーチで、実際のレッスンカルテを書きます。" +
-    "提供される『過去コメント例』の文体・語彙・ドリル名・言い回し・詳しさを必ず踏襲してください（この学校らしさが最重要）。" +
-    "薄い一般論で終わらせず、過去コメント例に出てくる具体語（三角形同調・下半身先行・股関節・重心移動・前傾キープ・正面インパクト・コンパクトなトップ・縦振り 等）とドリル名（gooドリル・足踏み・ベタ足・ショルダーターン・両手クロス・ウェイトシフト 等）を実際に使う。" +
+    "提供される『過去コメント例』と『この店の言葉』の文体・語彙・ドリル名・言い回し・詳しさを必ず踏襲してください（この店らしさが最重要）。" +
+    "薄い一般論で終わらせず、過去コメント例や『この店の言葉』に実際に出てくる具体語・ドリル名を使う。この店の資料に出てこない他校の用語やドリル名を持ち込まない。" +
     "医学的・断定的な表現は避け、生徒を前向きにする表現にします。" +
     "structured と natural は長さの方針がまったく違います。structured は詳しく、natural は短く。これを必ず守ること。" +
     "出力は必ず次のJSONのみ（前置き・説明・コードフェンス禁止）: " +
@@ -120,6 +125,7 @@ export async function draftComment(input: DraftInput): Promise<DraftResult> {
     (input.drill ? `ドリル: ${input.drill}\n` : "") +
     (input.coachMemo ? `今日のコーチ所見（口語・箇条書き可）: ${input.coachMemo}\n` : "") +
     (studentContext ? `\n--- この生徒の前回までのカルテ（継続性を意識）---\n${studentContext}\n` : "") +
+    (styleBlock ? `\n--- この店の言葉（語彙・ドリル名・文体）---\n${styleBlock}\n` : "") +
     `\n--- この学校の過去コメント例（文体のお手本）---\n${exampleBlock}\n\n` +
     (studentContext ? "前回からの継続・変化にも一言触れつつ、" : "") +
     `JSONでstructured（詳しく）とnatural（${NATURAL_MAX_CHARS}字以内の短いひとこと）を書いてください。`;
