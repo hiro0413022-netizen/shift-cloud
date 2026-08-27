@@ -287,3 +287,32 @@ export async function loadInsights(companyId: string) {
     .sort((a, b) => b.count - a.count);
   return { commentCount: commentCount ?? 0, diagCount: diagCount ?? 0, phases };
 }
+
+export type CoachStat = {
+  coach: string;
+  commentCount: number;
+  topPhases: { label: string; count: number }[];
+  topSymptoms: { label: string; count: number }[];
+};
+
+/**
+ * コーチ別の傾向（RPC sc_coach_insights / migration 0126）。
+ * 数千件のコメントをアプリへ引かず、DB側で集計して返す。
+ * coach は取込元の「講師」列の値（津スポーツのように数値IDの店もある）。
+ */
+export async function loadCoachInsights(companyId: string): Promise<CoachStat[]> {
+  const admin = createAdmin();
+  const { data } = await admin.rpc("sc_coach_insights", { p_company: companyId });
+  type Row = {
+    coach: string;
+    comment_count: number;
+    top_phases: { label: string; count: number }[] | null;
+    top_symptoms: { label: string; count: number }[] | null;
+  };
+  return ((data ?? []) as Row[]).map((r) => ({
+    coach: r.coach,
+    commentCount: Number(r.comment_count) || 0,
+    topPhases: r.top_phases ?? [],
+    topSymptoms: r.top_symptoms ?? [],
+  }));
+}

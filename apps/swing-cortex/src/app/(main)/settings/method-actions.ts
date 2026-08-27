@@ -119,7 +119,7 @@ export async function discoverThemes(): Promise<{ ok: boolean; message: string; 
 
   const system =
     "あなたはゴルフスクールの指導メソッドを体系化する専門家です。" +
-    "このスクールの実際のレッスンコメントから、この店が実際に教えている『指導テーマ』を8〜14個発見します。" +
+    "このスクールの実際のレッスンコメントから、この店が実際に教えている『指導テーマ』をできるだけ網羅的に発見します（目安15〜30個。コメントに根拠がある分だけ）。" +
     "汎用のゴルフ理論の分類（スライス・フック等）を押し付けず、コメントに実際に頻出する切り口" +
     "（スイング局面・姿勢エラー・この店独自のメソッド名など）でまとめること。" +
     "keywords は本文からそのテーマの実例を探す検索語（本文に実際に出てくる表記で3〜8個）。" +
@@ -131,7 +131,7 @@ export async function discoverThemes(): Promise<{ ok: boolean; message: string; 
   const parsed = text ? extractJson<{ themes?: Theme[] }>(text) : null;
   const themes = (parsed?.themes ?? [])
     .filter((t) => t?.name && t?.category && (t.keywords?.length ?? 0) > 0)
-    .slice(0, 16);
+    .slice(0, 30);
   if (!themes.length) return { ok: false, message: "テーマ発見に失敗しました（もう一度お試しください）" };
   return { ok: true, message: `${themes.length}テーマを発見`, themes };
 }
