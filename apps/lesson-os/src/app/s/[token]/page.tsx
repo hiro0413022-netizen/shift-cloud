@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Radar } from "@/components/radar";
 import type { Phases } from "@/lib/phases";
 import { ShareVideo } from "./share-video";
+import { brandOf } from "@/lib/brand";
 
 /**
  * 生徒向けマイページ（DECISIONS #50 / PGA NOTEユーザーアプリ準拠・青×白テーマ）
@@ -10,6 +11,22 @@ import { ShareVideo } from "./share-video";
  * 表示: マイデータ（進捗レーダー）／レッスン記録（動画＋コーチのアドバイス）／お手本スイング
  */
 export const dynamic = "force-dynamic";
+
+/**
+ * タブのタイトルもブランドに合わせる（#168）。
+ * ルートレイアウトの metadata は "GOLF WING Lesson OS" 固定なので、
+ * ここで上書きしないと FRANK の会員のタブに GOLF WING と出る。
+ */
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  const admin = createAdmin();
+  const { data: share } = await admin
+    .from("lsn_share_tokens").select("student_id, revoked_at").eq("token", token).maybeSingle();
+  if (!share || share.revoked_at) return { title: "マイデータ" };
+  const { data: st } = await admin
+    .from("lsn_students").select("store_id").eq("id", share.student_id).maybeSingle();
+  return { title: `マイデータ — ${brandOf((st?.store_id as string | null) ?? null).name}` };
+}
 
 export default async function StudentSharePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -24,7 +41,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
 
   const { data: student } = await admin
     .from("lsn_students")
-    .select("id, name, name_kana, goal, photo_path")
+    .select("id, name, name_kana, goal, photo_path, store_id")
     .eq("id", share.student_id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -101,16 +118,18 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
 
   const progMap = new Map((prog ?? []).map((p) => [p.item_id, p.percent]));
   const radarItems = (items ?? []).map((it) => ({ name: it.name, percent: progMap.get(it.id) ?? 0 }));
+  // ブランドは生徒の所属店舗で決める（#168）。直書きすると必ずどちらかの店で嘘になる
+  const brand = brandOf(student.store_id as string | null);
   const lessonCount = (videos ?? []).length;
   const latest = videos?.[0]?.shot_at ?? null;
 
   return (
     <main className="min-h-screen bg-[#f2f5f9] text-[#1c2733]">
       {/* 青ヘッダ（PGA NOTEユーザーアプリ準拠） */}
-      <header className="bg-[#1e5da8] px-4 py-3 text-white">
+      <header className="px-4 py-3 text-white" style={{ backgroundColor: brand.accent }}>
         <div className="mx-auto flex max-w-xl items-center justify-between">
           <p className="text-sm font-semibold tracking-wide">マイデータ</p>
-          <p className="text-[10px] tracking-[0.24em] opacity-80">GOLF WING</p>
+          <p className="text-[10px] tracking-[0.24em] opacity-80">{brand.name}</p>
         </div>
       </header>
 
@@ -122,7 +141,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
               // eslint-disable-next-line @next/next/no-img-element
               <img src={photoUrl} alt={student.name} className="h-16 w-16 rounded-lg object-cover" />
             ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-[#e5ecf5] text-xl font-semibold text-[#1e5da8]">
+              <div className="flex h-16 w-16 items-center justify-center rounded-lg text-xl font-semibold" style={{ backgroundColor: brand.accentSoft, color: brand.accent }}>
                 {student.name.slice(0, 1)}
               </div>
             )}
@@ -142,24 +161,24 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
         {radarItems.length > 0 && (
           <section className="rounded-xl bg-white p-4 shadow-sm">
             <div className="flex items-baseline justify-between">
-              <p className="text-sm font-semibold text-[#1e5da8]">進捗率</p>
+              <p className="text-sm font-semibold" style={{ color: brand.accent }}>進捗率</p>
               <p className="text-xs text-gray-500">
                 レッスン記録: {lessonCount}本{latest ? ` ・ 最新: ${latest}` : ""}
               </p>
             </div>
-            <Radar items={radarItems} stroke="#1e5da8" fill="rgba(30,93,168,0.3)" grid="#c8d4e2" label="#5a6b80" />
+            <Radar items={radarItems} stroke={brand.accent} fill={brand.radarFill} grid="#c8d4e2" label="#5a6b80" />
           </section>
         )}
 
         {/* レッスン記録 */}
         <section className="space-y-3">
-          <p className="px-1 text-sm font-semibold text-[#1e5da8]">レッスン記録</p>
+          <p className="px-1 text-sm font-semibold" style={{ color: brand.accent }}>レッスン記録</p>
           {(videos ?? []).length === 0 && <p className="rounded-xl bg-white p-4 text-sm text-gray-500 shadow-sm">まだ記録がありません</p>}
           {(videos ?? []).map((v) => (
             <div key={v.id} className="overflow-hidden rounded-xl bg-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-gray-100 px-4 py-2.5 text-xs text-gray-600">
                 <span className="font-semibold text-sm text-[#1c2733]">{v.shot_at ?? v.created_at.slice(0, 10)}</span>
-                {v.club && <span className="rounded bg-[#e5ecf5] px-1.5 py-0.5 text-[#1e5da8]">{v.club}</span>}
+                {v.club && <span className="rounded px-1.5 py-0.5" style={{ backgroundColor: brand.accentSoft, color: brand.accent }}>{v.club}</span>}
                 {v.distance_yd != null && <span>{v.distance_yd}yd</span>}
                 {v.is_best && <span className="ml-auto text-[#c9a545]">★ ベストスイング</span>}
               </div>
@@ -186,7 +205,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
         {/* お手本スイング */}
         {(models ?? []).length > 0 && (
           <section className="space-y-3">
-            <p className="px-1 text-sm font-semibold text-[#1e5da8]">コーチのお手本スイング</p>
+            <p className="px-1 text-sm font-semibold" style={{ color: brand.accent }}>コーチのお手本スイング</p>
             <div className="grid grid-cols-2 gap-3">
               {(models ?? []).map((m) => (
                 <div key={m.id} className="overflow-hidden rounded-xl bg-white shadow-sm">
@@ -212,7 +231,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
         )}
 
         <p className="pb-6 pt-2 text-center text-[10px] text-gray-400">
-          このページはあなた専用です。URLを他の人に教えないでください ・ GOLF WING Lesson OS
+          このページはあなた専用です。URLを他の人に教えないでください ・ {brand.name} Lesson OS
         </p>
       </div>
     </main>
