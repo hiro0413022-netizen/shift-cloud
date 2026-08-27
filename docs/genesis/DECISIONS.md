@@ -746,3 +746,10 @@
   **(c) 冪等は「商品名が既にあればスキップ」**（setup.mjs と同一）。何度叩いても増えない。カテゴリ未対応の古いAPIバージョン向けフォールバックも同じものを入れた。
   ⚠ **品目と価格の正典は `scripts/frank-square-setup.mjs` の FEE_ITEMS。** このAPIは同じ値の写しなので、**片方だけ直さないこと**（route.ts のコメントにも明記）。
   認証は `gn_ops_tokens`（purpose=`frank_square_catalog_sync`・期限内・sha256）。登録できるのは service_role を持つ運用者だけ。
+
+- #159b (2026-08-26) **レジ商品を本番投入・公式LINEのURLを設定**（コード変更なし・運用記録）。
+  **(a) レジ商品3件を投入済み** — `POST /api/public/frank/admin/square-catalog-sync`（#159）を実行。
+  結果: ビジター利用料5,500 / 体験レッスン3,300 / レッスン単発(25分)2,500 を**新規作成**、入会金・休会費は**既存のためスキップ**（冪等が意図どおり効いた）。
+  **誰も SQUARE_ACCESS_TOKEN を手元にコピーしていない**。使ったワンショットトークンは実行後すぐ失効させた（`gn_ops_tokens.expires_at` を過去に更新）。
+  **(b) 公式LINE** — 友だち追加URL `https://lin.ee/Xl0L2k7` を member-os の env `NEXT_PUBLIC_FRANK_LINE_URL` に設定し再デプロイ。ポータルに公式LINEボタンが出るようになった。
+  **(c) Vault を更新** — 「スクエア」に今回の追記（**SQUARE_ACCESS_TOKEN は Vercel env が正・type=encryptedなので表示可能／LOCATION_ID と WEBHOOK_SIGNATURE_KEY は sensitive で表示不可**）、および新規レコード「FRANK 会員ポータル（お客様用）」を追加（URL・画面一覧・env・価格の同期注意）。
