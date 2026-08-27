@@ -99,7 +99,7 @@ export default async function SettingsPage() {
         </div>
       </div>
 
-      <div className="mt-6 text-center text-[11px] text-slate-300">SWING CORTEX · Genesis連携版 P1</div>
+      <div className="mt-6 text-center text-[11px] text-slate-300">AIカルテナレッジ · Genesis連携版</div>
     </div>
   );
 }

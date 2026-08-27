@@ -19,7 +19,7 @@ function LoginForm() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">
-            SWING <span className="text-(--color-brand)">CORTEX</span>
+            AIカルテ<span className="text-(--color-brand)">ナレッジ</span>
           </h1>
           <p className="mt-2 text-sm text-(--color-dim)">コーチング診断 — コーチログイン</p>
         </div>

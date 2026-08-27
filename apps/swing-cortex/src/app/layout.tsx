@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SWING CORTEX — コーチング診断",
+  title: "AIカルテナレッジ — コーチング診断",
   description: "現場のレッスン1件ごとに賢くなる、コーチングの共有脳",
 };
 

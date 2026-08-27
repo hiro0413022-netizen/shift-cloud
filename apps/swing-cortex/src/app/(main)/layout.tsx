@@ -13,7 +13,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           </svg>
         </div>
         <div className="font-bold tracking-tight">
-          SWING <span className="text-(--color-brand)">CORTEX</span>
+          AIカルテ<span className="text-(--color-brand)">ナレッジ</span>
         </div>
         <span className="ml-auto rounded-full border border-(--color-line) px-2 py-0.5 text-[10px] text-(--color-faint)">
           {actor.name}

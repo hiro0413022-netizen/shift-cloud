@@ -5,6 +5,8 @@
 - feat(swing-cortex): 設定に「この店のレッスンメソッドを生成」（method-actions/method-client）。文体分析→指導テーマ発見→テーマごとに症状+確認項目+知識を生成(source='ai')→汎用シード置換。1アクション=AI1呼び出しでmaxDuration=60に収まる
 - feat(swing-cortex): migration 0125 `sc_settings.style`（店の文体プロファイル: vocab/drills/phrases/tone）。**適用済み**。draftCommentのGOLF WING語彙ハードコードを撤去し、styleとRAG例文だけで書く＝店の言葉尻を維持（YOZANの旧ハードコード語彙はstyleへ移設済み）
 - feat(swing-cortex): ヘッダー右上にログアウトボタン（アカウント切替用。設定内のボタンも継続）
+- feat(swing-cortex): インサイトに「コーチ別の傾向」（migration 0126 RPC `sc_coach_insights`・**適用済み**。コメント数・局面top・キーワードをコーチ単位でDB集計）
+- feat(swing-cortex): 表示ブランドを **「AIカルテナレッジ」** に変更（ヘッダー/ログイン/title/設定フッター。内部名・URL・sc_*・env CORTEX_* は据え置き）
 - data: 津スポーツセンター（tsusport）に店オリジナル・メソッド投入済み＝実コメント6,114件から12症状/27確認項目/27知識（ニュートラル姿勢・シャフトプレーン・フラットショルダー・アーリーエクステンション・バニラピッチ等、同店の実際の用語のみ）。汎用シード46件は除去済み。文体プロファイル保存済み
 
 
