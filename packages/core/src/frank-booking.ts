@@ -11,6 +11,8 @@
  * ここはDBに依存しない純粋なロジックと、設定の読み出しだけを置く。
  */
 
+import { isJpHoliday } from "./jp-holidays.ts";
+
 export const FRANK_STORE_ID = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
 export const FRANK_STORE_CODE = "frunk_himeji";
 
@@ -22,8 +24,10 @@ export type BookingCfg = {
   closed_dows: number[];
   slot_minutes: number;
   max_minutes_options: number[];
-  /** この日付は土日祝の営業時間を適用 */
+  /** この日付は土日祝の営業時間を適用（自動判定に「追加」するもの。臨時の祝日・お盆など） */
   holiday_dates: string[];
+  /** 日本の祝日を自動で土日祝あつかいにする（既定 true）。false にすると holiday_dates だけを見る */
+  auto_holidays?: boolean;
   /** 臨時休業日 */
   closed_dates: string[];
   /** 何日先まで予約できるか */
@@ -44,6 +48,7 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   slot_minutes: 30,
   max_minutes_options: [30, 60, 90, 120],
   holiday_dates: [],
+  auto_holidays: true,
   closed_dates: [],
   advance_days: 14,
   open_date: "2026-09-02", // プレオープン日
@@ -97,7 +102,8 @@ export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING
     if (cfg.closed_dates.includes(dateStr)) return null;
     if (cfg.closed_dows.includes(dow)) return null;
   }
-  const base = dow === 0 || dow === 6 || cfg.holiday_dates.includes(dateStr) ? cfg.weekend : cfg.weekday;
+  const holiday = cfg.holiday_dates.includes(dateStr) || (cfg.auto_holidays !== false && isJpHoliday(dateStr));
+  const base = dow === 0 || dow === 6 || holiday ? cfg.weekend : cfg.weekday;
   // オープン初日は open_time（10:00）から。閉店時刻はその日の営業時間どおり
   if (cfg.open_date && dateStr === cfg.open_date && cfg.open_time && toMin(cfg.open_time) > toMin(base.open)) {
     return { open: cfg.open_time, close: base.close };
