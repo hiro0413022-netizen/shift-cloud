@@ -12,6 +12,7 @@
     "./frank-token": "./src/frank-token.ts",
     "./frank-walkin": "./src/frank-walkin.ts",
     "./incidents": "./src/incidents.ts",
+    "./jp-holidays": "./src/jp-holidays.ts",
     "./jst": "./src/jst.ts",
     "./kernel": "./src/kernel.ts",
     "./members": "./src/members.ts",

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
-import { placeOrder, loadMenu, checkOut } from "@/lib/frank-portal";
+import { placeOrder, loadMenu, checkOut, assignBay } from "@/lib/frank-portal";
 import { unitPriceOf } from "@yozan/core/frank-portal";
 import { chargeOrderOnFile } from "@/lib/frank-square";
 import { logEvent } from "@/lib/kernel";
@@ -153,12 +153,30 @@ export async function linkOrderToMember(formData: FormData) {
 
 /**
  * 退店（#154）。お客様の来店中モードを閉じ、滞在時間を確定する。
- * 押し忘れても、予約終了+30分で自動的に来店中は終わる（currentVisit）。
+ *
+ * 押し忘れても来店中は自動で終わる（予約あり=終了+30分／予約なし=チェックイン+2時間・#163）が、
+ * **その自動終了はDBに書かない**。ここを押さないと滞在時間は永久に残らない。
  */
 export async function checkOutSeat(formData: FormData) {
   await guard();
   const id = s(formData.get("checkin_id"));
   if (!id) return;
   await checkOut(id);
+  revalidatePath("/orders");
+}
+
+/**
+ * 打席の割り当て（#164）。
+ *
+ * 予約なしで来た会員は打席が決まっていない状態でチェックインされる。
+ * 受付チェックイン画面でも選べるが、そこはお客様側を向いた画面で、
+ * お客様が待っている前で操作することになる。伝票側からも変えられるようにした。
+ */
+export async function assignSeatBay(formData: FormData) {
+  await guard();
+  const checkinId = s(formData.get("checkin_id"));
+  const bayId = s(formData.get("bay_id"));
+  if (!checkinId || !bayId) return;
+  await assignBay(checkinId, bayId);
   revalidatePath("/orders");
 }
