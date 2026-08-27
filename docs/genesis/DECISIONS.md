@@ -736,3 +736,13 @@
   ⚠ 既存会員4名にはこの同意が無い＝**モバイルオーダー公開前に周知文（同案 §3）を送り、異議のないことをもって同意扱いにするか、来店時に一言確認する**運用が要る。
   **(e) レジ商品の価格をユーザーが確定** — ビジター利用料 ¥5,500／レッスン単発(25分) ¥2,500／体験レッスン ¥3,300（キャンペーン中はレジで0円に変更して打つ）。`frank-square-setup.mjs` の FEE_ITEMS に追記済み（物販は後日リストが来たら追加）。
   **(f) `NEXT_PUBLIC_PORTAL_URL` はまだ設定しない** — DNSが通る前に設定すると `/orders/qr` が死んだURLのQRを刷れてしまう。**DNS開通を確認してから**入れる。
+
+- #159 (2026-08-26) **レジ商品の投入を運用ワンショットAPIにした（`/api/public/frank/admin/square-catalog-sync`）**（migrationなし）。
+  きっかけ＝ユーザー「SQUARE_ACCESS_TOKEN を保存していなかった」。
+  **(a) トークンは失われていない** — Vercel(yozan-genesis)の env に type=`encrypted` で存在する（`sensitive` ではないのでダッシュボードで値を表示できる）。
+  同じ env は member-os にも必要（[[frank-billing-stripe]] / OPERATIONS §14-1 の注記）。**Vault には未保存だったので、表示して Vault「スクエア」に控えること。**
+  **(b) それでもローカル実行はやめた** — `scripts/frank-square-setup.mjs` を回すには誰かがトークンを手元にコピーする必要があり、その一手間とコピーが端末に残るリスクが毎回ついてくる。
+  **#136 の `square-plan-sync` が同じ問題を「本番環境自身に作らせる」で既に解いていた**ので、レジ商品版を同じ形で足した（同じ認証・同じ冪等判定）。以後、商品を足すときもトークンを触らなくてよい。
+  **(c) 冪等は「商品名が既にあればスキップ」**（setup.mjs と同一）。何度叩いても増えない。カテゴリ未対応の古いAPIバージョン向けフォールバックも同じものを入れた。
+  ⚠ **品目と価格の正典は `scripts/frank-square-setup.mjs` の FEE_ITEMS。** このAPIは同じ値の写しなので、**片方だけ直さないこと**（route.ts のコメントにも明記）。
+  認証は `gn_ops_tokens`（purpose=`frank_square_catalog_sync`・期限内・sha256）。登録できるのは service_role を持つ運用者だけ。
