@@ -23,6 +23,10 @@ import {
   greetingLines,
   daysBetween,
   bayQrUrl,
+  hhmmToMin,
+  visitClosed,
+  VISIT_GRACE_MIN,
+  VISIT_NO_BOOKING_MIN,
   squareOrderIdempotencyKey,
   SQUARE_IDEMPOTENCY_MAX,
   type MenuItem,
@@ -194,5 +198,48 @@ test("isCheckinTokenShape は normalizeCheckinScan と同じ判定になる", ()
   for (const bad of ["", "ABC", good.slice(0, 15), `${good}X`, good.replace(/^./, "0"), "4901234567894"]) {
     assert.ok(!isCheckinTokenShape(bad), `${bad} は弾く`);
     assert.equal(normalizeCheckinScan(bad), null);
+  }
+});
+
+// --- 来店中モードを閉じる判定（#163） -----------------------------
+// ここが緩むと現場で起きること:
+//   閉じるのが早すぎる → 打席にいるお客様が注文できなくなる（気づかれない）
+//   閉じないまま       → 帰宅後もスマホに打席が出て、店外から注文画面が開ける
+const min = (hhmm: string) => hhmmToMin(hhmm) as number;
+
+test("予約がある人は 終了+30分 まで来店中", () => {
+  const endMin = min("14:00");
+  const base = { endMin, checkedInMin: min("13:00") };
+  assert.equal(visitClosed({ ...base, nowMin: min("14:00") }), false);
+  assert.equal(visitClosed({ ...base, nowMin: endMin + VISIT_GRACE_MIN }), false, "ちょうど30分後はまだ来店中");
+  assert.equal(visitClosed({ ...base, nowMin: endMin + VISIT_GRACE_MIN + 1 }), true);
+});
+
+test("予約が無い人は チェックイン+2時間 で閉じる（#163・これが無いと日付が変わるまで閉じなかった）", () => {
+  const inMin = min("10:00");
+  const base = { endMin: null, checkedInMin: inMin };
+  assert.equal(visitClosed({ ...base, nowMin: min("11:59") }), false);
+  assert.equal(visitClosed({ ...base, nowMin: inMin + VISIT_NO_BOOKING_MIN }), false);
+  assert.equal(visitClosed({ ...base, nowMin: inMin + VISIT_NO_BOOKING_MIN + 1 }), true);
+});
+
+test("予約があるときは チェックイン時刻ではなく予約終了で判断する", () => {
+  // 10:00にチェックインして13:00まで予約している人を、2時間ルールで閉じてはいけない
+  assert.equal(
+    visitClosed({ nowMin: min("12:30"), endMin: min("13:00"), checkedInMin: min("10:00") }),
+    false,
+  );
+});
+
+test("時刻がどちらも取れないときは閉じない（迷ったら開けておく）", () => {
+  assert.equal(visitClosed({ nowMin: min("23:59"), endMin: null, checkedInMin: null }), false);
+});
+
+test("hhmmToMin は形の違うものを null にする（壊れた値で誤判定しない）", () => {
+  assert.equal(hhmmToMin("00:00"), 0);
+  assert.equal(hhmmToMin("14:05"), 845);
+  assert.equal(hhmmToMin("14:05:00"), 845, "timeカラムの秒付きも読める");
+  for (const bad of ["", "abc", "1400", null, undefined]) {
+    assert.equal(hhmmToMin(bad as string | null), null, `${bad} は null`);
   }
 });

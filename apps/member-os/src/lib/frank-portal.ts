@@ -12,6 +12,8 @@ import {
   type MenuItem,
   type PriceKind,
   type OrderLineInput,
+  hhmmToMin,
+  visitClosed,
 } from "@yozan/core/frank-portal";
 import { chargeOrderOnFile } from "@/lib/frank-square";
 
@@ -35,9 +37,12 @@ function nowHHMM(): string {
   const d = new Date(Date.now() + 9 * 60 * 60 * 1000);
   return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
-function addMinutes(hhmm: string, min: number): string {
-  const t = Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5)) + min;
-  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+/** timestamptz を JST の "HH:MM" に直す。壊れていれば null（判定に使わない）。 */
+function jstHHMM(iso: string): string | null {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t + 9 * 60 * 60 * 1000);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
 }
 
 export const CHECKIN_MEMBER_STATUS_OK = ["active", "approved", "suspended"] as const;
@@ -309,7 +314,7 @@ export async function currentVisit(memberId: string): Promise<VisitState> {
   const today = jstYmd();
   const { data } = await admin
     .from("frunk_checkins")
-    .select("id, bay_id, checked_out_at, frunk_bays(code, name), frunk_bookings(end_time)")
+    .select("id, bay_id, checked_in_at, checked_out_at, frunk_bays(code, name), frunk_bookings(end_time)")
     .eq("member_id", memberId).eq("visited_on", today).is("deleted_at", null).maybeSingle();
   const c = (data ?? null) as Row | null;
   if (!c || s(c.checked_out_at)) {
@@ -318,11 +323,17 @@ export async function currentVisit(memberId: string): Promise<VisitState> {
   const bay = (c.frunk_bays as { code?: string; name?: string } | null) ?? null;
   const bk = (c.frunk_bookings as { end_time?: string } | null) ?? null;
 
-  // 予約終了+30分を過ぎたら来店中を終える。
-  // DBに書かずに判定だけで閉じるのは、閉じるためのcronを増やしたくないから
-  // （スタッフが伝票から「退店」を押せば checked_out_at が入る）。
+  // 来店中を終える判定。DBに書かずに判定だけで閉じるのは、
+  // 閉じるためのcronを増やしたくないから（スタッフが伝票から「退店」を押せば checked_out_at が入る）。
+  //   予約あり → 終了+30分
+  //   予約なし（ビジター・飛び込み） → チェックイン+2時間（#163。これが無いと日付が変わるまで閉じなかった）
   const end = bk?.end_time ? s(bk.end_time).slice(0, 5) : null;
-  if (end && nowHHMM() > addMinutes(end, 30)) {
+  const closed = visitClosed({
+    nowMin: hhmmToMin(nowHHMM()) ?? 0,
+    endMin: hhmmToMin(end),
+    checkedInMin: hhmmToMin(jstHHMM(s(c.checked_in_at))),
+  });
+  if (closed) {
     return { checkedIn: false, checkinId: s(c.id), bayId: null, bayCode: null, bayName: null, endTime: end };
   }
 

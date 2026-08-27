@@ -194,3 +194,44 @@ export const SQUARE_IDEMPOTENCY_MAX = 45;
 export function squareOrderIdempotencyKey(orderId: string): string {
   return `fo-${orderId}`.slice(0, SQUARE_IDEMPOTENCY_MAX);
 }
+
+// ---------------------------------------------------------------
+// 来店中モードを閉じる判定（#163）
+// ---------------------------------------------------------------
+/** 予約終了後、これだけは来店中を続ける（片付け・精算の時間）。 */
+export const VISIT_GRACE_MIN = 30;
+
+/**
+ * 予約が無いチェックイン（ビジター・飛び込み）を来店中にしておく上限。
+ *
+ * #163 まではここが無く、予約が無い人は **日付が変わるまで来店中のまま**だった。
+ * 帰宅後もスマホに打席が出続け、店外から注文画面を開けてしまう。
+ * 打席の予約枠が1時間なので、延長1回ぶんを見て2時間にしてある。
+ */
+export const VISIT_NO_BOOKING_MIN = 120;
+
+/** "HH:MM" を 0:00 からの分に直す。形が違えば null（＝判定に使わない）。 */
+export function hhmmToMin(hhmm: string | null | undefined): number | null {
+  if (typeof hhmm !== "string") return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm);
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/**
+ * 来店中モードを閉じてよいか。DBには書かない（判定だけで閉じる）。
+ *
+ * 予約があれば「終了+30分」、無ければ「チェックイン+2時間」で閉じる。
+ * どちらも取れないとき（時刻が壊れている等）は **閉じない** ＝ 来店中のままにする。
+ * 迷ったら開けておく方が安全で、間違って閉じると来店中のお客様が注文できなくなる。
+ */
+export function visitClosed(input: {
+  nowMin: number;
+  endMin: number | null;
+  checkedInMin: number | null;
+}): boolean {
+  const { nowMin, endMin, checkedInMin } = input;
+  if (endMin != null) return nowMin > endMin + VISIT_GRACE_MIN;
+  if (checkedInMin != null) return nowMin > checkedInMin + VISIT_NO_BOOKING_MIN;
+  return false;
+}
