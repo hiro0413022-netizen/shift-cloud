@@ -86,17 +86,15 @@ def jsonld_business():
         },
         "employee": {
             "@type": "Person",
-            "name": "藤田 晃規",
-            "jobTitle": "PGA会員（トーナメントプレーヤー） / ゴルフコーチ",
+            "name": "小川 うらら",
+            "alternateName": "らら",
+            "jobTitle": "所属レッスンプロ / ゴルフコーチ",
             "hasCredential": [
                 {"@type": "EducationalOccupationalCredential",
-                 "credentialCategory": "PGA会員（トーナメントプレーヤー）",
-                 "recognizedBy": {"@type": "Organization", "name": "公益社団法人 日本プロゴルフ協会（PGA）"}},
-                {"@type": "EducationalOccupationalCredential",
-                 "credentialCategory": "JGTO ツアーメンバー",
-                 "recognizedBy": {"@type": "Organization", "name": "一般社団法人 日本ゴルフツアー機構（JGTO）"}},
+                 "credentialCategory": "USGTF レベルIII",
+                 "recognizedBy": {"@type": "Organization", "name": "United States Golf Teachers Federation（USGTF）"}},
             ],
-            "sameAs": "https://www.jgto.org/player/15674/profile",
+            "sameAs": "https://www.youtube.com/channel/UC4QTQjrDLsx4WF3fdYuLHZQ",
         },
         "areaServed": [{"@type": "City", "name": n} for n in AREA_SERVED],
         "parentOrganization": {"@type": "Organization", "name": "株式会社YOZAN"},
@@ -112,7 +110,7 @@ def jsonld_business():
         "amenityFeature": [
             {"@type": "LocationFeatureSpecification", "name": "駐車場20台（無料）", "value": True},
             {"@type": "LocationFeatureSpecification", "name": "バーカウンター併設", "value": True},
-            {"@type": "LocationFeatureSpecification", "name": "ゴルフシミュレーター（全4打席）", "value": True},
+            {"@type": "LocationFeatureSpecification", "name": "ゴルフシミュレーター（全3打席／4打席目は増設予定）", "value": True},
             {"@type": "LocationFeatureSpecification", "name": "レフティ左右打席対応", "value": True},
         ],
         # TODO(確定後): "telephone", "geo"{lat,lng}, "sameAs"[SNS], "image"[実写]。定休日=毎週火曜。
@@ -445,18 +443,18 @@ def floormap_fig(floor, title, w, h, caption, rooms):
 def floorplan():
     """フロアマップ（実際の間取り図・1F/2Fの2枚）。"""
     f1 = floormap_fig(
-        "1F", "受付・パッティング練習場・バーカウンター・A打席", 1600, 853,
+        "1F", "受付・パッティング練習場・バーカウンター・A打席（DTECT）", 1600, 853,
         "FRANK GOLF 姫路・土山の1階フロアマップ。エントランス、受付、パッティング練習場、バーカウンター、ショップ、トイレ2室、スタッフルーム、A打席（シミュレーター付き）、2階へ上がる階段。",
         ["エントランス", "受付", "パッティング練習場", "バーカウンター",
-         "ショップ", "A打席（シミュレーター）", "トイレ 2室", "2階へ上がる階段"])
+         "ショップ", "A打席（DTECT）", "トイレ 2室", "2階へ上がる階段"])
     f2 = floormap_fig(
         "2F", "個室の打席（B・C・D）", 1600, 906,
         "FRANK GOLF 姫路・土山の2階フロアマップ。階段を挟んでB打席、C打席、D打席の3室。各室にシミュレータースクリーンとクラブスタンドを設置。",
-        ["B打席（レフティ対応）", "C打席", "D打席（準備中）", "各室にシミュレーター"])
+        ["B打席（レフティ対応・TrackMan 4）", "C打席（OKONGOLF）", "D打席（増設予定）", "各室にシミュレーター"])
     return f"""<div class="floorplan rv">
   {f1}
   {f2}
-  <p class="floorplan__note">※ D打席はプレオープン時点では準備中です。設営が完了しだい、このページと公式LINEでお知らせいたします。<br>※ 什器の配置は変更になる場合があります。</p>
+  <p class="floorplan__note">※ オープン時は A・B・C の3打席で稼働します。<b>D打席はオープンから約3ヶ月後の増設を予定</b>しています。設営が完了しだい、このページと公式LINEでお知らせいたします。<br>※ 什器の配置は変更になる場合があります。</p>
 </div>"""
 
 
@@ -481,7 +479,7 @@ def build_index():
     """
     b = head(
         "FRANK GOLF｜姫路・土山のインドアゴルフ｜体験レッスン無料",
-        "姫路・土山のインドアゴルフスクール。PGA会員プロのマンツーマンレッスンと最新シミュレーター。体験レッスン（約55分）は通常3,300円のところ無料。2026年9月2日プレオープン。",
+        "姫路・土山のインドアゴルフスクール。所属レッスンプロ「らら」のマンツーマンレッスンと最新シミュレーター。体験レッスン（約55分）は通常3,300円のところ無料。2026年9月2日プレオープン。",
         "home",
         jsonld=jsonld_business(),
     )
@@ -515,7 +513,7 @@ def build_index():
     <dl class="stats">
       <div><dt>体験レッスン</dt><dd>無料<small>／約55分</small></dd></div>
       <div><dt>打席</dt><dd>4<small>打席</small></dd></div>
-      <div><dt>コーチ</dt><dd>PGA会員<small>常駐</small></dd></div>
+      <div><dt>コーチ</dt><dd>所属プロ<small>常駐</small></dd></div>
       <div><dt>駐車場</dt><dd>20<small>台・無料</small></dd></div>
     </dl>
   </div>
@@ -560,9 +558,9 @@ def build_index():
       </div>
       <div>
         <p class="pill">LESSON</p>
-        <h2 class="ph">PGA会員プロが、<br>マンツーマンで。</h2>
+        <h2 class="ph">所属レッスンプロが、<br>マンツーマンで。</h2>
         <p class="ph-sub">
-          <span class="jb">PGA会員</span><wbr><span class="jb">（トーナメントプレーヤー）の</span><wbr><span class="jb">藤田プロが常駐。</span><br><wbr><span class="jb">握り方から、</span><wbr><span class="jb">スコアを縮める一点まで。</span><br><wbr><span class="jb">「今日はここだけ」に</span><wbr><span class="jb">絞って教えます。</span>
+          <span class="jb">USGTFレベルⅢ、</span><wbr><span class="jb">YouTube登録者6万人超の</span><wbr><span class="jb">「らら」プロが常駐。</span><br><wbr><span class="jb">握り方から、</span><wbr><span class="jb">スコアを縮める一点まで。</span><br><wbr><span class="jb">「今日はここだけ」に</span><wbr><span class="jb">絞って教えます。</span>
         </p>
         <p style="margin-top:26px"><a class="btn btn--ghost" href="lesson.html">レッスンの詳細</a></p>
       </div>
@@ -586,7 +584,7 @@ def build_index():
         </div>
         <div class="merit__body">
           <h3 class="merit__t">周りを気にせず打てる</h3>
-          <p class="merit__b">完全予約制の4打席。順番待ちも人目もありません。左打ちの方専用の打席もあります。</p>
+          <p class="merit__b">完全予約制の3打席。順番待ちも人目もありません。左打ちの方専用の打席もあります。※4打席目はオープン約3ヶ月後に増設予定です。</p>
         </div>
       </article>
       <article class="merit">
@@ -1094,26 +1092,26 @@ def build_lesson():
     </div>
     <div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">
       <div class="media-frame media-tall">
-        <img data-img-src="lesson" src="assets/img/lesson.jpg" alt="FRANK GOLF 常駐コーチ 藤田晃規プロ（イメージ）" loading="lazy" width="1280" height="853">
-        <span class="media-cap">PGA PRO / 藤田 晃規</span>
+        <img src="assets/img/coach-rara.jpg" alt="FRANK GOLF 姫路の所属レッスンプロ 小川うらら（らら）" loading="lazy" width="1000" height="1250">
+        <span class="media-cap">FRANK GOLF PRO / RARA</span>
       </div>
       <div>
-        <p class="card__no">PGA MEMBER</p>
-        <h3 class="card__t" style="font-size:2rem">藤田 晃規</h3>
-        <p class="card__t-jp" style="margin-bottom:14px">ふじた あきのり ／ Akinori FUJITA</p>
+        <p class="card__no">HEAD COACH</p>
+        <h3 class="card__t" style="font-size:2rem">らら</h3>
+        <p class="card__t-jp" style="margin-bottom:14px">小川 うらら ／ Urara OGAWA</p>
         <p class="coach__quals" style="margin-bottom:20px">
-          <span class="qual qual--main">PGA会員（トーナメントプレーヤー）</span><span class="qual">JGTO ツアーメンバー</span>
+          <span class="qual qual--main">USGTF レベルⅢ</span><span class="qual">YouTube「RaRa LESSON」登録者6万人超</span>
         </p>
         <p class="card__b" style="margin-bottom:22px">
-          <span class="jb">公益社団法人 日本プロゴルフ協会（PGA）会員</span><wbr><span class="jb">（トーナメントプレーヤー）。</span><wbr><span class="jb">日本ゴルフツアー機構（JGTO）</span><wbr><span class="jb">ツアーメンバー。</span><wbr><strong style="color:var(--txt-str)">兵庫県出身</strong><wbr><span class="jb">・大阪学院大学卒。</span><wbr><span class="jb">2009年にプロ転向、</span><wbr><span class="jb">アマチュア時代は</span><wbr><span class="jb">日本アマチュア選手権ベスト16。</span><wbr><span class="jb">地元・姫路土山で、</span><wbr><span class="jb">あなたの一球に</span><wbr><span class="jb">フランクに向き合います。</span>
+          <span class="jb">FRANK GOLFのメインコーチ。</span><wbr><span class="jb">チャンネル登録者数約6万人の</span><wbr><span class="jb">レッスン系YouTuber</span><wbr><span class="jb">「RaRa LESSON」として活動し、</span><wbr><span class="jb">ジュニア時代は全国大会に出場するなど</span><wbr><span class="jb">競技経験も豊富です。</span><wbr><strong style="color:var(--txt-str)">「何を直せばいいか分からない」から卒業。</strong><wbr><span class="jb">一人ひとりに寄り添って、</span><wbr><span class="jb">もっとゴルフが楽しくなるレッスンを</span><wbr><span class="jb">お届けします。</span>
         </p>
         <ul class="plan__f" style="font-size:13.5px">
-          <li>PGA（日本プロゴルフ協会）会員／トーナメントプレーヤー</li>
-          <li>JGTO（日本ゴルフツアー機構）ツアーメンバー</li>
-          <li>出身地：兵庫県</li>
-          <li>ゴルフ歴：15歳〜／2009年プロ転向</li>
+          <li>USGTF（全米ゴルフ指導者連盟）レベルⅢ 認定</li>
+          <li>YouTube「RaRa LESSON」チャンネル登録者6万人超</li>
+          <li>ジュニア時代は全国大会に出場</li>
+          <li>FRANK GOLF 姫路 メインコーチ</li>
         </ul>
-        <p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="https://www.jgto.org/player/15674/profile" target="_blank" rel="noopener">JGTO 選手プロフィール ↗</a></p>
+        <p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="https://www.youtube.com/channel/UC4QTQjrDLsx4WF3fdYuLHZQ" target="_blank" rel="noopener">無料レッスン動画を見る（YouTube） ↗</a></p>
       </div>
     </div>
   </div>
@@ -2075,7 +2073,7 @@ def build_lp_trial():
       <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">選ばれる3つの理由</h2>
       <div class="flow" style="margin-top:24px">
         <div class="flow__i"><p class="flow__n">01</p><div><h3 class="flow__t">ツアープロが常駐</h3><p class="flow__b">レッスンは<span data-frank="lesson.coaches" data-frank-fallback="ツアープロ">ツアープロ</span>が担当。会員は「求めたときに5〜10分」のワンポイント指導を受け放題感覚で。</p></div></div>
-        <div class="flow__i"><p class="flow__n">02</p><div><h3 class="flow__t">最新シミュレーター×完全予約制</h3><p class="flow__b"><span data-frank="store.simulator" data-frank-fallback="最新シミュレーター4打席">最新シミュレーター4打席</span>。完全予約制なので待ち時間ゼロ。天候も日焼けも関係なく、データで上達できます。</p></div></div>
+        <div class="flow__i"><p class="flow__n">02</p><div><h3 class="flow__t">最新シミュレーター×完全予約制</h3><p class="flow__b"><span data-frank="store.simulator" data-frank-fallback="最新シミュレーター3打席">最新シミュレーター3打席</span>。完全予約制なので待ち時間ゼロ。天候も日焼けも関係なく、データで上達できます。</p></div></div>
         <div class="flow__i"><p class="flow__n">03</p><div><h3 class="flow__t">バーラウンジ併設</h3><p class="flow__b">元ゴルフバーのカウンターを承継した交流空間。練習の前後に一杯、ゴルフ談義まで楽しめる「大人のゴルフ基地」です。</p></div></div>
       </div>
     </div>
