@@ -813,3 +813,22 @@
   受付チェックイン画面でも選べるが、あちらは**お客様側を向いた画面**で、お客様が待っている前での操作になる。
   **教訓**: 「押し忘れても自動で閉じる」を先に作ったせいで、**押す場所が無いこと自体に気づけなかった**。
   自動フォールバックがあるUIは、手動の入口が生きているかを別に確かめる必要がある（#161 と同じ構図）。
+
+- #165 (2026-08-27) **⚠ 本番デプロイが5本連続で失敗していた: `packages/core` の拡張子つき相対 import**（コード変更なし・tsconfigのみ）。
+  ユーザーが `/orders` を見て「退店ボタンが無い」と報告。**押す場所が無いのではなく、#164 が本番に出ていなかった**。
+  **(a) 症状** — `git push` は通るが Vercel が ERROR。本番は `bf5fe8d`（#162より前）を配信し続けていた。**サイトは落ちない**ので気づきにくい。
+  ```
+  Type error: An import path can only end with a '.ts' extension
+  when 'allowImportingTsExtensions' is enabled.
+    packages/core/src/frank-booking.ts:14  import { isJpHoliday } from "./jp-holidays.ts";
+  ```
+  **(b) 原因** — `packages/core` の中で相対 import に `.ts` を付けると、**それを読む全アプリの型チェックが落ちる**。
+  `apps/shift-cloud` と `apps/swing-cortex` だけ `allowImportingTsExtensions: true` が入っていたので、
+  リポジトリ内に前例があり「この書き方でよい」と誤認した。**core は全アプリが読む＝一番厳しいtsconfigに合わせる必要がある**。
+  同じ形の import が #162（`./frank-token.ts`）と祝日判定（`./jp-holidays.ts`）で**別々に同時に入った**。
+  **(c) 対応** — `noEmit: true` を持つ全12アプリの tsconfig に `allowImportingTsExtensions: true` を追加（既存2アプリと同じ設定に揃えた）。
+  拡張子を外す案は採らなかった。**`node --test` は拡張子なしの相対 import を解決できず、テストが動かなくなる**ため（両方を満たすのはこちら側）。
+  **(d) 教訓 ①** — `packages/core` を触ったら、**core を読むアプリのどれか1つで型チェックが通ることを確認するまで完了ではない**。テストが全通過しても型は別。
+  **(e) 教訓 ② これが一番重い** — **push した後、Vercel が READY になったことを確認していなかった**。
+  ERROR でも本番は古い版を配信し続けるので、画面は「普通に動いている」ように見える。#161（決済が全件失敗しても画面は正常）と同じ壊れ方を、今度はデプロイで踏んだ。
+  **以後、push を依頼したら必ずデプロイの状態まで見に行くこと。**
