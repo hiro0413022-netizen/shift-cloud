@@ -496,7 +496,7 @@ def build_index():
         <span class="s2">教わると<span class="hl">面白い</span>。</span>
       </h1>
       <p class="phero__lead">
-        <span class="jb">クラブを握ったことが</span><wbr><span class="jb">なくても大丈夫。</span><br><wbr><span class="jb">ツアープロが</span><wbr><span class="jb">マンツーマンで、</span><wbr><span class="jb">あなたの一球を見ます。</span>
+        <span class="jb">クラブを握ったことが</span><wbr><span class="jb">なくても大丈夫。</span><br><wbr><span class="jb">所属プロが</span><wbr><span class="jb">マンツーマンで、</span><wbr><span class="jb">あなたの一球を見ます。</span>
       </p>
       <div class="phero__cta">
         <a class="btn btn--brass" href="#" data-cta="trial">体験レッスンを予約（無料）</a>
@@ -506,13 +506,13 @@ def build_index():
     <div class="phero__pic">
       <div class="phero__stamp"><b>無料</b><span>TRIAL LESSON</span></div>
       <img data-img-src="hero" src="assets/img/hero-1.jpg" width="1600" height="900"
-           alt="FRANK GOLF 姫路・土山の店舗外観。インドアゴルフ練習場＆ゴルフスクール">
+           alt="FRANK GOLF 姫路・土山の店舗外観。看板「ゴルフは、教わると面白い」・完全個室のインドアゴルフ練習場">
     </div>
   </div>
   <div class="wrap">
     <dl class="stats">
       <div><dt>体験レッスン</dt><dd>無料<small>／約55分</small></dd></div>
-      <div><dt>打席</dt><dd>4<small>打席</small></dd></div>
+      <div><dt>打席</dt><dd>3<small>打席</small></dd></div>
       <div><dt>コーチ</dt><dd>所属プロ<small>常駐</small></dd></div>
       <div><dt>駐車場</dt><dd>20<small>台・無料</small></dd></div>
     </dl>
@@ -2044,7 +2044,7 @@ def build_lp_trial():
         ("体験に行ったら入会しないといけませんか？", "いいえ。強引な勧誘は一切いたしません。料金のご説明のみで、お持ち帰りでのご検討も歓迎です。"),
     ])
     b = head("【無料】プロの体験レッスン55分｜姫路・土山のインドアゴルフ FRANK GOLF",
-             "姫路・土山のインドアゴルフ FRANK GOLF。ツアープロのマンツーマン体験レッスン（約55分・通常3,300円）がいまなら無料。最新シミュレーター完備・手ぶらでOK・強引な勧誘なし。",
+             "姫路・土山のインドアゴルフ FRANK GOLF。所属レッスンプロのマンツーマン体験レッスン（約55分・通常3,300円）がいまなら無料。最新シミュレーター完備・手ぶらでOK・強引な勧誘なし。",
              "lp-trial", jsonld=faq)
     b += f"""
 <section class="page-head">
@@ -2053,7 +2053,7 @@ def build_lp_trial():
     <h1 class="h-en">まず、1球打ってみませんか。</h1>
     <p class="h-jp">プロのマンツーマン体験レッスン（約55分）が、いまなら無料。</p>
     <p class="lead">通常3,300円（税込）の体験レッスンを、プレオープン記念で無料でご案内しています。
-    最新シミュレーターでスイングを数字で見ながら、ツアープロがその場でひとつ、変化をつくります。
+    最新シミュレーターでスイングを数字で見ながら、所属プロがその場でひとつ、変化をつくります。
     手ぶらでOK・強引な勧誘は一切ありません。</p>
   </div>
 </section>
@@ -2072,7 +2072,7 @@ def build_lp_trial():
       <p class="eyebrow">Why FRANK GOLF</p>
       <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">選ばれる3つの理由</h2>
       <div class="flow" style="margin-top:24px">
-        <div class="flow__i"><p class="flow__n">01</p><div><h3 class="flow__t">ツアープロが常駐</h3><p class="flow__b">レッスンは<span data-frank="lesson.coaches" data-frank-fallback="ツアープロ">ツアープロ</span>が担当。会員は「求めたときに5〜10分」のワンポイント指導を受け放題感覚で。</p></div></div>
+        <div class="flow__i"><p class="flow__n">01</p><div><h3 class="flow__t">所属レッスンプロが常駐</h3><p class="flow__b">レッスンは<span data-frank="lesson.coaches" data-frank-fallback="所属レッスンプロ">所属レッスンプロ</span>が担当。会員は「求めたときに5〜10分」のワンポイント指導を受け放題感覚で。</p></div></div>
         <div class="flow__i"><p class="flow__n">02</p><div><h3 class="flow__t">最新シミュレーター×完全予約制</h3><p class="flow__b"><span data-frank="store.simulator" data-frank-fallback="最新シミュレーター3打席">最新シミュレーター3打席</span>。完全予約制なので待ち時間ゼロ。天候も日焼けも関係なく、データで上達できます。</p></div></div>
         <div class="flow__i"><p class="flow__n">03</p><div><h3 class="flow__t">バーラウンジ併設</h3><p class="flow__b">元ゴルフバーのカウンターを承継した交流空間。練習の前後に一杯、ゴルフ談義まで楽しめる「大人のゴルフ基地」です。</p></div></div>
       </div>

@@ -110,7 +110,7 @@ window.FRANK = {
   images: {
     /* ★実写の中身に合わせた割り当て（ファイル名は歴史的経緯でズレているので、
        「どの写真か」はここで決めます。差し替えるときは同じファイル名で上書き） */
-    hero:      "assets/img/hero-1.jpg",   // 店舗外観（看板つき・実写）
+    hero:      "assets/img/hero-1.jpg",   // 店舗外観（2026-08-27 最新の実写に差し替え・看板つき）
     hero2:     "assets/img/hero-2.jpg",   // 打席＋シミュレーター
     hero3:     "assets/img/hero-3.jpg",   // レッスン風景
     exterior:  "assets/img/hero-1.jpg",   // 外観
