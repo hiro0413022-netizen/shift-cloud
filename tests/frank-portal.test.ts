@@ -18,6 +18,8 @@ import {
   greetingLines,
   daysBetween,
   bayQrUrl,
+  squareOrderIdempotencyKey,
+  SQUARE_IDEMPOTENCY_MAX,
   type MenuItem,
 } from "../packages/core/src/frank-portal.ts";
 
@@ -143,4 +145,20 @@ test("間隔が空いていなければ「前回から」は出さない", () =>
 // --- 打席QR -----------------------------------------------------
 test("打席QRは会員/ビジターで分けない1本のURL", () => {
   assert.equal(bayQrUrl("https://my.frankgolf.jp/", "bay-1f-l"), "https://my.frankgolf.jp/bay/bay-1f-l");
+});
+
+// --- Square の冪等キー -------------------------------------------
+// #161: 本番で「Field must not be greater than 45 length」が出て
+//       モバイルオーダーの決済が1件も通らなかった。長さを固定する。
+test("Squareの冪等キーは45文字を超えない（UUIDでも収まる）", () => {
+  const uuid = "0123abcd-4567-89ef-0123-456789abcdef"; // 36文字
+  const key = squareOrderIdempotencyKey(uuid);
+  assert.ok(key.length <= SQUARE_IDEMPOTENCY_MAX, `${key.length}文字ある: ${key}`);
+  assert.match(key, /^fo-/);
+});
+
+test("同じ注文IDなら毎回同じ冪等キー（二重課金しない）", () => {
+  const uuid = "0123abcd-4567-89ef-0123-456789abcdef";
+  assert.equal(squareOrderIdempotencyKey(uuid), squareOrderIdempotencyKey(uuid));
+  assert.notEqual(squareOrderIdempotencyKey(uuid), squareOrderIdempotencyKey(uuid.replace("0123a", "9999a")));
 });

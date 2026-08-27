@@ -753,3 +753,21 @@
   **誰も SQUARE_ACCESS_TOKEN を手元にコピーしていない**。使ったワンショットトークンは実行後すぐ失効させた（`gn_ops_tokens.expires_at` を過去に更新）。
   **(b) 公式LINE** — 友だち追加URL `https://lin.ee/Xl0L2k7` を member-os の env `NEXT_PUBLIC_FRANK_LINE_URL` に設定し再デプロイ。ポータルに公式LINEボタンが出るようになった。
   **(c) Vault を更新** — 「スクエア」に今回の追記（**SQUARE_ACCESS_TOKEN は Vercel env が正・type=encryptedなので表示可能／LOCATION_ID と WEBHOOK_SIGNATURE_KEY は sensitive で表示不可**）、および新規レコード「FRANK 会員ポータル（お客様用）」を追加（URL・画面一覧・env・価格の同期注意）。
+
+- #160 (2026-08-26) **重複会員 FR0004 を FR0002 に統合**（コード変更なし・MCPで実施）。ユーザー確認「両方僕なのでFR0002だけ残して消してOK」。
+  **(a) 物理削除ではなく論理削除**（`deleted_at` ＋ `status='left'`）。この台帳の作法で、集計から外れて履歴は残る。`note` に統合の経緯を書いた。
+  **(b) ⚠ 消す前に気づいたこと: レッスンカルテの実データが「消す側」FR0004 にぶら下がっていた** — 動画1・コメント1・計測1・進捗9件・共有トークン1。FR0002側は空だった。
+  そのまま消していたら **Lesson OS にある唯一の実データを失っていた**（[[lesson-os-status]] の「動画2本」がこれ）。
+  `lsn_videos` / `lsn_measurements` / `lsn_progress` / `lsn_share_tokens` の `student_id` を FR0002 の生徒へ付け替えてから、空になった FR0004 の生徒カルテを論理削除した。
+  **教訓: 会員を消す前に、必ず lsn_* のぶら下がりを数える。** 予約・来店・注文がゼロでもカルテは残っていることがある。
+  **(c) 在籍会員数** — FR0004 を落としたが、同時刻に小川さんのテスト会員 FR0005 が増えたため 4 のまま（数字だけ見て「消えていない」と誤読しないこと）。
+
+- #161 (2026-08-26) **⚠ 本番バグ修正: Square の idempotency_key が45文字を超え、モバイルオーダーの決済が1件も通っていなかった**。
+  小川さんの実機テスト（FR0005・A打席・コーヒー300円）で発覚。`frunk_orders.payment_error` に
+  `Field must not be greater than 45 length` が残っていた。
+  **原因**: #154 で入れた `` `frank-order-${orderId}` `` が **12 + UUID36 = 48文字**。Square Payments API の `idempotency_key` 上限は **45文字**。
+  400 が返るので `chargeOrderOnFile` は必ず失敗し、**全注文が「未決済（退店時会計）」にフォールバックしていた**。
+  設計どおり注文自体は止まらなかったので画面上は正常に見え、**DBの payment_error を見るまで誰も気づけなかった**。
+  **修正**: 接頭辞を `fo-` にして39文字に収め、組み立てを `packages/core` の `squareOrderIdempotencyKey()` に集約。
+  **長さをテストで固定**（`tests/frank-portal.test.ts`・401件全通過）。今後 idempotency_key に接頭辞を足すときは必ずこの関数を通すこと。
+  **教訓**: 「注文を止めない」フォールバックは正しいが、**失敗が画面に出ない分、決済の疎通は必ず実データで確認する**必要がある。

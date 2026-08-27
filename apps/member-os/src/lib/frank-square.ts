@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "crypto";
+import { squareOrderIdempotencyKey } from "@yozan/core/frank-portal";
 
 /**
  * FRANK GOLF member-os → Square 操作（#124）
@@ -108,6 +109,7 @@ export async function chargeCardOnFile(input: {
  * chargeCardOnFile との違いは2つだけ:
  *   - **idempotency_key に注文IDを使う**。randomUUID だとリトライで二重課金になる。
  *     同じ注文は何度呼んでも Square 側で1回しか通らない。
+ *     ⚠ ただし **Square の上限は45文字**。接頭辞を足すと簡単に超える（#161）。
  *   - payment.id を返す（frunk_orders.square_payment_id に入れて Webhook と突き合わせる）。
  *
  * 失敗しても throw しない。呼び出し側は「未決済のまま伝票に出す」で処理を続ける
@@ -125,7 +127,9 @@ export async function chargeOrderOnFile(input: {
     const card = ((cards.cards as Array<{ id?: string; enabled?: boolean }> | undefined) ?? []).find((c) => c.enabled !== false);
     if (!card?.id) return { ok: false, error: "no_card" };
     const res = await sq("POST", "/payments", {
-      idempotency_key: `frank-order-${input.idempotencyKey}`,
+      // ⚠ Square の idempotency_key は **45文字まで**（#161・本番で発覚）。
+      //   長さの担保は core の純関数に寄せてテストで固定してある。ここで組み立て直さないこと。
+      idempotency_key: squareOrderIdempotencyKey(input.idempotencyKey),
       source_id: card.id,
       customer_id: input.customerId,
       amount_money: { amount: input.amountTaxIncluded, currency: "JPY" },

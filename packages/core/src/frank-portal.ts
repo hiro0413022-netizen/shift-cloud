@@ -189,3 +189,18 @@ export function bayQrUrl(portalBaseUrl: string, bayCode: string): string {
 export function tokenFingerprint(token: string): string {
   return createHash("sha256").update(token).digest("hex").slice(0, 12);
 }
+
+// ---------------------------------------------------------------
+// Square の冪等キー
+// ---------------------------------------------------------------
+/**
+ * Square Payments API の idempotency_key の上限（#161・本番で発覚）。
+ * `frank-order-`(12) + UUID(36) = 48 で全件 400（Field must not be greater than 45 length）になり、
+ * モバイルオーダーの決済が1件も通らなかった。接頭辞を足すときは必ずここを通すこと。
+ */
+export const SQUARE_IDEMPOTENCY_MAX = 45;
+
+/** 注文IDから Square の冪等キーを作る。同じ注文なら常に同じ値（＝二重課金しない）。 */
+export function squareOrderIdempotencyKey(orderId: string): string {
+  return `fo-${orderId}`.slice(0, SQUARE_IDEMPOTENCY_MAX);
+}
