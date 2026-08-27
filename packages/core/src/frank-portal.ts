@@ -5,24 +5,14 @@
 
 import { createHash, randomBytes } from "node:crypto";
 
+import { CHECKIN_TOKEN_ALPHABET, CHECKIN_TOKEN_LENGTH, CHECKIN_TOKEN_RE } from "./frank-token.ts";
+
 // ---------------------------------------------------------------
 // 会員証トークン
 // ---------------------------------------------------------------
-/**
- * 使う文字は 数字＋英大文字のみ、さらに 0/O・1/I/L を除いた32文字。
- *
- * なぜ記号と小文字を使わないか:
- *   受付のバーコードリーダー(Tera 9200)は USB HIDキーボードとして文字を「打つ」。
- *   既定はUS配列なので、日本語配列のPCに繋ぐと記号が化ける（- / _ \ など）。
- *   数字＋英大文字だけなら配列設定が何であっても化けない。
- *   仮想COM(シリアル)に切り替えても同じく安全なので、後から切り替えても影響しない。
- * なぜ 0/O・1/I/L を抜くか:
- *   スタッフが画面の文字を読んで手入力する場面（リーダー故障時）で誤りやすいため。
- */
-export const CHECKIN_TOKEN_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
-export const CHECKIN_TOKEN_LENGTH = 16;
-
-const TOKEN_RE = new RegExp(`^[${CHECKIN_TOKEN_ALPHABET}]{${CHECKIN_TOKEN_LENGTH}}$`);
+// トークンの文字集合・長さ・形の判定は frank-token.ts（node非依存）に置いてある。
+// 画面側（クライアントコンポーネント）からも同じ定義を読ませるため。
+export { CHECKIN_TOKEN_ALPHABET, CHECKIN_TOKEN_LENGTH } from "./frank-token.ts";
 
 /** 会員証QRの中身を作る。会員番号(FR0001=連番)は絶対に使わない（他人がQRを自作できるため）。 */
 export function newCheckinToken(): string {
@@ -52,7 +42,7 @@ export function newCheckinToken(): string {
 export function normalizeCheckinScan(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const s = raw.replace(/[\s　]+/g, "").toUpperCase();
-  return TOKEN_RE.test(s) ? s : null;
+  return CHECKIN_TOKEN_RE.test(s) ? s : null;
 }
 
 /** 会員証QRに載せるURL。読み取り機はこの文字列ではなくトークン単体を送る（下の QR は表示用）。 */

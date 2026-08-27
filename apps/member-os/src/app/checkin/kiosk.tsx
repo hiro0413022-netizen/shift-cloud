@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CHECKIN_TOKEN_ALPHABET, CHECKIN_TOKEN_LENGTH } from "@yozan/core/frank-token";
 
 type Bay = { id: string; name: string };
 type Ok = {
@@ -10,8 +11,33 @@ type Ok = {
 };
 type Ng = { ok: false; reason: string; message: string };
 type Result = Ok | Ng;
+type Diag = { raw: string; len: number; ms: number; end: "enter" | "idle"; reason: string; hint: string };
 
 const RESET_MS = 8000;
+
+/**
+ * リーダーが打ち終わってからこれだけ静かなら、Enter が来なくても送る（#162）。
+ * HIDリーダーは1文字を数ミリ秒間隔で打ち込むので、140ms 空いたら「打ち終わった」と見てよい。
+ * Tera 9200 の Suffix=Enter が未設定のままでも動かすための保険。
+ * 設定してあれば Enter 側が先に飛ぶので、この保険は出番がない。
+ */
+const SCAN_IDLE_MS = 140;
+const SCAN_MIN_LEN = 6;
+
+function hintFor(raw: string, r: Result): string {
+  if (r.ok) return "OK（チェックイン成立）";
+  if (r.reason !== "invalid") return r.message;
+  // サーバ側 normalizeCheckinScan と同じ正規化をしてから見る（小文字と空白は救済される）
+  const s = raw.replace(/[\s\u3000]+/g, "").toUpperCase();
+  const bad = Array.from(new Set(Array.from(s).filter((c) => !CHECKIN_TOKEN_ALPHABET.includes(c))));
+  if (bad.length > 0) {
+    return `会員証QRに無い文字が混ざっています（${bad.slice(0, 8).join("")}）。リーダーのキーボード配列が日本語になっている可能性`;
+  }
+  if (s.length !== CHECKIN_TOKEN_LENGTH) {
+    return `${s.length}文字（正しくは${CHECKIN_TOKEN_LENGTH}文字）。読み取り途中で送信された可能性`;
+  }
+  return "会員証QRではありません（商品バーコード等）。これは無視されます";
+}
 
 /**
  * 受付チェックイン画面（#154 / 構想 §5）
@@ -19,8 +45,12 @@ const RESET_MS = 8000;
  * この画面は **お客様側を向いている**。スタッフのメールや他のお客様の情報は出さない。
  * 出すのは 氏名・プラン・打席・声かけカード まで（生年月日や住所は出さない）。
  *
- * リーダーは USB HIDキーボードなので、画面側は「入力欄にフォーカスを当てておく」だけでよい。
- * フォーカスが外れると読み取りが迷子になるので、blur とクリックのたびに取り戻す。
+ * 読み取りの受け方（#162 で変更）:
+ *   リーダーは USB HIDキーボードなので、以前は「隠し入力欄にフォーカスを当てて Enter を待つ」形だった。
+ *   これは (1) フォーカスが外れると無反応 (2) Suffix=Enter 未設定だと無反応 の2つで沈黙する。
+ *   設置当日にどちらなのか切り分けられないのが致命的だったので、
+ *   window の keydown を直接拾い、Enter が来なくても打ち終わりで送る形にした。
+ *   ?debug=1 を付けると、読めた生文字列と却下理由が画面下に出る（設置と設定確認用）。
  */
 export function CheckinKiosk({ bays }: { bays: Bay[] }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +59,26 @@ export function CheckinKiosk({ bays }: { bays: Bay[] }) {
   const [manual, setManual] = useState(false);
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<Array<{ id: string; member_no: string; name: string; phone: string | null }>>([]);
+
+  const [debug, setDebug] = useState(false);
+  const [live, setLive] = useState("");
+  const [diag, setDiag] = useState<Diag | null>(null);
+
+  // window のリスナーからは state が古く見えるので、判定に使うものは ref にも置く
+  const busyRef = useRef(false);
+  const manualRef = useRef(false);
+  const debugRef = useRef(false);
+  const bufRef = useRef("");
+  const t0Ref = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { manualRef.current = manual; }, [manual]);
+
+  useEffect(() => {
+    const on = new URLSearchParams(window.location.search).get("debug") === "1";
+    debugRef.current = on;
+    setDebug(on);
+  }, []);
 
   const focus = useCallback(() => {
     if (!manual) inputRef.current?.focus();
@@ -54,20 +104,61 @@ export function CheckinKiosk({ bays }: { bays: Bay[] }) {
     return (await res.json()) as Result;
   };
 
-  const onScan = async (raw: string) => {
+  const onScan = useCallback(async (raw: string, end: "enter" | "idle", ms: number) => {
     const token = raw.trim();
-    if (!token || busy) return;
+    if (!token || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
       const r = await post({ action: "scan", token });
+      if (debugRef.current) {
+        setDiag({ raw: token, len: token.length, ms, end, reason: r.ok ? "ok" : r.reason, hint: hintFor(token, r) });
+      }
       // 形式違い（商品バーコード等）は画面を汚さずに捨てる
       if (!r.ok && r.reason === "invalid") return;
       setResult(r);
     } finally {
+      busyRef.current = false;
       setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
     }
-  };
+  }, []);
+
+  // リーダーの打ち込みを window で受ける（フォーカスが外れていても拾える）
+  useEffect(() => {
+    const flush = (end: "enter" | "idle") => {
+      const raw = bufRef.current;
+      const ms = t0Ref.current ? Date.now() - t0Ref.current : 0;
+      bufRef.current = "";
+      t0Ref.current = 0;
+      if (debugRef.current) setLive("");
+      if (raw.length >= SCAN_MIN_LEN) void onScan(raw, end, ms);
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (manualRef.current) return; // 手動チェックインの検索中は普通の入力
+      const el = e.target as HTMLElement | null;
+      if (el && el !== inputRef.current && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+
+      if (e.key === "Enter") {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        flush("enter");
+        return;
+      }
+      if (e.key.length !== 1) return; // Shift・矢印などは無視
+
+      if (!bufRef.current) t0Ref.current = Date.now();
+      bufRef.current += e.key;
+      if (debugRef.current) setLive(bufRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => flush("idle"), SCAN_IDLE_MS);
+    };
+
+    window.addEventListener("keydown", onKey, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [onScan]);
 
   const search = async (value: string) => {
     setQ(value);
@@ -100,16 +191,18 @@ export function CheckinKiosk({ bays }: { bays: Bay[] }) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-8" onClick={focus}>
-      {/* リーダーが打ち込む先。見えている必要はないが、画面外に置くとブラウザがフォーカスを外す */}
+      {/* 打ち込み先の受け皿。読み取りは window で拾うので、ここは文字を溜めない（readOnly）。
+          それでもフォーカスを当てておくのは、ブラウザのショートカット（Firefoxのクイック検索等）に
+          文字を食われないようにするため。 */}
       <input
         ref={inputRef}
         type="text"
+        readOnly
         inputMode="none"
         autoComplete="off"
+        tabIndex={-1}
+        aria-hidden
         className="absolute h-px w-px opacity-0"
-        onKeyDown={(e) => {
-          if (e.key === "Enter") { e.preventDefault(); void onScan((e.target as HTMLInputElement).value); }
-        }}
       />
 
       {!result && !manual && (
@@ -200,6 +293,25 @@ export function CheckinKiosk({ bays }: { bays: Bay[] }) {
           {/* 設置時と設定確認のための出口。お客様側を向いている画面なので目立たせない */}
           <a href="/orders" className="fixed bottom-5 left-6 text-xs text-(--color-dim)/50">受付へ戻る</a>
         </>
+      )}
+
+      {debug && (
+        // 設置・設定確認用。お客様側を向く画面なので ?debug=1 のときだけ出す
+        <div className="fixed inset-x-0 bottom-0 border-t border-(--color-line) bg-black/85 px-5 py-3 text-left font-mono text-xs leading-relaxed text-white">
+          <p className="text-(--color-gold)">診断モード（URLから ?debug=1 を外すと消えます）</p>
+          <p className="mt-1">入力中: {live || "（待機中）"}</p>
+          {diag ? (
+            <>
+              <p className="mt-1">
+                受信: {diag.raw} ／ {diag.len}文字 ／ {diag.ms}ms ／ 終端=
+                {diag.end === "enter" ? "Enter あり" : "Enter なし（打ち終わりで自動送信）"} ／ 結果={diag.reason}
+              </p>
+              <p className="mt-0.5 text-(--color-gold)">→ {diag.hint}</p>
+            </>
+          ) : (
+            <p className="mt-1">まだ1件も読み取っていません。1文字も出ないときはリーダーがPCに認識されていません</p>
+          )}
+        </div>
       )}
     </div>
   );

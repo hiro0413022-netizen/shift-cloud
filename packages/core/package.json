@@ -9,6 +9,7 @@
     "./frank-booking": "./src/frank-booking.ts",
     "./frank-handoff": "./src/frank-handoff.ts",
     "./frank-portal": "./src/frank-portal.ts",
+    "./frank-token": "./src/frank-token.ts",
     "./frank-walkin": "./src/frank-walkin.ts",
     "./incidents": "./src/incidents.ts",
     "./jst": "./src/jst.ts",

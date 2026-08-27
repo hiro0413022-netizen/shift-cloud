@@ -7,6 +7,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  CHECKIN_TOKEN_ALPHABET as TOKEN_ALPHABET,
+  CHECKIN_TOKEN_LENGTH as TOKEN_LENGTH,
+  isCheckinTokenShape,
+} from "../packages/core/src/frank-token.ts";
+import {
   newCheckinToken,
   normalizeCheckinScan,
   CHECKIN_TOKEN_ALPHABET,
@@ -161,4 +166,33 @@ test("同じ注文IDなら毎回同じ冪等キー（二重課金しない）", 
   const uuid = "0123abcd-4567-89ef-0123-456789abcdef";
   assert.equal(squareOrderIdempotencyKey(uuid), squareOrderIdempotencyKey(uuid));
   assert.notEqual(squareOrderIdempotencyKey(uuid), squareOrderIdempotencyKey(uuid.replace("0123a", "9999a")));
+});
+
+// --- 受付リーダーの読み取り（#162） -------------------------------
+// トークンの「形」だけを frank-token.ts に切り出した。
+// 受付画面（クライアント）が同じ定義を読むためで、コピーを作らないことが目的。
+// ここが frank-portal.ts の再エクスポートと食い違うと、
+// 画面の診断表示だけが嘘をつく（現場でいちばん困る壊れ方）ので固定しておく。
+test("トークンの定義は frank-token.ts が正典で、frank-portal.ts はそれを再エクスポートしている", () => {
+  assert.equal(TOKEN_ALPHABET, CHECKIN_TOKEN_ALPHABET);
+  assert.equal(TOKEN_LENGTH, CHECKIN_TOKEN_LENGTH);
+});
+
+test("トークンの文字集合に記号・小文字・紛らわしい文字を入れない", () => {
+  // 記号が入るとキーボード配列(US/JP)の違いでリーダーの打ち込みが化ける
+  assert.match(CHECKIN_TOKEN_ALPHABET, /^[0-9A-Z]+$/);
+  for (const c of "01OIL") {
+    assert.ok(!CHECKIN_TOKEN_ALPHABET.includes(c), `${c} は手入力で誤りやすいので入れない`);
+  }
+});
+
+test("isCheckinTokenShape は normalizeCheckinScan と同じ判定になる", () => {
+  const good = newCheckinToken();
+  assert.ok(isCheckinTokenShape(good));
+  assert.equal(normalizeCheckinScan(good), good);
+
+  for (const bad of ["", "ABC", good.slice(0, 15), `${good}X`, good.replace(/^./, "0"), "4901234567894"]) {
+    assert.ok(!isCheckinTokenShape(bad), `${bad} は弾く`);
+    assert.equal(normalizeCheckinScan(bad), null);
+  }
 });
