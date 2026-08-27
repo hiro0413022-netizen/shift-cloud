@@ -116,7 +116,7 @@ window.FRANK = {
     exterior:  "assets/img/hero-1.jpg",   // 外観
     bay:       "assets/img/play.jpg",     // 打席（テーブル・ワイン付き）
     sim:       "assets/img/hero-2.jpg",   // シミュレーター
-    lessonPic: "assets/img/hero-3.jpg",   // レッスン（★lesson.jpg は料理写真なので使わない）
+    lessonPic: "assets/img/lesson-rara.jpg",   // レッスン＝ららプロの実写（★lesson.jpg は料理写真なので使わない）
     lounge:    "assets/img/lounge.jpg",   // バーカウンター
     food:      "assets/img/lesson.jpg",   // ラウンジのフード（実体は料理写真）
     community: "assets/img/community.jpg",// ソファ席・パーティースペース
