@@ -28,8 +28,10 @@
 alter table lsn_video_pose
   add column if not exists club  jsonb,
   add column if not exists plane jsonb,
+  add column if not exists diag  jsonb,
   add column if not exists src_fps numeric(6, 2);
 
 comment on column lsn_video_pose.club    is 'クラブヘッド軌跡 {v,t[],p[[x,y,conf]],clubLen}。x,yは1000倍の整数・confは0〜100。検出できないコマは空配列';
 comment on column lsn_video_pose.plane   is 'スイングプレーンの基準線 {x1,y1,x2,y2,_method:"address"|"manual"}。0〜1の正規化座標';
+comment on column lsn_video_pose.diag    is 'クラブ検出がどこで落ちたか {frames,withPose,withRay,kept,final,thr,fill,conf}。「取れませんでした」だけだと現場で打つ手が無いので必ず残す';
 comment on column lsn_video_pose.src_fps is '動画の実測フレームレート（requestVideoFrameCallbackで計測）。取れなければ null';

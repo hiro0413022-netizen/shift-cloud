@@ -27,3 +27,6 @@ apps/genesis/src/assets/NotoSansJP-Regular.otf
 
 # MediaPipe の wasm/モデル（計10MB）。ビルド時に scripts/prepare-mediapipe.mjs が置く
 apps/lesson-os/public/mp/
+
+# クラブ検出の検証用に置く実動画（顧客の映像なのでコミット禁止）
+_swing_sample/

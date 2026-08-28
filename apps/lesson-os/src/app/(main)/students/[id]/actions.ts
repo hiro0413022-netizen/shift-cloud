@@ -492,6 +492,22 @@ export async function measurePhotoUrl(measurementId: string): Promise<{ url?: st
 type PoseDataIn = { v: 1; t: number[]; p: number[][] };
 type ClubDataIn = { v: 1; t: number[]; p: number[][]; clubLen: number };
 type PlaneIn = { x1: number; y1: number; x2: number; y2: number; _method: "address" | "manual" };
+/** クラブ検出がどこで落ちたか。取れなかったときに現場で打つ手を決めるための数字 */
+type ClubDiagIn = {
+  frames: number; withPose: number; withRay: number; kept: number; final: number;
+  thr: number; fill: number; conf: number;
+};
+const DIAG_KEYS = ["frames", "withPose", "withRay", "kept", "final", "thr", "fill", "conf"] as const;
+function cleanDiag(d: unknown): ClubDiagIn | null {
+  if (!d || typeof d !== "object") return null;
+  const src = d as Record<string, unknown>;
+  const out = {} as Record<string, number>;
+  for (const k of DIAG_KEYS) {
+    const n = Number(src[k]);
+    out[k] = isFinite(n) ? Math.round(n) : 0;
+  }
+  return out as unknown as ClubDiagIn;
+}
 
 const num01 = (n: unknown) => (typeof n === "number" && isFinite(n) ? Math.max(-2, Math.min(3, n)) : null);
 
@@ -520,6 +536,7 @@ export async function savePose(
     data: PoseDataIn;
     club?: ClubDataIn | null;
     plane?: PlaneIn | null;
+    diag?: ClubDiagIn | null;
   }
 ): Promise<{ error?: string }> {
   const { actor, admin, video } = await ownVideo(videoId);
@@ -558,6 +575,7 @@ export async function savePose(
       data: { v: 1, t, p },
       club,
       plane: cleanPlane(track.plane),
+      diag: cleanDiag(track.diag),
       analyzed_by: actor.staffId,
       updated_at: new Date().toISOString(),
     },
@@ -578,6 +596,7 @@ export type LoadedPose = {
   data: PoseDataIn;
   club: ClubDataIn | null;
   plane: PlaneIn | null;
+  diag: ClubDiagIn | null;
 };
 
 /** プレーヤーを開いたときに1本ぶんだけ取りに行く */
@@ -586,7 +605,7 @@ export async function loadPose(videoId: string): Promise<{ pose?: LoadedPose | n
   if (!video) return { error: "動画が見つかりません" };
   const { data, error } = await admin
     .from("lsn_video_pose")
-    .select("engine, fps, src_fps, width, height, frames, detected, data, club, plane")
+    .select("engine, fps, src_fps, width, height, frames, detected, data, club, plane, diag")
     .eq("video_id", video.id)
     .maybeSingle();
   if (error) return { error: error.message };
@@ -604,6 +623,7 @@ export async function loadPose(videoId: string): Promise<{ pose?: LoadedPose | n
       data: r.data as PoseDataIn,
       club: (r.club as ClubDataIn | null) ?? null,
       plane: (r.plane as PlaneIn | null) ?? null,
+      diag: (r.diag as ClubDiagIn | null) ?? null,
     },
   };
 }

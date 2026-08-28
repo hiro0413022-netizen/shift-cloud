@@ -7,7 +7,7 @@ import { PhaseBar } from "@/components/phase-bar";
 import {
   analyzeSwing, clubAt, drawClubTrace, drawPlane, drawPose, headSway,
   planeMetrics, poseAt, poseMetrics, videoBox,
-  type ClubData, type Plane, type PoseData,
+  type ClubData, type ClubDiag, type Plane, type PoseData,
 } from "@/lib/pose";
 import { loadPose, savePlane, savePose, saveAnnotations, savePhases } from "./actions";
 
@@ -69,6 +69,8 @@ export function VideoPlayer({
   const [club, setClub] = useState<ClubData | null>(null);
   const [plane, setPlane] = useState<Plane | null>(null);
   const [poseInfo, setPoseInfo] = useState<{ frames: number; detected: number; srcFps: number | null } | null>(null);
+  /** クラブが取れなかったときに「どこで落ちたか」を出す。原因を推測でなく数字で言えるようにする */
+  const [diag, setDiag] = useState<ClubDiag | null>(null);
   const [showPose, setShowPose] = useState(true);
   const [showTrace, setShowTrace] = useState(true);
   const [showPlane, setShowPlane] = useState(true);
@@ -167,6 +169,7 @@ export function VideoPlayer({
       setPose(r.pose.data);
       setClub(r.pose.club);
       setPlane(r.pose.plane);
+      setDiag(r.pose.diag);
       setPoseInfo({ frames: r.pose.frames, detected: r.pose.detected, srcFps: r.pose.srcFps });
     });
     return () => { alive = false; };
@@ -186,6 +189,7 @@ export function VideoPlayer({
       });
       setPose(track.data);
       setClub(track.club);
+      setDiag(track.diag);
       // 手で引いたプレーンは解析し直しても残す（コーチの判断のほうが正しい）
       const keepManual = plane?._method === "manual" ? plane : null;
       const nextPlane = keepManual ?? track.plane;
@@ -508,10 +512,29 @@ export function VideoPlayer({
                   {plane?._method === "manual" ? "（手で引いた線が基準）" : "（アドレスのシャフト線が基準）"}
                 </p>
               </div>
-            ) : (
+            ) : club ? (
               <p className="text-xs text-(--color-dim)">
-                {club ? "プレーンがありません。線ツールで基準にしたい直線を引いて【この線をプレーンにする】を押してください" : "クラブ軌跡が取れていないため、プレーンは出せません"}
+                プレーンがありません。線ツールで基準にしたい直線を引いて【この線をプレーンにする】を押してください
               </p>
+            ) : (
+              <div className="text-xs text-(--color-dim)">
+                <p>クラブ軌跡が取れていないため、プレーンは出せません。</p>
+                {diag && (
+                  <>
+                    <p className="mt-1 tabular-nums">
+                      解析{diag.frames}コマ → 手元が取れた{diag.withPose} → 向きの候補{diag.withRay} → 線として残った{diag.kept}
+                      （動きの閾値 {diag.thr} ／ 線の詰まり {diag.fill}% ／ 確からしさ {diag.conf}%）
+                    </p>
+                    <p className="mt-1">
+                      {diag.withPose < diag.frames * 0.5
+                        ? "手元（両手首）がほとんど取れていません。全身が画面に入る画角で撮り直してください。"
+                        : diag.withRay < diag.withPose * 0.3
+                          ? "クラブの動きが画面から見つかりません。手元からヘッドまでが画面に入っているか、背景とクラブの色が近すぎないかを確認してください。"
+                          : "クラブらしい直線が続きません。背景がごちゃついている／逆光／手ブレが原因のことが多いです。スマホを固定して撮り直すと変わります。"}
+                    </p>
+                  </>
+                )}
+              </div>
             )}
             {canDraw && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
