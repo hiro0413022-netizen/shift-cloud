@@ -227,7 +227,10 @@ export type StoreShift = {
   start_time: string | null;
   end_time: string | null;
   is_day_off: boolean;
+  staff_id: string | null;
   staff_name: string;
+  /** staff.sort_order（スタッフ管理の▲▼／店舗ダッシュボードのドラッグで決まる行順・#147/#171）。同値なら氏名順 */
+  staff_sort: number;
   template_color: string | null;
 };
 
@@ -264,7 +267,7 @@ export async function getStoreMonthFeed(
   const [shiftRes, eventRes, taskRes, trialRes] = await Promise.all([
     admin
       .from("shifts")
-      .select("date, start_time, end_time, is_day_off, staff(name), shift_templates(color)")
+      .select("date, start_time, end_time, is_day_off, staff(id, name, sort_order), shift_templates(color)")
       .eq("company_id", companyId)
       .eq("store_id", storeId)
       .eq("status", "published")
@@ -309,14 +312,16 @@ export async function getStoreMonthFeed(
 
   for (const s of (shiftRes.data ?? []) as unknown as {
     date: string; start_time: string | null; end_time: string | null; is_day_off: boolean;
-    staff: { name: string } | null; shift_templates: { color: string } | null;
+    staff: { id: string; name: string; sort_order: number | null } | null; shift_templates: { color: string } | null;
   }[]) {
     feed[s.date]?.shifts.push({
       date: s.date,
       start_time: s.start_time,
       end_time: s.end_time,
       is_day_off: s.is_day_off,
+      staff_id: s.staff?.id ?? null,
       staff_name: s.staff?.name ?? "?",
+      staff_sort: s.staff?.sort_order ?? 0,
       template_color: s.shift_templates?.color ?? null,
     });
   }

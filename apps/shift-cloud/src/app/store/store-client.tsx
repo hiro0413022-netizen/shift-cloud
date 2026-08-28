@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { dowJP, hm, fmtDateJP, addMonths } from "@/lib/util";
 import type { KpiCard, StoreInfo, StoreLink, StoreMonthFeed } from "@/lib/store-dash";
-import { toggleStoreTask, addStoreTask, logoutStore } from "./actions";
+import { toggleStoreTask, addStoreTask, reorderStoreStaff, logoutStore } from "./actions";
 
 /**
  * 店舗ダッシュボード（店頭PC共有表示）
@@ -16,6 +16,10 @@ import { toggleStoreTask, addStoreTask, logoutStore } from "./actions";
  *  - デバイストークン: basePath=`/store/<token>`, token=<token>, kioskToken=<token>
  *  - 店舗ログインCookie: basePath="/store", token=null, showLogout=true
  */
+type StaffRow = { id: string | null; name: string; sort: number };
+/** 行の識別子。スタッフ行はidで一意。id不明（削除済み等）のときだけ氏名で束ねる */
+const rowKey = (r: StaffRow) => r.id ?? `name:${r.name}`;
+
 export function StoreDashClient({
   basePath,
   token,
@@ -49,6 +53,11 @@ export function StoreDashClient({
   const [taskDraft, setTaskDraft] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // スタッフ行の並べ替え（#171）
+  const [draftOrder, setDraftOrder] = useState<string[] | null>(null);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement | null>());
+  const orderAtDragStart = useRef<string>("");
 
   // 置きっぱなしタブレット向け: 5分ごとに再取得
   useEffect(() => {
@@ -68,9 +77,91 @@ export function StoreDashClient({
   // 表示は半月単位（1〜15日 / 16〜末日）。指定が無ければ「今日」が入っている側を出す
   const curHalf: 1 | 2 = half ?? (today.slice(0, 7) === ym && Number(today.slice(8)) >= 16 ? 2 : 1);
   const gridDays = days.filter((d) => (curHalf === 1 ? Number(d.slice(8)) <= 15 : Number(d.slice(8)) >= 16));
-  // 行=当月のシフト（出勤・休み）に登場するスタッフ（登場順）
-  const staffNames: string[] = [];
-  for (const d of days) for (const s of feed[d].shifts) if (!staffNames.includes(s.staff_name)) staffNames.push(s.staff_name);
+  // 行=当月のシフト（出勤・休み）に登場するスタッフ。
+  // 並びは staff.sort_order → 氏名（スタッフ管理の▲▼・紙シフト・シフト作成と同じ規則・#147）。
+  // 以前は「その月に最初に出てきた順」で、月が変わると勝手に入れ替わっていた（#171）
+  const serverRows = useMemo<StaffRow[]>(() => {
+    const map = new Map<string, StaffRow>();
+    for (const d of Object.keys(feed).sort()) {
+      for (const s of feed[d].shifts) {
+        const key = rowKey({ id: s.staff_id, name: s.staff_name, sort: s.staff_sort });
+        if (!map.has(key)) map.set(key, { id: s.staff_id, name: s.staff_name, sort: s.staff_sort });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.sort - b.sort || a.name.localeCompare(b.name, "ja"));
+  }, [feed]);
+
+  // ドラッグ中と保存待ちのあいだだけ、見た目を先に入れ替えておく（サーバーが追いついたら捨てる）
+  const rows = useMemo<StaffRow[]>(() => {
+    if (!draftOrder) return serverRows;
+    const byKey = new Map(serverRows.map((r) => [rowKey(r), r]));
+    const out = draftOrder.map((k) => byKey.get(k)).filter((r): r is StaffRow => !!r);
+    for (const r of serverRows) if (!draftOrder.includes(rowKey(r))) out.push(r);
+    return out;
+  }, [serverRows, draftOrder]);
+
+  useEffect(() => {
+    if (!draftOrder) return;
+    // サーバーの並びが追いついたら下書きを捨てる（以後はサーバーが正）
+    if (serverRows.map(rowKey).join("\u0000") === draftOrder.join("\u0000")) setDraftOrder(null);
+  }, [serverRows, draftOrder]);
+
+  // 氏名しか分からない行（スタッフが削除済み等）が混ざっていると保存できない
+  const canReorder = rows.length > 1 && rows.every((r) => r.id);
+
+  const moveRow = (fromKey: string, toIndex: number) => {
+    const keys = rows.map(rowKey);
+    const from = keys.indexOf(fromKey);
+    if (from < 0 || toIndex < 0 || toIndex >= keys.length || from === toIndex) return;
+    const next = keys.slice();
+    next.splice(toIndex, 0, next.splice(from, 1)[0]);
+    setDraftOrder(next);
+  };
+
+  const onHandleDown = (e: React.PointerEvent<HTMLSpanElement>, key: string) => {
+    if (!canReorder) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    orderAtDragStart.current = rows.map(rowKey).join("\u0000");
+    setDragKey(key);
+  };
+
+  const onHandleMove = (e: React.PointerEvent<HTMLSpanElement>) => {
+    if (!dragKey) return;
+    const keys = rows.map(rowKey);
+    for (let i = 0; i < keys.length; i += 1) {
+      const el = rowRefs.current.get(keys[i]);
+      if (!el) continue;
+      const box = el.getBoundingClientRect();
+      if (e.clientY >= box.top && e.clientY <= box.bottom) {
+        moveRow(dragKey, i);
+        break;
+      }
+    }
+  };
+
+  const onHandleUp = () => {
+    if (!dragKey) return;
+    setDragKey(null);
+    const keys = rows.map(rowKey);
+    if (keys.join("\u0000") === orderAtDragStart.current) return; // 動いていない＝保存しない
+    const ids = rows.map((r) => r.id);
+    if (ids.some((id) => !id)) {
+      setMsg("並び順を保存できないスタッフが含まれています");
+      setDraftOrder(null);
+      return;
+    }
+    startTransition(async () => {
+      const r = await reorderStoreStaff(token, store.id, ids as string[]);
+      if (r.error) {
+        setMsg(r.error);
+        setDraftOrder(null);
+      } else {
+        setMsg(null);
+      }
+      router.refresh();
+    });
+  };
   // 半月の前後ページング（月をまたぐ）
   const goHalf = (dir: -1 | 1) => {
     if (dir === 1) {
@@ -172,20 +263,45 @@ export function StoreDashClient({
             </tr>
           </thead>
           <tbody>
-            {staffNames.length === 0 && (
+            {rows.length === 0 && (
               <tr>
                 <td colSpan={gridDays.length + 1} className="px-3 py-6 text-center text-zinc-400">
                   この月の確定シフトはまだありません
                 </td>
               </tr>
             )}
-            {staffNames.map((name) => (
-              <tr key={name}>
-                <th className="sticky left-0 z-10 whitespace-nowrap border-b border-r border-zinc-200 bg-white px-2 py-1.5 text-left text-xs font-semibold text-zinc-700">
-                  {name}
+            {rows.map((row) => {
+              const key = rowKey(row);
+              const dragging = dragKey === key;
+              return (
+              <tr
+                key={key}
+                ref={(el) => { rowRefs.current.set(key, el); }}
+                className={dragging ? "opacity-60" : ""}
+              >
+                <th className={`sticky left-0 z-10 whitespace-nowrap border-b border-r border-zinc-200 px-2 py-1.5 text-left text-xs font-semibold text-zinc-700 ${dragging ? "bg-brand-light" : "bg-white"}`}>
+                  <span className="flex items-center gap-1">
+                    {/* 並べ替えハンドル（#171）。マウスでもタッチでも動くようポインタイベントで実装 */}
+                    <span
+                      onPointerDown={(e) => onHandleDown(e, key)}
+                      onPointerMove={onHandleMove}
+                      onPointerUp={onHandleUp}
+                      onPointerCancel={onHandleUp}
+                      title={canReorder ? "ドラッグで並び替え" : "並び替えできません"}
+                      aria-label="並び替え"
+                      className={`-ml-0.5 select-none touch-none text-[13px] leading-none text-zinc-300 ${
+                        canReorder ? "cursor-grab active:cursor-grabbing hover:text-zinc-500" : "opacity-30"
+                      }`}
+                    >
+                      ⠿
+                    </span>
+                    {row.name}
+                  </span>
                 </th>
                 {gridDays.map((d) => {
-                  const cellShifts = feed[d].shifts.filter((s) => s.staff_name === name);
+                  const cellShifts = feed[d].shifts.filter((s) =>
+                    row.id ? s.staff_id === row.id : s.staff_name === row.name,
+                  );
                   const isSel = d === selected;
                   return (
                     <td
@@ -215,7 +331,8 @@ export function StoreDashClient({
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         <div className="flex flex-wrap gap-3 border-t border-zinc-100 px-3 py-2 text-[10px] text-zinc-400">
@@ -224,8 +341,14 @@ export function StoreDashClient({
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />イベント</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-400" />体験予約</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-red-400" />やること</span>
+          {canReorder && (
+            <span className="ml-auto">
+              <span className="mr-1 text-zinc-300">⠿</span>をドラッグでスタッフの並び替え（シフト作成・紙シフトにも反映）
+            </span>
+          )}
         </div>
       </div>
+      {msg && <p className="text-xs text-red-500">{msg}</p>}
       </div>
 
       {/* 選択日の詳細（PCはカレンダー右に固定表示） */}
