@@ -24,3 +24,6 @@ apps/report-os/out/
 # 一時検証ディレクトリと未使用フォント（サンドボックスから削除不可のため除外・#129）
 .pdftest/
 apps/genesis/src/assets/NotoSansJP-Regular.otf
+
+# MediaPipe の wasm/モデル（計10MB）。ビルド時に scripts/prepare-mediapipe.mjs が置く
+apps/lesson-os/public/mp/

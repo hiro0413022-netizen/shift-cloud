@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Annotations, Shape } from "@/lib/lesson";
 import { PHASES, estimatePhases, hasPhases, type PhaseKey, type Phases } from "@/lib/phases";
 import { PhaseBar } from "@/components/phase-bar";
-import { saveAnnotations, savePhases } from "./actions";
+import { analyzePose, drawPose, headSway, poseAt, poseMetrics, videoBox, type PoseData } from "@/lib/pose";
+import { loadPose, savePose, saveAnnotations, savePhases } from "./actions";
 
 /**
  * 動画プレーヤー＋描画ツール＋フェーズ移動（PGA NOTE準拠 / DECISIONS #51）
@@ -13,6 +14,12 @@ import { saveAnnotations, savePhases } from "./actions";
  * - コマ送り・スロー再生（0.25x/0.5x/1x）
  * - フェーズ移動: アドレス〜フィニッシュにワンタップ。自動推定＋手動微調整。
  * - 形状は0〜1の正規化座標で保存（annotations JSONB）
+ *
+ * 2026-08-28: ボーン（骨格）オーバーレイを追加。
+ *   撮り終わった動画をブラウザでコマ送り解析し（src/lib/pose.ts）、33関節を動画に重ねる。
+ *   結果は lsn_video_pose に残るので、次に開いたときは解析なしですぐ出る。
+ *   数値（肩・腰・ねじれ・前傾・頭のブレ）は2D投影なので、
+ *   絶対値ではなく「同じ生徒の前回との差」で読むこと。
  */
 type Tool = "none" | "line" | "circle" | "free";
 const COLORS = ["#ff4d4d", "#ffd54d", "#7CFC66", "#4dd2ff"];
@@ -46,6 +53,15 @@ export function VideoPlayer({
   const [cur, setCur] = useState(0);
   const [dur, setDur] = useState(0);
   const [estimating, setEstimating] = useState(false);
+
+  // --- ボーン（骨格） ---
+  const [pose, setPose] = useState<PoseData | null>(null);
+  const [poseInfo, setPoseInfo] = useState<{ frames: number; detected: number } | null>(null);
+  const [showPose, setShowPose] = useState(true);
+  const [poseFps, setPoseFps] = useState<30 | 60>(30);
+  const [poseBusy, setPoseBusy] = useState<{ done: number; total: number; phase: string } | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const jump = (t: number) => {
     const v = videoRef.current;
@@ -103,7 +119,71 @@ export function VideoPlayer({
       }
       ctx.stroke();
     }
+
+    // 骨格（描画の上に重ねる）
+    if (showPose && pose && videoRef.current) {
+      const lm = poseAt(pose, videoRef.current.currentTime);
+      if (lm) drawPose(ctx, lm, videoBox(videoRef.current, W, H));
+    }
   };
+
+  /* 再生中は毎フレーム描き直す。止まっているときは cur が動いたときだけでよい */
+  useEffect(() => {
+    if (!(showPose && pose && playing)) { redraw(); return; }
+    let raf = 0;
+    const loop = () => { redraw(); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPose, pose, playing, shapes, cur]);
+
+  /* 保存済みの骨格を読む（プレーヤーを開いたときだけ・一覧では引かない） */
+  useEffect(() => {
+    let alive = true;
+    loadPose(videoId).then((r) => {
+      if (!alive || !r.pose) return;
+      setPose(r.pose.data);
+      setPoseInfo({ frames: r.pose.frames, detected: r.pose.detected });
+    });
+    return () => { alive = false; };
+  }, [videoId]);
+
+  /** 撮り終わった動画をコマ送りで解析する。中止できる（現場で待たされない） */
+  const runPose = async () => {
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setPoseBusy({ done: 0, total: 1, phase: "モデルを読み込み中" });
+    setMsg(null);
+    try {
+      const track = await analyzePose(src, {
+        fps: poseFps,
+        signal: ac.signal,
+        onProgress: (done, total, phase) => setPoseBusy({ done, total, phase }),
+      });
+      setPose(track.data);
+      setPoseInfo({ frames: track.frames, detected: track.detected });
+      setShowPose(true);
+      const r = await savePose(videoId, track);
+      setMsg(
+        r.error
+          ? `解析できましたが保存に失敗しました: ${r.error}`
+          : track.detected < track.frames * 0.6
+            ? `骨格を解析しました（${track.detected}/${track.frames}コマ）。検出できないコマが多いので、全身が入る画角・明るい場所で撮り直すと精度が上がります`
+            : `骨格を解析しました（${track.detected}/${track.frames}コマ）`
+      );
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "解析に失敗しました");
+    } finally {
+      setPoseBusy(null);
+      abortRef.current = null;
+    }
+  };
+
+  /* いま表示しているコマの数値（2D投影なので前回との差で読む） */
+  const nowLm = pose ? poseAt(pose, cur) : null;
+  const m = nowLm ? poseMetrics(nowLm) : null;
+  const addressLm = pose && typeof phases?.address === "number" ? poseAt(pose, phases.address) : null;
+  const sway = m && addressLm ? headSway(poseMetrics(addressLm), m) : null;
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -204,6 +284,9 @@ export function VideoPlayer({
           onLoadedMetadata={(e) => setDur(e.currentTarget.duration || 0)}
           onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
           onSeeked={(e) => setCur(e.currentTarget.currentTime)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
           className="max-h-[68vh] w-full"
         />
         <canvas
@@ -251,6 +334,86 @@ export function VideoPlayer({
                 <button onClick={commitPhases} className="btn-gold !px-3 !py-1.5">フェーズを保存</button>
               </>
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ボーン（骨格）— 2026-08-28 */}
+      <div className="mt-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-2.5">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="font-medium text-(--color-gold)">骨格</span>
+
+          {!pose && !poseBusy && canDraw && (
+            <>
+              <button onClick={runPose} className="btn-ghost !px-2 !py-1.5">🦴 骨格を解析</button>
+              <select
+                value={poseFps}
+                onChange={(e) => setPoseFps(Number(e.target.value) === 60 ? 60 : 30)}
+                className="rounded-lg border border-(--color-line) bg-transparent px-2 py-1.5 text-(--color-dim)"
+                title="細かく見たいときだけ60。時間は倍かかります"
+              >
+                <option value={30}>30コマ/秒</option>
+                <option value={60}>60コマ/秒</option>
+              </select>
+              <span className="text-(--color-dim)">初回はモデルの読み込みで少し待ちます</span>
+            </>
+          )}
+
+          {poseBusy && (
+            <>
+              <span className="text-(--color-active)">
+                {poseBusy.phase} {poseBusy.total > 1 ? `${Math.round((poseBusy.done / poseBusy.total) * 100)}%` : ""}
+              </span>
+              <button onClick={() => abortRef.current?.abort()} className="btn-ghost !px-2 !py-1.5">中止</button>
+            </>
+          )}
+
+          {pose && !poseBusy && (
+            <>
+              <button
+                onClick={() => setShowPose((v) => !v)}
+                className={`rounded-lg border px-2.5 py-1.5 ${showPose ? "border-(--color-active) text-(--color-active)" : "border-(--color-line) text-(--color-dim)"}`}
+              >
+                {showPose ? "表示中" : "非表示"}
+              </button>
+              {poseInfo && (
+                <span className="text-(--color-dim)">
+                  {poseInfo.detected}/{poseInfo.frames}コマ検出
+                </span>
+              )}
+              {canDraw && <button onClick={runPose} className="btn-ghost !px-2 !py-1.5">↻ 解析し直す</button>}
+            </>
+          )}
+        </div>
+
+        {poseBusy && poseBusy.total > 1 && (
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-(--color-line)">
+            <div
+              className="h-full bg-(--color-active) transition-[width]"
+              style={{ width: `${Math.round((poseBusy.done / poseBusy.total) * 100)}%` }}
+            />
+          </div>
+        )}
+
+        {/* いま表示しているコマの数値。単眼カメラなので「前回との差」で読む */}
+        {pose && showPose && (
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs tabular-nums sm:grid-cols-5">
+            {[
+              ["肩の傾き", m ? `${m.shoulder > 0 ? "+" : ""}${m.shoulder}°` : "—"],
+              ["腰の傾き", m ? `${m.hip > 0 ? "+" : ""}${m.hip}°` : "—"],
+              ["ねじれ", m ? `${m.xFactor > 0 ? "+" : ""}${m.xFactor}°` : "—"],
+              ["前傾", m ? `${m.spine > 0 ? "+" : ""}${m.spine}°` : "—"],
+              ["頭のブレ", sway ? `←→${sway.x > 0 ? "+" : ""}${sway.x}% ↑↓${sway.y > 0 ? "+" : ""}${sway.y}%` : "—"],
+            ].map(([label, val]) => (
+              <div key={label} className="flex justify-between gap-2 sm:block">
+                <span className="text-(--color-dim)">{label}</span>
+                <span className="sm:block">{val}</span>
+              </div>
+            ))}
+            <p className="col-span-2 text-(--color-dim) sm:col-span-5">
+              角度は画面に映った見た目の角度です。カメラ位置が変わると数字も変わるので、
+              同じ生徒の前回との差で見てください{sway ? "" : "（頭のブレはアドレスを設定すると出ます）"}
+            </p>
           </div>
         )}
       </div>

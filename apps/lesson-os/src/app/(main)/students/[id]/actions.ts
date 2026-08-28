@@ -480,3 +480,86 @@ export async function measurePhotoUrl(measurementId: string): Promise<{ url?: st
   const { data: signed } = await admin.storage.from(BUCKET).createSignedUrl(row.photo_path, 1800);
   return signed?.signedUrl ? { url: signed.signedUrl } : { error: "URLの発行に失敗しました" };
 }
+
+/* ------------------------------------------------------------------ */
+/* ボーン（骨格）データ — 2026-08-28                                    */
+/*                                                                      */
+/* 解析そのものはブラウザ（src/lib/pose.ts）。ここは保管だけ。          */
+/* lsn_videos に列を足さず別テーブルにしたのは、1本あたり数百KBあり、    */
+/* カルテの一覧（1人20本超）に載せると重くなるため（0129 参照）。       */
+/* ------------------------------------------------------------------ */
+
+/** 解析結果の受け取り。壊れた形は入れずに弾く（DBを汚さない） */
+export async function savePose(
+  videoId: string,
+  track: {
+    engine: string;
+    fps: number;
+    width: number;
+    height: number;
+    frames: number;
+    detected: number;
+    data: { v: 1; t: number[]; p: number[][] };
+  }
+): Promise<{ error?: string }> {
+  const { actor, admin, video } = await ownVideo(videoId);
+  if (!video) return { error: "動画が見つかりません" };
+
+  const t = Array.isArray(track?.data?.t) ? track.data.t : [];
+  const p = Array.isArray(track?.data?.p) ? track.data.p : [];
+  if (!t.length || t.length !== p.length) return { error: "解析結果が不正です" };
+  if (t.length > 1200) return { error: "コマ数が多すぎます" };
+  // 1コマは 33関節×3 の 99個ちょうど（未検出は空配列）
+  if (p.some((row) => !Array.isArray(row) || (row.length !== 0 && row.length !== 99))) {
+    return { error: "解析結果が不正です" };
+  }
+
+  const { error } = await admin.from("lsn_video_pose").upsert(
+    {
+      video_id: video.id,
+      company_id: actor.companyId,
+      engine: String(track.engine ?? "").slice(0, 120),
+      fps: Number(track.fps) || null,
+      width: Math.round(Number(track.width) || 0) || null,
+      height: Math.round(Number(track.height) || 0) || null,
+      frames: t.length,
+      detected: Math.max(0, Math.min(t.length, Math.round(Number(track.detected) || 0))),
+      data: { v: 1, t, p },
+      analyzed_by: actor.staffId,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "video_id" }
+  );
+  if (error) return { error: error.message };
+  return {};
+}
+
+/** プレーヤーを開いたときに1本ぶんだけ取りに行く */
+export async function loadPose(videoId: string): Promise<{
+  pose?: {
+    engine: string;
+    fps: number | null;
+    frames: number;
+    detected: number;
+    data: { v: 1; t: number[]; p: number[][] };
+  } | null;
+  error?: string;
+}> {
+  const { admin, video } = await ownVideo(videoId);
+  if (!video) return { error: "動画が見つかりません" };
+  const { data, error } = await admin
+    .from("lsn_video_pose")
+    .select("engine, fps, frames, detected, data")
+    .eq("video_id", video.id)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  return { pose: (data as never) ?? null };
+}
+
+/** 撮り直しではなく解析だけやり直したいとき用 */
+export async function removePose(videoId: string): Promise<{ error?: string }> {
+  const { admin, video } = await ownVideo(videoId);
+  if (!video) return { error: "動画が見つかりません" };
+  const { error } = await admin.from("lsn_video_pose").delete().eq("video_id", video.id);
+  return error ? { error: error.message } : {};
+}
