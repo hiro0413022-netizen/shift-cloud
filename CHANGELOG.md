@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## 2026-08-28 — Shift Cloud: 店舗ダッシュボードから紙シフトを印刷
+- feat(shift-cloud): 店舗ダッシュボードのシフト表に「🖨 紙シフトを印刷」を追加（DECISIONS #172）。**いま見ている月・半月（前半/後半）をそのまま持っていく**ので、画面で確認した範囲がそのまま A4横1枚になる
+- feat(shift-cloud): `/store/print`（店舗ログインCookie）と `/store/<token>/print`（店頭端末トークン）を新設。**管理者アカウントで入り直さなくても店頭で刷れる**
+- refactor(shift-cloud): 紙シフトのページ本体を `components/shift-print.tsx`（`ShiftPrintSheet`/`resolvePrintRange`）に切り出し、`/admin/shifts/print` はその薄いラッパに。紙の体裁を2箇所に持たない。`PrintButton` も `components/print-button.tsx` へ移動（旧パスは再エクスポートstub）
+- security(shift-cloud): 店舗側の印刷は**認証で解決した1店舗に固定**（`?store=` の直打ちは効かない・切替タブも出さない）。オーナーがスタッフとしてもログインしている場合のみ複数店舗を選べる（#134）
+- note: 紙の中身は従来どおり**その店舗の在籍スタッフ全員**（役職でグルーピング）。ダッシュボードのグリッド（その月にシフトがある人だけ）とは母集団が違う。行順はどちらも `staff.sort_order`
+- db: migrationなし
+- test: `npx tsc --noEmit` 通過・既存425件パス
+
 ## 2026-08-28 — Shift Cloud: 店舗ダッシュボードのスタッフ行をドラッグで並べ替え
 - feat(shift-cloud): `/store` のシフト表で、スタッフ名の左の `⠿` をドラッグして行を並べ替えられるようにした（DECISIONS #171）。マウスでもタッチでも動く（ポインタイベント実装）。離した時点で保存
 - change(shift-cloud): シフト表の既定の行順を**「その月に最初にシフトが出てきた順」→ `staff.sort_order` → 氏名**に変更。スタッフ管理の▲▼・シフト作成・紙シフトと同じ並びになり、月が変わっても入れ替わらない（#147の並び順を店舗ダッシュボードにも適用）

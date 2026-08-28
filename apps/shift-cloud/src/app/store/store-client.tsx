@@ -223,6 +223,13 @@ export function StoreDashClient({
         </p>
         <button onClick={() => goHalf(1)} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-500">→</button>
         <span className="ml-auto text-xs text-zinc-400">{store.name}の出勤・予定</span>
+        {/* 紙シフト（A4横）。いま見ている月・半月をそのまま持っていく（#172） */}
+        <a
+          href={`${basePath}/print?store=${store.id}&ym=${ym}&range=${curHalf === 1 ? "half1" : "half2"}`}
+          className="whitespace-nowrap rounded-md border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-600 shadow-sm active:bg-zinc-50"
+        >
+          🖨 紙シフトを印刷
+        </a>
       </div>
 
       {/* Airシフト風: 行=スタッフ / 列=日付 / セル=出勤時刻 or 休み（#137） */}

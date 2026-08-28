@@ -1,12 +1,3 @@
-"use client";
-
-export function PrintButton() {
-  return (
-    <button
-      onClick={() => window.print()}
-      className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-    >
-      🖨 印刷する
-    </button>
-  );
-}
+// 旧: /admin/shifts/print/print-button.tsx。共通コンポーネント（components/print-button.tsx）へ移動。
+// 互換のため再エクスポートのみ残す（VMからファイル削除できないため）。
+export { PrintButton } from "@/components/print-button";
