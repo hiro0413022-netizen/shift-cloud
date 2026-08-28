@@ -1,167 +1,26 @@
 <!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>YOZAN｜あなたの店に、AI店長を。ゴルフ場を経営する会社が作った店舗システム</title><meta name="description" content="インドアゴルフ・ゴルフスクール向けの予約・会員管理・自動集金・レッスンAI。自社でゴルフ施設を運営するYOZANが、現場で毎日使っているシステムを開業38万円から。">
+<title>YOZAN｜あなたの店に、AI店長を。ゴルフ場を経営する会社が作った店舗システム</title><meta name="description" content="インドアゴルフ・ゴルフスクール向けの予約・会員管理・自動集金・レッスンAI。自社でゴルフ施設を運営するYOZANが、現場で毎日使っているシステムを開業38万円から。実際の画面をそのまま公開しています。">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700;800&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
-<style>
-:root{--green:#14452F;--green2:#0E2F20;--gold:#B08D3F;--gold2:#8F6F2A;--turf:#F7F6F1;--ink:#1D1D19;--line:#DDDAD0;--white:#fff}
-*{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{font-family:'Noto Sans JP',sans-serif;color:var(--ink);background:var(--turf);line-height:1.85;font-size:16px}
-img{max-width:100%}
-a{color:inherit;text-decoration:none}
-.disp{font-family:'Shippori Mincho',serif;font-weight:700}
-.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
-/* header */
-header{position:sticky;top:0;z-index:50;background:rgba(247,246,241,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-.hd{display:flex;align-items:center;justify-content:space-between;height:64px}
-.logo{font-weight:900;letter-spacing:.18em;color:var(--green);font-size:17px}
-.logo small{display:block;font-size:9px;letter-spacing:.3em;color:var(--gold2);font-weight:700}
-nav{display:flex;gap:22px;font-size:13px;font-weight:500}
-nav a:hover{color:var(--green)}
-.cta-s{background:var(--green);color:#fff;padding:9px 20px;border-radius:999px;font-size:13px;font-weight:700}
-.cta-s:hover{background:var(--green2)}
-@media(max-width:820px){nav{display:none}}
-/* hero */
-.hero{background:linear-gradient(160deg,var(--green) 0%,var(--green2) 70%);color:#fff;overflow:hidden;position:relative}
-.hero::after{content:"";position:absolute;right:-140px;top:-140px;width:480px;height:480px;border-radius:50%;border:1px solid rgba(176,141,63,.35)}
-.hero::before{content:"";position:absolute;right:-60px;top:-60px;width:320px;height:320px;border-radius:50%;border:1px solid rgba(176,141,63,.25)}
-.hero-in{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;padding:72px 0 80px;align-items:center}
-@media(max-width:820px){.hero-in{grid-template-columns:1fr;padding:48px 0}}
-.eyebrow{display:inline-block;border:1px solid var(--gold);color:#E7CF9B;font-size:12px;letter-spacing:.24em;padding:5px 14px;border-radius:999px;margin-bottom:22px;font-weight:700}
-h1.disp{font-size:clamp(30px,4.6vw,52px);line-height:1.5;letter-spacing:.02em}
-h1 .g{color:#E7CF9B}
-.hero p.lead{margin-top:20px;font-size:15.5px;color:#D9E3DC;max-width:34em}
-.hero-cta{margin-top:30px;display:flex;gap:14px;flex-wrap:wrap}
-.btn{display:inline-block;padding:15px 34px;border-radius:999px;font-weight:700;font-size:15px}
-.btn-gold{background:var(--gold);color:#12291C}
-.btn-gold:hover{background:#C6A254}
-.btn-ghost{border:1.5px solid rgba(255,255,255,.5);color:#fff}
-.btn-ghost:hover{border-color:#fff}
-/* phone mock */
-.phone{background:#0B1F15;border:1px solid rgba(176,141,63,.4);border-radius:26px;padding:18px 16px;box-shadow:0 28px 60px rgba(0,0,0,.35);max-width:360px;margin-left:auto}
-@media(max-width:820px){.phone{margin:0 auto}}
-.phone .ph-hd{display:flex;align-items:center;gap:10px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:12px}
-.avatar{width:34px;height:34px;border-radius:50%;background:var(--gold);color:#12291C;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px}
-.ph-hd b{color:#fff;font-size:13px}.ph-hd span{color:#7FA08D;font-size:10px;display:block}
-.bub{background:#123624;color:#E8EFE9;font-size:12px;line-height:1.7;border-radius:4px 14px 14px 14px;padding:10px 12px;margin-bottom:9px}
-.bub b{color:#E7CF9B}
-.chip{display:flex;gap:8px;margin-top:4px}
-.chip span{flex:1;text-align:center;background:rgba(176,141,63,.15);border:1px solid var(--gold);color:#E7CF9B;font-size:11px;padding:6px 4px;border-radius:999px;font-weight:700}
-/* scoreboard */
-.score{background:#0E2A1D;color:#fff}
-.score-in{display:grid;grid-template-columns:repeat(4,1fr);text-align:center}
-.score-in>div{padding:26px 8px;border-right:1px solid rgba(255,255,255,.08)}
-.score-in>div:last-child{border-right:none}
-.score .v{font-family:'Shippori Mincho',serif;font-size:30px;font-weight:800;color:#E7CF9B}
-.score .l{font-size:11px;color:#9DB8A8;margin-top:2px;letter-spacing:.08em}
-@media(max-width:680px){.score-in{grid-template-columns:repeat(2,1fr)}.score-in>div:nth-child(2){border-right:none}}
-/* sections */
-section{padding:76px 0}
-.sec-eyebrow{color:var(--gold2);font-size:12.5px;font-weight:900;letter-spacing:.3em;margin-bottom:10px}
-h2.disp{font-size:clamp(24px,3.4vw,36px);color:var(--green);line-height:1.5;margin-bottom:18px}
-.sub{color:#57564E;max-width:44em;font-size:15px}
-/* pain cards */
-.pains{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
-@media(max-width:820px){.pains{grid-template-columns:1fr}}
-.pain{background:#fff;border:1px solid var(--line);border-radius:12px;padding:24px 22px;font-size:14.5px}
-.pain b{display:block;color:var(--green);margin-bottom:6px;font-size:15.5px}
-/* loop */
-.loop{display:grid;grid-template-columns:repeat(5,1fr);gap:0;margin-top:40px;counter-reset:st}
-@media(max-width:820px){.loop{grid-template-columns:1fr}}
-.st{background:#fff;border:1px solid var(--line);padding:22px 18px;position:relative;counter-increment:st}
-.st::before{content:counter(st,decimal-leading-zero);font-family:'Shippori Mincho',serif;color:var(--gold);font-weight:800;font-size:13px;letter-spacing:.1em}
-.st b{display:block;color:var(--green);font-size:16px;margin:4px 0 6px}
-.st p{font-size:12.5px;color:#57564E;line-height:1.7}
-.st:not(:last-child)::after{content:"→";position:absolute;right:-13px;top:44%;color:var(--gold);font-weight:900;z-index:2}
-@media(max-width:820px){.st:not(:last-child)::after{content:"↓";right:auto;left:24px;top:auto;bottom:-16px}}
-/* pricing */
-.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
-@media(max-width:880px){.plans{grid-template-columns:1fr}}
-.plan{background:#fff;border:1px solid var(--line);border-radius:14px;padding:30px 26px;display:flex;flex-direction:column}
-.plan.hot{border:2px solid var(--gold);box-shadow:0 16px 40px rgba(20,69,47,.10);position:relative}
-.plan .badge{position:absolute;top:-13px;left:24px;background:var(--gold);color:#12291C;font-size:11.5px;font-weight:900;padding:4px 14px;border-radius:999px}
-.plan h3{color:var(--green);font-size:18px;margin-bottom:4px}
-.plan .items{font-size:12.5px;color:#57564E;min-height:3.2em;line-height:1.7}
-.plan .pr{font-family:'Shippori Mincho',serif;color:var(--green);font-size:34px;font-weight:800;margin-top:14px}
-.plan .pr small{font-size:13px;font-family:'Noto Sans JP';font-weight:700}
-.plan .mo{font-size:13px;color:#57564E;margin-bottom:12px}
-.plan .nt{font-size:12px;color:var(--gold2);font-weight:700;margin-bottom:14px;min-height:1.5em}
-.plan a{margin-top:auto;text-align:center;background:var(--green);color:#fff;border-radius:999px;padding:12px;font-weight:700;font-size:14px}
-.plan a:hover{background:var(--green2)}
-/* product grid */
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:34px}
-@media(max-width:880px){.grid{grid-template-columns:1fr 1fr}}
-@media(max-width:600px){.grid{grid-template-columns:1fr}}
-.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:24px 22px;transition:.18s;display:block}
-.card:hover{border-color:var(--gold);transform:translateY(-3px);box-shadow:0 12px 30px rgba(20,69,47,.10)}
-.card .cat{font-size:10.5px;letter-spacing:.2em;color:var(--gold2);font-weight:900}
-.card h3{color:var(--green);font-size:16.5px;margin:6px 0 4px}
-.card p{font-size:12.5px;color:#57564E;line-height:1.7;min-height:3.2em}
-.card .pr{margin-top:12px;font-size:13px;font-weight:700;color:var(--green)}
-.card .pr b{font-family:'Shippori Mincho',serif;font-size:19px}
-/* company */
-.dark{background:linear-gradient(160deg,var(--green) 0%,var(--green2) 80%);color:#fff}
-.dark h2.disp{color:#fff}
-.dark .sub{color:#C7D6CC}
-.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:38px}
-@media(max-width:820px){.facts{grid-template-columns:1fr 1fr}}
-.fact{border:1px solid rgba(176,141,63,.4);border-radius:12px;padding:20px 16px;text-align:center}
-.fact .v{font-family:'Shippori Mincho',serif;font-size:26px;font-weight:800;color:#E7CF9B}
-.fact .l{font-size:11.5px;color:#B9CDC0;margin-top:4px}
-.creed{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:38px}
-@media(max-width:820px){.creed{grid-template-columns:1fr}}
-.creed>div{background:rgba(255,255,255,.06);border-left:3px solid var(--gold);padding:20px 20px;font-size:13.5px;color:#D9E3DC}
-.creed b{display:block;color:#fff;font-size:15px;margin-bottom:6px}
-/* faq */
-.faq{max-width:760px;margin:36px auto 0}
-.faq details{background:#fff;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;padding:0 22px}
-.faq summary{cursor:pointer;font-weight:700;color:var(--green);padding:16px 0;font-size:15px;list-style:none;position:relative}
-.faq summary::after{content:"＋";position:absolute;right:0;color:var(--gold)}
-.faq details[open] summary::after{content:"−"}
-.faq p{padding:0 0 16px;font-size:14px;color:#57564E}
-/* cta band */
-.cta-band{background:#0E2A1D;color:#fff;text-align:center;padding:70px 24px}
-.cta-band h2{font-size:clamp(22px,3vw,32px);color:#fff;margin-bottom:14px}
-.cta-band p{color:#B9CDC0;font-size:14.5px;margin-bottom:26px}
-/* footer */
-footer{background:var(--green2);color:#9DB8A8;font-size:12px;padding:34px 0}
-.ft{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
-footer b{color:#fff;font-size:14px;letter-spacing:.14em}
-/* product page */
-.p-hero{background:linear-gradient(160deg,var(--green),var(--green2));color:#fff;padding:64px 0 56px}
-.crumb{font-size:12px;color:#9DB8A8;margin-bottom:18px}
-.crumb a{color:#C7D6CC}
-.p-hero .cat{color:#E7CF9B;font-size:12px;letter-spacing:.26em;font-weight:900}
-.p-hero h1{font-size:clamp(26px,4vw,42px);margin:8px 0 10px}
-.p-hero .tag{color:#D9E3DC;font-size:16px}
-.pricebar{display:flex;gap:36px;margin-top:26px;flex-wrap:wrap}
-.pricebar div span{font-size:11.5px;color:#9DB8A8;display:block}
-.pricebar div b{font-family:'Shippori Mincho',serif;font-size:30px;color:#E7CF9B;font-weight:800}
-.pricebar div small{font-size:12px;color:#C7D6CC}
-.pts{margin-top:30px}
-.pts li{background:#fff;border:1px solid var(--line);border-radius:10px;padding:16px 20px 16px 48px;margin-bottom:10px;list-style:none;position:relative;font-size:14.5px}
-.pts li::before{content:"";position:absolute;left:20px;top:22px;width:14px;height:8px;border-left:2.5px solid var(--gold);border-bottom:2.5px solid var(--gold);transform:rotate(-45deg)}
-.vsbox{background:#fff;border:2px solid var(--gold);border-radius:12px;padding:24px 26px;margin-top:30px}
-.vsbox .t{color:var(--gold2);font-weight:900;font-size:13px;letter-spacing:.2em;margin-bottom:8px}
-.vsbox p{font-size:14.5px}
-.setlink{margin-top:26px;background:#EFEBDD;border-radius:10px;padding:16px 20px;font-size:13.5px}
-.setlink b{color:var(--green)}
-.note{font-size:11.5px;color:#8B8A80;margin-top:12px}
-</style></head><body><header><div class="wrap hd">
+<link rel="stylesheet" href="assets/site.css">
+</head><body><header><div class="wrap hd">
 <a class="logo" href="index.html">YOZAN<small>GOLF BUSINESS SYSTEMS</small></a>
-<nav><a href="aitencho.html">AI店長</a><a href="index.html#plans">料金プラン</a><a href="index.html#products">システム一覧</a><a href="genesis.html">GENESIS</a><a href="index.html#company">会社について</a></nav>
+<nav><a href="#screens">画面を見る</a><a href="aitencho.html">AI店長</a><a href="#plans">料金プラン</a><a href="#products">システム一覧</a><a href="genesis.html">GENESIS</a><a href="#company">会社について</a></nav>
 <a class="cta-s" href="mailto:info@yozan-group.jp?subject=%E3%83%87%E3%83%A2%E4%BE%9D%E9%A0%BC">デモを見る</a>
 </div></header>
-<div class="hero"><div class="wrap hero-in">
+
+<div class="hero"><div class="wrap hero-in wide">
 <div><div class="eyebrow">ゴルフ場を経営する会社が作ったシステム</div>
 <h1 class="disp">あなたの店に、<br><span class="g">AI店長</span>を。</h1>
 <p class="lead">予約・入会・集金・レッスン・レジ締め。インドアゴルフの毎日の仕事を自動化し、体験のフォローから空き枠の案内まで、AIが「今日やるべきこと」を毎朝あなたのLINEに届けます。</p>
-<div class="hero-cta"><a class="btn btn-gold" href="mailto:info@yozan-group.jp?subject=%E3%83%87%E3%83%A2%E4%BE%9D%E9%A0%BC">デモを依頼する（無料）</a><a class="btn btn-ghost" href="#plans">料金を見る</a></div></div>
-<div class="phone"><div class="ph-hd"><div class="avatar">A</div><div><b>AI店長</b><span>今朝 7:00</span></div></div>
-<div class="bub">おはようございます。昨日の売上は <b>86,400円</b>、本日の予約は <b>12件</b> です。</div>
-<div class="bub">先週体験にいらした <b>田中様</b> がまだ未入会です。フォローのメッセージ案を作りました。<div class="chip"><span>承認して送信</span><span>あとで</span></div></div>
-<div class="bub"><b>土曜14時台</b> に空きが3枠あります。会員向けの案内文を用意しました。<div class="chip"><span>承認して配信</span></div></div></div></div></div>
+<div class="hero-cta"><a class="btn btn-gold" href="mailto:info@yozan-group.jp?subject=%E3%83%87%E3%83%A2%E4%BE%9D%E9%A0%BC">デモを依頼する（無料）</a><a class="btn btn-ghost" href="#screens">画面を見る</a></div></div>
+<div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">member-os / 予約カレンダー — FRANK GOLF 姫路</div></div>
+<img src="assets/shots/booking-calendar.jpg" alt="打席×時間×コーチの予約カレンダー画面" width="1280" height="618" loading="eager"></div>
+<p class="hero-note">↑ 私たちの店で今日も動いている、本物の管理画面です</p>
+</div></div></div>
+
 <div class="score"><div class="wrap score-in">
 <div><div class="v">210名</div><div class="l">自社スクールの在籍会員</div></div>
 <div><div class="v">5,939件</div><div class="l">蓄積したレッスン記録</div></div>
@@ -179,6 +38,46 @@ footer b{color:#fff;font-size:14px;letter-spacing:.14em}
 <div class="pain"><b>数字が見えるのは月末</b>先月いくら儲かったか、締めてみないと分からない。手を打つ頃には1か月遅れています。</div>
 </div></div></section>
 
+<section id="screens" style="background:#EFEBDD;padding-top:64px"><div class="wrap">
+<div class="sec-eyebrow">SCREENS</div>
+<h2 class="disp">まず、画面を見てください。</h2>
+<p class="sub">パンフレットの絵ではありません。ここに載せているのは、宝塚の GOLF WING と姫路の FRANK GOLF で実際に動いている画面です（お客様の氏名・連絡先はサンプルに置き換えています）。</p>
+<div class="shots">
+
+<div><div class="tag-real">実画面</div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">my.frankgolf.jp / 会員管理</div></div>
+<img src="assets/shots/members.jpg" alt="会員管理の一覧画面" loading="lazy"></div>
+<div class="cap"><b>会員管理・自動集金</b>在籍・休会・退会、プラン、入会日、連絡先をひとつの名簿で。月会費のカード決済はここから自動で走ります。</div></div>
+
+<div><div class="tag-real">実画面</div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">frankgolf.jp / 公式サイト</div></div>
+<img src="assets/shots/frank-hp.jpg" alt="FRANK GOLF 公式サイト" loading="lazy"></div>
+<div class="cap"><b>ゴルフ施設のホームページ</b>体験予約まで一直線につながる施設サイト。この予約が、そのまま受付台帳と会員データになります。</div></div>
+
+<div><div class="tag-real">実画面</div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">my.frankgolf.jp / Web入会申込</div></div>
+<img src="assets/shots/join-web.jpg" alt="Web入会申込フォーム" loading="lazy"></div>
+<div class="cap"><b>スマホで完結するWeb入会</b>プランを選んで送るだけ。店頭の紙の申込書と、その後の転記作業がなくなります。</div></div>
+
+<div><div class="tag-real">実画面</div>
+<div class="frame tablet"><div class="bar"></div>
+<img src="assets/shots/checkin.jpg" alt="QRチェックイン端末の画面" loading="lazy"></div>
+<div class="cap"><b>QRチェックイン（店頭タブレット）</b>会員証のQRをかざすだけで来店記録。誰が今店にいるかが、そのままレジと注文につながります。</div></div>
+
+<div><div class="tag-real mock">再現画面</div>
+<div class="frame dk"><div class="bar"><i></i><i></i><i></i><div class="url">lesson-os / スイング解析</div></div>
+<img src="assets/shots/mock-swing.jpg" alt="スイング解析画面" loading="lazy"></div>
+<div class="cap"><b>スイング動画カルテ</b>撮った動画から骨格とクラブ軌跡を出し、肩・腰・前傾・プレーン角を数値化。前回と重ねて見比べられます。</div></div>
+
+<div><div class="tag-real mock">再現画面</div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">shift-cloud / シフト作成</div></div>
+<img src="assets/shots/mock-shift.jpg" alt="シフト作成グリッド画面" loading="lazy"></div>
+<div class="cap"><b>シフト・勤怠・給与計算</b>スマホの希望提出からシフト確定、iPadの打刻、レッスン手当を含む給与集計まで同じデータで進みます。</div></div>
+
+</div>
+<p class="note">※「実画面」は本番環境のスクリーンショット、「再現画面」はログインが必要な画面を同じレイアウト・同じ配色でサンプルデータにより再現したものです。ご要望をいただければ、実機のデモで全画面をお見せします。</p>
+</div></section>
+
 <section style="padding-top:0"><div class="wrap">
 <div class="sec-eyebrow">AI STORE MANAGER</div>
 <h2 class="disp">AI店長は、気づいて、提案して、あなたの承認で動く。</h2>
@@ -190,8 +89,81 @@ footer b{color:#fff;font-size:14px;letter-spacing:.14em}
 <div class="st"><b>承認で実行</b><p>あなたがタップしたものだけが実行されます。</p></div>
 <div class="st"><b>学習する</b><p>結果を記録し、次はもっと的確に。使うほど店に馴染みます。</p></div>
 </div>
+
+<div class="fr" style="margin-top:48px">
+<div>
+<div class="frame dk"><div class="bar"><i></i><i></i><i></i><div class="url">yozan-genesis / AI社員の稼働状況</div></div>
+<img src="assets/shots/genesis-agents.jpg" alt="AI社員（AIエージェント）の稼働画面" loading="lazy"></div>
+<div class="cap"><span class="tag-real" style="margin:0 0 6px">実画面</span><br>それぞれのAIが「何を見て・何を判断し・何を実行するか」まで定義されています。実行が要承認のものは、必ずオーナーの承認待ちで止まります。</div>
+</div>
+<div class="txt">
+<h3>毎朝7時、あなたのLINEに「今日の一手」が届きます</h3>
+<div class="phone" style="max-width:100%;margin:0">
+<div class="ph-hd"><div class="avatar">A</div><div><b>AI店長</b><span>今朝 7:00</span></div></div>
+<div class="bub">おはようございます。昨日の売上は <b>86,400円</b>、本日の予約は <b>12件</b> です。</div>
+<div class="bub">先週体験にいらした <b>田中様</b> がまだ未入会です。フォローのメッセージ案を作りました。<div class="chip"><span>承認して送信</span><span>あとで</span></div></div>
+<div class="bub"><b>土曜14時台</b> に空きが3枠あります。会員向けの案内文を用意しました。<div class="chip"><span>承認して配信</span></div></div></div>
+</div></div>
+
 <p class="note">※ AI店長は体験フォローと朝のダイジェストから順次提供。退会予防・空き枠キャンペーンなどの拡張機能は「AI店長プレミアム」（月額＋15,000円）で提供します。</p>
 <div style="margin-top:22px"><a class="btn btn-gold" href="aitencho.html" style="background:var(--green);color:#fff">AI店長をくわしく見る</a></div>
+</div></section>
+
+<section style="background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"><div class="wrap">
+<div class="sec-eyebrow">HOW IT WORKS</div>
+<h2 class="disp">1本の流れで、店のお金と手間が減っていく。</h2>
+<p class="sub">13のシステムは別々の道具ではなく、ひとつのデータでつながっています。お客様が公式サイトで体験を予約した瞬間から、入会・集金・レッスン・レジ締めまでが同じ線の上に乗ります。</p>
+
+<div class="fr">
+<div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">reserve-os / 予約フォーム</div></div>
+<img src="assets/shots/reserve-form.jpg" alt="Web予約フォーム" loading="lazy"></div>
+</div>
+<div class="txt"><h3>① 予約が入る</h3>
+<p>公式サイトから、打席・コーチ・時間を選んで予約。ダブルブッキングはシステム側で禁止し、レフティ打席やプラン別の予約上限まで自動で判定します。</p>
+<ul><li>体験レッスンは日時を選ぶだけで即確定</li><li>前日リマインドまで自動送信</li><li>予約が入った瞬間に受付台帳へ自動で載る</li></ul></div>
+</div>
+
+<div class="fr rev">
+<div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">member-os / 受付台帳</div></div>
+<img src="assets/shots/mock-reception.jpg" alt="受付台帳の画面" loading="lazy"></div>
+</div>
+<div class="txt"><h3>② 来店・体験を記録する</h3>
+<p>タブレットに来店を記録すると、体験が何件で、そのうち何人が入会したかが自動で集計されます。紙とExcelの名簿はここで終わりになります。</p>
+<ul><li>体験→入会率が毎日その場で見える</li><li>未入会の方は「要フォロー」に自動で残る</li><li>そのままExcel名簿としても出力できる</li></ul></div>
+</div>
+
+<div class="fr">
+<div>
+<div class="frame"><div class="bar"><i></i><i></i><i></i><div class="url">my.frankgolf.jp / 会員管理</div></div>
+<img src="assets/shots/members.jpg" alt="会員管理の画面" loading="lazy"></div>
+</div>
+<div class="txt"><h3>③ 入会して、毎月自動で集金する</h3>
+<p>Web入会フォームから申し込みが入ると会員番号が発行され、月会費のカード決済が毎月自動で走ります。未払いは一覧に残るので、督促の抜けがなくなります。</p>
+<ul><li>入会金・プラン・予約上限をプランごとに設定</li><li>休会・退会の手続きも画面の中で完結</li><li>会員はスマホのマイページからQR会員証を表示</li></ul></div>
+</div>
+
+<div class="fr rev">
+<div>
+<div class="frame dk"><div class="bar"><i></i><i></i><i></i><div class="url">lesson-os / レッスンノート</div></div>
+<img src="assets/shots/mock-lesson-note.jpg" alt="レッスンノートの生徒一覧" loading="lazy"></div>
+</div>
+<div class="txt"><h3>④ レッスンの中身を、店の資産にする</h3>
+<p>生徒ごとにスイング動画・計測値・アドバイスが時系列で積み上がります。コーチが変わっても「この人がどこまで来たか」が引き継げます。</p>
+<ul><li>AIがその店の教え方でコメントを下書き</li><li>スイングは骨格・クラブ軌跡・プレーンまで解析</li><li>生徒へは共有リンクでそのまま渡せる</li></ul></div>
+</div>
+
+<div class="fr">
+<div>
+<div class="frame dk"><div class="bar"><i></i><i></i><i></i><div class="url">money-os / お金管理ダッシュボード</div></div>
+<img src="assets/shots/mock-money.jpg" alt="売上・現金管理のダッシュボード" loading="lazy"></div>
+</div>
+<div class="txt"><h3>⑤ レジ締めが、そのまま経営の数字になる</h3>
+<p>金種棚卸（レジ締め）がそのまま現金出納になり、カード・口座の取込明細と突き合わせて「合っているか」を毎日その場で確認できます。月末を待たずに数字が見えます。</p>
+<ul><li>店頭売上・経費・現金残高を1画面で</li><li>未仕分けの明細だけが残るので処理が終わる</li><li>月次報告の資料は毎月1日に自動でできている</li></ul></div>
+</div>
+
 </div></section>
 
 <section id="plans" style="background:#EFEBDD"><div class="wrap">
@@ -206,13 +178,72 @@ footer b{color:#fff;font-size:14px;letter-spacing:.14em}
 <div class="pr">780,000<small>円（税抜）</small></div><div class="mo">月額 38,000円</div>
 <div class="nt">AI店長プレミアム 3か月無料</div><a href="mailto:info@yozan-group.jp?subject=%E3%83%87%E3%83%A2%E4%BE%9D%E9%A0%BC">このプランのデモを見る</a></div></div>
 <p class="note">※ 単品でのご導入、導入後の追加もできます。既存の会員名簿・予約履歴の移行はこちらで行います（オプション）。</p>
+
+<div class="sec-eyebrow" style="margin-top:64px">COMPARISON</div>
+<h2 class="disp">「予約サービス」でも「オーダーメイド開発」でもない選択肢。</h2>
+<div class="cmpwrap"><table class="cmp">
+<thead><tr><th></th><th>汎用の予約サービス</th><th>オーダーメイド開発</th><th class="own">YOZAN</th></tr></thead>
+<tbody>
+<tr><td>初期費用の目安</td><td>0〜10万円</td><td>300万〜1,000万円</td><td class="own y">38万円〜</td></tr>
+<tr><td>打席×時間×コーチの同時管理</td><td class="n">できない</td><td class="y">できる</td><td class="own y">できる</td></tr>
+<tr><td>体験→入会率の自動集計</td><td class="n">できない</td><td>要件次第</td><td class="own y">標準搭載</td></tr>
+<tr><td>月会費の自動集金</td><td>別サービス</td><td class="y">できる</td><td class="own y">標準搭載</td></tr>
+<tr><td>レッスン記録・スイング解析</td><td class="n">できない</td><td>別途開発</td><td class="own y">標準搭載</td></tr>
+<tr><td>作った人がゴルフ店の現場を知っている</td><td class="n">—</td><td class="n">—</td><td class="own y">自社で2店舗を運営</td></tr>
+<tr><td>導入までの期間</td><td>即日</td><td>6か月〜1年</td><td class="own y">約1か月</td></tr>
+<tr><td>機能改善</td><td>全ユーザー共通</td><td>都度見積り</td><td class="own y">毎月・月額に込み</td></tr>
+</tbody></table></div>
+<p class="note">※ 比較は一般的な相場感によるもので、個別のサービス・開発会社を指すものではありません。</p>
 </div></section>
 
 <section id="products"><div class="wrap">
 <div class="sec-eyebrow">PRODUCTS</div>
 <h2 class="disp">13のシステム。ぜんぶ、自社の店で毎日動いています。</h2>
-<p class="sub">カタログ上の機能ではありません。私たちの練習場・スクール・キャディ派遣の現場で、今日も実際に使われているものだけを販売しています。</p>
-<div class="grid"><a class="card" href="products/homepage.html"><div class="cat">集客・入会</div><h3>ゴルフ施設のホームページ</h3><p>予約までつながる、施設の顔。</p><div class="pr">初期 <b>150,000</b>円〜／月5,000円</div></a><a class="card" href="products/booking.html"><div class="cat">集客・入会</div><h3>かんたんWeb予約</h3><p>打席×時間×コーチを、間違えずにさばく。</p><div class="pr">初期 <b>150,000</b>円〜／月6,000円</div></a><a class="card" href="products/members.html"><div class="cat">集客・入会</div><h3>会員管理・月会費の自動集金</h3><p>入会から集金まで、手を離す。</p><div class="pr">初期 <b>200,000</b>円〜／月8,000円</div></a><a class="card" href="products/reception.html"><div class="cat">集客・入会</div><h3>タブレット受付・体験管理</h3><p>体験から入会までの数字が、毎日見える。</p><div class="pr">初期 <b>100,000</b>円〜／月4,000円</div></a><a class="card" href="products/lesson-ai.html"><div class="cat">レッスン</div><h3>レッスンAIアシスタント</h3><p>その店の教え方で、AIがコメントを書く。</p><div class="pr">初期 <b>150,000</b>円〜／月8,000円</div></a><a class="card" href="products/swing-karte.html"><div class="cat">レッスン</div><h3>スイング動画カルテ</h3><p>スイングの成長を、動画で積み上げる。</p><div class="pr">初期 <b>180,000</b>円〜／月8,000円</div></a><a class="card" href="products/shift.html"><div class="cat">店舗運営</div><h3>シフト・勤怠・給与計算</h3><p>レッスン手当まで、給与が自動で合う。</p><div class="pr">初期 <b>150,000</b>円〜／月6,000円</div></a><a class="card" href="products/money.html"><div class="cat">店舗運営</div><h3>売上・現金管理</h3><p>レジ締めが、そのまま経営の数字になる。</p><div class="pr">初期 <b>150,000</b>円〜／月6,000円</div></a><a class="card" href="products/inventory.html"><div class="cat">店舗運営</div><h3>在庫・棚卸管理</h3><p>シャフト1本まで、棚と数字を合わせる。</p><div class="pr">初期 <b>100,000</b>円〜／月4,000円</div></a><a class="card" href="products/report.html"><div class="cat">店舗運営</div><h3>月次報告資料の自動作成</h3><p>毎月の報告資料が、毎月1日にできている。</p><div class="pr">初期 <b>100,000</b>円〜／月4,000円</div></a><a class="card" href="products/pro-site.html"><div class="cat">プロ・法人</div><h3>プロゴルファーの公式サイト</h3><p>あなたの看板を、スマホから育てる。</p><div class="pr">初期 <b>150,000</b>円〜／月5,000円</div></a><a class="card" href="products/caddy.html"><div class="cat">プロ・法人</div><h3>キャディ派遣管理</h3><p>派遣1件ごとの粗利まで、見える。</p><div class="pr">初期 <b>400,000</b>円〜／月15,000円</div></a><a class="card" href="products/sales-auto.html"><div class="cat">プロ・法人</div><h3>新規開拓 自動営業ツール</h3><p>相手専用のデモまで、自動で作る営業。</p><div class="pr">初期 <b>500,000</b>円〜／月20,000円</div></a><a class="card" href="genesis.html" style="background:#14452F;border-color:#14452F"><div class="cat" style="color:#E7CF9B">会社まるごと</div><h3 style="color:#fff">GENESIS</h3><p style="color:#C7D6CC">13のシステムを1つにつなぎ、経営の判断までAIが支える会社まるごと自動化パッケージ。</p><div class="pr" style="color:#E7CF9B">初期 <b style="color:#E7CF9B">1,500,000</b>円〜</div></a></div>
+<p class="sub">カタログ上の機能ではありません。私たちの練習場・スクール・キャディ派遣の現場で、今日も実際に使われているものだけを販売しています。カードを押すと、それぞれの画面と詳細が見られます。</p>
+<div class="grid">
+
+<a class="card thumbed" href="products/homepage.html"><div class="th"><img src="assets/shots/frank-hp.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">集客・入会</div><h3>ゴルフ施設のホームページ</h3><p>予約までつながる、施設の顔。</p><div class="pr">初期 <b>150,000</b>円〜／月5,000円</div></div></a>
+
+<a class="card thumbed" href="products/booking.html"><div class="th"><img src="assets/shots/booking-calendar.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">集客・入会</div><h3>かんたんWeb予約</h3><p>打席×時間×コーチを、間違えずにさばく。</p><div class="pr">初期 <b>150,000</b>円〜／月6,000円</div></div></a>
+
+<a class="card thumbed" href="products/members.html"><div class="th"><img src="assets/shots/members.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">集客・入会</div><h3>会員管理・月会費の自動集金</h3><p>入会から集金まで、手を離す。</p><div class="pr">初期 <b>200,000</b>円〜／月8,000円</div></div></a>
+
+<a class="card thumbed" href="products/reception.html"><div class="th"><img src="assets/shots/mock-reception.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">集客・入会</div><h3>タブレット受付・体験管理</h3><p>体験から入会までの数字が、毎日見える。</p><div class="pr">初期 <b>100,000</b>円〜／月4,000円</div></div></a>
+
+<a class="card thumbed" href="products/lesson-ai.html"><div class="th"><img src="assets/shots/mock-lesson-ai.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">レッスン</div><h3>レッスンAIアシスタント</h3><p>その店の教え方で、AIがコメントを書く。</p><div class="pr">初期 <b>150,000</b>円〜／月8,000円</div></div></a>
+
+<a class="card thumbed" href="products/swing-karte.html"><div class="th"><img src="assets/shots/mock-swing.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">レッスン</div><h3>スイング動画カルテ</h3><p>スイングの成長を、動画で積み上げる。</p><div class="pr">初期 <b>180,000</b>円〜／月8,000円</div></div></a>
+
+<a class="card thumbed" href="products/shift.html"><div class="th"><img src="assets/shots/mock-shift.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">店舗運営</div><h3>シフト・勤怠・給与計算</h3><p>レッスン手当まで、給与が自動で合う。</p><div class="pr">初期 <b>150,000</b>円〜／月6,000円</div></div></a>
+
+<a class="card thumbed" href="products/money.html"><div class="th"><img src="assets/shots/mock-money.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">店舗運営</div><h3>売上・現金管理</h3><p>レジ締めが、そのまま経営の数字になる。</p><div class="pr">初期 <b>150,000</b>円〜／月6,000円</div></div></a>
+
+<a class="card thumbed" href="products/inventory.html"><div class="th"><img src="assets/shots/mock-inventory.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">店舗運営</div><h3>在庫・棚卸管理</h3><p>シャフト1本まで、棚と数字を合わせる。</p><div class="pr">初期 <b>100,000</b>円〜／月4,000円</div></div></a>
+
+<a class="card thumbed" href="products/report.html"><div class="th"><img src="assets/shots/report-slide.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">店舗運営</div><h3>月次報告資料の自動作成</h3><p>毎月の報告資料が、毎月1日にできている。</p><div class="pr">初期 <b>100,000</b>円〜／月4,000円</div></div></a>
+
+<a class="card thumbed" href="products/pro-site.html"><div class="th"><img src="assets/shots/pro-site.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">プロ・法人</div><h3>プロゴルファーの公式サイト</h3><p>あなたの看板を、スマホから育てる。</p><div class="pr">初期 <b>150,000</b>円〜／月5,000円</div></div></a>
+
+<a class="card thumbed" href="products/caddy.html"><div class="th"><img src="assets/shots/mock-caddy.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">プロ・法人</div><h3>キャディ派遣管理</h3><p>派遣1件ごとの粗利まで、見える。</p><div class="pr">初期 <b>400,000</b>円〜／月15,000円</div></div></a>
+
+<a class="card thumbed" href="products/sales-auto.html"><div class="th"><img src="assets/shots/mock-sales-auto.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat">プロ・法人</div><h3>新規開拓 自動営業ツール</h3><p>相手専用のデモまで、自動で作る営業。</p><div class="pr">初期 <b>500,000</b>円〜／月20,000円</div></div></a>
+
+<a class="card thumbed" href="genesis.html" style="background:#14452F;border-color:#14452F"><div class="th" style="border-bottom-color:#1f5a3e"><img src="assets/shots/genesis-home.jpg" alt="" loading="lazy"></div><div class="in"><div class="cat" style="color:#E7CF9B">会社まるごと</div><h3 style="color:#fff">GENESIS</h3><p style="color:#C7D6CC">13のシステムを1つにつなぎ、経営の判断までAIが支える会社まるごと自動化パッケージ。</p><div class="pr" style="color:#E7CF9B">初期 <b style="color:#E7CF9B">1,500,000</b>円〜</div></div></a>
+
+</div>
+</div></section>
+
+<section style="background:#fff;border-top:1px solid var(--line)"><div class="wrap">
+<div class="sec-eyebrow">FLOW</div>
+<h2 class="disp">お問い合わせから、約1か月で店が動きはじめます。</h2>
+<p class="sub">開業前のお店なら、内装工事と並行して進められます。既存店の乗り換えも、営業を止めずに切り替えます。</p>
+<div class="flow">
+<div><b>デモを見る</b><p>実機の画面をそのままお見せします。売り込みはしません。オンラインでも店舗でも。</p><div class="when">当日〜1週間</div></div>
+<div><b>構成を決める</b><p>店の広さ・打席数・レッスンの形に合わせて、必要なシステムだけを選びます。</p><div class="when">1週間</div></div>
+<div><b>初期設定</b><p>プラン・料金・打席・コーチ・営業時間を設定。ホームページの原稿もこちらで用意します。</p><div class="when">2週間</div></div>
+<div><b>データ移行</b><p>既存の会員名簿・予約履歴はこちらで移します。お客様に作業をお願いしません。</p><div class="when">1週間</div></div>
+<div><b>開始・運用</b><p>操作説明のあと運用開始。以降の不具合対応と毎月の機能改善は月額に含まれます。</p><div class="when">以降ずっと</div></div>
+</div>
 </div></section>
 
 <section class="dark" id="company"><div class="wrap">
@@ -236,12 +267,15 @@ footer b{color:#fff;font-size:14px;letter-spacing:.14em}
 <h2 class="disp">よくあるご質問</h2>
 <div class="faq">
 <details><summary>なぜこんなに安いのですか？</summary><p>自社の店のために作ったシステムなので、開発費をすでに回収しているからです。営業部隊も広告費もかけていません。機能を削って安くしているわけではなく、自社で毎日使っているものそのままです。</p></details>
+<details><summary>載っている画面は本物ですか？</summary><p>「実画面」と書いてあるものは本番環境のスクリーンショットで、お客様の氏名・電話番号・メールアドレスだけをサンプルに置き換えています。「再現画面」は、ログインが必要で公開できない画面を、同じレイアウト・同じ配色でサンプルデータにより再現したものです。デモでは、実機で全画面をそのままお見せします。</p></details>
 <details><summary>今のシステムからの乗り換えが不安です。</summary><p>会員名簿・予約履歴の移行はこちらで行います。お客様に作業をお願いすることはありません。1つだけ導入して、良ければ足していく形も歓迎です。</p></details>
+<details><summary>導入までどのくらいかかりますか？</summary><p>標準で約1か月です。開業前のお店であれば内装工事と並行して進められますし、既存店の乗り換えも営業を止めずに切り替えます。</p></details>
 <details><summary>サポートはどうなっていますか？</summary><p>導入時の操作説明と、その後の不具合対応・毎月の機能改善が月額に含まれます。AIによる24時間の一次サポート窓口をご用意し、重大な障害（予約・決済・入会の停止）には即時に人が対応します。</p></details>
 <details><summary>パソコンが苦手でも使えますか？</summary><p>スタッフ画面はスマホ・タブレット前提で作っています。私たちの店でも、システムが得意ではないスタッフが毎日使っています。</p></details>
 <details><summary>ゴルフ以外の業種でも使えますか？</summary><p>ジム・整体・サロン・スクールなど、予約と月会費で成り立つ業態であれば使えます。ただし私たちの強みはゴルフ業界の知見にありますので、まずはご相談ください。</p></details>
 <details><summary>会員データの扱いは安全ですか？</summary><p>お客様の会員情報は事業者ごとに分離して保管し、個人情報の取扱いは契約書で明確にします。サービス改善のための統計データは、個人を特定できない形でのみ利用します。</p></details>
 </div></div></section>
+
 <div class="cta-band"><h2 class="disp">まずは、動いている画面を見てください。</h2>
 <p>私たちの店で毎日動いている本物の画面を、そのままお見せします。売り込みはいたしません。</p>
 <a class="btn btn-gold" href="mailto:info@yozan-group.jp?subject=%E3%83%87%E3%83%A2%E4%BE%9D%E9%A0%BC">デモを依頼する（無料）</a></div>
