@@ -7,6 +7,20 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-182. **Genesis ホームの会話型AI（JARVIS・#182）を動かす**
+   1. ~~Supabase で migration `0133_genesis_jarvis.sql` を流す~~ **✅ 適用済み（2026-08-28・MCP）** — `gn_jarvis_turns` / `gn_dev_requests` 作成済み
+   2. **`.\deploy-genesis-jarvis-182.ps1` を実行**（commit & push）
+   3. **Vercel(genesis) の環境変数に `GEMINI_API_KEY` を追加** — lesson-os / swing-cortex で使っているものと同じキーで構いません。
+      入れると声が高品質になります。**未設定でもブラウザ内蔵の音声で喋る**ので、後回しでも動きます。
+      さらに良い声にしたい場合だけ `OPENAI_API_KEY` を入れてください（あればそちらが優先されます）。
+   4. 動作確認: Genesis のホームを **Chrome か Edge** で開く → 開いた瞬間に喋る → 🎤 を押して「今月の売上は？」と話しかける。
+      「◯◯を直して」と話すと `/dev-requests`（開発依頼）に指示書が積まれます。
+   5. **スケジュールタスク「JARVIS 開発依頼キューの消化」の端末接続を承認する** — 毎時、キューに `queued` があれば
+      Cowork のセッションが起きて実装し、`.ps1` を用意して `done` に書き戻します（**pushはしません＝従来どおり古川さんが実行**）。
+      作成時点では「cloud only」＝**このPCのリポジトリに触れない**状態なので、承認が要ります。承認プロンプトが出なければ教えてください。
+
+
+
 A-154. **FRANK 会員ポータル #154 の稼働に必要な作業（9/2まで）** — 正典 `docs/modules/frank/MEMBER_PORTAL_構想.md`
    1. ~~Supabase で migration 0123 を流す~~ **✅ 適用済み（2026-08-26・MCP／メニュー24品も投入済み）**
    2. ~~`.\deploy-frank-portal-154.ps1` を実行~~ **✅ push済み（2026-08-26）**。続けて **`.\deploy-frank-portal-155.ps1`**（#155・PWA／自動チェックアウト／打席QR印刷／店舗解決のバグ修正）を実行してください。

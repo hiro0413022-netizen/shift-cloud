@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 2026-08-28 — Genesis: ホームを会話型AI（JARVIS）にした
+- feat(genesis): ホームのいちばん上に**対話AI「GENESIS」**を追加（DECISIONS #182）。画面を開くと**その場で喋る**（「おかえりなさい、古川さん。全体スコアは82点、本日の判断は3件です」）。最初の一言はLLMを使わずサーバー側で組み立てるので、**APIが落ちていても・課金しなくても必ず出る**
+- feat(genesis): **音声で話しかけられる**（Web Speech API・Chrome/Edge）。返事は `/api/jarvis/speak` で読み上げる — `OPENAI_API_KEY` があれば gpt-4o-mini-tts、無ければ `GEMINI_API_KEY` で Gemini TTS、どちらも無ければブラウザ内蔵音声。**どの状態でも無音にならない**
+- feat(genesis): 話しかけた内容を4つに振り分ける — ①いまの状況（ブリーフィング即答）②**数字（Ask Dataに丸投げ＝SQLはPostgresが実行し、生成SQLと件数を出典として表示）**③画面へ案内 ④**開発依頼**
+- feat(genesis): **開発依頼キュー `/dev-requests`** を新設。「◯◯を直して」と話すとAIが正式な開発指示書に起こして積み、Cowork側のClaudeが拾って実装する。**言われた原文（said）はAIの要約で上書きしない**（一次資料）
+- note: **JARVISは実行しない**（外部送信・課金・本番デプロイ・契約）。承認は従来どおりホームの判断フィードのボタン。本番へ出す最後の一歩（git push）は2026-08-17の決定でユーザーのPCからしか実行できず、**その制約がそのまま最後の安全弁**になっている
+- note: 下の「見る画面」（スコア・判断フィード・5大KPI・AIティッカー）は**そのまま残した**。会話が外れたときに戻れる場所を無くさない
+- refactor(genesis): 純粋な部分を `lib/jarvis-pure.ts`（ブリーフィング組み立て・最初の一言・AI返事の読み取り・案内先の検証）に切り出し
+- db: migration **0133**（`gn_jarvis_turns` 会話ログ / `gn_dev_requests` 開発依頼キュー）
+- test: `tests/jarvis.test.ts` 15件を追加。`npx tsc --noEmit` 通過・全477件パス
+- ⚠ ユーザー作業: ①Supabase に 0133 を流す ②Vercel(genesis) に `GEMINI_API_KEY`（または `OPENAI_API_KEY`）を設定 — 未設定でもブラウザ音声で動く
+
 ## 2026-08-28 — member-os: 一時利用者名簿Excelの日付と電話番号の書式
 - change(member-os): Excel出力の**日付を `2026/08/28`（スラッシュ区切り）**に（DECISIONS #173）。対象は 日付・生年月日・再来の場合日付記入・再アプローチ(日付)×2 の5列。取込側の `cellDate` は "/" も受けるので、出した名簿はそのまま取り込み直せる
 - change(member-os): Excel出力の**電話番号を `090-1234-5678` の形**に。数字だけ11桁・全角ハイフン・スペース区切り・`+81`始まり・ハイフン位置ちがいを整形する

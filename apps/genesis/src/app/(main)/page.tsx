@@ -15,6 +15,9 @@ import { runKpiIntegrityChecks } from "@/lib/kpi-checks";
 import { runLegalChecks } from "@/lib/legal-checks";
 import { getOpenSuggestions } from "@/lib/suggestions";
 import { getJudgmentFeed, type JudgmentItem } from "@/lib/judgment-feed";
+import { toBriefing, openingLine } from "@/lib/jarvis-pure";
+import { jstYmd } from "@/lib/jst";
+import { Jarvis } from "@/components/jarvis";
 import { Panel, Badge, Empty, fmtDate, KpiCard } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { decideApproval } from "./approvals/actions";
@@ -32,6 +35,9 @@ import { decideTrialRequest, decideJoinRequest, dismissHotLead, acknowledgeAlert
 export const dynamic = "force-dynamic";
 
 // REDESIGN_2026-07 §3-1: ホーム = スコア＋一言 / 判断フィード（その場で完結） / 5大KPI / AI活動ティッカー
+// #182: いちばん上に対話AI（JARVIS）を置き、開いた瞬間に状況を"喋る"面にした。
+//       下の見る画面（スコア・判断フィード・KPI・ティッカー）はそのまま残す＝
+//       会話が外れたときに必ず戻れる場所を無くさない。
 export default async function HomePage() {
   const actor = await requireGenesisActor();
   // #134 店舗またぎ廃止: オーナーは全社（null）、それ以外は自分の配属店舗だけ。
@@ -75,8 +81,26 @@ export default async function HomePage() {
       ? "今日の判断はありません。AIが引き続き会社を回しています。"
       : `今日の判断は${totalDecisions}件です。上から順に片づけてください。`;
 
+  // JARVIS が最初に喋る一言。LLMを使わずここで組み立てる＝
+  // APIが落ちていても・課金が発生しなくても、開いた瞬間に必ず声が出る。
+  const briefing = toBriefing({
+    name: actor.name,
+    score,
+    grade,
+    factors,
+    approvals: d.approvals.length,
+    feed,
+    alerts,
+    kpis: d.kpis as unknown as Record<string, unknown>[],
+    recentEvents: d.recentEvents as unknown as { title: unknown }[],
+    today: jstYmd(),
+  });
+
   return (
     <div className="space-y-5">
+      {/* 対話AI（#182） */}
+      <Jarvis opening={openingLine(briefing)} name={actor.name} />
+
       {/* スコア＋一言 */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
         <div className="flex items-center gap-4">

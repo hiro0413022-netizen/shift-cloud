@@ -294,3 +294,25 @@ body::before {
     scrollbar-width: thin;
   }
 }
+
+/* ------------------------------------------------------------
+   JARVIS（ホームの対話AI・#182）の状態表示
+   考えている＝回る / 聞いている・話している＝脈打つ。
+   状態を文字だけで出すと、視界の端で気づけない。
+   ------------------------------------------------------------ */
+@keyframes jarvis-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.18); opacity: 0.35; }
+}
+@keyframes jarvis-spin {
+  to { transform: rotate(360deg); }
+}
+.jarvis-pulse { animation: jarvis-pulse 1.4s ease-in-out infinite; }
+.jarvis-spin {
+  border-top-color: transparent;
+  border-right-color: transparent;
+  animation: jarvis-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jarvis-pulse, .jarvis-spin { animation: none; }
+}

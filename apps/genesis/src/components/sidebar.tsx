@@ -32,6 +32,7 @@ export const ADMIN_NAV = [
   { href: "/memories", label: "経営メモ（AIの記憶）", en: "Business Memory", icon: "🧠" },
   { href: "/decisions", label: "決定事項ログ", en: "Decision Log", icon: "⚖" },
   { href: "/events", label: "出来事ログ", en: "Company Events", icon: "⚡" },
+  { href: "/dev-requests", label: "開発依頼", en: "Dev Requests", icon: "🧾" },
   { href: "/dev", label: "開発状況", en: "Development", icon: "🛠" },
   { href: "/future", label: "未来シミュレーション", en: "Future", icon: "📈" },
   { href: "/connectors", label: "外部連携", en: "Connectors", icon: "🔌" },
@@ -47,6 +48,8 @@ function itemActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
   // チャット(/chat)は /command（CEO AI司令室タブ）でもアクティブ扱い（#78 §3-2統合）
   if (href === "/chat") return pathname.startsWith("/chat") || pathname.startsWith("/command");
+  // /dev と /dev-requests は別物（startsWith だと両方が光る）
+  if (href === "/dev") return pathname === "/dev";
   return pathname.startsWith(href);
 }
 
