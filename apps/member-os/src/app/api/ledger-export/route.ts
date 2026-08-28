@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { VISIT_TYPE_LABEL, PAYMENT_LABEL, GENDER_LABEL } from "@/lib/walkin";
+import { ymdSlash, formatTel } from "@/lib/ledger-format";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,27 +64,27 @@ export async function GET(request: Request) {
     const result = s(v.result);
 
     const row = new Array(57).fill("");
-    row[0] = s(v.visited_on);
+    row[0] = ymdSlash(v.visited_on);
     row[1] = VISIT_TYPE_LABEL[s(v.visit_type)] ?? s(v.visit_type);
     row[2] = s(g.name);
     row[3] = s(g.name_kana);
-    row[4] = s(g.birth_date);
+    row[4] = ymdSlash(g.birth_date);
     row[5] = GENDER_LABEL[s(g.gender)] ?? "";
     row[6] = s(g.postal_code);
     row[7] = [s(g.prefecture), s(g.address1), s(g.building)].filter(Boolean).join(" ");
     row[8] = s(g.distance_km);
-    row[9] = s(g.phone);
+    row[9] = formatTel(g.phone);
     row[10] = s(g.email);
     row[11] = s(g.occupation);
     row[12] = s(g.contact_method);
     row[13] = v.fee != null ? Number(v.fee) : "";
     row[14] = s(v.discount);
-    row[15] = s(v.repeat_date);
+    row[15] = ymdSlash(v.repeat_date);
     row[16] = PAYMENT_LABEL[s(v.payment_method)] ?? "";
     row[17] = s(v.pro_staff);
     row[18] = s(rec.name);
     row[19] = RESULT_LABEL[result] ?? "";
-    row[20] = s(v.reapproach_date);
+    row[20] = ymdSlash(v.reapproach_date);
     row[21] = s(v.note);
     row[22] = s(v.referral_source);
     row[23] = s(v.referral_source_other);
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
     row[40] = s(survey.join_interest);
     row[41] = s(survey.comment);
     row[42] = v.visit_type === "trial" && result === "join" ? "入会" : "";
-    row[43] = s(v.reapproach_date);
+    row[43] = ymdSlash(v.reapproach_date);
     ws.addRow(row);
   }
 
@@ -103,6 +104,9 @@ export async function GET(request: Request) {
   // 郵便番号(7列目)・電話番号(10列目)は数値化で先頭0が消える/指数表記になるのを防ぐためテキスト書式に固定
   ws.getColumn(7).numFmt = "@";
   ws.getColumn(10).numFmt = "@";
+  // 日付(1・5・16・21・44列目)は「2026/08/28」の文字列で出す。Excelが開いた時に
+  // ロケール既定の表示形式へ勝手に直さないようテキスト書式に固定する（#173）
+  for (const c of [1, 5, 16, 21, 44]) ws.getColumn(c).numFmt = "@";
 
   const buf = await wb.xlsx.writeBuffer();
   const fname = `一時利用者名簿_${from}_${to}.xlsx`;
