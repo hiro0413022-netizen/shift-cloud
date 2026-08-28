@@ -652,3 +652,201 @@ export async function removePose(videoId: string): Promise<{ error?: string }> {
   const { error } = await admin.from("lsn_video_pose").delete().eq("video_id", video.id);
   return error ? { error: error.message } : {};
 }
+
+/* ------------------------------------------------------------------ */
+/* レッスンメモ（会話の録音 → AI要約 → コーチが確認して確定） 2026-08-28  */
+/*                                                                      */
+/* 設計の柱は3つ。ここを崩さないこと。                                  */
+/*   1. 同意なしに録音は始められない（consent_at を必ず立ててから作る）   */
+/*   2. 音声は要約が済んだら消す（残すのは要約と、コーチが直した本文）    */
+/*   3. AIは下書き。カルテと共有ページに出るのは body だけ               */
+/* ------------------------------------------------------------------ */
+
+const MAX_NOTE_AUDIO = 60 * 1024 * 1024; // 音声のみ・1時間ぶんでも十分な余裕
+
+export type LessonNoteItem = {
+  id: string;
+  lessonDate: string;
+  status: string;
+  hasAudio: boolean;
+  seconds: number | null;
+  body: string | null;
+  summary: {
+    today: string[]; homework: string[]; studentWords: string[]; clubs: string[]; next: string[];
+  } | null;
+  transcript: string | null;
+  coach: string;
+  error: string | null;
+};
+
+/**
+ * 録音を始める前に呼ぶ。**同意の記録がこの行の存在意義**なので、
+ * 同意なしでは作らない（録音ボタンはこの戻り値が無いと押せない）。
+ */
+export async function startLessonNote(
+  studentId: string,
+  lessonDate: string,
+  consent: boolean
+): Promise<{ id?: string; error?: string }> {
+  const { actor, admin, ok } = await ownStudent(studentId);
+  if (!ok) return { error: "生徒が見つかりません" };
+  if (!consent) return { error: "お客様の同意を確認してから録音してください" };
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(lessonDate) ? lessonDate : new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const { data, error } = await admin
+    .from("lsn_lesson_notes")
+    .insert({
+      company_id: actor.companyId,
+      student_id: studentId,
+      lesson_date: date,
+      coach_staff_id: actor.staffId,
+      status: "draft",
+      consent_at: new Date().toISOString(),
+      consent_by: actor.staffId,
+    })
+    .select("id")
+    .single();
+  if (error || !data) return { error: error?.message ?? "作成に失敗しました" };
+  return { id: (data as { id: string }).id };
+}
+
+async function ownNote(noteId: string) {
+  const actor = await requireLessonActor();
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("lsn_lesson_notes")
+    .select("id, student_id, company_id, audio_path, lsn_students(store_id)")
+    .eq("id", noteId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  type Row = {
+    id: string; student_id: string; company_id: string; audio_path: string | null;
+    lsn_students: { store_id: string | null } | { store_id: string | null }[] | null;
+  };
+  const row = data as unknown as Row | null;
+  if (!row || row.company_id !== actor.companyId) return { actor, admin, note: null };
+  const st = Array.isArray(row.lsn_students) ? row.lsn_students[0] : row.lsn_students;
+  if (!canAccessStore(actor, st?.store_id ?? null)) return { actor, admin, note: null };
+  return { actor, admin, note: { id: row.id, studentId: row.student_id, audioPath: row.audio_path } };
+}
+
+/** 録音が終わったら音声を直PUTするためのURL */
+export async function createNoteUploadUrl(
+  noteId: string,
+  ext: string,
+  size: number
+): Promise<{ url?: string; path?: string; error?: string }> {
+  const { actor, admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  if (size > MAX_NOTE_AUDIO) return { error: "録音が長すぎます。分けて録音してください" };
+  const safeExt = /^[a-z0-9]{2,5}$/.test(ext) ? ext : "webm";
+  const path = `${actor.companyId}/${note.studentId}/notes/${Date.now()}.${safeExt}`;
+  const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URLの発行に失敗しました" };
+  return { url: data.signedUrl, path };
+}
+
+export async function finishNoteUpload(
+  noteId: string,
+  path: string,
+  seconds: number,
+  bytes: number
+): Promise<{ error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({
+      audio_path: path,
+      audio_seconds: Math.max(0, Math.round(seconds)) || null,
+      audio_bytes: Math.max(0, Math.round(bytes)) || null,
+      status: "uploaded",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", note.id);
+  return error ? { error: error.message } : {};
+}
+
+/** コーチが直した本文を確定する。カルテに出るのはこれだけ */
+export async function saveLessonNote(noteId: string, body: string): Promise<{ error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const text = body.trim().slice(0, 4000);
+  if (!text) return { error: "本文を入力してください" };
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({ body: text, status: "saved", updated_at: new Date().toISOString() })
+    .eq("id", note.id);
+  if (error) return { error: error.message };
+  const { data } = await admin.from("lsn_lesson_notes").select("student_id").eq("id", note.id).maybeSingle();
+  revalidatePath(`/students/${(data as { student_id: string } | null)?.student_id ?? note.studentId}`);
+  return {};
+}
+
+/**
+ * 音声を消す。要約が済んだら押せるようにしてあり、確定保存のときは自動で呼ぶ。
+ * 「残すのは要約と本文だけ」という約束をコードで守る。
+ */
+export async function deleteNoteAudio(noteId: string): Promise<{ error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  if (note.audioPath) {
+    const { error } = await admin.storage.from(BUCKET).remove([note.audioPath]);
+    if (error) return { error: error.message };
+  }
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({ audio_path: null, audio_deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", note.id);
+  return error ? { error: error.message } : {};
+}
+
+/** 文字起こしを消す（本文が正典なので、確認が済んだら消してよい） */
+export async function deleteNoteTranscript(noteId: string): Promise<{ error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({ transcript: null, updated_at: new Date().toISOString() })
+    .eq("id", note.id);
+  return error ? { error: error.message } : {};
+}
+
+export async function removeLessonNote(noteId: string): Promise<{ error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  if (note.audioPath) await admin.storage.from(BUCKET).remove([note.audioPath]);
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({ deleted_at: new Date().toISOString(), audio_path: null })
+    .eq("id", note.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/students/${note.studentId}`);
+  return {};
+}
+
+/** 1件ぶん読み直す（要約が終わったあとの画面更新用） */
+export async function loadLessonNote(noteId: string): Promise<{ note?: LessonNoteItem; error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const { data, error } = await admin
+    .from("lsn_lesson_notes")
+    .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, error, staff:coach_staff_id(name)")
+    .eq("id", note.id)
+    .maybeSingle();
+  if (error || !data) return { error: error?.message ?? "読み込めませんでした" };
+  const r = data as Record<string, unknown>;
+  return {
+    note: {
+      id: String(r.id),
+      lessonDate: String(r.lesson_date),
+      status: String(r.status),
+      hasAudio: !!r.audio_path,
+      seconds: (r.audio_seconds as number | null) ?? null,
+      body: (r.body as string | null) ?? null,
+      summary: (r.summary as LessonNoteItem["summary"]) ?? null,
+      transcript: (r.transcript as string | null) ?? null,
+      coach: ((r.staff as { name: string } | null)?.name) ?? "",
+      error: (r.error as string | null) ?? null,
+    },
+  };
+}

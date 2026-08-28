@@ -10,6 +10,8 @@ import { CompareView, type CompareSource } from "./compare-view";
 import { ProgressPanel, type ProgressItem } from "./progress-panel";
 import { ProfileForm } from "./profile-form";
 import { MeasurePanel, type MeasurementItem } from "./measure-panel";
+import { LessonNotePanel } from "./lesson-note";
+import type { LessonNoteItem } from "./actions";
 import {
   createVideoUploadUrl,
   createPosterUploadUrl,
@@ -50,9 +52,10 @@ export type StudentData = {
   skill: Record<string, string>;
 };
 
-type Tab = "lesson" | "measure" | "progress" | "profile" | "skill" | "compare";
+type Tab = "lesson" | "note" | "measure" | "progress" | "profile" | "skill" | "compare";
 const TABS: { id: Tab; label: string }[] = [
   { id: "lesson", label: "本日のレッスン" },
+  { id: "note", label: "会話メモ" },
   { id: "measure", label: "計測" },
   { id: "progress", label: "進捗" },
   { id: "profile", label: "基本情報" },
@@ -68,12 +71,14 @@ export function KarteClient({
   progress,
   compareSources,
   measurements,
+  lessonNotes,
 }: {
   student: StudentData;
   videos: VideoItem[];
   progress: ProgressItem[];
   compareSources: CompareSource[];
   measurements: MeasurementItem[];
+  lessonNotes: LessonNoteItem[];
 }) {
   const [tab, setTab] = useState<Tab>("lesson");
   const [msg, setMsg] = useState<string | null>(null);
@@ -402,6 +407,8 @@ export function KarteClient({
         </div>
       )}
 
+      {/* 会話を録音してAIがメモの下書きを作る（2026-08-28）。確定はコーチが行う */}
+      {tab === "note" && <LessonNotePanel studentId={student.id} initial={lessonNotes} />}
       {tab === "measure" && <MeasurePanel studentId={student.id} items={measurements} />}
       {tab === "progress" && <ProgressPanel studentId={student.id} items={progress} />}
       {tab === "profile" && (

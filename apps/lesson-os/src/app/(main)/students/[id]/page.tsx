@@ -8,6 +8,7 @@ import { KarteClient, type VideoItem, type StudentData } from "./karte-client";
 import type { CompareSource } from "./compare-view";
 import type { ProgressItem } from "./progress-panel";
 import type { MeasurementItem } from "./measure-panel";
+import type { LessonNoteItem } from "./actions";
 import type { TrackmanValues } from "@/lib/trackman";
 
 /** 生徒カルテ（DECISIONS #50: PGA NOTE準拠のタブ構成） */
@@ -27,7 +28,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
   // URL直打ちで他店舗のカルテを開けないようにする（#134）
   if (!canAccessStore(actor, (student as { store_id: string | null }).store_id)) notFound();
 
-  const [{ data: videos }, { data: items }, { data: prog }, { data: models }, { data: measures }] = await Promise.all([
+  const [{ data: videos }, { data: items }, { data: prog }, { data: models }, { data: measures }, { data: noteRows }] = await Promise.all([
     admin
       .from("lsn_videos")
       .select("id, shot_at, club, distance_yd, note, is_best, annotations, phases, created_at, storage_path, poster_path, staff:uploaded_by(name)")
@@ -58,6 +59,15 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
       .is("deleted_at", null)
       .order("measured_at", { ascending: false })
       .limit(60),
+    // レッスンメモ（会話の録音→AI要約）。音声そのものは一覧では触らない
+    admin
+      .from("lsn_lesson_notes")
+      .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, error, staff:coach_staff_id(name)")
+      .eq("student_id", id)
+      .is("deleted_at", null)
+      .order("lesson_date", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
 
   const videoIds = (videos ?? []).map((v) => v.id);
@@ -119,6 +129,19 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     values: ((m.data as TrackmanValues | null) ?? {}) as TrackmanValues,
   }));
 
+  const lessonNotes: LessonNoteItem[] = (noteRows ?? []).map((n) => ({
+    id: String(n.id),
+    lessonDate: String(n.lesson_date),
+    status: String(n.status),
+    hasAudio: Boolean(n.audio_path),
+    seconds: (n.audio_seconds as number | null) ?? null,
+    body: (n.body as string | null) ?? null,
+    summary: (n.summary as LessonNoteItem["summary"]) ?? null,
+    transcript: (n.transcript as string | null) ?? null,
+    coach: (n.staff as unknown as { name: string } | null)?.name ?? "",
+    error: (n.error as string | null) ?? null,
+  }));
+
   const progMap = new Map((prog ?? []).map((p) => [p.item_id, p.percent]));
   const progressItems: ProgressItem[] = (items ?? []).map((it) => ({
     itemId: it.id,
@@ -170,6 +193,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
         progress={progressItems}
         compareSources={compareSources}
         measurements={measurements}
+        lessonNotes={lessonNotes}
       />
     </div>
   );
