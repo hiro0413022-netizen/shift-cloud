@@ -675,6 +675,8 @@ export type LessonNoteItem = {
     today: string[]; homework: string[]; studentWords: string[]; clubs: string[]; next: string[];
   } | null;
   transcript: string | null;
+  shareBody: string | null;
+  symptoms: NoteSymptom[];
   coach: string;
   error: string | null;
 };
@@ -830,11 +832,12 @@ export async function loadLessonNote(noteId: string): Promise<{ note?: LessonNot
   if (!note) return { error: "メモが見つかりません" };
   const { data, error } = await admin
     .from("lsn_lesson_notes")
-    .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, error, staff:coach_staff_id(name)")
+    .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, share_body, error, staff:coach_staff_id(name)")
     .eq("id", note.id)
     .maybeSingle();
   if (error || !data) return { error: error?.message ?? "読み込めませんでした" };
   const r = data as Record<string, unknown>;
+  const tags = await loadNoteSymptoms(noteId);
   return {
     note: {
       id: String(r.id),
@@ -845,8 +848,158 @@ export async function loadLessonNote(noteId: string): Promise<{ note?: LessonNot
       body: (r.body as string | null) ?? null,
       summary: (r.summary as LessonNoteItem["summary"]) ?? null,
       transcript: (r.transcript as string | null) ?? null,
+      shareBody: (r.share_body as string | null) ?? null,
+      symptoms: tags.items ?? [],
       coach: ((r.staff as { name: string } | null)?.name) ?? "",
       error: (r.error as string | null) ?? null,
     },
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* レッスンメモ × AIカルテナレッジ（症状タグ）2026-08-28                */
+/*                                                                      */
+/* AIがやるのは分類だけ。本文はコーチの言葉のまま。                     */
+/* コーチはタップで○×を付けるだけで、記録が「検索できる資産」になる。   */
+/* ------------------------------------------------------------------ */
+
+export type NoteSymptom = {
+  id: string;
+  symptomId: string;
+  symptom: string;
+  category: string | null;
+  checkpointId: string | null;
+  checkpoint: string | null;
+  quote: string | null;
+  confidence: number;
+  source: string;
+  rejected: boolean;
+};
+
+export type SymptomOption = {
+  id: string;
+  name: string;
+  category: string | null;
+  checkpoints: { id: string; title: string }[];
+};
+
+/** 手でタグを足すための一覧（店のメソッドそのもの） */
+export async function listCompanySymptoms(): Promise<{ options?: SymptomOption[]; error?: string }> {
+  const actor = await requireLessonActor();
+  const admin = createAdmin();
+  const [{ data: sym }, { data: cps }] = await Promise.all([
+    admin.from("sc_symptoms")
+      .select("id, name, category, sort_order")
+      .eq("company_id", actor.companyId).eq("active", true).is("deleted_at", null)
+      .order("sort_order").order("name"),
+    admin.from("sc_checkpoints")
+      .select("id, symptom_id, title, priority")
+      .eq("company_id", actor.companyId).is("deleted_at", null)
+      .order("priority"),
+  ]);
+  const options: SymptomOption[] = (sym ?? []).map((r) => {
+    const x = r as Record<string, unknown>;
+    return {
+      id: String(x.id),
+      name: String(x.name),
+      category: (x.category as string | null) ?? null,
+      checkpoints: (cps ?? [])
+        .filter((c) => String((c as { symptom_id: string }).symptom_id) === String(x.id))
+        .map((c) => ({ id: String((c as { id: string }).id), title: String((c as { title: string }).title) })),
+    };
+  });
+  return { options };
+}
+
+/**
+ * コーチの○×。**外したものは消さずに rejected で残す**。
+ * 何が外れやすいかが分かれば、ナレッジ側を直す材料になる。
+ */
+export async function setNoteSymptomRejected(rowId: string, rejected: boolean): Promise<{ error?: string }> {
+  const actor = await requireLessonActor();
+  const admin = createAdmin();
+  const { error } = await admin
+    .from("lsn_note_symptoms")
+    .update({ rejected })
+    .eq("id", rowId)
+    .eq("company_id", actor.companyId);
+  return error ? { error: error.message } : {};
+}
+
+export async function addNoteSymptom(
+  noteId: string,
+  symptomId: string,
+  checkpointId: string | null
+): Promise<{ error?: string }> {
+  const { actor, admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  // 症状が自社のものか必ず確かめる（IDはクライアントから来る）
+  const { data: sym } = await admin
+    .from("sc_symptoms").select("id").eq("id", symptomId).eq("company_id", actor.companyId).maybeSingle();
+  if (!sym) return { error: "症状が見つかりません" };
+  if (checkpointId) {
+    const { data: cp } = await admin
+      .from("sc_checkpoints").select("id").eq("id", checkpointId).eq("company_id", actor.companyId)
+      .eq("symptom_id", symptomId).maybeSingle();
+    if (!cp) return { error: "確認項目が見つかりません" };
+  }
+  const { error } = await admin.from("lsn_note_symptoms").upsert(
+    {
+      company_id: actor.companyId,
+      note_id: note.id,
+      student_id: note.studentId,
+      symptom_id: symptomId,
+      checkpoint_id: checkpointId,
+      confidence: 100,
+      source: "coach",
+      rejected: false,
+    },
+    { onConflict: "note_id,symptom_id,checkpoint_id" }
+  );
+  return error ? { error: error.message } : {};
+}
+
+/** お客様の共有ページに出す説明文。下敷きはナレッジの client_explanation */
+export async function saveShareBody(noteId: string, text: string): Promise<{ error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({ share_body: text.trim().slice(0, 3000) || null, updated_at: new Date().toISOString() })
+    .eq("id", note.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/students/${note.studentId}`);
+  return {};
+}
+
+/** 1件ぶんのタグを読み直す */
+export async function loadNoteSymptoms(noteId: string): Promise<{ items?: NoteSymptom[]; error?: string }> {
+  const { actor, admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const { data } = await admin
+    .from("lsn_note_symptoms")
+    .select("id, symptom_id, checkpoint_id, quote, confidence, source, rejected, sc_symptoms(name, category), sc_checkpoints(title)")
+    .eq("note_id", note.id)
+    .eq("company_id", actor.companyId)
+    .order("confidence", { ascending: false });
+  return { items: (data ?? []).map(mapNoteSymptom) };
+}
+
+/** page.tsx と共用（ネスト取得は配列型に推論されることがあるので両対応・#76と同種） */
+export function mapNoteSymptom(r: unknown): NoteSymptom {
+  const x = r as Record<string, unknown>;
+  const s = Array.isArray(x.sc_symptoms) ? x.sc_symptoms[0] : x.sc_symptoms;
+  const c = Array.isArray(x.sc_checkpoints) ? x.sc_checkpoints[0] : x.sc_checkpoints;
+  return {
+    id: String(x.id),
+    symptomId: String(x.symptom_id),
+    symptom: String((s as { name?: string } | null)?.name ?? "（不明な症状）"),
+    category: ((s as { category?: string | null } | null)?.category) ?? null,
+    checkpointId: (x.checkpoint_id as string | null) ?? null,
+    checkpoint: ((c as { title?: string } | null)?.title) ?? null,
+    quote: (x.quote as string | null) ?? null,
+    confidence: Number(x.confidence ?? 0),
+    source: String(x.source ?? "ai"),
+    rejected: Boolean(x.rejected),
   };
 }

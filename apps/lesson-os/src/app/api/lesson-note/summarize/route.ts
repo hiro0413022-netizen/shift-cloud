@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireLessonActor, canAccessStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { readLessonAudio, MAX_AUDIO_BYTES } from "@/lib/lesson-note-ai";
+import { readLessonAudio, matchSymptoms, MAX_AUDIO_BYTES } from "@/lib/lesson-note-ai";
 
 /**
  * レッスンの録音を要約する（2026-08-28）
@@ -98,6 +98,72 @@ export async function POST(req: Request) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", note.id);
+
+  /* --- 店のメソッド（AIカルテナレッジ）に紐づける ------------------
+     AIに文章を書かせるのではなく、分類だけさせる。本文はコーチの言葉のまま。
+     ナレッジが無い会社では素通り（画面から手でタグ付けできる）。 */
+  if (read.body || read.transcript) {
+    const [{ data: sym }, { data: cps }] = await Promise.all([
+      admin.from("sc_symptoms")
+        .select("id, name, category, flight_dir, tags")
+        .eq("company_id", actor.companyId).eq("active", true).is("deleted_at", null),
+      admin.from("sc_checkpoints")
+        .select("id, symptom_id, title")
+        .eq("company_id", actor.companyId).is("deleted_at", null),
+    ]);
+    const symptoms = (sym ?? []).map((r) => {
+      const x = r as Record<string, unknown>;
+      return {
+        id: String(x.id), name: String(x.name),
+        category: (x.category as string | null) ?? null,
+        flight: (x.flight_dir as string | null) ?? null,
+        tags: Array.isArray(x.tags) ? (x.tags as string[]) : [],
+      };
+    });
+    const checkpoints = (cps ?? []).map((r) => {
+      const x = r as Record<string, unknown>;
+      return { id: String(x.id), symptomId: String(x.symptom_id), title: String(x.title) };
+    });
+
+    const material = [read.body, read.transcript].filter(Boolean).join("\n\n");
+    const matches = await matchSymptoms(material, symptoms, checkpoints);
+
+    if (matches.length) {
+      await admin.from("lsn_note_symptoms").upsert(
+        matches.map((m) => ({
+          company_id: actor.companyId,
+          note_id: note.id,
+          student_id: note.student_id,
+          symptom_id: m.symptomId,
+          checkpoint_id: m.checkpointId,
+          quote: m.quote || null,
+          confidence: m.confidence,
+          source: "ai",
+        })),
+        { onConflict: "note_id,symptom_id,checkpoint_id" }
+      );
+
+      // お客様向けの説明文は**ナレッジが持っている**ので、コーチは書かなくていい。
+      // 確認項目に紐づく client_explanation を下敷きとして置く（保存前にコーチが直す）。
+      const cpIds = matches.map((m) => m.checkpointId).filter((v): v is string => !!v);
+      if (cpIds.length) {
+        const { data: kn } = await admin
+          .from("sc_knowledge")
+          .select("checkpoint_id, client_explanation")
+          .eq("company_id", actor.companyId)
+          .in("checkpoint_id", cpIds)
+          .is("deleted_at", null);
+        const texts = (kn ?? [])
+          .map((k) => String((k as { client_explanation: string | null }).client_explanation ?? "").trim())
+          .filter(Boolean);
+        if (texts.length) {
+          await admin.from("lsn_lesson_notes")
+            .update({ share_body: texts.slice(0, 3).join("\n\n") })
+            .eq("id", note.id);
+        }
+      }
+    }
+  }
 
   // 約束どおり、要約が取れたら音声は消す（残すのは要約と本文だけ）
   if (!keepAudio && read.body) {

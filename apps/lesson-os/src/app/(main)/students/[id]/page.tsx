@@ -8,7 +8,7 @@ import { KarteClient, type VideoItem, type StudentData } from "./karte-client";
 import type { CompareSource } from "./compare-view";
 import type { ProgressItem } from "./progress-panel";
 import type { MeasurementItem } from "./measure-panel";
-import type { LessonNoteItem } from "./actions";
+import { mapNoteSymptom, type LessonNoteItem } from "./actions";
 import type { TrackmanValues } from "@/lib/trackman";
 
 /** 生徒カルテ（DECISIONS #50: PGA NOTE準拠のタブ構成） */
@@ -62,7 +62,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     // レッスンメモ（会話の録音→AI要約）。音声そのものは一覧では触らない
     admin
       .from("lsn_lesson_notes")
-      .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, error, staff:coach_staff_id(name)")
+      .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, share_body, error, staff:coach_staff_id(name)")
       .eq("student_id", id)
       .is("deleted_at", null)
       .order("lesson_date", { ascending: false })
@@ -129,6 +129,16 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     values: ((m.data as TrackmanValues | null) ?? {}) as TrackmanValues,
   }));
 
+  // 症状タグ（AIカルテナレッジへの紐づけ）。メモを開いた瞬間に出したいのでここでまとめて引く
+  const noteIds = (noteRows ?? []).map((n) => String(n.id));
+  const { data: tagRows } = noteIds.length
+    ? await admin
+        .from("lsn_note_symptoms")
+        .select("id, note_id, symptom_id, checkpoint_id, quote, confidence, source, rejected, sc_symptoms(name, category), sc_checkpoints(title)")
+        .in("note_id", noteIds)
+        .order("confidence", { ascending: false })
+    : { data: [] };
+
   const lessonNotes: LessonNoteItem[] = (noteRows ?? []).map((n) => ({
     id: String(n.id),
     lessonDate: String(n.lesson_date),
@@ -138,6 +148,8 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     body: (n.body as string | null) ?? null,
     summary: (n.summary as LessonNoteItem["summary"]) ?? null,
     transcript: (n.transcript as string | null) ?? null,
+    shareBody: (n.share_body as string | null) ?? null,
+    symptoms: (tagRows ?? []).filter((t) => String((t as { note_id: string }).note_id) === String(n.id)).map(mapNoteSymptom),
     coach: (n.staff as unknown as { name: string } | null)?.name ?? "",
     error: (n.error as string | null) ?? null,
   }));

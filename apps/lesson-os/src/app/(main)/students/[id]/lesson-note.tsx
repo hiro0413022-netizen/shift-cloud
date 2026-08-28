@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   startLessonNote, createNoteUploadUrl, finishNoteUpload, saveLessonNote,
   deleteNoteAudio, deleteNoteTranscript, removeLessonNote, loadLessonNote,
-  type LessonNoteItem,
+  listCompanySymptoms, setNoteSymptomRejected, addNoteSymptom, saveShareBody,
+  type LessonNoteItem, type SymptomOption,
 } from "./actions";
 
 /**
@@ -43,6 +44,10 @@ export function LessonNotePanel({ studentId, initial }: { studentId: string; ini
   const [msg, setMsg] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [openTranscript, setOpenTranscript] = useState<string | null>(null);
+  const [shareDrafts, setShareDrafts] = useState<Record<string, string>>({});
+  /** 店のメソッド（AIカルテナレッジ）の症状一覧。手でタグを足すときだけ読む */
+  const [options, setOptions] = useState<SymptomOption[] | null>(null);
+  const [adding, setAdding] = useState<string | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -143,6 +148,14 @@ export function LessonNotePanel({ studentId, initial }: { studentId: string; ini
       setBusy(null);
       noteIdRef.current = null;
       setSec(0);
+    }
+  };
+
+  const openAdd = async (id: string) => {
+    setAdding(adding === id ? null : id);
+    if (!options) {
+      const r = await listCompanySymptoms();
+      setOptions(r.options ?? []);
     }
   };
 
@@ -247,12 +260,71 @@ export function LessonNotePanel({ studentId, initial }: { studentId: string; ini
               </div>
             )}
 
+            {/* 店のメソッドへの紐づけ。AIは分類だけ、○×はコーチがタップで決める */}
+            <div className="mt-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-2">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-(--color-gold)">症状タグ</span>
+                {n.symptoms.length === 0 && <span className="text-(--color-dim)">まだありません</span>}
+                {n.symptoms.map((t) => (
+                  <button
+                    key={t.id}
+                    title={t.quote ? `根拠: ${t.quote}` : undefined}
+                    onClick={() => void setNoteSymptomRejected(t.id, !t.rejected).then(() => refresh(n.id))}
+                    className={`rounded-full border px-2.5 py-1 ${t.rejected ? "border-(--color-line) text-(--color-line) line-through" : "border-(--color-active) text-(--color-active)"}`}
+                  >
+                    {t.symptom}
+                    {t.checkpoint ? ` / ${t.checkpoint}` : ""}
+                    {t.source === "ai" && !t.rejected ? ` ${t.confidence}%` : ""}
+                  </button>
+                ))}
+                <button onClick={() => void openAdd(n.id)} className="btn-ghost !px-2 !py-1">＋ 症状を足す</button>
+              </div>
+              {adding === n.id && (
+                <select
+                  className="input-dark mt-2 w-full text-xs"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const [sid, cid] = e.target.value.split("|");
+                    if (!sid) return;
+                    void addNoteSymptom(n.id, sid, cid || null).then(() => { setAdding(null); refresh(n.id); });
+                  }}
+                >
+                  <option value="">症状を選ぶ…</option>
+                  {(options ?? []).map((o) => (
+                    <optgroup key={o.id} label={`${o.name}${o.category ? `（${o.category}）` : ""}`}>
+                      <option value={`${o.id}|`}>{o.name}（確認項目を指定しない）</option>
+                      {o.checkpoints.map((c) => (
+                        <option key={c.id} value={`${o.id}|${c.id}`}>{o.name} / {c.title}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              )}
+              <p className="mt-1 text-[11px] text-(--color-dim)">
+                タップで外せます（外したものも記録に残り、AIの外れ方を直す材料になります）。
+                タグが付くと「この生徒はこの症状が何回出たか」を後から数えられます。
+              </p>
+            </div>
+
+            <label className="mt-2 block text-xs text-(--color-dim)">先生の記録（カルテに残る本文）</label>
             <textarea
               value={draft}
               onChange={(e) => setDrafts((p) => ({ ...p, [n.id]: e.target.value }))}
               rows={5}
               placeholder="AIの下書きがここに出ます。内容を確認して直してから保存してください"
-              className="input-dark mt-2 w-full"
+              className="input-dark mt-1 w-full"
+            />
+
+            <label className="mt-2 block text-xs text-(--color-dim)">
+              お客様への説明（共有ページに出ます・ナレッジの標準説明が下敷き）
+            </label>
+            <textarea
+              value={shareDrafts[n.id] ?? n.shareBody ?? ""}
+              onChange={(e) => setShareDrafts((p) => ({ ...p, [n.id]: e.target.value }))}
+              onBlur={() => void saveShareBody(n.id, shareDrafts[n.id] ?? n.shareBody ?? "")}
+              rows={3}
+              placeholder="症状タグが付くと、店の標準説明がここに入ります"
+              className="input-dark mt-1 w-full"
             />
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <button onClick={() => void save(n.id)} className="btn-gold !px-3 !py-1.5">確認して保存</button>

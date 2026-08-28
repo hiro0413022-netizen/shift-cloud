@@ -175,3 +175,120 @@ export async function readLessonAudio(
     return null;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* 店のメソッド（AIカルテナレッジ）への紐づけ                          */
+/*                                                                      */
+/* ここが設計の要（2026-08-28）:                                        */
+/*   AIに文章を書かせるのではなく、**分類だけさせる**。                 */
+/*   本文はコーチの言葉のまま。AIの仕事は「今日の会話が、うちの店の      */
+/*   どの症状・どの確認項目の話だったか」を言い当てることだけ。          */
+/*                                                                      */
+/*   これで初めて、今日のレッスンが取り込み済みの28,842件と同じ土俵に    */
+/*   乗る（「この生徒はすくい打ちが3か月で4回」が出せるようになる）。   */
+/* ------------------------------------------------------------------ */
+
+export type SymptomRef = { id: string; name: string; category: string | null; flight: string | null; tags: string[] };
+export type CheckpointRef = { id: string; symptomId: string; title: string };
+
+export type SymptomMatch = {
+  symptomId: string;
+  checkpointId: string | null;
+  /** そう判断した根拠になった会話の一節。コーチが○×を付けるために出す */
+  quote: string;
+  /** 0〜100 */
+  confidence: number;
+};
+
+const MATCH_SYSTEM = [
+  "あなたはゴルフスクールの記録係。レッスンの会話メモを読んで、**その店で使っている症状の一覧**の中から",
+  "実際に話に出たものだけを選ぶ。",
+  "厳守すること:",
+  "- **一覧に無いものは作らない。** 必ず渡された id をそのまま返す。",
+  "- 会話で触れられていない症状は選ばない。**「近いから」で選ばない。**",
+  "- 迷ったら選ばない。空配列でよい。あとでコーチが手で足せる。",
+  "- 1つの症状につき、確認項目（checkpoint）まで特定できるときだけ checkpointId を入れる。分からなければ null。",
+  "- quote には、そう判断した根拠になった会話の一節を**原文のまま**短く入れる（作文しない）。",
+  "- confidence は、会話ではっきり触れられていれば80以上、示唆どまりなら50前後にする。",
+  "出力は次のJSONのみ:",
+  '{ "matches": [ { "symptomId": "...", "checkpointId": "... または null", "quote": "...", "confidence": 0 } ] }',
+].join("\n");
+
+/** 症状の紐づけ。ナレッジが無い会社では空配列（画面は手でタグ付けできる） */
+export async function matchSymptoms(
+  text: string,
+  symptoms: SymptomRef[],
+  checkpoints: CheckpointRef[]
+): Promise<SymptomMatch[]> {
+  const apiKey = geminiKey();
+  if (!apiKey || !symptoms.length || !text.trim()) return [];
+  const model = process.env.LESSON_NOTE_MODEL || process.env.CORTEX_GEMINI_MODEL || DEFAULT_MODEL;
+
+  const byId = new Map(symptoms.map((s) => [s.id, s]));
+  const list = symptoms
+    .map((s) => {
+      const cps = checkpoints.filter((c) => c.symptomId === s.id).map((c) => `    - ${c.id} : ${c.title}`);
+      const head = `- ${s.id} : ${s.name}${s.category ? `（${s.category}）` : ""}${s.flight ? ` 球筋:${s.flight}` : ""}${s.tags.length ? ` [${s.tags.join(",")}]` : ""}`;
+      return cps.length ? `${head}\n${cps.join("\n")}` : head;
+    })
+    .join("\n");
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: MATCH_SYSTEM }] },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                { text: `【この店で使っている症状と確認項目】\n${list}\n\n【今日のレッスンの会話メモ】\n${text.slice(0, 20000)}` },
+              ],
+            },
+          ],
+          generationConfig: { maxOutputTokens: 4000, temperature: 0, responseMimeType: "application/json" },
+        }),
+        signal: AbortSignal.timeout(90000),
+      }
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+    const out = (json.candidates ?? [])
+      .flatMap((c) => c.content?.parts ?? [])
+      .filter((p) => !p.thought)
+      .map((p) => p.text ?? "")
+      .join("")
+      .trim();
+    if (!out) return [];
+    const parsed = JSON.parse(out) as { matches?: unknown };
+    if (!Array.isArray(parsed.matches)) return [];
+
+    const cpOk = new Set(checkpoints.map((c) => c.id));
+    const seen = new Set<string>();
+    const matches: SymptomMatch[] = [];
+    for (const raw of parsed.matches) {
+      const m = raw as Record<string, unknown>;
+      const symptomId = String(m.symptomId ?? "");
+      // **一覧に無いIDは捨てる**（AIが作った症状をDBに入れない）
+      if (!byId.has(symptomId)) continue;
+      const cp = typeof m.checkpointId === "string" && cpOk.has(m.checkpointId) ? m.checkpointId : null;
+      const key = `${symptomId}/${cp ?? ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const conf = Number(m.confidence);
+      matches.push({
+        symptomId,
+        checkpointId: cp,
+        quote: typeof m.quote === "string" ? m.quote.trim().slice(0, 300) : "",
+        confidence: isFinite(conf) ? Math.max(0, Math.min(100, Math.round(conf))) : 50,
+      });
+      if (matches.length >= 12) break;
+    }
+    return matches;
+  } catch {
+    return [];
+  }
+}

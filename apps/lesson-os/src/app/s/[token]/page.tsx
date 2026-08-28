@@ -67,6 +67,20 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
       .limit(6),
   ]);
 
+  /**
+   * 今日のレッスンの説明（2026-08-28）。
+   * **コーチが確認して保存した share_body だけ**を出す。
+   * AIの下書きや文字起こしはお客様には出さない（#179 の約束）。
+   */
+  const { data: notes } = await admin
+    .from("lsn_lesson_notes")
+    .select("id, lesson_date, share_body, staff:coach_staff_id(name)")
+    .eq("student_id", student.id)
+    .is("deleted_at", null)
+    .not("share_body", "is", null)
+    .order("lesson_date", { ascending: false })
+    .limit(10);
+
   const videoIds = (videos ?? []).map((v) => v.id);
   const { data: comments } = videoIds.length
     ? await admin
@@ -167,6 +181,26 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
               </p>
             </div>
             <Radar items={radarItems} stroke={brand.accent} fill={brand.radarFill} grid="#c8d4e2" label="#5a6b80" />
+          </section>
+        )}
+
+        {/* コーチからのアドバイス（コーチが確認して保存したものだけ） */}
+        {(notes ?? []).length > 0 && (
+          <section className="space-y-3">
+            <p className="px-1 text-sm font-semibold" style={{ color: brand.accent }}>コーチからのアドバイス</p>
+            {(notes ?? []).map((n) => (
+              <div key={n.id as string} className="rounded-xl bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-xs text-gray-600">
+                  <span className="text-sm font-semibold text-[#1c2733]">{String(n.lesson_date)}</span>
+                  <span className="ml-auto">
+                    {(n.staff as unknown as { name: string } | null)?.name ?? ""}
+                  </span>
+                </div>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#1c2733]">
+                  {String(n.share_body)}
+                </p>
+              </div>
+            ))}
           </section>
         )}
 
