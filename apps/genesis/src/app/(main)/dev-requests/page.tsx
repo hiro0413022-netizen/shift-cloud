@@ -9,11 +9,11 @@ export const dynamic = "force-dynamic";
  * 開発依頼キュー（migration 0133 / DECISIONS #182）
  *
  * ホームのJARVISに「◯◯を直して」と話しかけると、AIが正式な指示書に起こしてここへ積む。
- * Cowork側のClaude（このリポジトリを触れる側）が queued を拾って実装し、
- * 着手で in_progress、実装が終わったら done + result_note を書き戻す。
+ * 毎時のスケジュールタスク（クラウド）が queued を拾い、GitHubからcloneして実装し、
+ * tsc とテストを通してから **差分（パッチ）** を書き戻す（#183）。
+ * 古川さんは `.\apply-dev-queue.ps1` を1回叩くだけで、取り込み→push→デプロイまで進む。
  *
- * 本番へ出す最後の一歩（git push）はユーザーのPCからしか実行できない（2026-08-17の決定）。
- * その制約がそのまま最後の安全弁になっているので、依頼の起票と実装はAIに任せきってよい。
+ * push だけは必ずPCから（2026-08-17の決定）＝それがそのまま最後の安全弁。
  */
 export default async function DevRequestsPage() {
   const actor = await requireGenesisActor();
@@ -27,7 +27,9 @@ export default async function DevRequestsPage() {
   const rows = data ?? [];
 
   const open = rows.filter((r) => r.status === "queued" || r.status === "in_progress" || r.status === "blocked");
-  const closed = rows.filter((r) => !open.includes(r));
+  // 実装が終わってパッチが載っているが、まだPCで取り込んでいないもの（#183）
+  const ready = rows.filter((r) => r.status === "done" && r.patch != null && r.applied_at == null);
+  const closed = rows.filter((r) => !open.includes(r) && !ready.includes(r));
 
   return (
     <div className="space-y-4">
@@ -37,6 +39,16 @@ export default async function DevRequestsPage() {
           ホームでJARVISに話した「作ってほしい・直してほしい」がここに積まれます。指示書に起こしたうえで、開発側のAIが拾います。
         </p>
       </header>
+
+      {ready.length > 0 && (
+        <Panel title={`取り込み待ち（${ready.length}件）`}>
+          <p className="mb-3 rounded-lg border border-emerald-800/50 bg-emerald-950/20 px-3 py-2 text-xs text-emerald-100">
+            実装と検証はクラウド側で終わっています。PowerShellで <code>.\apply-dev-queue.ps1</code> を実行すると、
+            取り込み・commit・push まで進みます（pushはこのPCからだけ、という運用のままです）。
+          </p>
+          <List rows={ready} />
+        </Panel>
+      )}
 
       <Panel title={`着手待ち・作業中（${open.length}件）`}>
         {open.length === 0 ? <Empty>いま抱えている依頼はありません</Empty> : <List rows={open} />}
@@ -63,6 +75,14 @@ function List({ rows }: { rows: Record<string, unknown>[] }) {
           </div>
 
           {r.said != null && <p className="mt-1 text-xs text-(--color-dim)">言われたこと: {String(r.said)}</p>}
+
+          {r.verified != null && (
+            <p className="mt-1 text-xs text-emerald-300">
+              検証: {String(r.verified)}
+              {r.files_changed != null ? ` ／ ${String(r.files_changed)}ファイル` : ""}
+              {r.applied_at != null ? ` ／ 取り込み済み ${fmtDate(String(r.applied_at))}` : ""}
+            </p>
+          )}
 
           <details className="mt-2 rounded-lg border border-(--color-line) bg-(--color-panel) px-3 py-2">
             <summary className="cursor-pointer text-xs text-sky-300">開発指示書を見る</summary>

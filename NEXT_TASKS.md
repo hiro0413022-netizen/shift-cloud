@@ -15,9 +15,20 @@ A-182. **Genesis ホームの会話型AI（JARVIS・#182）を動かす**
       さらに良い声にしたい場合だけ `OPENAI_API_KEY` を入れてください（あればそちらが優先されます）。
    4. 動作確認: Genesis のホームを **Chrome か Edge** で開く → 開いた瞬間に喋る → 🎤 を押して「今月の売上は？」と話しかける。
       「◯◯を直して」と話すと `/dev-requests`（開発依頼）に指示書が積まれます。
-   5. **スケジュールタスク「JARVIS 開発依頼キューの消化」の端末接続を承認する** — 毎時、キューに `queued` があれば
-      Cowork のセッションが起きて実装し、`.ps1` を用意して `done` に書き戻します（**pushはしません＝従来どおり古川さんが実行**）。
-      作成時点では「cloud only」＝**このPCのリポジトリに触れない**状態なので、承認が要ります。承認プロンプトが出なければ教えてください。
+   5. ~~スケジュールタスクの端末接続を承認する~~ **✅ 別方式に変更（#183）** — 承認が下りなかったので、
+      **クラウドが実装してパッチを書き戻し、PCが取り込む**形にしました。下の A-183 を見てください。
+
+A-183. **開発依頼キューの取り込み口を用意する（#183）**
+   1. **`.\deploy-dev-queue-183.ps1` を実行**（migration 0134 は適用済み）
+   2. **合言葉を1回だけ置く** — Vercel の `yozan-genesis` > Settings > Environment Variables から `CRON_SECRET` の値をコピーして:
+      ```powershell
+      New-Item -ItemType Directory -Force "$env:USERPROFILE\.yozan" | Out-Null
+      Set-Content -NoNewline "$env:USERPROFILE\.yozan\dev-queue.key" "<CRON_SECRETの値>"
+      ```
+      ⚠ リポジトリは public なので、合言葉は絶対にリポジトリの中に置かないでください。
+   3. 以後の運用: ホームでJARVISに「◯◯を直して」と話す → 毎時のクラウドタスクが実装して検証まで通す →
+      通知が来たら `.\apply-dev-queue.ps1` を実行（取り込み→push→デプロイ）。中身だけ見たいときは `-DryRun`。
+
 
 
 

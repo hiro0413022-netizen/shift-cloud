@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 2026-08-28 — Genesis: 開発依頼キューを「クラウドが実装 → PCが取り込む」で回す
+- feat: 毎時のスケジュールタスク（クラウド）が `gn_dev_requests` の `queued` を1件拾い、**GitHubからcloneして実装し、tsc とテストを通してから差分（パッチ）を書き戻す**（DECISIONS #183）
+- feat: 古川さんは **`.\apply-dev-queue.ps1` を1回叩くだけ** — pull → `git apply --3way` → commit → push → 取り込み済みを書き戻し。`-DryRun` で中身だけ確認できる
+- feat(genesis): `/api/dev-queue/pending`（取り込み待ちのパッチを渡す）と `/api/dev-queue/applied`（結果を書き戻す）。認証は `DEV_QUEUE_SECRET`（無ければ既存の `CRON_SECRET`）の Bearer。**どちらも未設定なら開けっぱなしにせず503で閉じる**
+- feat(genesis): `/dev-requests` に「取り込み待ち」欄と検証結果（tsc / テスト件数 / ファイル数）を表示
+- note: **なぜこの形か** — #182 のスケジュールタスクは端末接続の承認が下りず（案内も出ず）クラウドでしか動けなかった。ところが**リポジトリはpublicなのでクラウドから clone でき、npm install もテスト477件も tsc も完走する**（実測）。できないのは push だけなので、**実装と検証はクラウド・pushはPC**に割った
+- security: **リポジトリはpublicなので合言葉をリポジトリに置かない**。ps1 は `%USERPROFILE%\.yozan\dev-queue.key` から読む
+- note: 検証が通っていないパッチ（`verified` が空）は取り込み側が弾く。`git apply` が失敗した依頼は `blocked` に戻して人の目に留める（doneのまま放置すると毎回同じパッチで失敗し続ける）
+- db: migration **0134**（`gn_dev_requests` に patch / base_sha / verified / applied_at / files_changed）**適用済み**
+- test: `npx tsc --noEmit` 通過・全477件パス
+- ⚠ ユーザー作業: ①`.\deploy-dev-queue-183.ps1` を実行 ②`%USERPROFILE%\.yozan\dev-queue.key` に CRON_SECRET の値を1回だけ置く
+
 ## 2026-08-28 — Genesis: ホームを会話型AI（JARVIS）にした
 - feat(genesis): ホームのいちばん上に**対話AI「GENESIS」**を追加（DECISIONS #182）。画面を開くと**その場で喋る**（「おかえりなさい、古川さん。全体スコアは82点、本日の判断は3件です」）。最初の一言はLLMを使わずサーバー側で組み立てるので、**APIが落ちていても・課金しなくても必ず出る**
 - feat(genesis): **音声で話しかけられる**（Web Speech API・Chrome/Edge）。返事は `/api/jarvis/speak` で読み上げる — `OPENAI_API_KEY` があれば gpt-4o-mini-tts、無ければ `GEMINI_API_KEY` で Gemini TTS、どちらも無ければブラウザ内蔵音声。**どの状態でも無音にならない**

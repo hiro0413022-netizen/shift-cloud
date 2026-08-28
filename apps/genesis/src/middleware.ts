@@ -11,7 +11,9 @@ import { NextResponse, type NextRequest } from "next/server";
 // /api/public は認証不要の公開API群（FRANKサイトのCMS/打席予約/レッスン予約 #85〜#88）。
 // 入れ忘れると全APIが/loginへ307し、サイト側は「読み込みに失敗」になる（#90でE2Eテストにより発見）。
 // /lp は集客LP（PGA NOTE / SWING CORTEX #101）、/api/track は閲覧計測ビーコン（@yozan/track・#90の教訓）。
-const PUBLIC_PREFIXES = ["/login", "/api/webhooks", "/api/cron", "/api/public", "/api/track", "/manual", "/lp"];
+// /api/dev-queue は古川さんのPCの apply-dev-queue.ps1 が叩く（#183）。
+// ログインCookieを持てないので、認証は lib/dev-queue-auth.ts の Bearer で行う。
+const PUBLIC_PREFIXES = ["/login", "/api/webhooks", "/api/cron", "/api/public", "/api/track", "/api/dev-queue", "/manual", "/lp"];
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
