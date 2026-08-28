@@ -11,6 +11,7 @@ import {
   planeFromAddress,
   poseAt,
   clubAt,
+  viewPoint,
   LM,
   type Landmarks,
   type Plane,
@@ -136,7 +137,9 @@ const mkCand = (ang, r, norm, fill = 0.85) => {
     x: 100 + Math.cos(rad) * r, y: 100 + Math.sin(rad) * r,
   };
 };
-const frame = (...list) => ({ wx: 100, wy: 100, body: 100, list });
+const frame = (...list) => ({ wx: 100, wy: 100, body: 100, armAng: null, list });
+/** 前腕の向きつき（シャフトは前腕から大きくは外れないという条件を効かせる） */
+const frameArm = (armAng, ...list) => ({ wx: 100, wy: 100, body: 100, armAng, list });
 
 test("軌跡の組み立て: 弱い候補は捨て、前後のつながりで1本を選ぶ", () => {
   // 本物＝角度が少しずつ回りながら距離が一定。にせもの＝毎コマ違う方向に飛ぶ
@@ -169,6 +172,52 @@ test("軌跡の組み立て: 弱い候補しかないコマは空にする（滑
 test("軌跡の組み立て: 材料が少なすぎるときは null（無理に線を引かない）", () => {
   const frames = [frame(), frame(), frame()];
   assert.equal(buildClub(frames, [0, 33, 66], W, H).club, null);
+});
+
+test("軌跡の組み立て: 前腕から見て有り得ない向きの候補は捨てる", () => {
+  // 本物＝前腕とほぼ同じ向き。にせもの＝毎コマ強いが前腕の真裏（背景や体の輪郭を拾った形）
+  const frames = [];
+  for (let i = 0; i < 14; i++) {
+    const arm = 20 + i * 6;
+    frames.push(frameArm(arm, mkCand(arm + 5, 88, 0.5), mkCand(arm + 180, 92, 0.9)));
+  }
+  const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
+  assert.ok(club);
+  // 強さでは負けているほう（前腕と同じ向き）が選ばれること
+  const i = club.p.findIndex((r) => r.length === 3);
+  const arm = 20 + i * 6;
+  const got = Math.atan2(club.p[i][1] / 1000 * H - 100, club.p[i][0] / 1000 * W - 100) * 180 / Math.PI;
+  const diff = Math.abs(((got - arm + 540) % 360) - 180);
+  assert.ok(diff < 25, `前腕側を選ぶ (実際 ${got.toFixed(0)} vs 前腕 ${arm})`);
+});
+
+test("軌跡の組み立て: 取れなかったコマは前腕から補い、推定であることを負の値で残す", () => {
+  const frames = [];
+  for (let i = 0; i < 14; i++) {
+    const arm = 20 + i * 6;
+    // 5〜7コマ目だけ画像から取れない
+    frames.push(frameArm(arm, ...(i >= 5 && i <= 7 ? [] : [mkCand(arm + 5, 88, 0.5)])));
+  }
+  const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
+  assert.ok(club);
+  for (const i of [5, 6, 7]) {
+    assert.equal(club.p[i].length, 3, `${i}コマ目が埋まる`);
+    assert.ok(club.p[i][2] < 0, `${i}コマ目は推定として残る（負の値）`);
+  }
+  assert.ok(club.p[4][2] > 0, "実測は正のまま");
+});
+
+test("軌跡の組み立て: 両端は外挿しない・コックが飛ぶところは埋めない", () => {
+  const frames = [];
+  for (let i = 0; i < 14; i++) {
+    const arm = 0;
+    // 0〜3 は取れる、4〜9 は取れない、10〜13 はコックが90度ずれた状態で取れる
+    const list = i <= 3 ? [mkCand(5, 88, 0.5)] : i >= 10 ? [mkCand(95, 88, 0.5)] : [];
+    frames.push(frameArm(arm, ...list));
+  }
+  const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
+  assert.ok(club);
+  assert.ok(club.p.slice(4, 10).every((r) => r.length === 0), "コックが飛ぶ空白は埋めない");
 });
 
 /* --- 角度は必ず px で計算する（9:16 の落とし穴） ------------------ */
@@ -282,4 +331,28 @@ test("秒からいちばん近いコマを引く", () => {
   const club = { v: 1 as const, t: [0, 100], p: [[100, 200, 80], []], clubLen: 200 };
   assert.deepEqual(clubAt(club, 0), { x: 0.1, y: 0.2, conf: 0.8 });
   assert.equal(clubAt(club, 0.1), null);
+});
+
+/* --- 撮影方向（三脚を据えない運用のための目安） -------------------- */
+
+test("撮影方向: 肩が目一杯写れば正面、カメラを向いて短ければ後方", () => {
+  const stand = (shoulderHalf: number): Landmarks =>
+    lmWith({
+      [LM.lShoulder]: [0.5 - shoulderHalf, 0.3], [LM.rShoulder]: [0.5 + shoulderHalf, 0.3],
+      [LM.lAnkle]: [0.5, 0.9], [LM.rAnkle]: [0.5, 0.9],
+    });
+  // 肩〜足首 = 0.6 × 1000px = 600px。正面は 肩幅/身長 ≒ 0.30 → 肩幅 180px → half 0.09
+  const face = viewPoint(stand(0.09), 1000, 1000);
+  const dtl = viewPoint(stand(0.012), 1000, 1000);
+  assert.ok(face && face.label === "正面", `正面と出る (実際 ${face?.label}${face?.deg})`);
+  assert.ok(dtl && dtl.label === "後方", `後方と出る (実際 ${dtl?.label}${dtl?.deg})`);
+  assert.equal(face!.fill, 60, "体が画面の何%かも返す（撮影距離の目安）");
+});
+
+test("撮影方向: 体が小さすぎて測れないときは null", () => {
+  const tiny = lmWith({
+    [LM.lShoulder]: [0.5, 0.5], [LM.rShoulder]: [0.5, 0.5],
+    [LM.lAnkle]: [0.5, 0.51], [LM.rAnkle]: [0.5, 0.51],
+  });
+  assert.equal(viewPoint(tiny, 1000, 1000), null);
 });

@@ -382,8 +382,23 @@ export type FrameCands = {
   wx: number;
   wy: number;
   body: number;
+  /** 前腕（肘の中点→手首の中点）の向き。度。取れなければ null */
+  armAng: number | null;
   list: (ShaftHit & { x: number; y: number })[];
 };
+
+/** 角度差を -180〜180 に畳む */
+const angDiff = (a: number, b: number) => ((a - b + 540) % 360) - 180;
+
+/**
+ * 前腕とシャフトのなす角（手首のコック）の限界。
+ *
+ * 実測（2026-08-28・ユーザーのスイング動画で確認）:
+ *   アドレス〜テークバックでは **シャフトは前腕の向きから ±10度** に収まっていた。
+ *   スイング中は手首が折れて開くが、解剖学的にここを超えることはない。
+ *   ＝これを超える候補は、体の輪郭やシミュレーター画面を拾った誤検出。
+ */
+const MAX_COCK = 120;
 
 /**
  * コマごとの候補から軌跡を1本選ぶ（動的計画法）。
@@ -401,7 +416,14 @@ export function buildClub(
   cw: number,
   ch: number
 ): { club: ClubData | null; kept: number; ratio: number } {
-  const strong = frames.map((f) => f.list.filter((c) => c.norm >= CLUB_GATE));
+  // 前腕から見て有り得ない向きの候補は、ここで落とす。
+  // 「画面の反対側を向いた強い動き」（シミュレーターの画面・ネット・体の輪郭）が
+  // これでほぼ消える＝1コマだけ見れば互角だった競争が一気に決まる。
+  const strong = frames.map((f) =>
+    f.list.filter(
+      (c) => c.norm >= CLUB_GATE && (f.armAng == null || Math.abs(angDiff(c.ang, f.armAng)) <= MAX_COCK)
+    )
+  );
   const kept = strong.filter((l) => l.length).length;
   if (kept < 6) return { club: null, kept, ratio: 0 };
 
@@ -411,6 +433,7 @@ export function buildClub(
   const ratio = Math.max(0.7, Math.min(1.05, percentile(ratios, 0.7) || 0.9));
 
   const GAPF = 8;   // 何コマまで飛び越えてつなぐか
+  const cock = (i: number, c: ShaftHit) => (frames[i].armAng == null ? null : angDiff(c.ang, frames[i].armAng as number));
   const best: number[][] = strong.map((l) => l.map(() => -1e9));
   const from: ([number, number] | null)[][] = strong.map((l) => l.map(() => null));
   const value = (c: ShaftHit, body: number) => {
@@ -421,17 +444,22 @@ export function buildClub(
   for (let i = 0; i < strong.length; i++) {
     for (let k = 0; k < strong[i].length; k++) {
       const c = strong[i][k];
+      const ck = cock(i, c);
       let b = value(c, frames[i].body);
       let f: [number, number] | null = null;
       for (let g = 1; g <= GAPF && i - g >= 0; g++) {
         const j = i - g;
         for (let m = 0; m < strong[j].length; m++) {
           if (best[j][m] < -1e8) continue;
-          const p = strong[j][m];
-          const speed = Math.hypot(c.x - p.x, c.y - p.y) / g;
-          const pen = 2 * Math.pow(speed / Math.max(1, frames[i].body * 0.5), 2) + 0.25 * (g - 1);
-          const s = best[j][m] + value(c, frames[i].body) - pen;
-          if (s > b) { b = s; f = [j, m]; }
+          const pv = strong[j][m];
+          const speed = Math.hypot(c.x - pv.x, c.y - pv.y) / g;
+          let pen = 2 * Math.pow(speed / Math.max(1, frames[i].body * 0.5), 2) + 0.25 * (g - 1);
+          // 手首のコックはなめらかにしか変わらない。前腕から見た角度が
+          // 1コマで飛ぶ組み合わせは、どちらかが誤検出。
+          const pk = cock(j, pv);
+          if (ck != null && pk != null) pen += 1.2 * Math.pow(Math.abs(angDiff(ck, pk)) / (25 * g), 2);
+          const sc = best[j][m] + value(c, frames[i].body) - pen;
+          if (sc > b) { b = sc; f = [j, m]; }
         }
       }
       best[i][k] = b;
@@ -454,10 +482,40 @@ export function buildClub(
   const chosen = path.filter(Boolean).length;
   if (chosen < 6) return { club: null, kept, ratio };
 
-  const p = path.map((c) =>
+  const p: number[][] = path.map((c) =>
     c ? [Math.round((c.x / cw) * 1000), Math.round((c.y / ch) * 1000), Math.round(c.conf * 100)] : []
   );
-  const bodyMed = percentile(frames.filter((_, i) => path[i]).map((f) => f.body), 0.5) || 1;
+
+  // --- 取れなかったコマを前腕から埋める（推定・conf は負で持つ） ---
+  // クラブは前腕に対してなめらかにしか動かないので、前後の確かなコマの
+  // 「前腕から見た角度」を線形につないで補う。**外挿はしない**（両端と長い空白は埋めない）。
+  // 実測と推定は必ず区別して持つ（画面でも線の色を変える）。滑らかにつないで嘘をつかないため。
+  const anchors: number[] = [];
+  path.forEach((c, i) => { if (c && cock(i, c) != null) anchors.push(i); });
+  for (let a = 0; a < anchors.length - 1; a++) {
+    const i0 = anchors[a];
+    const i1 = anchors[a + 1];
+    if (i1 - i0 < 2 || i1 - i0 > 10) continue;
+    const c0 = cock(i0, path[i0] as ShaftHit) as number;
+    const c1 = cock(i1, path[i1] as ShaftHit) as number;
+    // コックが10コマ以内で60度以上変わることはない。それだけ違うなら
+    // 両端のどちらかが誤検出なので、間を埋めない（無い方がまし）
+    if (Math.abs(angDiff(c1, c0)) > 60) continue;
+    const r0 = (path[i0] as ShaftHit).r;
+    const r1 = (path[i1] as ShaftHit).r;
+    for (let i = i0 + 1; i < i1; i++) {
+      const f = frames[i];
+      if (f.armAng == null || !(f.body > 20)) continue;
+      const w = (i - i0) / (i1 - i0);
+      const ang = (f.armAng as number) + c0 + angDiff(c1, c0) * w;
+      const r = r0 + (r1 - r0) * w;
+      const x = f.wx + Math.cos((ang * Math.PI) / 180) * r;
+      const y = f.wy + Math.sin((ang * Math.PI) / 180) * r;
+      p[i] = [Math.round((x / cw) * 1000), Math.round((y / ch) * 1000), -1];  // 負＝推定
+    }
+  }
+
+  const bodyMed = percentile(frames.filter((_, i) => p[i].length).map((f) => f.body), 0.5) || 1;
   return { club: { v: 1, t, p, clubLen: Math.round(((bodyMed * ratio) / cw) * 1000) }, kept, ratio };
 }
 
@@ -577,7 +635,7 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
       }
 
       // クラブ: 骨格から手首と体の大きさが取れたときだけ
-      const cands: FrameCands = { wx: 0, wy: 0, body: 0, list: [] };
+      const cands: FrameCands = { wx: 0, wy: 0, body: 0, armAng: null, list: [] };
       if (i > 0 && one && one.length >= 33) {
         withPose++;
         const wx = ((one[LM.lWrist].x + one[LM.rWrist].x) / 2) * cw;
@@ -598,6 +656,11 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
         cands.wx = wx;
         cands.wy = wy;
         cands.body = body;
+        // 前腕の向き。シャフトは前腕から大きくは外れない（実測±10度＠アドレス）ので、
+        // 候補の絞り込みと、取れなかったコマの推定に使う
+        const ex = ((one[LM.lElbow].x + one[LM.rElbow].x) / 2) * cw;
+        const ey = ((one[LM.lElbow].y + one[LM.rElbow].y) / 2) * ch;
+        cands.armAng = Math.hypot(wx - ex, wy - ey) > 5 ? (Math.atan2(wy - ey, wx - ex) * 180) / Math.PI : null;
 
         // 何コマ前と比べるかは決め打ちにしない。実際にシャフトがきれいに出た最小の間隔を採る。
         // （手元の動きから推定する案は、骨格の点のブレ数pxを動きと誤認して外れる）
@@ -908,8 +971,12 @@ export function drawClubTrace(
     const y = oy + (r[1] / 1000) * dh;
     const c = r[2] / 100;
     if (prev) {
-      ctx.globalAlpha = Math.max(0.15, Math.min(1, (c + prev[2]) / 2));
-      ctx.strokeStyle = color;
+      // 実測はオレンジの実線、推定（前腕から補ったコマ）は青の点線。
+      // 見た目で必ず区別できるようにする＝滑らかにつないで嘘をつかない
+      const est = c < 0 || prev[2] < 0;
+      ctx.setLineDash(est ? [lw * 2.5, lw * 2.5] : []);
+      ctx.globalAlpha = est ? 0.7 : Math.max(0.15, Math.min(1, (c + prev[2]) / 2));
+      ctx.strokeStyle = est ? "#8aa6ff" : color;
       ctx.lineWidth = lw;
       ctx.beginPath();
       ctx.moveTo(prev[0], prev[1]);
@@ -919,13 +986,14 @@ export function drawClubTrace(
     prev = [x, y, c];
   }
   ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
 
-  // いまのコマのヘッドとシャフト
+  // いまのコマのヘッド
   const now = clubAt(club, sec);
-  if (now && now.conf >= 0.2) {
+  if (now && (now.conf >= 0.2 || now.conf < 0)) {
     const x = ox + now.x * dw;
     const y = oy + now.y * dh;
-    ctx.fillStyle = color;
+    ctx.fillStyle = now.conf < 0 ? "#8aa6ff" : color;
     ctx.strokeStyle = "rgba(0,0,0,0.6)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1003,6 +1071,47 @@ export function poseMetrics(lm: Landmarks, W: number, H: number): PoseMetrics {
     spine: norm180(spine),
     head: { x: X(LM.nose), y: Y(LM.nose) },
     shoulderWidth: Math.hypot(X(LM.rShoulder) - X(LM.lShoulder), Y(LM.rShoulder) - Y(LM.lShoulder)) || 1,
+  };
+}
+
+/**
+ * 撮影方向と写り具合（2026-08-28）
+ *
+ * なぜ要るか:
+ *   角度の数字は「同じ生徒の前回との差」で読むもの。三脚を毎回据えるのは現場で続かない
+ *   （ユーザー判断・2026-08-28）ので、代わりに **今回どの向き・どの大きさで撮れたか** を数字で出し、
+ *   前回と近いかどうかをコーチが目で確かめられるようにする。
+ *
+ * 求め方:
+ *   アドレスでは肩のラインは飛球線と直角。
+ *   後方（DTL）から見ると肩のラインはカメラを向いて短く写り、正面から見ると目一杯broadsideに写る。
+ *   よって「肩幅 ÷ 肩〜足首」の比がそのまま撮影方向の目安になる（正面でおよそ0.30）。
+ *   ⚠ カメラの高さや姿勢でも多少変わるので、あくまで目安。前回と比べるための物差しとして使う。
+ */
+export type ViewPoint = {
+  /** 0=後方（DTL） … 90=正面 */
+  deg: number;
+  label: "後方" | "斜め" | "正面";
+  /** 体（肩〜足首）が画面の高さの何%を占めているか。撮影距離の目安 */
+  fill: number;
+};
+
+export function viewPoint(lm: Landmarks, W: number, H: number): ViewPoint | null {
+  const X = (i: number) => lm[i].x * W;
+  const Y = (i: number) => lm[i].y * H;
+  const sw = Math.hypot(X(LM.rShoulder) - X(LM.lShoulder), Y(LM.rShoulder) - Y(LM.lShoulder));
+  const smx = (X(LM.lShoulder) + X(LM.rShoulder)) / 2;
+  const smy = (Y(LM.lShoulder) + Y(LM.rShoulder)) / 2;
+  const amx = (X(LM.lAnkle) + X(LM.rAnkle)) / 2;
+  const amy = (Y(LM.lAnkle) + Y(LM.rAnkle)) / 2;
+  const body = Math.hypot(amx - smx, amy - smy);
+  if (!(body > 20)) return null;
+  const FACE_ON = 0.3; // 正面から見たときの 肩幅÷肩〜足首 のおおよその値
+  const deg = (Math.asin(Math.max(0, Math.min(1, sw / body / FACE_ON))) * 180) / Math.PI;
+  return {
+    deg: Math.round(deg),
+    label: deg < 30 ? "後方" : deg < 60 ? "斜め" : "正面",
+    fill: Math.round((body / H) * 100),
   };
 }
 

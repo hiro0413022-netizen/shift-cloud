@@ -52,6 +52,7 @@ const DATAURL_MAX = 12 * 1024 * 1024;
 
 const CD_KEY = "lsn.rec.countdown";
 const LIMIT_KEY = "lsn.rec.limit";
+const GHOST_KEY = "lsn.rec.ghost";
 
 const readNum = (key: string, allow: number[], fallback: number) => {
   if (typeof window === "undefined") return fallback;
@@ -76,10 +77,21 @@ const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0
 export function SwingRecorder({
   onRegister,
   onClose,
+  ghostUrl,
 }: {
   /** 登録処理。エラー文字列を返せば画面に出す。null なら成功でこのモジュールを閉じる */
   onRegister: (c: Captured, meta: RecordMeta) => Promise<string | null>;
   onClose: () => void;
+  /**
+   * 前回スイングの1コマ目。プレビューに薄く重ねて画角を合わせるために使う（2026-08-28）。
+   *
+   * なぜ枠線ガイドではなくこれか:
+   *   角度や距離の数字は「前回との差」で読むものなので、毎回だいたい同じ画角で撮れていることが前提になる。
+   *   三脚を毎回据えるのは現場で続かない、とユーザー判断（2026-08-28）。
+   *   前回の絵そのものを薄く重ねて、人が見て合わせるほうが速いし、線より外れが分かりやすい。
+   *   2026-08-22 に消した枠線ガイド（文字がはみ出て切れた）は復活させない。
+   */
+  ghostUrl?: string | null;
 }) {
   const camRef = useRef<HTMLVideoElement>(null);
   const playRef = useRef<HTMLVideoElement>(null);
@@ -91,6 +103,7 @@ export function SwingRecorder({
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [limit, setLimit] = useState(() => readNum(LIMIT_KEY, [5, 8, 12], 8));
   const [countdown, setCountdown] = useState(() => readNum(CD_KEY, [0, 3], 0));
+  const [ghost, setGhost] = useState(() => readNum(GHOST_KEY, [0, 1], 1) === 1);
   const [count, setCount] = useState<number | null>(null);
   const [rec, setRec] = useState(false);
   const [left, setLeft] = useState(0);
@@ -370,6 +383,17 @@ export function SwingRecorder({
               style={{ transform: facing === "user" ? "scaleX(-1)" : undefined }}
             />
 
+            {/* 前回の画角（薄く重ねる。撮影の邪魔にならないよう操作は素通し） */}
+            {ghostUrl && ghost && !preview && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={ghostUrl}
+                alt=""
+                aria-hidden
+                className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35 mix-blend-screen"
+              />
+            )}
+
             {count !== null && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-8xl font-bold text-(--color-gold)">
                 {count}
@@ -443,9 +467,26 @@ export function SwingRecorder({
                 {c === 0 ? "なし" : "3秒"}
               </button>
             ))}
+            {ghostUrl && (
+              <>
+                <span className="mx-1 text-(--color-line)">|</span>
+                <button
+                  onClick={() => {
+                    const next = !ghost;
+                    setGhost(next);
+                    try { window.localStorage.setItem(GHOST_KEY, next ? "1" : "0"); } catch { /* 保存できなくても撮影は続けられる */ }
+                  }}
+                  disabled={rec || count !== null}
+                  className={`rounded-lg border px-2.5 py-1.5 ${ghost ? "border-(--color-active) text-(--color-active)" : "border-(--color-line) text-(--color-dim)"}`}
+                >
+                  👻 前回に重ねる
+                </button>
+              </>
+            )}
           </div>
           <p className="mt-1.5 shrink-0 text-center text-[11px] text-(--color-dim)">
             {countdown > 0 ? `${countdown}秒カウントダウン後に録画開始` : "押した瞬間に録画開始"}・{limit}秒で自動停止 ／ マイクを塞がないでください（打球音でインパクトを検出）
+            {ghostUrl && ghost && <><br />前回のスイングを薄く重ねています。人と打席の位置が重なるように立ち位置を合わせると、前回との数字の比較が効きます</>}
           </p>
         </div>
       )}

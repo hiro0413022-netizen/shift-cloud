@@ -317,7 +317,12 @@ export function KarteClient({
           {busy && progressText && <p className="text-center text-xs text-(--color-active)">{progressText}</p>}
 
           {recOpen && (
-            <SwingRecorder onClose={() => setRecOpen(false)} onRegister={registerFromRecorder} />
+            <SwingRecorder
+              onClose={() => setRecOpen(false)}
+              onRegister={registerFromRecorder}
+              // 前回の画角に合わせるためのゴースト。三脚を毎回据えるのは現場で続かない（2026-08-28）
+              ghostUrl={videos.find((v) => v.posterUrl)?.posterUrl ?? null}
+            />
           )}
 
           {/* 動画タイムライン */}

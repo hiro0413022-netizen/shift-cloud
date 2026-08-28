@@ -6,7 +6,7 @@ import { PHASES, estimatePhases, hasPhases, type PhaseKey, type Phases } from "@
 import { PhaseBar } from "@/components/phase-bar";
 import {
   analyzeSwing, clubAt, drawClubTrace, drawPlane, drawPose, headSway,
-  planeMetrics, poseAt, poseMetrics, videoBox,
+  planeMetrics, poseAt, poseMetrics, videoBox, viewPoint,
   type ClubData, type ClubDiag, type Plane, type PoseData,
 } from "@/lib/pose";
 import { loadPose, savePlane, savePose, saveAnnotations, savePhases } from "./actions";
@@ -246,7 +246,17 @@ export function VideoPlayer({
   const addressLm = pose && typeof phases?.address === "number" ? poseAt(pose, phases.address) : null;
   const sway = m && addressLm ? headSway(poseMetrics(addressLm, dw, dh), m) : null;
   const pm = plane && club ? planeMetrics(plane, club, dw, dh, phases ?? null) : null;
+  // 撮影の再現性を見るための目安（三脚を据えない運用のため・2026-08-28）
+  const firstLm = pose ? poseAt(pose, pose.t.length ? pose.t[Math.floor(pose.t.length * 0.1)] / 1000 : 0) : null;
+  const vp = (addressLm ?? firstLm) ? viewPoint((addressLm ?? firstLm)!, dw, dh) : null;
   const headNow = clubAt(club, cur);
+  // 実測（画像から取れた）と推定（前腕から補った）は必ず分けて数える
+  const clubCount = club
+    ? club.p.reduce(
+        (a, r) => (r.length === 3 ? (r[2] > 0 ? { real: a.real + 1, est: a.est } : { real: a.real, est: a.est + 1 }) : a),
+        { real: 0, est: 0 }
+      )
+    : null;
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -457,6 +467,11 @@ export function VideoPlayer({
                   {poseInfo.srcFps ? ` ・元動画 ${poseInfo.srcFps}fps` : ""}
                 </span>
               )}
+              {vp && (
+                <span className="rounded bg-(--color-header)/40 px-2 py-0.5 text-(--color-dim)" title="前回と近い数字なら、角度も前回と比べられます">
+                  📷 {vp.label}{vp.deg}° ・体の大きさ {vp.fill}%
+                </span>
+              )}
               {canDraw && <button onClick={runAnalyze} className="btn-ghost !px-2 !py-1.5">↻ 解析し直す</button>}
             </>
           )}
@@ -552,9 +567,12 @@ export function VideoPlayer({
 
         {pose && (
           <p className="mt-2 text-xs text-(--color-dim)">
-            角度はすべて「画面に映った見た目の角度」です。三脚の位置が変わると数字も変わるので、
-            同じ生徒の前回との差で見てください。
-            {club && "クラブ軌跡はインパクト前後で薄くなる／飛ぶのが正常です（ヘッドが速すぎて写っていません）。"}
+            <span className="text-(--color-txt)">頭のブレ・プレーンからの離れ（%）は体の大きさで割ってあるので、撮影距離が変わっても比べられます。</span>
+            {" "}一方で角度は「画面に映った見た目の角度」なので、立ち位置が変わると数字も変わります。
+            上の「📷 {vp ? `${vp.label}${vp.deg}° ・体の大きさ ${vp.fill}%` : "撮影方向"}」が前回と近ければ、角度もそのまま比べられます。
+            撮影画面の【👻 前回に重ねる】を使うと合わせやすくなります。
+            {clubCount &&
+              ` クラブ軌跡は実測${clubCount.real}コマ・前腕から推定${clubCount.est}コマ（推定は青い点線）。`}
             {poseInfo?.srcFps && poseInfo.srcFps < 50 && "この動画は" + poseInfo.srcFps + "fpsです。インパクト前後まで見たいならiPhone純正カメラのスローモーションで撮ってください。"}
           </p>
         )}
