@@ -523,7 +523,7 @@ export function VideoPlayer({
                   <>
                     <p className="mt-1 tabular-nums">
                       解析{diag.frames}コマ → 手元が取れた{diag.withPose} → 向きの候補{diag.withRay} → 線として残った{diag.kept}
-                      （動きの閾値 {diag.thr} ／ 線の詰まり {diag.fill}% ／ 確からしさ {diag.conf}%）
+                      （動きの閾値 {diag.thr} ／ 線の詰まり {diag.fill}% ／ 確からしさ {diag.conf}% ／ 比較コマ間隔 {diag.gap}）
                     </p>
                     <p className="mt-1">
                       {diag.withPose < diag.frames * 0.5

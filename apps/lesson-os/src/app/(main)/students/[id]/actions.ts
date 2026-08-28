@@ -495,9 +495,9 @@ type PlaneIn = { x1: number; y1: number; x2: number; y2: number; _method: "addre
 /** クラブ検出がどこで落ちたか。取れなかったときに現場で打つ手を決めるための数字 */
 type ClubDiagIn = {
   frames: number; withPose: number; withRay: number; kept: number; final: number;
-  thr: number; fill: number; conf: number;
+  thr: number; fill: number; conf: number; gap: number;
 };
-const DIAG_KEYS = ["frames", "withPose", "withRay", "kept", "final", "thr", "fill", "conf"] as const;
+const DIAG_KEYS = ["frames", "withPose", "withRay", "kept", "final", "thr", "fill", "conf", "gap"] as const;
 function cleanDiag(d: unknown): ClubDiagIn | null {
   if (!d || typeof d !== "object") return null;
   const src = d as Record<string, unknown>;

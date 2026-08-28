@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  scanShaft,
+  scanShaftCandidates,
   motionThreshold,
   buildClub,
   signedDist,
@@ -61,7 +61,7 @@ test("動きの閾値は画面の地の高さから決まる（固定値にし�
 
 test("シャフト検出: 動いた直線の向きと先端を拾う", () => {
   const cur = frameWithRay([{ deg: 30, r0: 5, r1: 88, val: 220 }]);
-  const hit = scanShaft(blank, cur, W, H, 100, 100, 90, null, THR);
+  const hit = scanShaftCandidates(blank, cur, W, H, 100, 100, 90, THR)[0];
   assert.ok(hit, "検出できること");
   assert.ok(Math.abs(((hit!.ang - 30 + 540) % 360) - 180) < 4, `角度が30度付近 (実際 ${hit!.ang})`);
   assert.ok(hit!.r > 80, `先端が遠い側にある (実際 ${hit!.r})`);
@@ -74,7 +74,7 @@ test("シャフト検出: 短い腕ではなく長いクラブを選ぶ", () => 
     { deg: 200, r0: 5, r1: 38, val: 255 },
     { deg: 30, r0: 5, r1: 88, val: 200 },
   ]);
-  const hit = scanShaft(blank, cur, W, H, 100, 100, 90, null, THR);
+  const hit = scanShaftCandidates(blank, cur, W, H, 100, 100, 90, THR)[0];
   assert.ok(hit);
   assert.ok(Math.abs(((hit!.ang - 30 + 540) % 360) - 180) < 6, `クラブ側を選ぶ (実際 ${hit!.ang})`);
 });
@@ -83,7 +83,7 @@ test("シャフト検出: 散らばったノイズは線として認めない（
   // 明るいが並んでいない点をばらまく。合計値だけで選ぶとこれが勝ってしまう
   const cur = new Uint8Array(W * H);
   for (let i = 0; i < cur.length; i += 13) cur[i] = 255;
-  const hit = scanShaft(blank, cur, W, H, 100, 100, 90, null, THR);
+  const hit = scanShaftCandidates(blank, cur, W, H, 100, 100, 90, THR)[0];
   if (hit) assert.ok(hit.conf < 0.4, `ノイズに高い確からしさを与えない (実際 ${hit.conf.toFixed(2)})`);
 });
 
@@ -98,57 +98,77 @@ test("シャフト検出: 原点が数pxずれても細いシャフトを見失�
       if (x >= 0 && y >= 0 && x < W && y < H) img[y * W + x] = 230;
     }
   }
-  const hit = scanShaft(blank, img, W, H, 100, 100, 90, null, THR);
+  const hit = scanShaftCandidates(blank, img, W, H, 100, 100, 90, THR)[0];
   assert.ok(hit, "ずれていても検出できること");
   assert.ok(hit!.r > 70, `先端まで届く (実際 ${hit!.r.toFixed(0)})`);
   assert.ok(hit!.fill > 0.6, `線として詰まっていると判定される (実際 ${hit!.fill.toFixed(2)})`);
 });
 
 test("シャフト検出: 動きが無いコマ（アドレス）は null", () => {
-  assert.equal(scanShaft(blank, blank, W, H, 100, 100, 90, null, THR), null);
+  assert.deepEqual(scanShaftCandidates(blank, blank, W, H, 100, 100, 90, THR), []);
 });
 
-test("シャフト検出: 直前の向きは弱い後押しにとどまる（切り返しで置いていかれない）", () => {
-  // 1コマで100度回っても、実際に写っている向きを選べること
-  const cur = frameWithRay([{ deg: 130, r0: 5, r1: 88, val: 220 }]);
-  const hit = scanShaft(blank, cur, W, H, 100, 100, 90, 30, THR);
-  assert.ok(hit);
-  assert.ok(Math.abs(((hit!.ang - 130 + 540) % 360) - 180) < 6, `実際に動いた向きを選ぶ (実際 ${hit!.ang})`);
+test("シャフト検出: 候補は「山」ごとに1本ずつ、強い順に返る", () => {
+  const cur = frameWithRay([
+    { deg: 30, r0: 5, r1: 88, val: 220 },
+    { deg: 150, r0: 5, r1: 70, val: 200 },
+  ]);
+  const cands = scanShaftCandidates(blank, cur, W, H, 100, 100, 90, THR, 4);
+  assert.ok(cands.length >= 2, "2本とも候補に残る");
+  assert.ok(cands[0].score >= cands[1].score, "強い順");
+  const near = (deg: number) => cands.some((c) => Math.abs(((c.ang - deg + 540) % 360) - 180) < 6);
+  assert.ok(near(30) && near(150), `2つの山が別々に出る (実際 ${cands.map((c) => c.ang)})`);
 });
 
-test("軌跡の組み立て: 確からしさの低いコマは落ち、クラブ長で頭打ちになる", () => {
-  const mk = (ang: number, r: number, conf: number, fill = 0.8) =>
-    ({ wx: 100, wy: 100, hit: { ang, r, score: 100, fill, conf } });
-  const hits = [
-    null,
-    mk(0, 80, 0.8), mk(10, 82, 0.8), mk(20, 79, 0.8), mk(30, 81, 0.8),
-    mk(40, 300, 0.9),            // 外れ値（背景の何かを拾った）→ クラブ長でクランプされる
-    mk(50, 40, 0.05, 0.2),       // 線になっていない → 落ちる
-    mk(60, 80, 0.7), mk(70, 80, 0.7),
-  ];
-  const t = hits.map((_, i) => i * 33);
-  const { club } = buildClub(hits, t, W, H);
+test("シャフト検出: 本物のシャフトとノイズは norm ではっきり分かれる", () => {
+  const shaft = scanShaftCandidates(blank, frameWithRay([{ deg: 30, r0: 5, r1: 88, val: 220 }]), W, H, 100, 100, 90, THR)[0];
+  const noise = new Uint8Array(W * H);
+  for (let i = 0; i < noise.length; i += 13) noise[i] = 255;
+  const n = scanShaftCandidates(blank, noise, W, H, 100, 100, 90, THR)[0];
+  assert.ok(shaft.norm > 0.4, `シャフトは 0.4 超 (実際 ${shaft.norm.toFixed(2)})`);
+  if (n) assert.ok(n.norm < 0.3, `ノイズは 0.3 未満 (実際 ${n.norm.toFixed(2)})`);
+});
+
+const mkCand = (ang, r, norm, fill = 0.85) => {
+  const rad = (ang * Math.PI) / 180;
+  return {
+    ang, r, fill, score: norm * 48, norm, conf: Math.min(1, norm / 0.6) * Math.min(1, fill / 0.8),
+    x: 100 + Math.cos(rad) * r, y: 100 + Math.sin(rad) * r,
+  };
+};
+const frame = (...list) => ({ wx: 100, wy: 100, body: 100, list });
+
+test("軌跡の組み立て: 弱い候補は捨て、前後のつながりで1本を選ぶ", () => {
+  // 本物＝角度が少しずつ回りながら距離が一定。にせもの＝毎コマ違う方向に飛ぶ
+  const frames = [];
+  for (let i = 0; i < 14; i++) {
+    frames.push(frame(mkCand(20 + i * 6, 88, 0.5), mkCand((i * 137) % 360, 60, 0.55)));
+  }
+  const t = frames.map((_, i) => i * 33);
+  const { club } = buildClub(frames, t, W, H);
   assert.ok(club, "軌跡ができること");
-  assert.equal(club!.p.length, hits.length, "コマ数は骨格とそろえる");
-  assert.equal(club!.p[0].length, 0, "1コマ目は前コマが無いので空");
-  assert.equal(club!.p[6].length, 0, "線になっていないコマは空にする（滑らかにつないで嘘をつかない）");
-  const far = Math.hypot(club!.p[5][0] / 1000 * W - 100, club!.p[5][1] / 1000 * H - 100);
-  assert.ok(far < 95, `外れ値はクラブ長までに抑える (実際 ${far.toFixed(0)}px)`);
+  const picked = club.p.filter((r) => r.length === 3).length;
+  assert.ok(picked >= 12, `ほぼ全コマ選ばれる (実際 ${picked})`);
+  // 選ばれたのは滑らかに回るほう（距離が一定＝クラブ長に近い）
+  const rs = club.p.map((r, i) => (r.length ? Math.hypot(r[0] / 1000 * W - 100, r[1] / 1000 * H - 100) : null)).filter(Boolean);
+  assert.ok(rs.every((r) => Math.abs(r - 88) < 8), "距離が一定のほうを選ぶ");
 });
 
-test("軌跡の組み立て: 前後から離れた孤立点は落とす", () => {
-  const mk = (ang: number, r: number) => ({ wx: 100, wy: 100, hit: { ang, r, score: 100, fill: 0.8, conf: 0.6 } });
-  // 0,10,20,30度と続くところに、ひとつだけ180度反対を向いた点を挟む
-  const hits = [mk(0, 80), mk(10, 80), mk(200, 80), mk(20, 80), mk(30, 80), mk(40, 80), mk(50, 80)];
-  const t = hits.map((_, i) => i * 33);
-  const { club } = buildClub(hits, t, W, H);
+test("軌跡の組み立て: 弱い候補しかないコマは空にする（滑らかにつないで嘘をつかない）", () => {
+  const frames = [];
+  for (let i = 0; i < 14; i++) {
+    const list = [mkCand(20 + i * 6, 88, i === 7 ? 0.1 : 0.5)];  // 7コマ目だけ弱い
+    frames.push(frame(...list));
+  }
+  const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
   assert.ok(club);
-  assert.equal(club!.p[2].length, 0, "孤立した点は落ちる");
-  assert.ok(club!.p[1].length === 3 && club!.p[3].length === 3, "前後の点は残る");
+  assert.equal(club.p[7].length, 0, "弱いコマは飛ばす");
+  assert.ok(club.p[6].length === 3 && club.p[8].length === 3, "前後はつながる");
 });
 
 test("軌跡の組み立て: 材料が少なすぎるときは null（無理に線を引かない）", () => {
-  assert.equal(buildClub([null, null, null], [0, 33, 66], W, H).club, null);
+  const frames = [frame(), frame(), frame()];
+  assert.equal(buildClub(frames, [0, 33, 66], W, H).club, null);
 });
 
 /* --- 角度は必ず px で計算する（9:16 の落とし穴） ------------------ */

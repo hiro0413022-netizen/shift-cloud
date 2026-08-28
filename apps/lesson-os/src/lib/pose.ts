@@ -212,16 +212,6 @@ export function disposePose() {
 /** 動いたとみなす差分の下限。実際の閾値は毎コマ画面から測って決める（下の motionThreshold） */
 const MOTION_FLOOR = 10;
 
-export type ShaftHit = {
-  ang: number;
-  /** ヘッドまでの距離(px) */
-  r: number;
-  score: number;
-  /** rIn〜r の間で「動いた」画素が並んでいた割合。シャフトは線なので高くなる */
-  fill: number;
-  conf: number;
-};
-
 /**
  * このコマの「動いた量」の地の高さを測って閾値を決める。
  *
@@ -244,22 +234,36 @@ export function motionThreshold(prev: Uint8Array, cur: Uint8Array, cw: number, c
   return Math.max(MOTION_FLOOR, p85 + 4);
 }
 
+export type ShaftHit = {
+  ang: number;
+  /** ヘッドまでの距離(px) */
+  r: number;
+  /** rIn〜r の間で「線が並んでいた」割合。シャフトは線なので高くなる */
+  fill: number;
+  /** 素点。1サンプルあたり約1.2なので、シャフト全部が写れば帯のサンプル数に近づく */
+  score: number;
+  /** 素点をサンプル数で割ったもの。**本物のシャフトは0.4以上・ノイズは0.1未満**とはっきり分かれる */
+  norm: number;
+  conf: number;
+};
+
+/** 帯の中で取るサンプル数（rIn〜rOut を step で刻んだ数。norm の分母） */
+const BAND_SAMPLES = 48;
+
 /**
  * 両手首の中点を原点に、放射状に「動いた画素の並び」を探してシャフトの向きを取る。
+ * 1本に絞らず、角度スコアの山を上位K個返す（後段のDPが前後のつながりから選ぶ）。
  *
  * なぜヘッドを直接探さないか:
  *   ヘッドは小さくて速く、インパクト前後では点ではなく帯になる。
  *   一方シャフトは長い直線なので、ブレていても「その方向に動いた画素が並ぶ」形で必ず残る。
  *
- * なぜ内側を採点から外すか:
- *   手首から体側に伸びる腕も動く。クラブは腕より長いので、外側だけ見れば自然にクラブが勝つ。
- *   ただし外しすぎると、カメラ方向を向いて短く写ったクラブ（トップ〜切り返し）を落とすので 0.3R まで。
- *
- * fill（並びの詰まり具合）を必ず見るのが要点:
- *   ノイズは点在するだけで並ばない。シャフトは手首からヘッドまで途切れずに続く。
- *   合計値だけで選ぶと、明るく散らばったノイズが勝ってしまう。
+ * 3つの仕掛けが全部要る（どれか1つでも欠けると実機で取れない）:
+ *   1. 光線に直角方向の幅   手首の中点は数pxずれ角度も1度刻み。r=200pxで1度ずれると横に3.5px外れる
+ *   2. 中心 − 周り（ridge） 体の輪郭や背景の明滅は「太い」。シャフトは「細い」。細いものだけ残す
+ *   3. fill（並びの詰まり） ノイズは点在するだけで並ばない。シャフトは手首からヘッドまで続く
  */
-export function scanShaft(
+export function scanShaftCandidates(
   prev: Uint8Array,
   cur: Uint8Array,
   cw: number,
@@ -267,10 +271,10 @@ export function scanShaft(
   wx: number,
   wy: number,
   R: number,
-  prevAng: number | null,
-  thr: number
-): ShaftHit | null {
-  if (!(R > 8)) return null;
+  thr: number,
+  K = 4
+): ShaftHit[] {
+  if (!(R > 8)) return [];
   const rIn = R * 0.3;
   const rOut = R * 1.1;
   const step = Math.max(1, R / 60);
@@ -279,11 +283,8 @@ export function scanShaft(
     const rad = (a * Math.PI) / 180;
     const dx = Math.cos(rad);
     const dy = Math.sin(rad);
-    // 光線と直角方向に少しだけ幅を持たせて、その中の最大を採る。
-    // これが無いと実用にならない: 手首の中点は数px ずれるし、角度も1度刻みなので、
-    // 遠くへ行くほど光線がシャフトから外れる（r=200px で1度ずれると3.5px 横にずれる）。
-    const px = -dy;
-    const py = dx;
+    const nx = -dy;
+    const ny = dx;
     let n = 0;
     let cum = 0;
     let sc = 0;
@@ -295,19 +296,20 @@ export function scanShaft(
       const y = (wy + dy * r) | 0;
       if (x < 0 || y < 0 || x >= cw || y >= ch) break;
       n++;
-      const w = 1 + r * 0.025;
-      let d = 0;
-      for (const o of [0, -w, w]) {
-        const ox = (wx + dx * r + px * o) | 0;
-        const oy = (wy + dy * r + py * o) | 0;
-        if (ox < 0 || oy < 0 || ox >= cw || oy >= ch) continue;
+      const w = 1 + r * 0.025;   // シャフトの太さぶん
+      const far = w * 3 + 5;     // 「周り」を見る距離
+      const pick = (o: number) => {
+        const ox = (wx + dx * r + nx * o) | 0;
+        const oy = (wy + dy * r + ny * o) | 0;
+        if (ox < 0 || oy < 0 || ox >= cw || oy >= ch) return 0;
         const j = oy * cw + ox;
-        const v = Math.abs(cur[j] - prev[j]);
-        if (v > d) d = v;
-      }
-      if (d > thr) {
+        return Math.abs(cur[j] - prev[j]);
+      };
+      const center = Math.max(pick(0), pick(-w), pick(w));
+      const surround = (pick(-far) + pick(far)) / 2;
+      if (center - surround > thr && center > thr) {
         cum++;
-        sc += 0.5 + r / R; // 遠くまで届いている向きを優遇する
+        sc += 0.5 + r / R;       // 遠くまで届いている向きを優遇する
         const fill = cum / n;
         if (fill >= 0.5) { bestR = r; bestFill = fill; bestSc = sc; }
       }
@@ -315,39 +317,42 @@ export function scanShaft(
     return { r: bestR, fill: bestFill, score: bestSc };
   };
 
-  const scores: number[] = [];
-  let bestA = 0;
-  let bestSel = -1;   // 直前の向きの後押しを含めた選抜用のスコア
-  let best = { r: 0, fill: 0, score: 0 };
+  const STEP = 3;
+  const n = 360 / STEP;
+  const got: { r: number; fill: number; score: number }[] = new Array(n);
+  for (let i = 0; i < n; i++) got[i] = sample(i * STEP);
 
-  for (let a = 0; a < 360; a += 3) {
-    const got = sample(a);
-    scores.push(got.score);
-    // 直前のコマと向きが近ければ少しだけ後押しする（クラブは連続して動く）。
-    // ただし切り返しは1コマで20度以上回るので、効きは弱く・幅は広く。
-    let sel = got.score;
-    if (prevAng != null) {
-      const d = Math.abs(((a - prevAng + 540) % 360) - 180);
-      if (d < 45) sel *= 1 + 0.12 * (1 - d / 45);
+  // 角度スコアの「山」だけを候補にする（同じ山の隣どうしを何本も拾わない）
+  const peaks: ShaftHit[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = got[(i - 1 + n) % n].score;
+    const b = got[i].score;
+    const c = got[(i + 1) % n].score;
+    if (b > 0 && b >= a && b > c) {   // 同点が続く「肩」で同じ山を何本も拾わない
+      peaks.push({ ang: i * STEP, r: got[i].r, fill: got[i].fill, score: b, norm: 0, conf: 0 });
     }
-    if (sel > bestSel) { bestSel = sel; bestA = a; best = got; }
   }
-  if (!(best.score > 0) || best.r < rIn) return null;
-
-  // 3度刻みで見つけた山を1度刻みで詰める
-  for (let a = bestA - 3; a <= bestA + 3; a++) {
-    const got = sample((a + 360) % 360);
-    if (got.score > best.score) { bestA = (a + 360) % 360; best = got; }
+  peaks.sort((x, y) => y.score - x.score);
+  const top = peaks.slice(0, K);
+  for (const t of top) {
+    // 3度刻みで見つけた山を1度刻みで詰める
+    for (let a = t.ang - 2; a <= t.ang + 2; a++) {
+      const gg = sample((a + 360) % 360);
+      if (gg.score > t.score) { t.ang = (a + 360) % 360; t.r = gg.r; t.fill = gg.fill; t.score = gg.score; }
+    }
+    t.norm = t.score / BAND_SAMPLES;
+    t.conf = Math.max(0, Math.min(1, (t.norm / 0.6) * Math.min(1, t.fill / 0.8)));
   }
-
-  // 「他の向きに比べて突出しているか」×「線として詰まっているか」
-  scores.sort((x, y) => x - y);
-  const p85 = scores[Math.min(scores.length - 1, Math.floor(scores.length * 0.85))] || 0;
-  const stand = Math.max(0, Math.min(1, (best.score / (p85 + 1) - 1.05) / 1.2));
-  const conf = Math.max(0, Math.min(1, stand * Math.min(1, best.fill / 0.75)));
-
-  return { ang: bestA, r: best.r, score: best.score, fill: best.fill, conf };
+  return top.filter((t) => t.r >= rIn && t.score > 0);
 }
+
+/** 本物のシャフトはこの値を超える。ノイズは 0.1 未満なので、ここはかなり素直に効く */
+const CLUB_GATE = 0.35;
+/** これを超えたらもう十分きれいに出ている＝それ以上コマ間隔を広げない */
+const CLUB_GOOD = 0.45;
+/** 何コマ前と比べるかの候補（スロー撮影ほど大きい値が要る） */
+export const REF_GAPS = [1, 2, 4, 8, 12];
+export const MAX_REF_GAP = 12;
 
 const percentile = (arr: number[], p: number) => {
   if (!arr.length) return 0;
@@ -363,13 +368,98 @@ const percentile = (arr: number[], p: number) => {
 export type ClubDiag = {
   frames: number;
   withPose: number;   // 手首が取れたコマ
-  withRay: number;    // 向きの候補が見つかったコマ
+  withRay: number;    // シャフトらしい向きが1本以上あったコマ
   kept: number;       // 確からしさで残ったコマ
   final: number;      // 前後のつながりで残ったコマ
   thr: number;        // 動いたとみなす閾値の中央値
   fill: number;       // 線の詰まり具合の中央値（%）
   conf: number;       // 確からしさの中央値（%）
+  gap: number;        // 実際に使った「何コマ前と比べたか」の中央値
 };
+
+/** DPに渡すコマごとの候補 */
+export type FrameCands = {
+  wx: number;
+  wy: number;
+  body: number;
+  list: (ShaftHit & { x: number; y: number })[];
+};
+
+/**
+ * コマごとの候補から軌跡を1本選ぶ（動的計画法）。
+ *
+ * なぜ「そのコマで一番強い向き」を選んではいけないか:
+ *   シミュレーターの画面・体の輪郭・ネットなど、強く動くものはクラブ以外にもある。
+ *   1コマだけ見れば互角でも、**クラブは前のコマの続きになっている**という条件を入れると一意に決まる。
+ *
+ * 距離の条件も効く: クラブは伸び縮みしないので、手元からヘッドまでの距離は
+ * （カメラ方向を向いて短く写るぶんを除けば）体の大きさに対してほぼ一定。
+ */
+export function buildClub(
+  frames: FrameCands[],
+  t: number[],
+  cw: number,
+  ch: number
+): { club: ClubData | null; kept: number; ratio: number } {
+  const strong = frames.map((f) => f.list.filter((c) => c.norm >= CLUB_GATE));
+  const kept = strong.filter((l) => l.length).length;
+  if (kept < 6) return { club: null, kept, ratio: 0 };
+
+  // クラブ長は体の大きさとの比で持つ（コマごとに体の写る大きさが変わるため）
+  const ratios: number[] = [];
+  strong.forEach((l, i) => { if (l.length && frames[i].body > 20) ratios.push(l[0].r / frames[i].body); });
+  const ratio = Math.max(0.7, Math.min(1.05, percentile(ratios, 0.7) || 0.9));
+
+  const GAPF = 8;   // 何コマまで飛び越えてつなぐか
+  const best: number[][] = strong.map((l) => l.map(() => -1e9));
+  const from: ([number, number] | null)[][] = strong.map((l) => l.map(() => null));
+  const value = (c: ShaftHit, body: number) => {
+    const exp = Math.max(1, body * ratio);
+    return Math.min(1.5, c.norm) * 2 + Math.min(1, c.fill / 0.8) - Math.abs(c.r - exp) / exp;
+  };
+
+  for (let i = 0; i < strong.length; i++) {
+    for (let k = 0; k < strong[i].length; k++) {
+      const c = strong[i][k];
+      let b = value(c, frames[i].body);
+      let f: [number, number] | null = null;
+      for (let g = 1; g <= GAPF && i - g >= 0; g++) {
+        const j = i - g;
+        for (let m = 0; m < strong[j].length; m++) {
+          if (best[j][m] < -1e8) continue;
+          const p = strong[j][m];
+          const speed = Math.hypot(c.x - p.x, c.y - p.y) / g;
+          const pen = 2 * Math.pow(speed / Math.max(1, frames[i].body * 0.5), 2) + 0.25 * (g - 1);
+          const s = best[j][m] + value(c, frames[i].body) - pen;
+          if (s > b) { b = s; f = [j, m]; }
+        }
+      }
+      best[i][k] = b;
+      from[i][k] = f;
+    }
+  }
+
+  let bi = -1;
+  let bk = -1;
+  let bv = -1e9;
+  for (let i = 0; i < strong.length; i++) {
+    for (let k = 0; k < strong[i].length; k++) if (best[i][k] > bv) { bv = best[i][k]; bi = i; bk = k; }
+  }
+  if (bi < 0) return { club: null, kept, ratio };
+
+  const path: ((ShaftHit & { x: number; y: number }) | null)[] = new Array(strong.length).fill(null);
+  let cur: [number, number] | null = [bi, bk];
+  while (cur) { path[cur[0]] = strong[cur[0]][cur[1]]; cur = from[cur[0]][cur[1]]; }
+
+  const chosen = path.filter(Boolean).length;
+  if (chosen < 6) return { club: null, kept, ratio };
+
+  const p = path.map((c) =>
+    c ? [Math.round((c.x / cw) * 1000), Math.round((c.y / ch) * 1000), Math.round(c.conf * 100)] : []
+  );
+  const bodyMed = percentile(frames.filter((_, i) => path[i]).map((f) => f.body), 0.5) || 1;
+  return { club: { v: 1, t, p, clubLen: Math.round(((bodyMed * ratio) / cw) * 1000) }, kept, ratio };
+}
 
 /* ------------------------------------------------------------------ */
 /* 解析本体                                                            */
@@ -430,18 +520,20 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
     let detected = 0;
     let lastTs = -1;
 
-    // クラブ検出の作業領域（毎コマ確保しない）
-    let gA = new Uint8Array(cw * ch);
-    let gB = new Uint8Array(cw * ch);
-    let hasPrev = false;
-    let prevAng: number | null = null;
-    const hits: ({ wx: number; wy: number; hit: ShaftHit } | null)[] = [];
+    // クラブ検出の作業領域。
+    // 直近 MAX_REF_GAP コマぶんを持っておく（毎コマ確保しない）。
+    // なぜ1コマ前だけでは足りないか: スロー撮影だとコマ間でクラブがほとんど動かず、
+    // 差分にシャフトが出ない。実機のスロー動画がまさにこれで、1コマ前だと何も取れなかった。
+    const ring: Uint8Array[] = Array.from({ length: MAX_REF_GAP + 1 }, () => new Uint8Array(cw * ch));
+    const ringAt = (n: number) => ring[((n % ring.length) + ring.length) % ring.length];
+    const frameCands: FrameCands[] = [];
     // 検出がどこで落ちたかを数えておく
     let withPose = 0;
     let withRay = 0;
     const thrs: number[] = [];
     const fills: number[] = [];
     const confs: number[] = [];
+    const gaps: number[] = [];
 
     for (let i = 0; i < total; i++) {
       if (opts.signal?.aborted) throw new Error("中止しました");
@@ -456,9 +548,10 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
       ctx.drawImage(video, 0, 0, cw, ch);
 
       // 輝度だけ取り出す（差分に色は要らない）
+      const gCur = ringAt(i);
       const img = ctx.getImageData(0, 0, cw, ch).data;
-      for (let j = 0, k = 0; j < gA.length; j++, k += 4) {
-        gA[j] = (img[k] * 77 + img[k + 1] * 151 + img[k + 2] * 28) >> 8;
+      for (let j = 0, k = 0; j < gCur.length; j++, k += 4) {
+        gCur[j] = (img[k] * 77 + img[k + 1] * 151 + img[k + 2] * 28) >> 8;
       }
 
       // detectForVideo のタイムスタンプは必ず増えていないといけない
@@ -483,9 +576,9 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
         row = []; // このコマだけ落ちても続ける
       }
 
-      // クラブ: 前コマがあり、骨格から手首と体の大きさが取れたときだけ
-      let hit: { wx: number; wy: number; hit: ShaftHit } | null = null;
-      if (hasPrev && one && one.length >= 33) {
+      // クラブ: 骨格から手首と体の大きさが取れたときだけ
+      const cands: FrameCands = { wx: 0, wy: 0, body: 0, list: [] };
+      if (i > 0 && one && one.length >= 33) {
         withPose++;
         const wx = ((one[LM.lWrist].x + one[LM.rWrist].x) / 2) * cw;
         const wy = ((one[LM.lWrist].y + one[LM.rWrist].y) / 2) * ch;
@@ -493,31 +586,49 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
         const smy = ((one[LM.lShoulder].y + one[LM.rShoulder].y) / 2) * ch;
         const amx = ((one[LM.lAnkle].x + one[LM.rAnkle].x) / 2) * cw;
         const amy = ((one[LM.lAnkle].y + one[LM.rAnkle].y) / 2) * ch;
-        // 肩〜足首を体の物差しにする。クラブはその 0.7〜0.85 倍（7I〜DR）
+        // 肩〜足首を体の物差しにする。クラブはその 0.7〜1.0 倍（7I〜DR）
         let body = Math.hypot(amx - smx, amy - smy);
         if (!(body > 20)) {
-          const sw = Math.hypot((one[LM.rShoulder].x - one[LM.lShoulder].x) * cw, (one[LM.rShoulder].y - one[LM.lShoulder].y) * ch);
+          const sw = Math.hypot(
+            (one[LM.rShoulder].x - one[LM.lShoulder].x) * cw,
+            (one[LM.rShoulder].y - one[LM.lShoulder].y) * ch
+          );
           body = sw * 3.2;
         }
-        const thr = motionThreshold(gB, gA, cw, ch);
-        thrs.push(thr);
-        const found = scanShaft(gB, gA, cw, ch, wx, wy, body * 0.95, prevAng, thr);
-        if (found) {
+        cands.wx = wx;
+        cands.wy = wy;
+        cands.body = body;
+
+        // 何コマ前と比べるかは決め打ちにしない。実際にシャフトがきれいに出た最小の間隔を採る。
+        // （手元の動きから推定する案は、骨格の点のブレ数pxを動きと誤認して外れる）
+        let bestNorm = -1;
+        for (const g of REF_GAPS) {
+          if (i - g < 0) break;
+          const ref = ringAt(i - g);
+          const th = motionThreshold(ref, gCur, cw, ch);
+          const got = scanShaftCandidates(ref, gCur, cw, ch, wx, wy, body * 0.95, th);
+          const nm = got.length ? got[0].norm : 0;
+          if (nm > bestNorm) {
+            bestNorm = nm;
+            cands.list = got.map((c) => ({
+              ...c,
+              x: wx + Math.cos((c.ang * Math.PI) / 180) * c.r,
+              y: wy + Math.sin((c.ang * Math.PI) / 180) * c.r,
+            }));
+            if (got.length) { thrs[i] = th; gaps[i] = g; }
+          }
+          if (nm >= CLUB_GOOD) break;
+        }
+        if (cands.list.length) {
           withRay++;
-          fills.push(found.fill);
-          confs.push(found.conf);
-          hit = { wx, wy, hit: found };
-          if (found.conf > 0.3) prevAng = found.ang;
+          fills.push(cands.list[0].fill);
+          confs.push(cands.list[0].conf);
         }
       }
-      hits.push(hit);
+      frameCands.push(cands);
 
       t.push(ts);
       p.push(row);
-
-      // 次のコマのために前コマとして持つ（バッファは入れ替えるだけ）
-      const swap = gB; gB = gA; gA = swap;
-      hasPrev = true;
 
       if (i % 5 === 0) {
         opts.onProgress?.(i + 1, total, "解析中");
@@ -527,7 +638,7 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
 
     opts.onProgress?.(total, total, "解析中");
 
-    const built = buildClub(hits, t, cw, ch);
+    const built = buildClub(frameCands, t, cw, ch);
     const club = built.club;
     const plane = club ? planeFromAddress({ v: 1, t, p }, club, W, H) : null;
     const diag: ClubDiag = {
@@ -536,9 +647,10 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
       withRay,
       kept: built.kept,
       final: club ? club.p.filter((r) => r.length === 3).length : 0,
-      thr: Math.round(percentile(thrs, 0.5)),
+      thr: Math.round(percentile(thrs.filter((n) => n != null), 0.5)),
       fill: Math.round(percentile(fills, 0.5) * 100),
       conf: Math.round(percentile(confs, 0.5) * 100),
+      gap: Math.round(percentile(gaps.filter((n) => n != null), 0.5)),
     };
 
     return {
@@ -549,74 +661,6 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
     video.src = "";
     revoke();
   }
-}
-
-/**
- * コマごとの当たりをクラブ軌跡にまとめる。
- *
- * 確からしさの一発勝負にしない:
- *   閾値をいくつにしても、逆光・服の色・背景で当たり外れが出る。
- *   そこで「ゆるく拾って、前後のつながりで落とす」形にした。
- *   クラブは連続して動くので、前後どちらからも離れすぎた点は必ず誤検出。
- *
- * クラブ長は各コマの到達距離の80パーセンタイル
- * （＝一番よく写っているコマに合わせる。平均だと短い側に引っぱられる）。
- */
-export function buildClub(
-  hits: ({ wx: number; wy: number; hit: ShaftHit } | null)[],
-  t: number[],
-  cw: number,
-  ch: number
-): { club: ClubData | null; kept: number } {
-  // 線として詰まっているコマだけをクラブ長の材料にする
-  const solid = hits.filter((h): h is NonNullable<typeof h> => !!h && h.hit.fill >= 0.6 && h.hit.conf > 0.2);
-  const clubPx = percentile(solid.map((g) => g.hit.r), 0.8);
-  if (!(clubPx > 8) || solid.length < 4) return { club: null, kept: solid.length };
-
-  const raw: ([number, number, number] | null)[] = hits.map((h) => {
-    if (!h) return null;
-    // ゆるく拾う。ここで落とすのは「線になっていない」ものだけ
-    if (h.hit.conf < 0.08 || h.hit.fill < 0.45) return null;
-    const r = Math.max(clubPx * 0.3, Math.min(clubPx * 1.15, h.hit.r));
-    const rad = (h.hit.ang * Math.PI) / 180;
-    return [h.wx + Math.cos(rad) * r, h.wy + Math.sin(rad) * r, h.hit.conf];
-  });
-  const kept = raw.filter(Boolean).length;
-  if (kept < 5) return { club: null, kept };
-
-  // 前後のつながりで孤立した点を落とす。
-  // 「隣のコマとの距離」の中央値を物差しにして、その3倍を超えて両隣から離れた点は誤検出。
-  const gaps: number[] = [];
-  for (let i = 1; i < raw.length; i++) {
-    const a = raw[i - 1];
-    const b = raw[i];
-    if (a && b) gaps.push(Math.hypot(b[0] - a[0], b[1] - a[1]));
-  }
-  const med = percentile(gaps, 0.5) || clubPx * 0.2;
-  const limit = Math.max(med * 3, clubPx * 0.25);
-  const linked = raw.map((v, i) => {
-    if (!v) return null;
-    const near = [raw[i - 1], raw[i + 1]].some(
-      (n) => n && Math.hypot(n[0] - v[0], n[1] - v[1]) <= limit
-    );
-    return near ? v : null;
-  });
-
-  // 3コマの移動平均（前後が欠けていれば平均しない）。点のガタつきだけ取る
-  const out: number[][] = linked.map((v, i) => {
-    if (!v) return [];
-    const a = linked[i - 1];
-    const b = linked[i + 1];
-    const xs = [v[0]], ys = [v[1]];
-    if (a) { xs.push(a[0]); ys.push(a[1]); }
-    if (b) { xs.push(b[0]); ys.push(b[1]); }
-    const x = xs.reduce((s, n) => s + n, 0) / xs.length;
-    const y = ys.reduce((s, n) => s + n, 0) / ys.length;
-    return [Math.round((x / cw) * 1000), Math.round((y / ch) * 1000), Math.round(v[2] * 100)];
-  });
-
-  if (out.filter((r) => r.length).length < 5) return { club: null, kept };
-  return { club: { v: 1, t, p: out, clubLen: Math.round((clubPx / cw) * 1000) }, kept };
 }
 
 /* ------------------------------------------------------------------ */
@@ -840,11 +884,14 @@ export function drawClubTrace(
   club: ClubData,
   box: Box,
   sec: number,
-  opts: { color?: string; showAll?: boolean } = {}
+  opts: { color?: string; showAll?: boolean; tailMs?: number } = {}
 ) {
   const { ox, oy, dw, dh } = box;
   const color = opts.color ?? "#ff9f1c";
   const upto = opts.showAll ? Infinity : sec * 1000 + 1;
+  // 尾の長さ。動画が長いと最初から全部描いてしまい、線がぐちゃぐちゃになって読めない。
+  // 再生に合わせてヘッドの後ろだけ引く（コーチが見たいのはいま通った軌跡）。
+  const from = opts.showAll ? -Infinity : upto - (opts.tailMs ?? 2000);
 
   ctx.save();
   ctx.lineCap = "round";
@@ -854,6 +901,7 @@ export function drawClubTrace(
   let prev: [number, number, number] | null = null;
   for (let i = 0; i < club.p.length; i++) {
     if (club.t[i] > upto) break;
+    if (club.t[i] < from) { prev = null; continue; }
     const r = club.p[i];
     if (r.length !== 3) { prev = null; continue; }
     const x = ox + (r[0] / 1000) * dw;
