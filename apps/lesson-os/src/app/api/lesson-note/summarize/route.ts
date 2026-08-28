@@ -92,7 +92,8 @@ export async function POST(req: Request) {
       summary: read.summary,
       body: read.body || null,
       ai_raw: read.raw as object,
-      status: "summarized",
+      // 本文が出ていないなら失敗扱い。音声は消さずに残すので、原因を直して要約し直せる
+      status: read.body ? "summarized" : "failed",
       error: read.warning,
       updated_at: new Date().toISOString(),
     })

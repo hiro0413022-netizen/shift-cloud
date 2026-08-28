@@ -92,6 +92,7 @@ export async function readLessonAudio(
     return { transcript: "", summary: EMPTY, body: "", raw: null, warning: "録音が長すぎて要約できませんでした" };
   }
 
+  // モデル名は環境変数で差し替えられるようにしておく（音声対応モデルが変わっても再デプロイ不要）
   const model = process.env.LESSON_NOTE_MODEL || process.env.CORTEX_GEMINI_MODEL || DEFAULT_MODEL;
   const style = styleSamples.filter(Boolean).slice(0, 5);
   const user = [
@@ -124,7 +125,16 @@ export async function readLessonAudio(
         signal: AbortSignal.timeout(240000),
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // 何が起きたかを必ず持って帰る。「要約できませんでした」だけだと、
+      // モデル名違い・キー不正・音声形式・上限超過のどれなのか現場で切り分けられない。
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      return {
+        transcript: "", summary: EMPTY, body: "",
+        raw: { status: res.status, detail },
+        warning: `AIが応答しませんでした（HTTP ${res.status}）${detail ? `: ${detail}` : ""}`,
+      };
+    }
     const json = (await res.json()) as {
       candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[];
     };
