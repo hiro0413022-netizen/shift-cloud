@@ -152,3 +152,53 @@ test("優先度は3つだけ。知らない値は normal に寄せる", () => {
   assert.equal(normalizePriority("最優先"), "normal");
   assert.equal(normalizePriority(undefined), "normal");
 });
+
+/* ---------- ウェイクワード（#184） ---------- */
+import { detectWake, pauseMs, WAKE_WORDS } from "../apps/genesis/src/lib/jarvis-pure.ts";
+
+test("「ジェネシス」で起動し、その後ろが用件になる", () => {
+  const r = detectWake("ジェネシス、今月の売上は？");
+  assert.equal(r.hit, true);
+  assert.equal(r.rest, "今月の売上は？");
+});
+
+test("聞き取りの表記ゆれを拾う（ゼネシス・genesis・ひらがな）", () => {
+  for (const s of ["ゼネシス 承認待ちを教えて", "genesis 承認待ちを教えて", "じぇねしす 承認待ちを教えて"]) {
+    const r = detectWake(s);
+    assert.equal(r.hit, true, s);
+    assert.equal(r.rest, "承認待ちを教えて", s);
+  }
+});
+
+test("何度も呼びかけたときは最後の呼びかけより後ろだけを用件にする", () => {
+  const r = detectWake("ジェネシス。ジェネシス、体験の入会率は？");
+  assert.equal(r.rest, "体験の入会率は？");
+});
+
+test("呼びかけだけで用件が無いときは rest が空（そのまま聞き続ける合図）", () => {
+  const r = detectWake("ジェネシス");
+  assert.equal(r.hit, true);
+  assert.equal(r.rest, "");
+});
+
+test("呼びかけが無ければ起動しない（雑談を拾わない）", () => {
+  assert.equal(detectWake("今日はいい天気ですね").hit, false);
+  assert.equal(detectWake("").hit, false);
+});
+
+test("呼びかけ直後の読点・スペースは用件から落とす", () => {
+  assert.equal(detectWake("ジェネシス　　、、売上").rest, "売上");
+});
+
+test("ウェイクワードは小文字化して比較しても衝突しない（全部ユニーク）", () => {
+  const lower = WAKE_WORDS.map((w) => w.toLowerCase());
+  assert.equal(new Set(lower).size, lower.length);
+});
+
+test("無音の待ち時間は3段階。知らない値は「ふつう」に寄せる", () => {
+  assert.equal(pauseMs("fast"), 900);
+  assert.equal(pauseMs("slow"), 3000);
+  assert.equal(pauseMs("normal"), 1800);
+  assert.equal(pauseMs("とても速い"), 1800);
+  assert.equal(pauseMs(null), 1800);
+});

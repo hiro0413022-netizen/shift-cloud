@@ -180,3 +180,61 @@ export function parseDecision(raw: string): Decision | null {
 export function normalizePriority(p: unknown): "urgent" | "normal" | "low" {
   return p === "urgent" || p === "low" ? p : "normal";
 }
+
+/* ------------------------------------------------------------
+   ウェイクワード（#184）
+
+   なぜ入れるか（2026-08-28 ユーザー指摘）:
+     「毎回ボタンを押して話す形になっている。ボタンではなく、
+       僕がジェネシスと言ったら会話モードに入るほうがいいのでは」
+     そのとおりで、押してから話す限り "呼べば答える" にはならない。
+
+   なぜ聞き取り結果に対して純関数で判定するか:
+     音声認識は同じ言葉を毎回同じ表記で返さない（ジェネシス / ゼネシス /
+     genesis / 読点つき …）。ここが外れると**永久に起動しない**という
+     いちばん分かりにくい壊れ方をするので、表記ゆれをテストで固定する。
+------------------------------------------------------------ */
+
+/** 「ジェネシス」の聞き取られ方。実際に出た表記を見つけたらここに足す */
+export const WAKE_WORDS = [
+  "ジェネシス", "じぇねしす", "ゼネシス", "ぜねしす", "ジェニシス", "ジェネシズ", "ジェネスス",
+  "genesis", "ジャービス", "ジャーヴィス", "じゃーびす",
+];
+
+/** 呼びかけの直後に来がちな区切り記号。用件の頭から削る */
+const LEAD_TRIM = /^[\s、,。.！!？?ー・:：]+/;
+
+/**
+ * 聞き取ったテキストに呼びかけが含まれるかを見る。
+ * 含まれていたら、**最後の**呼びかけより後ろを用件として返す
+ * （「ジェネシス、ジェネシス、今月の売上は？」でも用件だけが残る）。
+ */
+export function detectWake(text: string): { hit: boolean; rest: string } {
+  if (!text) return { hit: false, rest: "" };
+  const lower = text.toLowerCase();
+  let at = -1;
+  let len = 0;
+  for (const w of WAKE_WORDS) {
+    const i = lower.lastIndexOf(w.toLowerCase());
+    if (i >= 0 && i >= at) {
+      at = i;
+      len = w.length;
+    }
+  }
+  if (at < 0) return { hit: false, rest: "" };
+  return { hit: true, rest: text.slice(at + len).replace(LEAD_TRIM, "").trim() };
+}
+
+/**
+ * 話し終わりと見なすまでの無音の長さ（ミリ秒）。
+ *
+ * ユーザー指摘「喋っている最中にいきなり終了して回答してしまいます」の対策。
+ * ブラウザ標準の区切りは日本語の"間"に対して短すぎるので、
+ * 自前で無音を測って区切る。速さは人によるので選べるようにする。
+ */
+export const PAUSE_MS = { fast: 900, normal: 1800, slow: 3000 } as const;
+export type PauseSpeed = keyof typeof PAUSE_MS;
+
+export function pauseMs(speed: string | null | undefined): number {
+  return PAUSE_MS[(speed as PauseSpeed) in PAUSE_MS ? (speed as PauseSpeed) : "normal"];
+}
