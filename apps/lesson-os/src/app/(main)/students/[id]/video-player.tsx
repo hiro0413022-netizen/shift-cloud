@@ -4,8 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import type { Annotations, Shape } from "@/lib/lesson";
 import { PHASES, estimatePhases, hasPhases, type PhaseKey, type Phases } from "@/lib/phases";
 import { PhaseBar } from "@/components/phase-bar";
-import { analyzePose, drawPose, headSway, poseAt, poseMetrics, videoBox, type PoseData } from "@/lib/pose";
-import { loadPose, savePose, saveAnnotations, savePhases } from "./actions";
+import {
+  analyzeSwing, clubAt, drawClubTrace, drawPlane, drawPose, headSway,
+  planeMetrics, poseAt, poseMetrics, videoBox,
+  type ClubData, type Plane, type PoseData,
+} from "@/lib/pose";
+import { loadPose, savePlane, savePose, saveAnnotations, savePhases } from "./actions";
 
 /**
  * 動画プレーヤー＋描画ツール＋フェーズ移動（PGA NOTE準拠 / DECISIONS #51）
@@ -20,6 +24,12 @@ import { loadPose, savePose, saveAnnotations, savePhases } from "./actions";
  *   結果は lsn_video_pose に残るので、次に開いたときは解析なしですぐ出る。
  *   数値（肩・腰・ねじれ・前傾・頭のブレ）は2D投影なので、
  *   絶対値ではなく「同じ生徒の前回との差」で読むこと。
+ *
+ * 2026-08-28(2): クラブヘッド軌跡とスイングプレーンを追加。
+ *   骨格と同じ1回の解析でまとめて作る（動画を2回なめない）。
+ *   軌跡は確からしさで濃さが変わる＝**インパクト前後で線が飛ぶのは正常**。
+ *   60fpsではヘッドが1コマ60〜80cm動いて帯状にブレるので、そこは追えない。
+ *   自動プレーンが外れたときは、線ツールで引いた直線を基準面に採用できる（手動が優先）。
  */
 type Tool = "none" | "line" | "circle" | "free";
 const COLORS = ["#ff4d4d", "#ffd54d", "#7CFC66", "#4dd2ff"];
@@ -54,13 +64,19 @@ export function VideoPlayer({
   const [dur, setDur] = useState(0);
   const [estimating, setEstimating] = useState(false);
 
-  // --- ボーン（骨格） ---
+  // --- スイング解析（骨格・クラブ軌跡・プレーン） ---
   const [pose, setPose] = useState<PoseData | null>(null);
-  const [poseInfo, setPoseInfo] = useState<{ frames: number; detected: number } | null>(null);
+  const [club, setClub] = useState<ClubData | null>(null);
+  const [plane, setPlane] = useState<Plane | null>(null);
+  const [poseInfo, setPoseInfo] = useState<{ frames: number; detected: number; srcFps: number | null } | null>(null);
   const [showPose, setShowPose] = useState(true);
-  const [poseFps, setPoseFps] = useState<30 | 60>(30);
+  const [showTrace, setShowTrace] = useState(true);
+  const [showPlane, setShowPlane] = useState(true);
+  const [poseFps, setPoseFps] = useState<30 | 60 | 120>(30);
   const [poseBusy, setPoseBusy] = useState<{ done: number; total: number; phase: string } | null>(null);
   const [playing, setPlaying] = useState(false);
+  /** 角度計算は必ず動画の実寸(px)で行う。正規化のままだと 9:16 で角度が狂う */
+  const [dim, setDim] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
   const abortRef = useRef<AbortController | null>(null);
 
   const jump = (t: number) => {
@@ -120,57 +136,69 @@ export function VideoPlayer({
       ctx.stroke();
     }
 
-    // 骨格（描画の上に重ねる）
-    if (showPose && pose && videoRef.current) {
-      const lm = poseAt(pose, videoRef.current.currentTime);
-      if (lm) drawPose(ctx, lm, videoBox(videoRef.current, W, H));
+    // 解析結果（描画の上に重ねる）
+    if (videoRef.current && (pose || club || plane)) {
+      const box = videoBox(videoRef.current, W, H);
+      const now = videoRef.current.currentTime;
+      if (showPlane && plane) drawPlane(ctx, plane, box);
+      if (showTrace && club) drawClubTrace(ctx, club, box, now);
+      if (showPose && pose) {
+        const lm = poseAt(pose, now);
+        if (lm) drawPose(ctx, lm, box);
+      }
     }
   };
 
   /* 再生中は毎フレーム描き直す。止まっているときは cur が動いたときだけでよい */
   useEffect(() => {
-    if (!(showPose && pose && playing)) { redraw(); return; }
+    if (!((pose || club || plane) && playing)) { redraw(); return; }
     let raf = 0;
     const loop = () => { redraw(); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPose, pose, playing, shapes, cur]);
+  }, [showPose, showTrace, showPlane, pose, club, plane, playing, shapes, cur]);
 
-  /* 保存済みの骨格を読む（プレーヤーを開いたときだけ・一覧では引かない） */
+  /* 保存済みの解析結果を読む（プレーヤーを開いたときだけ・一覧では引かない） */
   useEffect(() => {
     let alive = true;
     loadPose(videoId).then((r) => {
       if (!alive || !r.pose) return;
       setPose(r.pose.data);
-      setPoseInfo({ frames: r.pose.frames, detected: r.pose.detected });
+      setClub(r.pose.club);
+      setPlane(r.pose.plane);
+      setPoseInfo({ frames: r.pose.frames, detected: r.pose.detected, srcFps: r.pose.srcFps });
     });
     return () => { alive = false; };
   }, [videoId]);
 
-  /** 撮り終わった動画をコマ送りで解析する。中止できる（現場で待たされない） */
-  const runPose = async () => {
+  /** 撮り終わった動画をコマ送りで解析する。骨格・クラブ軌跡・プレーンを1回でまとめて作る */
+  const runAnalyze = async () => {
     const ac = new AbortController();
     abortRef.current = ac;
     setPoseBusy({ done: 0, total: 1, phase: "モデルを読み込み中" });
     setMsg(null);
     try {
-      const track = await analyzePose(src, {
+      const track = await analyzeSwing(src, {
         fps: poseFps,
         signal: ac.signal,
         onProgress: (done, total, phase) => setPoseBusy({ done, total, phase }),
       });
       setPose(track.data);
-      setPoseInfo({ frames: track.frames, detected: track.detected });
+      setClub(track.club);
+      // 手で引いたプレーンは解析し直しても残す（コーチの判断のほうが正しい）
+      const keepManual = plane?._method === "manual" ? plane : null;
+      const nextPlane = keepManual ?? track.plane;
+      setPlane(nextPlane);
+      setPoseInfo({ frames: track.frames, detected: track.detected, srcFps: track.srcFps });
       setShowPose(true);
-      const r = await savePose(videoId, track);
-      setMsg(
-        r.error
-          ? `解析できましたが保存に失敗しました: ${r.error}`
-          : track.detected < track.frames * 0.6
-            ? `骨格を解析しました（${track.detected}/${track.frames}コマ）。検出できないコマが多いので、全身が入る画角・明るい場所で撮り直すと精度が上がります`
-            : `骨格を解析しました（${track.detected}/${track.frames}コマ）`
-      );
+
+      const r = await savePose(videoId, { ...track, plane: nextPlane });
+      const notes: string[] = [`骨格 ${track.detected}/${track.frames}コマ`];
+      notes.push(track.club ? "クラブ軌跡あり" : "クラブ軌跡は取れませんでした");
+      if (track.detected < track.frames * 0.6) notes.push("全身が入る画角・明るい場所で撮り直すと精度が上がります");
+      if (!track.club) notes.push("手元とクラブが画面に入っているか確認してください");
+      setMsg(r.error ? `解析できましたが保存に失敗しました: ${r.error}` : notes.join(" / "));
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "解析に失敗しました");
     } finally {
@@ -179,11 +207,42 @@ export function VideoPlayer({
     }
   };
 
+  /** 描いた直線をスイングプレーンの基準にする（自動が外れたときの逃げ道） */
+  const lastLine = [...shapes].reverse().find((sh): sh is Extract<Shape, { t: "line" }> => sh.t === "line");
+  const useLineAsPlane = async () => {
+    if (!lastLine) return;
+    // 画面外まで伸ばしておく（プレーンは線分ではなく面のつもりで見るもの）
+    const dx = lastLine.x2 - lastLine.x1;
+    const dy = lastLine.y2 - lastLine.y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const k = 2 / len;
+    const next: Plane = {
+      x1: Number((lastLine.x1 - dx * k).toFixed(4)),
+      y1: Number((lastLine.y1 - dy * k).toFixed(4)),
+      x2: Number((lastLine.x2 + dx * k).toFixed(4)),
+      y2: Number((lastLine.y2 + dy * k).toFixed(4)),
+      _method: "manual",
+    };
+    setPlane(next);
+    setShowPlane(true);
+    const r = await savePlane(videoId, next);
+    setMsg(r.error ?? "この線をスイングプレーンにしました");
+  };
+  const resetPlane = async () => {
+    setPlane(null);
+    const r = await savePlane(videoId, null);
+    setMsg(r.error ?? "プレーンを消しました。解析し直すと自動で引き直します");
+  };
+
   /* いま表示しているコマの数値（2D投影なので前回との差で読む） */
+  const dw = dim.w || 1;
+  const dh = dim.h || 1;
   const nowLm = pose ? poseAt(pose, cur) : null;
-  const m = nowLm ? poseMetrics(nowLm) : null;
+  const m = nowLm ? poseMetrics(nowLm, dw, dh) : null;
   const addressLm = pose && typeof phases?.address === "number" ? poseAt(pose, phases.address) : null;
-  const sway = m && addressLm ? headSway(poseMetrics(addressLm), m) : null;
+  const sway = m && addressLm ? headSway(poseMetrics(addressLm, dw, dh), m) : null;
+  const pm = plane && club ? planeMetrics(plane, club, dw, dh, phases ?? null) : null;
+  const headNow = clubAt(club, cur);
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -281,7 +340,10 @@ export function VideoPlayer({
           controls
           playsInline
           preload="metadata"
-          onLoadedMetadata={(e) => setDur(e.currentTarget.duration || 0)}
+          onLoadedMetadata={(e) => {
+            setDur(e.currentTarget.duration || 0);
+            setDim({ w: e.currentTarget.videoWidth || 0, h: e.currentTarget.videoHeight || 0 });
+          }}
           onTimeUpdate={(e) => setCur(e.currentTarget.currentTime)}
           onSeeked={(e) => setCur(e.currentTarget.currentTime)}
           onPlay={() => setPlaying(true)}
@@ -338,22 +400,23 @@ export function VideoPlayer({
         )}
       </div>
 
-      {/* ボーン（骨格）— 2026-08-28 */}
+      {/* スイング解析（骨格・クラブ軌跡・プレーン）— 2026-08-28 */}
       <div className="mt-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-2.5">
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="font-medium text-(--color-gold)">骨格</span>
+          <span className="font-medium text-(--color-gold)">スイング解析</span>
 
           {!pose && !poseBusy && canDraw && (
             <>
-              <button onClick={runPose} className="btn-ghost !px-2 !py-1.5">🦴 骨格を解析</button>
+              <button onClick={runAnalyze} className="btn-ghost !px-2 !py-1.5">🦴 解析する</button>
               <select
                 value={poseFps}
-                onChange={(e) => setPoseFps(Number(e.target.value) === 60 ? 60 : 30)}
+                onChange={(e) => setPoseFps(Number(e.target.value) === 120 ? 120 : Number(e.target.value) === 60 ? 60 : 30)}
                 className="rounded-lg border border-(--color-line) bg-transparent px-2 py-1.5 text-(--color-dim)"
-                title="細かく見たいときだけ60。時間は倍かかります"
+                title="クラブ軌跡を細かく見たいときだけ上げる。時間も比例して伸びます"
               >
                 <option value={30}>30コマ/秒</option>
                 <option value={60}>60コマ/秒</option>
+                <option value={120}>120コマ/秒（スロー撮影用）</option>
               </select>
               <span className="text-(--color-dim)">初回はモデルの読み込みで少し待ちます</span>
             </>
@@ -370,18 +433,27 @@ export function VideoPlayer({
 
           {pose && !poseBusy && (
             <>
-              <button
-                onClick={() => setShowPose((v) => !v)}
-                className={`rounded-lg border px-2.5 py-1.5 ${showPose ? "border-(--color-active) text-(--color-active)" : "border-(--color-line) text-(--color-dim)"}`}
-              >
-                {showPose ? "表示中" : "非表示"}
-              </button>
+              {([
+                ["骨格", showPose, setShowPose, true],
+                ["クラブ軌跡", showTrace, setShowTrace, !!club],
+                ["プレーン", showPlane, setShowPlane, !!plane],
+              ] as [string, boolean, (v: boolean) => void, boolean][]).map(([label, on, set, has]) => (
+                <button
+                  key={label}
+                  disabled={!has}
+                  onClick={() => set(!on)}
+                  className={`rounded-lg border px-2.5 py-1.5 disabled:opacity-30 ${on && has ? "border-(--color-active) text-(--color-active)" : "border-(--color-line) text-(--color-dim)"}`}
+                >
+                  {label}
+                </button>
+              ))}
               {poseInfo && (
                 <span className="text-(--color-dim)">
                   {poseInfo.detected}/{poseInfo.frames}コマ検出
+                  {poseInfo.srcFps ? ` ・元動画 ${poseInfo.srcFps}fps` : ""}
                 </span>
               )}
-              {canDraw && <button onClick={runPose} className="btn-ghost !px-2 !py-1.5">↻ 解析し直す</button>}
+              {canDraw && <button onClick={runAnalyze} className="btn-ghost !px-2 !py-1.5">↻ 解析し直す</button>}
             </>
           )}
         </div>
@@ -395,7 +467,7 @@ export function VideoPlayer({
           </div>
         )}
 
-        {/* いま表示しているコマの数値。単眼カメラなので「前回との差」で読む */}
+        {/* 体の数値（いま表示しているコマ） */}
         {pose && showPose && (
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs tabular-nums sm:grid-cols-5">
             {[
@@ -410,11 +482,58 @@ export function VideoPlayer({
                 <span className="sm:block">{val}</span>
               </div>
             ))}
-            <p className="col-span-2 text-(--color-dim) sm:col-span-5">
-              角度は画面に映った見た目の角度です。カメラ位置が変わると数字も変わるので、
-              同じ生徒の前回との差で見てください{sway ? "" : "（頭のブレはアドレスを設定すると出ます）"}
-            </p>
           </div>
+        )}
+
+        {/* スイングプレーン */}
+        {pose && !poseBusy && (
+          <div className="mt-2 border-t border-(--color-line) pt-2">
+            {pm ? (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs tabular-nums sm:grid-cols-5">
+                {[
+                  ["プレーン角", `${pm.angle}°`],
+                  ["トップ", pm.top == null ? "—" : `${pm.top > 0 ? "+" : ""}${pm.top}%`],
+                  ["切り返し", pm.down == null ? "—" : `${pm.down > 0 ? "+" : ""}${pm.down}%`],
+                  ["バック最大", pm.backMax == null ? "—" : `${pm.backMax > 0 ? "+" : ""}${pm.backMax}%`],
+                  ["ダウン最大", pm.downMax == null ? "—" : `${pm.downMax > 0 ? "+" : ""}${pm.downMax}%`],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex justify-between gap-2 sm:block">
+                    <span className="text-(--color-dim)">{label}</span>
+                    <span className="sm:block">{val}</span>
+                  </div>
+                ))}
+                <p className="col-span-2 text-(--color-dim) sm:col-span-5">
+                  ％はクラブ長を100としたプレーンからの離れ。
+                  <span className="text-(--color-txt)">＋がプレーンより上（スティープ側）・−が下（シャロー側）</span>。
+                  {plane?._method === "manual" ? "（手で引いた線が基準）" : "（アドレスのシャフト線が基準）"}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-(--color-dim)">
+                {club ? "プレーンがありません。線ツールで基準にしたい直線を引いて【この線をプレーンにする】を押してください" : "クラブ軌跡が取れていないため、プレーンは出せません"}
+              </p>
+            )}
+            {canDraw && (
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                <button onClick={useLineAsPlane} disabled={!lastLine} className="btn-ghost !px-2 !py-1.5 disabled:opacity-40">
+                  ✎ この線をプレーンにする
+                </button>
+                {plane && <button onClick={resetPlane} className="btn-ghost !px-2 !py-1.5">プレーンを消す</button>}
+                {headNow && headNow.conf < 0.35 && (
+                  <span className="text-(--color-dim)">このコマはヘッドがブレていて自信が低いです</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {pose && (
+          <p className="mt-2 text-xs text-(--color-dim)">
+            角度はすべて「画面に映った見た目の角度」です。三脚の位置が変わると数字も変わるので、
+            同じ生徒の前回との差で見てください。
+            {club && "クラブ軌跡はインパクト前後で薄くなる／飛ぶのが正常です（ヘッドが速すぎて写っていません）。"}
+            {poseInfo?.srcFps && poseInfo.srcFps < 50 && "この動画は" + poseInfo.srcFps + "fpsです。インパクト前後まで見たいならiPhone純正カメラのスローモーションで撮ってください。"}
+          </p>
         )}
       </div>
 

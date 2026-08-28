@@ -482,12 +482,29 @@ export async function measurePhotoUrl(measurementId: string): Promise<{ url?: st
 }
 
 /* ------------------------------------------------------------------ */
-/* ボーン（骨格）データ — 2026-08-28                                    */
+/* スイング解析（骨格・クラブ軌跡・プレーン） — 2026-08-28              */
 /*                                                                      */
 /* 解析そのものはブラウザ（src/lib/pose.ts）。ここは保管だけ。          */
 /* lsn_videos に列を足さず別テーブルにしたのは、1本あたり数百KBあり、    */
-/* カルテの一覧（1人20本超）に載せると重くなるため（0129 参照）。       */
+/* カルテの一覧（1人20本超）に載せると重くなるため（0129 / 0130）。     */
 /* ------------------------------------------------------------------ */
+
+type PoseDataIn = { v: 1; t: number[]; p: number[][] };
+type ClubDataIn = { v: 1; t: number[]; p: number[][]; clubLen: number };
+type PlaneIn = { x1: number; y1: number; x2: number; y2: number; _method: "address" | "manual" };
+
+const num01 = (n: unknown) => (typeof n === "number" && isFinite(n) ? Math.max(-2, Math.min(3, n)) : null);
+
+/** 線が0〜1の座標として妥当かだけ見る（画面外へ伸ばすぶんがあるので少し余裕を持たせる） */
+function cleanPlane(pl: unknown): PlaneIn | null {
+  const o = pl as Partial<PlaneIn> | null;
+  if (!o) return null;
+  const v = [num01(o.x1), num01(o.y1), num01(o.x2), num01(o.y2)];
+  if (v.some((n) => n === null)) return null;
+  const [x1, y1, x2, y2] = v as number[];
+  if (Math.hypot(x2 - x1, y2 - y1) < 0.02) return null;
+  return { x1, y1, x2, y2, _method: o._method === "manual" ? "manual" : "address" };
+}
 
 /** 解析結果の受け取り。壊れた形は入れずに弾く（DBを汚さない） */
 export async function savePose(
@@ -495,11 +512,14 @@ export async function savePose(
   track: {
     engine: string;
     fps: number;
+    srcFps?: number | null;
     width: number;
     height: number;
     frames: number;
     detected: number;
-    data: { v: 1; t: number[]; p: number[][] };
+    data: PoseDataIn;
+    club?: ClubDataIn | null;
+    plane?: PlaneIn | null;
   }
 ): Promise<{ error?: string }> {
   const { actor, admin, video } = await ownVideo(videoId);
@@ -508,10 +528,20 @@ export async function savePose(
   const t = Array.isArray(track?.data?.t) ? track.data.t : [];
   const p = Array.isArray(track?.data?.p) ? track.data.p : [];
   if (!t.length || t.length !== p.length) return { error: "解析結果が不正です" };
-  if (t.length > 1200) return { error: "コマ数が多すぎます" };
+  if (t.length > 1400) return { error: "コマ数が多すぎます" };
   // 1コマは 33関節×3 の 99個ちょうど（未検出は空配列）
   if (p.some((row) => !Array.isArray(row) || (row.length !== 0 && row.length !== 99))) {
     return { error: "解析結果が不正です" };
+  }
+
+  // クラブは 1コマ [x, y, conf] の3個ちょうど（未検出は空配列）。骨格とコマ数が揃っていること
+  let club: ClubDataIn | null = null;
+  const ct = track.club?.t;
+  const cp = track.club?.p;
+  if (Array.isArray(ct) && Array.isArray(cp) && ct.length === t.length && cp.length === t.length) {
+    if (!cp.some((row) => !Array.isArray(row) || (row.length !== 0 && row.length !== 3))) {
+      club = { v: 1, t: ct, p: cp, clubLen: Math.round(Number(track.club?.clubLen) || 0) };
+    }
   }
 
   const { error } = await admin.from("lsn_video_pose").upsert(
@@ -520,11 +550,14 @@ export async function savePose(
       company_id: actor.companyId,
       engine: String(track.engine ?? "").slice(0, 120),
       fps: Number(track.fps) || null,
+      src_fps: Number(track.srcFps) || null,
       width: Math.round(Number(track.width) || 0) || null,
       height: Math.round(Number(track.height) || 0) || null,
       frames: t.length,
       detected: Math.max(0, Math.min(t.length, Math.round(Number(track.detected) || 0))),
       data: { v: 1, t, p },
+      club,
+      plane: cleanPlane(track.plane),
       analyzed_by: actor.staffId,
       updated_at: new Date().toISOString(),
     },
@@ -534,26 +567,62 @@ export async function savePose(
   return {};
 }
 
+export type LoadedPose = {
+  engine: string;
+  fps: number | null;
+  srcFps: number | null;
+  width: number | null;
+  height: number | null;
+  frames: number;
+  detected: number;
+  data: PoseDataIn;
+  club: ClubDataIn | null;
+  plane: PlaneIn | null;
+};
+
 /** プレーヤーを開いたときに1本ぶんだけ取りに行く */
-export async function loadPose(videoId: string): Promise<{
-  pose?: {
-    engine: string;
-    fps: number | null;
-    frames: number;
-    detected: number;
-    data: { v: 1; t: number[]; p: number[][] };
-  } | null;
-  error?: string;
-}> {
+export async function loadPose(videoId: string): Promise<{ pose?: LoadedPose | null; error?: string }> {
   const { admin, video } = await ownVideo(videoId);
   if (!video) return { error: "動画が見つかりません" };
   const { data, error } = await admin
     .from("lsn_video_pose")
-    .select("engine, fps, frames, detected, data")
+    .select("engine, fps, src_fps, width, height, frames, detected, data, club, plane")
     .eq("video_id", video.id)
     .maybeSingle();
   if (error) return { error: error.message };
-  return { pose: (data as never) ?? null };
+  if (!data) return { pose: null };
+  const r = data as Record<string, unknown>;
+  return {
+    pose: {
+      engine: String(r.engine ?? ""),
+      fps: (r.fps as number | null) ?? null,
+      srcFps: (r.src_fps as number | null) ?? null,
+      width: (r.width as number | null) ?? null,
+      height: (r.height as number | null) ?? null,
+      frames: Number(r.frames ?? 0),
+      detected: Number(r.detected ?? 0),
+      data: r.data as PoseDataIn,
+      club: (r.club as ClubDataIn | null) ?? null,
+      plane: (r.plane as PlaneIn | null) ?? null,
+    },
+  };
+}
+
+/**
+ * プレーンだけ差し替える（自動が外れたときにコーチが線を引き直す逃げ道）。
+ * 手で引いた線は _method="manual" になり、解析し直しても手動が優先される。
+ */
+export async function savePlane(videoId: string, plane: PlaneIn | null): Promise<{ error?: string }> {
+  const { admin, video } = await ownVideo(videoId);
+  if (!video) return { error: "動画が見つかりません" };
+  const cleaned = plane ? cleanPlane(plane) : null;
+  if (plane && !cleaned) return { error: "線が短すぎます" };
+  const { error } = await admin
+    .from("lsn_video_pose")
+    .update({ plane: cleaned, updated_at: new Date().toISOString() })
+    .eq("video_id", video.id);
+  if (error) return { error: error.message };
+  return {};
 }
 
 /** 撮り直しではなく解析だけやり直したいとき用 */
