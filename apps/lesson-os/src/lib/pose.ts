@@ -375,6 +375,8 @@ export type ClubDiag = {
   fill: number;       // 線の詰まり具合の中央値（%）
   conf: number;       // 確からしさの中央値（%）
   gap: number;        // 実際に使った「何コマ前と比べたか」の中央値
+  /** #185: 出来上がった軌跡が「スイングとしてありうるか」の判定 */
+  verdict?: TrackVerdict;
 };
 
 /** DPに渡すコマごとの候補 */
@@ -410,6 +412,172 @@ const MAX_COCK = 120;
  * 距離の条件も効く: クラブは伸び縮みしないので、手元からヘッドまでの距離は
  * （カメラ方向を向いて短く写るぶんを除けば）体の大きさに対してほぼ一定。
  */
+/* ------------------------------------------------------------------ */
+/* 出来上がった軌跡が「スイングとしてありうるか」（#185）              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * なぜ要るか（2026-08-29 ユーザー指摘「まだクラブヘッド軌道をうまく取れていない」）:
+ *
+ *   本番データを見たら、**線は出ているのに中身が腕だった**。
+ *     video 71fb30cd: 147コマ中146コマで線が出て conf 75% と報告されていたが、
+ *                     ヘッドの縦の動きは156pxしかなく（体は661px）、
+ *                     **一度も手元より下に来ていなかった**。
+ *     video 580447a5: 同じく一度も手元より下に来ていない。
+ *
+ *   ゴルフスイングでは、アドレスとインパクトで**ヘッドは必ず手元より下**を通る。
+ *   これを満たさない軌跡は、クラブではなく腕・体の輪郭・背景を追っている。
+ *
+ *   #176 で入れた conf / fill は「その向きに動いた画素が並んでいるか」しか見ておらず、
+ *   **腕はきれいに並ぶので高得点を出す**。だから確からしさでは弾けない。
+ *   出来上がった軌跡の形そのものを見るしかない。
+ *
+ * 方針は #175 と同じ ——「滑らかにつないで嘘をつかない」。
+ * 自信ありげに間違った線を引くくらいなら、出さずに理由を言う。
+ */
+export type TrackVerdict = {
+  ok: boolean;
+  /** 却下した理由（コーチにそのまま見せる） */
+  reason: string | null;
+  /** どう撮り直せば取れるか */
+  advice: string | null;
+  /** ヘッドが手元より下にあったコマ数 */
+  belowHands: number;
+  /** ヘッドの縦の移動量 ÷ 体の大きさ（%） */
+  vRangePct: number;
+  /** シャフトの向きが何度ぶん振れたか */
+  sweepDeg: number;
+  /** 手元の1コマあたり最大移動量 ÷ 体の大きさ（%） */
+  handSpeedPct: number;
+};
+
+/**
+ * 手元が1コマでこれ以上動いていたら、クラブは差分では追えない。
+ *
+ * 実測（2026-08-29・本番データ）:
+ *   腕を誤検出した2本は 8.6% と 18.0%。うまく取れた #176 の検証動画は
+ *   スロー撮影（12秒に引き伸ばされた1スイング）で、比較コマ間隔に8〜16が要る＝
+ *   1コマあたりの動きはこれよりはるかに小さい。
+ *   クラブヘッドは手元の3〜4倍の速さで動くので、手元が体の4%動く時点で
+ *   ヘッドは1コマで体の12〜16%＝シャフトは線ではなく扇形の塗りつぶしになる。
+ */
+const HAND_SPEED_LIMIT_PCT = 4;
+
+/** ヘッドの縦の移動は、スイングなら体の大きさを超える（地面〜頭上を通るため） */
+const MIN_V_RANGE_PCT = 60;
+
+/** シャフトの向きの振れ幅。テークバックからフォローまでで最低これだけは回る */
+const MIN_SWEEP_DEG = 150;
+
+export function verifySwingTrack(
+  pose: PoseData,
+  club: ClubData | null,
+  W: number,
+  H: number
+): TrackVerdict {
+  const base: TrackVerdict = {
+    ok: false, reason: null, advice: null,
+    belowHands: 0, vRangePct: 0, sweepDeg: 0, handSpeedPct: 0,
+  };
+
+  // --- 手元の速度（クラブが取れていてもいなくても測る。撮り直しの案内に使う） ---
+  const wrists: { x: number; y: number }[] = [];
+  const bodies: number[] = [];
+  for (const row of pose.p) {
+    if (!row || row.length < 99) { wrists.push({ x: NaN, y: NaN }); continue; }
+    const g = (j: number, axis: 0 | 1) => (row[j * 3 + axis] / 1000) * (axis === 0 ? W : H);
+    const wx = (g(LM.lWrist, 0) + g(LM.rWrist, 0)) / 2;
+    const wy = (g(LM.lWrist, 1) + g(LM.rWrist, 1)) / 2;
+    wrists.push({ x: wx, y: wy });
+    const smx = (g(LM.lShoulder, 0) + g(LM.rShoulder, 0)) / 2;
+    const smy = (g(LM.lShoulder, 1) + g(LM.rShoulder, 1)) / 2;
+    const amx = (g(LM.lAnkle, 0) + g(LM.rAnkle, 0)) / 2;
+    const amy = (g(LM.lAnkle, 1) + g(LM.rAnkle, 1)) / 2;
+    const b = Math.hypot(amx - smx, amy - smy);
+    if (b > 20) bodies.push(b);
+  }
+  const body = bodies.length ? percentile(bodies, 0.5) : 0;
+
+  let maxStep = 0;
+  for (let i = 1; i < wrists.length; i++) {
+    const a = wrists[i - 1];
+    const b2 = wrists[i];
+    if (!isFinite(a.x) || !isFinite(b2.x)) continue;
+    const d = Math.hypot(b2.x - a.x, b2.y - a.y);
+    if (d > maxStep) maxStep = d;
+  }
+  base.handSpeedPct = body > 0 ? Math.round((maxStep / body) * 1000) / 10 : 0;
+
+  const tooFast = base.handSpeedPct > HAND_SPEED_LIMIT_PCT;
+  const speedAdvice = tooFast
+    ? `手元が1コマで体の${base.handSpeedPct}%動いています（追える目安は${HAND_SPEED_LIMIT_PCT}%まで）。` +
+      "ヘッドは手元の3〜4倍の速さで動くので、この撮り方ではシャフトが線として写りません。" +
+      "iPhone純正カメラの「スロー」で撮って、カルテの動画取り込みから入れてください。"
+    : null;
+
+  if (!club || club.p.length === 0) {
+    return { ...base, reason: "クラブらしい直線が見つかりませんでした。", advice: speedAdvice };
+  }
+
+  // --- 出来上がった軌跡の形を見る（実測コマだけ。推定コマは前後から作った値なので混ぜない） ---
+  let below = 0;
+  let measured = 0;
+  let ymin = Infinity;
+  let ymax = -Infinity;
+  const buckets = new Set<number>();
+
+  for (let i = 0; i < club.p.length; i++) {
+    const row = club.p[i];
+    if (!row || row.length < 3) continue;
+    const [cx, cy, conf] = row;
+    if (!(conf > 0)) continue; // 負＝前腕から補った推定コマ
+    measured++;
+    if (cy < ymin) ymin = cy;
+    if (cy > ymax) ymax = cy;
+    const w = wrists[i];
+    if (w && isFinite(w.y) && cy > w.y) below++;
+    if (w && isFinite(w.x)) {
+      const ang = (Math.atan2(cy - w.y, cx - w.x) * 180) / Math.PI;
+      buckets.add(Math.floor(((ang + 360) % 360) / 30));
+    }
+  }
+
+  if (measured === 0) {
+    return { ...base, reason: "実測できたコマがありません（すべて推定でした）。", advice: speedAdvice };
+  }
+
+  base.belowHands = below;
+  base.vRangePct = body > 0 ? Math.round(((ymax - ymin) / body) * 1000) / 10 : 0;
+  base.sweepDeg = buckets.size * 30;
+
+  // アドレスとインパクトでヘッドは必ず手元より下を通る。ここが0なら追っているのはクラブではない
+  if (below === 0) {
+    return {
+      ...base,
+      reason:
+        "ヘッドが一度も手元より下に来ていません。アドレスとインパクトでは必ず手元より下を通るので、" +
+        "これはクラブではなく腕や背景を追っています。",
+      advice: speedAdvice ?? "手元からヘッドまでが画面に入る画角で撮り直してください。",
+    };
+  }
+  if (base.vRangePct < MIN_V_RANGE_PCT) {
+    return {
+      ...base,
+      reason: `ヘッドの縦の動きが体の${base.vRangePct}%しかありません（スイングなら100%を超えます）。`,
+      advice: speedAdvice ?? "全身とクラブが画面に入る画角で撮り直してください。",
+    };
+  }
+  if (base.sweepDeg < MIN_SWEEP_DEG) {
+    return {
+      ...base,
+      reason: `シャフトの向きが${base.sweepDeg}度しか変わっていません（スイングなら180度以上回ります）。`,
+      advice: speedAdvice ?? "スイング全体（アドレスからフォローまで）が入るように撮り直してください。",
+    };
+  }
+
+  return { ...base, ok: true, reason: null, advice: null };
+}
+
 export function buildClub(
   frames: FrameCands[],
   t: number[],
@@ -702,7 +870,10 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
     opts.onProgress?.(total, total, "解析中");
 
     const built = buildClub(frameCands, t, cw, ch);
-    const club = built.club;
+    // #185: 線が出たことと、それがクラブであることは別。形を見て、違えば捨てる。
+    // 自信ありげに腕をなぞった線を返すくらいなら、理由を言って何も出さないほうがよい。
+    const verdict = verifySwingTrack({ v: 1, t, p }, built.club, W, H);
+    const club = verdict.ok ? built.club : null;
     const plane = club ? planeFromAddress({ v: 1, t, p }, club, W, H) : null;
     const diag: ClubDiag = {
       frames: total,
@@ -714,6 +885,7 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
       fill: Math.round(percentile(fills, 0.5) * 100),
       conf: Math.round(percentile(confs, 0.5) * 100),
       gap: Math.round(percentile(gaps.filter((n) => n != null), 0.5)),
+      verdict,
     };
 
     return {

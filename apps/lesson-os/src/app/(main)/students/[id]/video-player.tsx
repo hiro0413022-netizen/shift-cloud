@@ -540,13 +540,28 @@ export function VideoPlayer({
                       解析{diag.frames}コマ → 手元が取れた{diag.withPose} → 向きの候補{diag.withRay} → 線として残った{diag.kept}
                       （動きの閾値 {diag.thr} ／ 線の詰まり {diag.fill}% ／ 確からしさ {diag.conf}% ／ 比較コマ間隔 {diag.gap}）
                     </p>
-                    <p className="mt-1">
-                      {diag.withPose < diag.frames * 0.5
-                        ? "手元（両手首）がほとんど取れていません。全身が画面に入る画角で撮り直してください。"
-                        : diag.withRay < diag.withPose * 0.3
-                          ? "クラブの動きが画面から見つかりません。手元からヘッドまでが画面に入っているか、背景とクラブの色が近すぎないかを確認してください。"
-                          : "クラブらしい直線が続きません。背景がごちゃついている／逆光／手ブレが原因のことが多いです。スマホを固定して撮り直すと変わります。"}
-                    </p>
+                    {/* #185: 線は出たが「クラブではなかった」場合は、その判定結果を優先して出す。
+                        撮り方の一般論より、実際に何が起きたかのほうが直しようがある。 */}
+                    {diag.verdict?.reason ? (
+                      <>
+                        <p className="mt-1 text-amber-300">{diag.verdict.reason}</p>
+                        {diag.verdict.advice && <p className="mt-1">{diag.verdict.advice}</p>}
+                        <p className="mt-1 tabular-nums text-[11px]">
+                          （実測での確認: ヘッドが手元より下 {diag.verdict.belowHands}コマ ／
+                          縦の動き 体の{diag.verdict.vRangePct}% ／
+                          向きの振れ {diag.verdict.sweepDeg}度 ／
+                          手元の最大速度 体の{diag.verdict.handSpeedPct}%/コマ）
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-1">
+                        {diag.withPose < diag.frames * 0.5
+                          ? "手元（両手首）がほとんど取れていません。全身が画面に入る画角で撮り直してください。"
+                          : diag.withRay < diag.withPose * 0.3
+                            ? "クラブの動きが画面から見つかりません。手元からヘッドまでが画面に入っているか、背景とクラブの色が近すぎないかを確認してください。"
+                            : "クラブらしい直線が続きません。背景がごちゃついている／逆光／手ブレが原因のことが多いです。スマホを固定して撮り直すと変わります。"}
+                      </p>
+                    )}
                   </>
                 )}
               </div>

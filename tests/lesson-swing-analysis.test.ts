@@ -356,3 +356,125 @@ test("撮影方向: 体が小さすぎて測れないときは null", () => {
   });
   assert.equal(viewPoint(tiny, 1000, 1000), null);
 });
+
+/* ---------- 出来上がった軌跡がスイングとしてありうるか（#185） ----------
+   本番データ（2026-08-29）で「線は出ているのに中身が腕だった」実例をそのままケースにする。
+   video 71fb30cd: 147コマ中146コマで線・conf 75% と報告されたが、
+                   ヘッドは一度も手元より下に来ず、縦の動きは体の24%しかなかった。   */
+import { verifySwingTrack, type PoseData, type ClubData } from "../apps/lesson-os/src/lib/pose.ts";
+
+const VW = 1080;
+const VH = 1920;
+
+/** 33関節×xyz を1000倍した整数の行を作る（要る関節だけ埋める） */
+function poseRow(o: { wristY: number; wristX?: number; shoulderY?: number; ankleY?: number }): number[] {
+  const row = new Array(99).fill(0);
+  const set = (j: number, x: number, y: number) => {
+    row[j * 3] = Math.round((x / VW) * 1000);
+    row[j * 3 + 1] = Math.round((y / VH) * 1000);
+  };
+  const wx = o.wristX ?? 540;
+  set(15, wx, o.wristY); // 左手首
+  set(16, wx, o.wristY); // 右手首
+  set(11, 540, o.shoulderY ?? 600); // 肩
+  set(12, 540, o.shoulderY ?? 600);
+  set(27, 540, o.ankleY ?? 1600); // 足首（肩〜足首＝体の大きさ 1000px）
+  set(28, 540, o.ankleY ?? 1600);
+  set(13, 540, 700); // 肘
+  set(14, 540, 700);
+  return row;
+}
+
+function make(frames: { wristY: number; wristX?: number; cx: number; cy: number; conf?: number }[]) {
+  const pose: PoseData = { v: 1, t: frames.map((_, i) => i * 33), p: frames.map((f) => poseRow(f)) };
+  const club: ClubData = {
+    v: 1,
+    t: frames.map((_, i) => i * 33),
+    p: frames.map((f) => [f.cx, f.cy, f.conf ?? 0.8]),
+    clubLen: 600,
+  };
+  return { pose, club };
+}
+
+test("ヘッドが一度も手元より下に来なければ却下する（腕を追っている）", () => {
+  // 本番 71fb30cd の再現: ヘッドは常に手元より上、縦の動きもわずか
+  const { pose, club } = make(
+    Array.from({ length: 40 }, (_, i) => ({
+      wristY: 1000,
+      cx: 400 + i * 10,
+      cy: 800 + (i % 5) * 10, // 手元(1000)より常に上
+    }))
+  );
+  const v = verifySwingTrack(pose, club, VW, VH);
+  assert.equal(v.ok, false);
+  assert.match(v.reason ?? "", /手元より下/);
+  assert.equal(v.belowHands, 0);
+});
+
+test("ヘッドの縦の動きが体の大きさに対して小さすぎれば却下する", () => {
+  // 手元より下には来るが、縦にほとんど動いていない
+  const { pose, club } = make(
+    Array.from({ length: 40 }, (_, i) => ({
+      wristY: 900,
+      cx: 300 + i * 12,
+      cy: 1000 + (i % 4) * 20, // 常に手元より下だが縦の幅は60px（体は1000px）
+    }))
+  );
+  const v = verifySwingTrack(pose, club, VW, VH);
+  assert.equal(v.ok, false);
+  assert.match(v.reason ?? "", /縦の動き/);
+});
+
+test("ちゃんとしたスイングは通す（地面から頭上まで回る）", () => {
+  const frames = Array.from({ length: 60 }, (_, i) => {
+    const ang = (-90 + (i / 59) * 300) * (Math.PI / 180); // 300度ぶん回す
+    return {
+      wristY: 1000,
+      cx: 540 + Math.cos(ang) * 600,
+      cy: 1000 + Math.sin(ang) * 600, // 手元の上下600px＝体の60%を超える
+    };
+  });
+  const { pose, club } = make(frames);
+  const v = verifySwingTrack(pose, club, VW, VH);
+  assert.equal(v.ok, true, v.reason ?? "");
+  assert.equal(v.reason, null);
+  assert.ok(v.belowHands > 0);
+});
+
+test("クラブが無ければ理由を返す（例外にしない）", () => {
+  const { pose } = make([{ wristY: 1000, cx: 0, cy: 0 }]);
+  const v = verifySwingTrack(pose, null, VW, VH);
+  assert.equal(v.ok, false);
+  assert.match(v.reason ?? "", /見つかりませんでした/);
+});
+
+test("手元が速すぎる撮り方は、スロー撮影を促す案内になる", () => {
+  // 1コマで手元が体の10%（100px）動く＝通常速度で撮った動画
+  const frames = Array.from({ length: 20 }, (_, i) => ({
+    wristY: 1000,
+    wristX: 400 + i * 100,
+    cx: 400 + i * 100,
+    cy: 800,
+  }));
+  const { pose, club } = make(frames);
+  const v = verifySwingTrack(pose, club, VW, VH);
+  assert.equal(v.ok, false);
+  assert.ok(v.handSpeedPct >= 10, `handSpeedPct=${v.handSpeedPct}`);
+  assert.match(v.advice ?? "", /スロー/);
+});
+
+test("スロー撮影ぶんの遅さなら、速度を理由にした案内は出さない", () => {
+  const frames = Array.from({ length: 60 }, (_, i) => {
+    const ang = (-90 + (i / 59) * 300) * (Math.PI / 180);
+    return {
+      wristY: 1000,
+      wristX: 540 + i, // 1コマ1px＝体の0.1%
+      cx: 540 + Math.cos(ang) * 600,
+      cy: 1000 + Math.sin(ang) * 600,
+    };
+  });
+  const { pose, club } = make(frames);
+  const v = verifySwingTrack(pose, club, VW, VH);
+  assert.ok(v.handSpeedPct < 4, `handSpeedPct=${v.handSpeedPct}`);
+  assert.equal(v.advice, null);
+});
