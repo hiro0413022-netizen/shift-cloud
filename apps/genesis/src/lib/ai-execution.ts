@@ -299,6 +299,209 @@ const HANDLERS: Record<string, Handler> = {
     });
     return { contact: c.person_name ?? c.display_name ?? null, sent: true };
   },
+  /* ---------- FRANK 打席予約（#186・取消枠5分） ----------
+     ユーザー判断（2026-08-29）「取消枠（入るが数分は戻せる）」。
+     JARVISに話した内容がそのまま予約になるので、**実行する瞬間に空きを確認し直す**。
+     積んだ時点では空いていても、5分の間に店頭で埋まっていることがある。 */
+  booking_create: async ({ admin, row }) => {
+    const p = row.payload;
+    const date = String(p.date ?? "");
+    const start = String(p.start ?? "");
+    const minutes = Number(p.minutes ?? 60);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("date が YYYY-MM-DD ではありません");
+    if (!/^\d{2}:\d{2}/.test(start)) throw new Error("start が HH:MM ではありません");
+
+    const { FRANK_STORE_ID, loadBookingCfg, businessHours, toMin, toTime } = await import("@yozan/core/frank-booking");
+    const cfg = await loadBookingCfg(admin);
+    const hours = businessHours(date, cfg);
+    if (!hours) throw new Error(`${date} は定休日です`);
+    const s0 = toMin(start);
+    const e0 = s0 + minutes;
+    if (s0 < toMin(hours.open) || e0 > toMin(hours.close)) {
+      throw new Error(`営業時間（${hours.open}〜${hours.close}）の外です`);
+    }
+
+    // 会員番号があれば会員を引く。無ければ名前だけの都度予約
+    let memberId: string | null = null;
+    let memberName: string | null = null;
+    const memberNo = p.member_no ? String(p.member_no).trim() : "";
+    if (memberNo) {
+      const { data: m } = await admin
+        .from("frunk_members")
+        .select("id, name")
+        .eq("company_id", row.company_id)
+        .eq("store_id", FRANK_STORE_ID)
+        .eq("member_no", memberNo)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (!m) throw new Error(`会員番号 ${memberNo} が見つかりません`);
+      memberId = String(m.id);
+      memberName = String(m.name);
+    }
+    const guestName = String(p.guest_name ?? "").trim();
+    if (!memberId && !guestName) throw new Error("お名前か会員番号が要ります（持ち主の分からない予約は作らない）");
+
+    // 打席を決める。指定が無ければ A→B→C の順で空いているところ（レフティはB固定・#92）
+    const wantLefty = p.lefty === true;
+    const { data: bays } = await admin
+      .from("frunk_bays")
+      .select("id, name, is_lefty, sort")
+      .eq("company_id", row.company_id)
+      .eq("active", true)
+      .is("deleted_at", null)
+      .order("sort", { ascending: true });
+    let candidates = (bays ?? []).filter((b) => (wantLefty ? b.is_lefty === true : true));
+    if (p.bay_name) {
+      const want = String(p.bay_name);
+      candidates = candidates.filter((b) => String(b.name).includes(want));
+      if (candidates.length === 0) throw new Error(`打席「${want}」が見つかりません`);
+    }
+    if (candidates.length === 0) throw new Error(wantLefty ? "レフティ用の打席が空いていません" : "使える打席がありません");
+
+    // 実行の瞬間に、その打席のその日の予約を引いて重なりを見る
+    const { data: sameDay } = await admin
+      .from("frunk_bookings")
+      .select("bay_id, start_time, end_time")
+      .eq("company_id", row.company_id)
+      .eq("store_id", FRANK_STORE_ID)
+      .eq("booked_date", date)
+      .neq("status", "cancelled")
+      .is("deleted_at", null);
+
+    const taken = (bayId: string) =>
+      (sameDay ?? []).some(
+        (b) => String(b.bay_id) === bayId && s0 < toMin(String(b.end_time)) && e0 > toMin(String(b.start_time))
+      );
+    const bay = candidates.find((b) => !taken(String(b.id)));
+    if (!bay) throw new Error(`${date} ${start} は空いている打席がありません`);
+
+    const { data: created, error } = await admin
+      .from("frunk_bookings")
+      .insert({
+        company_id: row.company_id,
+        store_id: FRANK_STORE_ID,
+        member_id: memberId,
+        customer_kind: memberId ? "member" : "dropin",
+        guest_name: memberId ? null : guestName,
+        guest_phone: p.phone ? String(p.phone) : null,
+        party_size: Number(p.party_size ?? 1),
+        bay_id: bay.id,
+        booked_date: date,
+        start_time: start,
+        end_time: toTime(e0),
+        status: "confirmed",
+        source: "jarvis",
+        note: p.note ? String(p.note) : null,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    await logEvent(row.company_id, {
+      event_type: "ai.booking_created",
+      title: `予約を登録: ${date} ${start} ${bay.name} ${memberName ?? guestName}`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { booking_id: created?.id ?? null, bay: bay.name, date, start, end: toTime(e0), who: memberName ?? guestName };
+  },
+
+  /* 予約の取り消し。消さずに status を cancelled にする（台帳から消えると経緯が追えない） */
+  booking_cancel: async ({ admin, row }) => {
+    const id = String(row.payload.booking_id ?? "");
+    if (!id) throw new Error("payload.booking_id が未指定です");
+    const { data: b } = await admin
+      .from("frunk_bookings")
+      .select("id, booked_date, start_time, status")
+      .eq("company_id", row.company_id)
+      .eq("id", id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!b) throw new Error("その予約が見つかりません");
+    if (String(b.status) === "cancelled") return { booking_id: id, already: true };
+    const { error } = await admin
+      .from("frunk_bookings")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) throw new Error(error.message);
+    await logEvent(row.company_id, {
+      event_type: "ai.booking_cancelled",
+      title: `予約を取り消し: ${String(b.booked_date)} ${String(b.start_time).slice(0, 5)}`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { booking_id: id, cancelled: true };
+  },
+
+  /* 受付台帳に1件（来店・体験）。お客様の氏名が入るので、名前が無ければ作らない */
+  walkin_add: async ({ admin, row }) => {
+    const p = row.payload;
+    const name = String(p.guest_name ?? "").trim();
+    if (!name) throw new Error("お名前が要ります");
+    const visitedOn = String(p.visited_on ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(visitedOn)) throw new Error("visited_on が YYYY-MM-DD ではありません");
+    const storeId = p.store_id ? String(p.store_id) : null;
+    if (!storeId) throw new Error("店舗が特定できません");
+
+    // 同じ人が同じ日に二重に載らないよう、氏名＋日付で既存を見る
+    const { data: g } = await admin
+      .from("mbr_guests")
+      .select("id")
+      .eq("company_id", row.company_id)
+      .eq("store_id", storeId)
+      .eq("name", name)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    let guestId = g?.id ? String(g.id) : null;
+    if (!guestId) {
+      const { data: ng, error: ge } = await admin
+        .from("mbr_guests")
+        .insert({
+          company_id: row.company_id,
+          store_id: storeId,
+          name,
+          name_kana: p.kana ? String(p.kana) : null,
+          mobile: p.phone ? String(p.phone) : null,
+        })
+        .select("id")
+        .single();
+      if (ge) throw new Error(ge.message);
+      guestId = String(ng.id);
+    } else {
+      const { data: dup } = await admin
+        .from("mbr_walkin_visits")
+        .select("id")
+        .eq("company_id", row.company_id)
+        .eq("guest_id", guestId)
+        .eq("visited_on", visitedOn)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (dup) return { walkin_id: String(dup.id), already: true };
+    }
+
+    const { data: created, error } = await admin
+      .from("mbr_walkin_visits")
+      .insert({
+        company_id: row.company_id,
+        store_id: storeId,
+        guest_id: guestId,
+        visited_on: visitedOn,
+        visit_type: String(p.visit_type ?? "trial"),
+        note: p.note ? String(p.note) : null,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    await logEvent(row.company_id, {
+      event_type: "ai.walkin_added",
+      title: `受付台帳に登録: ${visitedOn} ${name}`,
+      source: "ai_executor",
+      source_type: "ai",
+    });
+    return { walkin_id: created?.id ?? null, guest: name, visited_on: visitedOn };
+  },
+
   // SNS投稿の承認（#101 / content-loop）: 承認＝「予約確定」。実投稿は予定時刻に
   // /api/cron/execute → publishDueContent が行う（Instagramへは時刻どおりに出したいため）。
   // 判断フィードでの修正（payload.body差し替え）をここで cnt_posts に同期する。

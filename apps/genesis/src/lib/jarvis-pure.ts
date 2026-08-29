@@ -153,14 +153,29 @@ export function openingLine(b: JarvisBriefing, hour: number = jstHour()): string
    （黙るくらいなら、整形されていなくても答えを返すほうがまし）。
 ------------------------------------------------------------ */
 export type Decision = {
-  intent: "data" | "navigate" | "dev" | "talk";
+  intent: "data" | "navigate" | "dev" | "talk" | "act";
   reply?: string;
   question?: string;
   href?: string;
   dev?: { title?: string; app?: string; priority?: string };
+  /** #186: 取消枠つきで実行する操作 */
+  act?: { type?: string; args?: Record<string, unknown> };
 };
 
-const INTENTS = ["data", "navigate", "dev", "talk"];
+const INTENTS = ["data", "navigate", "dev", "talk", "act"];
+
+/* ------------------------------------------------------------
+   JARVISが実行してよい操作（#186）
+
+   ここに無い type は実行しない。**AIが思いついた操作名で書き込ませない**ため。
+   お客様への送信・課金・契約は入れない（VISION §7・従来どおり承認カード）。
+------------------------------------------------------------ */
+export const ACT_TYPES = ["booking_create", "booking_cancel", "walkin_add", "staff_directive"] as const;
+export type ActType = (typeof ACT_TYPES)[number];
+
+export function isActType(v: unknown): v is ActType {
+  return typeof v === "string" && (ACT_TYPES as readonly string[]).includes(v);
+}
 
 export function parseDecision(raw: string): Decision | null {
   if (!raw) return null;

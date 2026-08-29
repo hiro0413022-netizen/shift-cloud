@@ -202,3 +202,26 @@ test("無音の待ち時間は3段階。知らない値は「ふつう」に寄�
   assert.equal(pauseMs("とても速い"), 1800);
   assert.equal(pauseMs(null), 1800);
 });
+
+/* ---------- 実行してよい操作の線引き（#186） ---------- */
+import { isActType, ACT_TYPES, parseDecision as pd2 } from "../apps/genesis/src/lib/jarvis-pure.ts";
+
+test("実行してよい操作は4つだけ。AIが思いついた操作名では書き込ませない", () => {
+  assert.deepEqual([...ACT_TYPES], ["booking_create", "booking_cancel", "walkin_add", "staff_directive"]);
+  for (const t of ACT_TYPES) assert.equal(isActType(t), true, t);
+});
+
+test("お客様への送信・課金・デプロイは act として受け付けない（承認カード経由のまま）", () => {
+  for (const t of ["line_broadcast", "customer_message", "payment", "prod_deploy", "db_change", "member_delete"]) {
+    assert.equal(isActType(t), false, t);
+  }
+  assert.equal(isActType(undefined), false);
+  assert.equal(isActType(123), false);
+});
+
+test("intent=act のJSONを読める", () => {
+  const d = pd2('{"intent":"act","reply":"入れます","act":{"type":"booking_create","args":{"date":"2026-09-02","start":"14:00","guest_name":"田中"}}}');
+  assert.equal(d?.intent, "act");
+  assert.equal(d?.act?.type, "booking_create");
+  assert.equal((d?.act?.args as Record<string, unknown>)?.date, "2026-09-02");
+});

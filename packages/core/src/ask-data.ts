@@ -60,9 +60,23 @@ gnv_members — 会員（スナップショット）
   member_no, member_name, gender, age, join_date(date), leave_date(date), leave_reason,
   member_type, class_name, store_name, campaign, payment_method, monthly_visits, last_visit_date,
   is_active(bool: leave_date が null なら true = 在籍中)
-gnv_trials — 体験レッスン予約
+gnv_trials — 体験レッスン（元データは受付台帳。0135以前は空テーブルを読んでいて常に0件だった）
   booking_seq, program, lesson_date(date), start_time, status, joined(bool:入会したか),
   joined_at(date), decline_reason, source, created_at, store_name
+gnv_bookings — 打席予約（FRANK GOLF）1行=1予約
+  booked_date(date), start_time, end_time, status, source, customer_kind,
+  customer_name, member_no, guest_phone, party_size, amount, paid_amount,
+  payment_status, payment_method, note, created_at, bay_name, store_name
+  ※「予約」「空き」を聞かれたらここ。**キャンセルは status='cancelled' で残っている**ので、
+    いま有効な予約を数えるときは status <> 'cancelled' を必ず付ける。
+gnv_walkins — 受付台帳（来店・体験）1行=1来店
+  visit_seq, visited_on(date), visit_type('trial'=体験), fee, discount, payment_method,
+  pro_staff, result('join'=入会), repeat_date, reapproach_date, referral_source,
+  follow_up_at, follow_up_channel, note, guest_name, guest_kana, gender, birth_date, store_name
+  ※体験数は visit_type='trial'、入会は result='join'。入会率＝両者の比。
+gnv_orders — モバイルオーダー（FRANK）1行=1注文
+  order_no, ordered_on(date), ordered_at, status, subtotal(税抜), tax_amount,
+  amount(税込＝お客様が払う額), payment_status, source, bay_name, customer_name, store_name
 gnv_shifts — シフト（予定）
   date, start_time, end_time, is_day_off(bool), status, store_name, staff_name
 gnv_attendance — 勤怠実績（すべて分単位）

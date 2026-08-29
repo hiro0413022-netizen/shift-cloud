@@ -31,6 +31,7 @@ type Msg = {
   text: string;
   link?: { href: string; label: string } | null;
   dev?: { id: string; title: string } | null;
+  act?: { id: string; title: string; runsAt: string; mode: string } | null;
   sql?: string | null;
   rowCount?: number | null;
   intent?: string;
@@ -185,7 +186,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         const r: JarvisReply = await talkToJarvis(q, history, inputMode);
         setMsgs((prev) => [
           ...prev,
-          { role: "assistant", text: r.reply, link: r.link, dev: r.dev, sql: r.sql, rowCount: r.rowCount, intent: r.intent },
+          { role: "assistant", text: r.reply, link: r.link, dev: r.dev, act: r.act, sql: r.sql, rowCount: r.rowCount, intent: r.intent },
         ]);
         if (voiceRef.current) {
           void speak(r.reply);
@@ -570,13 +571,27 @@ function Bubble({ msg }: { msg: Msg }) {
 }
 
 function Extras({ msg }: { msg: Msg }) {
-  if (!msg.link && !msg.dev && !msg.sql) return null;
+  if (!msg.link && !msg.dev && !msg.act && !msg.sql) return null;
   return (
     <div className="mt-2 space-y-2">
       {msg.link && (
         <Link href={msg.link.href} className="btn-main inline-block">
           {msg.link.label}を開く →
         </Link>
+      )}
+      {msg.act && (
+        <div className="rounded-lg border border-amber-700/50 bg-amber-950/20 px-3 py-2 text-xs">
+          <p className="text-amber-200">
+            {msg.act.mode === "approval" ? "承認待ちにしました" : "実行予定に入れました（取り消せます）"}
+          </p>
+          <p className="mt-0.5 text-(--color-dim)">{msg.act.title}</p>
+          {msg.act.mode !== "approval" && (
+            <p className="mt-0.5 text-(--color-dim)">
+              実行 {new Date(msg.act.runsAt).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+              　／　下の「実行予定」から取り消せます
+            </p>
+          )}
+        </div>
       )}
       {msg.dev && (
         <div className="rounded-lg border border-emerald-800/50 bg-emerald-950/20 px-3 py-2 text-xs">

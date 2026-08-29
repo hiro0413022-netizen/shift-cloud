@@ -21,8 +21,11 @@ import {
   parseDecision,
   normalizePriority,
   alertTag,
+  isActType,
+  ACT_TYPES,
   type JarvisBriefing,
 } from "@/lib/jarvis-pure";
+import { enqueueAction } from "@/lib/ai-execution";
 
 // 純粋な部分は jarvis-pure.ts（テスト tests/jarvis.test.ts で固定）。画面からはここ経由で使う。
 export { toBriefing, openingLine, jstHour, NAV_MAP, alertTag };
@@ -89,10 +92,12 @@ export type JarvisTurnInput = {
 };
 
 export type JarvisReply = {
-  intent: "data" | "navigate" | "dev" | "talk" | "error";
+  intent: "data" | "navigate" | "dev" | "talk" | "act" | "error";
   reply: string;
   link: { href: string; label: string } | null;
   dev: { id: string; title: string } | null;
+  /** #186: 積んだ操作（取消枠つき）。画面は「◯分後に実行・取り消せます」と出す */
+  act: { id: string; title: string; runsAt: string; mode: string } | null;
   sql: string | null;
   rowCount: number | null;
   rows: Record<string, unknown>[];
@@ -121,16 +126,26 @@ function systemPrompt(b: JarvisBriefing): string {
     "   question に「調べたい内容を1文」で書く。あなたは数字を書かない（DBが計算した値だけを後で読み上げる）。",
     "3. navigate — その話は特定の画面を開くのが早い。href は次の一覧から選ぶ:",
     ...NAV_MAP.map((n) => `   ${n.href} = ${n.label}（${n.about}）`),
-    "4. dev — システムの追加・修正・不具合の依頼。「〜できるようにして」「〜が動かない」「〜を直して」など。",
+    "4. act — その場で実行してよい操作。**入れてから5分間は取り消せる**（ホームの「実行予定」に出る）。",
+    "   act.type は次のどれか:",
+    "     booking_create … FRANKの打席予約を入れる。args: {date:'YYYY-MM-DD', start:'HH:MM', minutes:60, guest_name または member_no, phone?, party_size?, bay_name?, lefty?, note?}",
+    "     booking_cancel … 予約を取り消す。args: {booking_id}（IDが分からなければ act にせず data で先に調べる）",
+    "     walkin_add     … 受付台帳に来店/体験を1件。args: {guest_name, visited_on:'YYYY-MM-DD', visit_type:'trial'|'visit', kana?, phone?, note?}",
+    "     staff_directive… スタッフへ公式LINEで連絡。args: {body}",
+    "   **日付は必ず YYYY-MM-DD に直す**（「明日」は上の日付から計算）。時刻は HH:MM。",
+    "   **足りない情報があるときは act にしない**。talk で1つだけ聞き返す（例: お名前は？ 何時からですか？）。",
+    "   reply には「何を・いつ・誰の分で入れるか」と「5分以内なら取り消せる」ことを必ず入れる。",
+    "5. dev — システムの追加・修正・不具合の依頼。「〜できるようにして」「〜が動かない」「〜を直して」など。",
     "   dev.title に一行で要件、dev.app に触りそうなアプリ（genesis / member-os / lesson-os / shift-cloud / money-os / swing-cortex / frank-golf / その他）、",
     "   dev.priority に urgent | normal | low。",
     "",
     "## 出力形式（JSONのみ。前後に文章やコードフェンスを付けない）",
-    '{"intent":"talk|data|navigate|dev","reply":"読み上げる日本語","question":"dataのときだけ","href":"navigateのときだけ","dev":{"title":"","app":"","priority":""}}',
+    '{"intent":"talk|data|navigate|dev|act","reply":"読み上げる日本語","question":"dataのときだけ","href":"navigateのときだけ","dev":{"title":"","app":"","priority":""},"act":{"type":"","args":{}}}',
     "",
     "## 厳守",
     "- ブリーフィングに無い数字を自分で書かない（推測・概算・一般論の数字は禁止）。数字が要るなら intent=data。",
-    "- 外部送信・課金・本番デプロイ・契約は、あなたは実行しない。該当する話は navigate で承認画面へ案内する。",
+    "- お客様への送信・課金・本番デプロイ・契約は act にしない（承認が要る）。navigate で承認画面へ案内する。",
+    "- 推測で予約を入れない。日付・時刻・お名前のどれかが曖昧なら、必ず talk で聞き返す。",
     "- reply は必ず日本語で、そのまま音声で読み上げられる文にする（記号・箇条書き・URLを入れない）。",
   ].join("\n");
 }
@@ -160,7 +175,7 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
   const admin = createAdmin();
 
   const base: JarvisReply = {
-    intent: "talk", reply: "", link: null, dev: null, sql: null, rowCount: null, rows: [], error: null, elapsedMs: 0,
+    intent: "talk", reply: "", link: null, dev: null, act: null, sql: null, rowCount: null, rows: [], error: null, elapsedMs: 0,
   };
 
   if (!said) return { ...base, intent: "error", reply: "もう一度お願いします。", error: "empty", elapsedMs: 0 };
@@ -220,6 +235,26 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
       link: hit ? { href: hit.href, label: hit.label } : null,
       reply: out.reply || (hit ? `${hit.label}を開きます。` : "どの画面をご覧になりますか。"),
     };
+  } else if (decision.intent === "act") {
+    const type = decision.act?.type;
+    if (!isActType(type)) {
+      out = { ...out, intent: "talk", reply: out.reply || "その操作はまだできません。" };
+    } else {
+      const done = await enqueueJarvisAction({
+        admin,
+        actor: input.actor,
+        type,
+        args: (decision.act?.args ?? {}) as Record<string, unknown>,
+        said,
+      });
+      out = {
+        ...out,
+        intent: done ? "act" : "talk",
+        act: done,
+        reply: out.reply || (done ? "承知しました。5分以内なら取り消せます。" : "うまく積めませんでした。"),
+        error: done ? null : "enqueue_failed",
+      };
+    }
   } else if (decision.intent === "dev") {
     const created = await createDevRequest({
       admin,
@@ -241,6 +276,60 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
   out.elapsedMs = Date.now() - started;
   await logTurn(admin, input, out, briefing);
   return out;
+}
+
+/* ------------------------------------------------------------
+   操作を実行キューへ（#186）
+
+   直接DBに書かない。**必ず ai_action_queue を通す**。理由:
+     - 実行モード（取消枠5分）と取り消しUIが既にそこにある（#61・ホームの「実行予定」）
+     - 実行の瞬間に空きを見直せる（積んだ時点と5分後で状況が変わる）
+     - 監査ログと失敗理由が1か所に残る
+   ai_execution_policies が approval のものは、ここに積むと承認カードになる（＝勝手に実行されない）。
+------------------------------------------------------------ */
+async function enqueueJarvisAction(args: {
+  admin: ReturnType<typeof createAdmin>;
+  actor: GenesisActor;
+  type: string;
+  args: Record<string, unknown>;
+  said: string;
+}): Promise<{ id: string; title: string; runsAt: string; mode: string } | null> {
+  const payload: Record<string, unknown> = { ...args.args, _said: args.said };
+  // 受付台帳は店舗が要る。指定が無ければ本人の主所属に寄せる
+  if (args.type === "walkin_add" && !payload.store_id) {
+    payload.store_id = args.actor.primaryStoreId ?? args.actor.storeIds[0] ?? null;
+  }
+  const title = actionTitle(args.type, args.args);
+  try {
+    const r = await enqueueAction(args.admin, {
+      companyId: args.actor.companyId,
+      actionType: args.type,
+      title,
+      payload,
+      originKind: "jarvis",
+      createdBy: args.actor.staffId,
+    });
+    if (!r.id) return null;
+    return { id: r.id, title, runsAt: r.scheduledAt, mode: r.mode };
+  } catch {
+    return null;
+  }
+}
+
+function actionTitle(type: string, a: Record<string, unknown>): string {
+  const who = String(a.guest_name ?? a.member_no ?? "");
+  switch (type) {
+    case "booking_create":
+      return `予約を入れる: ${String(a.date ?? "")} ${String(a.start ?? "")} ${who}`.trim();
+    case "booking_cancel":
+      return "予約を取り消す";
+    case "walkin_add":
+      return `受付台帳に登録: ${String(a.visited_on ?? "")} ${who}`.trim();
+    case "staff_directive":
+      return `スタッフへ連絡: ${String(a.body ?? "").slice(0, 40)}`;
+    default:
+      return type;
+  }
 }
 
 /* ------------------------------------------------------------
@@ -344,6 +433,7 @@ async function logTurn(
       action: {
         link: out.link,
         dev: out.dev,
+        act: out.act,
         score: briefing.score,
         decisions: briefing.decisionCount,
       },
