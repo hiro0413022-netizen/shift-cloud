@@ -1,10 +1,11 @@
 "use server";
 
+import { createHash, randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getActor, isOwner, assertStoreAccess } from "@/lib/auth";
-import { verifyStoreDevice } from "@/lib/store-dash";
+import { verifyStoreDevice, MEMBER_OS_URL } from "@/lib/store-dash";
 import { getStoreSession, clearStoreSession } from "@/lib/store-session";
 import { logAudit } from "@/lib/audit";
 
@@ -183,4 +184,53 @@ export async function reorderStoreStaff(
 export async function logoutStore(): Promise<void> {
   await clearStoreSession();
   redirect("/login");
+}
+
+// ============================================================
+// フィッティング受付（DECISIONS #186）
+// ============================================================
+
+/** 受付URLの有効期限（時間）。店頭タブレットの放置対策 */
+const INTAKE_TTL_HOURS = 6;
+
+/**
+ * 「来店」を押したときの処理。
+ *   1. 台帳の行に来店打刻（arrived_at）
+ *   2. その1行だけを開ける受付フォームURLを発行して返す
+ *
+ * 受付フォームは予約でいただいた氏名・カナ・電話・メールが入った状態で開く。
+ * お客様に書き直させない（ユーザー指示 2026-08-29）。
+ */
+export async function markFittingArrived(
+  token: string | null,
+  visitId: string
+): Promise<{ url?: string; error?: string }> {
+  const ctx = await resolveCtx(token);
+  if (!ctx) return { error: "認証が無効です" };
+
+  const admin = createAdmin();
+  const { data: visit } = await admin
+    .from("mbr_walkin_visits")
+    .select("id, company_id, store_id, consent_at, deleted_at")
+    .eq("id", visitId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!visit || visit.company_id !== ctx.companyId) return { error: "受付する予約が見つかりません" };
+  if (!(await canWriteStore(ctx, visit.store_id as string | null))) return { error: "受付する予約が見つかりません" };
+
+  const raw = randomBytes(24).toString("base64url");
+  const now = new Date();
+  const { error } = await admin
+    .from("mbr_walkin_visits")
+    .update({
+      arrived_at: now.toISOString(),
+      intake_token_hash: createHash("sha256").update(raw).digest("hex"),
+      intake_token_expires_at: new Date(now.getTime() + INTAKE_TTL_HOURS * 3600_000).toISOString(),
+      updated_at: now.toISOString(),
+    })
+    .eq("id", visit.id);
+  if (error) return { error: error.message };
+
+  revalidate(token);
+  return { url: `${MEMBER_OS_URL.replace(/\/$/, "")}/reception/v/${raw}` };
 }

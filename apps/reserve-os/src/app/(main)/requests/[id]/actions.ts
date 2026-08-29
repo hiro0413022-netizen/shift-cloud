@@ -7,6 +7,20 @@ import { logEvent, logAudit } from "@/lib/kernel";
 import { jstLocalToISO, fmtJst } from "@/lib/reserve";
 import { sendConfirmation } from "@/lib/mail";
 import { closeStaffTask } from "@/lib/staff-task";
+import { syncFittingWalkin } from "@yozan/core/fitting-walkin";
+
+/**
+ * 受付台帳（member-os の一時利用者名簿）へ反映する（DECISIONS #186）。
+ * 台帳が書けなくても予約の操作そのものは成立させる（お客様の予約を消す方が事故が大きい）。
+ */
+async function syncLedger(id: string, staffId: string | null): Promise<void> {
+  try {
+    const r = await syncFittingWalkin(createAdmin(), id, { receptionStaffId: staffId });
+    if (!r.ok) console.error("[reserve] 受付台帳への反映に失敗:", r.error);
+  } catch (e) {
+    console.error("[reserve] 受付台帳への反映で例外:", e);
+  }
+}
 
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
@@ -73,6 +87,9 @@ export async function confirmRequest(formData: FormData) {
   // スタッフポータルの「やること」を完了にする（DECISIONS #55）
   await closeStaffTask(id, actor.staffId);
 
+  // 受付台帳へ（確定した瞬間に載せる・ユーザー決定 2026-08-29 / DECISIONS #186）
+  await syncLedger(id, actor.staffId);
+
   await logAudit(actor, "reserve.confirm", "res_requests", id, { status: req.status }, { status: "confirmed", confirmed_at: confirmedISO });
   await logEvent(actor.companyId, {
     event_type: "reserve.confirmed",
@@ -94,6 +111,7 @@ export async function declineRequest(formData: FormData) {
   const admin = createAdmin();
   await admin.from("res_requests").update({ status: "declined", staff_note: staffNote || null, handled_by: actor.staffId }).eq("id", id);
   await closeStaffTask(id, actor.staffId);
+  await syncLedger(id, actor.staffId); // 台帳から下げる（来店打刻済みの行は残す）
   await logAudit(actor, "reserve.decline", "res_requests", id, { status: req.status }, { status: "declined" });
   redirect(`/requests/${id}`);
 }
@@ -122,6 +140,7 @@ export async function cancelRequest(formData: FormData) {
   const admin = createAdmin();
   await admin.from("res_requests").update({ status: "canceled", handled_by: actor.staffId }).eq("id", id);
   await closeStaffTask(id, actor.staffId);
+  await syncLedger(id, actor.staffId); // 台帳から下げる（来店打刻済みの行は残す）
   await logAudit(actor, "reserve.cancel", "res_requests", id, { status: req.status }, { status: "canceled" });
   redirect(`/requests/${id}`);
 }

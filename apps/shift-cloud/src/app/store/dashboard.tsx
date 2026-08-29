@@ -1,6 +1,6 @@
 import { currentYM, daysOfMonth, todayJST } from "@/lib/util";
 import { getActor, isOwner } from "@/lib/auth";
-import { listStores, getStoreKpis, getStoreMonthFeed, getStoreLinks } from "@/lib/store-dash";
+import { listStores, getStoreKpis, getStoreMonthFeed, getStoreLinks, getFittingBoard, RESERVE_OS_URL } from "@/lib/store-dash";
 import { StoreDashClient } from "./store-client";
 
 /**
@@ -47,10 +47,11 @@ export async function StoreDashboard({
   const days = daysOfMonth(ym);
   const today = todayJST();
 
-  const [feed, kpis, links] = await Promise.all([
+  const [feed, kpis, links, fitting] = await Promise.all([
     getStoreMonthFeed(companyId, store.id, days),
     getStoreKpis(companyId, store, currentYM()), // KPIは常に「今月」（カレンダーの表示月と独立）
     getStoreLinks(companyId, store.id),
+    getFittingBoard(companyId, store.id, today), // フィッティング＝未対応の申込と本日ご来店（#186）
   ]);
 
   return (
@@ -67,6 +68,8 @@ export async function StoreDashboard({
       feed={feed}
       kpis={kpis}
       links={links}
+      fitting={fitting}
+      reserveOsUrl={RESERVE_OS_URL}
     />
   );
 }

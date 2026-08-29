@@ -398,3 +398,131 @@ export async function getStoreLinks(companyId: string, storeId: string): Promise
     .filter((l) => !l.store_id || l.store_id === storeId)
     .map(({ id, label, url, note }) => ({ id, label, url, note }));
 }
+
+// ============================================================
+// フィッティング（Reserve OS 申込 → 受付台帳）— 画面上部の常設パネル（DECISIONS #186）
+//
+// なぜ日付マスではなく上部固定なのか（ユーザー決定 2026-08-29）:
+//   申込は「やること」として **申込を受けた日のマス** にしか出ず、確定すると done で消えていた。
+//   実際に R-0004（8/25申込・希望8/29）は4日間 pending のまま放置され、当日ご来店された。
+//   折り返し待ちは日付に埋めてはいけない。開いた瞬間に見える場所に出す。
+// ============================================================
+
+/** 他アプリのURL。Vercelのプロジェクト名が変わったら env で上書きする */
+export const MEMBER_OS_URL = process.env.MEMBER_OS_URL || "https://member-os-tau.vercel.app";
+export const RESERVE_OS_URL = process.env.RESERVE_OS_URL || "https://shift-cloud-reserve-os.vercel.app";
+
+export type FittingPending = {
+  requestId: string;
+  seq: string;          // R-0004
+  name: string;
+  phone: string | null;
+  serviceName: string | null;
+  prefs: string[];      // 第1〜3希望（JST整形済み）
+  waitingDays: number;  // 申込から何日経ったか
+};
+
+export type FittingToday = {
+  visitId: string;
+  name: string;
+  phone: string | null;
+  note: string | null;
+  time: string | null;   // 予約時刻 HH:MM
+  arrived: boolean;      // 来店ボタンを押したか
+  filled: boolean;       // 受付フォームの記入が済んだか（consent_at）
+};
+
+export type FittingBoard = { pending: FittingPending[]; today: FittingToday[] };
+
+const JST_TZ = "Asia/Tokyo";
+
+/** timestamptz(ISO) → "8/30(日) 11:00"（JST） */
+function fmtPref(iso: unknown): string {
+  if (!iso) return "";
+  const d = new Date(String(iso));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("ja-JP", {
+    timeZone: JST_TZ, month: "numeric", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function hhmm(iso: unknown): string | null {
+  if (!iso) return null;
+  const d = new Date(String(iso));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString("ja-JP", { timeZone: JST_TZ, hour: "2-digit", minute: "2-digit" });
+}
+
+/** 申込からの経過日数（JSTの日付差） */
+function daysSince(iso: unknown, today: string): number {
+  const ymd = iso
+    ? new Intl.DateTimeFormat("en-CA", { timeZone: JST_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(String(iso)))
+    : today;
+  const a = Date.parse(`${ymd}T00:00:00Z`);
+  const b = Date.parse(`${today}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
+
+export async function getFittingBoard(companyId: string, storeId: string, today: string): Promise<FittingBoard> {
+  const admin = createAdmin();
+
+  const [reqRes, visitRes] = await Promise.all([
+    // 未対応の申込（日付に関係なく全部。折り返しが済むまで消えない）
+    admin
+      .from("res_requests")
+      .select("id, request_seq, name, phone, service_name, pref1_at, pref2_at, pref3_at, created_at")
+      .eq("company_id", companyId)
+      .eq("store_id", storeId)
+      .eq("status", "pending")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+      .limit(30),
+    // 本日ご来店予定（確定した瞬間に台帳へ入る・0135 / fitting-walkin.ts）
+    admin
+      .from("mbr_walkin_visits")
+      .select("id, note, arrived_at, consent_at, survey, mbr_guests(name, phone, mobile)")
+      .eq("company_id", companyId)
+      .eq("store_id", storeId)
+      .eq("visit_type", "fitting")
+      .eq("visited_on", today)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true })
+      .limit(30),
+  ]);
+
+  const reqRows = (reqRes.data ?? []) as unknown as {
+    id: string; request_seq: number | null; name: string | null; phone: string | null;
+    service_name: string | null; pref1_at: string | null; pref2_at: string | null; pref3_at: string | null;
+    created_at: string;
+  }[];
+
+  const pending: FittingPending[] = reqRows.map((r) => ({
+    requestId: String(r.id),
+    seq: `R-${String(r.request_seq ?? "").padStart(4, "0")}`,
+    name: String(r.name ?? ""),
+    phone: r.phone ?? null,
+    serviceName: r.service_name ?? null,
+    prefs: [r.pref1_at, r.pref2_at, r.pref3_at].filter(Boolean).map(fmtPref),
+    waitingDays: daysSince(r.created_at, today),
+  }));
+
+  const todayRows = (visitRes.data ?? []) as unknown as {
+    id: string; note: string | null; arrived_at: string | null; consent_at: string | null;
+    survey: { reserve?: { confirmed_at?: string | null } } | null;
+    mbr_guests: { name: string; phone: string | null; mobile: string | null } | null;
+  }[];
+
+  const list: FittingToday[] = todayRows.map((v) => ({
+    visitId: v.id,
+    name: v.mbr_guests?.name ?? "（お名前未登録）",
+    phone: v.mbr_guests?.mobile || v.mbr_guests?.phone || null,
+    note: v.note,
+    time: hhmm(v.survey?.reserve?.confirmed_at ?? null),
+    arrived: v.arrived_at != null,
+    filled: v.consent_at != null,
+  }));
+  list.sort((a, b) => (a.time ?? "99:99").localeCompare(b.time ?? "99:99"));
+
+  return { pending, today: list };
+}

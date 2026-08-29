@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { dowJP, hm, fmtDateJP, addMonths } from "@/lib/util";
-import type { KpiCard, StoreInfo, StoreLink, StoreMonthFeed } from "@/lib/store-dash";
-import { toggleStoreTask, addStoreTask, reorderStoreStaff, logoutStore } from "./actions";
+import type { FittingBoard, KpiCard, StoreInfo, StoreLink, StoreMonthFeed } from "@/lib/store-dash";
+import { toggleStoreTask, addStoreTask, reorderStoreStaff, logoutStore, markFittingArrived } from "./actions";
 
 /**
  * 店舗ダッシュボード（店頭PC共有表示）
@@ -33,6 +33,8 @@ export function StoreDashClient({
   feed,
   kpis,
   links,
+  fitting,
+  reserveOsUrl,
 }: {
   basePath: string;
   token: string | null;
@@ -46,11 +48,15 @@ export function StoreDashClient({
   feed: StoreMonthFeed;
   kpis: KpiCard[];
   links: StoreLink[];
+  fitting: FittingBoard;
+  reserveOsUrl: string;
 }) {
   const router = useRouter();
   const days = Object.keys(feed).sort();
   const [selected, setSelected] = useState<string>(days.includes(today) ? today : days[0]);
   const [taskDraft, setTaskDraft] = useState("");
+  // フィッティングの受付URL（「来店」を押すと発行される・#186）
+  const [intake, setIntake] = useState<{ name: string; url: string } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   // スタッフ行の並べ替え（#171）
@@ -212,6 +218,88 @@ export function StoreDashClient({
           </div>
         ))}
       </div>
+
+      {/* フィッティング（未対応の申込 / 本日ご来店）— #186
+          折り返し待ちを日付マスに埋めない。開いた瞬間に見える場所に置く */}
+      {(fitting.pending.length > 0 || fitting.today.length > 0) && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {fitting.pending.length > 0 && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+              <p className="text-sm font-bold text-amber-900">
+                折り返し待ちのフィッティング申込　{fitting.pending.length}件
+              </p>
+              <p className="mt-0.5 text-[11px] text-amber-700">
+                お客様は日時を選べません。電話で日程を決めて、Reserve OSで「確定」を押すと受付台帳に入ります。
+              </p>
+              <ul className="mt-2 space-y-2">
+                {fitting.pending.map((p) => (
+                  <li key={p.requestId} className="rounded-xl bg-white p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-zinc-800">{p.name} 様</span>
+                      <span className="text-xs text-zinc-400">{p.seq}</span>
+                      {p.waitingDays >= 1 && (
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${p.waitingDays >= 2 ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-800"}`}>
+                          {p.waitingDays}日経過
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm text-zinc-600">{p.serviceName}</p>
+                    {p.prefs.map((v, i) => (
+                      <p key={i} className="text-sm text-zinc-600">第{i + 1}希望 {v}</p>
+                    ))}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-3 text-sm">
+                      {p.phone && <a href={`tel:${p.phone}`} className="font-medium text-brand underline">{p.phone}</a>}
+                      <a href={`${reserveOsUrl}/requests/${p.requestId}`} target="_blank" rel="noreferrer" className="text-zinc-500 underline">
+                        申込の詳細
+                      </a>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {fitting.today.length > 0 && (
+            <div className="rounded-2xl border border-sky-200 bg-white p-4 shadow-sm">
+              <p className="text-sm font-bold text-zinc-800">本日のフィッティング　{fitting.today.length}件</p>
+              <p className="mt-0.5 text-[11px] text-zinc-500">
+                「来店」を押すと受付台帳に打刻し、予約でいただいた内容が入った受付フォームが開きます。
+              </p>
+              <ul className="mt-2 space-y-2">
+                {fitting.today.map((t) => (
+                  <li key={t.visitId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-zinc-800">
+                        {t.time && <span className="mr-2 text-sky-600">{t.time}</span>}
+                        {t.name} 様
+                      </p>
+                      {t.note && <p className="mt-0.5 text-[12px] leading-relaxed text-zinc-500">{t.note}</p>}
+                    </div>
+                    {t.filled ? (
+                      <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">記入済み ✓</span>
+                    ) : (
+                      <button
+                        disabled={pending}
+                        onClick={() =>
+                          startTransition(async () => {
+                            const r = await markFittingArrived(token, t.visitId);
+                            if (r.error) setMsg(r.error);
+                            else if (r.url) setIntake({ name: t.name, url: r.url });
+                            router.refresh();
+                          })
+                        }
+                        className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 ${t.arrived ? "bg-zinc-400" : "bg-brand"}`}
+                      >
+                        {t.arrived ? "受付を開き直す" : "来店"}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* シフト表グリッド＋選択日詳細（PCは2カラム・狭い画面は縦積み） */}
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
@@ -434,6 +522,35 @@ export function StoreDashClient({
         </div>
       )}
       </div>
+
+      {/* フィッティングの受付フォームを開く（#186） */}
+      {intake && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <p className="text-lg font-semibold text-zinc-800">{intake.name} 様の受付</p>
+            <p className="mt-2 text-sm text-zinc-500">
+              予約でいただいたお名前・フリガナ・電話・メールは入力済みです。<br />
+              ご住所など足りない欄とご署名だけお願いしてください。
+            </p>
+            <a
+              href={intake.url}
+              className="mt-5 block rounded-xl bg-brand py-4 text-center text-base font-semibold text-white"
+            >
+              この端末で受付フォームを開く
+            </a>
+            <p className="mt-3 break-all rounded-lg bg-zinc-50 p-2 text-[11px] text-zinc-500">
+              別の端末で開く場合はこのURL（6時間有効）: {intake.url}
+            </p>
+            <button
+              type="button"
+              onClick={() => setIntake(null)}
+              className="mt-3 w-full rounded-xl border border-zinc-200 py-3 text-sm font-medium text-zinc-500"
+            >
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 業務リンク集 */}
       <div>
