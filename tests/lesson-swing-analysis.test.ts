@@ -220,6 +220,96 @@ test("軌跡の組み立て: 両端は外挿しない・コックが飛ぶとこ
   assert.ok(club.p.slice(4, 10).every((r) => r.length === 0), "コックが飛ぶ空白は埋めない");
 });
 
+test("軌跡の組み立て: インパクトの空白で二つに分かれても両方拾う（2026-08-29・IMG_8986）", () => {
+  // ダウンスイング〜インパクトは差分が扇になり候補が長く途切れる。
+  // 最良の1本だけを採る作りだと、切れた向こう側＝フォロースルーが丸ごと消えていた。
+  const frames = [];
+  for (let i = 0; i < 34; i++) {
+    // 0-13=バック側、14-23=空白（DPの飛び越え8コマを超える）、24-33=フォロー側
+    frames.push(frame(...(i >= 14 && i < 24 ? [] : [mkCand(20 + i * 6, 88, 0.5)])));
+  }
+  const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
+  assert.ok(club);
+  const picked = (a: number, b: number) => club!.p.slice(a, b + 1).filter((r) => r.length === 3).length;
+  assert.ok(picked(0, 13) >= 12, `バック側が残る (実際 ${picked(0, 13)})`);
+  assert.ok(picked(24, 33) >= 8, `フォロー側も拾う (実際 ${picked(24, 33)})`);
+  assert.equal(picked(14, 23), 0, "インパクトの空白はそのまま＝滑らかにつないで嘘をつかない");
+});
+
+test("軌跡の組み立て: 空白の向こうが短い切れ端なら拾わない（ノイズの可能性が高い）", () => {
+  const frames = [];
+  for (let i = 0; i < 29; i++) {
+    // 24-28 の5コマだけの切れ端は、体の輪郭や画面の映り込みかもしれないので採らない
+    frames.push(frame(...(i >= 14 && i < 24 ? [] : [mkCand(20 + i * 6, 88, 0.5)])));
+  }
+  const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
+  assert.ok(club);
+  assert.ok(club.p.slice(24, 29).every((r) => r.length === 0), "5コマの切れ端は空のまま");
+});
+
+/* --- アーク表示（軌跡を1本のなめらかな線に・2026-08-29） ---------- */
+
+import { buildClubArc } from "../apps/lesson-os/src/lib/pose.ts";
+
+const AW = 1080;
+const AH = 1920;
+
+/** ClubData を作る（p は 0〜1000 の整数・conf 80） */
+function clubOf(pts: ({ x: number; y: number } | null)[], clubLen = 555) {
+  return {
+    v: 1 as const,
+    t: pts.map((_, i) => i * 33),
+    p: pts.map((p) => (p ? [Math.round((p.x / AW) * 1000), Math.round((p.y / AH) * 1000), 80] : [])),
+    clubLen,
+  };
+}
+
+test("アーク: なめらかな弧は1本の実線にまとまる", () => {
+  // 中心(540,1000)半径600の弧を40コマ（1コマ約5度＝50px前後の動き）
+  const pts = Array.from({ length: 40 }, (_, i) => {
+    const ang = ((-90 + i * 5) * Math.PI) / 180;
+    return { x: 540 + Math.cos(ang) * 600, y: 1000 + Math.sin(ang) * 600 };
+  });
+  const segs = buildClubArc(clubOf(pts), AW, AH);
+  assert.equal(segs.length, 1, `1本になる (実際 ${segs.map((s) => s.kind)})`);
+  assert.equal(segs[0].kind, "measured");
+  // なめらかにしても元の弧から大きくは離れない（データに無い場所へ線を引かない）
+  for (const p of segs[0].pts) {
+    const r = Math.hypot(p.x * AW - 540, p.y * AH - 1000);
+    assert.ok(Math.abs(r - 600) < 40, `弧の上にある (実際 r=${r.toFixed(0)})`);
+  }
+});
+
+test("アーク: インパクトの長い空白には橋を架けない（どこを通ったか分からない）", () => {
+  // バック側20コマ → 25コマの空白 → フォロー側20コマ（遠い場所）
+  const pts: ({ x: number; y: number } | null)[] = [];
+  for (let i = 0; i < 20; i++) pts.push({ x: 150 + i * 15, y: 1500 });
+  for (let i = 0; i < 25; i++) pts.push(null);
+  for (let i = 0; i < 20; i++) pts.push({ x: 900 - i * 15, y: 300 });
+  const segs = buildClubArc(clubOf(pts), AW, AH);
+  assert.equal(segs.filter((s) => s.kind === "measured").length, 2, "両側とも残る");
+  assert.equal(segs.filter((s) => s.kind === "bridge").length, 0, "空白は破線でもつながない");
+});
+
+test("アーク: 骨格があれば前腕から90度超の点は使わない（ネットの揺れ対策）", () => {
+  // 前腕は右向き（肘(400,1000)→手首(540,1000)）。ヘッドが真後ろ（左）にある点は有り得ない
+  const row = new Array(99).fill(0);
+  const set = (j: number, x: number, y: number) => {
+    row[j * 3] = Math.round((x / AW) * 1000);
+    row[j * 3 + 1] = Math.round((y / AH) * 1000);
+  };
+  set(LM.lWrist, 540, 1000); set(LM.rWrist, 540, 1000);
+  set(LM.lElbow, 400, 1000); set(LM.rElbow, 400, 1000);
+  const pts = Array.from({ length: 12 }, (_, i) => ({ x: 100 - i * 2, y: 1000 })); // 手首の真後ろ
+  const club = clubOf(pts);
+  const pose = { v: 1 as const, t: club.t, p: club.t.map(() => [...row]) };
+  assert.deepEqual(buildClubArc(club, AW, AH, { pose }), [], "全部落ちる");
+  // 前腕と同じ向き（右）なら残る
+  const ok = Array.from({ length: 12 }, (_, i) => ({ x: 940 + i * 2, y: 1000 }));
+  const segs = buildClubArc(clubOf(ok), AW, AH, { pose });
+  assert.equal(segs.length, 1);
+});
+
 /* --- 角度は必ず px で計算する（9:16 の落とし穴） ------------------ */
 
 function lmWith(over: Record<number, [number, number]>): Landmarks {
@@ -390,7 +480,10 @@ function make(frames: { wristY: number; wristX?: number; cx: number; cy: number;
   const club: ClubData = {
     v: 1,
     t: frames.map((_, i) => i * 33),
-    p: frames.map((f) => [f.cx, f.cy, f.conf ?? 0.8]),
+    // cx,cy は px 指定 → 保存形式（0〜1000の正規化）に直して入れる。
+    // ⚠ 以前はここが px のままで、本体の単位ミス（正規化とpxの混同）と打ち消し合って
+    //   バグを見逃していた（2026-08-29 に IMG_8982 の棄却で発覚）。
+    p: frames.map((f) => [Math.round((f.cx / VW) * 1000), Math.round((f.cy / VH) * 1000), f.conf ?? 80]),
     clubLen: 600,
   };
   return { pose, club };

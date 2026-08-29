@@ -5,7 +5,7 @@ import type { Annotations, Shape } from "@/lib/lesson";
 import { PHASES, estimatePhases, hasPhases, type PhaseKey, type Phases } from "@/lib/phases";
 import { PhaseBar } from "@/components/phase-bar";
 import {
-  analyzeSwing, clubAt, drawClubTrace, drawPlane, drawPose, headSway,
+  analyzeSwing, clubAt, drawClubArc, drawClubTrace, drawPlane, drawPose, headSway,
   planeMetrics, poseAt, poseMetrics, videoBox, viewPoint,
   type ClubData, type ClubDiag, type Plane, type PoseData,
 } from "@/lib/pose";
@@ -30,6 +30,11 @@ import { loadPose, savePlane, savePose, saveAnnotations, savePhases } from "./ac
  *   軌跡は確からしさで濃さが変わる＝**インパクト前後で線が飛ぶのは正常**。
  *   60fpsではヘッドが1コマ60〜80cm動いて帯状にブレるので、そこは追えない。
  *   自動プレーンが外れたときは、線ツールで引いた直線を基準面に採用できる（手動が優先）。
+ *
+ * 2026-08-29: 軌跡の「1本の線」表示（アーク）を追加。
+ *   市販アプリのようにスイング全体をなめらかな弧で見せる（src/lib/pose.ts の buildClubArc）。
+ *   フェーズがあればアドレス〜フィニッシュに絞る。実測が無い区間（インパクト前後）は
+ *   破線＝計測できていないことを隠さない。従来の「再生に合わせた尾」表示と切り替え。
  */
 type Tool = "none" | "line" | "circle" | "free";
 const COLORS = ["#ff4d4d", "#ffd54d", "#7CFC66", "#4dd2ff"];
@@ -73,6 +78,8 @@ export function VideoPlayer({
   const [diag, setDiag] = useState<ClubDiag | null>(null);
   const [showPose, setShowPose] = useState(true);
   const [showTrace, setShowTrace] = useState(true);
+  /** 軌跡の見せ方: tail=再生に合わせて尾を引く / arc=スイング全体を1本の線で */
+  const [traceStyle, setTraceStyle] = useState<"tail" | "arc">("tail");
   const [showPlane, setShowPlane] = useState(true);
   const [poseFps, setPoseFps] = useState<30 | 60 | 120>(30);
   const [poseBusy, setPoseBusy] = useState<{ done: number; total: number; phase: string } | null>(null);
@@ -143,7 +150,19 @@ export function VideoPlayer({
       const box = videoBox(videoRef.current, W, H);
       const now = videoRef.current.currentTime;
       if (showPlane && plane) drawPlane(ctx, plane, box);
-      if (showTrace && club) drawClubTrace(ctx, club, box, now);
+      if (showTrace && club) {
+        if (traceStyle === "arc") {
+          // アーク＝スイング全体を1本の線で。フェーズがあれば素振りやフィニッシュ後を弧に入れない
+          drawClubArc(ctx, club, box, {
+            fromSec: typeof phases?.address === "number" ? phases.address - 0.3 : undefined,
+            toSec: typeof phases?.finish === "number" ? phases.finish + 0.3 : undefined,
+            pose,
+          });
+          drawClubTrace(ctx, club, box, now, { tailMs: 0 }); // いまのコマのヘッド位置だけ重ねる
+        } else {
+          drawClubTrace(ctx, club, box, now);
+        }
+      }
       if (showPose && pose) {
         const lm = poseAt(pose, now);
         if (lm) drawPose(ctx, lm, box);
@@ -159,7 +178,7 @@ export function VideoPlayer({
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPose, showTrace, showPlane, pose, club, plane, playing, shapes, cur]);
+  }, [showPose, showTrace, traceStyle, showPlane, pose, club, plane, playing, shapes, cur, phases]);
 
   /* 保存済みの解析結果を読む（プレーヤーを開いたときだけ・一覧では引かない） */
   useEffect(() => {
@@ -450,6 +469,7 @@ export function VideoPlayer({
               {([
                 ["骨格", showPose, setShowPose, true],
                 ["クラブ軌跡", showTrace, setShowTrace, !!club],
+                ["🌀 1本の線", traceStyle === "arc", (v: boolean) => setTraceStyle(v ? "arc" : "tail"), !!club && showTrace],
                 ["プレーン", showPlane, setShowPlane, !!plane],
               ] as [string, boolean, (v: boolean) => void, boolean][]).map(([label, on, set, has]) => (
                 <button
@@ -587,7 +607,8 @@ export function VideoPlayer({
             上の「📷 {vp ? `${vp.label}${vp.deg}° ・体の大きさ ${vp.fill}%` : "撮影方向"}」が前回と近ければ、角度もそのまま比べられます。
             撮影画面の【👻 前回に重ねる】を使うと合わせやすくなります。
             {clubCount &&
-              ` クラブ軌跡は実測${clubCount.real}コマ・前腕から推定${clubCount.est}コマ（推定は青い点線）。`}
+              ` クラブ軌跡は実測${clubCount.real}コマ・前腕から推定${clubCount.est}コマ（推定は青い点線）。` +
+              (traceStyle === "arc" ? "【1本の線】は実測をなめらかにまとめた弧。破線＝実測が無い区間（インパクト前後で切れるのは正常）。" : "")}
             {poseInfo?.srcFps && poseInfo.srcFps < 50 && "この動画は" + poseInfo.srcFps + "fpsです。インパクト前後まで見たいならiPhone純正カメラのスローモーションで撮ってください。"}
           </p>
         )}

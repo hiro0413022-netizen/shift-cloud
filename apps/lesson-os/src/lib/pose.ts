@@ -348,6 +348,12 @@ export function scanShaftCandidates(
 
 /** 本物のシャフトはこの値を超える。ノイズは 0.1 未満なので、ここはかなり素直に効く */
 const CLUB_GATE = 0.35;
+/** 2本目以降の軌跡として拾う最低コマ数。これより短い切れ端はノイズの可能性が高い */
+const MIN_SEG_FRAMES = 8;
+/** 2本目以降は、主軌跡の「1コマあたり得点」のこの割合以上のものだけ拾う */
+const SEG_KEEP = 0.55;
+/** 軌跡抽出を繰り返す上限。1スイングで意味のある区間は アドレスの揺らし・バック・フォロー・クラブ下ろし 程度 */
+const MAX_SEGMENTS = 6;
 /** これを超えたらもう十分きれいに出ている＝それ以上コマ間隔を広げない */
 const CLUB_GOOD = 0.45;
 /** 何コマ前と比べるかの候補（スロー撮影ほど大きい値が要る） */
@@ -529,8 +535,13 @@ export function verifySwingTrack(
   for (let i = 0; i < club.p.length; i++) {
     const row = club.p[i];
     if (!row || row.length < 3) continue;
-    const [cx, cy, conf] = row;
+    const conf = row[2];
     if (!(conf > 0)) continue; // 負＝前腕から補った推定コマ
+    // ⚠ club.p は 0〜1000 の正規化・wrists は px。必ず px に直してから比べる。
+    //   （2026-08-29 発覚: ここが正規化のままだったので、縦長動画ではヘッドがほぼ常に
+    //     「手元より上」と判定され、本物のクラブ軌跡まで棄却されていた。IMG_8982 で実測。）
+    const cx = (row[0] / 1000) * W;
+    const cy = (row[1] / 1000) * H;
     measured++;
     if (cy < ymin) ymin = cy;
     if (cy > ymax) ymax = cy;
@@ -602,52 +613,104 @@ export function buildClub(
 
   const GAPF = 8;   // 何コマまで飛び越えてつなぐか
   const cock = (i: number, c: ShaftHit) => (frames[i].armAng == null ? null : angDiff(c.ang, frames[i].armAng as number));
-  const best: number[][] = strong.map((l) => l.map(() => -1e9));
-  const from: ([number, number] | null)[][] = strong.map((l) => l.map(() => null));
   const value = (c: ShaftHit, body: number) => {
     const exp = Math.max(1, body * ratio);
     return Math.min(1.5, c.norm) * 2 + Math.min(1, c.fill / 0.8) - Math.abs(c.r - exp) / exp;
   };
 
-  for (let i = 0; i < strong.length; i++) {
-    for (let k = 0; k < strong[i].length; k++) {
-      const c = strong[i][k];
-      const ck = cock(i, c);
-      let b = value(c, frames[i].body);
-      let f: [number, number] | null = null;
-      for (let g = 1; g <= GAPF && i - g >= 0; g++) {
-        const j = i - g;
-        for (let m = 0; m < strong[j].length; m++) {
-          if (best[j][m] < -1e8) continue;
-          const pv = strong[j][m];
-          const speed = Math.hypot(c.x - pv.x, c.y - pv.y) / g;
-          let pen = 2 * Math.pow(speed / Math.max(1, frames[i].body * 0.5), 2) + 0.25 * (g - 1);
-          // 手首のコックはなめらかにしか変わらない。前腕から見た角度が
-          // 1コマで飛ぶ組み合わせは、どちらかが誤検出。
-          const pk = cock(j, pv);
-          if (ck != null && pk != null) pen += 1.2 * Math.pow(Math.abs(angDiff(ck, pk)) / (25 * g), 2);
-          const sc = best[j][m] + value(c, frames[i].body) - pen;
-          if (sc > b) { b = sc; f = [j, m]; }
+  // DP本体。blocked=1 のコマは使わない（下の2本目以降の抽出で塗りつぶす）
+  const runDP = (blocked: Uint8Array) => {
+    const best: number[][] = strong.map((l) => l.map(() => -1e9));
+    const from: ([number, number] | null)[][] = strong.map((l) => l.map(() => null));
+    for (let i = 0; i < strong.length; i++) {
+      if (blocked[i]) continue;
+      for (let k = 0; k < strong[i].length; k++) {
+        const c = strong[i][k];
+        const ck = cock(i, c);
+        let b = value(c, frames[i].body);
+        let f: [number, number] | null = null;
+        for (let g = 1; g <= GAPF && i - g >= 0; g++) {
+          const j = i - g;
+          if (blocked[j]) continue;
+          for (let m = 0; m < strong[j].length; m++) {
+            if (best[j][m] < -1e8) continue;
+            const pv = strong[j][m];
+            const headDisp = Math.hypot(c.x - pv.x, c.y - pv.y);
+            const speed = headDisp / g;
+            let pen = 2 * Math.pow(speed / Math.max(1, frames[i].body * 0.5), 2) + 0.25 * (g - 1);
+            // 手首のコックはなめらかにしか変わらない。前腕から見た角度が
+            // 1コマで飛ぶ組み合わせは、どちらかが誤検出。
+            const pk = cock(j, pv);
+            if (ck != null && pk != null) pen += 1.2 * Math.pow(Math.abs(angDiff(ck, pk)) / (25 * g), 2);
+            // ヘッドは手元に付いている＝手元が動いたらヘッドも最低それだけ動く（2026-08-29・IMG_8986）。
+            // ボールがネットに当たった後の「ネット/カーテンの揺れ」は細い縦線が同じ場所で
+            // 揺れ続けるため、差分では完璧なシャフトに見え、しかも動かないのでDPが大好物だった。
+            // 手元が飛んでいるのにヘッドが止まっている乗り換えを罰して、この偽チェーンを断つ。
+            const wristDisp = Math.hypot(frames[i].wx - frames[j].wx, frames[i].wy - frames[j].wy);
+            pen += 1.5 * Math.pow(Math.max(0, wristDisp - headDisp) / Math.max(1, frames[i].body * 0.2), 2);
+            const sc = best[j][m] + value(c, frames[i].body) - pen;
+            if (sc > b) { b = sc; f = [j, m]; }
+          }
         }
+        best[i][k] = b;
+        from[i][k] = f;
       }
-      best[i][k] = b;
-      from[i][k] = f;
     }
-  }
+    let bi = -1;
+    let bk = -1;
+    let bv = -1e9;
+    for (let i = 0; i < strong.length; i++) {
+      if (blocked[i]) continue;
+      for (let k = 0; k < strong[i].length; k++) if (best[i][k] > bv) { bv = best[i][k]; bi = i; bk = k; }
+    }
+    if (bi < 0) return null;
+    const picks: [number, number][] = [];
+    let cur: [number, number] | null = [bi, bk];
+    while (cur) { picks.push(cur); cur = from[cur[0]][cur[1]]; }
+    picks.reverse();
+    return { picks, score: bv };
+  };
 
-  let bi = -1;
-  let bk = -1;
-  let bv = -1e9;
-  for (let i = 0; i < strong.length; i++) {
-    for (let k = 0; k < strong[i].length; k++) if (best[i][k] > bv) { bv = best[i][k]; bi = i; bk = k; }
-  }
-  if (bi < 0) return { club: null, kept, ratio };
-
+  /**
+   * 最良の1本だけで終わらせない（2026-08-29・IMG_8986 のスロー実動画で実測）:
+   *   ダウンスイング〜インパクトは1コマの動きが大きすぎて差分が扇になり、
+   *   ゲートを通る候補が30コマ近く途切れる。DPは8コマまでしか飛び越えないので、
+   *   「アドレス〜トップ」と「インパクト後〜フィニッシュ」が別々の軌跡になり、
+   *   最良の1本だけを採る従来の作りではフォロースルーが丸ごと捨てられていた
+   *   （369コマ中、69-185は取れたのに 210-368 のフォロー側が全部消えた）。
+   *
+   * 使ったコマ区間を塗りつぶして DP を繰り返し、主軌跡に見劣りしない区間だけ拾い足す。
+   * インパクト前後の空白はそのまま残す＝滑らかにつないで嘘をつかない。
+   * 空白が10コマ以内なら下の前腕補間が「推定」として埋め、超えるなら切れたまま描かれる。
+   */
+  const blocked = new Uint8Array(strong.length);
   const path: ((ShaftHit & { x: number; y: number }) | null)[] = new Array(strong.length).fill(null);
-  let cur: [number, number] | null = [bi, bk];
-  while (cur) { path[cur[0]] = strong[cur[0]][cur[1]]; cur = from[cur[0]][cur[1]]; }
+  let primaryPerNode = 0;
+  let chosen = 0;
+  for (let seg = 0; seg < MAX_SEGMENTS; seg++) {
+    const got = runDP(blocked);
+    if (!got) break;
+    const first = got.picks[0][0];
+    const last = got.picks[got.picks.length - 1][0];
+    const perNode = got.score / got.picks.length;
+    // 2本目以降は 短い切れ端／主軌跡より明らかに弱いもの を拾わない
+    //（弱い切れ端は体の輪郭やシミュレーター画面の映り込みであることが多い）
+    const okSeg =
+      seg === 0
+        ? got.picks.length >= 6
+        : got.picks.length >= MIN_SEG_FRAMES && perNode >= primaryPerNode * SEG_KEEP;
+    if (seg === 0) {
+      if (!okSeg) break;
+      primaryPerNode = perNode;
+    }
+    if (okSeg) {
+      for (const [i, k] of got.picks) path[i] = strong[i][k];
+      chosen += got.picks.length;
+    }
+    // 却下した区間も塗りつぶす: 同じ区間を掘り直しても、より弱い切れ端しか出てこない
+    for (let i = first; i <= last; i++) blocked[i] = 1;
+  }
 
-  const chosen = path.filter(Boolean).length;
   if (chosen < 6) return { club: null, kept, ratio };
 
   const p: number[][] = path.map((c) =>
@@ -1173,6 +1236,217 @@ export function drawClubTrace(
     ctx.fill();
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+/* ------------------------------------------------------------------ */
+/* アーク表示（軌跡を1本のなめらかな線にまとめる・2026-08-29）          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 市販のスイングアプリのような「1本のなめらかな弧」で軌跡を見せるための整形。
+ *
+ * 表示専用で、保存データ（ClubData）は一切触らない。
+ * 「滑らかにつないで嘘をつかない」はここでも守る:
+ *   - なめらかにするのは **実測点の並びの中** だけ（数pxのジッタ取り）。
+ *   - 実測が途切れた区間（インパクト前後など）は kind:"bridge" として別に返し、
+ *     描画では破線にする＝実線とひと目で区別できる。
+ *   - 前腕から補った推定点（conf<0）の区間も kind:"estimated" で分けて返す。
+ */
+export type ArcSegment = {
+  kind: "measured" | "bridge";
+  /** 0〜1 の正規化座標（なめらかにする計算は px で行ってから戻している） */
+  pts: { x: number; y: number }[];
+};
+
+/** 実測がこれ以上コマ数飛んだら別の区間とみなす（30fps解析で約0.4秒） */
+const ARC_SPLIT_FRAMES = 12;
+/**
+ * 隣の点がクラブ長の1.2倍を超えて飛んでいたら「候補の乗り移り」として切る。
+ * ⚠ IMG_8986の実測: 本物の速い動き（切り返し直後）は1コマでクラブ長0.9倍まで飛ぶので、
+ *   これより厳しくすると本物のスイングの弧が切れてしまう。
+ */
+const ARC_JUMP_MAX = 1.2;
+/**
+ * 進行方向が120度超も折り返し、かつクラブ長の0.13倍以上動いた点で切る。
+ * 本物の弧はなめらかに曲がる。急な折り返しは別の場所を拾い直した点
+ * （ネットの揺れ・画面の映り込み）で、つなぐとジグザグの嘘になる（IMG_8986で実測）。
+ */
+const ARC_TURN_DEG = 120;
+const ARC_TURN_MIN = 0.13;
+/** これより短い区間はノイズとして描かない */
+const ARC_MIN_RUN = 5;
+/** 区間どうしをつなぐ破線は クラブ長1.3倍・18コマ以内の空白だけ（それ以上はどこを通ったか分からない） */
+const ARC_BRIDGE_MAX = 1.3;
+const ARC_BRIDGE_FRAMES = 18;
+/**
+ * アークでは前腕から90度超の点は使わない（DPの±120度より厳しく）。
+ * ボールがネットに当たった後の「ネット/カーテンの揺れ」は差分上完璧なシャフトに見えるが、
+ * 前腕の向きからは大きく外れる。実測（IMG_8986）: 本物のフォローは±72度以内だった。
+ */
+const ARC_MAX_COCK = 90;
+
+/** 窓5の中央値でジッタを取る（外れ値1点に引っ張られない） */
+function median5(vals: number[], i: number): number {
+  const a: number[] = [];
+  for (let j = Math.max(0, i - 2); j <= Math.min(vals.length - 1, i + 2); j++) a.push(vals[j]);
+  a.sort((x, y) => x - y);
+  return a[Math.floor(a.length / 2)];
+}
+
+/** Chaikin の角割り。2回かけると折れ線が十分なめらかな弧になる */
+function chaikin(pts: { x: number; y: number }[], times = 2): { x: number; y: number }[] {
+  let cur = pts;
+  for (let t = 0; t < times; t++) {
+    if (cur.length < 3) return cur;
+    const out: { x: number; y: number }[] = [cur[0]];
+    for (let i = 0; i < cur.length - 1; i++) {
+      const a = cur[i];
+      const b = cur[i + 1];
+      out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    out.push(cur[cur.length - 1]);
+    cur = out;
+  }
+  return cur;
+}
+
+export function buildClubArc(
+  club: ClubData,
+  W: number,
+  H: number,
+  opts: { fromSec?: number; toSec?: number; pose?: PoseData | null } = {}
+): ArcSegment[] {
+  const clubPx = Math.max(40, (club.clubLen / 1000) * W);
+  const fromMs = (opts.fromSec ?? -Infinity) * 1000;
+  const toMs = (opts.toSec ?? Infinity) * 1000;
+  type P = { i: number; x: number; y: number };
+  const pts: P[] = [];
+  for (let i = 0; i < club.p.length; i++) {
+    const r = club.p[i];
+    // 弧は「実測のまとめ」なので、前腕から補った推定コマ（conf<0）は使わない
+    if (!r || r.length !== 3 || r[2] < 0) continue;
+    if (club.t[i] < fromMs || club.t[i] > toMs) continue;
+    const x = (r[0] / 1000) * W;
+    const y = (r[1] / 1000) * H;
+    // 骨格があれば、前腕から有り得ない向きの点をここで落とす（ネットの揺れ対策）
+    const row = opts.pose?.p[i];
+    if (row && row.length >= 99) {
+      const g = (j: number, a: 0 | 1) => (row[j * 3 + a] / 1000) * (a === 0 ? W : H);
+      const wx = (g(LM.lWrist, 0) + g(LM.rWrist, 0)) / 2;
+      const wy = (g(LM.lWrist, 1) + g(LM.rWrist, 1)) / 2;
+      const ex = (g(LM.lElbow, 0) + g(LM.rElbow, 0)) / 2;
+      const ey = (g(LM.lElbow, 1) + g(LM.rElbow, 1)) / 2;
+      if (Math.hypot(wx - ex, wy - ey) > 5) {
+        const arm = (Math.atan2(wy - ey, wx - ex) * 180) / Math.PI;
+        const head = (Math.atan2(y - wy, x - wx) * 180) / Math.PI;
+        if (Math.abs(angDiff(head, arm)) > ARC_MAX_COCK) continue;
+      }
+    }
+    pts.push({ i, x, y });
+  }
+  if (pts.length < ARC_MIN_RUN) return [];
+
+  // 1) コマ番号の飛び・距離の飛び・急な折り返しで「連続した並び（run）」に切る
+  const runs: P[][] = [];
+  let cur: P[] = [pts[0]];
+  for (let k = 1; k < pts.length; k++) {
+    const a = pts[k - 1];
+    const b = pts[k];
+    const gap = b.i - a.i;
+    const jump = Math.hypot(b.x - a.x, b.y - a.y);
+    let turn = 0;
+    if (cur.length >= 2) {
+      const p0 = cur[cur.length - 2];
+      const n1 = Math.hypot(a.x - p0.x, a.y - p0.y);
+      const n2 = jump;
+      if (n1 > 4 && n2 > 4) {
+        const dot = ((a.x - p0.x) * (b.x - a.x) + (a.y - p0.y) * (b.y - a.y)) / (n1 * n2);
+        turn = (Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI;
+      }
+    }
+    if (
+      gap > ARC_SPLIT_FRAMES ||
+      jump > clubPx * ARC_JUMP_MAX ||
+      (turn > ARC_TURN_DEG && jump > clubPx * ARC_TURN_MIN)
+    ) {
+      runs.push(cur);
+      cur = [b];
+    } else {
+      cur.push(b);
+    }
+  }
+  runs.push(cur);
+
+  // 2) 短い切れ端を捨て、run ごとにジッタ取り→なめらかに。
+  //    run の間は破線の橋（実測が無いことを隠さない）
+  const kept = runs.filter((r) => r.length >= ARC_MIN_RUN);
+  const out: ArcSegment[] = [];
+  let prevEnd: { i: number; x: number; y: number } | null = null;
+  for (const run of kept) {
+    const xs = run.map((p) => p.x);
+    const ys = run.map((p) => p.y);
+    const smooth = run.map((_, i) => ({ x: median5(xs, i), y: median5(ys, i) }));
+    if (prevEnd) {
+      const d = Math.hypot(smooth[0].x - prevEnd.x, smooth[0].y - prevEnd.y);
+      // 長すぎる空白（インパクト前後など）はどこを通ったか分からないので線を引かない
+      if (d <= clubPx * ARC_BRIDGE_MAX && run[0].i - prevEnd.i <= ARC_BRIDGE_FRAMES) {
+        out.push({
+          kind: "bridge",
+          pts: [
+            { x: prevEnd.x / W, y: prevEnd.y / H },
+            { x: smooth[0].x / W, y: smooth[0].y / H },
+          ],
+        });
+      }
+    }
+    const soft = chaikin(smooth);
+    out.push({ kind: "measured", pts: soft.map((p) => ({ x: p.x / W, y: p.y / H })) });
+    prevEnd = { i: run[run.length - 1].i, x: smooth[smooth.length - 1].x, y: smooth[smooth.length - 1].y };
+  }
+  return out;
+}
+
+/**
+ * アーク描画。実測＝オレンジの実線（後半ほど濃く・太く）、
+ * 実測が無い区間の橋＝薄い破線。フェーズがあれば fromSec/toSec で
+ * アドレス〜フィニッシュに絞る（素振りやフィニッシュ後を弧に入れない）。
+ */
+export function drawClubArc(
+  ctx: CanvasRenderingContext2D,
+  club: ClubData,
+  box: Box,
+  opts: { color?: string; fromSec?: number; toSec?: number; pose?: PoseData | null } = {}
+) {
+  const { ox, oy, dw, dh } = box;
+  const color = opts.color ?? "#ff7a2f";
+  const segs = buildClubArc(club, dw, dh, { fromSec: opts.fromSec, toSec: opts.toSec, pose: opts.pose });
+  if (!segs.length) return;
+  const lw = Math.max(2.5, dw / 160);
+  const total = segs.reduce((n, s) => n + s.pts.length, 0);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  let done = 0;
+  for (const seg of segs) {
+    const bridge = seg.kind === "bridge";
+    ctx.setLineDash(bridge ? [lw * 2.2, lw * 2.6] : []);
+    ctx.strokeStyle = color;
+    for (let i = 1; i < seg.pts.length; i++) {
+      const t = (done + i) / total; // 0=始点 → 1=終点
+      ctx.globalAlpha = bridge ? 0.4 : 0.35 + 0.55 * t;
+      ctx.lineWidth = bridge ? lw * 0.8 : lw * (0.8 + 0.5 * t);
+      ctx.beginPath();
+      ctx.moveTo(ox + seg.pts[i - 1].x * dw, oy + seg.pts[i - 1].y * dh);
+      ctx.lineTo(ox + seg.pts[i].x * dw, oy + seg.pts[i].y * dh);
+      ctx.stroke();
+    }
+    done += seg.pts.length;
+  }
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
   ctx.restore();
 }
 
