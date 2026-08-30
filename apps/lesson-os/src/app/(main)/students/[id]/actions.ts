@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
+import { mapNoteSymptom, type NoteSymptom } from "./note-symptom";
 import { requireLessonActor, canAccessStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { encSeg } from "@/lib/libkey";
@@ -863,18 +864,10 @@ export async function loadLessonNote(noteId: string): Promise<{ note?: LessonNot
 /* コーチはタップで○×を付けるだけで、記録が「検索できる資産」になる。   */
 /* ------------------------------------------------------------------ */
 
-export type NoteSymptom = {
-  id: string;
-  symptomId: string;
-  symptom: string;
-  category: string | null;
-  checkpointId: string | null;
-  checkpoint: string | null;
-  quote: string | null;
-  confidence: number;
-  source: string;
-  rejected: boolean;
-};
+// NoteSymptom 型と mapNoteSymptom は ./note-symptom.ts へ移動（2026-08-30）。
+// "use server" ファイルは async 関数しか export できず、同期関数を置いたことで
+// Next のビルドが2日間落ちていた（Server Actions must be async functions）。
+export type { NoteSymptom } from "./note-symptom";
 
 export type SymptomOption = {
   id: string;
@@ -983,23 +976,4 @@ export async function loadNoteSymptoms(noteId: string): Promise<{ items?: NoteSy
     .eq("company_id", actor.companyId)
     .order("confidence", { ascending: false });
   return { items: (data ?? []).map(mapNoteSymptom) };
-}
-
-/** page.tsx と共用（ネスト取得は配列型に推論されることがあるので両対応・#76と同種） */
-export function mapNoteSymptom(r: unknown): NoteSymptom {
-  const x = r as Record<string, unknown>;
-  const s = Array.isArray(x.sc_symptoms) ? x.sc_symptoms[0] : x.sc_symptoms;
-  const c = Array.isArray(x.sc_checkpoints) ? x.sc_checkpoints[0] : x.sc_checkpoints;
-  return {
-    id: String(x.id),
-    symptomId: String(x.symptom_id),
-    symptom: String((s as { name?: string } | null)?.name ?? "（不明な症状）"),
-    category: ((s as { category?: string | null } | null)?.category) ?? null,
-    checkpointId: (x.checkpoint_id as string | null) ?? null,
-    checkpoint: ((c as { title?: string } | null)?.title) ?? null,
-    quote: (x.quote as string | null) ?? null,
-    confidence: Number(x.confidence ?? 0),
-    source: String(x.source ?? "ai"),
-    rejected: Boolean(x.rejected),
-  };
 }

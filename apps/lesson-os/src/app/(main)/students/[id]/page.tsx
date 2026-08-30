@@ -8,7 +8,8 @@ import { KarteClient, type VideoItem, type StudentData } from "./karte-client";
 import type { CompareSource } from "./compare-view";
 import type { ProgressItem } from "./progress-panel";
 import type { MeasurementItem } from "./measure-panel";
-import { mapNoteSymptom, type LessonNoteItem } from "./actions";
+import { type LessonNoteItem } from "./actions";
+import { mapNoteSymptom } from "./note-symptom";
 import type { TrackmanValues } from "@/lib/trackman";
 
 /** 生徒カルテ（DECISIONS #50: PGA NOTE準拠のタブ構成） */
