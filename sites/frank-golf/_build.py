@@ -958,7 +958,7 @@ def build_facility():
     <div class="gallery rv" style="margin-top:36px">
       <div class="gallery__i"><img data-img-src="play" src="assets/img/play.jpg" alt="FRANK GOLF 姫路の打席イメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">打席</span></div>
       <div class="gallery__i"><img data-img-src="lounge" src="assets/img/lounge.jpg" alt="FRANK GOLF 姫路のバー・ラウンジイメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">ラウンジ</span></div>
-      <div class="gallery__i"><img data-img-src="lesson" src="assets/img/lesson.jpg" alt="FRANK GOLF 姫路のレッスン・データ分析イメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">レッスン</span></div>
+      <div class="gallery__i"><img data-img-src="lesson" src="assets/img/lesson-rara-wide.jpg" alt="FRANK GOLF 姫路のレッスン。所属プロ「らら」がボール位置から指導する様子" loading="lazy" width="1200" height="800"><span class="gallery__cap">レッスン</span></div>
       <div class="gallery__i"><img data-img-src="community" src="assets/img/community.jpg" alt="FRANK GOLF 姫路の会員交流イメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">コミュニティ</span></div>
       <div class="gallery__i"><img data-img-src="concept" src="assets/img/concept.jpg" alt="FRANK GOLF 姫路のブランドイメージ" loading="lazy" width="1280" height="720"><span class="gallery__cap">エントランス（準備中）</span></div>
       <div class="gallery__i"><img data-img-src="hero" src="assets/img/hero.jpg" alt="FRANK GOLF 姫路の館内イメージ" loading="lazy" width="1920" height="1200"><span class="gallery__cap">館内（準備中）</span></div>
@@ -1055,7 +1055,7 @@ def build_lesson():
              "lesson")
     b += page_head("レッスン", "LESSON", "プロに教わる。データで確かめる。",
                    "自己流の限界は、たいてい「何が悪いか分からない」ところから来ます。")
-    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("lesson", "assets/img/lesson.jpg", "FRANK GOLF 姫路のゴルフレッスン・スイングデータ分析のイメージ", "LESSON") + '</div></section>'
+    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("lesson", "assets/img/lesson-rara-wide.jpg", "FRANK GOLF 姫路のゴルフレッスン。所属プロ「らら」がボール位置から指導する様子", "LESSON") + '</div></section>'
 
     b += """
 <section class="sec">

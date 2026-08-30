@@ -122,7 +122,7 @@ window.FRANK = {
     community: "assets/img/community.jpg",// ソファ席・パーティースペース
     concept:   "assets/img/play.jpg",     // コンセプト
     play:      "assets/img/play.jpg",
-    lesson:    "assets/img/hero-3.jpg",
+    lesson:    "assets/img/lesson-rara-wide.jpg",   // レッスンページ＝ららプロの実写（★lesson.jpg は料理写真なので使わない）
     // プレオープン告知バナー（SNS・LINE配布用。トップでは使わなくなりました）
     bannerWide:   "assets/banner-wide.jpg",
     bannerSquare: "assets/banner-square.jpg",
