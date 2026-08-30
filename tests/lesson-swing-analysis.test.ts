@@ -207,17 +207,36 @@ test("軌跡の組み立て: 取れなかったコマは前腕から補い、推
   assert.ok(club.p[4][2] > 0, "実測は正のまま");
 });
 
-test("軌跡の組み立て: 両端は外挿しない・コックが飛ぶところは埋めない", () => {
+test("軌跡の組み立て: コックの変化が速すぎる空白は埋めない（どちらかが誤検出）", () => {
   const frames = [];
   for (let i = 0; i < 14; i++) {
     const arm = 0;
-    // 0〜3 は取れる、4〜9 は取れない、10〜13 はコックが90度ずれた状態で取れる
-    const list = i <= 3 ? [mkCand(5, 88, 0.5)] : i >= 10 ? [mkCand(95, 88, 0.5)] : [];
+    // 0〜5 は取れる、6〜7 は取れない、8〜13 は3コマ相当でコックが90度飛んだ状態で取れる
+    // （90度/3コマ=30度/コマ > 上限25度/コマ → 両端のどちらかが誤検出とみなす）
+    const list = i <= 5 ? [mkCand(5, 88, 0.5)] : i >= 8 ? [mkCand(95, 88, 0.5)] : [];
     frames.push(frameArm(arm, ...list));
   }
   const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
   assert.ok(club);
-  assert.ok(club.p.slice(4, 10).every((r) => r.length === 0), "コックが飛ぶ空白は埋めない");
+  assert.ok(club.p.slice(6, 8).every((r) => r.length === 0), "速すぎるコック変化の空白は埋めない");
+});
+
+test("軌跡の組み立て: 長い空白もコックがなめらかなら前腕から埋める（2026-08-29・骨格を背骨に）", () => {
+  // インパクト前後は差分では原理的に取れないが、骨格（手首・前腕）は取れている。
+  // IMG_8986の実測: トップの切り返し25コマをまたぐコック変化は5.3度/コマ → 補間で引ける。
+  const frames = [];
+  for (let i = 0; i < 40; i++) {
+    const arm = 0;
+    // 0〜9=取れる、10〜29=20コマの空白、30〜39=コックが80度進んだ状態（3.8度/コマ）
+    const list = i <= 9 ? [mkCand(5, 88, 0.5)] : i >= 30 ? [mkCand(85, 88, 0.5)] : [];
+    frames.push(frameArm(arm, ...list));
+  }
+  const { club } = buildClub(frames, frames.map((_, i) => i * 33), W, H);
+  assert.ok(club);
+  for (let i = 10; i < 30; i++) {
+    assert.equal(club.p[i].length, 3, `${i}コマ目が埋まる`);
+    assert.ok(club.p[i][2] < 0, `${i}コマ目は推定として残る（負の値）`);
+  }
 });
 
 test("軌跡の組み立て: インパクトの空白で二つに分かれても両方拾う（2026-08-29・IMG_8986）", () => {

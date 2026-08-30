@@ -608,7 +608,7 @@ export function VideoPlayer({
             撮影画面の【👻 前回に重ねる】を使うと合わせやすくなります。
             {clubCount &&
               ` クラブ軌跡は実測${clubCount.real}コマ・前腕から推定${clubCount.est}コマ（推定は青い点線）。` +
-              (traceStyle === "arc" ? "【1本の線】は実測をなめらかにまとめた弧。破線＝実測が無い区間（インパクト前後で切れるのは正常）。" : "")}
+              (traceStyle === "arc" ? "【1本の線】は実測をなめらかにまとめた弧。青い破線＝骨格（前腕とコック）から補った推定区間。" : "")}
             {poseInfo?.srcFps && poseInfo.srcFps < 50 && "この動画は" + poseInfo.srcFps + "fpsです。インパクト前後まで見たいならiPhone純正カメラのスローモーションで撮ってください。"}
           </p>
         )}

@@ -718,20 +718,28 @@ export function buildClub(
   );
 
   // --- 取れなかったコマを前腕から埋める（推定・conf は負で持つ） ---
-  // クラブは前腕に対してなめらかにしか動かないので、前後の確かなコマの
-  // 「前腕から見た角度」を線形につないで補う。**外挿はしない**（両端と長い空白は埋めない）。
-  // 実測と推定は必ず区別して持つ（画面でも線の色を変える）。滑らかにつないで嘘をつかないため。
+  // 骨格（手首・前腕）はほぼ全コマ取れている（ユーザー指摘 2026-08-29）。それを背骨にして、
+  // 「前腕から見たシャフトの角度（コック）」と「手元〜ヘッド距離」だけを前後の実測コマから
+  // 線形につないで補う。シャフトの向き＝前腕の向き＋コックなので、未知はコックだけ。
+  //
+  // IMG_8986 の実測（2026-08-29）:
+  //   - 最大の空白＝トップの切り返し25コマをまたぐコック変化は 5.3度/コマ → 補間で十分引ける
+  //   - リリース付近の実測どうしでも 23度/コマ 程度
+  //   → 旧規則（空白10コマ・60度まで）は保守的すぎてこの空白を埋められなかった。
+  //     1コマあたり MAX_COCK_RATE 度までの変化なら埋める、に変更（それ超は誤検出とみなす）。
+  // **外挿はしない**（両端は埋めない）。実測と推定は必ず区別して持つ（オレンジ実線／青点線）。
+  const MAX_FILL_GAP = 40;
+  const MAX_COCK_RATE = 25;
   const anchors: number[] = [];
   path.forEach((c, i) => { if (c && cock(i, c) != null) anchors.push(i); });
   for (let a = 0; a < anchors.length - 1; a++) {
     const i0 = anchors[a];
     const i1 = anchors[a + 1];
-    if (i1 - i0 < 2 || i1 - i0 > 10) continue;
+    if (i1 - i0 < 2 || i1 - i0 > MAX_FILL_GAP) continue;
     const c0 = cock(i0, path[i0] as ShaftHit) as number;
     const c1 = cock(i1, path[i1] as ShaftHit) as number;
-    // コックが10コマ以内で60度以上変わることはない。それだけ違うなら
-    // 両端のどちらかが誤検出なので、間を埋めない（無い方がまし）
-    if (Math.abs(angDiff(c1, c0)) > 60) continue;
+    // コックの変化が速すぎる組み合わせは、両端のどちらかが誤検出なので埋めない（無い方がまし）
+    if (Math.abs(angDiff(c1, c0)) > MAX_COCK_RATE * (i1 - i0)) continue;
     const r0 = (path[i0] as ShaftHit).r;
     const r1 = (path[i1] as ShaftHit).r;
     for (let i = i0 + 1; i < i1; i++) {
@@ -1254,7 +1262,7 @@ export function drawClubTrace(
  *   - 前腕から補った推定点（conf<0）の区間も kind:"estimated" で分けて返す。
  */
 export type ArcSegment = {
-  kind: "measured" | "bridge";
+  kind: "measured" | "estimated" | "bridge";
   /** 0〜1 の正規化座標（なめらかにする計算は px で行ってから戻している） */
   pts: { x: number; y: number }[];
 };
@@ -1321,18 +1329,21 @@ export function buildClubArc(
   const clubPx = Math.max(40, (club.clubLen / 1000) * W);
   const fromMs = (opts.fromSec ?? -Infinity) * 1000;
   const toMs = (opts.toSec ?? Infinity) * 1000;
-  type P = { i: number; x: number; y: number };
+  type P = { i: number; x: number; y: number; est: boolean };
   const pts: P[] = [];
   for (let i = 0; i < club.p.length; i++) {
     const r = club.p[i];
-    // 弧は「実測のまとめ」なので、前腕から補った推定コマ（conf<0）は使わない
-    if (!r || r.length !== 3 || r[2] < 0) continue;
+    if (!r || r.length !== 3) continue;
     if (club.t[i] < fromMs || club.t[i] > toMs) continue;
+    // 前腕+コック補間の推定コマ（conf<0）も弧に入れる（2026-08-29・ユーザー案）。
+    // 描画は必ず青の破線＝実測と見分けがつく形で。
+    const est = r[2] < 0;
     const x = (r[0] / 1000) * W;
     const y = (r[1] / 1000) * H;
-    // 骨格があれば、前腕から有り得ない向きの点をここで落とす（ネットの揺れ対策）
+    // 骨格があれば、前腕から有り得ない向きの実測点をここで落とす（ネットの揺れ対策）。
+    // 推定点はもともと前腕から作った点なので見る必要がない。
     const row = opts.pose?.p[i];
-    if (row && row.length >= 99) {
+    if (!est && row && row.length >= 99) {
       const g = (j: number, a: 0 | 1) => (row[j * 3 + a] / 1000) * (a === 0 ? W : H);
       const wx = (g(LM.lWrist, 0) + g(LM.rWrist, 0)) / 2;
       const wy = (g(LM.lWrist, 1) + g(LM.rWrist, 1)) / 2;
@@ -1344,7 +1355,7 @@ export function buildClubArc(
         if (Math.abs(angDiff(head, arm)) > ARC_MAX_COCK) continue;
       }
     }
-    pts.push({ i, x, y });
+    pts.push({ i, x, y, est });
   }
   if (pts.length < ARC_MIN_RUN) return [];
 
@@ -1387,7 +1398,7 @@ export function buildClubArc(
   for (const run of kept) {
     const xs = run.map((p) => p.x);
     const ys = run.map((p) => p.y);
-    const smooth = run.map((_, i) => ({ x: median5(xs, i), y: median5(ys, i) }));
+    const smooth = run.map((p, i) => ({ x: median5(xs, i), y: median5(ys, i), est: p.est }));
     if (prevEnd) {
       const d = Math.hypot(smooth[0].x - prevEnd.x, smooth[0].y - prevEnd.y);
       // 長すぎる空白（インパクト前後など）はどこを通ったか分からないので線を引かない
@@ -1401,8 +1412,21 @@ export function buildClubArc(
         });
       }
     }
-    const soft = chaikin(smooth);
-    out.push({ kind: "measured", pts: soft.map((p) => ({ x: p.x / W, y: p.y / H })) });
+    // 実測と推定の切り替わりで区間を分ける（線種を変えるため）。境目の点は両側に含めてつなぐ
+    let s = 0;
+    for (let i = 1; i <= smooth.length; i++) {
+      if (i === smooth.length || smooth[i].est !== smooth[s].est) {
+        const slice = smooth.slice(Math.max(0, s - 1), i + (i < smooth.length ? 1 : 0));
+        if (slice.length >= 2) {
+          const soft = chaikin(slice.map((p) => ({ x: p.x, y: p.y })));
+          out.push({
+            kind: smooth[s].est ? "estimated" : "measured",
+            pts: soft.map((p) => ({ x: p.x / W, y: p.y / H })),
+          });
+        }
+        s = i;
+      }
+    }
     prevEnd = { i: run[run.length - 1].i, x: smooth[smooth.length - 1].x, y: smooth[smooth.length - 1].y };
   }
   return out;
@@ -1431,13 +1455,14 @@ export function drawClubArc(
   ctx.lineJoin = "round";
   let done = 0;
   for (const seg of segs) {
-    const bridge = seg.kind === "bridge";
-    ctx.setLineDash(bridge ? [lw * 2.2, lw * 2.6] : []);
-    ctx.strokeStyle = color;
+    const solid = seg.kind === "measured";
+    // 実測＝オレンジ実線／前腕+コック補間の推定＝青の破線／実測なしの橋＝薄い破線
+    ctx.setLineDash(solid ? [] : [lw * 2.2, lw * 2.6]);
+    ctx.strokeStyle = seg.kind === "estimated" ? "#8aa6ff" : color;
     for (let i = 1; i < seg.pts.length; i++) {
       const t = (done + i) / total; // 0=始点 → 1=終点
-      ctx.globalAlpha = bridge ? 0.4 : 0.35 + 0.55 * t;
-      ctx.lineWidth = bridge ? lw * 0.8 : lw * (0.8 + 0.5 * t);
+      ctx.globalAlpha = seg.kind === "bridge" ? 0.4 : solid ? 0.35 + 0.55 * t : 0.75;
+      ctx.lineWidth = solid ? lw * (0.8 + 0.5 * t) : lw * 0.8;
       ctx.beginPath();
       ctx.moveTo(ox + seg.pts[i - 1].x * dw, oy + seg.pts[i - 1].y * dh);
       ctx.lineTo(ox + seg.pts[i].x * dw, oy + seg.pts[i].y * dh);
