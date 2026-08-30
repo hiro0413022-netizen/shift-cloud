@@ -1256,10 +1256,9 @@ export function drawClubTrace(
  *
  * 表示専用で、保存データ（ClubData）は一切触らない。
  * 「滑らかにつないで嘘をつかない」はここでも守る:
- *   - なめらかにするのは **実測点の並びの中** だけ（数pxのジッタ取り）。
- *   - 実測が途切れた区間（インパクト前後など）は kind:"bridge" として別に返し、
- *     描画では破線にする＝実線とひと目で区別できる。
- *   - 前腕から補った推定点（conf<0）の区間も kind:"estimated" で分けて返す。
+ *   - 実測アンカーどうしの区間だけ実線（"measured"）。
+ *   - 推定アンカー（前腕+コック補間）や区間が飛んだところは "estimated"＝青破線で必ず区別。
+ * kind:"bridge" は旧方式の名残（現方式では出さないが型は残す）。
  */
 export type ArcSegment = {
   kind: "measured" | "estimated" | "bridge";
@@ -1267,26 +1266,24 @@ export type ArcSegment = {
   pts: { x: number; y: number }[];
 };
 
-/** 実測がこれ以上コマ数飛んだら別の区間とみなす（30fps解析で約0.4秒） */
-const ARC_SPLIT_FRAMES = 12;
 /**
- * 隣の点がクラブ長の1.2倍を超えて飛んでいたら「候補の乗り移り」として切る。
- * ⚠ IMG_8986の実測: 本物の速い動き（切り返し直後）は1コマでクラブ長0.9倍まで飛ぶので、
- *   これより厳しくすると本物のスイングの弧が切れてしまう。
+ * ★方式（2026-08-30・ユーザー案「スイングを30分割してヘッド位置を特定し、そこから線を引く」）
+ *
+ * 全コマを線でつなぐと、ネットの揺れや画面の映り込みを拾った点まで一筆に入り
+ * 「落書き」になる。そこで:
+ *   1. スイングの時間を ARC_BUCKETS 個の区間に割る
+ *   2. 各区間の実測点から上位K候補を出し、DP（確からしさ＋前後の区間とのつながり）で
+ *      **1区間1点のアンカー** を選ぶ。奥のネット等は一瞬強くても前後とつながらないので選から漏れる
+ *   3. 実測が無い区間だけ、前腕+コック補間の推定点をアンカーに使う（青破線で区別）
+ *   4. アンカー列に centripetal Catmull-Rom で滑らかな1本の線を引く
  */
-const ARC_JUMP_MAX = 1.2;
-/**
- * 進行方向が120度超も折り返し、かつクラブ長の0.13倍以上動いた点で切る。
- * 本物の弧はなめらかに曲がる。急な折り返しは別の場所を拾い直した点
- * （ネットの揺れ・画面の映り込み）で、つなぐとジグザグの嘘になる（IMG_8986で実測）。
- */
-const ARC_TURN_DEG = 120;
-const ARC_TURN_MIN = 0.13;
-/** これより短い区間はノイズとして描かない */
-const ARC_MIN_RUN = 5;
-/** 区間どうしをつなぐ破線は クラブ長1.3倍・18コマ以内の空白だけ（それ以上はどこを通ったか分からない） */
-const ARC_BRIDGE_MAX = 1.3;
-const ARC_BRIDGE_FRAMES = 18;
+const ARC_BUCKETS = 30;
+/** 各区間で残す実測候補の数 */
+const ARC_CAND_K = 3;
+/** アンカーが飛び越えられる区間数。これを超える空白はつながず、点の多い側だけ描く */
+const ARC_GAP_MAX = 6;
+/** アンカーがこれ未満なら弧を描かない（線の体をなさない） */
+const ARC_MIN_ANCHORS = 8;
 /**
  * アークでは前腕から90度超の点は使わない（DPの±120度より厳しく）。
  * ボールがネットに当たった後の「ネット/カーテンの揺れ」は差分上完璧なシャフトに見えるが、
@@ -1294,30 +1291,31 @@ const ARC_BRIDGE_FRAMES = 18;
  */
 const ARC_MAX_COCK = 90;
 
-/** 窓5の中央値でジッタを取る（外れ値1点に引っ張られない） */
-function median5(vals: number[], i: number): number {
-  const a: number[] = [];
-  for (let j = Math.max(0, i - 2); j <= Math.min(vals.length - 1, i + 2); j++) a.push(vals[j]);
-  a.sort((x, y) => x - y);
-  return a[Math.floor(a.length / 2)];
-}
+const lerpP = (a: { x: number; y: number }, b: { x: number; y: number }, u: number) =>
+  ({ x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u });
 
-/** Chaikin の角割り。2回かけると折れ線が十分なめらかな弧になる */
-function chaikin(pts: { x: number; y: number }[], times = 2): { x: number; y: number }[] {
-  let cur = pts;
-  for (let t = 0; t < times; t++) {
-    if (cur.length < 3) return cur;
-    const out: { x: number; y: number }[] = [cur[0]];
-    for (let i = 0; i < cur.length - 1; i++) {
-      const a = cur[i];
-      const b = cur[i + 1];
-      out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
-      out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
-    }
-    out.push(cur[cur.length - 1]);
-    cur = out;
+/** centripetal Catmull-Rom（α=0.5）。アンカー間隔が不均一でも輪や行き過ぎを作らない */
+function catmullRom(
+  p0: { x: number; y: number }, p1: { x: number; y: number },
+  p2: { x: number; y: number }, p3: { x: number; y: number }, steps: number
+): { x: number; y: number }[] {
+  const tj = (ti: number, a: { x: number; y: number }, b: { x: number; y: number }) =>
+    ti + (Math.sqrt(Math.hypot(b.x - a.x, b.y - a.y)) || 1e-3);
+  const t0 = 0;
+  const t1 = tj(t0, p0, p1);
+  const t2 = tj(t1, p1, p2);
+  const t3 = tj(t2, p2, p3);
+  const out: { x: number; y: number }[] = [];
+  for (let s = 1; s <= steps; s++) {
+    const t = t1 + ((t2 - t1) * s) / steps;
+    const a1 = lerpP(p0, p1, (t - t0) / (t1 - t0));
+    const a2 = lerpP(p1, p2, (t - t1) / (t2 - t1));
+    const a3 = lerpP(p2, p3, (t - t2) / (t3 - t2));
+    const b1 = lerpP(a1, a2, (t - t0) / (t2 - t0));
+    const b2 = lerpP(a2, a3, (t - t1) / (t3 - t1));
+    out.push(lerpP(b1, b2, (t - t1) / (t2 - t1)));
   }
-  return cur;
+  return out;
 }
 
 export function buildClubArc(
@@ -1329,14 +1327,13 @@ export function buildClubArc(
   const clubPx = Math.max(40, (club.clubLen / 1000) * W);
   const fromMs = (opts.fromSec ?? -Infinity) * 1000;
   const toMs = (opts.toSec ?? Infinity) * 1000;
-  type P = { i: number; x: number; y: number; est: boolean };
+
+  type P = { t: number; x: number; y: number; est: boolean; conf: number };
   const pts: P[] = [];
   for (let i = 0; i < club.p.length; i++) {
     const r = club.p[i];
     if (!r || r.length !== 3) continue;
     if (club.t[i] < fromMs || club.t[i] > toMs) continue;
-    // 前腕+コック補間の推定コマ（conf<0）も弧に入れる（2026-08-29・ユーザー案）。
-    // 描画は必ず青の破線＝実測と見分けがつく形で。
     const est = r[2] < 0;
     const x = (r[0] / 1000) * W;
     const y = (r[1] / 1000) * H;
@@ -1355,79 +1352,75 @@ export function buildClubArc(
         if (Math.abs(angDiff(head, arm)) > ARC_MAX_COCK) continue;
       }
     }
-    pts.push({ i, x, y, est });
+    pts.push({ t: club.t[i], x, y, est, conf: est ? 30 : r[2] });
   }
-  if (pts.length < ARC_MIN_RUN) return [];
+  if (pts.length < ARC_MIN_ANCHORS) return [];
 
-  // 1) コマ番号の飛び・距離の飛び・急な折り返しで「連続した並び（run）」に切る
-  const runs: P[][] = [];
-  let cur: P[] = [pts[0]];
-  for (let k = 1; k < pts.length; k++) {
-    const a = pts[k - 1];
-    const b = pts[k];
-    const gap = b.i - a.i;
-    const jump = Math.hypot(b.x - a.x, b.y - a.y);
-    let turn = 0;
-    if (cur.length >= 2) {
-      const p0 = cur[cur.length - 2];
-      const n1 = Math.hypot(a.x - p0.x, a.y - p0.y);
-      const n2 = jump;
-      if (n1 > 4 && n2 > 4) {
-        const dot = ((a.x - p0.x) * (b.x - a.x) + (a.y - p0.y) * (b.y - a.y)) / (n1 * n2);
-        turn = (Math.acos(Math.max(-1, Math.min(1, dot))) * 180) / Math.PI;
-      }
-    }
-    if (
-      gap > ARC_SPLIT_FRAMES ||
-      jump > clubPx * ARC_JUMP_MAX ||
-      (turn > ARC_TURN_DEG && jump > clubPx * ARC_TURN_MIN)
-    ) {
-      runs.push(cur);
-      cur = [b];
-    } else {
-      cur.push(b);
-    }
+  // 1) 時間を区間に割り、各区間の候補を作る（実測が無い区間だけ推定を1点）
+  const t0 = pts[0].t;
+  const t1 = pts[pts.length - 1].t;
+  if (!(t1 > t0)) return [];
+  const buckets: P[][] = Array.from({ length: ARC_BUCKETS }, () => []);
+  for (const p of pts) {
+    const b = Math.min(ARC_BUCKETS - 1, Math.floor(((p.t - t0) / (t1 - t0 + 1)) * ARC_BUCKETS));
+    buckets[b].push(p);
   }
-  runs.push(cur);
+  const cands: P[][] = buckets.map((list) => {
+    const meas = list.filter((p) => !p.est).sort((a, b) => b.conf - a.conf).slice(0, ARC_CAND_K);
+    if (meas.length) return meas;
+    const ests = list.filter((p) => p.est);
+    return ests.length ? [ests[Math.floor(ests.length / 2)]] : [];
+  });
 
-  // 2) 短い切れ端を捨て、run ごとにジッタ取り→なめらかに。
-  //    run の間は破線の橋（実測が無いことを隠さない）
-  const kept = runs.filter((r) => r.length >= ARC_MIN_RUN);
-  const out: ArcSegment[] = [];
-  let prevEnd: { i: number; x: number; y: number } | null = null;
-  for (const run of kept) {
-    const xs = run.map((p) => p.x);
-    const ys = run.map((p) => p.y);
-    const smooth = run.map((p, i) => ({ x: median5(xs, i), y: median5(ys, i), est: p.est }));
-    if (prevEnd) {
-      const d = Math.hypot(smooth[0].x - prevEnd.x, smooth[0].y - prevEnd.y);
-      // 長すぎる空白（インパクト前後など）はどこを通ったか分からないので線を引かない
-      if (d <= clubPx * ARC_BRIDGE_MAX && run[0].i - prevEnd.i <= ARC_BRIDGE_FRAMES) {
-        out.push({
-          kind: "bridge",
-          pts: [
-            { x: prevEnd.x / W, y: prevEnd.y / H },
-            { x: smooth[0].x / W, y: smooth[0].y / H },
-          ],
-        });
-      }
-    }
-    // 実測と推定の切り替わりで区間を分ける（線種を変えるため）。境目の点は両側に含めてつなぐ
-    let s = 0;
-    for (let i = 1; i <= smooth.length; i++) {
-      if (i === smooth.length || smooth[i].est !== smooth[s].est) {
-        const slice = smooth.slice(Math.max(0, s - 1), i + (i < smooth.length ? 1 : 0));
-        if (slice.length >= 2) {
-          const soft = chaikin(slice.map((p) => ({ x: p.x, y: p.y })));
-          out.push({
-            kind: smooth[s].est ? "estimated" : "measured",
-            pts: soft.map((p) => ({ x: p.x / W, y: p.y / H })),
-          });
+  // 2) DP: 確からしさ＋前後のつながりで1区間1点。
+  //    奥のネット・画面の映り込みは一瞬強くても前後の区間とつながらないので選から漏れる。
+  const best: number[][] = cands.map((l) => l.map(() => -1e9));
+  const from: ([number, number] | null)[][] = cands.map((l) => l.map(() => null));
+  const score = (c: P) => (c.est ? 0.25 : 0.4 + 0.6 * (c.conf / 100));
+  for (let b = 0; b < ARC_BUCKETS; b++) {
+    for (let k = 0; k < cands[b].length; k++) {
+      const c = cands[b][k];
+      let bs = score(c);
+      let f: [number, number] | null = null;
+      for (let g = 1; g <= ARC_GAP_MAX && b - g >= 0; g++) {
+        for (let m = 0; m < cands[b - g].length; m++) {
+          if (best[b - g][m] < -1e8) continue;
+          const p = cands[b - g][m];
+          const d = Math.hypot(c.x - p.x, c.y - p.y);
+          // 1区間（スイングの1/30）でヘッドが動ける距離の上限。実測: 切り返し直後で約クラブ長0.9倍/区間
+          const allow = clubPx * (0.9 * g + 0.5);
+          const pen = Math.pow(d / allow, 2) + 0.35 * (g - 1);
+          const sc = best[b - g][m] + score(c) - pen;
+          if (sc > bs) { bs = sc; f = [b - g, m]; }
         }
-        s = i;
       }
+      best[b][k] = bs;
+      from[b][k] = f;
     }
-    prevEnd = { i: run[run.length - 1].i, x: smooth[smooth.length - 1].x, y: smooth[smooth.length - 1].y };
+  }
+  let bi = -1;
+  let bk = -1;
+  let bv = -1e9;
+  for (let b = 0; b < ARC_BUCKETS; b++) {
+    for (let k = 0; k < cands[b].length; k++) if (best[b][k] > bv) { bv = best[b][k]; bi = b; bk = k; }
+  }
+  if (bi < 0) return [];
+  const anchors: (P & { b: number })[] = [];
+  let cur: [number, number] | null = [bi, bk];
+  while (cur) { anchors.push({ b: cur[0], ...cands[cur[0]][cur[1]] }); cur = from[cur[0]][cur[1]]; }
+  anchors.reverse();
+  if (anchors.length < ARC_MIN_ANCHORS) return [];
+
+  // 3) アンカー列に滑らかな線。推定アンカーや飛んだ区間は "estimated"（青破線）で正直に区別
+  const out: ArcSegment[] = [];
+  for (let a = 0; a < anchors.length - 1; a++) {
+    const p0 = anchors[Math.max(0, a - 1)];
+    const p1 = anchors[a];
+    const p2 = anchors[a + 1];
+    const p3 = anchors[Math.min(anchors.length - 1, a + 2)];
+    const kind: ArcSegment["kind"] = p1.est || p2.est || p2.b - p1.b > 2 ? "estimated" : "measured";
+    const sampled = [{ x: p1.x, y: p1.y }, ...catmullRom(p0, p1, p2, p3, 14)];
+    out.push({ kind, pts: sampled.map((p) => ({ x: p.x / W, y: p.y / H })) });
   }
   return out;
 }

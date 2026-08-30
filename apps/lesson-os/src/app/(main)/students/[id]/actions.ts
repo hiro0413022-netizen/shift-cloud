@@ -494,18 +494,38 @@ type PoseDataIn = { v: 1; t: number[]; p: number[][] };
 type ClubDataIn = { v: 1; t: number[]; p: number[][]; clubLen: number };
 type PlaneIn = { x1: number; y1: number; x2: number; y2: number; _method: "address" | "manual" };
 /** クラブ検出がどこで落ちたか。取れなかったときに現場で打つ手を決めるための数字 */
+type DiagVerdictIn = {
+  ok: boolean; reason: string | null; advice: string | null;
+  belowHands: number; vRangePct: number; sweepDeg: number; handSpeedPct: number;
+};
 type ClubDiagIn = {
   frames: number; withPose: number; withRay: number; kept: number; final: number;
   thr: number; fill: number; conf: number; gap: number;
+  verdict?: DiagVerdictIn;
 };
 const DIAG_KEYS = ["frames", "withPose", "withRay", "kept", "final", "thr", "fill", "conf", "gap"] as const;
 function cleanDiag(d: unknown): ClubDiagIn | null {
   if (!d || typeof d !== "object") return null;
   const src = d as Record<string, unknown>;
-  const out = {} as Record<string, number>;
+  const out = {} as Record<string, unknown>;
   for (const k of DIAG_KEYS) {
     const n = Number(src[k]);
     out[k] = isFinite(n) ? Math.round(n) : 0;
+  }
+  // #185 の判定（verdict）も保存する（2026-08-30 発覚: ここで落としていたため、
+  // 再訪時に「なぜクラブ軌跡が出ないか」の理由と撮り直しの案内が消えていた）
+  const v = src.verdict;
+  if (v && typeof v === "object") {
+    const vv = v as Record<string, unknown>;
+    out.verdict = {
+      ok: Boolean(vv.ok),
+      reason: typeof vv.reason === "string" ? vv.reason.slice(0, 500) : null,
+      advice: typeof vv.advice === "string" ? vv.advice.slice(0, 500) : null,
+      belowHands: Math.round(Number(vv.belowHands) || 0),
+      vRangePct: isFinite(Number(vv.vRangePct)) ? Number(vv.vRangePct) : 0,
+      sweepDeg: Math.round(Number(vv.sweepDeg) || 0),
+      handSpeedPct: isFinite(Number(vv.handSpeedPct)) ? Number(vv.handSpeedPct) : 0,
+    } satisfies DiagVerdictIn;
   }
   return out as unknown as ClubDiagIn;
 }

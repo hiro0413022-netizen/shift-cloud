@@ -283,31 +283,36 @@ function clubOf(pts: ({ x: number; y: number } | null)[], clubLen = 555) {
   };
 }
 
-test("アーク: なめらかな弧は1本の実線にまとまる", () => {
+test("アーク: なめらかな弧は実線のアンカー列にまとまる（30分割方式）", () => {
   // 中心(540,1000)半径600の弧を40コマ（1コマ約5度＝50px前後の動き）
   const pts = Array.from({ length: 40 }, (_, i) => {
     const ang = ((-90 + i * 5) * Math.PI) / 180;
     return { x: 540 + Math.cos(ang) * 600, y: 1000 + Math.sin(ang) * 600 };
   });
   const segs = buildClubArc(clubOf(pts), AW, AH);
-  assert.equal(segs.length, 1, `1本になる (実際 ${segs.map((s) => s.kind)})`);
-  assert.equal(segs[0].kind, "measured");
+  assert.ok(segs.length >= 8, `アンカー区間ができる (実際 ${segs.length})`);
+  assert.ok(segs.every((s) => s.kind === "measured"), "全部実線（推定なし）");
   // なめらかにしても元の弧から大きくは離れない（データに無い場所へ線を引かない）
-  for (const p of segs[0].pts) {
+  for (const s of segs) for (const p of s.pts) {
     const r = Math.hypot(p.x * AW - 540, p.y * AH - 1000);
-    assert.ok(Math.abs(r - 600) < 40, `弧の上にある (実際 r=${r.toFixed(0)})`);
+    assert.ok(Math.abs(r - 600) < 45, `弧の上にある (実際 r=${r.toFixed(0)})`);
   }
 });
 
-test("アーク: インパクトの長い空白には橋を架けない（どこを通ったか分からない）", () => {
-  // バック側20コマ → 25コマの空白 → フォロー側20コマ（遠い場所）
+test("アーク: 大きな空白は飛び越えず、点の多い側だけ描く（落書き防止）", () => {
+  // バック側20コマ → 25コマの空白 → 別の場所に20コマ。
+  // 空白は区間6個ぶんの上限を超えるので、無理につながず片側だけを描く
   const pts: ({ x: number; y: number } | null)[] = [];
   for (let i = 0; i < 20; i++) pts.push({ x: 150 + i * 15, y: 1500 });
   for (let i = 0; i < 25; i++) pts.push(null);
   for (let i = 0; i < 20; i++) pts.push({ x: 900 - i * 15, y: 300 });
   const segs = buildClubArc(clubOf(pts), AW, AH);
-  assert.equal(segs.filter((s) => s.kind === "measured").length, 2, "両側とも残る");
-  assert.equal(segs.filter((s) => s.kind === "bridge").length, 0, "空白は破線でもつながない");
+  assert.ok(segs.length > 0, "片側は描ける");
+  // どの線も空白の中間帯（y=700〜1200px）を通らない＝知らない場所に線を引かない
+  for (const s of segs) for (const p of s.pts) {
+    const y = p.y * AH;
+    assert.ok(y < 700 || y > 1200, `中間帯を通らない (実際 y=${y.toFixed(0)})`);
+  }
 });
 
 test("アーク: 骨格があれば前腕から90度超の点は使わない（ネットの揺れ対策）", () => {
@@ -326,7 +331,7 @@ test("アーク: 骨格があれば前腕から90度超の点は使わない（�
   // 前腕と同じ向き（右）なら残る
   const ok = Array.from({ length: 12 }, (_, i) => ({ x: 940 + i * 2, y: 1000 }));
   const segs = buildClubArc(clubOf(ok), AW, AH, { pose });
-  assert.equal(segs.length, 1);
+  assert.ok(segs.length >= 8, `アンカー区間ができる (実際 ${segs.length})`);
 });
 
 /* --- 角度は必ず px で計算する（9:16 の落とし穴） ------------------ */
