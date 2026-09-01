@@ -46,22 +46,17 @@ type Table = {
   update(patch: Row): Chain;
 };
 
-type Db = { from(table: string): Table };
+type Db = {
+  from(table: string): Table;
+  /** 名寄せはDB関数で行う（#190。アプリ側で数百件だけ読むと既存客が新規として増える） */
+  rpc(fn: string, args: Row): Res<unknown>;
+};
 
 export const TRIAL_LEDGER_PREFIX = "FRANK-TRIAL-";
 
 /** 受付台帳の冪等キー */
 export function trialReservationNo(trialRequestId: string): string {
   return `${TRIAL_LEDGER_PREFIX}${trialRequestId}`;
-}
-
-/** 数字だけ（電話の表記ゆれ吸収用・下10桁で照合する） */
-function digits(s: unknown): string {
-  return String(s ?? "").replace(/[^0-9]/g, "");
-}
-function phoneKey(s: unknown): string {
-  const d = digits(s);
-  return d.length > 10 ? d.slice(-10) : d;
 }
 
 const hhmm = (t: unknown): string => String(t ?? "").slice(0, 5);
@@ -115,7 +110,7 @@ export async function syncTrialWalkin(
   const reqRes = await admin
     .from("mbr_trial_requests")
     .select(
-      "id, company_id, store_id, name, name_kana, phone, email, booked_date, start_time, end_time, status, source, lefty, experience, message, deleted_at",
+      "id, company_id, store_id, name, name_kana, birth_date, phone, email, booked_date, start_time, end_time, status, source, lefty, experience, message, deleted_at",
     )
     .eq("id", trialRequestId)
     .maybeSingle();
@@ -239,19 +234,28 @@ async function resolveGuestId(
   const phone = String(req.phone ?? "").trim();
   const email = String(req.email ?? "").trim();
 
+  const birth = req.birth_date == null || String(req.birth_date).trim() === "" ? null : String(req.birth_date).trim();
+
   if (phone || email) {
-    const res = await admin
-      .from("mbr_guests")
-      .select("id, phone, mobile, email")
-      .eq("company_id", companyId)
-      .is("deleted_at", null)
-      .limit(500);
-    const key = phoneKey(phone);
-    const mail = email.toLowerCase();
-    for (const g of res.data ?? []) {
-      const hitPhone = key !== "" && (phoneKey(g.phone) === key || phoneKey(g.mobile) === key);
-      const hitMail = mail !== "" && String(g.email ?? "").toLowerCase() === mail;
-      if (hitPhone || hitMail) return String(g.id);
+    // ⚠ 以前はここで mbr_guests を **500件だけ** 読んで突き合わせていた（#190で修正）。
+    //   FRANK と GOLF WING は同じ会社で、mbr_guests は既に6,000人を超えている。
+    //   500件しか見ないと既存のお客様が毎回「新規」として増え、来店検索でも二重に出ていた。
+    //   照合はDB関数 find_guest_by_contact（0135）に寄せる＝フィッティング側と同じ1本の規則。
+    const hit = await admin.rpc("find_guest_by_contact", {
+      p_company_id: companyId,
+      p_phone: phone || null,
+      p_email: email || null,
+    });
+    if (!hit.error && hit.data) {
+      const gid = String(hit.data);
+      // 既存のお客様に生年月日が無ければ、予約でいただいた分で埋める（あるものは上書きしない）
+      if (birth) {
+        const cur = await admin.from("mbr_guests").select("id, birth_date").eq("id", gid).maybeSingle();
+        if (cur.data && (cur.data.birth_date == null || String(cur.data.birth_date).trim() === "")) {
+          await admin.from("mbr_guests").update({ birth_date: birth, updated_at: new Date().toISOString() }).eq("id", gid);
+        }
+      }
+      return gid;
     }
   }
 
@@ -262,6 +266,7 @@ async function resolveGuestId(
       store_id: storeId,
       name,
       name_kana: req.name_kana == null || String(req.name_kana).trim() === "" ? null : String(req.name_kana).trim(),
+      birth_date: birth,
       phone: phone || null,
       email: email || null,
     })

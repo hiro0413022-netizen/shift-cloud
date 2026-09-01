@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
   const r = await createTrialBooking({
     name: String(body.name ?? ""),
     nameKana: body.name_kana ? String(body.name_kana) : undefined,
+    birthDate: body.birth_date ? String(body.birth_date) : undefined,
     phone: body.phone ? String(body.phone) : undefined,
     email: body.email ? String(body.email) : undefined,
     date: String(body.date ?? ""),

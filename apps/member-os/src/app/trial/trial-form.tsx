@@ -5,6 +5,7 @@ import { submitTrial, type TrialState } from "./actions";
 import { TRIAL_EXPERIENCE } from "@/lib/trial";
 import { privacyUrl } from "@/lib/site";
 import { NameFields } from "@/components/name-fields";
+import { BirthDateInput } from "@/components/birth-date-input";
 
 const field =
   "w-full rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
@@ -34,6 +35,12 @@ export function TrialForm() {
           requiredMark={<span className="text-rose-400"> *</span>}
         />
       </div>
+      {/* 生年月日は必須（#190）。公式サイトの体験予約と同じ扱いにそろえる */}
+      <BirthDateInput
+        inputClassName={field}
+        labelClassName={label}
+        label="生年月日 *"
+      />
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className={label}>電話番号</label>

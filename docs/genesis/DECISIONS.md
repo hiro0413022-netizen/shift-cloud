@@ -988,3 +988,21 @@
   ⚠ 音は iPad/Safari の制約で**一度タップしないと鳴らせない**（従来どおり「音をONにする」が要る）。ONにした瞬間に1回鳴らすようにしたので、押せているかどうかが分かる。
 
   実装: `apps/member-os/src/lib/frank-reservation.ts`（`loadMemberOptions`）、`app/(main)/reservations/member-picker.tsx`（新規）・`page.tsx`・`actions.ts`、`app/orders/live.tsx`・`page.tsx`。member-os の `tsc --noEmit` と **`next build` 通過**（クラウドでcloneして実走）・テスト518件パス
+
+- #190 (2026-09-01) **体験予約に生年月日を必須で入れ、体験→受付台帳の名寄せの穴を塞いだ**（migration 0137適用済）。ユーザー指示「体験予約時に生年月日を入れるようにしてください、ここは必須」。
+
+  **(a) なぜ体験の時点でいただくか。** 体験のあと入会される方は、店頭で会員申込書に**もう一度 生年月日を書いている**。受付台帳（`mbr_guests`）にも生年月日の欄はあるのに、Web体験予約からは一度も入っていなかった＝年代別の集客分析もできなかった。予約時にいただければ、来店時は**確認だけ**で済む（`/reception/v/` の受付フォームは `mbr_guests.birth_date` を既に流し込む・#186）。
+
+  **(b) 判定は1か所に置く**＝`packages/core/src/birth-date.ts`（`birthDateError` / `normalizeBirthDate` / `ageOn`・テスト7件）。体験の入口は**2つ**ある（公式サイトの素のJS／member-os の `/trial`）ので、画面ごとに条件を書くと必ずズレる。**画面のチェックだけでは足りない**（画面を通らない直接POSTで空のまま入る）ので、**サーバー側でも同じ関数を通す**。弾くのは「日付として成立しないもの」だけ＝2月31日・未来・1900年より前。**年齢での足切りはしない**（体験には未成年も来る）。基準日は必ず引数で渡す＝環境の日付に依存する時限爆弾テストを作らない（#157）。
+
+  **(c) 公式サイトは年/月/日の3プルダウン**（`input type="date"` はiPhone/iPadのホイールで「日」が合わせにくく、入力を諦める方が出る）。member-os 側は既存の `BirthDateInput` をそのまま使う。**日数は選んだ年月に合わせて出し直す**＝存在しない日を選ばせない。
+
+  **(d) NOT NULL にはしない**（0137）。既存の申込には値が無く、過去分を捏造しない。スタッフが電話で受けて後から埋める入口（member-os `/trials`）も残っている。**必須はお客様が自分で予約する入口で担保する**。
+
+  **(e) ついでに見つけた実害 — 体験の名寄せが500件しか見ていなかった。** `frank-walkin.ts` の `resolveGuestId` は `mbr_guests` を **`.limit(500)`** で読んでアプリ側で突き合わせていた。FRANK と GOLF WING は**同じ会社**で `mbr_guests` は既に6,000人超＝**既存のお客様が体験のたびに「新規」として増え、来店検索でも二重に出ていた**。#186 でフィッティング側だけをDB関数 `find_guest_by_contact`（0135）に寄せていたが、体験側が取り残されていた。同じ関数に寄せて塞いだ＝**名寄せの規則を2つ持たない**。
+
+  **(f) 既存のお客様の生年月日は上書きしない**。空のときだけ、予約でいただいた値で埋める。
+
+  実装: `packages/core/src/birth-date.ts`（新規）・`frank-walkin.ts`、`apps/genesis/src/lib/frank-trial.ts`・`api/public/frank/trial/route.ts`、`apps/member-os/src/app/trial/{actions.ts,trial-form.tsx}`、`sites/frank-golf/_build.py`（＋生成物 `trial-booking.html`）、`supabase/migrations/0137_trial_birth_date.sql`（**適用済み**）、`tests/birth-date.test.ts`。genesis / member-os の `tsc --noEmit` と **`next build` 通過**（クラウドでcloneして実走）・テスト **525件パス**（新規7件）
+
+  **(g) FRANKのスタッフ打刻は新規開発なしで使える**（ユーザー依頼「フランクゴルフ用のスタッフ用の打刻できるようにしてください」）。Shift Cloud の打刻端末（`/kiosk/<token>`・ログイン不要）は **#88 で FRANK 用に発行済み**で、URLは Vault「FRANK 店頭タブレット（店舗ダッシュボード/打刻）」に記録されていた。実機で開いて「FRANK GOLF 姫路／名前を選んでください」と6名が出ることを確認済み。**打刻端末は店舗ダッシュボードと同じトークン**（`/store/<token>` と `/kiosk/<token>`）。⚠ 打刻画面に**スタッフではないアカウント「FRANK GOLF姫路」（login_id: frankgolf・店舗ログイン用）が人として並ぶ**。消すとログインが壊れるので、隠すには「人かどうか」の区別が要る＝次の判断（ユーザーへ確認済み）。

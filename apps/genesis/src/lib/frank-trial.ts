@@ -4,6 +4,7 @@ import { logEvent } from "@/lib/kernel";
 import { loadBookingCfg, businessHours } from "@/lib/frank-booking";
 import { bookableRange } from "@yozan/core/frank-booking";
 import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
+import { birthDateError, normalizeBirthDate } from "@yozan/core/birth-date";
 import { buildTrialConfirmMail, sendFrankMail } from "@/lib/frank-mail";
 
 /**
@@ -147,6 +148,8 @@ export type TrialInput = {
   email?: string;
   date: string;
   start: string;
+  /** 生年月日 YYYY-MM-DD（Web体験予約では必須・#190） */
+  birthDate?: string;
   lefty?: boolean;
   experience?: string;
   message?: string;
@@ -186,6 +189,9 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
   if (phone && phone.replace(/\D/g, "").length < 10) return { ok: false, error: "電話番号をご確認ください" };
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "メールアドレスをご確認ください" };
   if (!input.consent) return { ok: false, error: "個人情報の取扱いへの同意が必要です" };
+  // 生年月日は必須（#190・ユーザー指示）。画面のチェックだけだと直接POSTで空のまま入る
+  const birthErr = birthDateError(input.birthDate, jstToday());
+  if (birthErr) return { ok: false, error: birthErr };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { ok: false, error: "日付が不正です" };
   if (!/^\d{2}:\d{2}$/.test(input.start)) return { ok: false, error: "時刻が不正です" };
 
@@ -246,6 +252,7 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
       store_id: FRANK_STORE,
       name,
       name_kana: input.nameKana?.trim() || null,
+      birth_date: normalizeBirthDate(input.birthDate, jstToday()),
       phone: phone || null,
       email: email || null,
       pref1: `${input.date} ${input.start}`, // 旧一覧との互換（第1希望欄に確定枠を入れる）

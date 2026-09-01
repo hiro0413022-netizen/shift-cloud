@@ -139,6 +139,17 @@
               <label class="form__label" for="tb-mei-kana">メイ（フリガナ）</label>
               <input id="tb-mei-kana" type="text" placeholder="タロウ">
             </div>
+            <div class="form__row form__row--full">
+              <label class="form__label" for="tb-birth-y">生年月日 <span class="req">必須</span></label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select id="tb-birth-y" style="flex:1.2"><option value="">年</option></select>
+                <span style="opacity:.7">年</span>
+                <select id="tb-birth-m" style="flex:1"><option value="">月</option></select>
+                <span style="opacity:.7">月</span>
+                <select id="tb-birth-d" style="flex:1"><option value="">日</option></select>
+                <span style="opacity:.7">日</span>
+              </div>
+            </div>
             <div class="form__row">
               <label class="form__label" for="tb-phone">電話番号 <span class="req">必須</span></label>
               <input id="tb-phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="090-1234-5678">
@@ -227,6 +238,43 @@
 
   function jstNow(){ return new Date(Date.now() + 9*3600*1000) }
   function ymd(d){ return d.toISOString().slice(0,10) }
+
+  /* ---------- 生年月日（年/月/日の3つのプルダウン） ----------
+     iPhone/iPadの <input type="date"> はホイールで「日」が合わせにくく、
+     入力を諦める方が出るため3分割にしている（member-os の BirthDateInput と同じ考え方）。
+     日数は選んだ年月に合わせて出し直す（2月31日を選ばせない）。 */
+  (function(){
+    var y = $("tb-birth-y"), m = $("tb-birth-m"), d = $("tb-birth-d");
+    if (!y || !m || !d) return;
+    var thisYear = jstNow().getUTCFullYear();
+    var h = '<option value="">年</option>';
+    for (var i = thisYear; i >= thisYear - 100; i--) h += '<option value="' + i + '">' + i + '</option>';
+    y.innerHTML = h;
+    h = '<option value="">月</option>';
+    for (var mm = 1; mm <= 12; mm++) h += '<option value="' + mm + '">' + mm + '</option>';
+    m.innerHTML = h;
+    function fillDays(){
+      var yy = Number(y.value) || 2000; /* 未選択のあいだは閏年扱いで29日まで出す */
+      var mo = Number(m.value);
+      var last = mo ? new Date(yy, mo, 0).getDate() : 31;
+      var keep = Number(d.value);
+      var s2 = '<option value="">日</option>';
+      for (var dd = 1; dd <= last; dd++) s2 += '<option value="' + dd + '">' + dd + '</option>';
+      d.innerHTML = s2;
+      if (keep && keep <= last) d.value = String(keep);
+    }
+    y.addEventListener("change", fillDays);
+    m.addEventListener("change", fillDays);
+    fillDays();
+  })();
+
+  /* 選ばれた生年月日を YYYY-MM-DD で返す。未選択は "" */
+  function birthValue(){
+    var y = $("tb-birth-y"), m = $("tb-birth-m"), d = $("tb-birth-d");
+    if (!y || !m || !d || !y.value || !m.value || !d.value) return "";
+    var p2 = function(n){ return ("0" + n).slice(-2) };
+    return y.value + "-" + p2(m.value) + "-" + p2(d.value);
+  }
 
   /* ---------- キャンセル画面 ---------- */
   var token = (location.search.match(/[?&]cancel=([0-9a-f]+)/) || [])[1];
@@ -370,11 +418,13 @@
     if (!sei)  { el.className = "form__status is-err"; el.textContent = "姓をご入力ください"; $("tb-sei").focus(); return }
     if (!mei)  { el.className = "form__status is-err"; el.textContent = "名をご入力ください"; $("tb-mei").focus(); return }
     if (!phone) { el.className = "form__status is-err"; el.textContent = "電話番号をご入力ください"; $("tb-phone").focus(); return }
+    var birth = birthValue();
+    if (!birth) { el.className = "form__status is-err"; el.textContent = "生年月日をご入力ください"; $("tb-birth-y").focus(); return }
     if (!$("tb-consent").checked) { el.className = "form__status is-err"; el.textContent = "個人情報の取扱いへの同意が必要です"; return }
 
     var btn = $("tb-submit"); btn.disabled = true; el.textContent = "確定しています…";
     fetch(API, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({
-      action:"book", name:name, name_kana:kana, phone:phone,
+      action:"book", name:name, name_kana:kana, birth_date:birth, phone:phone,
       email:$("tb-email").value.trim(), date:state.date, start:state.start,
       lefty:state.lefty, experience:$("tb-exp").value, message:$("tb-msg").value.trim(), consent:true
     })}).then(function(r){ return r.json() }).then(function(j){

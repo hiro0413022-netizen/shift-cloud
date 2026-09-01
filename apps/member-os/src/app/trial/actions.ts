@@ -5,6 +5,8 @@ import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
 import { readName } from "@/lib/name";
 import { sendFrankMail, buildTrialRequestReceiptMail } from "@/lib/frank-mail";
+import { birthDateError } from "@yozan/core/birth-date";
+import { jstYmd } from "@/lib/jst";
 
 export type TrialState = { ok?: boolean; error?: string };
 
@@ -26,6 +28,10 @@ export async function submitTrial(_prev: TrialState, formData: FormData): Promis
   const phone = str(formData.get("phone"));
   const email = str(formData.get("email"));
   if (!phone && !email) return { error: "電話番号またはメールアドレスのいずれかをご入力ください" };
+  // 生年月日は必須（#190・ユーザー指示）。判定は公式サイト側と同じ規則（@yozan/core/birth-date）
+  const birthDate = str(formData.get("birth_date"));
+  const birthErr = birthDateError(birthDate, jstYmd());
+  if (birthErr) return { error: birthErr };
   if (!str(formData.get("pref1"))) return { error: "第1希望日時をご入力ください" };
   if (str(formData.get("consent_privacy")) !== "1")
     return { error: "個人情報の取扱いへの同意が必要です" };
@@ -36,6 +42,7 @@ export async function submitTrial(_prev: TrialState, formData: FormData): Promis
     store_id: store.storeId,
     name,
     name_kana: nameKana,
+    birth_date: birthDate,
     phone: phone || null,
     email: email || null,
     pref1: orNull(formData.get("pref1")),
