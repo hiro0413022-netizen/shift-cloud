@@ -39,14 +39,60 @@ async function sq(method: string, path: string, body?: Record<string, unknown>):
   return json;
 }
 
-/** 休会: 月会費の自動課金を止める */
-export async function pauseSubscription(subscriptionId: string): Promise<SquareOpResult> {
+/**
+ * 休会: 月会費の自動課金を止める。
+ *
+ * effectiveDate（"YYYY-MM-DD"）を渡すと **その日から** 止まる（#192）。
+ * 店のルールでは休会は必ず月初からなので、通常は "2026-10-01" のような月初が入る。
+ * 省略すると Square は「次の請求サイクルの開始日」で止める。
+ * ⚠ 未指定＝即時停止ではない。ここを取り違えると「止めたつもりで1回落ちる」事故になる。
+ */
+export async function pauseSubscription(subscriptionId: string, effectiveDate?: string | null): Promise<SquareOpResult> {
   if (!token()) return { ok: false, skipped: true };
   try {
-    await sq("POST", `/subscriptions/${subscriptionId}/pause`, {});
+    await sq("POST", `/subscriptions/${subscriptionId}/pause`, effectiveDate ? { pause_effective_date: effectiveDate } : {});
     return { ok: true };
   } catch (e) {
     console.error("[frank-square] pause failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}
+
+/**
+ * 退会: 月会費の自動課金を解約する（#192・2026-09-01）。
+ *
+ * これまで退会は Square を触らず「ダッシュボードで解約してください」と赤字を出すだけだった。
+ * 見落とすと翌月も引き落とされるので、退会日に合わせてここで必ず止める。
+ *
+ * effectiveDate（"YYYY-MM-DD"）あり:
+ *   PUT /subscriptions/{id} で canceled_date を入れる＝**その日で解約が予約される**。
+ *   店のルールでは退会日は必ず月末なので、その月までは請求され、翌月から止まる。
+ * effectiveDate なし:
+ *   POST /subscriptions/{id}/cancel＝**現在の請求サイクルの終わり**で解約（Squareの仕様。即時ではない）。
+ */
+export async function cancelSubscription(subscriptionId: string, effectiveDate?: string | null): Promise<SquareOpResult> {
+  if (!token()) return { ok: false, skipped: true };
+  try {
+    if (effectiveDate) {
+      await sq("PUT", `/subscriptions/${subscriptionId}`, { subscription: { canceled_date: effectiveDate } });
+    } else {
+      await sq("POST", `/subscriptions/${subscriptionId}/cancel`, {});
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square] cancel failed:", e);
+    return { ok: false, error: String(e) };
+  }
+}
+
+/** 退会の取り消し: 予約済みの解約日を消して自動課金を戻す */
+export async function uncancelSubscription(subscriptionId: string): Promise<SquareOpResult> {
+  if (!token()) return { ok: false, skipped: true };
+  try {
+    await sq("PUT", `/subscriptions/${subscriptionId}`, { subscription: { canceled_date: null } });
+    return { ok: true };
+  } catch (e) {
+    console.error("[frank-square] uncancel failed:", e);
     return { ok: false, error: String(e) };
   }
 }

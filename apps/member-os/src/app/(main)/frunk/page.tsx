@@ -13,6 +13,7 @@ import {
   type MemberSort,
 } from "@/lib/frunk-member-search";
 import { jstYmd } from "@/lib/jst";
+import { monthEndLabel, monthFromLabel } from "@yozan/core/frank-membership";
 import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment } from "./actions";
 import { joinPaymentView } from "@/lib/frunk-join-view";
 
@@ -147,6 +148,12 @@ export default async function FrunkPage({
                       </Link>
                       {m.name_kana ? <span className="text-xs text-(--color-dim)">{String(m.name_kana)}</span> : null}
                       <Badge tone="accent">{planName(m.plan_id) ?? "プラン未選択"}</Badge>
+                      {m.scheduled_leave_date ? (
+                        <Badge tone="warn">{monthEndLabel(String(m.scheduled_leave_date))}で退会予定</Badge>
+                      ) : null}
+                      {m.scheduled_suspend_start ? (
+                        <Badge tone="warn">{monthFromLabel(String(m.scheduled_suspend_start))}休会予定</Badge>
+                      ) : null}
                     </div>
                     <div className="mt-1 text-xs text-(--color-dim)">
                       {[

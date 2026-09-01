@@ -12,7 +12,24 @@ import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_METHODS, FRUNK_PAY
 import { OCCUPATIONS, CONTACT_METHODS, GENDER_LABEL, GENDERS } from "@/lib/walkin";
 import { jstYmd } from "@/lib/jst";
 import { BOOKING_STATUS_LABEL, CUSTOMER_KIND_LABEL, PAYMENT_STATUS_LABEL, outstanding } from "@yozan/core/frank-booking";
-import { setMemberStatus, changePlan, resendApprovalMail, saveAlertNote, updateMemberProfile } from "../actions";
+import {
+  leaveDateOptions,
+  suspendStartOptions,
+  monthEndLabel,
+  monthFromLabel,
+  leaveApplyDeadline,
+  suspendApplyDeadline,
+  mdLabel,
+} from "@yozan/core/frank-membership";
+import {
+  setMemberStatus,
+  changePlan,
+  cancelScheduledChange,
+  stopSquareBilling,
+  resendApprovalMail,
+  saveAlertNote,
+  updateMemberProfile,
+} from "../actions";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -128,6 +145,12 @@ export default async function FrunkMemberPage({
   const bookingList = (bookings ?? []) as Row[];
   const today = jstYmd();
 
+  // 退会・休会の受付ルール（#192）。選択肢の生成も検証もサーバーアクションと同じ関数を通す
+  const leaveOpts = leaveDateOptions(today);
+  const suspendOpts = suspendStartOptions(today);
+  const scheduledLeave = m.scheduled_leave_date ? String(m.scheduled_leave_date) : "";
+  const scheduledSuspend = m.scheduled_suspend_start ? String(m.scheduled_suspend_start) : "";
+
   const live = bookingList.filter((b) => b.status !== "cancelled");
   const visited = bookingList.filter((b) => b.status === "visited").length;
   const noShow = bookingList.filter((b) => b.status === "no_show").length;
@@ -161,6 +184,8 @@ export default async function FrunkMemberPage({
             <h1 className="text-2xl font-bold tracking-tight">{String(m.name ?? "（氏名未入力）")}</h1>
             {m.name_kana ? <span className="text-sm text-(--color-dim)">{String(m.name_kana)}</span> : null}
             <Badge tone={FRUNK_STATUS_TONE[status] ?? "default"}>{FRUNK_STATUS_LABEL[status] ?? status}</Badge>
+            {scheduledLeave ? <Badge tone="warn">{monthEndLabel(scheduledLeave)}で退会予定</Badge> : null}
+            {scheduledSuspend ? <Badge tone="warn">{monthFromLabel(scheduledSuspend)}休会予定</Badge> : null}
             {inMinTerm ? <Badge tone="warn">継続期間 {String(m.min_term_until)}まで</Badge> : null}
           </div>
           <p className="mt-0.5 text-sm text-(--color-dim)">
@@ -261,6 +286,15 @@ export default async function FrunkMemberPage({
                   {status === "suspended" ? "一時停止中（休会）" : "稼働中"}
                 </Badge>
                 <span className="ml-2 text-xs text-(--color-dim)">Square サブスクリプション</span>
+                {/* 退会もプラン変更もせず「引き落としだけ止めたい」ときの出口（#192）。
+                    0円プランに切り替えたのにサブスクだけ残っている、という状態を画面から潰せるようにする。 */}
+                <form action={stopSquareBilling} className="mt-1">
+                  <input type="hidden" name="id" value={id} />
+                  <input type="hidden" name="back" value={back} />
+                  <button className="text-xs text-(--color-dim) underline hover:text-rose-600">
+                    自動課金を解約する
+                  </button>
+                </form>
               </>
             ) : (
               <Badge tone="default">未登録（店頭払い）</Badge>
@@ -280,11 +314,13 @@ export default async function FrunkMemberPage({
                   <option value="" disabled>
                     プランを変更…
                   </option>
+                  {/* 0円プラン（スタッフ・モニター）もここに出す。以前は monthly_price>0 で弾いていたため、
+                      作って保存したのに変更先に出てこなかった（2026-09-01 ユーザー指摘・#192）。 */}
                   {planList
-                    .filter((p) => p.active !== false && p.id !== m.plan_id && Number(p.monthly_price ?? 0) > 0)
+                    .filter((p) => p.active !== false && p.id !== m.plan_id)
                     .map((p) => (
                       <option key={String(p.id)} value={String(p.id)}>
-                        {String(p.name)}（{yen(p.monthly_price as number | null)}）
+                        {String(p.name)}（{Number(p.monthly_price ?? 0) > 0 ? yen(p.monthly_price as number | null) : "月会費なし"}）
                       </option>
                     ))}
                 </select>
@@ -305,14 +341,6 @@ export default async function FrunkMemberPage({
                   </button>
                 </form>
               ) : null}
-              {status !== "suspended" && status !== "left" && (
-                <form action={setMemberStatus}>
-                  <input type="hidden" name="id" value={id} />
-                  <input type="hidden" name="back" value={back} />
-                  <input type="hidden" name="to" value="suspended" />
-                  <button className={btnGhostCls}>休会にする</button>
-                </form>
-              )}
               {status === "suspended" && (
                 <form action={setMemberStatus}>
                   <input type="hidden" name="id" value={id} />
@@ -321,17 +349,79 @@ export default async function FrunkMemberPage({
                   <button className={btnCls}>復帰させる</button>
                 </form>
               )}
-              {status !== "left" && (
-                <form action={setMemberStatus}>
-                  <input type="hidden" name="id" value={id} />
-                  <input type="hidden" name="back" value={back} />
-                  <input type="hidden" name="to" value="left" />
-                  <button className="rounded-lg border border-(--color-line) px-3 py-2 text-sm text-(--color-dim) hover:text-rose-600">
-                    退会にする
-                  </button>
-                </form>
-              )}
             </div>
+
+            {/* 退会・休会は「いつから」を選んで受け付ける（#192・2026-09-01 ユーザー確定）
+                退会=月末・申し出の翌月末から／休会=月初・10日までなら翌月から。
+                受付と同時に Square の自動課金も同じ日付で止める。 */}
+            {status !== "left" && (
+              <div className="mt-3 space-y-2 border-t border-(--color-line) pt-3">
+                {scheduledLeave ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm">
+                    <span className="font-semibold text-rose-700">{monthEndLabel(scheduledLeave)}で退会予定</span>
+                    <span className="text-xs text-(--color-dim)">その日までは通常どおりご利用いただけます</span>
+                    <form action={cancelScheduledChange}>
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="back" value={back} />
+                      <input type="hidden" name="kind" value="leave" />
+                      <button className={btnGhostCls}>退会予約を取り消す</button>
+                    </form>
+                  </div>
+                ) : scheduledSuspend ? (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm">
+                    <span className="font-semibold text-amber-800">{monthFromLabel(scheduledSuspend)}休会予定</span>
+                    <span className="text-xs text-(--color-dim)">休会費 2,200円（税込）は店頭で申し受けます</span>
+                    <form action={cancelScheduledChange}>
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="back" value={back} />
+                      <input type="hidden" name="kind" value="suspend" />
+                      <button className={btnGhostCls}>休会予約を取り消す</button>
+                    </form>
+                  </div>
+                ) : (
+                  <>
+                    {status !== "suspended" && (
+                      <form action={setMemberStatus} className="flex flex-wrap items-center gap-2">
+                        <input type="hidden" name="id" value={id} />
+                        <input type="hidden" name="back" value={back} />
+                        <input type="hidden" name="to" value="suspended" />
+                        <span className="text-sm">休会</span>
+                        <select name="suspend_start" defaultValue={suspendOpts[0]} className={`${inputCls} !w-auto`}>
+                          {suspendOpts.map((d) => (
+                            <option key={d} value={d}>
+                              {monthFromLabel(d)}
+                            </option>
+                          ))}
+                        </select>
+                        <button className={btnGhostCls}>休会を受け付ける</button>
+                        <span className="text-xs text-(--color-dim)">
+                          10日までの申し出で翌月から（{monthFromLabel(suspendOpts[0])}なら {mdLabel(suspendApplyDeadline(suspendOpts[0]))}まで）
+                        </span>
+                      </form>
+                    )}
+                    <form action={setMemberStatus} className="flex flex-wrap items-center gap-2">
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="back" value={back} />
+                      <input type="hidden" name="to" value="left" />
+                      <span className="text-sm">退会</span>
+                      <select name="leave_date" defaultValue={leaveOpts[0]} className={`${inputCls} !w-auto`}>
+                        {leaveOpts.map((d) => (
+                          <option key={d} value={d}>
+                            {monthEndLabel(d)}
+                          </option>
+                        ))}
+                      </select>
+                      <button className="rounded-lg border border-(--color-line) px-3 py-2 text-sm text-(--color-dim) hover:text-rose-600">
+                        退会を受け付ける
+                      </button>
+                      <span className="text-xs text-(--color-dim)">
+                        退会は月末・申し出の翌月末から（{monthEndLabel(leaveOpts[0])}なら {mdLabel(leaveApplyDeadline(leaveOpts[0]))}まで）
+                      </span>
+                    </form>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </Panel>
       </div>

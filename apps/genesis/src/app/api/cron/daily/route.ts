@@ -8,6 +8,7 @@ import { runAiScorecard } from "@/lib/ai-scorecard";
 import { runMorningDigest } from "@/lib/morning-digest";
 import { runContentLoop, refreshContentMetrics } from "@/lib/content-loop";
 import { runFrankReminders } from "@/lib/frank-mail";
+import { runFrankMembershipSchedule } from "@/lib/frank-membership-cron";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
 
 export const dynamic = "force-dynamic";
@@ -59,5 +60,7 @@ export async function GET(req: NextRequest) {
   }
   // FRANK 明日の予約リマインダーメール（#118・会社ループの外＝1回だけ。RESEND未設定なら自動skip）
   const frankReminders = await runFrankReminders().catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, results, frankReminders });
+  // FRANK 退会・休会の予約を当日反映（#192・会社ループの外＝1回だけ）
+  const frankMembership = await runFrankMembershipSchedule().catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ok: true, results, frankReminders, frankMembership });
 }

@@ -10,7 +10,22 @@ import { logAudit } from "@/lib/kernel";
 import { FRUNK_STORE_CODE } from "@/lib/frunk";
 import { requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
 import { buildApprovalMail, sendFrankMail } from "@/lib/frank-mail";
-import { pauseSubscription, resumeSubscription, swapSubscriptionPlan, chargeCardOnFile } from "@/lib/frank-square";
+import {
+  pauseSubscription,
+  resumeSubscription,
+  swapSubscriptionPlan,
+  chargeCardOnFile,
+  cancelSubscription,
+  uncancelSubscription,
+} from "@/lib/frank-square";
+import {
+  canLeaveOn,
+  canSuspendFrom,
+  earliestLeaveDate,
+  earliestSuspendStart,
+  monthEndLabel,
+  monthFromLabel,
+} from "@yozan/core/frank-membership";
 import { planChangeProration } from "@/lib/frank-billing-pure";
 import { jstYmd } from "@/lib/jst";
 import { readName } from "@/lib/name";
@@ -302,7 +317,19 @@ export async function saveAlertNote(formData: FormData) {
 }
 
 // ---- 会員ステータス変更（休会・復帰・退会） ----
-// 休会=Squareの月会費自動課金を一時停止（休会費2,200円税込は店頭で徴収）／復帰=再開（#124）
+//
+// 【2026-09-01 ユーザー確定・#192】退会と休会は「先の日付で受け付ける」。
+//   退会 = 月末。申込月の翌月末より前は選べない（9月末退会なら8月末までの申し出）
+//   休会 = 月初。当月10日までの申し出で翌月から、11日以降は翌々月から
+//   受付日の判定は @yozan/core/frank-membership に置いてある。画面もサーバーも同じ関数を通すこと。
+//
+// 【お金】以前は退会してもSquareの自動課金が止まらず「ダッシュボードで解約してください」と
+//   出すだけだった。見落とすと翌月も引き落とされるので、受付と同時に Square にも
+//   同じ日付で解約/停止を予約する。cronが遅れてもお金は正しい日付で止まる。
+//
+//   退会 → canceled_date = 退会日（その月まで請求・翌月から停止）
+//   休会 → pause_effective_date = 休会開始日（休会費2,200円税込は店頭徴収）
+//   復帰 → resume（即時）
 export async function setMemberStatus(formData: FormData) {
   const actor = await requireFrankActor();
   const admin = createAdmin();
@@ -310,51 +337,176 @@ export async function setMemberStatus(formData: FormData) {
   const id = str(formData.get("id"));
   const to = str(formData.get("to"));
   if (!id || !["active", "suspended", "left"].includes(to)) return;
-  // キャンペーン入会は6か月継続（#131）: 期間内の退会はスタッフに警告（ブロックはしない・特例対応可）
-  let minTermWarn = "";
-  if (to === "left") {
-    const { data: pre } = await admin.from("frunk_members").select("min_term_until")
-      .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle(); // 店舗スコープ（#134）
-    if (pre?.min_term_until && String(pre.min_term_until) > today()) {
-      minTermWarn = `⚠ この会員はキャンペーン入会の継続期間中です（${String(pre.min_term_until)}まで）。`;
-    }
-  }
+  const now = today();
 
-  const patch: Record<string, unknown> = { status: to };
-  if (to === "suspended") patch.suspend_start = today();
-  if (to === "active") patch.suspend_end = today();
-  if (to === "left") patch.leave_date = today();
-  await admin.from("frunk_members").update(patch)
-    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID); // 店舗スコープ（#134）
-
-  // Square側の追従（失敗してもステータス変更は成立。結果は画面のメッセージで伝える）
   const { data: m } = await admin
     .from("frunk_members")
-    .select("member_no, square_subscription_id, billing_status")
+    .select("member_no, name, status, min_term_until, square_subscription_id, billing_status")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID) // 店舗スコープ（#134）
     .maybeSingle();
-  const subId = m?.square_subscription_id ? String(m.square_subscription_id) : null;
-  if (subId) {
-    const r =
-      to === "suspended" ? await pauseSubscription(subId)
-      : to === "active" ? await resumeSubscription(subId)
-      : null; // 退会はお客様都合のタイミングがあるため自動解約しない（ダッシュボードで解約）
-    await logAudit(actor, "frunk.square_follow", "frunk_members", null, null, { id, to, square: r });
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+  const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
+  const who = `${String(m.name ?? "")}様`;
+
+  // ---- 復帰（即時） ----
+  if (to === "active") {
+    await admin
+      .from("frunk_members")
+      .update({ status: "active", suspend_end: now, scheduled_suspend_start: null, updated_at: new Date().toISOString() })
+      .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+    const r = subId ? await resumeSubscription(subId) : null;
+    await logAudit(actor, "frunk.status.active", "frunk_members", id, null, { square: r });
+    revalidateMember(id);
     if (r && !r.ok && !r.skipped) {
       redirect(`${dest}?err=` + encodeURIComponent(
-        `ステータスは変更しましたが、Square側の${to === "suspended" ? "課金停止" : "課金再開"}に失敗しました。Squareダッシュボードで確認してください（${m?.member_no ?? ""}）`,
+        `${who}を復帰させましたが、Squareの課金再開に失敗しました。ダッシュボードで確認してください（${m.member_no ?? ""}）`,
       ));
     }
-    if (to === "left") {
-      redirect(`${dest}?err=` + encodeURIComponent(
-        `${minTermWarn}退会にしました。月会費の自動課金は自動では止まりません。Squareダッシュボードでサブスクリプションを解約してください（${m?.member_no ?? ""}）`,
-      ));
-    }
+    redirect(`${dest}?msg=` + encodeURIComponent(`${who}を復帰させました。${subId ? "月会費の自動課金も再開します。" : ""}`));
   }
-  if (minTermWarn) redirect(`${dest}?err=` + encodeURIComponent(`${minTermWarn}退会にしました。`));
+
+  // ---- 休会（開始月を指定して予約） ----
+  if (to === "suspended") {
+    const from = str(formData.get("suspend_start")) || earliestSuspendStart(now);
+    if (!canSuspendFrom(now, from)) {
+      redirect(`${dest}?err=` + encodeURIComponent(
+        `その休会開始日は受け付けられません。10日までの申し出で翌月から、11日以降は翌々月からです（最短 ${monthFromLabel(earliestSuspendStart(now))}）`,
+      ));
+    }
+    await admin
+      .from("frunk_members")
+      .update({ scheduled_suspend_start: from, scheduled_leave_date: null, updated_at: new Date().toISOString() })
+      .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+
+    const r = subId ? await pauseSubscription(subId, from) : null;
+    await logAudit(actor, "frunk.status.suspend_reserve", "frunk_members", id, null, { from, square: r });
+    revalidateMember(id);
+
+    const tail = !subId
+      ? "（カード自動課金は未登録の会員です）"
+      : r?.ok
+        ? `月会費の自動課金は ${monthFromLabel(from)} 停止します。`
+        : r?.skipped
+          ? "⚠Square未接続のため、課金停止はダッシュボードで行ってください。"
+          : "⚠Squareの課金停止に失敗しました。ダッシュボードで確認してください。";
+    const param = tail.startsWith("⚠") ? "err" : "msg";
+    redirect(`${dest}?${param}=` + encodeURIComponent(
+      `${who}の休会を ${monthFromLabel(from)} で受け付けました。それまでは通常どおりご利用いただけます。${tail} 休会費2,200円（税込）は店頭で申し受けます。`,
+    ));
+  }
+
+  // ---- 退会（退会日＝月末を指定して予約） ----
+  const on = str(formData.get("leave_date")) || earliestLeaveDate(now);
+  if (!canLeaveOn(now, on)) {
+    redirect(`${dest}?err=` + encodeURIComponent(
+      `その退会日は受け付けられません。退会は月末で、申し出の翌月末からです（最短 ${monthEndLabel(earliestLeaveDate(now))}）`,
+    ));
+  }
+  // キャンペーン入会は6か月継続（#131）: 期間内の退会はスタッフに警告（ブロックはしない・特例対応可）
+  const minTermWarn =
+    m.min_term_until && String(m.min_term_until) > on
+      ? `⚠ この会員はキャンペーン入会の継続期間中です（${String(m.min_term_until)}まで）。`
+      : "";
+
+  await admin
+    .from("frunk_members")
+    .update({ scheduled_leave_date: on, scheduled_suspend_start: null, updated_at: new Date().toISOString() })
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+
+  const r = subId ? await cancelSubscription(subId, on) : null;
+  await logAudit(actor, "frunk.status.leave_reserve", "frunk_members", id, null, { on, square: r });
   revalidateMember(id);
+
+  const tail = !subId
+    ? "（カード自動課金は未登録の会員です）"
+    : r?.ok
+      ? `月会費の自動課金は ${monthEndLabel(on)} で解約されます（その月までは請求されます）。`
+      : r?.skipped
+        ? "⚠Square未接続のため、解約はダッシュボードで行ってください。"
+        : "⚠Squareの解約に失敗しました。ダッシュボードで解約してください。";
+  const param = tail.startsWith("⚠") || minTermWarn ? "err" : "msg";
+  redirect(`${dest}?${param}=` + encodeURIComponent(
+    `${minTermWarn}${who}の退会を ${monthEndLabel(on)} で受け付けました。それまでは通常どおりご利用いただけます。${tail}`,
+  ));
+}
+
+/**
+ * 月会費の自動課金だけを解約する（#192）。
+ *
+ * 退会でもプラン変更でもなく「この人のカード引き落としだけ止めたい」場面がある
+ * （スタッフ・モニターなど0円扱いに切り替えたのにサブスクだけ残っている等）。
+ * Square の解約は即時ではなく **現在の請求サイクルの終わり** で効く。
+ */
+export async function stopSquareBilling(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("name, member_no, square_subscription_id")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+  const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
+  if (!subId) redirect(`${dest}?err=` + encodeURIComponent("この会員にはカードの自動課金が登録されていません"));
+
+  const r = await cancelSubscription(subId);
+  await logAudit(actor, "frunk.square.stop_billing", "frunk_members", id, null, { square: r });
+  revalidateMember(id);
+  if (r.ok) {
+    redirect(`${dest}?msg=` + encodeURIComponent(
+      `${String(m.name ?? "")}様の月会費の自動課金を解約しました（現在の請求期間の終わりで停止します）。`,
+    ));
+  }
+  redirect(`${dest}?err=` + encodeURIComponent(
+    r.skipped
+      ? "Square未接続のため解約できませんでした。ダッシュボードで解約してください。"
+      : `解約できませんでした。Squareダッシュボードで確認してください（${m.member_no ?? ""}）`,
+  ));
+}
+
+/** 退会・休会の予約を取り消す（お客様の気が変わった／入力ミス） */
+export async function cancelScheduledChange(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  const kind = str(formData.get("kind")); // "leave" | "suspend"
+  if (!id || !["leave", "suspend"].includes(kind)) return;
+
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("name, square_subscription_id")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+  const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
+
+  await admin
+    .from("frunk_members")
+    .update(
+      kind === "leave"
+        ? { scheduled_leave_date: null, updated_at: new Date().toISOString() }
+        : { scheduled_suspend_start: null, updated_at: new Date().toISOString() },
+    )
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+
+  // Square側の予約も戻す（退会=解約日を消す／休会=停止を取り消して再開）
+  const r = subId ? (kind === "leave" ? await uncancelSubscription(subId) : await resumeSubscription(subId)) : null;
+  await logAudit(actor, "frunk.status.schedule_cancel", "frunk_members", id, null, { kind, square: r });
+  revalidateMember(id);
+
+  const bad = r && !r.ok && !r.skipped;
+  redirect(
+    `${dest}?${bad ? "err" : "msg"}=` +
+      encodeURIComponent(
+        `${String(m.name ?? "")}様の${kind === "leave" ? "退会" : "休会"}予約を取り消しました。` +
+          (bad ? "⚠Square側の自動課金が戻っているかダッシュボードで確認してください。" : subId ? "月会費の自動課金も元に戻します。" : ""),
+      ),
+  );
 }
 
 // ---- プラン変更（#124） ----
@@ -395,7 +547,14 @@ export async function changePlan(formData: FormData) {
 
   // Square: 翌請求から新プラン額へ
   const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
-  if (subId && newPlan.square_variation_nofee_id) {
+  if (subId && newPrice === 0) {
+    // 0円プラン（スタッフ・モニター等）に変えたら、月会費の自動課金そのものを解約する（#192）。
+    // ここを swap で済ませると 0円のバリエーションが無いので **旧プランの金額のまま落ち続ける**。
+    const r = await cancelSubscription(subId);
+    if (r.ok) notes.push("月会費の自動課金を解約しました（現在の請求期間の終わりで停止します）。");
+    else if (r.skipped) notes.push("⚠Square未接続のため、自動課金の解約はダッシュボードで行ってください。");
+    else notes.push("⚠Squareの自動課金を解約できませんでした。ダッシュボードで解約してください。");
+  } else if (subId && newPlan.square_variation_nofee_id) {
     const r = await swapSubscriptionPlan(subId, String(newPlan.square_variation_nofee_id));
     if (r.ok) notes.push("翌月から新プランの月会費が自動課金されます。");
     else if (r.skipped) notes.push("⚠Square未接続のため、プラン差し替えはダッシュボードで行ってください。");
