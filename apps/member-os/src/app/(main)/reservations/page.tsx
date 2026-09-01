@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank } from "@/lib/store-scope";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { loadDay, loadUnpaid, loadMonthCounts, type BookingRow } from "@/lib/frank-reservation";
+import { loadDay, loadUnpaid, loadMonthCounts, loadCoaches, type BookingRow } from "@/lib/frank-reservation";
 import {
   BOOKING_STATUS_LABEL,
   CUSTOMER_KIND_LABEL,
@@ -16,7 +16,7 @@ import {
 import { toTimelineItems, monthOf, labelJa } from "@/lib/bay-timeline-pure";
 import { BayTimeline, TimelineLegend } from "@/components/bay-timeline";
 import { MonthMiniCalendar, STEP_OPTIONS } from "@/components/month-picker";
-import { createBooking, setBookingStatus, deleteBooking, recordPayment, updateBooking } from "./actions";
+import { createBooking, setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -60,10 +60,11 @@ export default async function ReservationsPage({
   // 縦軸の刻み（#135）。既定は30分＝予約の刻みと同じ
   const step = STEP_OPTIONS.includes(Number(sp.step)) ? Number(sp.step) : 30;
 
-  const [view, unpaidRows, monthData] = await Promise.all([
+  const [view, unpaidRows, monthData, coaches] = await Promise.all([
     loadDay(date, actor.companyId),
     loadUnpaid(actor.companyId),
     loadMonthCounts(monthOf(date), actor.companyId),
+    loadCoaches(actor.companyId),
   ]);
   const bays = view.bays.filter((b) => b.active);
   const closedBays = view.bays.filter((b) => !b.active);
@@ -85,6 +86,8 @@ export default async function ReservationsPage({
   const unpaidTotal = unpaidList.reduce((s, x) => s + x.out, 0);
 
   const trialCount = live.filter((b) => b.customer_kind === "trial").length;
+  // パーソナルレッスン25分の「希望（未確定）」。担当を決めるまで放置されないよう件数を出す（0136）
+  const lessonWaiting = live.filter((b) => b.lesson_option_status === "requested");
 
   return (
     <div className="space-y-4">
@@ -116,6 +119,24 @@ export default async function ReservationsPage({
           <a href="https://frankgolf.jp/lesson-booking.html" target="_blank" rel="noreferrer" className={btnGhostCls}>レッスン予約 ↗</a>
         </div>
       </Panel>
+
+      {lessonWaiting.length > 0 && (
+        <Panel title={`パーソナルレッスン（25分）のご希望　${lessonWaiting.length}件 未確定`} className="d1">
+          <p className="text-sm text-(--color-dim)">
+            会員様が打席予約に追加されたご希望です。<strong className="text-(--color-txt)">担当プロと開始時刻</strong>を決めて、
+            下の予約一覧から「確定」してください（お受けできない場合は「お断り」にして、お客様へご連絡をお願いします）。
+          </p>
+          <ul className="mt-2 space-y-1 text-sm">
+            {lessonWaiting.map((b) => (
+              <li key={b.id}>
+                <a href={`#bk-${b.id}`} className="text-indigo-600 underline">
+                  {b.start_time.slice(0, 5)}〜{b.end_time.slice(0, 5)}　{who(b)}（{b.frunk_bays?.name ?? ""}）
+                </a>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
       {/* 未収金サマリ */}
       <Panel title={`未収金サマリ（未収・一部入金 ${unpaidList.length}件）`} className="d1">
@@ -266,6 +287,14 @@ export default async function ReservationsPage({
                         <span className="font-semibold">{who(b)}</span>
                       )}
                       {t?.lefty ? <Badge tone="warn">レフティ</Badge> : null}
+                      {b.lesson_option_status === "requested" ? <Badge tone="warn">パーソナル{b.lesson_option_minutes ?? 25}分 希望</Badge> : null}
+                      {b.lesson_option_status === "confirmed" ? (
+                        <Badge tone="ok">
+                          パーソナル{b.lesson_option_minutes ?? 25}分
+                          {b.lesson_option_start ? ` ${b.lesson_option_start.slice(0, 5)}〜` : ""}
+                        </Badge>
+                      ) : null}
+                      {b.lesson_option_status === "declined" ? <Badge tone="default">パーソナル お断り</Badge> : null}
                       <span className="text-xs text-(--color-dim)">
                         {[b.frunk_bays?.name, b.guest_phone ?? t?.phone, t?.experience, b.party_size && b.party_size > 1 ? `${b.party_size}名` : null]
                           .filter(Boolean).join("　")}
@@ -299,6 +328,60 @@ export default async function ReservationsPage({
 
                   {t?.message ? (
                     <p className="text-xs text-(--color-dim)">ご要望: {t.message}</p>
+                  ) : null}
+
+                  {/* パーソナルレッスン25分（0136）。打席のお時間の中で、誰が・何時から教えるかを決めて確定する */}
+                  {b.lesson_option_status ? (
+                    <details
+                      className="rounded-lg border border-(--color-line) bg-white/60 px-2 py-1.5"
+                      open={b.lesson_option_status === "requested"}
+                    >
+                      <summary className="cursor-pointer text-xs font-semibold text-(--color-dim)">
+                        パーソナルレッスン（{b.lesson_option_minutes ?? 25}分・{yen(b.lesson_option_fee ?? 2500)}）
+                        {b.lesson_option_status === "requested" ? " — 担当と時間を決めて確定" : " — 内容を変更"}
+                      </summary>
+                      {b.lesson_option_note ? (
+                        <p className="mt-2 text-xs text-(--color-dim)">会員様のご要望: {b.lesson_option_note}</p>
+                      ) : null}
+                      <form action={setLessonOption} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        <input type="hidden" name="id" value={b.id} />
+                        <input type="hidden" name="date" value={date} />
+                        <input type="hidden" name="mode" value="confirm" />
+                        <Field label="担当プロ">
+                          <select name="staff_id" defaultValue={b.lesson_option_staff_id ?? ""} className={inputCls}>
+                            <option value="">選択してください</option>
+                            {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                        </Field>
+                        <Field label={`開始（${b.start_time.slice(0, 5)}〜${b.end_time.slice(0, 5)} の中で）`}>
+                          <input
+                            type="time"
+                            name="lesson_start"
+                            defaultValue={(b.lesson_option_start ?? b.start_time).slice(0, 5)}
+                            step={300}
+                            className={inputCls}
+                          />
+                        </Field>
+                        <Field label="所要（分）">
+                          <input name="lesson_minutes" inputMode="numeric" defaultValue={String(b.lesson_option_minutes ?? 25)} className={inputCls} />
+                        </Field>
+                        <div className="flex items-end gap-2">
+                          <button className={btnCls}>確定</button>
+                        </div>
+                      </form>
+                      <div className="mt-2 flex gap-3">
+                        <form action={setLessonOption}>
+                          <input type="hidden" name="id" value={b.id} /><input type="hidden" name="date" value={date} />
+                          <input type="hidden" name="mode" value="decline" />
+                          <button className="text-xs text-(--color-dim) underline hover:text-red-400">お断り（要ご連絡）</button>
+                        </form>
+                        <form action={setLessonOption}>
+                          <input type="hidden" name="id" value={b.id} /><input type="hidden" name="date" value={date} />
+                          <input type="hidden" name="mode" value="clear" />
+                          <button className="text-xs text-(--color-dim) underline">この希望を取り消す</button>
+                        </form>
+                      </div>
+                    </details>
                   ) : null}
 
                   {/* 日時・打席の変更（#151）。消して作り直さずに直せる */}

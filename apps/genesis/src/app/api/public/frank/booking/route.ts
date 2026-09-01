@@ -17,7 +17,7 @@ const CORS = {
  * GET  ?my=1&member_no&phone_last4    … 自分の予約一覧
  * GET  ?my=1&t=<引き渡しトークン>      … 同上（会員ポータルからの遷移・#152）
  * GET  ?me=1&t=<引き渡しトークン>      … トークンの持ち主（氏名）を返す。ページの挨拶表示用
- * POST {action:'book', ...}           … 予約作成
+ * POST {action:'book', ...}           … 予約作成（lesson:true で25分パーソナルレッスンを希望）
  * POST {action:'cancel', ...}         … キャンセル
  *
  * 認証は「会員番号＋電話番号下4桁」が基本。会員ポータルにログイン済みのお客様は
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
     bayCode: String(body.bay_code ?? ""),
     start: String(body.start ?? ""),
     minutes: Number(body.minutes ?? 60),
+    lesson: body.lesson === true || body.lesson === "1",
   });
   return NextResponse.json(r, { status: r.ok ? 200 : 400, headers: CORS });
 }

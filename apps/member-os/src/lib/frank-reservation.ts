@@ -47,6 +47,13 @@ export type BookingRow = {
   payment_method: string | null;
   member_id: string | null;
   trial_request_id: string | null;
+  /** 打席予約に付いた25分パーソナルレッスン（0136）。null=希望なし */
+  lesson_option_status: string | null;
+  lesson_option_staff_id: string | null;
+  lesson_option_start: string | null;
+  lesson_option_minutes: number | null;
+  lesson_option_fee: number | null;
+  lesson_option_note: string | null;
   frunk_members: { name: string; member_no: string; alert_note: string | null } | null;
   frunk_bays: { name: string } | null;
   mbr_trial_requests: { name: string; phone: string | null; lefty: boolean; experience: string | null; message: string | null } | null;
@@ -62,9 +69,13 @@ export type LessonRow = {
   staff: { name: string } | null;
 };
 
+const LESSON_OPT_COLS =
+  "lesson_option_status, lesson_option_staff_id, lesson_option_start, lesson_option_minutes, lesson_option_fee, lesson_option_note, ";
+
 const BOOKING_COLS =
   "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, " +
   "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
+  LESSON_OPT_COLS +
   "frunk_members(name, member_no, alert_note), frunk_bays(name), " +
   "mbr_trial_requests(name, phone, lefty, experience, message)";
 
@@ -99,6 +110,7 @@ export type BookingDetail = BookingRow & {
 const DETAIL_COLS =
   "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, source, created_at, " +
   "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
+  LESSON_OPT_COLS +
   "frunk_members(id, name, name_kana, member_no, alert_note, phone, email, status, frunk_plans(name)), " +
   "frunk_bays(name, floor, equipment, is_lefty), " +
   "mbr_trial_requests(id, name, name_kana, phone, email, lefty, experience, message, status, source)";
@@ -327,6 +339,20 @@ export function lessonOccupancy(view: DayView): Map<string, LessonRow> {
     }
   }
   return map;
+}
+
+/** レッスンの担当プロ候補（在籍中のスタッフ）。25分パーソナルの確定に使う（0136） */
+export async function loadCoaches(companyId: string): Promise<{ id: string; name: string }[]> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("staff")
+    .select("id, name, sort_order")
+    .eq("company_id", companyId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+  return ((data ?? []) as Array<{ id: string; name: string }>).map((r) => ({ id: String(r.id), name: String(r.name) }));
 }
 
 export { FRANK_STORE_ID, toMin, toTime };

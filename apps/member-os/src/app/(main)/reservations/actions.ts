@@ -414,6 +414,66 @@ export async function recordPayment(formData: FormData) {
   back(date);
 }
 
+/**
+ * 打席予約に付いた「パーソナルレッスン25分」の希望を確定する（0136 / 2026-09-01）
+ *
+ * お客様側では担当プロも時間も選ばせない（当日のシフト次第のため）。
+ * ここで「誰が・打席時間内の何時から」を入れて確定＝requested → confirmed にする。
+ * お受けできないときは declined にして、お客様には店舗からご連絡する。
+ */
+export async function setLessonOption(formData: FormData) {
+  const actor = await requireReceptionActor();
+  requireStoreAccess(actor, FRANK_STORE_ID);
+  const admin = createAdmin();
+
+  const id = str(formData.get("id"));
+  const date = str(formData.get("date"));
+  const mode = str(formData.get("mode")); // confirm | decline | clear
+  if (!id || !mode) return;
+
+  const { data: bk } = await admin
+    .from("frunk_bookings")
+    .select("id, start_time, end_time, lesson_option_minutes")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!bk) return;
+
+  const now = new Date().toISOString();
+  let patch: Record<string, unknown>;
+
+  if (mode === "decline") {
+    patch = { lesson_option_status: "declined", lesson_option_staff_id: null, lesson_option_start: null };
+  } else if (mode === "clear") {
+    patch = { lesson_option_status: null, lesson_option_staff_id: null, lesson_option_start: null };
+  } else {
+    const staffId = str(formData.get("staff_id"));
+    const start = str(formData.get("lesson_start"));
+    const minutes = num(formData.get("lesson_minutes")) ?? bk.lesson_option_minutes ?? 25;
+    if (!staffId || !/^\d{2}:\d{2}$/.test(start)) return back(date); // 担当と開始時刻がそろうまで確定しない
+    // レッスンは打席のお時間の中で行う（はみ出す指定は受け付けない）
+    const s = toMin(start);
+    if (s < toMin(String(bk.start_time)) || s + minutes > toMin(String(bk.end_time))) return back(date);
+    patch = {
+      lesson_option_status: "confirmed",
+      lesson_option_staff_id: staffId,
+      lesson_option_start: `${toTime(s)}:00`,
+      lesson_option_minutes: minutes,
+    };
+  }
+
+  await admin
+    .from("frunk_bookings")
+    .update({ ...patch, updated_at: now })
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID);
+  await logAudit(actor, "frank.booking.lesson_option", "frunk_bookings", id, null, patch);
+  back(date);
+}
+
 /* 店頭カレンダーのトークンURL発行は廃止した。
  * 店頭では店舗アカウントでログインして `/board` を開く（ログイン必須）。
  * お客様Web予約のトークンURLも廃止済み（#93・予約はサイトに集約）。 */

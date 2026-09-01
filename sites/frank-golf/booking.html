@@ -81,7 +81,7 @@
       <p class="eyebrow">Reservation</p>
       <h2 class="h-en">BAY BOOKING</h2>
       <p class="h-jp">打席予約（会員様専用）</p>
-      <p style="margin-top:10px;font-size:13px;opacity:.75">会員番号とお電話番号の下4桁でログイン不要のままご予約いただけます。<br>30分単位・プランの1日上限まで。キャンセルもこのページから。</p>
+      <p style="margin-top:10px;font-size:13px;opacity:.75">会員番号とお電話番号の下4桁でログイン不要のままご予約いただけます。<br>ご予約は<b>毎時00分スタート</b>・1時間または2時間。プランの1日上限まで。キャンセルもこのページから。<br>ご希望の方は、打席のご予約に<b>パーソナルレッスン（25分）</b>を追加できます。</p>
       <p style="margin-top:8px;font-size:12px;opacity:.7">ご予約は <b>2026年9月2日（水）10:00</b> のオープン以降の枠から承ります。<br>営業時間: 平日 10:00〜22:00 ／ 土日祝 9:00〜20:00（火曜定休）</p>
     </div>
 
@@ -105,12 +105,29 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
         <label style="font-size:12px">利用時間<select id="bk-min" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit">
-          <option value="30">30分</option><option value="60" selected>1時間</option><option value="90">1時間30分</option><option value="120">2時間</option>
+          <option value="60" selected>1時間</option><option value="120">2時間</option>
         </select></label>
       </div>
       <p id="bk-step3" style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 0">3. 空いている枠（○）をタップ</p>
       <p id="bk-status" style="margin-top:8px;font-size:13px;opacity:.8">日付を選ぶと空き状況が表示されます。</p>
       <div id="bk-grid" style="margin-top:10px;overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
+
+      <!-- オプション: パーソナルレッスン25分（申込は「希望」。担当プロと時間は店舗が調整して確定します） -->
+      <div id="bk-opt" hidden style="margin-top:16px;border-top:1px solid rgba(43,50,41,.15);padding-top:14px">
+        <p id="bk-step4" style="font-size:12px;font-weight:700;opacity:.8;margin:0 0 8px">4. オプション（任意）</p>
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:13px;cursor:pointer">
+          <input id="bk-lesson" type="checkbox" style="margin-top:3px;width:18px;height:18px;flex:0 0 auto">
+          <span>
+            <b id="bk-lesson-label">パーソナルレッスン（25分）を追加する</b>
+            <span style="display:block;margin-top:4px;font-size:12px;opacity:.7">
+              ご予約いただいた打席のお時間の中で、プロが25分マンツーマンでお教えします。<br>
+              担当プロと開始時刻は当日のシフトに合わせて店舗で調整し、<b>確定のご連絡</b>をいたします（ご希望に添えない場合はご連絡します）。
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div id="bk-confirm" style="margin-top:14px"></div>
       <p style="margin-top:14px"><button id="bk-my" class="btn btn--ghost" type="button">自分の予約を確認・キャンセル</button></p>
       <div id="bk-mylist" style="margin-top:10px"></div>
       <p style="margin-top:18px;font-size:12px;opacity:.6">レッスンのご予約は<a id="bk-lesson-link" href="lesson-booking.html" style="text-decoration:underline">レッスン予約ページ</a>から。</p>
@@ -212,7 +229,12 @@
   var BILL_API="https://yozan-genesis.vercel.app/api/public/frank/billing";
   var OPEN="2026-09-02"; // プレオープン日（サーバー側でも同じ判定をする）
   var $=function(id){return document.getElementById(id)};
-  var sel=null, hoursClose=null, retried=false;
+  var sel=null, retried=false, DATA=null;
+  var LABEL={30:"30分",60:"1時間",90:"1時間30分",120:"2時間",150:"2時間30分",180:"3時間"};
+  function toM(t){return Number(t.slice(0,2))*60+Number(t.slice(3,5))}
+  function toT(m){return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+m%60).slice(-2)}
+  function minutes(){return Number($("bk-min").value)||60}
+  function yen(n){return Number(n).toLocaleString("ja-JP")}
   function jst(){var d=new Date(Date.now()+9*3600*1000);return d.toISOString().slice(0,10)}
 
   // 会員番号・下4桁はこのブラウザに保存（毎回の入力を不要に）
@@ -244,6 +266,7 @@
     $("bk-who").textContent=name+" 様としてご予約いただけます（会員番号の入力は不要です）";
     $("bk-step2").textContent="1. 日付と利用時間";
     $("bk-step3").textContent="2. 空いている枠（○）をタップ";
+    $("bk-step4").textContent="3. オプション（任意）";
     $("bk-bill-hint").textContent="下のボタンからお進みください。";
     var ll=$("bk-lesson-link"); if(ll) ll.href="lesson-booking.html?t="+encodeURIComponent(TOK);
     my();
@@ -265,53 +288,103 @@
   var start = jst()<OPEN ? OPEN : jst();
   $("bk-date").min=start; $("bk-date").value=start;
 
+  /** [t, t+mins) が重なるマス（grainの頭に丸める）。サーバーの taken と同じ数え方 */
+  function cells(t,mins,grain){
+    var a=toM(t), b=a+mins, out=[];
+    for(var m=Math.floor(a/grain)*grain;m<b;m+=grain) out.push(toT(m));
+    return out;
+  }
+  /** その打席・その開始時刻で、選んだ利用時間ぶん続けて空いているか */
+  function freeAt(bayId,t,mins){
+    if(!DATA||!DATA.hours) return false;
+    if(toM(t)+mins>toM(DATA.hours.close)) return false;      // 閉店をまたぐ枠は出さない
+    var used=DATA.taken[bayId]||[];
+    var cs=cells(t,mins,DATA.grain||30);
+    for(var i=0;i<cs.length;i++) if(used.indexOf(cs[i])>=0) return false;
+    return true;
+  }
+  /** 利用時間の選択肢はサーバー設定に合わせる（現在は 1時間・2時間） */
+  function setMinOptions(list){
+    if(!list||!list.length) return;
+    var cur=$("bk-min").value, h="";
+    list.forEach(function(m){h+='<option value="'+m+'">'+(LABEL[m]||m+"分")+"</option>"});
+    $("bk-min").innerHTML=h;
+    $("bk-min").value=list.indexOf(Number(cur))>=0?cur:String(list[0]);
+  }
+  /** パーソナルレッスンのオプション欄（設定でオフなら丸ごと隠す） */
+  function setLessonOpt(o){
+    if(!o){$("bk-opt").hidden=true;$("bk-lesson").checked=false;return}
+    $("bk-opt").hidden=false;
+    $("bk-lesson-label").textContent="パーソナルレッスン（"+o.minutes+"分）を追加する　＋"+yen(o.price)+"円（当日精算）";
+  }
+  function lessonWanted(){ return !$("bk-opt").hidden && $("bk-lesson").checked }
+
+  /** 選んだ枠の確認ボタン。利用時間やオプションを変えても消えないよう、決まった場所に出す */
+  function renderConfirm(){
+    var c=$("bk-confirm"); c.innerHTML="";
+    if(!sel) return;
+    var end=toT(toM(sel.t)+minutes());
+    var p=document.createElement("p");
+    var b=document.createElement("button");
+    b.className="btn"; b.type="button";
+    b.textContent="この枠で予約する（"+sel.t+"〜"+end+"）";
+    b.addEventListener("click",book);
+    p.appendChild(b);
+    c.appendChild(p);
+  }
+
+  function render(){
+    var j=DATA; if(!j) return;
+    var mins=minutes();
+    var h='<table style="border-collapse:collapse;font-size:11px;min-width:560px"><tr><th style="text-align:left;padding:4px 6px">打席</th>';
+    j.slots.forEach(function(t){h+='<th style="padding:4px 4px;font-weight:400;opacity:.7">'+t+"</th>"});
+    h+="</tr>";
+    var any=false;
+    j.bays.forEach(function(b){
+      h+='<tr><td style="padding:4px 6px;white-space:nowrap">'+b.name+'<br><span style="opacity:.6">'+(b.equipment||"")+"</span></td>";
+      j.slots.forEach(function(t){
+        if(freeAt(b.id,t,mins)){
+          any=true;
+          var on=sel&&sel.bay===b.code&&sel.t===t;
+          h+='<td style="padding:2px;text-align:center"><button type="button" data-bay="'+b.code+'" data-t="'+t+'" style="cursor:pointer;border:1px solid rgba(43,50,41,.3);background:'+(on?"rgba(53,132,90,.25)":"transparent")+';color:inherit;border-radius:6px;padding:2px 8px">○</button></td>';
+        }else{
+          h+='<td style="padding:2px;text-align:center;opacity:.25">×</td>';
+        }
+      });
+      h+="</tr>";
+    });
+    h+="</table>";
+    $("bk-grid").innerHTML=h;
+    $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(btn){
+      btn.addEventListener("click",function(){
+        sel={bay:btn.getAttribute("data-bay"),t:btn.getAttribute("data-t")};
+        render(); renderConfirm();
+        $("bk-confirm").scrollIntoView({block:"nearest"});
+      });
+    });
+    $("bk-status").textContent = any
+      ? "○をタップ → 下の「この枠で予約する」を押してください（営業 "+j.hours.open+"〜"+j.hours.close+"・毎時00分スタート）"
+      : "この日は「"+(LABEL[mins]||mins+"分")+"」で続けて空いている枠がありません。利用時間や日付を変えてお試しください。";
+  }
+
   function load(){
     var date=$("bk-date").value; if(!date) return;
+    sel=null; $("bk-confirm").innerHTML="";
     $("bk-status").textContent="読み込み中…"; $("bk-grid").innerHTML="";
     fetch(API+"?date="+date).then(function(r){return r.json()}).then(function(j){
       if(j.min_date){$("bk-date").min=j.min_date}
       if(j.max_date){$("bk-date").max=j.max_date}
       if(j.closed){
+        DATA=null;
         $("bk-status").textContent=j.reason||"この日は休業日です。別の日付をお選びください。";
         // オープン前の日付だったら、予約できる最初の日に自動で切り替える（1回だけ）
         if(!retried && j.min_date && date<j.min_date){retried=true;$("bk-date").value=j.min_date;load()}
         return;
       }
-      hoursClose=j.hours.close;
-      $("bk-status").textContent="○をタップ → 下の「この枠で予約する」を押してください（営業 "+j.hours.open+"〜"+j.hours.close+"）";
-      var h='<table style="border-collapse:collapse;font-size:11px;min-width:640px"><tr><th style="text-align:left;padding:4px 6px">打席</th>';
-      j.slots.forEach(function(t){h+='<th style="padding:4px 2px;font-weight:400;opacity:.7">'+t+"</th>"});
-      h+="</tr>";
-      j.bays.forEach(function(b){
-        h+='<tr><td style="padding:4px 6px;white-space:nowrap">'+b.name+'<br><span style="opacity:.6">'+(b.equipment||"")+"</span></td>";
-        j.slots.forEach(function(t){
-          var used=(j.taken[b.id]||[]).indexOf(t)>=0;
-          h+= used?'<td style="padding:2px;text-align:center;opacity:.25">×</td>'
-                 :'<td style="padding:2px;text-align:center"><button type="button" data-bay="'+b.code+'" data-t="'+t+'" style="cursor:pointer;border:1px solid rgba(43,50,41,.3);background:transparent;color:inherit;border-radius:6px;padding:2px 6px">○</button></td>';
-        });
-        h+="</tr>";
-      });
-      h+="</table>";
-      $("bk-grid").innerHTML=h;
-      $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(btn){
-        btn.addEventListener("click",function(){
-          $("bk-grid").querySelectorAll("button[data-bay]").forEach(function(b2){b2.style.background="transparent"});
-          btn.style.background="rgba(53,132,90,.25)";
-          sel={bay:btn.getAttribute("data-bay"),t:btn.getAttribute("data-t")};
-          // 閉店時刻を超える利用時間は選べないようにする
-          var toM=function(t){return Number(t.slice(0,2))*60+Number(t.slice(3,5))};
-          var remain=hoursClose?toM(hoursClose)-toM(sel.t):240;
-          var capped=false;
-          Array.prototype.forEach.call($("bk-min").options,function(o){o.disabled=Number(o.value)>remain});
-          if(Number($("bk-min").value)>remain){$("bk-min").value=String(Math.max(30,Math.floor(remain/30)*30));capped=true}
-          var end=(function(m){return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+m%60).slice(-2)})(toM(sel.t)+Number($("bk-min").value));
-          var old=$("bk-go"); if(old) old.remove();
-          var p=document.createElement("p"); p.id="bk-go"; p.style.marginTop="12px";
-          p.innerHTML='<button class="btn" type="button">この枠で予約する（'+sel.t+'〜'+end+'）</button>'+(capped?'<span style="display:block;margin-top:6px;font-size:12px;opacity:.7">閉店（'+hoursClose+'）までのため利用時間を調整しました</span>':'');
-          $("bk-grid").after(p);
-          p.querySelector("button").addEventListener("click",book);
-        });
-      });
+      DATA=j;
+      setMinOptions(j.minutes_options);
+      setLessonOpt(j.lesson_option);
+      render();
     }).catch(function(){$("bk-status").textContent="読み込みに失敗しました。時間をおいてお試しください。"});
   }
   function auth(){
@@ -329,14 +402,21 @@
   function merge(base,add){ for(var k in add) base[k]=add[k]; return base }
   function book(){
     var a=auth(); if(!a||!sel) return;
+    var mins=minutes(), wantLesson=lessonWanted();
     // 二重送信ガード（連打で同じ枠へ複数POSTしない）
-    var wrap=$("bk-go"); var btn=wrap?wrap.querySelector("button"):null;
+    var btn=$("bk-confirm").querySelector("button");
     if(btn){ if(btn.disabled) return; btn.disabled=true; }
     var done=function(){ if(btn) btn.disabled=false; };
-    fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(merge({action:"book",date:$("bk-date").value,bay_code:sel.bay,start:sel.t,minutes:Number($("bk-min").value)},authBody(a)))})
+    fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(merge({action:"book",date:$("bk-date").value,bay_code:sel.bay,start:sel.t,minutes:mins,lesson:wantLesson},authBody(a)))})
       .then(function(r){return r.json()}).then(function(j){
         done();
-        if(j.ok){alert("予約が完了しました！\n"+$("bk-date").value+" "+sel.t+"〜");load();my()}
+        if(j.ok){
+          var msg="予約が完了しました！\n"+$("bk-date").value+" "+sel.t+"〜"+toT(toM(sel.t)+mins);
+          if(wantLesson) msg+="\n\nパーソナルレッスン（25分）のご希望を承りました。\n担当プロと開始時刻は店舗で調整のうえ、確定をご連絡します。";
+          alert(msg);
+          $("bk-lesson").checked=false;
+          load(); my();
+        }
         else alert(j.error||"予約できませんでした");
       }).catch(function(){done();alert("通信に失敗しました。時間をおいてお試しください")});
   }
@@ -346,7 +426,12 @@
       if(j.error){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
       if(!j.bookings.length){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後の予約はありません。</p>';return}
       var h='<p style="font-size:13px">'+j.name+"様の予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
-      j.bookings.forEach(function(b){h+='<li style="margin-top:6px">'+b.booked_date+" "+String(b.start_time).slice(0,5)+"〜"+String(b.end_time).slice(0,5)+"（"+(b.frunk_bays?b.frunk_bays.name:"")+'） <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(43,50,41,.35);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>'});
+      j.bookings.forEach(function(b){
+        var ls="";
+        if(b.lesson_option_status==="requested") ls=' <span style="opacity:.75">／ パーソナル'+(b.lesson_option_minutes||25)+'分 希望（調整中）</span>';
+        else if(b.lesson_option_status==="confirmed") ls=' <span style="opacity:.75">／ パーソナル'+(b.lesson_option_minutes||25)+'分 '+(b.lesson_option_start?String(b.lesson_option_start).slice(0,5)+"〜":"")+'確定</span>';
+        h+='<li style="margin-top:6px">'+b.booked_date+" "+String(b.start_time).slice(0,5)+"〜"+String(b.end_time).slice(0,5)+"（"+(b.frunk_bays?b.frunk_bays.name:"")+'）'+ls+' <button type="button" data-id="'+b.id+'" style="margin-left:8px;font-size:12px;cursor:pointer;border:1px solid rgba(43,50,41,.35);background:transparent;color:inherit;border-radius:6px;padding:2px 8px">キャンセル</button></li>';
+      });
       h+="</ul>";
       $("bk-mylist").innerHTML=h;
       $("bk-mylist").querySelectorAll("button[data-id]").forEach(function(btn){
@@ -360,7 +445,15 @@
     });
   }
   $("bk-date").addEventListener("change",function(){retried=false;load()});
-  $("bk-min").addEventListener("change",function(){var old=document.getElementById("bk-go");if(old)old.remove();sel=null});
+  // 利用時間を変えたら、選んでいた枠がまだ続けて空いているかを見直す
+  $("bk-min").addEventListener("change",function(){
+    if(!DATA){renderConfirm();return}
+    if(sel){
+      var bay=(DATA.bays||[]).filter(function(b){return b.code===sel.bay})[0];
+      if(!bay||!freeAt(bay.id,sel.t,minutes())) sel=null;
+    }
+    render(); renderConfirm();
+  });
   $("bk-my").addEventListener("click",my);
 
   // ---- 月会費のカード継続課金（Square） ----

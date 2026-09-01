@@ -42,6 +42,21 @@ export async function saveBasics(formData: FormData): Promise<void> {
   revalidatePath("/site-admin");
 }
 
+/** お客様が選べる利用時間。空・不正なら 60/120 に戻す */
+function memberMinutes(raw: string): number[] {
+  const list = raw
+    .split(/[、,\s]+/)
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n >= 15 && n <= 240);
+  return list.length > 0 ? Array.from(new Set(list)).sort((a, b) => a - b) : [60, 120];
+}
+
+/** パーソナルレッスンの料金（0＝受付を止める） */
+function lessonPrice(raw: string): number {
+  const n = Number(raw.replace(/[^\d]/g, ""));
+  return Number.isFinite(n) && n >= 0 ? n : 2500;
+}
+
 /** 予約設定（#87: 営業時間・定休日・祝日・臨時休業・予約可能日数） */
 export async function saveBookingCfg(formData: FormData): Promise<void> {
   const admin = createAdmin();
@@ -58,6 +73,14 @@ export async function saveBookingCfg(formData: FormData): Promise<void> {
     closed_dows: dows.length > 0 ? dows : [2],
     slot_minutes: [15, 30, 60].includes(Number(t("slot"))) ? Number(t("slot")) : 30,
     max_minutes_options: [30, 60, 90, 120],
+    // お客様側（frankgolf.jp の打席予約）の刻み。スタッフの30分刻みとは別に持つ（2026-09-01）
+    member_start_step: [30, 60].includes(Number(t("member_start_step"))) ? Number(t("member_start_step")) : 60,
+    member_minutes_options: memberMinutes(t("member_minutes_options")),
+    lesson_option: {
+      enabled: lessonPrice(t("lesson_option_price")) > 0,
+      minutes: 25,
+      price: lessonPrice(t("lesson_option_price")),
+    },
     holiday_dates: dates("holiday_dates"),
     closed_dates: dates("closed_dates"),
     special_open_dates: dates("special_open_dates"),

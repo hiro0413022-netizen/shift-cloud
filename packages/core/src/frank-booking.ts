@@ -22,8 +22,16 @@ export type BookingCfg = {
   weekend: { open: string; close: string };
   /** 定休曜日 0=日〜6=土 */
   closed_dows: number[];
+  /** スタッフ画面のグリッド粒度・台帳の刻み（お客様の予約開始時刻ではない） */
   slot_minutes: number;
+  /** スタッフが電話・店頭予約で選べる利用時間 */
   max_minutes_options: number[];
+  /** お客様（会員）の打席予約の開始時刻の刻み。60＝毎時00分スタートのみ（2026-09-01 運用ルール） */
+  member_start_step?: number;
+  /** お客様（会員）が選べる利用時間。スタッフ側（max_minutes_options）とは別に持つ */
+  member_minutes_options?: number[];
+  /** 打席予約に付けられる25分パーソナルレッスンのオプション（申込は「希望」。担当は店舗が確定する） */
+  lesson_option?: { enabled: boolean; minutes: number; price: number };
   /** この日付は土日祝の営業時間を適用（自動判定に「追加」するもの。臨時の祝日・お盆など） */
   holiday_dates: string[];
   /** 日本の祝日を自動で土日祝あつかいにする（既定 true）。false にすると holiday_dates だけを見る */
@@ -47,6 +55,9 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   closed_dows: [2], // 火曜定休
   slot_minutes: 30,
   max_minutes_options: [30, 60, 90, 120],
+  member_start_step: 60, // 毎時00分スタートのみ
+  member_minutes_options: [60, 120],
+  lesson_option: { enabled: true, minutes: 25, price: 2500 },
   holiday_dates: [],
   auto_holidays: true,
   closed_dates: [],
@@ -81,7 +92,51 @@ export async function loadBookingCfg(admin: SupabaseAdminLike): Promise<BookingC
     ...o,
     weekday: { ...DEFAULT_BOOKING_CFG.weekday, ...(o.weekday ?? {}) },
     weekend: { ...DEFAULT_BOOKING_CFG.weekend, ...(o.weekend ?? {}) },
+    lesson_option: { ...DEFAULT_BOOKING_CFG.lesson_option!, ...(o.lesson_option ?? {}) },
   };
+}
+
+// ------------------------------------------------------------------
+// お客様（会員）側の予約の刻み（2026-09-01）
+//
+// 「打席予約は毎時00分スタート・1時間単位」に変えたときも、スタッフ画面は
+// 30分刻みのまま柔軟に入れられるようにしたい（電話で「14:30から30分」など）。
+// そのため slot_minutes（スタッフ・台帳）とお客様側の刻みを分けて持つ。
+// ------------------------------------------------------------------
+
+/** お客様の打席予約の開始時刻の刻み（既定60分＝毎時00分のみ） */
+export const memberStartStep = (cfg: BookingCfg = DEFAULT_BOOKING_CFG): number =>
+  cfg.member_start_step && cfg.member_start_step > 0 ? cfg.member_start_step : 60;
+
+/** お客様が選べる利用時間（既定 60分・120分） */
+export const memberMinutesOptions = (cfg: BookingCfg = DEFAULT_BOOKING_CFG): number[] => {
+  const list = (cfg.member_minutes_options ?? []).filter((n) => Number.isInteger(n) && n > 0);
+  return list.length > 0 ? [...list].sort((a, b) => a - b) : [60, 120];
+};
+
+/** 25分パーソナルレッスンのオプション設定 */
+export const lessonOption = (cfg: BookingCfg = DEFAULT_BOOKING_CFG) => ({
+  ...DEFAULT_BOOKING_CFG.lesson_option!,
+  ...(cfg.lesson_option ?? {}),
+});
+
+/** 空き判定に使うグリッドの粒度。開始時刻の刻みより細かい台帳の予約（14:30〜など）も
+ *  必ず1マス以上を塗るように、slot_minutes と開始刻みの小さいほうを使う */
+export function grainOf(cfg: BookingCfg = DEFAULT_BOOKING_CFG): number {
+  const a = cfg.slot_minutes > 0 ? cfg.slot_minutes : 30;
+  const b = memberStartStep(cfg);
+  return Math.min(a, b);
+}
+
+/** [start, end) が重なるグリッドのマス（開始時刻の配列）。
+ *  端数（14:35〜など）でもマスの頭に丸めて塗るので、塗り残しが出ない */
+export function coveredCells(start: string, end: string, grain: number): string[] {
+  const s = toMin(start.slice(0, 5));
+  const e = toMin(end.slice(0, 5));
+  const out: string[] = [];
+  if (!(e > s) || grain <= 0) return out;
+  for (let m = Math.floor(s / grain) * grain; m < e; m += grain) out.push(toTime(m));
+  return out;
 }
 
 export const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));

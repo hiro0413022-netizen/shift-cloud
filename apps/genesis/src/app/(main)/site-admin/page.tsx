@@ -122,7 +122,7 @@ function BookingSection({ d, input, label, btn }: { d: Record<string, unknown>; 
           <input name="closed_dows" defaultValue={cfg.closed_dows.join(",")} placeholder="2" className={input} />
         </div>
         <div>
-          <label className={label}>予約枠の単位（分）</label>
+          <label className={label}>台帳・スタッフ画面の刻み（分）</label>
           <input name="slot" defaultValue={String(cfg.slot_minutes)} placeholder="30" className={input} />
         </div>
         <div>
@@ -142,6 +142,21 @@ function BookingSection({ d, input, label, btn }: { d: Record<string, unknown>; 
         <div className="col-span-2">
           <label className={label}>特別営業日（内覧会など・オープン前や定休日でもこの日だけ予約を受け付ける）</label>
           <input name="special_open_dates" defaultValue={(cfg.special_open_dates ?? []).join(", ")} placeholder="2026-08-16, 2026-08-17" className={input} />
+        </div>
+      </div>
+      {/* お客様（会員）の打席予約の刻み。スタッフ側（上の「台帳・スタッフ画面の刻み」）とは別（2026-09-01） */}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className={label}>お客様の開始時刻の刻み（分・60＝毎時00分のみ）</label>
+          <input name="member_start_step" defaultValue={String(cfg.member_start_step ?? 60)} placeholder="60" className={input} />
+        </div>
+        <div>
+          <label className={label}>お客様が選べる利用時間（分・「,」区切り）</label>
+          <input name="member_minutes_options" defaultValue={(cfg.member_minutes_options ?? [60, 120]).join(",")} placeholder="60,120" className={input} />
+        </div>
+        <div>
+          <label className={label}>パーソナルレッスン25分の料金（円・0で受付を止める）</label>
+          <input name="lesson_option_price" defaultValue={String(cfg.lesson_option?.price ?? 2500)} placeholder="2500" className={input} />
         </div>
       </div>
       <button type="submit" className={btn}>予約設定を保存</button>

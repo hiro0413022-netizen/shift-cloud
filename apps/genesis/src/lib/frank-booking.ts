@@ -7,13 +7,21 @@ import {
   loadBookingCfg as loadCfg,
   businessHours as hoursOf,
   bookableRange,
+  memberStartStep,
+  memberMinutesOptions,
+  lessonOption,
+  grainOf,
+  coveredCells,
   type BookingCfg,
 } from "@yozan/core/frank-booking";
 import { handoffSecret, verifyHandoff } from "@yozan/core/frank-handoff";
 
 /**
  * FRANK GOLF 打席予約（#86 §3-3・台帳一本化 #93）
- * - 30分単位。営業時間・定休日は @yozan/core/frank-booking（gn_site_content で上書き可）
+ * - お客様は **毎時00分スタート・1時間 or 2時間**（2026-09-01 ユーザー確定）。
+ *   刻みは cfg.member_start_step / cfg.member_minutes_options。台帳とスタッフ画面は
+ *   従来どおり30分刻み（slot_minutes）なので、電話予約の 14:30〜 もそのまま入れられる。
+ * - 営業時間・定休日は @yozan/core/frank-booking（gn_site_content で上書き可）
  * - 会員認証: 会員番号＋電話番号下4桁（Web完結・パスワードレス）
  * - プラン上限: レギュラー=1日60分／マスター=1日120分／ライト=1日60分+月4回まで（#136b・ユーザー確定）
  * ★ 設定と営業時間の判定はスタッフ画面(member-os)と共通。ここで独自定義しないこと。
@@ -151,10 +159,14 @@ export async function getSlots(dateStr: string) {
         : "この日は休業日です";
     return { date: dateStr, closed: true, reason, open_date: cfg.open_date, min_date: range.min, max_date: range.max, bays: bays ?? [], slots: [], taken: {} };
   }
-  const SLOT_MIN = cfg.slot_minutes;
+  // お客様に見せる開始時刻は「毎時00分」。空き判定はもっと細かいマス（grain）で行う
+  const STEP = memberStartStep(cfg);
+  const GRAIN = grainOf(cfg);
+  const minutesOptions = memberMinutesOptions(cfg);
+  const lesson = lessonOption(cfg);
 
   const slots: string[] = [];
-  for (let m = toMin(hours.open); m + SLOT_MIN <= toMin(hours.close); m += SLOT_MIN) slots.push(toTime(m));
+  for (let m = toMin(hours.open); m + Math.min(...minutesOptions) <= toMin(hours.close); m += STEP) slots.push(toTime(m));
 
   const { data: bookings } = await admin
     .from("frunk_bookings")
@@ -167,12 +179,29 @@ export async function getSlots(dateStr: string) {
   // レッスン枠（#88 §3-4）: プロが打席指定で公開した枠は打席予約から除外
   const lessonSlots = await lessonBaySlots(admin, dateStr);
 
+  // 埋まっているマス。14:30〜のスタッフ予約や25分のレッスンも、マスの頭に丸めて必ず塗る
+  // （60分刻みの列だけを塗ると 14:30〜の予約が「空き」に見えてしまうため）
   const taken: Record<string, string[]> = {};
   for (const b of [...(bookings ?? []), ...lessonSlots]) {
     const list = taken[String(b.bay_id)] ?? (taken[String(b.bay_id)] = []);
-    for (let m = toMin(String(b.start_time)); m < toMin(String(b.end_time)); m += SLOT_MIN) list.push(toTime(m));
+    for (const c of coveredCells(String(b.start_time), String(b.end_time), GRAIN)) list.push(c);
   }
-  return { date: dateStr, closed: false, hours, open_date: cfg.open_date, min_date: range.min, max_date: range.max, bays: bays ?? [], slots, taken };
+  return {
+    date: dateStr,
+    closed: false,
+    hours,
+    open_date: cfg.open_date,
+    min_date: range.min,
+    max_date: range.max,
+    bays: bays ?? [],
+    slots,
+    taken,
+    // 画面が「利用時間ぶん空いているか」を自分で判定できるようにする
+    grain: GRAIN,
+    step: STEP,
+    minutes_options: minutesOptions,
+    lesson_option: lesson.enabled ? { minutes: lesson.minutes, price: lesson.price } : null,
+  };
 }
 
 /** プラン上限チェック → OKなら予約作成 */
@@ -180,8 +209,10 @@ export async function createBooking(input: {
   auth: MemberAuth;
   date: string;
   bayCode: string;
-  start: string; // "HH:MM"
-  minutes: number; // 30 | 60 | 90 | 120
+  start: string; // "HH:MM"（毎時00分）
+  minutes: number; // 60 | 120
+  /** パーソナルレッスン（25分）の希望。担当プロと時間は店舗が確定する */
+  lesson?: boolean;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const admin = createAdmin();
   const member = await authMember(admin, input.auth);
@@ -193,7 +224,13 @@ export async function createBooking(input: {
   const startMin = toMin(input.start);
   const endMin = startMin + input.minutes;
   if (startMin < toMin(hours.open) || endMin > toMin(hours.close)) return { ok: false, error: "営業時間外です" };
-  if (!cfg.max_minutes_options.includes(input.minutes)) return { ok: false, error: "利用時間が不正です" };
+  const minutesOptions = memberMinutesOptions(cfg);
+  if (!minutesOptions.includes(input.minutes)) return { ok: false, error: "利用時間が不正です" };
+  // 開始は毎時00分のみ（画面の作りに関係なく、APIを直接叩かれても守る）
+  const step = memberStartStep(cfg);
+  if ((startMin - toMin(hours.open)) % step !== 0) {
+    return { ok: false, error: `ご予約の開始は${step === 60 ? "毎時00分" : `${step}分刻み`}のみです` };
+  }
   const range = bookableRange(cfg);
   const todayJst = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   if (input.date < todayJst) return { ok: false, error: "過去の日付は予約できません" };
@@ -239,6 +276,10 @@ export async function createBooking(input: {
     if (!days.has(input.date) && days.size >= 4) return { ok: false, error: "ライト会員は月4回までのご利用です（同じ日の追加予約は回数に含みません）" };
   }
 
+  // パーソナルレッスン（25分）の希望。設定でオフのときは黙って無視する
+  const lesson = lessonOption(cfg);
+  const wantsLesson = input.lesson === true && lesson.enabled;
+
   const { data: bay } = await admin
     .from("frunk_bays")
     .select("id, name")
@@ -276,6 +317,13 @@ export async function createBooking(input: {
       end_time: toTime(endMin),
       status: "confirmed",
       source: "web",
+      ...(wantsLesson
+        ? {
+            lesson_option_status: "requested",
+            lesson_option_minutes: lesson.minutes,
+            lesson_option_fee: lesson.price,
+          }
+        : {}),
     })
     .select("id")
     .single();
@@ -283,7 +331,7 @@ export async function createBooking(input: {
 
   await logEvent(String(member.company_id), {
     event_type: "booking.created",
-    title: `打席予約: ${member.name}様 ${input.date} ${input.start}〜${toTime(endMin)}（${bay.name}）`.slice(0, 120),
+    title: `打席予約: ${member.name}様 ${input.date} ${input.start}〜${toTime(endMin)}（${bay.name}）${wantsLesson ? "＋パーソナル25分 希望" : ""}`.slice(0, 120),
     source: "frank_booking",
     source_type: "system",
   });
@@ -297,7 +345,10 @@ export async function listMyBookings(auth: MemberAuth) {
   const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const { data } = await admin
     .from("frunk_bookings")
-    .select("id, booked_date, start_time, end_time, status, frunk_bays(name)")
+    .select(
+      "id, booked_date, start_time, end_time, status, frunk_bays(name), " +
+        "lesson_option_status, lesson_option_start, lesson_option_minutes, lesson_option_fee",
+    )
     .eq("member_id", member.id)
     .gte("booked_date", today)
     .eq("status", "confirmed")
