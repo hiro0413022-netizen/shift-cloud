@@ -1,8 +1,18 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
-import { canAccessFrank } from "@/lib/store-scope";
+import { canAccessFrank, canAccessGolfWing } from "@/lib/store-scope";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { loadDay, loadUnpaid, loadMonthCounts, loadCoaches, loadMemberOptions, type BookingRow } from "@/lib/frank-reservation";
+import {
+  loadDay,
+  loadUnpaid,
+  loadMonthCounts,
+  loadCoaches,
+  loadMemberOptions,
+  loadBookingDetail,
+  loadLessonDetail,
+  type BookingRow,
+} from "@/lib/frank-reservation";
 import {
   BOOKING_STATUS_LABEL,
   CUSTOMER_KIND_LABEL,
@@ -13,11 +23,33 @@ import {
   jstToday,
   outstanding,
 } from "@yozan/core/frank-booking";
-import { toTimelineItems, monthOf, labelJa } from "@/lib/bay-timeline-pure";
-import { BayTimeline, TimelineLegend } from "@/components/bay-timeline";
-import { MonthMiniCalendar, STEP_OPTIONS } from "@/components/month-picker";
-import { createBooking, setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption } from "./actions";
-import { MemberPicker } from "./member-picker";
+import {
+  toTimelineItems,
+  monthOf,
+  labelJa,
+  addDaysStr,
+  addMonths,
+  weekStart,
+  toMin,
+  type TimelineItem,
+} from "@/lib/bay-timeline-pure";
+import { BayTimeline, WeekTimeline, TimelineLegend, type WeekDay } from "@/components/bay-timeline";
+import {
+  MonthMiniCalendar,
+  MonthCalendar,
+  CalendarViewSwitch,
+  STEP_OPTIONS,
+  type CalendarView,
+} from "@/components/month-picker";
+import { BookingDetailPanel, LessonDetailPanel } from "@/components/booking-detail";
+import { setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption } from "./actions";
+import { BookingSheet } from "./booking-sheet";
+
+const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
+
+/** 体験の枠（毎時00分・60分押さえ）。正典は Genesis 側 frank-trial.ts。ここは入力欄の選択肢を作るだけ */
+const TRIAL_MINUTES = 60;
+const TRIAL_START_STEP = 60;
 
 export const dynamic = "force-dynamic";
 
@@ -51,36 +83,72 @@ function who(b: BookingRow): string {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; step?: string; bay?: string; start?: string }>;
+  searchParams: Promise<{ date?: string; view?: string; step?: string; sel?: string; store?: string }>;
 }) {
   const actor = await requireReceptionActor();
   // 店舗またぎ廃止（#134）: FRANK姫路に配属されていない人には存在ごと見せない
   if (!canAccessFrank(actor)) notFound();
   const sp = await searchParams;
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : jstToday();
-  // 縦軸の刻み（#135）。既定は30分＝予約の刻みと同じ
+  const today = jstToday();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : today;
+  // 月/週/日（#135）。既定は日。表示時刻の刻みは 15/30/60 分だけ許す（既定30分＝予約の刻みと同じ）
+  const mode: CalendarView = sp.view === "week" ? "week" : sp.view === "month" ? "month" : "day";
   const step = STEP_OPTIONS.includes(Number(sp.step)) ? Number(sp.step) : 30;
+  const month = monthOf(date);
+  const weekFrom = weekStart(date); // 週は日曜はじまり（Smart Helloと同じ）
+  const days = mode === "week" ? Array.from({ length: 7 }, (_, i) => addDaysStr(weekFrom, i)) : [date];
 
-  const [view, unpaidRows, monthData, coaches, memberOptions] = await Promise.all([
-    loadDay(date, actor.companyId),
+  const [dayViews, monthData, unpaidRows, coaches, memberOptions, detail, canGw] = await Promise.all([
+    Promise.all(days.map((d) => loadDay(d, actor.companyId))),
+    loadMonthCounts(month, actor.companyId),
     loadUnpaid(actor.companyId),
-    loadMonthCounts(monthOf(date), actor.companyId),
     loadCoaches(actor.companyId),
     loadMemberOptions(actor.companyId), // 予約作成の会員検索（氏名でも引ける・#189）
+    loadSelection(sp.sel ?? null, actor.companyId),
+    canAccessGolfWing(actor),
   ]);
-  const bays = view.bays.filter((b) => b.active);
-  const closedBays = view.bays.filter((b) => !b.active);
-  const live = view.bookings.filter((b) => b.status !== "cancelled");
 
-  // 縦＝時間・横＝打席のタイムライン（#135・/dashboard と同じ部品・同じ色）
-  const gridSlots = view.hours ? genSlots(view.hours, step) : [];
-  const items = toTimelineItems(view.bookings, view.lessons);
-  const bookableSlots = new Set(view.slots); // 予約を作れる開始時刻（表示粒度とは別）
-  const emptyHref = (bayId: string, slot: string) =>
-    bookableSlots.has(slot) ? `/reservations?date=${date}&step=${step}&bay=${bayId}&start=${slot}#booking-form` : undefined;
-  // 空きコマを押して来たときは、予約作成フォームに打席と開始時刻を入れておく
-  const preBay = bays.some((b) => b.id === sp.bay) ? (sp.bay as string) : (bays[0]?.id ?? "");
-  const preStart = view.slots.includes(sp.start ?? "") ? (sp.start as string) : (view.slots[0] ?? "");
+  const dayView = dayViews.find((v) => v.date === date) ?? dayViews[0];
+  const { cfg, counts } = monthData;
+  const isClosed = (d: string) => businessHours(d, cfg) === null;
+
+  const bays = dayView.bays.filter((b) => b.active);
+  const closedBays = dayView.bays.filter((b) => !b.active);
+  const live = dayView.bookings.filter((b) => b.status !== "cancelled");
+
+  // 縦＝時間・横＝打席のタイムライン（#135）
+  const gridSlots = dayView.hours ? genSlots(dayView.hours, step) : [];
+  const items = toTimelineItems(dayView.bookings, dayView.lessons);
+  const bookableSlots = new Set(dayView.slots); // 予約を作れる開始時刻（表示粒度とは別）
+
+  // 体験を入れられる開始時刻（毎時00分・約55分＝60分押さえ）。空きの有無はGenesis側が最終判定する
+  const trialSlots: string[] = [];
+  if (dayView.hours) {
+    const open = toMin(dayView.hours.open);
+    const close = toMin(dayView.hours.close);
+    for (let m = Math.ceil(open / TRIAL_START_STEP) * TRIAL_START_STEP; m + TRIAL_MINUTES <= close; m += TRIAL_START_STEP) {
+      trialSlots.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:00`);
+    }
+  }
+
+  const href = (p: { date?: string; view?: CalendarView; month?: string; step?: number; sel?: string }) => {
+    const d = p.date ?? date;
+    const v = p.view ?? mode;
+    const st = p.step ?? step;
+    const base = `/reservations?date=${d}&view=${v}&step=${st}`;
+    return p.sel ? `${base}&sel=${encodeURIComponent(p.sel)}#booking-detail` : base;
+  };
+  const itemHref = (item: TimelineItem, d?: string) => href({ date: d ?? date, sel: item.id });
+
+  // 「前へ/次へ」の刻みは表示中の単位に合わせる（日=1日・週=7日・月=1か月）
+  const prevHref =
+    mode === "month"
+      ? href({ date: `${addMonths(month, -1)}-01`, month: addMonths(month, -1) })
+      : href({ date: addDaysStr(date, mode === "week" ? -7 : -1) });
+  const nextHref =
+    mode === "month"
+      ? href({ date: `${addMonths(month, 1)}-01`, month: addMonths(month, 1) })
+      : href({ date: addDaysStr(date, mode === "week" ? 7 : 1) });
 
   const unpaidList = unpaidRows
     .map((b) => ({ b, out: outstanding(b.amount, b.paid_amount, b.payment_status) }))
@@ -91,34 +159,142 @@ export default async function ReservationsPage({
   // パーソナルレッスン25分の「希望（未確定）」。担当を決めるまで放置されないよう件数を出す（0136）
   const lessonWaiting = live.filter((b) => b.lesson_option_status === "requested");
 
+  const calendar =
+    mode === "month" ? (
+      <MonthCalendar month={month} today={today} counts={counts} href={href} isClosed={isClosed} />
+    ) : mode === "week" ? (
+      <WeekTimeline
+        days={dayViews.map(toWeekDay)}
+        step={step}
+        bayCount={bays.length}
+        hrefDay={(d) => href({ date: d, view: "day", month: monthOf(d) })}
+        today={today}
+        itemHref={itemHref}
+      />
+    ) : dayView.closed || !dayView.hours ? (
+      <Empty>{labelJa(date)} は定休日です（営業時間・定休日は Genesis の /site-admin で変更できます）</Empty>
+    ) : (
+      // 空きマスを押すと、その日・その時刻・その打席で入力パネルが開く（#192）
+      <BookingSheet
+        date={date}
+        dateLabel={labelJa(date)}
+        bays={bays.map((b) => ({ id: b.id, name: b.name }))}
+        slots={dayView.slots}
+        minutesOptions={cfg.max_minutes_options}
+        members={memberOptions}
+        trialSlots={trialSlots}
+      >
+        <BayTimeline
+          slots={gridSlots}
+          step={step}
+          bays={bays}
+          items={items}
+          nowMin={date === today ? jstNowMin() : null}
+          emptyTap={(_bayId, slot) => bookableSlots.has(slot)}
+          itemHref={(it) => itemHref(it)}
+          selectedId={sp.sel ?? null}
+          maxHeightClass="max-h-[68vh]"
+        />
+      </BookingSheet>
+    );
+
   return (
     <div className="space-y-4">
       <header className="reveal flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold">予約管理 — FRANK GOLF 姫路</h1>
-          <p className="text-sm text-(--color-dim)">
-            会員のWeb予約・体験・レッスン・電話予約をまとめて管理します（台帳は1つ）
+          <h1 className="text-xl font-bold tracking-tight">予約 — FRANK GOLF 姫路</h1>
+          <p className="mt-0.5 text-sm text-(--color-dim)">
+            体験・会員・都度・レッスンの予約をこの1画面で。空いているマスを押すとその場で登録できます
           </p>
         </div>
-        <form className="flex items-center gap-2">
-          <input type="date" name="date" defaultValue={date} className={inputCls} />
-          <select name="step" defaultValue={String(step)} className={`${inputCls} !w-24`} aria-label="表示時刻">
-            {STEP_OPTIONS.map((s) => <option key={s} value={s}>{s}分</option>)}
-          </select>
-          <button className={btnGhostCls}>表示</button>
-        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={prevHref} className={btnGhostCls} aria-label="前へ">←</Link>
+          <form className="flex items-center gap-2">
+            <input type="hidden" name="view" value={mode} />
+            <input type="hidden" name="step" value={String(step)} />
+            <input type="date" name="date" defaultValue={date} className={inputCls} />
+            <button className={btnGhostCls}>表示</button>
+          </form>
+          <Link href={nextHref} className={btnGhostCls} aria-label="次へ">→</Link>
+          <Link href={href({ date: today, month: monthOf(today) })} className={btnGhostCls}>今日</Link>
+        </div>
       </header>
 
-      <Panel title="お客様のご予約について" className="d1">
+      {canGw && (
+        <p className="text-right text-xs">
+          <Link href="/dashboard?store=gw" className="text-(--color-dim) underline hover:text-(--color-txt)">
+            GOLF WING 宝塚の月次サマリーを見る →
+          </Link>
+        </p>
+      )}
+
+      <Panel
+        title={`予約カレンダー　${
+          mode === "month"
+            ? `${month.slice(0, 4)}年${Number(month.slice(5, 7))}月`
+            : mode === "week"
+              ? `${labelJa(weekFrom)} 〜 ${labelJa(addDaysStr(weekFrom, 6))}`
+              : `${labelJa(date)}${dayView.closed ? "　定休日" : `　${dayView.hours?.open}〜${dayView.hours?.close}`}`
+        }`}
+        className="d1"
+      >
+        <div className="flex flex-col gap-4 lg:flex-row">
+          {/* 左サイド: 月ミニカレンダー → 月/週/日 → 表示時刻（Smart Helloと同じ並び） */}
+          <aside className="w-full shrink-0 space-y-3 lg:w-56">
+            <MonthMiniCalendar
+              month={month}
+              selected={date}
+              today={today}
+              href={href}
+              view={mode}
+              counts={counts}
+              isClosed={isClosed}
+            />
+            <CalendarViewSwitch view={mode} step={step} date={date} href={href} />
+            <div className="flex flex-col gap-1.5 text-xs">
+              <a href={`${LESSON_OS_URL}/frank`} target="_blank" rel="noreferrer" className={btnGhostCls}>🎯 レッスン管理システム ↗</a>
+              <Link href="/frunk" className={btnGhostCls}>FRANK会員（重要説明事項の記入）</Link>
+              <Link href="/board" target="_blank" className={btnGhostCls}>ロビー掲示用カレンダー ↗</Link>
+            </div>
+          </aside>
+
+          <div className="min-w-0 flex-1 space-y-3">
+            {detail && (
+              <div id="booking-detail">
+                {detail.kind === "booking" ? (
+                  <BookingDetailPanel
+                    b={detail.booking}
+                    backHref={href({})}
+                    date={detail.booking.booked_date}
+                    bays={bays.map((x) => ({ id: x.id, name: x.name }))}
+                  />
+                ) : (
+                  <LessonDetailPanel l={detail.lesson} backHref={href({})} />
+                )}
+              </div>
+            )}
+
+            {calendar}
+
+            <TimelineLegend>
+              <span>空いているマスを押すと、その時間で【体験】【会員・都度】を登録できます</span>
+              <span>予約の名前を押すと詳細（連絡先・会計・来店処理）が開きます</span>
+              <span>⚠ = 重要説明事項あり（FRANK会員画面で記入・確認）</span>
+              {closedBays.length > 0 && <span>休止中: {closedBays.map((b) => b.name).join("・")}</span>}
+            </TimelineLegend>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="お客様ご自身のご予約について" className="d1">
         <p className="text-sm text-(--color-dim)">
-          お客様のご予約は <strong className="text-(--color-txt)">公式サイト（frankgolf.jp）</strong> で完結します。
-          体験は日時を選ぶだけでその場で確定し、この画面にすぐ表示されます。
-          電話・店頭で受けたぶんだけ、下の「予約を作成」から登録してください。
+          お客様のご予約は <strong className="text-(--color-txt)">公式サイト（frankgolf.jp）</strong> と
+          <strong className="text-(--color-txt)"> 会員ポータル（my.frankgolf.jp）</strong> で完結し、この画面にすぐ表示されます。
+          電話・店頭で受けたぶんだけ、カレンダーのマスを押して登録してください。
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <a href="https://frankgolf.jp/trial-booking.html" target="_blank" rel="noreferrer" className={btnGhostCls}>体験予約ページ ↗</a>
-          <a href="https://frankgolf.jp/booking.html" target="_blank" rel="noreferrer" className={btnGhostCls}>会員の打席予約 ↗</a>
-          <a href="https://frankgolf.jp/lesson-booking.html" target="_blank" rel="noreferrer" className={btnGhostCls}>レッスン予約 ↗</a>
+          <a href="https://my.frankgolf.jp/member/login" target="_blank" rel="noreferrer" className={btnGhostCls}>会員ポータル ↗</a>
         </div>
       </Panel>
 
@@ -141,7 +317,7 @@ export default async function ReservationsPage({
       )}
 
       {/* 未収金サマリ */}
-      <Panel title={`未収金サマリ（未収・一部入金 ${unpaidList.length}件）`} className="d1">
+      <Panel title={`未収金サマリ（未収・一部入金 ${unpaidList.length}件）`} className="d2">
         {unpaidList.length === 0 ? (
           <Empty>未収金はありません</Empty>
         ) : (
@@ -177,98 +353,13 @@ export default async function ReservationsPage({
         )}
       </Panel>
 
-      {/* 空き状況グリッド */}
-      <Panel
-        title={`空き状況　${labelJa(date)}${view.closed ? "　定休日" : `　${view.hours?.open}〜${view.hours?.close}`}`}
-        className="d2"
-      >
-        {/* 縦＝時間・横＝打席（#135）。左の月カレンダーで日を選び、空きコマを押すと下の作成フォームに入る */}
-        <div className="flex flex-col gap-4 lg:flex-row">
-          <aside className="w-full shrink-0 lg:w-56">
-            <MonthMiniCalendar
-              month={monthOf(date)}
-              selected={date}
-              today={jstToday()}
-              view="day"
-              counts={monthData.counts}
-              isClosed={(d) => businessHours(d, monthData.cfg) === null}
-              href={(p) => `/reservations?date=${p.date ?? date}&step=${p.step ?? step}`}
-            />
-          </aside>
-          <div className="min-w-0 flex-1 space-y-2">
-            {view.closed ? (
-              <Empty>この日は定休日です（営業時間・定休日は Genesis の /site-admin で変更できます）</Empty>
-            ) : (
-              <>
-                <BayTimeline
-                  slots={gridSlots}
-                  step={step}
-                  bays={bays}
-                  items={items}
-                  emptyHref={emptyHref}
-                  itemHref={(it) => (it.id.startsWith("lesson:") ? undefined : `#bk-${it.id}`)}
-                  maxHeightClass="max-h-[68vh]"
-                />
-                <TimelineLegend>
-                  <span>予約の名前を押すと下の一覧（詳細・入金）へ移動します</span>
-                  <span>空きコマを押すと下の作成フォームに入ります</span>
-                  {closedBays.length > 0 && <span>休止中: {closedBays.map((b) => b.name).join("・")}</span>}
-                </TimelineLegend>
-              </>
-            )}
-          </div>
-        </div>
-      </Panel>
-
-      {/* 予約作成 */}
-      <Panel title="予約を作成（電話・店頭で受けたぶん）" className="d2">
-        {/* 上のタイムラインで空きコマを押すと #booking-form へ飛び、打席と開始時刻が入った状態になる（#135） */}
-        <form id="booking-form" action={createBooking} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <input type="hidden" name="booking_date" value={date} />
-          <Field label="打席">
-            <select name="bay_id" defaultValue={preBay} className={inputCls}>
-              {bays.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </Field>
-          <Field label="開始時刻">
-            <select name="start_time" defaultValue={preStart} className={inputCls}>
-              {view.slots.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </Field>
-          <Field label="利用時間">
-            <select name="minutes" className={inputCls} defaultValue="60">
-              {view.cfg.max_minutes_options.map((m) => <option key={m} value={m}>{m}分</option>)}
-            </select>
-          </Field>
-          {/* 会員はお名前でも会員番号でも引ける（#189）。選ぶと自動で「会員」の予約になる。
-              区分の選択欄は廃止した＝選び忘れて会員が都度利用として登録される事故を無くす */}
-          <div className="col-span-2">
-            <Field label="会員（お名前・カナ・会員番号・電話で検索）">
-              <MemberPicker members={memberOptions} inputCls={inputCls} />
-            </Field>
-          </div>
-          <Field label="お名前（会員でない方）">
-            <input name="guest_name" placeholder="山田 太郎" className={inputCls} />
-          </Field>
-          <Field label="電話番号">
-            <input name="guest_phone" placeholder="090-..." className={inputCls} />
-          </Field>
-          <Field label="料金（請求額）">
-            <input name="amount" inputMode="numeric" placeholder="0" className={inputCls} />
-          </Field>
-          <div className="col-span-2 flex items-end sm:col-span-4">
-            <button className={`${btnCls} w-full justify-center sm:w-auto`}>＋ 予約を登録</button>
-          </div>
-        </form>
-      </Panel>
-
       {/* 当日の予約一覧 */}
       <Panel title={`予約一覧（${date}）　${live.length}件${trialCount ? `（うち体験 ${trialCount}件）` : ""}`} className="d3">
-        {view.bookings.length === 0 ? (
+        {dayView.bookings.length === 0 ? (
           <Empty>この日の予約はありません</Empty>
         ) : (
           <div className="space-y-2">
-            {view.bookings.map((b) => {
+            {dayView.bookings.map((b) => {
               const out = outstanding(b.amount, b.paid_amount, b.payment_status);
               const t = b.mbr_trial_requests;
               return (
@@ -469,4 +560,32 @@ export default async function ReservationsPage({
       </Panel>
     </div>
   );
+}
+
+
+function toWeekDay(v: Awaited<ReturnType<typeof loadDay>>): WeekDay {
+  return {
+    date: v.date,
+    closed: v.closed,
+    slots: v.slots,
+    items: toTimelineItems(v.bookings, v.lessons),
+  };
+}
+
+/** 現在時刻（JSTの分）。サーバーはUTCなので +9h してから読む（JST日付ルール #73） */
+function jstNowMin(): number {
+  const now = new Date(Date.now() + 9 * 3600_000);
+  return now.getUTCHours() * 60 + now.getUTCMinutes();
+}
+
+/** ?sel= の中身を詳細データに変える。`lesson:<uuid>` はレッスン枠、それ以外は予約ID（#139） */
+async function loadSelection(sel: string | null | undefined, companyId: string) {
+  const raw = (sel ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("lesson:")) {
+    const l = await loadLessonDetail(raw.slice("lesson:".length), companyId);
+    return l ? ({ kind: "lesson", lesson: l } as const) : null;
+  }
+  const b = await loadBookingDetail(raw, companyId);
+  return b ? ({ kind: "booking", booking: b } as const) : null;
 }

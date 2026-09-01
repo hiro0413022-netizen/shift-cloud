@@ -1,11 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Panel } from "@/components/ui";
 import { StatCard, type StatGroup } from "./stat-card";
-import { FrankCalendarDashboard } from "./frank-calendar";
-import { STEP_OPTIONS } from "@/components/month-picker";
-import { jstToday } from "@yozan/core/frank-booking";
+
 import { FRANK_STORE_ID, canAccessFrank, golfWingStoreId, canAccessStore, companyHasFrank, storeFilterIds } from "@/lib/store-scope";
 import { tallyJoins, type LedgerJoin, type RosterJoin } from "@/lib/join-tally-pure";
 import { VISIT_TYPE_LABEL } from "@/lib/walkin";
@@ -74,28 +73,18 @@ export default async function DashboardPage({
     );
   }
 
+  // #192: 予約カレンダーは /reservations（予約管理）に統合した。
+  // 「カレンダーで見る画面」と「登録・入金する画面」が別タブに分かれていて、
+  // 空いている時間を見つけてから登録するのに毎回タブを行き来していた（2026-09-01 ユーザー指摘）。
+  // 既存のブックマーク・他画面からのリンク（/dashboard?date=…&sel=…）はそのまま活きるよう転送する。
   if (showFrank) {
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? (sp.date as string) : jstToday();
-    // 月/週/日（#135）。既定は日。表示時刻の刻みは 15/30/60 分だけ許す（既定30分＝予約の刻みと同じ）
-    const view = sp.view === "week" ? ("week" as const) : sp.view === "month" ? ("month" as const) : ("day" as const);
-    const step = STEP_OPTIONS.includes(Number(sp.step)) ? Number(sp.step) : 30;
-    return (
-      <div className="space-y-4">
-        {bothStores && (
-          <p className="text-right text-xs">
-            <Link href="/dashboard?store=gw" className="text-(--color-dim) underline hover:text-(--color-txt)">GOLF WING 宝塚の月次サマリーを見る →</Link>
-          </p>
-        )}
-        <FrankCalendarDashboard
-          date={date}
-          view={view}
-          step={step}
-          companyId={actor.companyId}
-          extraQuery={bothStores ? "&store=frank" : ""}
-          sel={sp.sel ?? null}
-        />
-      </div>
-    );
+    const q = new URLSearchParams();
+    if (sp.date) q.set("date", sp.date);
+    if (sp.view) q.set("view", sp.view);
+    if (sp.step) q.set("step", sp.step);
+    if (sp.sel) q.set("sel", sp.sel);
+    const qs = q.toString();
+    redirect(qs ? `/reservations?${qs}` : "/reservations");
   }
 
   const month = /^\d{4}-\d{2}$/.test(sp.month ?? "") ? (sp.month as string) : ym(new Date());
@@ -242,7 +231,7 @@ export default async function DashboardPage({
         </div>
         <div className="flex items-center gap-2">
           {bothStores && (
-            <Link href="/dashboard?store=frank" className="mr-2 text-xs text-(--color-dim) underline hover:text-(--color-txt)">← FRANK姫路のカレンダー</Link>
+            <Link href="/reservations" className="mr-2 text-xs text-(--color-dim) underline hover:text-(--color-txt)">← FRANK姫路の予約カレンダー</Link>
           )}
           <Link href={`/dashboard?month=${prev}${storeQ}`} className="rounded-lg border border-(--color-line) bg-white px-2.5 py-1.5 text-sm text-(--color-dim) hover:text-(--color-txt)" aria-label="前月">←</Link>
           <form>

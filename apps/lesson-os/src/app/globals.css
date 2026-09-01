@@ -35,22 +35,51 @@ body {
 }
 
 /* ============================================================
-   モバイル対応（基準: docs/genesis/DESIGN_SYSTEM.md）
+   スマホ対応（2026-09-01・#192 ユーザー指示で作り直し）
+
+   ここには以前「max-width:767px では .grid-cols-2 を1列に、.grid-cols-3〜6 を2列に」
+   という一括の書き換えがあった。これが Tailwind の `grid-cols-2 md:grid-cols-4` を
+   打ち消していて、**画面のほとんどがスマホで1列に伸びる**（＝ひたすら縦に長い）原因だった。
+   （unlayered なCSSは Tailwind の @layer utilities より強いので必ず勝ってしまう）
+
+   一括の書き換えはやめて、レイアウトは各画面の `md:` 指定に任せる。
+   ここに残すのは「指で操作するために必要なこと」だけ。
    ============================================================ */
 @media (max-width: 767px) {
-  .grid-cols-2 {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-  }
-  .grid-cols-3,
-  .grid-cols-4,
-  .grid-cols-5,
-  .grid-cols-6 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  /* 表は画面幅で切らずに横スクロールさせる */
   table {
     display: block;
     max-width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  /* iOS Safari は 16px 未満の入力欄をタップすると画面を勝手に拡大する。
+     拡大されると元に戻せず、そのあとの操作がすべてズレる */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* 指で押せる大きさ（44px）。文字だけのボタンが押しづらかった */
+  button,
+  .btn-gold,
+  .btn-ghost {
+    min-height: 44px;
+  }
+
+  /* ホームバーに隠れないように */
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* 横スクロールするタブ（スマホのナビ・カルテのタブ）。バーは出さない */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

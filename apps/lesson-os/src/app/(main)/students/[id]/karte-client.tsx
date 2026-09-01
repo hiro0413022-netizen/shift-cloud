@@ -229,12 +229,12 @@ export function KarteClient({
   return (
     <div className="space-y-4">
       {/* 生徒ヘッダ（PGA NOTE風: 写真＋名前＋受講理由/目標） */}
-      <div className="flex items-center gap-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-(--color-line) bg-(--color-panel) p-3 md:gap-4 md:p-4">
         {student.photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={student.photoUrl} alt={student.name} className="h-16 w-16 rounded-lg object-cover" />
+          <img src={student.photoUrl} alt={student.name} className="h-14 w-14 rounded-lg object-cover md:h-16 md:w-16" />
         ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-(--color-panel-2) text-xl font-semibold text-(--color-gold)">
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-(--color-panel-2) text-xl font-semibold text-(--color-gold) md:h-16 md:w-16">
             {student.name.slice(0, 1)}
           </div>
         )}
@@ -248,9 +248,10 @@ export function KarteClient({
             {student.memberCode ? ` ・ 会員 ${student.memberCode}` : ""}
           </p>
         </div>
-        <div className="shrink-0 text-right">
+        {/* スマホでは名前の下に回す（右に置くと名前が潰れる） */}
+        <div className="w-full shrink-0 md:w-auto md:text-right">
           {shareUrl ? (
-            <div className="max-w-[220px]">
+            <div className="md:max-w-[220px]">
               <p className="mb-1 text-[10px] text-(--color-dim)">生徒に送るURL（LINE等で共有）</p>
               <div className="flex gap-1">
                 <input readOnly value={shareUrl} className="input-dark w-full !py-1 text-[10px]" onFocus={(e) => e.currentTarget.select()} />
@@ -259,18 +260,20 @@ export function KarteClient({
               <button onClick={() => startTransition(async () => { await revokeShareLink(student.id); setShareUrl(null); setMsg("共有を停止しました"); })} className="mt-1 text-[10px] text-(--color-dim) underline">共有を停止する</button>
             </div>
           ) : (
-            <button onClick={share} disabled={pending} className="btn-ghost text-xs">🔗 生徒へ共有リンク</button>
+            <button onClick={share} disabled={pending} className="btn-ghost w-full text-xs md:w-auto">🔗 生徒へ共有リンク</button>
           )}
         </div>
       </div>
 
-      {/* タブ */}
-      <div className="grid grid-cols-3 gap-1 rounded-xl border border-(--color-line) bg-(--color-panel) p-1 text-center text-xs md:grid-cols-6 md:text-sm">
+      {/* タブ。スマホは横に流す（7つを2〜3列に折ると縦に伸びて、下の内容が画面から押し出される） */}
+      <div className="no-scrollbar flex gap-1 overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel) p-1 text-sm md:grid md:grid-cols-7 md:text-center">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-lg py-2 ${tab === t.id ? "bg-(--color-active) font-semibold text-white" : "text-(--color-dim)"}`}
+            className={`shrink-0 rounded-lg px-3 py-2 whitespace-nowrap md:px-2 ${
+              tab === t.id ? "bg-(--color-active) font-semibold text-white" : "text-(--color-dim)"
+            }`}
           >
             {t.label}
           </button>

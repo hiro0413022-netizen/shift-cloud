@@ -9,6 +9,16 @@ import { requireStoreAccess } from "@/lib/store-scope";
 import { loadBookingCfg, businessHours } from "@yozan/core/frank-booking";
 import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
 import { sendFrankMail, buildBookingRescheduleMail } from "@/lib/frank-mail";
+import { readName } from "@/lib/name";
+import { birthDateError } from "@yozan/core/birth-date";
+import { jstYmd } from "@/lib/jst";
+
+/** Genesis（frankgolf.jp の裏側）。体験予約の規則はあちらが正典なので、ここでは作り直さない */
+const GENESIS_URL = process.env.GENESIS_URL || "https://yozan-genesis.vercel.app";
+
+/** 画面に返す結果（#192）。以前は失敗しても黙って戻るだけで、
+ *  「登録を押したのに増えない」がスタッフ側から見て原因不明だった */
+export type BookingFormState = { ok?: boolean; error?: string; message?: string };
 
 /**
  * FRANK GOLF 予約管理（スタッフ操作）— 台帳は frunk_bookings 一本（#93 / 0084）
@@ -34,8 +44,14 @@ function back(date: string) {
   revalidatePath("/"); // 受付台帳（体験は予約と同時に台帳へ載る）
 }
 
-/** 電話・店頭で受けた予約を作る（会員 / 都度利用） */
-export async function createBooking(formData: FormData) {
+/**
+ * 電話・店頭で受けた予約を作る（会員 / 都度利用）
+ *
+ * #192: カレンダーの空きマスをタップして開く入力パネルから呼ばれる。
+ *  - 結果を必ず文字で返す（黙って何も起きない、を無くす）
+ *  - レッスン枠との重なりも見る（作成時は見ておらず、打席がダブルブッキングになり得た）
+ */
+export async function createBooking(_prev: BookingFormState, formData: FormData): Promise<BookingFormState> {
   const actor = await requireReceptionActor();
   requireStoreAccess(actor, FRANK_STORE_ID); // FRANK姫路の予約はFRANKに配属された人だけ（#134）
   const admin = createAdmin();
@@ -50,15 +66,17 @@ export async function createBooking(formData: FormData) {
   const memberNo = str(formData.get("member_no"));
   const guestName = str(formData.get("guest_name"));
 
-  if (!date || !start || !bayId) return;
+  if (!date || !start || !bayId) return { error: "日付・開始時刻・打席をご確認ください" };
 
   const cfg = await loadBookingCfg(admin);
   const hours = businessHours(date, cfg);
-  if (!hours) return back(date);
+  if (!hours) return { error: "この日は定休日です" };
 
   const s = toMin(start);
   const e = s + minutes;
-  if (s < toMin(hours.open) || e > toMin(hours.close)) return back(date);
+  if (s < toMin(hours.open) || e > toMin(hours.close)) {
+    return { error: `営業時間（${hours.open}〜${hours.close}）に収まりません` };
+  }
 
   // 会員指定なら会員を引く（見つからなければ名前だけの都度予約として登録）。
   // 画面から来たIDでも、必ず会社・店舗で引き直す＝クライアントの値をそのまま信じない（#134）
@@ -73,20 +91,33 @@ export async function createBooking(formData: FormData) {
     const { data: m } = await (pickedId ? q.eq("id", pickedId) : q.eq("member_no", memberNo)).maybeSingle();
     memberId = m?.id ? String(m.id) : null;
   }
-  if (!memberId && !guestName) return back(date); // 持ち主が分からない予約は作らない
+  if (!memberId && !guestName) return { error: "会員を選ぶか、お名前をご入力ください" };
 
-  // 区間の重なりを確認（DBのunique indexは開始時刻だけを見るため）
-  const { data: same } = await admin
-    .from("frunk_bookings")
-    .select("start_time, end_time")
-    .eq("company_id", actor.companyId)
-    .eq("store_id", FRANK_STORE_ID)
-    .eq("bay_id", bayId)
-    .eq("booked_date", date)
-    .neq("status", "cancelled")
-    .is("deleted_at", null);
-  for (const b of same ?? []) {
-    if (s < toMin(String(b.end_time)) && e > toMin(String(b.start_time))) return back(date);
+  // 区間の重なりを確認（DBのunique indexは開始時刻だけを見るため）。レッスン枠も同じ打席を使う。
+  const [{ data: same }, { data: lessons }] = await Promise.all([
+    admin
+      .from("frunk_bookings")
+      .select("start_time, end_time")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .eq("bay_id", bayId)
+      .eq("booked_date", date)
+      .neq("status", "cancelled")
+      .is("deleted_at", null),
+    admin
+      .from("frunk_lesson_slots")
+      .select("start_time, end_time")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .eq("bay_id", bayId)
+      .eq("slot_date", date)
+      .eq("status", "open")
+      .is("deleted_at", null),
+  ]);
+  for (const b of [...(same ?? []), ...(lessons ?? [])]) {
+    if (s < toMin(String(b.end_time)) && e > toMin(String(b.start_time))) {
+      return { error: "その打席・その時間はすでにふさがっています" };
+    }
   }
 
   const { error } = await admin.from("frunk_bookings").insert({
@@ -106,8 +137,84 @@ export async function createBooking(formData: FormData) {
     amount: num(formData.get("amount")),
     note: str(formData.get("note")) || null,
   });
-  if (!error) await logAudit(actor, "frank.booking.create", "frunk_bookings", null, null, { date, start, bayId });
+  if (error) return { error: `登録できませんでした: ${error.message}` };
+  await logAudit(actor, "frank.booking.create", "frunk_bookings", null, null, { date, start, bayId });
   back(date);
+  return { ok: true, message: `${start.slice(0, 5)} の予約を登録しました` };
+}
+
+/**
+ * 電話・店頭で受けた「体験」を、カレンダーのマスから直接確定する（#192）
+ *
+ * ★ 規則を member-os 側で作り直さない
+ *   体験は「毎時00分・60分押さえ・打席はA→B→Cの優先順で自動割当・レフティは左右打席のみ・
+ *   生年月日必須・受付台帳へ自動連携・確定メール」という決まりがあり、その正典は
+ *   Genesis の /api/public/frank/trial（apps/genesis/src/lib/frank-trial.ts）。
+ *   ここで同じ処理を書くと、規則が変わったときに片方だけ古くなる。
+ *   だからスタッフ画面からも同じAPIを呼ぶ（member-os → Genesis はサーバー間の通信）。
+ *
+ * ★ これまでは、電話で体験を受けたスタッフは公式サイトの体験予約ページを自分で開いて
+ *   お客様のふりをして入力するしかなかった（2026-09-01 ユーザー指摘）。
+ */
+export async function createTrialByStaff(_prev: BookingFormState, formData: FormData): Promise<BookingFormState> {
+  const actor = await requireReceptionActor();
+  requireStoreAccess(actor, FRANK_STORE_ID); // #134
+  const { name, nameKana } = readName(formData);
+  if (!name) return { error: "お名前（姓・名）をご入力ください" };
+
+  const phone = str(formData.get("guest_phone"));
+  const email = str(formData.get("email"));
+  if (!phone && !email) return { error: "お電話番号かメールアドレスのどちらかをご入力ください" };
+
+  const birthDate = str(formData.get("birth_date"));
+  const birthErr = birthDateError(birthDate, jstYmd());
+  if (birthErr) return { error: birthErr };
+
+  if (str(formData.get("consent_privacy")) !== "1") {
+    return { error: "個人情報の取扱いについてお客様の同意（口頭で可）を確認し、チェックを入れてください" };
+  }
+
+  const date = str(formData.get("booking_date"));
+  const start = str(formData.get("start_time")).slice(0, 5);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(start)) {
+    return { error: "日付・開始時刻をご確認ください" };
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${GENESIS_URL}/api/public/frank/trial`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        action: "book",
+        name,
+        name_kana: nameKana ?? undefined,
+        birth_date: birthDate,
+        phone: phone || undefined,
+        email: email || undefined,
+        date,
+        start,
+        lefty: str(formData.get("lefty")) === "1",
+        experience: str(formData.get("experience")) || undefined,
+        message: str(formData.get("message")) || undefined,
+        consent: true,
+        src: "staff", // 流入元は「Web体験予約（staff）」として台帳に残る＝Web申込と区別できる
+      }),
+    });
+  } catch {
+    return { error: "体験予約システムに接続できませんでした。時間をおいて、もう一度お試しください" };
+  }
+
+  const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; bayName?: string; end?: string };
+  if (!res.ok || !body.ok) return { error: body.error || "体験のご予約を登録できませんでした" };
+
+  await logAudit(actor, "frank.trial.create_by_staff", "mbr_trial_requests", null, null, { date, start, name });
+  back(date);
+  return {
+    ok: true,
+    message: `${date} ${start}〜${(body.end ?? "").slice(0, 5)} ${body.bayName ?? ""} で体験を確定しました`,
+  };
 }
 
 /**

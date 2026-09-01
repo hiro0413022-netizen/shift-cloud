@@ -60,6 +60,7 @@ export function BayTimeline({
   items,
   nowMin = null,
   emptyHref,
+  emptyTap,
   itemHref,
   selectedId = null,
   maxHeightClass = "max-h-[72vh]",
@@ -73,6 +74,9 @@ export function BayTimeline({
   /** 空きコマを押したときの遷移先（/reservations で予約作成フォームに流し込む）。
    *  undefined を返すとただの空き枠として描く（例: 15分表示中の10:15は予約の刻みに乗らない） */
   emptyHref?: (bayId: string, slot: string) => string | undefined;
+  /** 空きコマを「その場の入力パネル」で開く（#192）。true を返したコマだけ押せるボタンになる。
+   *  実際に開くのは親の <BookingSheet>（data-book-* を拾うクライアント側）。emptyHref より優先。 */
+  emptyTap?: (bayId: string, slot: string) => boolean;
   /** 予約ブロックを押したときの遷移先（詳細を開く・#139）。undefined を返すと押せないまま */
   itemHref?: (item: TimelineItem) => string | undefined;
   /** いま詳細を開いている予約（枠を太くして「これを見ている」と分かるようにする） */
@@ -124,14 +128,29 @@ export function BayTimeline({
                     if (cell.kind === "covered") return null; // 上のブロックのrowSpanが飲み込んでいる
                     const base = `border-r border-(--color-line) p-0.5 align-top ${hourTop ? "border-t" : ""} ${isNow ? "bg-accent/5" : ""}`;
                     if (cell.kind === "empty") {
+                      // 空きコマの見た目は3通り: その場で開くボタン / 別画面へのリンク / ただの空き
+                      const emptyCls =
+                        "flex h-full min-h-10 w-full items-center justify-center rounded-md border border-dashed border-(--color-line) bg-(--color-panel-2) text-sm text-(--color-dim)/40 transition-colors hover:border-accent hover:bg-accent/5 hover:text-accent";
+                      if (emptyTap?.(cell.bayId, cell.slot)) {
+                        return (
+                          <td key={bays[i].id} className={base}>
+                            <button
+                              type="button"
+                              data-book-bay={cell.bayId}
+                              data-book-slot={cell.slot}
+                              aria-label={`${cell.slot.slice(0, 5)} ${bays[i].name} に予約を入れる`}
+                              className={emptyCls}
+                            >
+                              ＋
+                            </button>
+                          </td>
+                        );
+                      }
                       const href = emptyHref?.(cell.bayId, cell.slot);
                       return (
                         <td key={bays[i].id} className={base}>
                           {href ? (
-                            <Link
-                              href={href}
-                              className="flex h-full min-h-10 items-center justify-center rounded-md border border-dashed border-(--color-line) bg-(--color-panel-2) text-[10px] text-transparent transition-colors hover:border-accent hover:text-accent"
-                            >
+                            <Link href={href} className={emptyCls}>
                               ＋
                             </Link>
                           ) : (
@@ -334,9 +353,15 @@ export function WeekTimeline({
                   }
                   const list = bySlot[r];
                   if (list.length === 0) {
+                    // 空きコマを押したらその日の日表示へ（打席まで選んで予約するのは日表示・#192）
                     return (
                       <td key={day.date} className={cellCls}>
-                        <div className="h-full min-h-8 rounded border border-dashed border-(--color-line) bg-(--color-panel-2)" />
+                        <Link
+                          href={hrefDay(day.date)}
+                          className="flex h-full min-h-8 items-center justify-center rounded border border-dashed border-(--color-line) bg-(--color-panel-2) text-[10px] text-(--color-dim)/40 transition-colors hover:border-accent hover:bg-accent/5 hover:text-accent"
+                        >
+                          ＋
+                        </Link>
                       </td>
                     );
                   }

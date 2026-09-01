@@ -64,8 +64,8 @@ export default async function StudentsPage({
           </span>
         </h1>
         <div className="flex items-center gap-2">
-          <form className="flex flex-wrap items-center gap-2">
-            <input name="q" defaultValue={q} placeholder="氏名、かな、会員番号で検索" className="input-dark w-64 max-w-full" />
+          <form className="flex w-full flex-wrap items-center gap-2">
+            <input name="q" defaultValue={q} placeholder="氏名、かな、会員番号で検索" className="input-dark w-full sm:w-64" />
             <label className="flex items-center gap-1 whitespace-nowrap text-xs text-(--color-dim)">
               <input type="checkbox" name="inactive" value="1" defaultChecked={showInactive} className="accent-(--color-gold)" />
               退会者も表示
