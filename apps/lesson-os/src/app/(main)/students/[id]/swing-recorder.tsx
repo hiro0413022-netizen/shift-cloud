@@ -34,6 +34,17 @@ import { CLUBS } from "@/lib/lesson";
  *        枠を固定高さにする（メタデータ未取得で高さ0に潰れるのを防ぐ）
  *        → 失敗したら data: URL で再試行 → それでもだめなら1コマ目の静止画を出す
  *      の三段構えにして、「何も映らないまま登録することになる」状態を無くした。
+ *
+ * 2026-09-01（iPhone 17 Pro Max でカメラが開かなかった件）:
+ *   ホーム画面に追加したアイコンから開くと、iOS はそれを Safari とは別のアプリとして扱い、
+ *   カメラ・マイクの許可も別に持つ。Safari 側で許可済みでも、こちらは未許可のまま。
+ *   さらに許可の確認は「タップ起点」でないと出ないことがあり、画面を開いた直後に
+ *   useEffect から getUserMedia を呼ぶだけだと、確認が出ないまま NotAllowedError で落ちる。
+ *   対処:
+ *     (1) 失敗を握りつぶさず、DOMException の name ごとに次の一手まで書いた文を出す
+ *     (2) 【カメラを開始】をプレビュー上に出し、タップから getUserMedia を呼び直せるようにする
+ *     (3) 1920x1080@60 → 素の facingMode → 音声なし → video:true と要求を段階的に緩める
+ *         （音声だけ断られる端末があるため。音が録れないときは打球音の自動推定が効かない旨を出す）
  */
 
 const MIMES = [
@@ -46,6 +57,44 @@ const MIMES = [
 
 /** iOS Safari は codecs 付きの type を持つ blob: を再生できない。素の type に落とす */
 const baseMime = (m: string) => (m.split(";")[0] || "video/webm").trim();
+
+/**
+ * iOS の「ホーム画面に追加」したアイコンから開いた場合（standalone）は、
+ * Safari とカメラ・マイクの許可が別あつかいになる。Safari 側で許可済みでも
+ * こちらでは未許可のまま NotAllowedError で落ちる（2026-09-01・iPhone 17 Pro Max）。
+ */
+const isStandalone = () =>
+  typeof window !== "undefined" &&
+  (window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
+
+const isIOS = () =>
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+/** 失敗の理由ごとに「次に何をすればいいか」まで書く（現場で読む文） */
+function camMessage(e: unknown): string {
+  const name = (e as DOMException | null)?.name ?? "";
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    return "この画面が https で開かれていないため、カメラを使えません（アドレスを確認してください）";
+  }
+  switch (name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return isIOS() && isStandalone()
+        ? "カメラの使用が許可されませんでした。ホーム画面のアイコンから開いた場合、Safari の許可とは別あつかいになります。下の【カメラを開始】を押して、出てくる確認で「許可」を選んでください。確認が出ないときは Safari で開き直すか、ホーム画面のアイコンを削除して追加し直してください"
+        : "カメラの使用が許可されませんでした。下の【カメラを開始】を押して、出てくる確認で「許可」を選んでください";
+    case "NotFoundError":
+    case "OverconstrainedError":
+      return "使えるカメラが見つかりませんでした。🔄 でカメラを切り替えてお試しください";
+    case "NotReadableError":
+    case "AbortError":
+      return "カメラが他のアプリで使われている可能性があります。カメラアプリなどを閉じてから【カメラを開始】を押してください";
+    default:
+      return `カメラを起動できませんでした（${name || "原因不明"}）。【カメラを開始】でもう一度お試しください`;
+  }
+}
 
 /** data: URL 再試行の上限（端末メモリを踏み抜かないため） */
 const DATAURL_MAX = 12 * 1024 * 1024;
@@ -111,6 +160,8 @@ export function SwingRecorder({
   const [busy, setBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<Captured | null>(null);
   const [ready, setReady] = useState(false);
+  const [needsTap, setNeedsTap] = useState(false); // 許可の確認はタップ起点でないと出ない端末がある
+  const [noAudio, setNoAudio] = useState(false);
   const [club, setClub] = useState("");
   const [dist, setDist] = useState("");
   const [note, setNote] = useState("");
@@ -134,24 +185,48 @@ export function SwingRecorder({
     setReady(false);
   }, []);
 
+  /**
+   * 端末の都合で断られることがあるので、要求を段階的に緩めて拾う。
+   * 許可されていない／カメラが無い場合は緩めても直らないので、そこで止める。
+   */
+  const openCamera = useCallback(async (want: "environment" | "user") => {
+    const ladder: MediaStreamConstraints[] = [
+      { video: { facingMode: want, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } }, audio: true },
+      { video: { facingMode: want }, audio: true },
+      { video: { facingMode: want }, audio: false }, // マイクだけ断られる端末がある
+      { video: true, audio: false },
+    ];
+    let last: unknown = null;
+    for (const c of ladder) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(c);
+      } catch (e) {
+        last = e;
+        const n = (e as DOMException | null)?.name;
+        if (n === "NotAllowedError" || n === "SecurityError" || n === "NotFoundError") throw e;
+      }
+    }
+    throw last;
+  }, []);
+
   const start = useCallback(async () => {
     setErr(null);
     stopStream();
     try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 60 } },
-        audio: true, // 打球音でインパクトを検出するため必須
-      });
+      const s = await openCamera(facing);
       streamRef.current = s;
+      setNoAudio(s.getAudioTracks().length === 0); // 打球音が録れない＝インパクト自動推定は効かない
+      setNeedsTap(false);
       if (camRef.current) {
         camRef.current.srcObject = s;
         await camRef.current.play().catch(() => {});
       }
       setReady(true);
-    } catch {
-      setErr("カメラを起動できませんでした。ブラウザのカメラ許可を確認してください");
+    } catch (e) {
+      setErr(camMessage(e));
+      setNeedsTap(true);
     }
-  }, [facing, stopStream]);
+  }, [facing, stopStream, openCamera]);
 
   useEffect(() => {
     if (supported && !preview) void start();
@@ -394,6 +469,21 @@ export function SwingRecorder({
               />
             )}
 
+            {/* 許可の確認はタップ起点でないと出ない端末がある（iOSのホーム画面アプリなど） */}
+            {!ready && !busy && (
+              <div className="absolute inset-x-0 bottom-24 top-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/60 px-6 text-center">
+                <button
+                  onClick={() => void start()}
+                  className="rounded-full border border-(--color-gold) px-6 py-3 text-sm font-bold text-(--color-gold)"
+                >
+                  📷 カメラを開始
+                </button>
+                <span className="text-[11px] leading-relaxed text-white/70">
+                  {needsTap ? "許可の確認が出たら「許可」を選んでください" : "カメラを準備しています…"}
+                </span>
+              </div>
+            )}
+
             {count !== null && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-8xl font-bold text-(--color-gold)">
                 {count}
@@ -442,6 +532,11 @@ export function SwingRecorder({
           </div>
 
           {err && <p className="mt-2 text-xs text-(--color-danger)">{err}</p>}
+          {noAudio && !err && (
+            <p className="mt-2 text-[11px] text-(--color-dim)">
+              マイクが使えないため音は録れません（インパクトの自動推定は効きません）
+            </p>
+          )}
 
           {/* 秒数・カウントダウン（シャッターとは別・下段） */}
           <div className="mt-2 flex w-full max-w-[440px] shrink-0 flex-wrap items-center justify-center gap-1.5 text-xs">
