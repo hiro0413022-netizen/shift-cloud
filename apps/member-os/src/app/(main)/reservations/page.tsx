@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank } from "@/lib/store-scope";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { loadDay, loadUnpaid, loadMonthCounts, loadCoaches, type BookingRow } from "@/lib/frank-reservation";
+import { loadDay, loadUnpaid, loadMonthCounts, loadCoaches, loadMemberOptions, type BookingRow } from "@/lib/frank-reservation";
 import {
   BOOKING_STATUS_LABEL,
   CUSTOMER_KIND_LABEL,
@@ -17,6 +17,7 @@ import { toTimelineItems, monthOf, labelJa } from "@/lib/bay-timeline-pure";
 import { BayTimeline, TimelineLegend } from "@/components/bay-timeline";
 import { MonthMiniCalendar, STEP_OPTIONS } from "@/components/month-picker";
 import { createBooking, setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption } from "./actions";
+import { MemberPicker } from "./member-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -60,11 +61,12 @@ export default async function ReservationsPage({
   // 縦軸の刻み（#135）。既定は30分＝予約の刻みと同じ
   const step = STEP_OPTIONS.includes(Number(sp.step)) ? Number(sp.step) : 30;
 
-  const [view, unpaidRows, monthData, coaches] = await Promise.all([
+  const [view, unpaidRows, monthData, coaches, memberOptions] = await Promise.all([
     loadDay(date, actor.companyId),
     loadUnpaid(actor.companyId),
     loadMonthCounts(monthOf(date), actor.companyId),
     loadCoaches(actor.companyId),
+    loadMemberOptions(actor.companyId), // 予約作成の会員検索（氏名でも引ける・#189）
   ]);
   const bays = view.bays.filter((b) => b.active);
   const closedBays = view.bays.filter((b) => !b.active);
@@ -238,16 +240,14 @@ export default async function ReservationsPage({
               {view.cfg.max_minutes_options.map((m) => <option key={m} value={m}>{m}分</option>)}
             </select>
           </Field>
-          <Field label="区分">
-            <select name="customer_kind" className={inputCls} defaultValue="dropin">
-              <option value="member">会員</option>
-              <option value="dropin">都度利用</option>
-            </select>
-          </Field>
-          <Field label="会員番号（会員時）">
-            <input name="member_no" placeholder="FR0001" className={inputCls} />
-          </Field>
-          <Field label="お名前（都度利用時）">
+          {/* 会員はお名前でも会員番号でも引ける（#189）。選ぶと自動で「会員」の予約になる。
+              区分の選択欄は廃止した＝選び忘れて会員が都度利用として登録される事故を無くす */}
+          <div className="col-span-2">
+            <Field label="会員（お名前・カナ・会員番号・電話で検索）">
+              <MemberPicker members={memberOptions} inputCls={inputCls} />
+            </Field>
+          </div>
+          <Field label="お名前（会員でない方）">
             <input name="guest_name" placeholder="山田 太郎" className={inputCls} />
           </Field>
           <Field label="電話番号">

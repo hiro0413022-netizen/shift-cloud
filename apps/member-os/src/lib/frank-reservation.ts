@@ -355,4 +355,43 @@ export async function loadCoaches(companyId: string): Promise<{ id: string; name
   return ((data ?? []) as Array<{ id: string; name: string }>).map((r) => ({ id: String(r.id), name: String(r.name) }));
 }
 
+/**
+ * 予約作成の会員指定に出す候補（#189）
+ *
+ * ユーザー依頼「スタッフがPCで予約を取るとき、会員番号だけでなく名前でも検索したい」。
+ * 会員はFRANK姫路で数百人なので**まとめて渡して画面側で絞る**（/frunk と同じ考え方）。
+ * サーバーに問い合わせながら絞ると、電話を受けながら打つ速さに追いつかない。
+ *
+ * 退会・却下は候補に出さない（予約が取れない相手を出しても選び間違えるだけ）。
+ * 休会は出す＝店頭で「今日から復帰」を受けることがあるため。
+ */
+export type MemberOption = {
+  id: string;
+  member_no: string | null;
+  name: string;
+  name_kana: string | null;
+  phone: string | null;
+  status: string | null;
+};
+
+export async function loadMemberOptions(companyId: string): Promise<MemberOption[]> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("frunk_members")
+    .select("id, member_no, name, name_kana, phone, status")
+    .eq("company_id", companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .in("status", ["active", "suspended"])
+    .is("deleted_at", null)
+    .order("member_no", { ascending: true });
+  return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+    id: String(r.id),
+    member_no: (r.member_no as string | null) ?? null,
+    name: String(r.name ?? ""),
+    name_kana: (r.name_kana as string | null) ?? null,
+    phone: (r.phone as string | null) ?? null,
+    status: (r.status as string | null) ?? null,
+  }));
+}
+
 export { FRANK_STORE_ID, toMin, toTime };

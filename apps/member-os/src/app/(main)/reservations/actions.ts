@@ -43,8 +43,10 @@ export async function createBooking(formData: FormData) {
   const date = str(formData.get("booking_date"));
   const start = str(formData.get("start_time"));
   const bayId = str(formData.get("bay_id"));
-  const kind = str(formData.get("customer_kind")) || "dropin";
   const minutes = num(formData.get("minutes")) ?? 60;
+  // #189: 会員はお名前でも探せるようにしたので、画面からは会員IDが来る。
+  // 会員番号だけを受ける旧フォーム（ブックマーク・外部からのPOST）も壊さない。
+  const pickedId = str(formData.get("member_id"));
   const memberNo = str(formData.get("member_no"));
   const guestName = str(formData.get("guest_name"));
 
@@ -58,17 +60,17 @@ export async function createBooking(formData: FormData) {
   const e = s + minutes;
   if (s < toMin(hours.open) || e > toMin(hours.close)) return back(date);
 
-  // 会員指定なら会員を引く（見つからなければ名前だけの都度予約として登録）
+  // 会員指定なら会員を引く（見つからなければ名前だけの都度予約として登録）。
+  // 画面から来たIDでも、必ず会社・店舗で引き直す＝クライアントの値をそのまま信じない（#134）
   let memberId: string | null = null;
-  if (kind === "member" && memberNo) {
-    const { data: m } = await admin
+  if (pickedId || memberNo) {
+    const q = admin
       .from("frunk_members")
       .select("id")
       .eq("company_id", actor.companyId)
       .eq("store_id", FRANK_STORE_ID)
-      .eq("member_no", memberNo)
-      .is("deleted_at", null)
-      .maybeSingle();
+      .is("deleted_at", null);
+    const { data: m } = await (pickedId ? q.eq("id", pickedId) : q.eq("member_no", memberNo)).maybeSingle();
     memberId = m?.id ? String(m.id) : null;
   }
   if (!memberId && !guestName) return back(date); // 持ち主が分からない予約は作らない

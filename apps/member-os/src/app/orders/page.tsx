@@ -53,6 +53,14 @@ export default async function OrdersPage() {
   const open = orders.filter((o) => s(o.status) === "open");
   // 新しい注文が入ったら音を鳴らすための指紋（件数と最新IDが変われば鳴る）
   const signature = `${open.length}:${s(open[open.length - 1]?.id)}`;
+  // 未提供のまま3分たったら鳴らし直す（#189・ユーザー依頼）。判定は画面側でする
+  const openOrders = open.map((o) => ({ id: s(o.id), orderedAt: s(o.ordered_at) }));
+  // 経過分。10秒ごとに描き直すので、表示のズレは最大10秒
+  const nowMs = Date.now();
+  const waitedMin = (iso: string): number => {
+    const t = Date.parse(iso);
+    return Number.isNaN(t) ? 0 : Math.max(0, Math.floor((nowMs - t) / 60_000));
+  };
 
   // 来店中（まだ退店を押していない）。打席が決まっていない人もここに必ず出す。
   // #164: 以前は打席カードの中にしか退店ボタンが無く、
@@ -95,7 +103,7 @@ export default async function OrdersPage() {
         <div className="flex items-center gap-4">
           <Link href="/orders/menu" className="text-xs text-(--color-dim) underline underline-offset-4">メニュー管理</Link>
           <Link href="/orders/qr" className="text-xs text-(--color-dim) underline underline-offset-4">打席QRを印刷</Link>
-          <OrdersLive signature={signature} unserved={open.length} />
+          <OrdersLive signature={signature} unserved={open.length} openOrders={openOrders} />
         </div>
       </header>
 
@@ -159,12 +167,22 @@ export default async function OrdersPage() {
                     const mem = (o.frunk_members as { member_no?: string; name?: string } | null) ?? null;
                     const served = s(o.status) === "served";
                     const paid = s(o.payment_status) === "paid";
+                    // 提供までの経過。3分を超えたら赤くする＝音と画面で同じ基準を使う（#189）
+                    const waited = served ? 0 : waitedMin(s(o.ordered_at));
+                    const late = !served && waited >= 3;
                     return (
-                      <div key={s(o.id)} className={`rounded-xl border px-3 py-2.5 ${served ? "border-(--color-line) bg-(--color-panel-2) opacity-60" : "border-(--color-accent)/30 bg-white"}`}>
+                      <div key={s(o.id)} className={`rounded-xl border px-3 py-2.5 ${served ? "border-(--color-line) bg-(--color-panel-2) opacity-60" : late ? "border-red-400 bg-red-50" : "border-(--color-accent)/30 bg-white"}`}>
                         <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
                           <span className="font-mono text-(--color-dim)">{s(o.order_no)}</span>
-                          <span className={paid ? "rounded bg-(--color-accent)/10 px-2 py-0.5 text-(--color-accent)" : "rounded bg-amber-100 px-2 py-0.5 text-amber-800"}>
-                            {paid ? "決済済" : "未決済（退店時）"}
+                          <span className="flex items-center gap-1.5">
+                            {!served && (
+                              <span className={late ? "rounded bg-red-600 px-2 py-0.5 font-bold text-white" : "rounded bg-(--color-panel-2) px-2 py-0.5 text-(--color-dim)"}>
+                                {hhmmJST(s(o.ordered_at))} ／ 経過 {waited}分
+                              </span>
+                            )}
+                            <span className={paid ? "rounded bg-(--color-accent)/10 px-2 py-0.5 text-(--color-accent)" : "rounded bg-amber-100 px-2 py-0.5 text-amber-800"}>
+                              {paid ? "決済済" : "未決済（退店時）"}
+                            </span>
                           </span>
                         </div>
                         <p className="text-xs text-(--color-dim)">
