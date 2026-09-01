@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/", label: "ダッシュボード" },
   { href: "/sales", label: "売上" },
   { href: "/analysis", label: "売上分析" },
+  { href: "/expense", label: "経費入力" },
   { href: "/cash", label: "現金出納" },
   { href: "/count", label: "金種棚卸" },
   { href: "/import", label: "カード・口座取込", ownerOnly: true },

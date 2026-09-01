@@ -1006,3 +1006,30 @@
   実装: `packages/core/src/birth-date.ts`（新規）・`frank-walkin.ts`、`apps/genesis/src/lib/frank-trial.ts`・`api/public/frank/trial/route.ts`、`apps/member-os/src/app/trial/{actions.ts,trial-form.tsx}`、`sites/frank-golf/_build.py`（＋生成物 `trial-booking.html`）、`supabase/migrations/0137_trial_birth_date.sql`（**適用済み**）、`tests/birth-date.test.ts`。genesis / member-os の `tsc --noEmit` と **`next build` 通過**（クラウドでcloneして実走）・テスト **525件パス**（新規7件）
 
   **(g) FRANKのスタッフ打刻は新規開発なしで使える**（ユーザー依頼「フランクゴルフ用のスタッフ用の打刻できるようにしてください」）。Shift Cloud の打刻端末（`/kiosk/<token>`・ログイン不要）は **#88 で FRANK 用に発行済み**で、URLは Vault「FRANK 店頭タブレット（店舗ダッシュボード/打刻）」に記録されていた。実機で開いて「FRANK GOLF 姫路／名前を選んでください」と6名が出ることを確認済み。**打刻端末は店舗ダッシュボードと同じトークン**（`/store/<token>` と `/kiosk/<token>`）。⚠ 打刻画面に**スタッフではないアカウント「FRANK GOLF姫路」（login_id: frankgolf・店舗ログイン用）が人として並ぶ**。消すとログインが壊れるので、隠すには「人かどうか」の区別が要る＝次の判断（ユーザーへ確認済み）。
+
+- #191 (2026-09-01) **経費の支出（納品書ぶんを含む）をスタッフが入力できるようにした**（migration 0138適用済）。ユーザー依頼「money-osで納品書、経費の支出の分をスタッフに入力してもらいたい」。
+
+  **(a) これまで店で出ていったお金はどこにも入らなかった。** `mon_expense` に行が入る経路は「ファイン精算書の移行」と「カード・口座CSVの仕分け」の2つだけで、**店の現金で買った消耗品・立替・掛けの仕入は帳簿に存在しなかった**。本部が後から思い出して拾うしかなく、拾えなかった分はそのまま利益を過大に見せていた。
+
+  **(b) 支払い方法は3つに絞った**（ユーザー確定）＝ **店の現金／立替／掛け（後日振込）**。ここが設計の中心で、**支払い方法ごとに帳簿のどこが動くかが変わる**:
+  | 方法 | 経費(mon_expense) | 現金出納 | 銀行CSVからも入るか |
+  |---|---|---|---|
+  | 店の現金 | 計上する | **出金を自動で書く** | 出てこない（消込不要） |
+  | 立替 | 計上する | 動かさない（店の金は減っていない） | 精算を振込にしたときだけ |
+  | 掛け | 計上する | 動かさない | **必ず出る＝消込が要る** |
+
+  **(c) 二重計上の急所を画面に出した。** PLの経費は `mon_expense`（発生）＋`mon_bank_txn` の確定出金（支払）の足し算（[[expense-settlement]]・SYSTEM.md §4-5 の恒久ルール「新しい自動計上を足すときは、その支払が銀行側からも入るか必ず確認する」）。掛けと立替(振込精算)は**銀行側からも入る**ので、`settled_txn_id` の消込を押し忘れると支払いが二重に乗る。よって **「あとで支払い・精算するもの」パネルを月の切り替えと無関係に常設**し、消込画面へのリンクを置いた。押し忘れを画面が覚えている状態にする（#122「アラートは直せるまで作る」と同じ）。
+
+  **(d) 現金で払った分は現金出納にも書く。** 書かないと**レジの実残高と帳簿がズレる**。売上の現金連携と同じ形（`source='expense'` / `source_ref=経費ID`）で1行作り、金額や日付を直したら出納側も直し、削除したら出納の行も消して `rebalanceCashLedger` で残高を積み直す。**片方だけ残すのがいちばん危ない**（#98 の旧 deleteSale と同じ轍）。
+
+  **(e) 承認は挟まない**（ユーザー確定「入力したら即計上」）。そのかわり **①押す前に「この操作で帳簿がどうなるか」を必ず表示 ②あとから編集・削除できる ③入力者名(`entered_by`)を残す** の3点で担保する。
+
+  **(f) 科目はボタン**（ユーザー確定）。値は `mon_category_map(src_kind='expense')` に実在する表記に合わせる（仕入/備品/水道光熱費/広告/送料＋支払手数料・その他経費）。**「わからない」を用意し、押すと科目は空**＝集計では `other_expense` に落ちる（壊れない）うえ、一覧に「科目未設定 ◯件」と出るので本部が拾って直せる。**迷ったときに適当な科目を選ばせるより、空のまま拾えるほうが直しやすい。**
+
+  **(g) 写真は撮らせない**（ユーザー回答「PC操作で行うので写真撮影はむずかしいかも」）。代わりに **納品書・伝票番号 (`doc_no`)** を入れてもらう＝紙と突き合わせる唯一の手がかり。PDFで残したいものは既存の `/receipts`（証憑・電帳法対応）に上げる導線が既にある。
+
+  **(h) 判定は純関数に切り出してテストで固定**＝`apps/money-golfwing/src/lib/expense.ts`（`expenseEffect` / `expenseInputError` / `PAY_METHODS` / `EXPENSE_CATEGORIES`・テスト9件）。**支払い方法→帳簿のどこが動くか**を画面のJSXに散らすと、「現金で払ったのにレジが合わない」が静かに起きる。画面もサーバーも同じ関数を通す。
+
+  ⚠ **権限**: money-os のアクセスは Shift Cloud の店舗配属をそのまま流用しているので、**ログインできるスタッフは自店舗のお金の画面を見られる**（本画面に限らず従来から）。見せたくない人がいる場合は staff_store_assignments 側の整理が要る＝次の判断。
+
+  実装: `supabase/migrations/0138_expense_staff_input.sql`（**適用済み**・`entered_by`/`doc_no`/`paid_by`/`reimbursed_on`＋未消込の部分索引）、`apps/money-golfwing/src/lib/expense.ts`、`app/(main)/expense/{page.tsx,actions.ts,ExpenseEntry.tsx}`、`components/nav.tsx`、`tests/expense-input.test.ts`。money-golfwing の `tsc --noEmit` と **`next build` 通過**（クラウドでcloneして実走）・テスト **534件パス**（新規9件）
