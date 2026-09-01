@@ -1,4 +1,5 @@
 import "server-only";
+import { FRANK_LINKS, FRANK_SITE, trialCancelUrl } from "@yozan/core/frank-links";
 
 /**
  * FRANK GOLF お客様向けメール（member-os 側）
@@ -17,9 +18,26 @@ import "server-only";
  */
 
 const FROM_DEFAULT = "FRANK GOLF <info@frankgolf.jp>";
-export const FRANK_SITE = "https://frankgolf.jp";
+export { FRANK_SITE };
 
-export type MailResult = { ok: boolean; skipped?: boolean; error?: string };
+/**
+ * お客様に出すリンクは会員ポータル（my.frankgolf.jp）に一本化した（#188）。
+ * メールの中に frankgolf.jp と member-os-tau.vercel.app が混在していて、
+ * 「打席予約はこちら」が2つあるように見えていた（2026-09-01 ユーザー指摘）。
+ * URLの正典は @yozan/core/frank-links。ここで直書きしない。
+ */
+/** 会員あて（会員ページへ誘導する） */
+const SIGNATURE = ["FRANK GOLF（姫路・土山）", `会員ページ ${FRANK_LINKS.home}`];
+/** まだ会員でない方あて（体験の申込など。会員ページに送っても入れない） */
+const SIGNATURE_GUEST = ["FRANK GOLF（姫路・土山）", FRANK_SITE];
+
+/**
+ * 送信結果。id は Resend のメッセージID（#188）。
+ * 「送ったのに届いていない」の相談は、このIDで Resend のログを引けば
+ * delivered / bounced / complained のどれなのかが一発で分かる。
+ * IDを持ち帰らないと、毎回メールアドレスと時刻で探すことになる。
+ */
+export type MailResult = { ok: boolean; skipped?: boolean; error?: string; id?: string };
 /** Resend の添付（content は base64 文字列） */
 export type MailAttachment = { filename: string; content: string };
 
@@ -49,9 +67,12 @@ export async function sendFrankMail(input: {
     if (!res.ok) {
       const body = await res.text();
       console.error("[frank-mail] 送信失敗:", res.status, body.slice(0, 300));
-      return { ok: false, error: `resend ${res.status}` };
+      // 理由まで持ち帰る（例: 無料プランの上限・ドメイン未認証は本文にしか出ない）
+      return { ok: false, error: `resend ${res.status} ${body.slice(0, 160)}`.trim() };
     }
-    return { ok: true };
+    const json = (await res.json().catch(() => ({}))) as { id?: string };
+    console.info("[frank-mail] 送信:", input.to, json.id ?? "(id不明)", input.subject);
+    return { ok: true, id: json.id };
   } catch (e) {
     console.error("[frank-mail] 送信失敗:", e);
     return { ok: false, error: String(e) };
@@ -73,7 +94,7 @@ export function buildBookingRescheduleMail(input: {
   kind: "trial" | "booking";
 }): { subject: string; text: string } {
   const label = input.kind === "trial" ? "体験レッスン" : "ご予約";
-  const cancel = input.cancelToken ? `${FRANK_SITE}/trial-booking.html?cancel=${input.cancelToken}` : null;
+  const cancel = input.cancelToken ? trialCancelUrl(input.cancelToken) : null;
   return {
     subject: `【FRANK GOLF】${label}の日時変更のお知らせ`,
     text: [
@@ -86,10 +107,10 @@ export function buildBookingRescheduleMail(input: {
       "",
       "お間違いがないかご確認ください。ご都合が合わない場合はお手数ですがご連絡ください。",
       ...(cancel ? ["", "ご予約の確認・キャンセルはこちらから", cancel] : []),
+      ...(input.kind === "booking" ? ["", "ご予約の確認・変更は会員ページから", FRANK_LINKS.home] : []),
       "",
       "──────────────",
-      "FRANK GOLF（フランクゴルフ）",
-      FRANK_SITE,
+      ...(input.kind === "trial" ? SIGNATURE_GUEST : SIGNATURE),
     ].join("\n"),
   };
 }
@@ -124,8 +145,7 @@ export function buildTrialRequestReceiptMail(input: {
       "",
       "当日は動きやすい服装でお越しください。クラブ・シューズは無料でお貸しします。",
       "",
-      "FRANK GOLF（姫路・土山）",
-      FRANK_SITE,
+      ...SIGNATURE_GUEST,
     ].join("\n"),
   };
 }
@@ -158,11 +178,10 @@ export function buildWebSignupReceiptMail(input: { name: string; planName?: stri
       "※ 会員番号が発行されるまでは、Web予約（打席・レッスン）はご利用いただけません。",
       "　 承認前に予約ページで会員番号を入力するとエラーになりますので、ご連絡をお待ちください。",
       "",
-      `打席予約ページ: ${FRANK_SITE}/booking.html`,
+      `会員ページ（ご予約・カルテ・会員証QR）: ${FRANK_LINKS.home}`,
       "",
       "ご不明な点はこのメールにご返信ください。",
-      "FRANK GOLF（姫路・土山）",
-      FRANK_SITE,
+      ...SIGNATURE,
     ].join("\n"),
   };
 }
@@ -190,9 +209,9 @@ export function buildApprovalMail(input: {
     fee > 0
       ? [
           "■ 月会費のお支払い登録（クレジットカード）",
-          `打席予約ページ（${FRANK_SITE}/booking.html）の「月会費のお支払い登録」から、`,
-          "会員番号と電話番号下4桁を入力してお手続きください。安全な決済ページ（Square）で",
-          "カードを登録すると、月会費は毎月自動でお支払いになります。",
+          `${FRANK_LINKS.settings}`,
+          "会員ページにログインし、「設定・お手続き」からお手続きください。",
+          "安全な決済ページ（Square）でカードを登録すると、月会費は毎月自動でお支払いになります。",
           joinFee > 0
             ? `初回のみ、月会費に続けて入会金 ${joinFee.toLocaleString()}円（税込）を同じカードへ自動でご請求します。`
             : "入会金はクーポン適用のため無料です。",
@@ -209,15 +228,15 @@ export function buildApprovalMail(input: {
       "",
       `■ あなたの会員番号: ${input.memberNo}`,
       ...(planLine ? [planLine, ""] : [""]),
-      "■ 打席のWeb予約",
-      `${FRANK_SITE}/booking.html から、会員番号と電話番号下4桁でご予約いただけます。`,
+      "■ 会員ページ（打席のご予約・ご予約の確認・レッスンカルテ・会員証QR）",
+      FRANK_LINKS.home,
+      "ログインは 会員番号 と 電話番号の下4桁 です。",
       "",
       ...billing,
       "会員番号はこのメールを保存するか、スクリーンショットでお控えください。",
       "",
       "ご不明な点はこのメールにご返信ください。",
-      "FRANK GOLF（姫路・土山）",
-      FRANK_SITE,
+      ...SIGNATURE,
     ].join("\n"),
   };
 }

@@ -5,6 +5,7 @@ import { authMember, type MemberAuth } from "@/lib/frank-booking";
 import { monthlyFeeTaxIncluded, toE164Jp, JOIN_CHECKOUT_NOTE_PREFIX } from "@/lib/frank-pos-pure";
 import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { jstYmd } from "@/lib/jst";
+import { FRANK_PORTAL } from "@yozan/core/frank-links";
 
 /**
  * FRANK GOLF 月会費の継続課金（Square）#123 / migration 0105
@@ -33,7 +34,8 @@ import { jstYmd } from "@/lib/jst";
  */
 
 const SQUARE_API = "https://connect.squareup.com/v2";
-const SITE = "https://frankgolf.jp";
+// カード登録後の戻り先はお客様の入口＝会員ポータル（#188）
+const SITE = FRANK_PORTAL;
 
 /**
  * 決済リンクの order_id を会員に控える（#136）。
@@ -327,7 +329,7 @@ export async function createSquareBillingCheckout(
       },
       checkout_options: {
         subscription_plan_id: variationId,
-        redirect_url: `${SITE}/booking.html?billing=success`,
+        redirect_url: `${SITE}/member/settings?billing=success`,
         ask_for_shipping_address: false,
       },
       pre_populated_data: {

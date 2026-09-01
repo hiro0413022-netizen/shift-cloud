@@ -13,7 +13,8 @@ import {
   type MemberSort,
 } from "@/lib/frunk-member-search";
 import { jstYmd } from "@/lib/jst";
-import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken } from "./actions";
+import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment } from "./actions";
+import { joinPaymentView } from "@/lib/frunk-join-view";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -163,6 +164,49 @@ export default async function FrunkPage({
                     <img src={String(m.signature)} alt="署名" className="h-14 rounded-md border border-(--color-line) bg-white" />
                   ) : null}
                 </div>
+
+                {/* 決済の状況（#188）— 承認ボタンの手前に必ず出す。
+                    「決済していなくても承認できてしまう」ので、押す前に何を見ればいいかまで書く */}
+                {(() => {
+                  const pay = joinPaymentView(m);
+                  const tone =
+                    pay.tone === "ok"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : pay.tone === "warn"
+                        ? "border-amber-300 bg-amber-50 text-amber-900"
+                        : "border-(--color-line) bg-(--color-panel) text-(--color-dim)";
+                  return (
+                    <div className={`mt-3 rounded-lg border px-3 py-2 text-xs ${tone}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold">
+                          {pay.tone === "ok" ? "✅" : pay.tone === "warn" ? "⚠" : "・"} 決済: {pay.label}
+                        </span>
+                        {pay.expected > 0 && <span>請求予定 {yen(pay.expected)}（税込）</span>}
+                      </div>
+                      {pay.note && <p className="mt-1 leading-relaxed">{pay.note}</p>}
+                      <p className="mt-1 leading-relaxed opacity-80">
+                        確認のしかた: Square ダッシュボード →「取引」で
+                        {m.email ? `「${String(m.email)}」` : "申込日"}
+                        を検索すると、同じ決済が出ます。
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <form action={checkJoinPayment}>
+                          <input type="hidden" name="id" value={String(m.id)} />
+                          <button className={btnGhostCls}>Squareで入金を確認</button>
+                        </form>
+                        <form action={confirmJoinPayment}>
+                          <input type="hidden" name="id" value={String(m.id)} />
+                          <button className={btnGhostCls}>入金を確認して入会を確定</button>
+                        </form>
+                      </div>
+                      <p className="mt-1 opacity-70">
+                        「入金を確認して入会を確定」はWeb入会と同じ手順（会員番号・控えPDF・完了メール）で確定します。
+                        入金が見つからないときは何も起きません。
+                      </p>
+                    </div>
+                  );
+                })()}
+
                 <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-(--color-line) pt-3">
                   <form action={approveSignup} className="flex items-end gap-2">
                     <input type="hidden" name="id" value={String(m.id)} />
@@ -176,6 +220,10 @@ export default async function FrunkPage({
                     <input type="hidden" name="id" value={String(m.id)} />
                     <button className={btnGhostCls}>却下</button>
                   </form>
+                  <p className="w-full text-xs text-(--color-dim)">
+                    「承認して会員化」は決済を確認しません（現金・振込・口座振替でお受けした場合の入口です）。
+                    カード決済の方は上の「入金を確認して入会を確定」をお使いください。
+                  </p>
                 </div>
               </div>
             ))}

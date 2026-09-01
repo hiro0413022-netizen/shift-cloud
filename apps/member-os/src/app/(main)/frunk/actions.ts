@@ -16,6 +16,8 @@ import { jstYmd } from "@/lib/jst";
 import { readName } from "@/lib/name";
 import { normalizeAddress } from "@/lib/address";
 
+const GENESIS_URL = process.env.GENESIS_URL || "https://yozan-genesis.vercel.app";
+
 function str(v: FormDataEntryValue | null): string {
   return typeof v === "string" ? v.trim() : "";
 }
@@ -441,4 +443,114 @@ export async function issueSignupToken(formData: FormData) {
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? "https";
   redirect(`/frunk?signup_url=${encodeURIComponent(`${proto}://${host}/join/${raw}`)}`);
+}
+
+// ---- 入会申込の決済確認（#188） ----
+//
+// 「承認して会員化」は決済が済んでいるかに関係なく押せた。Web入会（#129）は入金Webhookで
+// 自動的に確定するので、ここに残っている pending は「まだ払っていない人」か
+// 「Webhookが届かなかった人」のどちらかで、**画面では見分けが付かなかった**（2026-09-01 ユーザー指摘）。
+// Square の取引そのものを見に行き、結果を必ず画面に返す。
+// Square env は yozan-genesis にしかないので、照会は genesis の公開APIに投げる。
+
+type JoinPayment = { orderId: string; amount: number; at: string | null; via: string };
+type JoinPaymentStatus = {
+  ok?: boolean;
+  checked?: boolean;
+  paid?: boolean;
+  payments?: JoinPayment[];
+  expected?: number;
+  amountMatches?: boolean;
+  memberNo?: string | null;
+  hint?: string;
+  error?: string;
+};
+
+const yen = (n: number) => `${Number(n).toLocaleString()}円`;
+const jstAt = (iso: string | null) =>
+  iso ? new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().replace("T", " ").slice(0, 16) : "";
+
+function describePayments(st: JoinPaymentStatus): string {
+  const list = st.payments ?? [];
+  const total = list.reduce((a, p) => a + p.amount, 0);
+  const detail = list.map((p) => `${jstAt(p.at)} ${yen(p.amount)}`).join(" / ");
+  const expected = Number(st.expected ?? 0);
+  const gap =
+    expected > 0 && total !== expected
+      ? `　⚠ 請求予定額（${yen(expected)}）と一致しません。Squareでご確認ください。`
+      : "";
+  return `${detail}${gap}`;
+}
+
+async function askGenesis(memberId: string, confirm: boolean): Promise<JoinPaymentStatus & { status?: JoinPaymentStatus }> {
+  try {
+    const res = await fetch(`${GENESIS_URL}/api/public/frank/admin/join-payment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ member_id: memberId, ...(confirm ? { confirm: true } : {}) }),
+      cache: "no-store",
+    });
+    return (await res.json().catch(() => ({}))) as JoinPaymentStatus;
+  } catch (e) {
+    console.error("[frunk] join-payment lookup failed:", e);
+    return { ok: false, error: "決済の照会に失敗しました（通信）" };
+  }
+}
+
+/** Squareの入金を照会して結果を表示するだけ（何も書き換えない） */
+export async function checkJoinPayment(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  if (!id) return;
+  // 他店・他社の申込を照会させない（画面を隠すだけでは守れない・#134）
+  const { data: m } = await admin
+    .from("frunk_members").select("id, name")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("対象の申込が見つかりません"));
+
+  const st = await askGenesis(id, false);
+  await logAudit(actor, "frunk.join_payment.check", "frunk_members", id, null, { paid: !!st.paid });
+  if (st.error) redirect(`${dest}?err=` + encodeURIComponent(`決済を確認できませんでした: ${st.error}`));
+  if (st.paid) {
+    redirect(
+      `${dest}?msg=` +
+        encodeURIComponent(`✅ Squareで入金を確認しました（${describePayments(st)}）。「入金を確認して入会を確定」を押すと会員番号を発行します。`),
+    );
+  }
+  redirect(
+    `${dest}?err=` +
+      encodeURIComponent(
+        st.checked
+          ? `Squareに入金が見つかりませんでした。${st.hint ?? ""} 現金・振込でお受けした場合は「承認して会員化」で進めてください。`
+          : `Squareに照会できませんでした。${st.hint ?? ""}`,
+      ),
+  );
+}
+
+/** 入金が確認できたときだけ、Web入会と同じ手順（会員番号・控えPDF・完了メール）で確定する */
+export async function confirmJoinPayment(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  if (!id) return;
+  const { data: m } = await admin
+    .from("frunk_members").select("id, name")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("対象の申込が見つかりません"));
+
+  const r = (await askGenesis(id, true)) as { ok?: boolean; memberNo?: string | null; error?: string; status?: JoinPaymentStatus };
+  await logAudit(actor, "frunk.join_payment.confirm", "frunk_members", id, null, { ok: !!r.ok, member_no: r.memberNo ?? null });
+  revalidateMember(id);
+  if (r.ok) {
+    redirect(
+      `${dest}?msg=` +
+        encodeURIComponent(
+          `${String((m as Record<string, unknown>).name ?? "")}様の入金を確認し、${r.memberNo} で入会を確定しました（控えPDF付きの完了メールを送信）。Squareのサブスク設定（価格・次回請求日）もあわせてご確認ください。`,
+        ),
+    );
+  }
+  redirect(`${dest}?err=` + encodeURIComponent(`確定できませんでした: ${r.error ?? "原因不明"}`));
 }

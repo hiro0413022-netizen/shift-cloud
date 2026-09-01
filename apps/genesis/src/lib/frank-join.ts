@@ -9,6 +9,7 @@ import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { chargeCardOnFile } from "@/lib/frank-square-billing";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import { logEvent } from "@/lib/kernel";
+import { FRANK_LINKS } from "@yozan/core/frank-links";
 
 type Admin = ReturnType<typeof createAdmin>;
 
@@ -23,9 +24,8 @@ type Admin = ReturnType<typeof createAdmin>;
  * 2・3はベストエフォート（失敗しても入会の確定は成立させ、eventsに警告を残す）。
  */
 
-const MEMBER_OS_URL = process.env.NEXT_PUBLIC_MEMBER_OS_URL || "https://member-os-tau.vercel.app";
+// お客様に出すリンクは会員ポータル（my.frankgolf.jp）に一本化（#188）。正典は @yozan/core/frank-links
 const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
-const FRANK_SITE = "https://frankgolf.jp";
 
 /** 会員番号 FR#### の採番（同時申込は unique index が衝突させ、リトライで次番号へ） */
 export async function assignMemberNo(admin: Admin, companyId: string, memberId: string): Promise<string | null> {
@@ -293,14 +293,11 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
       "",
       `■ あなたの会員番号: ${memberNo}`,
       "",
-      "■ 打席のWeb予約",
-      `${FRANK_SITE}/booking.html から「会員番号＋電話番号下4桁」でご予約いただけます。`,
-      "",
-      "■ 会員ページ（予約の確認・レッスンカルテ）",
-      `${MEMBER_OS_URL}/member/login`,
-      "ログインは会員番号＋電話番号下4桁です。",
+      "■ 会員ページ（打席のご予約・ご予約の確認・レッスンカルテ・会員証QR）",
+      FRANK_LINKS.home,
+      "ログインは 会員番号 と 電話番号の下4桁 です。ご予約もこのページから承ります。",
       ...(karteToken
-        ? ["", "■ あなたのレッスンカルテ", `${LESSON_OS_URL}/s/${karteToken}`, "レッスンの記録・動画・コーチのコメントをいつでもご覧いただけます。"]
+        ? ["", "■ あなたのレッスンカルテ", `${LESSON_OS_URL}/s/${karteToken}`, "レッスンの記録・動画・コーチのコメントをいつでもご覧いただけます（会員ページからもご覧いただけます）。"]
         : []),
       "",
       "■ 月会費のお支払い",
@@ -320,14 +317,33 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
       "",
       "ご不明な点はこのメールにご返信ください。",
       "FRANK GOLF（姫路・土山）",
-      FRANK_SITE,
+      `会員ページ ${FRANK_LINKS.home}`,
     ];
-    await sendFrankMail({
+    const sent = await sendFrankMail({
       to: m.email,
       subject: `【FRANK GOLF】ご入会ありがとうございます（会員番号 ${memberNo}）`,
       text: lines.join("\n"),
       attachments,
     });
+    // 完了メールは会員番号・控えPDF・会員ページのURLを伝える唯一の手段なので、
+    // 落ちたことを黙って見送らない（2026-09-01: iCloud宛が届いていない相談があった）。
+    // 届いたかどうか（delivered/bounced）は Resend のログを message id で引く。
+    if (!sent.ok) {
+      await logEvent(m.company_id, {
+        event_type: "frunk.join_mail_failed",
+        title: `入会完了メールを送れませんでした: ${m.name}様（${memberNo} / ${m.email}）${sent.skipped ? "送信設定が未設定" : (sent.error ?? "")}`.slice(0, 120),
+        source: "frank_billing",
+        source_type: "system",
+        severity: "warning",
+      });
+    } else {
+      await logEvent(m.company_id, {
+        event_type: "frunk.join_mail_sent",
+        title: `入会完了メールを送信: ${m.name}様（${memberNo} / ${m.email} / Resend ${sent.id ?? "id不明"}）`.slice(0, 120),
+        source: "frank_billing",
+        source_type: "system",
+      });
+    }
   }
 
   return memberNo;

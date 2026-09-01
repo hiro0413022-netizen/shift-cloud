@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createJoinCheckoutForMember } from "@/lib/frank-square-billing";
+import { FRANK_PORTAL } from "@yozan/core/frank-links";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,9 +26,12 @@ export async function POST(req: NextRequest) {
   if (!/^[0-9a-f-]{36}$/i.test(memberId)) {
     return NextResponse.json({ ok: false, error: "bad_member_id" }, { status: 400 });
   }
-  // 完了画面は member-os / frankgolf.jp のみ許可（open redirect 防止）
-  const okRedirect =
-    redirectUrl.startsWith("https://member-os-tau.vercel.app/") || redirectUrl.startsWith("https://frankgolf.jp/");
+  // 完了画面は 会員ポータル / member-os / frankgolf.jp のみ許可（open redirect 防止）
+  // ⚠ my.frankgolf.jp を足したのは #188（お客様が見るURLをポータルに一本化したため）。
+  //    旧URLも残すのは、古いタブから発行された決済リンクの戻り先を壊さないため。
+  const okRedirect = [`${FRANK_PORTAL}/`, "https://member-os-tau.vercel.app/", "https://frankgolf.jp/"].some((p) =>
+    redirectUrl.startsWith(p),
+  );
   if (!okRedirect) return NextResponse.json({ ok: false, error: "bad_redirect" }, { status: 400 });
 
   const r = await createJoinCheckoutForMember(memberId, redirectUrl);

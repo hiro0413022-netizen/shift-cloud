@@ -3,7 +3,9 @@
  * 送信本体は frank-mail.ts。
  */
 
-export const FRANK_SITE = "https://frankgolf.jp";
+import { FRANK_LINKS, FRANK_SITE, trialCancelUrl } from "@yozan/core/frank-links";
+
+export { FRANK_SITE };
 const TEL_NOTE = "ご不明な点はお気軽にご連絡ください。";
 
 export const fmtDateJa = (d: string) => {
@@ -21,7 +23,8 @@ export function buildTrialConfirmMail(p: {
   bayName: string;
   cancelToken: string;
 }): { subject: string; text: string } {
-  const cancelUrl = `${FRANK_SITE}/trial-booking.html?cancel=${p.cancelToken}`;
+  // お客様に出すURLは my.frankgolf.jp に一本化（#188・転送先は従来の trial-booking.html）
+  const cancelUrl = trialCancelUrl(p.cancelToken);
   return {
     subject: `【FRANK GOLF】体験レッスンのご予約を承りました（${fmtDateJa(p.date)} ${p.start}〜）`,
     text: [
@@ -31,7 +34,7 @@ export function buildTrialConfirmMail(p: {
       "",
       `日時: ${fmtDateJa(p.date)} ${p.start}〜${p.end}（約55分）`,
       `打席: ${p.bayName}`,
-      `アクセス: ${FRANK_SITE}/access.html`,
+      `アクセス: ${FRANK_LINKS.access}`,
       "",
       "当日は動きやすい服装でお越しください。クラブ・シューズは無料でお貸しします。",
       "",
@@ -62,12 +65,15 @@ export function buildReminderMail(p: {
       `明日の${p.kind}をお知らせします。`,
       "",
       `日時: ${fmtDateJa(p.date)} ${p.start}〜${p.end}`,
-      `アクセス: ${FRANK_SITE}/access.html`,
+      `アクセス: ${FRANK_LINKS.access}`,
       "",
       ...(p.cancelUrl ? ["▼ ご都合が悪くなった場合はこちらからキャンセルできます", p.cancelUrl, ""] : []),
+      ...(p.kind === "打席のご予約"
+        ? ["▼ ご予約の確認・キャンセルは会員ページから", FRANK_LINKS.home, ""]
+        : []),
       TEL_NOTE,
       "FRANK GOLF",
-      FRANK_SITE,
+      p.kind === "打席のご予約" ? FRANK_LINKS.home : FRANK_SITE,
     ].join("\n"),
   };
 }

@@ -1,7 +1,8 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
-import { buildReminderMail, buildTrialConfirmMail, FRANK_SITE } from "@/lib/frank-mail-pure";
+import { buildReminderMail, buildTrialConfirmMail } from "@/lib/frank-mail-pure";
+import { trialCancelUrl } from "@yozan/core/frank-links";
 
 export { buildTrialConfirmMail, buildReminderMail };
 
@@ -21,7 +22,13 @@ export { buildTrialConfirmMail, buildReminderMail };
 
 const FROM_DEFAULT = "FRANK GOLF <info@frankgolf.jp>";
 
-export type MailResult = { ok: boolean; skipped?: boolean; error?: string };
+/**
+ * 送信結果。id は Resend のメッセージID（#188）。
+ * 「送ったのに届いていない」の相談は、このIDで Resend のログを引けば
+ * delivered / bounced / complained のどれなのかが一発で分かる。
+ * IDを持ち帰らないと、毎回メールアドレスと時刻で探すことになる。
+ */
+export type MailResult = { ok: boolean; skipped?: boolean; error?: string; id?: string };
 /** Resend の添付（content は base64 文字列）#129 */
 export type MailAttachment = { filename: string; content: string };
 
@@ -51,9 +58,12 @@ export async function sendFrankMail(input: {
     if (!res.ok) {
       const body = await res.text();
       console.error("[frank-mail] 送信失敗:", res.status, body.slice(0, 300));
-      return { ok: false, error: `resend ${res.status}` };
+      // 理由まで持ち帰る（例: 無料プランの上限・ドメイン未認証は本文にしか出ない）
+      return { ok: false, error: `resend ${res.status} ${body.slice(0, 160)}`.trim() };
     }
-    return { ok: true };
+    const json = (await res.json().catch(() => ({}))) as { id?: string };
+    console.info("[frank-mail] 送信:", input.to, json.id ?? "(id不明)", input.subject);
+    return { ok: true, id: json.id };
   } catch (e) {
     console.error("[frank-mail] 送信失敗:", e);
     return { ok: false, error: String(e) };
@@ -87,7 +97,7 @@ export async function runFrankReminders(): Promise<{ trial: number; booking: num
       date: tomorrow,
       start: String(t.start_time ?? "").slice(0, 5),
       end: String(t.end_time ?? "").slice(0, 5),
-      cancelUrl: t.cancel_token ? `${FRANK_SITE}/trial-booking.html?cancel=${t.cancel_token}` : undefined,
+      cancelUrl: t.cancel_token ? trialCancelUrl(String(t.cancel_token)) : undefined,
     });
     const r = await sendFrankMail({ to: String(t.email), ...m });
     if (r.ok) trial += 1;

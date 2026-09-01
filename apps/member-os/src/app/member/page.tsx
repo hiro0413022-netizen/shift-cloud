@@ -6,7 +6,6 @@ import { BOOKING_STATUS_LABEL, jstToday } from "@yozan/core/frank-booking";
 import { checkinQrPayload } from "@yozan/core/frank-portal";
 import { ensureCheckinToken, currentVisit, karteShareUrl, karteHasNew } from "@/lib/frank-portal";
 import { memberLogout, cancelMyBooking } from "./actions";
-import { frankSiteUrl } from "@/lib/frank-site-link";
 import { VisitPanel } from "./visit-panel";
 import { AddToHome } from "./add-to-home";
 
@@ -110,13 +109,13 @@ export default async function MemberHomePage({
       {/* ① 会員証QR ⇄ 来店中モード（かざした瞬間に切り替わる） */}
       {!member.isProvisional && <VisitPanel initial={visit} qrDataUrl={qrDataUrl} token={token} />}
 
-      {/* ② 予約 */}
-      <a
-        href={frankSiteUrl("booking.html", member.isProvisional ? null : member.memberNo)}
+      {/* ② 予約 — 予約画面もポータルの中（#188。別ドメインへ飛ばさない） */}
+      <Link
+        href="/member/book"
         className="mb-3 block w-full rounded-xl border border-(--color-line) bg-(--color-panel) py-3.5 text-center font-semibold text-(--color-txt) transition-colors hover:bg-(--color-panel-2)"
       >
-        ＋ Web予約する
-      </a>
+        ＋ 打席を予約する
+      </Link>
 
       {upcoming.length > 0 && (
         <section className="mb-4">

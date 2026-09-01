@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 2026-09-01 — FRANK: お客様の入口を my.frankgolf.jp に一本化し、入会承認の前に決済を確かめられるようにした
+- **fix(member-os): 入会申込を「決済を確認しないまま承認できる」状態をやめた**（DECISIONS #188・ユーザー指摘）。承認待ちカードに **決済の状況**（入金確認済み／決済ページまで進んだが未入金／店頭でのお手続き）と**請求予定額**、**Squareダッシュボードでの探し方**を出す
+- feat(member-os): 承認待ちカードに **【Squareで入金を確認】** と **【入金を確認して入会を確定】** を追加。後者は Web入会と同じ手順（会員番号・控えPDF・完了メール）で確定する。**入金が見つからないときは何も起きない**
+- feat(member-os): **打席予約を会員ポータルの中に置いた**（`my.frankgolf.jp/member/book`）。ログイン済みなら会員番号と電話下4桁を聞き直さない。台帳と予約APIは従来どおり1本
+- feat(member-os): **月会費のカード登録**を会員ポータルの「設定・お手続き」に追加。Square決済後は `my.frankgolf.jp/member/settings` に戻る
+- **fix: お客様向けメールのリンクを全部 my.frankgolf.jp にそろえた**。`frankgolf.jp` と `member-os-tau.vercel.app` が混在し、「打席予約はこちら」が2種類あるように見えていた。URLの正典は `@yozan/core/frank-links` の1か所
+- fix: 体験のキャンセルURLも `my.frankgolf.jp/cancel/<token>` 経由にした（画面は従来の trial-booking.html へ転送）
+- fix(mail): 送信結果に **Resend の message id** を持ち帰り、失敗理由も本文まで残すようにした。**入会完了メールの成功・失敗を `events` に記録**（`frunk.join_mail_sent` / `frunk.join_mail_failed`）
+- note: **iCloud宛の未達は送信元の設定が原因ではない** — frankgolf.jp の SPF（`send.frankgolf.jp`）・DKIM（`resend._domainkey`）・DMARC は実測で正しく揃っている。Resend のログを message id で引いて delivered / bounced を確かめる運用に変えた
+- doc: 簡易ログインQRのA4ポスター `FRANK_GOLF_出店計画/FRANK_会員ポータルQR_A4.pdf`（中身は `my.frankgolf.jp/member/login` のみ・再出力は `scripts/frank-qr-poster.py`）
+- test: `tests/frunk-join-view.test.ts` 新規4件。genesis / member-os の `tsc --noEmit` と `next build` 通過・全518件パス
+
 ## 2026-09-01 — FRANK: 打席予約を毎時00分スタートにし、25分パーソナルを付けられるようにした
 - feat(frankgolf.jp): 会員の打席予約を **毎時00分スタート・1時間 または 2時間** に変えた（DECISIONS #187・ユーザー確定）。30分刻み・30分/90分の選択肢はお客様側から外した
 - feat(frankgolf.jp): 打席予約に **「パーソナルレッスン（25分）を追加する ＋2,500円」** のチェックを追加。**申込は「希望」まで**で、担当プロと打席時間内のどこで行うかは店舗が決めて確定する（ユーザー確定）

@@ -165,7 +165,8 @@ test("体験確認メール: キャンセルURL・日時・打席が入る", () 
     cancelToken: "abc123",
   });
   assert.match(m.subject, /2026年9月5日（土） 10:00〜/);
-  assert.match(m.text, /https:\/\/frankgolf\.jp\/trial-booking\.html\?cancel=abc123/);
+  // #188: お客様に出すURLは会員ポータル（my.frankgolf.jp）に一本化した（転送先は従来の trial-booking.html）
+  assert.match(m.text, /https:\/\/my\.frankgolf\.jp\/cancel\/abc123/);
   assert.match(m.text, /A打席/);
   assert.match(m.text, /山田太郎 様/);
 });

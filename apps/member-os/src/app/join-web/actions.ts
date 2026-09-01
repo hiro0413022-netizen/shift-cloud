@@ -8,6 +8,7 @@ import { sendFrankMail, buildWebSignupReceiptMail } from "@/lib/frank-mail";
 import { validCoupon, normalizeCoupon, isJoinCampaignActive, JOIN_CAMPAIGN } from "@/lib/frank-billing-pure";
 import { joinAddress } from "@/lib/address";
 import { readName } from "@/lib/name";
+import { FRANK_PORTAL } from "@yozan/core/frank-links";
 
 export type WebSignupState = { ok?: boolean; error?: string };
 
@@ -20,7 +21,8 @@ function orNull(v: FormDataEntryValue | null): string | null {
 }
 const GENDERS = ["male", "female", "other", "unknown"];
 
-const MEMBER_OS_URL = process.env.NEXT_PUBLIC_MEMBER_OS_URL || "https://member-os-tau.vercel.app";
+// お客様が見るURLは会員ポータル（my.frankgolf.jp）に一本化（#188）。正典は @yozan/core/frank-links
+const MEMBER_OS_URL = FRANK_PORTAL;
 const GENESIS_URL = process.env.GENESIS_URL || "https://yozan-genesis.vercel.app";
 
 /**

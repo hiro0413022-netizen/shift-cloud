@@ -9,6 +9,7 @@
     "./fitting-walkin": "./src/fitting-walkin.ts",
     "./frank-booking": "./src/frank-booking.ts",
     "./frank-handoff": "./src/frank-handoff.ts",
+    "./frank-links": "./src/frank-links.ts",
     "./frank-portal": "./src/frank-portal.ts",
     "./frank-tax": "./src/frank-tax.ts",
     "./frank-token": "./src/frank-token.ts",

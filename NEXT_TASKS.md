@@ -7,6 +7,24 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-188. **FRANK お客様の入口を my.frankgolf.jp に一本化（#188）を動かす**
+   1. **`.\deploy-frank-portal-188.ps1` を実行**（commit & push・migrationはありません）
+   2. **Vercel(member-os) の環境変数を確認** — `NEXT_PUBLIC_PORTAL_URL = https://my.frankgolf.jp`（#154 で設定済みのはず）と
+      `GENESIS_URL`（未設定なら既定の `https://yozan-genesis.vercel.app` を使うので、そのままでも動きます）
+   3. 動作確認（お客様側）: `my.frankgolf.jp/member/login` → ログイン → **【＋ 打席を予約する】がポータルの中で開く**（別サイトに飛ばない）→
+      枠を選んで予約 → 会員ページの「これからのご予約」に出る → 「設定・お手続き」に **月会費のカード登録** が出る
+   4. 動作確認（スタッフ側）: member-os `/frunk` の承認待ちに **決済の状況**が出る → 【Squareで入金を確認】を押すと
+      入金の有無・金額・日時が出る → 入金があれば【入金を確認して入会を確定】で会員番号＋控えPDFのメールまで進む
+   5. **簡易ログインQRのポスターを印刷して掲示** — `FRANK_GOLF_出店計画/FRANK_会員ポータルQR_A4.pdf`（A4・受付とラウンジ）
+   6. **iCloud宛の未達を確かめる** — Resend（https://resend.com・Googleアカウントでログイン）の **Logs** で該当アドレスを検索し、
+      **Delivered / Bounced / Complained** のどれかを見る。
+      ・Delivered → 相手の**迷惑メールフォルダ**。お客様に確認をお願いする
+      ・Bounced → 理由が出るのでそれに従う
+      ・そもそも記録が無い → **無料プランの上限（月3,000通）**かドメイン認証が外れていないかを確認
+      ※ frankgolf.jp の SPF / DKIM / DMARC は 2026-09-01 に実測して**正しく揃っている**ことを確認済み（送信元の設定は原因ではない）
+   7. 任意（推奨）: お名前.com の DNS で `_dmarc.frankgolf.jp` を
+      `v=DMARC1; p=none; rua=mailto:info@frankgolf.jp` に変更すると、**どこで弾かれたかの週次レポートが届く**ようになります
+
 A-187. **FRANK 打席予約の00分スタート＋25分パーソナル（#187）を動かす**
    1. ~~Supabase で migration `0136_frank_bay_lesson_option.sql` を流す~~ **✅ 適用済み（2026-09-01・MCP）**
    2. **`.\deploy-frank-hourly-187.ps1` を実行**（commit & push）
