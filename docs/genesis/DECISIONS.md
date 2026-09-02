@@ -1115,3 +1115,17 @@
   **(g) 請求書払いは無い**（現状カードのみ）。法人は請求書を希望されることが多いので、**FAQに明記**したうえで請求先の住所・メールをご担当者と別に指定できるようにした（経理の方に届く）。口座振替・請求書払いを入れるかは次の判断。
 
   実装: `supabase/migrations/0140_frank_corporate_plans.sql`（**適用済み**）、`packages/core/src/frank-corporate.ts`・`frank-corporate-members.ts`（新規）、`apps/genesis/src/lib/{frank-booking.ts,frank-join.ts}`、`apps/member-os/src/app/join-web/{page.tsx,web-join-form.tsx,actions.ts}`、`apps/member-os/src/app/(main)/frunk/{actions.ts,[id]/page.tsx}`、`sites/frank-golf/{_build.py,assets/site-data.js}`（生成物 corporate.html / plan.html）、`tests/frank-corporate.test.ts`。member-os / genesis の `tsc --noEmit` と **`next build` 通過**（クラウドでcloneして実走）・テスト **561件パス**（新規13件）
+
+- #196 (2026-09-01) **電子伝票の通知音を最初からONにした**（migrationなし）。ユーザー依頼「電子伝票の画面で最初から音オンにしておいてください」。
+
+  **(a) これまでは開くたびに【音をONにする】を押す必要があった**（#189で音そのものは作り直したが、ONにする操作は残っていた）。iPad を再起動した・タブを開き直した・スタッフが交代した、のどれでも無音に戻る。**押し忘れに誰も気づけない**のがいちばん困る壊れ方だった。
+
+  **(b) 開いた瞬間に AudioContext を作って `resume()` を試み、表示も最初から「🔔 音ON」にする。** ⚠ ただし **iPad Safari / Chrome は一度も操作していないページで音を鳴らせない**（自動再生の制限）。これはこちら側の設定では外せない。
+
+  **(c) だから「押させる」のをやめて「触れば効く」にした。** 鳴らせない間は `window` の `pointerdown` / `touchstart` / `keydown` を拾って `resume()` する＝**伝票を1枚押しただけ・スクロールしただけで音が使えるようになる**。開店時に一度画面に触れば、その日はもう意識しなくてよい。
+
+  **(d) 鳴らせない状態は小さなボタンではなく帯で出す**（「🔔 画面を一度タップすると音が鳴ります」・琥珀色）。**気づかないまま無音で営業する**のを防ぐのが目的なので、目立たせる側に倒す。`onstatechange` と `visibilitychange` で状態を追い、放置で suspended に落ちても復帰させる。
+
+  **(e) 「音を止める」も残した**（夜間の事務作業など）。既定がONになっただけで、切る自由は残す。
+
+  実装: `apps/member-os/src/app/orders/live.tsx`。member-os の `tsc --noEmit` と **`next build` 通過**（クラウドでcloneして実走）

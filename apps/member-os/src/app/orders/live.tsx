@@ -7,8 +7,16 @@ import { useRouter } from "next/navigation";
  * 電子伝票の自動更新と通知音（#154 → #189 で音を作り直し）
  *
  * 画面まるごとリロードせず router.refresh() で差し替える（入力中のフォームを飛ばさないため）。
- * 音は iPad Safari の制約で **一度タップしないと鳴らせない** ので「音をON」を押してもらう。
- * 押していない間は無音で更新だけ続く。
+ *
+ * ★ #196（2026-09-01 ユーザー依頼「電子伝票の画面で最初から音オンにしておいて」）
+ *   音は **最初からON** にする。開いた瞬間に AudioContext を作って resume() を試み、
+ *   画面上の表示も最初から「🔔 音ON」。
+ *   ⚠ ただし iPad Safari / Chrome は **一度も操作していないページで音を鳴らせない**（自動再生の制限）。
+ *   これはこちらの設定では外せないので、鳴らせない間は
+ *     ・帯で「画面を一度タップすると音が鳴ります」と出す（小さなボタンを探させない）
+ *     ・**画面のどこを触っても**（伝票を押しても・スクロールしても）音が使えるようになる
+ *   ようにした。開店時に一度触れば、その日はもう意識しないで済む。
+ *   「押していないから鳴らない」を、店の人が気づけない形で放置しないのが目的。
  *
  * ★ #189（2026-09-01 ユーザー指摘「音が短すぎる。もっと長く大きく」「提供済みにするまで
  *   3分たったらもう一度鳴らして」）で変えたこと:
@@ -42,7 +50,10 @@ export function OrdersLive({
   const ctx = useRef<AudioContext | null>(null);
   /** 注文ID → 最後に鳴らした時刻。router.refresh() では作り直されないので覚えていられる */
   const reminded = useRef<Map<string, number>>(new Map());
-  const [sound, setSound] = useState(false);
+  /** 音を鳴らすつもりか（既定でON）。OFFにできる出口も残す＝夜間の事務作業などで切りたい場合 */
+  const [sound, setSound] = useState(true);
+  /** ブラウザが実際に鳴らせる状態か（AudioContext が running）。ここが false の間は無音 */
+  const [ready, setReady] = useState(false);
   const [now, setNow] = useState("");
 
   /**
@@ -99,8 +110,8 @@ export function OrdersLive({
   useEffect(() => {
     if (prev.current === signature) return;
     prev.current = signature;
-    chime(false);
-  }, [signature, chime]);
+    if (sound && ready) chime(false);
+  }, [signature, chime, sound, ready]);
 
   /**
    * 未提供のまま3分たった注文を鳴らし直す。
@@ -108,7 +119,7 @@ export function OrdersLive({
    * 提供済み・取消になった注文は openOrders から消えるので、覚えている時刻も掃除する。
    */
   useEffect(() => {
-    if (!sound) return;
+    if (!sound || !ready) return;
     const check = () => {
       const t = Date.now();
       const alive = new Set(openOrders.map((o) => o.id));
@@ -130,22 +141,61 @@ export function OrdersLive({
     check();
     const id = setInterval(check, 15_000);
     return () => clearInterval(id);
-  }, [openOrders, sound, chime]);
+  }, [openOrders, sound, ready, chime]);
 
-  const enable = () => {
+  /** AudioContext を用意して鳴らせるようにする。何度呼んでも作り直さない */
+  const arm = useCallback((withTestTone: boolean) => {
     type W = typeof window & { webkitAudioContext?: typeof AudioContext };
     const Ctor = window.AudioContext ?? (window as W).webkitAudioContext;
     if (!Ctor) return;
-    ctx.current = new Ctor();
-    void ctx.current.resume();
-    setSound(true);
-    chime(false); // ONにした瞬間に1回鳴らす＝音量をその場で確かめられる
-  };
+    if (!ctx.current) {
+      ctx.current = new Ctor();
+      // suspended ↔ running の行き来を画面表示に反映する（放置で落ちることがある）
+      ctx.current.onstatechange = () => setReady(ctx.current?.state === "running");
+    }
+    const ac = ctx.current;
+    void ac.resume().then(() => {
+      setReady(ac.state === "running");
+      if (withTestTone && ac.state === "running") chime(false);
+    });
+    setReady(ac.state === "running");
+  }, [chime]);
+
+  /**
+   * 開いた瞬間に音を使えるようにする（#196）。
+   * 自動再生の制限で resume() が通らないブラウザ（iPad Safari など）では suspended のままなので、
+   * **画面のどこを触っても** もう一度 resume() する。伝票を1枚押した時点で音が出るようになり、
+   * 「ボタンを押し忘れていて鳴らなかった」が起きない。
+   */
+  useEffect(() => {
+    arm(false);
+    const unlock = () => arm(false);
+    const opts = { passive: true } as AddEventListenerOptions;
+    window.addEventListener("pointerdown", unlock, opts);
+    window.addEventListener("touchstart", unlock, opts);
+    window.addEventListener("keydown", unlock);
+    // タブに戻ってきたときも復帰させる（放置で suspended に落ちる）
+    const onVis = () => { if (document.visibilityState === "visible") arm(false); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("keydown", unlock);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [arm]);
 
   return (
     <div className="flex items-center gap-3 text-sm text-(--color-dim)">
       <span className="tabular-nums">{now}</span>
-      {sound ? (
+      {!sound ? (
+        <button
+          onClick={() => { setSound(true); arm(true); }}
+          className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-xs"
+        >
+          音をONにする
+        </button>
+      ) : ready ? (
         <>
           <span className="text-(--color-accent)">🔔 音ON</span>
           <button
@@ -154,10 +204,22 @@ export function OrdersLive({
           >
             テスト再生
           </button>
+          <button
+            onClick={() => setSound(false)}
+            className="text-xs text-(--color-dim) underline"
+            title="この画面を閉じるまで音を止めます"
+          >
+            音を止める
+          </button>
         </>
       ) : (
-        <button onClick={enable} className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-xs">
-          音をONにする
+        // ブラウザの自動再生制限で、まだ鳴らせない状態。
+        // 小さなボタンではなく帯で出す（気づかないまま無音で営業するのがいちばん困る）
+        <button
+          onClick={() => arm(true)}
+          className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800"
+        >
+          🔔 画面を一度タップすると音が鳴ります
         </button>
       )}
     </div>
