@@ -56,8 +56,18 @@ window.FRANK = {
     ],
     // 法人プラン（料金ページのスペック表・法人ページに表示）
     corporate: [
-      { name: "法人ライトプラン", price: "39,800円 / 月", desc: "最大2名様登録／社員の福利厚生・接待前の調整に" },
-      { name: "法人プレミアムプラン", price: "59,800円 / 月", desc: "最大4名様登録／同伴ビジター無料枠つきの最上級プラン" },
+      { name: "法人ライトプラン", price: "39,800円 / 月",
+        desc: "ご利用者 最大2名様までご登録／打席のご予約は御社合計4コマ（1コマ＝1時間）まで",
+        features: ["ご利用者を最大2名様までご登録（ご登録の入れ替えは店頭で承ります）",
+                   "打席のご予約は御社合計で4コマ（1コマ＝1時間）まで",
+                   "ご利用が済むと、また次のご予約をお取りいただけます",
+                   "ご請求は御社に1本（ご利用者ごとの追加費用はありません）"] },
+      { name: "法人プレミアムプラン", price: "59,800円 / 月",
+        desc: "ご利用者 最大4名様までご登録／御社合計8コマまで／同伴のビジター様は無料",
+        features: ["ご利用者を最大4名様までご登録（ご登録の入れ替えは店頭で承ります）",
+                   "打席のご予約は御社合計で8コマ（1コマ＝1時間）まで",
+                   "同伴のビジター様は無料（回数の制限はありません）",
+                   "ご請求は御社に1本（ご利用者ごとの追加費用はありません）"] },
     ],
     // レッスン料金
     lessonPrice: "25分マンツーマン 2,500円 ／ 4回チケット 9,000円 ／ 8回チケット 16,000円",
@@ -136,7 +146,7 @@ window.FRANK = {
     trialBooking: "trial-booking.html",
 
     // ★Web入会：member-os のWeb入会申込フォーム（公開・プラン選択つき）。
-    joinWeb: "https://member-os-tau.vercel.app/join-web",
+    joinWeb: "https://my.frankgolf.jp/join-web",
 
     // （旧）オンサイトのFormspreeフォームは使いません＝member-osに集約。null固定でOK。
     trialForm: null,
@@ -146,13 +156,13 @@ window.FRANK = {
 
     // 会員向け（member-os / 稼働中）
     // ★会員ログインは「会員番号＋電話番号下4桁」。打席予約(booking.html)と同じ frunk_members を見ます。
-    memberLogin:    "https://member-os-tau.vercel.app/member/login",
+    memberLogin:    "https://my.frankgolf.jp/member/login",
     // ★旧 /member/register（仮会員 P########）は廃止しました（2026-08-07）。
     //   その番号では打席予約が通らないため、入会は joinWeb に一本化しています。
-    memberRegister: "https://member-os-tau.vercel.app/join-web",
+    memberRegister: "https://my.frankgolf.jp/join-web",
     // ★お客様の打席予約は公式サイトに一本化（#93）。member-os の /member/book は転送のみ。
     memberBooking:  "booking.html",
-    memberHome:     "https://member-os-tau.vercel.app/member",
+    memberHome:     "https://my.frankgolf.jp/member",
 
     instagram: null,
     youtube: null,

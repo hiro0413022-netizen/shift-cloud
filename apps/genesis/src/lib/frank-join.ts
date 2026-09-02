@@ -10,6 +10,7 @@ import { chargeCardOnFile } from "@/lib/frank-square-billing";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import { logEvent } from "@/lib/kernel";
 import { FRANK_LINKS } from "@yozan/core/frank-links";
+import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
 
 type Admin = ReturnType<typeof createAdmin>;
 
@@ -129,7 +130,17 @@ export type WebJoinMemberRow = {
     prepaidMonths?: number;
     campaign?: boolean;
   } | null;
-  frunk_plans: { name: string | null; monthly_price: number | null; joining_fee: number | null } | null;
+  store_id: string | null;
+  plan_id: string | null;
+  company_name: string | null;
+  corporate_users: Array<{ name?: string; nameKana?: string | null; phone?: string; email?: string | null }> | null;
+  frunk_plans: {
+    name: string | null;
+    monthly_price: number | null;
+    joining_fee: number | null;
+    is_corporate?: boolean | null;
+    max_users?: number | null;
+  } | null;
 };
 
 /** JST日付に月を足す（毎月同日・末日は繰り下げ） */
@@ -157,7 +168,7 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   const { data } = await admin
     .from("frunk_members")
     .select(
-      "id, company_id, status, name, name_kana, gender, birth_date, phone, email, postal_code, address1, start_date, signature, joining_fee_waived, join_campaign, square_customer_id, square_checkout_breakdown, frunk_plans(name, monthly_price, joining_fee)"
+      "id, company_id, store_id, plan_id, status, name, name_kana, gender, birth_date, phone, email, postal_code, address1, start_date, signature, joining_fee_waived, join_campaign, square_customer_id, square_checkout_breakdown, company_name, corporate_users, frunk_plans(name, monthly_price, joining_fee, is_corporate, max_users)"
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -229,6 +240,27 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
     console.error("[frank-join] lesson karte failed:", e);
   }
 
+  // 法人プラン（#195）: ご利用者ぶんの会員行と会員番号。月会費は契約者に1本のまま
+  const corporateUsers = m.frunk_plans?.is_corporate
+    ? await createCorporateUserMembers(admin, {
+        id: m.id,
+        company_id: m.company_id,
+        store_id: m.store_id ?? null,
+        plan_id: m.plan_id ?? null,
+        company_name: m.company_name,
+        corporate_users: m.corporate_users,
+        today: jstYmd(),
+        assignMemberNo: (id) => assignMemberNo(admin, m.company_id, id),
+        onCreated: async (u) => {
+          try {
+            await ensureLessonKarte(admin, { companyId: m.company_id, name: u.name, memberNo: u.memberNo });
+          } catch (e) {
+            console.error("[frank-join] corporate user karte failed:", e);
+          }
+        },
+      })
+    : [];
+
   if (m.email) {
     // 実際に決済した内訳（est）と必ず一致させる。ここで独自計算しない（#136）
     const joinFee = est.joiningFee;
@@ -293,6 +325,17 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
       "",
       `■ あなたの会員番号: ${memberNo}`,
       "",
+      // 法人プランは、ご担当者様あてに全員分の会員番号をまとめてお送りする（#195）。
+      // お一人ずつ番号が違うので、そのままお渡しいただけるように名前と並べて出す
+      ...(corporateUsers.length > 0
+        ? [
+            `■ ご利用者の会員番号（${m.company_name ?? ""}）`,
+            ...corporateUsers.map((u) => `　${u.name} 様: ${u.memberNo}`),
+            "各ご利用者様には、会員番号とご自身の電話番号の下4桁で会員ページにログインしていただけます。",
+            "打席のご予約は御社の合計枠から消化され、ご利用が済むとまた次のご予約をお取りいただけます。",
+            "",
+          ]
+        : []),
       "■ 会員ページ（打席のご予約・ご予約の確認・レッスンカルテ・会員証QR）",
       FRANK_LINKS.home,
       "ログインは 会員番号 と 電話番号の下4桁 です。ご予約もこのページから承ります。",

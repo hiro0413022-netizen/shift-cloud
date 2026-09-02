@@ -18,6 +18,7 @@ import {
   cancelSubscription,
   uncancelSubscription,
 } from "@/lib/frank-square";
+import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
 import {
   canLeaveOn,
   canSuspendFrom,
@@ -245,15 +246,42 @@ export async function approveSignup(formData: FormData) {
   }
   await logAudit(actor, "frunk.signup_approve", "frunk_members", null, null, { id, member_no: memberNo });
 
+  // 法人プラン（#195）: 現金・振込での承認でも、ご利用者ぶんの会員番号を発行する。
+  // Web入会（入金Webhook）は genesis 側の同じ関数を通る。行の形は @yozan/core に1か所だけ置く。
+  const { data: cm } = await admin
+    .from("frunk_members")
+    .select("id, company_id, store_id, plan_id, company_name, corporate_users, frunk_plans(is_corporate)")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  const isCorporate = !!(cm as unknown as { frunk_plans: { is_corporate?: boolean } | null } | null)?.frunk_plans?.is_corporate;
+  let corporateNos: Array<{ name: string; memberNo: string }> = [];
+  if (cm && isCorporate) {
+    corporateNos = await createCorporateUserMembers(admin, {
+      id: String(cm.id),
+      company_id: String(cm.company_id),
+      store_id: cm.store_id ? String(cm.store_id) : null,
+      plan_id: cm.plan_id ? String(cm.plan_id) : null,
+      company_name: cm.company_name ? String(cm.company_name) : null,
+      corporate_users: (cm.corporate_users ?? null) as never,
+      today: today(),
+      assignMemberNo: (memberId) => nextMemberNo(admin, actor.companyId, memberId),
+    });
+    await logAudit(actor, "frunk.corporate_users_created", "frunk_members", id, null, { users: corporateNos });
+  }
+
   // 承認メール（会員番号の通知＋カード登録の案内 #123）。送信失敗で承認は落とさないが、
   // 「送れていない」ことは画面で必ず伝える（黙って落とすと会員番号が誰にも届かない）
+  const corporateNote =
+    corporateNos.length > 0
+      ? `ご利用者の会員番号: ${corporateNos.map((u) => `${u.name}=${u.memberNo}`).join("・")}。`
+      : "";
   const mail = await sendApprovalMailTo(admin, id, memberNo);
   if (!mail.ok) {
     redirect("/frunk?err=" + encodeURIComponent(
-      `${memberNo} で承認しました。ただし会員番号のメールは${mail.reason} 会員番号を口頭・LINEでお伝えいただくか、原因を直してから「承認メール再送」を押してください。`,
+      `${memberNo} で承認しました。${corporateNote}ただし会員番号のメールは${mail.reason} 会員番号を口頭・LINEでお伝えいただくか、原因を直してから「承認メール再送」を押してください。`,
     ));
   }
   revalidatePath("/frunk");
+  if (corporateNote) redirect("/frunk?msg=" + encodeURIComponent(`${memberNo} で承認しました。${corporateNote}`));
 }
 
 /** 承認メール（会員番号の案内）の再送。承認は1回きりなので、届かなかった時の救済用 */
@@ -429,6 +457,122 @@ export async function setMemberStatus(formData: FormData) {
   const param = tail.startsWith("⚠") || minTermWarn ? "err" : "msg";
   redirect(`${dest}?${param}=` + encodeURIComponent(
     `${minTermWarn}${who}の退会を ${monthEndLabel(on)} で受け付けました。それまでは通常どおりご利用いただけます。${tail}`,
+  ));
+}
+
+/* ============================ 法人プランのご利用者（#195） ============================
+ * 法人は「会社が契約して、社員の方が使う」形。人は入れ替わるので、店頭で足したり外したりできる。
+ * 追加した方にも会員番号を出す（誰が来たかが記録に残り、レッスンカルテも分けられる）。
+ * 月会費のサブスクを持つのは契約者の行だけ＝ここで人を足しても請求は増えない。
+ * ============================================================================== */
+
+/** 契約者の行を取り、法人の設定を返す（利用者の行から呼ばれたら親をたどる） */
+async function corporateRoot(admin: ReturnType<typeof createAdmin>, companyId: string, memberId: string) {
+  const cols =
+    "id, corporate_parent_id, company_id, store_id, plan_id, company_name, corporate_users, frunk_plans(name, is_corporate, max_users)";
+  const { data: me } = await admin
+    .from("frunk_members").select(cols)
+    .eq("id", memberId).eq("company_id", companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!me) return null;
+  const rootId = me.corporate_parent_id ? String(me.corporate_parent_id) : String(me.id);
+  if (rootId === String(me.id)) return me;
+  const { data: root } = await admin
+    .from("frunk_members").select(cols).eq("id", rootId).eq("company_id", companyId).maybeSingle();
+  return root ?? null;
+}
+
+/** 会員番号 FR#### の採番（genesis assignMemberNo と同じ数え方・company単位） */
+async function nextMemberNo(admin: ReturnType<typeof createAdmin>, companyId: string, memberId: string): Promise<string | null> {
+  for (let i = 0; i < 5; i++) {
+    const { count } = await admin
+      .from("frunk_members").select("id", { count: "exact", head: true })
+      .eq("company_id", companyId).not("member_no", "is", null);
+    const no = `FR${String((count ?? 0) + 1 + i).padStart(4, "0")}`;
+    const { data: up, error } = await admin
+      .from("frunk_members").update({ member_no: no, updated_at: new Date().toISOString() })
+      .eq("id", memberId).is("member_no", null).select("member_no");
+    if (!error) {
+      if ((up ?? []).length > 0) return no;
+      const { data: cur } = await admin.from("frunk_members").select("member_no").eq("id", memberId).maybeSingle();
+      return cur?.member_no ? String(cur.member_no) : null;
+    }
+    if (!String(error.code ?? "").includes("23505")) return null;
+  }
+  return null;
+}
+
+export async function addCorporateUser(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  const name = str(formData.get("cu_name"));
+  const phone = str(formData.get("cu_phone"));
+  if (!id) return;
+  if (!name || phone.replace(/\D/g, "").length < 4) {
+    redirect(`${dest}?err=` + encodeURIComponent("お名前と電話番号（下4桁がログインに必要）をご入力ください"));
+  }
+
+  const root = await corporateRoot(admin, actor.companyId, id);
+  const plan = (root as unknown as { frunk_plans: { is_corporate?: boolean; max_users?: number } | null } | null)?.frunk_plans;
+  if (!root || !plan?.is_corporate) redirect(`${dest}?err=` + encodeURIComponent("法人プランの会員ではありません"));
+
+  const maxUsers = Number(plan?.max_users ?? 2);
+  const { count } = await admin
+    .from("frunk_members").select("id", { count: "exact", head: true })
+    .eq("corporate_parent_id", String(root.id)).is("deleted_at", null);
+  if ((count ?? 0) >= maxUsers) {
+    redirect(`${dest}?err=` + encodeURIComponent(
+      `このプランのご登録上限（${maxUsers}名）に達しています。入れ替える場合は、先に外す方の【登録を外す】を押してください`,
+    ));
+  }
+  // 同じ電話番号は会員ページのログインが取り違えるので受けない
+  const { data: dup } = await admin
+    .from("frunk_members").select("id, name").eq("corporate_parent_id", String(root.id)).eq("phone", phone)
+    .is("deleted_at", null).maybeSingle();
+  if (dup) redirect(`${dest}?err=` + encodeURIComponent(`同じ電話番号のご利用者（${String(dup.name)}様）が既にご登録済みです`));
+
+  const created = await createCorporateUserMembers(admin, {
+    id: String(root.id),
+    company_id: String(root.company_id),
+    store_id: root.store_id ? String(root.store_id) : null,
+    plan_id: root.plan_id ? String(root.plan_id) : null,
+    company_name: root.company_name ? String(root.company_name) : null,
+    corporate_users: [{ name, nameKana: orNull(formData.get("cu_kana")), phone, email: orNull(formData.get("cu_email")) }],
+    today: today(),
+    assignMemberNo: (memberId) => nextMemberNo(admin, actor.companyId, memberId),
+  });
+  await logAudit(actor, "frunk.corporate_user_add", "frunk_members", String(root.id), null, { created });
+  revalidateMember(id);
+  revalidateMember(String(root.id));
+  redirect(
+    created.length > 0
+      ? `${dest}?msg=` + encodeURIComponent(`${created[0].name}様をご利用者に追加しました（会員番号 ${created[0].memberNo}）。ログインは会員番号と電話番号の下4桁です`)
+      : `${dest}?err=` + encodeURIComponent("ご利用者を追加できませんでした。もう一度お試しください"),
+  );
+}
+
+/** ご利用者の登録を外す（人が入れ替わったとき）。行は消さずに退会にして履歴を残す */
+export async function removeCorporateUser(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const userId = str(formData.get("user_id"));
+  if (!userId) return;
+  const { data: u } = await admin
+    .from("frunk_members").select("id, name, member_no, corporate_parent_id")
+    .eq("id", userId).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!u?.corporate_parent_id) redirect(`${dest}?err=` + encodeURIComponent("法人のご利用者ではありません"));
+
+  await admin
+    .from("frunk_members")
+    .update({ status: "left", leave_date: today(), corporate_parent_id: null, updated_at: new Date().toISOString() })
+    .eq("id", userId).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+  await logAudit(actor, "frunk.corporate_user_remove", "frunk_members", userId, null, { member_no: u.member_no });
+  revalidateMember(String(u.corporate_parent_id));
+  revalidateMember(userId);
+  redirect(`${dest}?msg=` + encodeURIComponent(
+    `${String(u.name)}様（${String(u.member_no ?? "")}）のご登録を外しました。空いた枠に新しい方をご登録いただけます`,
   ));
 }
 

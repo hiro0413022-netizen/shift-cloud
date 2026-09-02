@@ -24,14 +24,18 @@ export default async function JoinWebPage({
   const { data: plans } = store
     ? await admin
         .from("frunk_plans")
-        .select("id, name, monthly_price, joining_fee, max_bookings_per_day, note, active")
+        .select("id, name, monthly_price, joining_fee, max_bookings_per_day, note, active, public_signup, is_corporate, max_users, max_open_slots, companion_free")
         .eq("company_id", store.companyId)
         .is("deleted_at", null)
         .order("sort_order", { ascending: true })
     : { data: [] };
 
+  // お客様に出してよいプランだけ（#195）。
+  // 以前は active だけで絞っていたため、note に「一般公開しない」と書いてある
+  // テスト会員・スタッフ・モニター会員が、そのままお客様の入会フォームに並んでいた。
+  // active（画面に出す/出さない）と public_signup（お客様が申し込めるか）は別物として持つ。
   const visiblePlans = (plans ?? []).filter(
-    (p) => p.active || (showTest && String(p.name) === "テスト会員"),
+    (p) => (p.active && p.public_signup !== false) || (showTest && String(p.name) === "テスト会員"),
   );
 
   return (

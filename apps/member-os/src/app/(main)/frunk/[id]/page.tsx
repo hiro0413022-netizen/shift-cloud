@@ -21,11 +21,14 @@ import {
   suspendApplyDeadline,
   mdLabel,
 } from "@yozan/core/frank-membership";
+import { corporateSpec } from "@yozan/core/frank-corporate";
 import {
   setMemberStatus,
   changePlan,
   cancelScheduledChange,
   stopSquareBilling,
+  addCorporateUser,
+  removeCorporateUser,
   resendApprovalMail,
   saveAlertNote,
   updateMemberProfile,
@@ -101,7 +104,7 @@ export default async function FrunkMemberPage({
   const admin = createAdmin();
   const { data: member } = await admin
     .from("frunk_members")
-    .select("*, frunk_plans(id, name, monthly_price, joining_fee, max_bookings_per_day, max_bookings_per_week)")
+    .select("*, frunk_plans(id, name, monthly_price, joining_fee, max_bookings_per_day, max_bookings_per_week, is_corporate, max_users, max_open_slots, companion_free)")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID) // 店舗スコープ（#134）
@@ -144,6 +147,21 @@ export default async function FrunkMemberPage({
   const planList = (plans ?? []) as Row[];
   const bookingList = (bookings ?? []) as Row[];
   const today = jstYmd();
+
+  // 法人プラン（#195）。利用者の行から開いたときは契約者をたどる
+  const corpSpec = corporateSpec(plan as never);
+  const corpParentId = m.corporate_parent_id ? String(m.corporate_parent_id) : "";
+  const corpRootId = corpParentId || id;
+  const { data: corpRows } = corpSpec.isCorporate
+    ? await admin
+        .from("frunk_members")
+        .select("id, name, member_no, phone, status")
+        .eq("company_id", actor.companyId)
+        .eq("corporate_parent_id", corpRootId)
+        .is("deleted_at", null)
+        .order("member_no")
+    : { data: [] };
+  const corpUsers = (corpRows ?? []).filter((u) => String((u as Row).status) !== "left") as Row[];
 
   // 退会・休会の受付ルール（#192）。選択肢の生成も検証もサーバーアクションと同じ関数を通す
   const leaveOpts = leaveDateOptions(today);
@@ -425,6 +443,79 @@ export default async function FrunkMemberPage({
           </div>
         </Panel>
       </div>
+
+      {/* ===== 法人プラン（#195） =====
+          契約者の会員カードにご利用者を並べる。人は入れ替わるので、店頭で足したり外したりできる。
+          月会費のサブスクを持つのは契約者だけなので、ここで人を足しても請求は増えない。 */}
+      {corpSpec.isCorporate && (
+        <Panel
+          title={`法人プラン　${m.company_name ? String(m.company_name) : "（会社名未登録）"}　ご利用者 ${corpUsers.length}/${corpSpec.maxUsers}名`}
+          className="d2"
+        >
+          {corpParentId ? (
+            <div className="space-y-2 text-sm">
+              <p>
+                この方は法人プランの<span className="font-semibold">ご利用者</span>です。ご契約・お支払い・ご利用者の入れ替えは契約者の会員カードで行います。
+              </p>
+              <Link href={`/frunk/${corpParentId}`} className="text-indigo-600 underline">
+                契約者の会員カードを開く →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid gap-1 text-sm sm:grid-cols-2">
+                <Info label="会社名">{m.company_name ? String(m.company_name) : "—"}</Info>
+                <Info label="ご担当者">{String(m.name ?? "")}</Info>
+                <Info label="請求先メール">{m.billing_email ? String(m.billing_email) : `${m.email ? String(m.email) : "—"}（ご担当者）`}</Info>
+                <Info label="請求先住所">
+                  {[m.billing_postal_code, m.billing_address1].filter(Boolean).join(" ") || "—（ご担当者の住所へ）"}
+                </Info>
+                <Info label="打席のご予約">
+                  御社合計 {corpSpec.maxOpenSlots} コマ（1コマ＝1時間）まで先にお取りいただけます。ご利用が済むと次が取れます
+                </Info>
+                <Info label="同伴ビジター">{corpSpec.companionFree ? "無料（回数制限なし）" : "同伴の無料枠はありません"}</Info>
+              </div>
+
+              <div className="space-y-2 border-t border-(--color-line) pt-3">
+                {corpUsers.length === 0 && <Empty>ご利用者がまだ登録されていません。下のフォームから追加してください。</Empty>}
+                {corpUsers.map((u) => (
+                  <div key={String(u.id)} className="flex flex-wrap items-center gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm">
+                    <Link href={`/frunk/${String(u.id)}`} className="font-semibold text-indigo-600 underline">
+                      {String(u.name)}
+                    </Link>
+                    <Badge tone="accent">{u.member_no ? String(u.member_no) : "会員番号未発行"}</Badge>
+                    <span className="text-xs text-(--color-dim)">{u.phone ? String(u.phone) : ""}</span>
+                    <form action={removeCorporateUser} className="ml-auto">
+                      <input type="hidden" name="user_id" value={String(u.id)} />
+                      <input type="hidden" name="back" value={back} />
+                      <button className="text-xs text-(--color-dim) underline hover:text-rose-600">登録を外す</button>
+                    </form>
+                  </div>
+                ))}
+              </div>
+
+              {corpUsers.length < corpSpec.maxUsers ? (
+                <form action={addCorporateUser} className="grid grid-cols-2 items-end gap-2 border-t border-(--color-line) pt-3 sm:grid-cols-5">
+                  <input type="hidden" name="id" value={id} />
+                  <input type="hidden" name="back" value={back} />
+                  <Field label="お名前"><input name="cu_name" placeholder="山田 太郎" className={`${inputCls} !py-1.5`} /></Field>
+                  <Field label="フリガナ"><input name="cu_kana" placeholder="ヤマダ タロウ" className={`${inputCls} !py-1.5`} /></Field>
+                  <Field label="電話番号"><input name="cu_phone" inputMode="tel" placeholder="090-1234-5678" className={`${inputCls} !py-1.5`} /></Field>
+                  <Field label="メール"><input name="cu_email" type="email" className={`${inputCls} !py-1.5`} /></Field>
+                  <button className={btnCls}>＋ ご利用者を追加</button>
+                  <p className="col-span-2 text-xs text-(--color-dim) sm:col-span-5">
+                    追加すると会員番号を発行します。ログインは会員番号とご本人の電話番号の下4桁です（番号はおひとりずつ違うものをご登録ください）。
+                  </p>
+                </form>
+              ) : (
+                <p className="border-t border-(--color-line) pt-3 text-xs text-(--color-dim)">
+                  ご登録上限（{corpSpec.maxUsers}名）です。入れ替えるときは、先に外す方の【登録を外す】を押してください。
+                </p>
+              )}
+            </div>
+          )}
+        </Panel>
+      )}
 
       {/* 予約・来店 */}
       <Panel

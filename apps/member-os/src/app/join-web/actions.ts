@@ -6,6 +6,7 @@ import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
 import { sendFrankMail, buildWebSignupReceiptMail } from "@/lib/frank-mail";
 import { validCoupon, normalizeCoupon, isJoinCampaignActive, JOIN_CAMPAIGN } from "@/lib/frank-billing-pure";
+import { corporateSpec, normalizeCorporateUsers } from "@yozan/core/frank-corporate";
 import { joinAddress } from "@/lib/address";
 import { readName } from "@/lib/name";
 import { FRANK_PORTAL } from "@yozan/core/frank-links";
@@ -69,7 +70,7 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
 
   const { data: plan } = await admin
     .from("frunk_plans")
-    .select("id, name, active")
+    .select("id, name, active, public_signup, is_corporate, max_users, max_open_slots, companion_free")
     .eq("id", str(formData.get("plan_id")))
     .eq("company_id", store.companyId)
     .is("deleted_at", null)
@@ -77,8 +78,29 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
   if (!plan) return { error: "選択されたプランが無効です。画面を更新して再度お試しください。" };
   // 非公開プランは受け付けない。ただし「テスト会員」だけは通しテスト用に許可
   // （/join-web?test=1 のときだけ画面に出る。一般公開はしない #136）
-  if (!plan.active && String(plan.name) !== "テスト会員") {
+  // public_signup=false は画面に出していないだけでなく、直接POSTされても通さない（#195）
+  const testPlan = String(plan.name) === "テスト会員";
+  if ((!plan.active || plan.public_signup === false) && !testPlan) {
     return { error: "選択されたプランは現在お申し込みいただけません。画面を更新して再度お試しください。" };
+  }
+
+  // ---- 法人プラン（#195） ----
+  // 会社が契約し、社員の方が使う。月会費のお支払いは契約者（ご担当者）に1本だけ。
+  // ご利用者は申込のときに全員ぶんいただき、確定時にお一人ずつ会員番号を発行する。
+  const spec = corporateSpec(plan);
+  const companyName = str(formData.get("company_name"));
+  let corporateUsers: ReturnType<typeof normalizeCorporateUsers>["users"] = [];
+  if (spec.isCorporate) {
+    if (!companyName) return { error: "会社名・団体名をご入力ください" };
+    const rows = Array.from({ length: spec.maxUsers }).map((_, i) => ({
+      name: str(formData.get(`cu_name_${i}`)),
+      nameKana: str(formData.get(`cu_kana_${i}`)),
+      phone: str(formData.get(`cu_phone_${i}`)),
+      email: str(formData.get(`cu_email_${i}`)),
+    }));
+    const norm = normalizeCorporateUsers(rows, spec.maxUsers);
+    if (norm.error) return { error: norm.error };
+    corporateUsers = norm.users;
   }
 
   const values = {
@@ -112,6 +134,12 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
         ? `Web入会（即決済）クーポン適用: ${coupon}`
         : "Web入会（即決済）",
     status: "pending" as const,
+    // 法人（#195）。個人の申込では全部 null のまま
+    company_name: spec.isCorporate ? companyName : null,
+    billing_postal_code: spec.isCorporate ? orNull(formData.get("billing_postal_code")) : null,
+    billing_address1: spec.isCorporate ? orNull(formData.get("billing_address1")) : null,
+    billing_email: spec.isCorporate ? orNull(formData.get("billing_email")) : null,
+    corporate_users: spec.isCorporate ? corporateUsers : null,
   };
 
   // 決済未完了の申込が残っていれば行を使い回す（同じ人が2行にならないように）。

@@ -8,6 +8,7 @@ import { FRANK_TERMS_TEXT, FRANK_PRIVACY_URL } from "@/lib/frank-terms";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
 import { NameFields } from "@/components/name-fields";
+import { corporateSpec } from "@yozan/core/frank-corporate";
 import { SignaturePad } from "@/components/signature-pad";
 
 type Plan = {
@@ -17,6 +18,10 @@ type Plan = {
   joining_fee: number | null;
   max_bookings_per_day: number | null;
   note: string | null;
+  is_corporate?: boolean | null;
+  max_users?: number | null;
+  max_open_slots?: number | null;
+  companion_free?: boolean | null;
 };
 
 const field =
@@ -45,6 +50,8 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
 
   const todayYmd = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const plan = plans.find((p) => p.id === planId) ?? null;
+  // 法人プラン（#195）。判定は @yozan/core/frank-corporate に寄せる（サーバーも同じ関数を通す）
+  const spec = corporateSpec(plan);
 
   const toEstimate = () => {
     const form = formRef.current;
@@ -105,6 +112,88 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         )}
         <p className="text-xs text-(--color-dim)">※ 表示金額はすべて税抜（月額）です。</p>
       </div>
+
+      {/* ===== 法人プランのご契約情報（#195・2026-09-01） =====
+          法人は「会社が契約して、社員の方が使う」形。月会費のお支払いは1本だけ、
+          ご利用者はおひとりずつ会員番号を出す（誰が来たかが記録に残り、カルテも分けられる）。
+          ご利用者は申込のときに全員ぶんご登録いただく（ユーザー確定）。 */}
+      {spec.isCorporate && (
+        <div className={`${cardCls} space-y-4`}>
+          <div>
+            <p className="text-sm font-semibold text-(--color-txt)">ご契約の法人について</p>
+            <p className="mt-1 text-xs text-(--color-dim)">
+              このプランは<span className="font-medium text-(--color-txt)">最大{spec.maxUsers}名様</span>までご登録いただけます。
+              打席のご予約は御社合計で<span className="font-medium text-(--color-txt)">{spec.maxOpenSlots}コマ（1コマ＝1時間）</span>まで先にお取りいただけ、
+              ご利用が済むとまた次のご予約をお取りいただけます。
+              {spec.companionFree ? "同伴のビジター様は無料でご一緒いただけます。" : ""}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className={label}>会社名・団体名 <span className="text-rose-400">*</span></label>
+              <input name="company_name" required placeholder="株式会社ヨザン" className={field} />
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-(--color-dim)">
+                このあとの「お客様情報」は<span className="font-medium text-(--color-txt)">ご担当者様（ご契約者）</span>のご入力をお願いします。
+                月会費のご請求とご連絡は、ご担当者様宛にお送りします。
+              </p>
+            </div>
+            <div className="col-span-2">
+              <label className={label}>請求先メールアドレス（経理ご担当が別の場合）</label>
+              <input name="billing_email" type="email" placeholder="keiri@example.co.jp" className={field} />
+            </div>
+            <div>
+              <label className={label}>請求先 郵便番号</label>
+              <input name="billing_postal_code" inputMode="numeric" placeholder="670-0000" className={field} />
+            </div>
+            <div>
+              <label className={label}>請求先 住所</label>
+              <input name="billing_address1" placeholder="兵庫県姫路市…" className={field} />
+            </div>
+            <p className="col-span-2 text-xs text-(--color-dim)">
+              ※ 請求先が空欄のときは、ご担当者様のご連絡先へお送りします。
+            </p>
+          </div>
+
+          <div className="space-y-3 border-t border-(--color-line) pt-4">
+            <div>
+              <p className="text-sm font-semibold text-(--color-txt)">ご利用者のご登録 <span className="text-rose-400">*</span></p>
+              <p className="mt-1 text-xs text-(--color-dim)">
+                実際にご利用になる方を{spec.maxUsers}名様までご登録ください（あとから店頭で入れ替えもできます）。
+                おひとりずつ会員番号を発行しますので、
+                <span className="font-medium text-(--color-txt)">会員ページのログインに使う電話番号は、おひとりずつ違う番号</span>をご入力ください。
+              </p>
+            </div>
+            {Array.from({ length: spec.maxUsers }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3">
+                <p className="mb-2 text-xs font-semibold text-(--color-dim)">
+                  ご利用者 {i + 1}
+                  {i === 0 ? <span className="ml-2 font-normal">（ご担当者様がご利用になる場合は、同じ内容をご入力ください）</span> : <span className="ml-2 font-normal">（空欄可・あとからご登録いただけます）</span>}
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={label}>お名前{i === 0 ? <span className="text-rose-400"> *</span> : null}</label>
+                    <input name={`cu_name_${i}`} required={i === 0} placeholder="山田 太郎" className={field} />
+                  </div>
+                  <div>
+                    <label className={label}>フリガナ</label>
+                    <input name={`cu_kana_${i}`} placeholder="ヤマダ タロウ" className={field} />
+                  </div>
+                  <div>
+                    <label className={label}>電話番号{i === 0 ? <span className="text-rose-400"> *</span> : null}</label>
+                    <input name={`cu_phone_${i}`} type="tel" required={i === 0} placeholder="090-1234-5678" className={field} />
+                  </div>
+                  <div>
+                    <label className={label}>メールアドレス</label>
+                    <input name={`cu_email_${i}`} type="email" placeholder="taro@example.co.jp" className={field} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* お客様情報 */}
       <div className={`${cardCls} space-y-4`}>
@@ -205,6 +294,12 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
         return (
           <div id="join-estimate" className={`${cardCls} space-y-3 border-(--color-gold)/60`}>
             <p className="text-base font-bold text-(--color-txt)">お見積り（{plan.name}）</p>
+            {spec.isCorporate && (
+              <p className="rounded-lg bg-(--color-panel-2) p-3 text-xs text-(--color-dim)">
+                法人プランのお支払いは<span className="font-medium text-(--color-txt)">御社で1本</span>です（ご利用者ごとの追加費用はありません）。
+                ご入会が確定すると、ご登録いただいたご利用者お一人ずつに会員番号を発行し、ご担当者様宛にまとめてお送りします。
+              </p>
+            )}
             <div className="text-sm">
               <div className={row}>
                 <span>入会金</span>

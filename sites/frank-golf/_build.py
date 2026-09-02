@@ -1308,8 +1308,8 @@ def build_plan():
       </div>
     </div>
     <div class="spec rv" style="margin-top:44px">
-      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price" data-tax>近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price" data-tax>近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v"><span data-frank="price.corporate.0.price" data-tax>近日公開</span><br><span data-frank="price.corporate.0.desc"></span><br><a href="corporate.html" style="color:var(--brass-2)">法人でのご利用について ↗</a></p></div>
+      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v"><span data-frank="price.corporate.1.price" data-tax>近日公開</span><br><span data-frank="price.corporate.1.desc"></span><br><a href="corporate.html" style="color:var(--brass-2)">法人でのご利用について ↗</a></p></div>
       <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice" data-tax>近日公開</p></div>
       <div class="spec__row"><p class="spec__k">入会金</p><p class="spec__v" data-frank="price.joinFee" data-tax>近日公開</p></div>
       <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">近日公開</p></div>
@@ -1455,7 +1455,7 @@ def build_beginner():
 
 def build_corporate():
     b = head("法人でのご利用｜FRANK GOLF",
-             "接待・商談、福利厚生、法人交流。打席とラウンジがひと続きのFRANK GOLFは、法人利用と相性のよい空間です。姫路・土山。",
+             "法人ライト（月39,800円・2名様）／法人プレミアム（月59,800円・4名様・同伴無料）。接待・商談、福利厚生、法人交流。打席とラウンジがひと続きのFRANK GOLF。姫路・土山。",
              "corporate")
     b += page_head("法人でのご利用", "CORPORATE", "接待の前に、まずここで一度。",
                    "一緒に打って、そのまま座って話す。関係づくりが、姫路市内で完結します。")
@@ -1481,16 +1481,114 @@ def build_corporate():
       <article class="card rv"><p class="card__no">02</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">福利厚生として</h3><p class="card__b">社員の方が個々にご利用いただけます。ゴルフを始めたい社員の受け皿として、また部署を越えた交流のきっかけとして。</p></article>
       <article class="card rv"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">法人同士の交流</h3><p class="card__b">姫路の経営者・ビジネスパーソンが集まる場として、法人交流イベントを企画します。名刺交換の場ではなく、ゴルフを介した自然なつながりを。</p></article>
     </div>
-    <div class="spec rv" style="margin-top:44px">
-      <div class="spec__row"><p class="spec__k">法人ライトプラン</p><p class="spec__v" data-frank="price.corporate.0.price" data-tax>近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v" data-frank="price.corporate.1.price" data-tax>近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">ご利用人数</p><p class="spec__v" data-frank="store.bays">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">貸切利用</p><p class="spec__v" data-frank="lounge.note">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">ラウンジのご利用時間</p><p class="spec__v" data-frank="lounge.hours">近日公開</p></div>
+  </div>
+</section>
+
+<!-- ===== 法人プラン ===== -->
+<section class="sec">
+  <div class="wrap">
+    <div class="rv" style="max-width:56ch">
+      <p class="eyebrow">Corporate Plan</p>
+      <h2 class="h-en">TWO PLANS</h2>
+      <p class="h-jp">法人プランは2つです</p>
+      <p class="lead">
+        ご契約は会社名で1本。ご利用になる方をご登録いただき、社員証のように会員番号をお一人ずつお持ちいただきます。
+      </p>
     </div>
-    <p class="lead rv" style="margin-top:28px">
-      法人でのご利用に関するご相談は、公式LINEから承ります。
-    </p>
+    <div class="grid grid--2 rv" style="margin-top:44px">
+      <div class="plan">
+        <p class="plan__n">CORPORATE LIGHT</p>
+        <p class="plan__n-jp">法人ライトプラン</p>
+        <p class="plan__p"><span data-frank="price.corporate.0.price" data-tax>近日公開</span></p>
+        <ul class="plan__f" data-frank="price.corporate.0.features"><li>ご利用者を最大2名様までご登録</li><li>打席のご予約は御社合計で4コマ（1コマ＝1時間）まで</li></ul>
+      </div>
+      <div class="plan plan--feat">
+        <span class="plan__badge">同伴無料</span>
+        <p class="plan__n">CORPORATE PREMIUM</p>
+        <p class="plan__n-jp">法人プレミアムプラン</p>
+        <p class="plan__p"><span data-frank="price.corporate.1.price" data-tax>近日公開</span></p>
+        <ul class="plan__f" data-frank="price.corporate.1.features"><li>ご利用者を最大4名様までご登録</li><li>打席のご予約は御社合計で8コマまで</li><li>同伴のビジター様は無料</li></ul>
+      </div>
+    </div>
+
+    <div class="spec rv" style="margin-top:44px">
+      <div class="spec__row"><p class="spec__k">ご登録できる人数</p><p class="spec__v">法人ライト 2名様まで ／ 法人プレミアム 4名様まで。<br>人事異動などでご利用者が替わるときは、店頭でご登録の入れ替えを承ります（追加費用はいただきません）。</p></div>
+      <div class="spec__row"><p class="spec__k">打席のご予約</p><p class="spec__v">先にお取りいただけるのは、御社合計で <strong>ライト4コマ・プレミアム8コマ</strong>（1コマ＝1時間）です。ご利用が済むと、また次のご予約をお取りいただけます。ご登録者どなたのご予約も、同じ枠から使います。</p></div>
+      <div class="spec__row"><p class="spec__k">会員ページ</p><p class="spec__v">ご利用者お一人ずつに会員番号を発行します。ご自身の会員番号と電話番号の下4桁で会員ページにログインし、打席のご予約・会員証QR・レッスンカルテをご覧いただけます。</p></div>
+      <div class="spec__row"><p class="spec__k">同伴のビジター様</p><p class="spec__v">法人プレミアムは無料（回数の制限はありません）。法人ライトには同伴の無料枠はございません。</p></div>
+      <div class="spec__row"><p class="spec__k">レッスン</p><p class="spec__v" data-frank="lesson.style">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">入会金</p><p class="spec__v" data-frank="price.joinFee" data-tax>近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">お支払い</p><p class="spec__v">クレジットカードでの毎月のお支払いです。ご請求は御社に1本で、ご利用者ごとの追加費用はいただきません。請求先のご住所・メールアドレスは、お申し込みのときにご担当者様と別に指定いただけます。</p></div>
+      <div class="spec__row"><p class="spec__k">打席・設備</p><p class="spec__v" data-frank="store.bays">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">シミュレーター</p><p class="spec__v" data-frank="store.simulator">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">備考</p><p class="spec__v" data-frank="price.note">近日公開</p></div>
+    </div>
+
+    <div class="center rv" style="margin-top:40px">
+      <div class="cta__btns" style="justify-content:center">
+        <a class="btn btn--brass" data-link="links.joinWeb">法人プランで入会を申し込む</a>
+        <a class="btn btn--ghost" href="#" data-cta="trial">まずは体験する</a>
+      </div>
+      <p class="cta__note" style="margin-top:14px">
+        お申し込みフォームで「法人ライトプラン」「法人プレミアムプラン」をお選びください。
+        会社名・ご担当者様・請求先と、ご利用者のお名前・電話番号をご入力いただきます。
+        お支払いが済むと、ご利用者お一人ずつの会員番号をご担当者様宛にまとめてお送りします。
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ご入会の流れ ===== -->
+<section class="sec sec--alt">
+  <div class="wrap">
+    <div class="rv" style="max-width:56ch">
+      <p class="eyebrow">How to Join</p>
+      <h2 class="h-en">JOIN AS A COMPANY</h2>
+      <p class="h-jp">法人でのご入会の流れ</p>
+    </div>
+    <div class="flow rv" style="margin-top:44px">
+      <div class="flow__i">
+        <p class="flow__n">STEP 01</p>
+        <div><h3 class="flow__t">見学・体験（任意）</h3><p class="flow__b">まず一度、打って、ラウンジをご覧ください。接待でお使いいただけるかどうかは、来ていただくのがいちばん早いと思います。体験レッスン（約55分）は無料です。</p></div>
+      </div>
+      <div class="flow__i">
+        <p class="flow__n">STEP 02</p>
+        <div><h3 class="flow__t">お申し込み</h3><p class="flow__b"><a data-link="links.joinWeb" style="color:var(--brass-2)">Webでの入会申込 ↗</a>から、法人プランをお選びください。会社名・ご担当者様・請求先と、ご利用になる方（ライト2名様・プレミアム4名様まで）をご入力いただきます。</p></div>
+      </div>
+      <div class="flow__i">
+        <p class="flow__n">STEP 03</p>
+        <div><h3 class="flow__t">お支払い</h3><p class="flow__b">そのまま安全な決済ページでお支払いいただきます。ご請求は御社に1本です。規約のご確認と電子サインもこの画面で完了します。</p></div>
+      </div>
+      <div class="flow__i">
+        <p class="flow__n">STEP 04</p>
+        <div><h3 class="flow__t">会員番号のお渡し・ご利用開始</h3><p class="flow__b">ご利用者お一人ずつの会員番号を、ご担当者様宛にまとめてお送りします。そのまま社員の方へお渡しください。会員ページからすぐに打席をご予約いただけます。</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== よくあるご質問 ===== -->
+<section class="sec">
+  <div class="wrap" style="max-width:860px">
+    <div class="center rv">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="h-en">QUESTIONS</h2>
+      <p class="h-jp">法人でのご利用について</p>
+    </div>
+    <div class="faq rv" style="margin-top:36px">
+      <details><summary>登録した人以外は利用できませんか。</summary>
+        <div class="faq__a">打席をご利用いただくには、ご利用者としてのご登録をお願いしています。人事異動などで替わられる場合は、店頭でご登録の入れ替えを承ります（追加費用はいただきません）。法人プレミアムは、ご登録者に同伴されるビジター様が無料でご一緒いただけます。</div></details>
+      <details><summary>「4コマ・8コマ」とはどういう意味ですか。</summary>
+        <div class="faq__a">1コマ＝1時間の打席のご予約です。先にお取りいただける本数の上限で、法人ライトは御社合計4コマ、法人プレミアムは8コマまで。ご利用が済むと、また次のご予約をお取りいただけます。たとえばプレミアムで、4名様が同じ日に2時間ずつお取りになると8コマになり、その日が終わればまた8コマお取りいただけます。</div></details>
+      <details><summary>社員それぞれのログインはどうなりますか。</summary>
+        <div class="faq__a">ご利用者お一人ずつに会員番号を発行します。ログインはご自身の会員番号と電話番号の下4桁です。ご予約・会員証QR・レッスンカルテは、それぞれの方のものとして記録されます。お申し込みのときに、おひとりずつ違う電話番号をご入力ください。</div></details>
+      <details><summary>請求書でのお支払いはできますか。</summary>
+        <div class="faq__a">恐れ入りますが、現在はクレジットカードでの毎月のお支払いのみとさせていただいております。請求先のご住所・メールアドレスは、ご担当者様と別に指定いただけますので、経理ご担当の方にお送りすることができます。</div></details>
+      <details><summary>接待で使いたいのですが、貸切はできますか。</summary>
+        <div class="faq__a">打席・ラウンジの貸切につきましては、日程と規模によりご相談を承ります。公式LINEまたは店頭でお声がけください。</div></details>
+      <details><summary>途中でプランを変えられますか。</summary>
+        <div class="faq__a">はい。ライトからプレミアムへの変更は店頭で承ります。当月分は週割りの差額をご請求し、翌月から新しいプランの月会費になります。</div></details>
+    </div>
   </div>
 </section>
 """

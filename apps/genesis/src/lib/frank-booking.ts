@@ -15,6 +15,7 @@ import {
   type BookingCfg,
 } from "@yozan/core/frank-booking";
 import { handoffSecret, verifyHandoff } from "@yozan/core/frank-handoff";
+import { checkOpenSlots, corporateSpec } from "@yozan/core/frank-corporate";
 
 /**
  * FRANK GOLF 打席予約（#86 §3-3・台帳一本化 #93）
@@ -92,7 +93,7 @@ export async function verifyMember(admin: Admin, memberNo: string, phoneLast4: s
 
   const { data } = await admin
     .from("frunk_members")
-    .select("id, company_id, name, member_no, phone, status, plan_id, frunk_plans(name, max_bookings_per_day)")
+    .select("id, company_id, name, member_no, phone, status, plan_id, corporate_parent_id, frunk_plans(name, max_bookings_per_day, max_open_slots, is_corporate, max_users, companion_free)")
     .eq("member_no", no)
     .is("deleted_at", null)
     .maybeSingle();
@@ -123,7 +124,7 @@ export async function verifyMemberByHandoff(admin: Admin, token: string) {
   if (!no) return null;
   const { data } = await admin
     .from("frunk_members")
-    .select("id, company_id, name, member_no, phone, status, plan_id, frunk_plans(name, max_bookings_per_day)")
+    .select("id, company_id, name, member_no, phone, status, plan_id, corporate_parent_id, frunk_plans(name, max_bookings_per_day, max_open_slots, is_corporate, max_users, companion_free)")
     .eq("member_no", no)
     .is("deleted_at", null)
     .maybeSingle();
@@ -238,7 +239,16 @@ export async function createBooking(input: {
   if (input.date > range.max) return { ok: false, error: `ご予約は ${range.max.replace(/-/g, "/")} までの日付で承ります` };
 
   // プラン上限
-  const plan = (member as unknown as { frunk_plans: { name: string; max_bookings_per_day: number | null } | null }).frunk_plans;
+  const plan = (member as unknown as {
+    frunk_plans: {
+      name: string;
+      max_bookings_per_day: number | null;
+      max_open_slots?: number | null;
+      is_corporate?: boolean | null;
+      max_users?: number | null;
+      companion_free?: boolean | null;
+    } | null;
+  }).frunk_plans;
   const dailyMax = (plan?.max_bookings_per_day ?? 1) * 60; // 時間→分
   const { data: sameDay } = await admin
     .from("frunk_bookings")
@@ -275,6 +285,58 @@ export async function createBooking(input: {
     // 正の仕様は「月4回」（2026-08-13 ユーザー確定 #136b。旧実装の8日はHP表記とも食い違っていた）
     if (!days.has(input.date) && days.size >= 4) return { ok: false, error: "ライト会員は月4回までのご利用です（同じ日の追加予約は回数に含みません）" };
   }
+
+  // 「予約は消化してから次を取る」（#195・2026-09-01 ユーザー確定・全会員共通）
+  //
+  //   まだ消化していない予約として同時に持てるコマ数に上限がある（1コマ=1時間）。
+  //   法人は **登録者全員の合計** で数える（会社ぶんの枠を分け合う。誰が来てもよい代わりに、
+  //   1人が押さえ切ると他の方が取れなくなるので、画面のメッセージで残り数を必ず伝える）。
+  //
+  //   数え方は @yozan/core/frank-corporate。ここで書き直さないこと
+  //   （お客様の画面とサーバーでズレると「○を押したのに予約できません」になる）。
+  const spec = corporateSpec(plan);
+  const nowHm = new Date(Date.now() + 9 * 3600_000).toISOString().slice(11, 16);
+  // 法人は契約者と利用者を全部集める。契約者の行は corporate_parent_id が null なので、
+  // 自分が利用者なら親を、契約者なら自分を起点にする
+  let holderIds: string[] = [String(member.id)];
+  if (spec.isCorporate) {
+    const rootId = (member as { corporate_parent_id?: string | null }).corporate_parent_id
+      ? String((member as { corporate_parent_id?: string | null }).corporate_parent_id)
+      : String(member.id);
+    const { data: group } = await admin
+      .from("frunk_members")
+      .select("id")
+      .or(`id.eq.${rootId},corporate_parent_id.eq.${rootId}`)
+      .is("deleted_at", null);
+    holderIds = (group ?? []).map((g) => String((g as { id: string }).id));
+    if (holderIds.length === 0) holderIds = [rootId];
+  }
+  const { data: openRows, error: openErr } = await admin
+    .from("frunk_bookings")
+    .select("booked_date, start_time, end_time, status")
+    .in("member_id", holderIds)
+    .gte("booked_date", todayJst)
+    .neq("status", "cancelled")
+    .is("deleted_at", null);
+  if (openErr) {
+    // 取得に失敗したら安全側（予約を通さない）。黙って上限を無効化しない
+    console.error("[frank-booking] open slots query failed:", openErr);
+    return { ok: false, error: "予約状況の確認に失敗しました。時間をおいてお試しください" };
+  }
+  const slotCheck = checkOpenSlots({
+    bookings: (openRows ?? []).map((b) => ({
+      date: String(b.booked_date),
+      endTime: String(b.end_time),
+      minutes: toMin(String(b.end_time)) - toMin(String(b.start_time)),
+      status: String(b.status ?? ""),
+    })),
+    addMinutes: input.minutes,
+    limit: spec.maxOpenSlots,
+    todayYmd: todayJst,
+    nowHm,
+    corporate: spec.isCorporate,
+  });
+  if (!slotCheck.ok) return { ok: false, error: slotCheck.error ?? "ご予約の上限に達しています" };
 
   // パーソナルレッスン（25分）の希望。設定でオフのときは黙って無視する
   const lesson = lessonOption(cfg);
