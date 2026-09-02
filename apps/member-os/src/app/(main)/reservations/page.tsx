@@ -11,6 +11,7 @@ import {
   loadMemberOptions,
   loadBookingDetail,
   loadLessonDetail,
+  loadLiveSignature,
   type BookingRow,
 } from "@/lib/frank-reservation";
 import {
@@ -44,6 +45,7 @@ import {
 import { BookingDetailPanel, LessonDetailPanel } from "@/components/booking-detail";
 import { setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption } from "./actions";
 import { BookingSheet } from "./booking-sheet";
+import { LiveRefresh } from "@/components/live-refresh";
 
 const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
 
@@ -98,7 +100,7 @@ export default async function ReservationsPage({
   const weekFrom = weekStart(date); // 週は日曜はじまり（Smart Helloと同じ）
   const days = mode === "week" ? Array.from({ length: 7 }, (_, i) => addDaysStr(weekFrom, i)) : [date];
 
-  const [dayViews, monthData, unpaidRows, coaches, memberOptions, detail, canGw] = await Promise.all([
+  const [dayViews, monthData, unpaidRows, coaches, memberOptions, detail, canGw, liveSig] = await Promise.all([
     Promise.all(days.map((d) => loadDay(d, actor.companyId))),
     loadMonthCounts(month, actor.companyId),
     loadUnpaid(actor.companyId),
@@ -106,6 +108,7 @@ export default async function ReservationsPage({
     loadMemberOptions(actor.companyId), // 予約作成の会員検索（氏名でも引ける・#189）
     loadSelection(sp.sel ?? null, actor.companyId),
     canAccessGolfWing(actor),
+    loadLiveSignature(actor.companyId), // 自動更新の判定（#197）
   ]);
 
   const dayView = dayViews.find((v) => v.date === date) ?? dayViews[0];
@@ -206,6 +209,10 @@ export default async function ReservationsPage({
           <p className="mt-0.5 text-sm text-(--color-dim)">
             体験・会員・都度・レッスンの予約をこの1画面で。空いているマスを押すとその場で登録できます
           </p>
+          {/* お客様の予約は24時間いつでも入る。リロード待ちにすると見落とすので自動で取り直す（#197） */}
+          <div className="mt-1.5">
+            <LiveRefresh signature={liveSig} intervalSec={15} label="予約に動きがありました" />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link href={prevHref} className={btnGhostCls} aria-label="前へ">←</Link>

@@ -7,6 +7,7 @@ import {
   toMin,
   toTime,
   FRANK_STORE_ID,
+  jstToday,
   type BookingCfg,
 } from "@yozan/core/frank-booking";
 import { monthRange, EMPTY_DAY_COUNT, type DayCount } from "@/lib/bay-timeline-pure";
@@ -313,6 +314,48 @@ export async function loadUnpaid(companyId: string): Promise<BookingRow[]> {
     .order("booked_date")
     .limit(300);
   return ((data ?? []) as unknown as BookingRow[]);
+}
+
+/**
+ * 画面の自動更新に使う「いまの状態」を表す文字列（#197）
+ *
+ * 予約はお客様が24時間いつでも入れられる。リロードを押すまで出ないと **見落とす**ので、
+ * 画面はひとりでに取り直す（LiveRefresh）。その「中身が変わったか」の判定に使う。
+ *
+ * ★ 今日以降の予約を全部見る（表示している日だけでは、来週の予約が入っても気づけない）。
+ * ★ 件数だけでは足りない（1件入って1件キャンセルされたら同じ数になる）ので、
+ *   最後に動いた時刻も混ぜる。
+ * ★ 体験の申込（mbr_trial_requests）も一緒に見る。体験は予約と同じくらい取りこぼせない。
+ */
+export async function loadLiveSignature(companyId: string): Promise<string> {
+  const admin = createAdmin();
+  const today = jstToday();
+  const [{ data: bookings }, { data: trials }] = await Promise.all([
+    admin
+      .from("frunk_bookings")
+      .select("id, updated_at, status")
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .gte("booked_date", today)
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(500),
+    // 体験は日付で絞らない（日程がまだ決まっていない申込こそ取りこぼせない）。
+    // 直近200件の「最後に動いた時刻」が変われば、新しい申込か状態変更があった合図
+    admin
+      .from("mbr_trial_requests")
+      .select("id, updated_at, status")
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(200),
+  ]);
+  const b = (bookings ?? []) as Array<{ updated_at?: string | null; status?: string | null }>;
+  const t = (trials ?? []) as Array<{ updated_at?: string | null; status?: string | null }>;
+  const live = (rows: Array<{ status?: string | null }>) => rows.filter((r) => String(r.status ?? "") !== "cancelled").length;
+  const top = (rows: Array<{ updated_at?: string | null }>) => String(rows[0]?.updated_at ?? "");
+  return `b${b.length}:${live(b)}:${top(b)}|t${t.length}:${live(t)}:${top(t)}`;
 }
 
 /** 予約が占有している時間帯を、打席ごとの「開始時刻の集合」に展開する（グリッド表示用） */

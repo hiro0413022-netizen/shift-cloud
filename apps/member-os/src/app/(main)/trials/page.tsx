@@ -6,6 +6,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Badge, Empty, fmtDate } from "@/components/ui";
 import { TRIAL_STATUS_LABEL, TRIAL_STATUS_TONE } from "@/lib/trial";
 import { setTrialStatus, saveTrialNote } from "./actions";
+import { LiveRefresh } from "@/components/live-refresh";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -26,6 +27,9 @@ export default async function TrialsPage() {
 
   const rows = (data ?? []) as Row[];
   const pending = rows.filter((r) => r.status === "pending").length;
+  // 自動更新の判定（#197）。件数だけだと「1件増えて1件対応済み」で同じ数になるので
+  // 最後に動いた時刻も混ぜる
+  const liveSig = `t${rows.length}:${pending}:${String(rows[0]?.updated_at ?? rows[0]?.created_at ?? "")}`;
 
   return (
     <div className="space-y-5">
@@ -33,6 +37,10 @@ export default async function TrialsPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">体験申込 — FRANK GOLF 姫路</h1>
           <p className="mt-1 text-sm text-(--color-dim)">公式サイトの体験フォームからの申込です。未対応 {pending} 件。</p>
+          {/* 体験の申込も24時間いつでも届く。リロード待ちにすると見落とす（#197） */}
+          <div className="mt-1.5">
+            <LiveRefresh signature={liveSig} intervalSec={20} label="体験の申込が届きました" />
+          </div>
         </div>
       </div>
 

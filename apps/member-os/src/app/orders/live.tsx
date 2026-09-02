@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useChime } from "@/components/chime";
 
 /**
  * 電子伝票の自動更新と通知音（#154 → #189 で音を作り直し）
@@ -47,44 +48,11 @@ export function OrdersLive({
 }) {
   const router = useRouter();
   const prev = useRef(signature);
-  const ctx = useRef<AudioContext | null>(null);
   /** 注文ID → 最後に鳴らした時刻。router.refresh() では作り直されないので覚えていられる */
   const reminded = useRef<Map<string, number>>(new Map());
-  /** 音を鳴らすつもりか（既定でON）。OFFにできる出口も残す＝夜間の事務作業などで切りたい場合 */
-  const [sound, setSound] = useState(true);
-  /** ブラウザが実際に鳴らせる状態か（AudioContext が running）。ここが false の間は無音 */
-  const [ready, setReady] = useState(false);
+  // 音の面倒（自動再生の制限・どこを触っても復帰・状態表示）は共通フックが持つ（#197で共通化）
+  const { sound, setSound, ready, chime, arm } = useChime(true);
   const [now, setNow] = useState("");
-
-  /**
-   * 合図の音。音声ファイルを置かずに済ませる（配信物を増やさない）。
-   * 2音の繰り返しにしているのは、単音より人の耳に引っかかるため。
-   * urgent（鳴らし直し）は低めの音を混ぜて、新着と聞き分けられるようにする。
-   */
-  const chime = useCallback((urgent = false) => {
-    const ac = ctx.current;
-    if (!ac) return;
-    void ac.resume(); // 画面を放置していると suspended に落ちることがある
-    const t0 = ac.currentTime + 0.02;
-    const beat = 0.4; // 1音あたりの間隔
-    const notes = urgent ? [660, 494, 660, 494, 660, 494] : [880, 1175, 880, 1175, 880, 1175];
-    notes.forEach((hz, i) => {
-      const at = t0 + i * beat;
-      const osc = ac.createOscillator();
-      const gain = ac.createGain();
-      osc.type = "triangle"; // sine より倍音があり、同じ音量でも通る
-      osc.frequency.value = hz;
-      osc.connect(gain);
-      gain.connect(ac.destination);
-      // 0.25 → 0.9（ユーザー指摘「もっと大きく」）。歪まないよう立ち上がりは滑らかに
-      gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.9, at + 0.03);
-      gain.gain.setValueAtTime(0.9, at + 0.22);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.34);
-      osc.start(at);
-      osc.stop(at + 0.36);
-    });
-  }, []);
 
   useEffect(() => {
     const id = setInterval(() => router.refresh(), intervalSec * 1000);
@@ -110,7 +78,7 @@ export function OrdersLive({
   useEffect(() => {
     if (prev.current === signature) return;
     prev.current = signature;
-    if (sound && ready) chime(false);
+    if (sound && ready) chime("new");
   }, [signature, chime, sound, ready]);
 
   /**
@@ -136,54 +104,12 @@ export function OrdersLive({
         }
       }
       // 何件たまっていても鳴らすのは1回（連打すると誰も聞かなくなる）
-      if (ring) chime(true);
+      if (ring) chime("urgent");
     };
     check();
     const id = setInterval(check, 15_000);
     return () => clearInterval(id);
   }, [openOrders, sound, ready, chime]);
-
-  /** AudioContext を用意して鳴らせるようにする。何度呼んでも作り直さない */
-  const arm = useCallback((withTestTone: boolean) => {
-    type W = typeof window & { webkitAudioContext?: typeof AudioContext };
-    const Ctor = window.AudioContext ?? (window as W).webkitAudioContext;
-    if (!Ctor) return;
-    if (!ctx.current) {
-      ctx.current = new Ctor();
-      // suspended ↔ running の行き来を画面表示に反映する（放置で落ちることがある）
-      ctx.current.onstatechange = () => setReady(ctx.current?.state === "running");
-    }
-    const ac = ctx.current;
-    void ac.resume().then(() => {
-      setReady(ac.state === "running");
-      if (withTestTone && ac.state === "running") chime(false);
-    });
-    setReady(ac.state === "running");
-  }, [chime]);
-
-  /**
-   * 開いた瞬間に音を使えるようにする（#196）。
-   * 自動再生の制限で resume() が通らないブラウザ（iPad Safari など）では suspended のままなので、
-   * **画面のどこを触っても** もう一度 resume() する。伝票を1枚押した時点で音が出るようになり、
-   * 「ボタンを押し忘れていて鳴らなかった」が起きない。
-   */
-  useEffect(() => {
-    arm(false);
-    const unlock = () => arm(false);
-    const opts = { passive: true } as AddEventListenerOptions;
-    window.addEventListener("pointerdown", unlock, opts);
-    window.addEventListener("touchstart", unlock, opts);
-    window.addEventListener("keydown", unlock);
-    // タブに戻ってきたときも復帰させる（放置で suspended に落ちる）
-    const onVis = () => { if (document.visibilityState === "visible") arm(false); };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("touchstart", unlock);
-      window.removeEventListener("keydown", unlock);
-      document.removeEventListener("visibilitychange", onVis);
-    };
-  }, [arm]);
 
   return (
     <div className="flex items-center gap-3 text-sm text-(--color-dim)">
@@ -199,7 +125,7 @@ export function OrdersLive({
         <>
           <span className="text-(--color-accent)">🔔 音ON</span>
           <button
-            onClick={() => chime(false)}
+            onClick={() => chime("new")}
             className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-xs"
           >
             テスト再生
