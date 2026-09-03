@@ -1956,6 +1956,9 @@ def build_trial_booking():
 (function(){
   var API = "https://yozan-genesis.vercel.app/api/public/frank/trial";
   var $ = function(id){ return document.getElementById(id) };
+  /* 曜日は日付文字列を UTC として読む（"YYYY-MM-DDT00:00:00Z" + getUTCDay）。
+     ⚠ "+09:00" を付けるとUTCでは前日15時になり、getUTCDay() が前日の曜日を返す。
+        9/2（水）が「火」と表示された実障害（#200）。ここは触らないこと。 */
   var WD = ["日","月","火","水","木","金","土"];
   var state = { date:null, start:null, lefty:false, slots:null };
 
@@ -2010,7 +2013,7 @@ def build_trial_booking():
         $("tb-cancel-info").textContent = "このご予約はキャンセル済みです。";
         $("tb-cancel-go").disabled = true; return;
       }
-      var d = new Date(j.date + "T00:00:00+09:00");
+      var d = new Date(j.date + "T00:00:00Z");
       $("tb-cancel-info").textContent = j.name + " 様 ／ " + j.date.replace(/-/g,"/") + "（" + WD[d.getUTCDay()] + "）"
         + j.start + "〜" + j.end + " ／ " + j.bayName;
     });
@@ -2113,7 +2116,7 @@ def build_trial_booking():
         state.start = btn.getAttribute("data-t");
         $("tb-times").querySelectorAll("button").forEach(function(b){ b.classList.remove("is-on") });
         btn.classList.add("is-on");
-        var d = new Date(state.date + "T00:00:00+09:00");
+        var d = new Date(state.date + "T00:00:00Z");
         $("tb-pick").textContent = state.date.replace(/-/g,"/") + "（" + WD[d.getUTCDay()] + "） "
           + state.start + "〜　体験レッスン 無料・約" + j.labelMinutes + "分"
           + (state.lefty ? "　／　左右打席" : "");
@@ -2158,7 +2161,7 @@ def build_trial_booking():
         if (state.date) selectDate(state.date, $("tb-dates").querySelector('button[data-date="' + state.date + '"]'));
         return;
       }
-      var d = new Date(j.date + "T00:00:00+09:00");
+      var d = new Date(j.date + "T00:00:00Z");
       $("tb").hidden = true;
       $("tb-done").hidden = false;
       $("tb-done-when").textContent = j.date.replace(/-/g,"/") + "（" + WD[d.getUTCDay()] + "） " + j.start + "〜" + j.end;

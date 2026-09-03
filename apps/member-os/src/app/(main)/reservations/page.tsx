@@ -85,7 +85,7 @@ function who(b: BookingRow): string {
 export default async function ReservationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; view?: string; step?: string; sel?: string; store?: string }>;
+  searchParams: Promise<{ date?: string; view?: string; step?: string; sel?: string; store?: string; msg?: string; err?: string }>;
 }) {
   const actor = await requireReceptionActor();
   // 店舗またぎ廃止（#134）: FRANK姫路に配属されていない人には存在ごと見せない
@@ -226,6 +226,19 @@ export default async function ReservationsPage({
           <Link href={href({ date: today, month: monthOf(today) })} className={btnGhostCls}>今日</Link>
         </div>
       </header>
+
+      {/* 変更の結果は必ず出す（#200）。以前は変更できないとき理由が出ず、
+          「保存を押したのに元の予約に戻る」としか見えなかった */}
+      {sp.err && (
+        <p className="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
+          変更できませんでした — {sp.err}
+        </p>
+      )}
+      {sp.msg && (
+        <p className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
+          {sp.msg}
+        </p>
+      )}
 
       {canGw && (
         <p className="text-right text-xs">

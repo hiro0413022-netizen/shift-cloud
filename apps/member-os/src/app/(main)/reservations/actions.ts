@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logAudit } from "@/lib/kernel";
@@ -43,6 +44,34 @@ function back(date: string) {
   revalidatePath("/trials");
   revalidatePath("/dashboard");
   revalidatePath("/"); // 受付台帳（体験は予約と同時に台帳へ載る）
+}
+
+/* ------------------------------------------------------------
+   結果を必ず画面に返す（#200）
+
+   実障害（2026-09-03）: 予約の打席と日付を変えて保存したのに、画面が元の予約のまま戻る。
+   原因は「変更できないとき、理由を出さずにそのまま戻していた」こと。
+   定休日・営業時間外・ほかの予約やレッスン枠との重なり——どれも正しい拒否だが、
+   **スタッフから見ると「保存を押しても何も起きない」**にしか見えない。
+   さらに日付を変えて成功したときも、画面は変更前の日を映したままだった
+   （その日にはもう無いので「消えた／戻った」に見える）。
+
+   ここから先は refuse()（理由つきで戻る）／moved()（新しい日へ連れて行く）を必ず通す。
+------------------------------------------------------------ */
+function reservationsUrl(date: string, sel: string, params: Record<string, string>): string {
+  const q = new URLSearchParams();
+  if (date) q.set("date", date);
+  if (sel) q.set("sel", sel);
+  for (const [k, v] of Object.entries(params)) if (v) q.set(k, v);
+  return `/reservations?${q.toString()}`;
+}
+/** 変更できなかった理由を画面に出して戻る */
+function refuse(date: string, sel: string, reason: string): never {
+  redirect(reservationsUrl(date, sel, { err: reason }));
+}
+/** 変更できたことを画面に出す。日付が変わったら**変更後の日**へ連れて行く */
+function moved(date: string, sel: string, message: string): never {
+  redirect(reservationsUrl(date, sel, { msg: message }));
 }
 
 /**
@@ -252,7 +281,7 @@ export async function updateBooking(formData: FormData) {
     .eq("store_id", FRANK_STORE_ID)
     .is("deleted_at", null)
     .maybeSingle();
-  if (!bkRow) return back(fromDate);
+  if (!bkRow) refuse(fromDate, "", "対象の予約が見つかりませんでした（すでに削除された可能性があります）");
   const bk = bkRow as {
     id: string;
     booked_date: string;
@@ -273,15 +302,17 @@ export async function updateBooking(formData: FormData) {
   const start = str(formData.get("start_time")) || bk.start_time.slice(0, 5);
   const bayId = str(formData.get("bay_id")) || bk.bay_id || "";
   const minutes = num(formData.get("minutes")) ?? Math.max(15, toMin(bk.end_time) - toMin(bk.start_time));
-  if (!date || !start || !bayId) return back(fromDate);
+  if (!date || !start || !bayId) refuse(fromDate, id, "日付・開始時刻・打席のどれかが空です");
 
   const cfg = await loadBookingCfg(admin);
   const hours = businessHours(date, cfg);
-  if (!hours) return back(fromDate); // 定休日・営業時間外の日には動かせない
+  // 定休日・臨時休業の日には動かせない。**理由を言わずに戻さない**（#200）
+  if (!hours) refuse(fromDate, id, `${date} は定休日・休業日のため予約を入れられません`);
 
   const s = toMin(start);
   const e = s + minutes;
-  if (s < toMin(hours.open) || e > toMin(hours.close)) return back(fromDate);
+  if (s < toMin(hours.open) || e > toMin(hours.close))
+    refuse(fromDate, id, `${date} の営業時間は ${hours.open}〜${hours.close} です（${start}〜${toTime(e)} は範囲外）`);
 
   // ── 重なり確認（自分は除く）
   const { data: sameBay } = await admin
@@ -295,7 +326,14 @@ export async function updateBooking(formData: FormData) {
     .neq("id", id)
     .is("deleted_at", null);
   for (const b of sameBay ?? []) {
-    if (s < toMin(String(b.end_time)) && e > toMin(String(b.start_time))) return back(fromDate);
+    if (s < toMin(String(b.end_time)) && e > toMin(String(b.start_time))) {
+      const bay = await bayLabel(admin, bayId);
+      refuse(
+        fromDate,
+        id,
+        `${bay} は ${date} ${String(b.start_time).slice(0, 5)}〜${String(b.end_time).slice(0, 5)} に別のご予約が入っています（先にそちらを動かすか、別の打席・時間をお選びください）`
+      );
+    }
   }
 
   // ── レッスン枠とも重なりを見る（打席は共有なので）
@@ -309,7 +347,14 @@ export async function updateBooking(formData: FormData) {
     .neq("status", "closed")
     .is("deleted_at", null);
   for (const l of lessons ?? []) {
-    if (s < toMin(String(l.end_time)) && e > toMin(String(l.start_time))) return back(fromDate);
+    if (s < toMin(String(l.end_time)) && e > toMin(String(l.start_time))) {
+      const bay = await bayLabel(admin, bayId);
+      refuse(
+        fromDate,
+        id,
+        `${bay} は ${date} ${String(l.start_time).slice(0, 5)}〜${String(l.end_time).slice(0, 5)} にレッスン枠が入っています`
+      );
+    }
   }
 
   const endTime = toTime(e);
@@ -331,7 +376,7 @@ export async function updateBooking(formData: FormData) {
   if (formData.has("note")) patch.note = str(formData.get("note")) || null;
 
   const { error } = await admin.from("frunk_bookings").update(patch).eq("id", id);
-  if (error) return back(fromDate);
+  if (error) refuse(fromDate, id, `保存できませんでした（${error.message}）。もう一度お試しください`);
 
   // ── 体験予約は申込・受付台帳まで揃える
   if (bk.trial_request_id) {
@@ -352,8 +397,12 @@ export async function updateBooking(formData: FormData) {
     await syncTrialWalkin(admin, String(bk.trial_request_id), { receptionStaffId: actor.staffId });
   }
 
-  // ── お客様へのお知らせ（チェックしたときだけ）
+  /* ── お客様へのお知らせ（チェックしたときだけ）
+     ⚠ ここから先で例外を投げない。予約はもう直っているのに画面がエラーになると
+        「保存できていない」と勘違いして二重に直すことになる（#200）。 */
+  let mailNote = "";
   if (str(formData.get("notify")) === "1") {
+   try {
     const bayName = await bayLabel(admin, bayId);
     const beforeBay = bk.bay_id ? await bayLabel(admin, bk.bay_id) : "";
     const to = await bookingEmail(admin, bk.trial_request_id, bk.member_id);
@@ -369,8 +418,14 @@ export async function updateBooking(formData: FormData) {
         cancelToken: (tr as { cancel_token?: string | null } | null)?.cancel_token ?? null,
         kind: bk.trial_request_id ? "trial" : "booking",
       });
-      await sendFrankMail({ to, subject: mail.subject, text: mail.text });
+      const r = await sendFrankMail({ to, subject: mail.subject, text: mail.text });
+      mailNote = r?.ok ? "／変更のご連絡をメールしました" : "／メールは送れませんでした（電話・LINEでお伝えください）";
+    } else {
+      mailNote = "／メール宛先が未登録のため送っていません";
     }
+   } catch {
+     mailNote = "／メールは送れませんでした（電話・LINEでお伝えください）";
+   }
   }
 
   await logAudit(
@@ -385,6 +440,17 @@ export async function updateBooking(formData: FormData) {
   // 変更前の日と変更後の日、どちらのカレンダーも作り直す
   back(bk.booked_date);
   back(date);
+
+  /* 変更後の日へ連れて行く（#200）。
+     日付を変えたのに変更前の日を映したままだと、その日にはもう無いので
+     「保存したのに元に戻った／消えた」に見える。 */
+  const bayName = await bayLabel(admin, bayId);
+  const changedDay = date !== bk.booked_date;
+  moved(
+    date,
+    id,
+    `${changedDay ? `${bk.booked_date} → ` : ""}${date} ${start}〜${endTime.slice(0, 5)}${bayName ? ` ${bayName}` : ""} に変更しました${mailNote}`
+  );
 }
 
 async function bayLabel(admin: ReturnType<typeof createAdmin>, bayId: string): Promise<string> {
