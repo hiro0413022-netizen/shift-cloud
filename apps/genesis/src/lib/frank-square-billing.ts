@@ -69,6 +69,41 @@ async function recordCheckoutOrder(
     .neq("billing_status", "active");
 }
 
+/**
+ * 決済リンクを作る。**お客様の連絡先が原因でリンク作成ごと失敗させない**（#208）。
+ *
+ * pre_populated_data（決済画面にメール・電話を入れておくだけの親切機能）は、
+ * Square 側で厳しく検証される。2026-09-03、携帯なのに10桁の電話番号で申し込まれた入会が
+ * "Invalid phone number." で弾かれ、**お客様が決済ページに一度も行けないまま
+ * 「承認待ち」画面に落ちた**。入力の打ち間違いで決済が止まるのは割に合わない。
+ *
+ * そこで、prefill が原因と分かる失敗だけ、prefill を外してもう一度だけ作り直す。
+ * （400 は注文が作られないので、作り直しても二重注文にはならない。
+ *   それ以外のエラーは握りつぶさずそのまま投げる＝原因が見えなくなるのを防ぐ）
+ */
+async function createPaymentLink(
+  token: string,
+  body: Record<string, unknown>,
+  prePopulated: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const hasPrefill = Object.keys(prePopulated).length > 0;
+  try {
+    return await squarePost(token, "/online-checkout/payment-links", {
+      ...body,
+      ...(hasPrefill ? { pre_populated_data: prePopulated } : {}),
+    });
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e).toLowerCase();
+    const prefillFault = /phone|email|address/.test(msg);
+    if (!hasPrefill || !prefillFault) throw e;
+    console.warn("[frank-square-billing] prefill rejected, retrying without it:", msg);
+    return await squarePost(token, "/online-checkout/payment-links", {
+      ...body,
+      idempotency_key: randomUUID(),
+    });
+  }
+}
+
 function accessToken(): string | null {
   const t = process.env.SQUARE_ACCESS_TOKEN;
   return t && t.trim().length > 10 ? t.trim() : null;
@@ -244,25 +279,29 @@ export async function createJoinCheckoutForMember(
   });
   const amount = est.total;
   try {
+    // 電話番号は「国内番号として成り立つとき」だけ渡す（@yozan/core/jp-phone が判定・#208）
     const phone = toE164Jp(row.phone ? String(row.phone) : null);
-    const json = await squarePost(token, "/online-checkout/payment-links", {
-      idempotency_key: randomUUID(),
-      quick_pay: {
-        name: `FRANK GOLF ご入会（${plan.name}）初回一括・税込`,
-        price_money: { amount, currency: "JPY" },
-        location_id: locationId,
+    const json = await createPaymentLink(
+      token,
+      {
+        idempotency_key: randomUUID(),
+        quick_pay: {
+          name: `FRANK GOLF ご入会（${plan.name}）初回一括・税込`,
+          price_money: { amount, currency: "JPY" },
+          location_id: locationId,
+        },
+        checkout_options: {
+          subscription_plan_id: variationId,
+          redirect_url: redirectUrl,
+          ask_for_shipping_address: false,
+        },
+        payment_note: `${JOIN_CHECKOUT_NOTE_PREFIX} ${String(row.name ?? "")}`,
       },
-      checkout_options: {
-        subscription_plan_id: variationId,
-        redirect_url: redirectUrl,
-        ask_for_shipping_address: false,
-      },
-      pre_populated_data: {
+      {
         ...(row.email ? { buyer_email: String(row.email) } : {}),
         ...(phone ? { buyer_phone_number: phone } : {}),
       },
-      payment_note: `${JOIN_CHECKOUT_NOTE_PREFIX} ${String(row.name ?? "")}`,
-    });
+    );
     const link = json.payment_link as { url?: string; order_id?: string } | undefined;
     if (!link?.url || !link.order_id) throw new Error("payment_link missing url/order_id");
 
@@ -278,7 +317,10 @@ export async function createJoinCheckoutForMember(
     return { ok: true, url: String(link.url) };
   } catch (e) {
     console.error("[frank-square-billing] join checkout failed:", e);
-    return { ok: false, error: "checkout_failed" };
+    // 理由をそのまま返す。呼び出し元（member-os）が events に残し、
+    // スタッフが「決済ページに行けなかった申込」に気づけるようにするため（#208）
+    const detail = String(e instanceof Error ? e.message : e).slice(0, 160);
+    return { ok: false, error: `checkout_failed: ${detail}` };
   }
 }
 
@@ -320,24 +362,27 @@ export async function createSquareBillingCheckout(
 
   try {
     const phone = toE164Jp(row.phone ? String(row.phone) : null);
-    const json = await squarePost(token, "/online-checkout/payment-links", {
-      idempotency_key: randomUUID(),
-      quick_pay: {
-        name: `FRANK GOLF 月会費（${plan.name}・税込）`,
-        price_money: { amount, currency: "JPY" },
-        location_id: locationId,
+    const json = await createPaymentLink(
+      token,
+      {
+        idempotency_key: randomUUID(),
+        quick_pay: {
+          name: `FRANK GOLF 月会費（${plan.name}・税込）`,
+          price_money: { amount, currency: "JPY" },
+          location_id: locationId,
+        },
+        checkout_options: {
+          subscription_plan_id: variationId,
+          redirect_url: `${SITE}/member/settings?billing=success`,
+          ask_for_shipping_address: false,
+        },
+        payment_note: `FRANK月会費 ${String(member.member_no ?? "")}`,
       },
-      checkout_options: {
-        subscription_plan_id: variationId,
-        redirect_url: `${SITE}/member/settings?billing=success`,
-        ask_for_shipping_address: false,
-      },
-      pre_populated_data: {
+      {
         ...(row.email ? { buyer_email: String(row.email) } : {}),
         ...(phone ? { buyer_phone_number: phone } : {}),
       },
-      payment_note: `FRANK月会費 ${String(member.member_no ?? "")}`,
-    });
+    );
     const link = json.payment_link as { url?: string; order_id?: string } | undefined;
     if (!link?.url || !link.order_id) throw new Error("payment_link missing url/order_id");
 

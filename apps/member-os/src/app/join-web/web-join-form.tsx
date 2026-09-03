@@ -9,6 +9,7 @@ import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
 import { NameFields } from "@/components/name-fields";
 import { corporateSpec } from "@yozan/core/frank-corporate";
+import { jpPhoneError } from "@yozan/core/jp-phone";
 import { SignaturePad } from "@/components/signature-pad";
 
 type Plan = {
@@ -45,6 +46,13 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
   const [planId, setPlanId] = useState(plans.find((p) => p.name.includes("レギュラー"))?.id ?? plans[0]?.id ?? "");
   const [signature, setSignature] = useState("");
   const [coupon, setCoupon] = useState("");
+  // 電話番号はその場で桁数を見る（#208）。
+  // 打ち間違い（携帯なのに10桁など）に気づかないまま送られると、Squareが決済リンクの
+  // 発行を拒否して「決済ページに行けないのに申込は済んでいる」状態になってしまう。
+  // 会員ページのログインも電話番号の下4桁なので、間違ったままだと後でご本人が入れない。
+  const [phone, setPhone] = useState("");
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const phoneMsg = phone.trim() === "" ? null : jpPhoneError(phone);
   const [step, setStep] = useState<"input" | "estimate">("input");
   const formRef = useRef<HTMLFormElement | null>(null);
 
@@ -57,6 +65,11 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
     const form = formRef.current;
     if (!form) return;
     if (!form.reportValidity()) return;
+    if (jpPhoneError(phone)) {
+      setPhoneTouched(true);
+      form.querySelector<HTMLInputElement>('input[name="phone"]')?.focus();
+      return;
+    }
     if (!signature) {
       alert("ご署名（電子サイン）をお願いします");
       return;
@@ -66,13 +79,15 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
   };
 
   if (state.ok) {
-    // Square未設定環境のフォールバック（通常は決済ページへリダイレクトするためここには来ない）
+    // 決済ページを出せなかったときのフォールバック（Square未設定・発行失敗）。
+    // ⚠ この画面はお支払いが済んでいない。前は成功と見分けが付かなかったので明記する（#208）
     return (
-      <div className="rounded-2xl border border-emerald-500/40 bg-(--color-panel) p-8 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/10 text-3xl text-emerald-400">✓</div>
-        <p className="mt-3 text-lg font-semibold">入会のお申し込みありがとうございました</p>
+      <div className="rounded-2xl border border-amber-500/40 bg-(--color-panel) p-8 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 text-3xl text-amber-400">✓</div>
+        <p className="mt-3 text-lg font-semibold">入会のお申し込みを承りました</p>
         <p className="mt-2 text-sm text-(--color-dim)">
-          内容をスタッフが確認し、折り返しご連絡いたします。<br />確定後、会員としてWeb予約をご利用いただけます。
+          ただいま決済ページをご用意できませんでした。<span className="font-medium text-(--color-txt)">お支払いはまだ完了していません。</span>
+          <br />内容をスタッフが確認し、折り返しご連絡のうえお手続きいたします。
         </p>
       </div>
     );
@@ -208,7 +223,17 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={label}>電話番号 <span className="text-rose-400">*</span></label><input name="phone" type="tel" required placeholder="090-1234-5678" className={field} /></div>
+          <div>
+            <label className={label}>電話番号 <span className="text-rose-400">*</span></label>
+            <input
+              name="phone" type="tel" required inputMode="tel" autoComplete="tel" placeholder="090-1234-5678"
+              className={`${field} ${phoneTouched && phoneMsg ? "border-rose-400" : ""}`}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onBlur={() => setPhoneTouched(true)}
+            />
+            {phoneTouched && phoneMsg && <p className="mt-1 text-xs text-rose-400">{phoneMsg}</p>}
+          </div>
           <div><label className={label}>メールアドレス <span className="text-rose-400">*</span></label><input name="email" type="email" required placeholder="example@mail.com" className={field} /></div>
         </div>
         <p className="text-xs text-(--color-dim)">※ 会員ページのログインに電話番号下4桁を、入会の控え（PDF）の送付にメールアドレスを使用します</p>

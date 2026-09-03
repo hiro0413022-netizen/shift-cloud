@@ -10,6 +10,7 @@ import { corporateSpec } from "@yozan/core/frank-corporate";
 import { joinAddress } from "@/lib/address";
 import { readName } from "@/lib/name";
 import { FRANK_PORTAL } from "@yozan/core/frank-links";
+import { jpPhoneError, normalizeJpPhone } from "@yozan/core/jp-phone";
 
 export type WebSignupState = { ok?: boolean; error?: string };
 
@@ -43,10 +44,15 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
   const { name, nameKana } = readName(formData);
   if (!name) return { error: "お名前（姓・名）を入力してください" };
   if (!str(formData.get("plan_id"))) return { error: "ご希望のプランをお選びください" };
-  const phone = str(formData.get("phone"));
   const email = str(formData.get("email"));
   if (!email) return { error: "メールアドレスをご入力ください（入会の控えとご案内をお送りします）" };
-  if (!phone) return { error: "電話番号をご入力ください（会員ページのログインに下4桁を使用します）" };
+  // 電話番号は画面と同じ関数で検査する（正典 @yozan/core/jp-phone・#208）。
+  // 画面のチェックだけに頼ると、直接POSTや古いタブから桁数の合わない番号が入り、
+  // Squareが決済リンクの発行ごと拒否する（＝お客様が決済ページに行けない）。
+  const phoneErr = jpPhoneError(formData.get("phone"));
+  if (phoneErr) return { error: `${phoneErr}（会員ページのログインに下4桁を使用します）` };
+  // 保存はハイフンなしの数字にそろえる（ログインは下4桁・検索は数字で突き合わせるため）
+  const phone = normalizeJpPhone(formData.get("phone"));
   if (str(formData.get("consent_privacy")) !== "1") return { error: "個人情報の取扱いへの同意が必要です" };
   if (str(formData.get("consent_mobile_order")) !== "1")
     return { error: "会員ポータルからのご注文（登録カードでのお支払い）への同意が必要です" };
@@ -176,6 +182,7 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
 
   // Square決済リンクを genesis 経由で発行（Square env は yozan-genesis のみに設定）
   let checkoutUrl: string | null = null;
+  let checkoutError: string | null = null;
   try {
     const res = await fetch(`${GENESIS_URL}/api/public/frank/join-checkout`, {
       method: "POST",
@@ -187,13 +194,31 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     });
     const json = (await res.json().catch(() => ({}))) as { ok?: boolean; url?: string; error?: string };
     if (json.ok && json.url) checkoutUrl = json.url;
-    else console.error("[join-web] checkout link failed:", json.error);
+    else {
+      checkoutError = json.error ?? `HTTP ${res.status}`;
+      console.error("[join-web] checkout link failed:", checkoutError);
+    }
   } catch (e) {
+    checkoutError = String(e instanceof Error ? e.message : e).slice(0, 160);
     console.error("[join-web] checkout link failed:", e);
   }
 
   if (!checkoutUrl) {
     // Square未設定・失敗時のフォールバック: 従来の承認待ちフロー（申込は成立させる）
+    //
+    // ⚠ ここに落ちた申込は「お客様は決済ページを一度も見ていない」＝入金が無い。
+    //   画面は成功に見えるので、**events に残さないと誰も気づけない**（#208・2026-09-03の実障害）。
+    //   /frunk の承認待ちに並ぶが、それが「未入金」なのか「Webhook未達」なのかは
+    //   決済状況の表示（#188）で見分ける。
+    await logEvent(store.companyId, {
+      event_type: "frunk.join_checkout_failed",
+      title: `Web入会: 決済ページを出せませんでした（${name} 様）`,
+      description: `理由: ${checkoutError ?? "不明"} / 連絡先: ${phone} ${email}。お客様には「折り返しご連絡」と表示しています。店舗からご連絡してお手続きください。`,
+      source: "web",
+      source_type: "system",
+      severity: "warning",
+      raw_payload: { member_id: memberId, reason: checkoutError },
+    });
     const mail = buildWebSignupReceiptMail({ name, planName: plan.name ?? null });
     await sendFrankMail({ to: email, subject: mail.subject, text: mail.text });
     return { ok: true };

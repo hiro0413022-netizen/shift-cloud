@@ -100,7 +100,7 @@ export const monthlyFeeTaxIncluded = (priceExTax: number) => Math.round(priceExT
 /**
  * 日本の電話番号 → E.164（+81…）。Squareの pre_populated_data 用。変換できなければ null（＝渡さない）。
  *
- * ⚠ 判定の正典は @yozan/core/jp-phone。ここでは中身を書かない（#207）。
+ * ⚠ 判定の正典は @yozan/core/jp-phone。ここでは中身を書かない（#208）。
  *   旧実装は「0始まり10桁以上」を無条件で通していたため、携帯なのに10桁の
  *   「0905655867」を +81905655867 として Square に渡し、決済リンクの発行ごと
  *   "Invalid phone number." で失敗させていた（2026-09-03 実障害）。
