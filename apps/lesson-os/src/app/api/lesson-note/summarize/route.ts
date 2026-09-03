@@ -91,6 +91,9 @@ export async function POST(req: Request) {
       transcript: read.transcript || null,
       summary: read.summary,
       body: read.body || null,
+      // お客様への説明も同じ1回の呼び出しで作っている（2026-09-03）。
+      // 先生の記録(body)とは別物で、宛先が違うだけ。どちらも保存前に先生が直す下書き。
+      share_body: read.client || null,
       ai_raw: read.raw as object,
       // 本文が出ていないなら失敗扱い。音声は消さずに残すので、原因を直して要約し直せる
       status: read.body ? "summarized" : "failed",
@@ -143,25 +146,11 @@ export async function POST(req: Request) {
         { onConflict: "note_id,symptom_id,checkpoint_id" }
       );
 
-      // お客様向けの説明文は**ナレッジが持っている**ので、コーチは書かなくていい。
-      // 確認項目に紐づく client_explanation を下敷きとして置く（保存前にコーチが直す）。
-      const cpIds = matches.map((m) => m.checkpointId).filter((v): v is string => !!v);
-      if (cpIds.length) {
-        const { data: kn } = await admin
-          .from("sc_knowledge")
-          .select("checkpoint_id, client_explanation")
-          .eq("company_id", actor.companyId)
-          .in("checkpoint_id", cpIds)
-          .is("deleted_at", null);
-        const texts = (kn ?? [])
-          .map((k) => String((k as { client_explanation: string | null }).client_explanation ?? "").trim())
-          .filter(Boolean);
-        if (texts.length) {
-          await admin.from("lsn_lesson_notes")
-            .update({ share_body: texts.slice(0, 3).join("\n\n") })
-            .eq("id", note.id);
-        }
-      }
+      /* お客様への説明は 2026-09-03 から **AIが今日の会話から書く**（ユーザー判断）。
+         それまではナレッジの標準説明(sc_knowledge.client_explanation)をそのまま貼っていたが、
+         毎回ほぼ同じ文になり「今日の話」にならなかった。
+         ナレッジとの連携（標準説明を下敷きにする）はあらためて別途入れる。
+         症状タグ（上の upsert）は続ける＝記録が数えられる資産であることは変わらない。 */
     }
   }
 

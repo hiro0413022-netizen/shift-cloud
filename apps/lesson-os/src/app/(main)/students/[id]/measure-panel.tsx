@@ -21,8 +21,13 @@ export type MeasurementItem = {
   club: string | null;
   note: string | null;
   hasPhoto: boolean;
+  /** 本日のレッスンのどのスイングの数値か（2026-09-03）。null=その日のレッスン全体 */
+  videoId: string | null;
   values: TrackmanValues;
 };
+
+/** 紐づけ先に出すスイング動画（本日のレッスンと同じ並び＝新しい順） */
+export type MeasureVideo = { id: string; shotAt: string; club: string | null };
 
 const MAX_EDGE = 1600; // AIに送る前に縮める（通信・API上限・料金のすべてに効く）
 
@@ -47,7 +52,15 @@ async function downscale(file: File): Promise<{ blob: Blob; type: string }> {
 
 const today = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 
-export function MeasurePanel({ studentId, items }: { studentId: string; items: MeasurementItem[] }) {
+export function MeasurePanel({
+  studentId,
+  items,
+  videos = [],
+}: {
+  studentId: string;
+  items: MeasurementItem[];
+  videos?: MeasureVideo[];
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -60,7 +73,13 @@ export function MeasurePanel({ studentId, items }: { studentId: string; items: M
   const [club, setClub] = useState("");
   const [date, setDate] = useState(today());
   const [note, setNote] = useState("");
+  /** null = 自動（その日の最後のスイング）。先生が選び直したらその動画に固定する */
+  const [videoPick, setVideoPick] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // videos は新しい順に並んでいるので、最初に見つかったものが「その日の最後の1本」
+  const autoVideo = videos.find((v) => v.shotAt === date)?.id ?? "";
+  const linkVideo = videoPick ?? autoVideo;
 
   const reset = () => {
     if (preview) URL.revokeObjectURL(preview);
@@ -71,6 +90,7 @@ export function MeasurePanel({ studentId, items }: { studentId: string; items: M
     setPreview(null);
     setClub("");
     setNote("");
+    setVideoPick(null);
     setWarn(null);
     if (fileRef.current) fileRef.current.value = "";
   };
@@ -129,6 +149,7 @@ export function MeasurePanel({ studentId, items }: { studentId: string; items: M
         note: note || undefined,
         values,
         aiRaw,
+        videoId: linkVideo || null,
       });
       if (r.error) setMsg(r.error);
       else { setMsg("計測を保存しました"); reset(); }
@@ -188,6 +209,27 @@ export function MeasurePanel({ studentId, items }: { studentId: string; items: M
                 メモ
                 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="例: finishでの詰まりを直した後" className="input-dark mt-1 w-full" />
               </label>
+              {/* 本日のレッスンへの紐づけ（2026-09-03）。既定はその日の最後のスイング */}
+              <label className="col-span-2 text-xs text-(--color-dim) md:col-span-4">
+                本日のレッスンに紐づける
+                <select
+                  value={linkVideo}
+                  onChange={(e) => setVideoPick(e.target.value)}
+                  className="input-dark mt-1 w-full"
+                >
+                  <option value="">紐づけない（計測だけ残す）</option>
+                  {videos.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.shotAt}
+                      {v.club ? ` ${v.club}` : ""}
+                      {v.id === autoVideo ? "（この日の最後のスイング）" : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-[11px] text-(--color-line)">
+                  紐づけると、本日のレッスンの動画の下にレッスンデータとして並び、お客様の画面にも出ます
+                </span>
+              </label>
             </div>
           </div>
 
@@ -228,6 +270,7 @@ export function MeasurePanel({ studentId, items }: { studentId: string; items: M
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-medium">{m.measuredAt}</span>
             {m.club && <span className="rounded bg-(--color-header)/40 px-2 py-0.5 text-xs">{m.club}</span>}
+            {m.videoId && <span className="rounded bg-(--color-active)/15 px-2 py-0.5 text-[11px] text-(--color-active)">レッスンに紐づけ済み</span>}
             <span className="text-xs text-(--color-dim)">{summarize(m.values)}</span>
             <span className="ml-auto flex gap-2 text-xs">
               {m.hasPhoto && (

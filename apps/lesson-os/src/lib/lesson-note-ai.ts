@@ -39,8 +39,16 @@ export type LessonSummary = {
 export type LessonNoteRead = {
   transcript: string;
   summary: LessonSummary;
-  /** そのまま貼れるコメント下書き */
+  /** そのまま貼れるコメント下書き（先生の記録・先生の言葉のまま） */
   body: string;
+  /**
+   * お客様への説明の下書き（2026-09-03 ユーザー依頼）。
+   * 先生の記録とは**別に**作る。中身は同じ今日の会話だが、宛先が違う:
+   *   body   = 先生が読む記録（専門用語のまま・箇条書き的でよい）
+   *   client = お客様が読む説明（専門用語を噛み砕く・「〜しましょう」）
+   * 同じ1回の呼び出しで両方作らせる＝AIを2回呼ばないので待ち時間が増えない。
+   */
+  client: string;
   raw: unknown;
   warning: string | null;
 };
@@ -57,6 +65,15 @@ const SYSTEM = [
   "- 雑談・世間話・料金や予約の話は入れない。スイングとレッスンの中身だけ。",
   "- 個人の健康状態・家族の事情など、レッスンに関係のない私的な話は書き起こしにも要約にも入れない。",
   "- 話し手が コーチ か 生徒 か分かる範囲で書き分ける。分からなければ書き分けない。",
+  "",
+  "本文は2つ作る。**どちらも今日の会話に出たことだけ**で書く（新しい助言を足さない）:",
+  "  body   = 先生がカルテで読む記録。先生の言い回しのまま。専門用語はそのまま使ってよい。",
+  "  client = **そのお客様本人**に見せる説明。次の決まりを守る:",
+  "    ・お客様に語りかける文体（「〜しましょう」「〜がよくなりました」）。150〜250字。",
+  "    ・専門用語は必ず言い換えるか、ひとこと説明を付ける（例: フェースの向き＝クラブの面の向き）。",
+  "    ・「今日できるようになったこと」→「まだ残っている課題」→「次までにやること」の順。",
+  "    ・お客様を評価・否定しない。できていないことも「次の一歩」の形で書く。",
+  "    ・録音に無い助言・数値・約束は書かない。会話が短くて書けないなら空文字にする。",
   "出力は次のJSONのみ（前置き・説明文なし）:",
   "{",
   '  "transcript": "会話の文字起こし。話者が分かれば「コーチ:」「生徒:」を行頭に付ける",',
@@ -67,7 +84,8 @@ const SYSTEM = [
   '    "clubs": ["話に出たクラブ・番手"],',
   '    "next": ["次回みるところ"]',
   "  },",
-  '  "body": "カルテにそのまま貼れる本文。200〜400字。見出しなしの文章で、今日直したこと→本人の感覚→次までの宿題 の順"',
+  '  "body": "カルテにそのまま貼れる本文。200〜400字。見出しなしの文章で、今日直したこと→本人の感覚→次までの宿題 の順",',
+  '  "client": "お客様に見せる説明。150〜250字。上の決まりに従う"',
   "}",
 ].join("\n");
 
@@ -89,7 +107,7 @@ export async function readLessonAudio(
   const apiKey = geminiKey();
   if (!apiKey) return null;
   if (audio.byteLength > MAX_AUDIO_BYTES) {
-    return { transcript: "", summary: EMPTY, body: "", raw: null, warning: "録音が長すぎて要約できませんでした" };
+    return { transcript: "", summary: EMPTY, body: "", client: "", raw: null, warning: "録音が長すぎて要約できませんでした" };
   }
 
   // モデル名は環境変数で差し替えられるようにしておく（音声対応モデルが変わっても再デプロイ不要）
@@ -130,7 +148,7 @@ export async function readLessonAudio(
       // モデル名違い・キー不正・音声形式・上限超過のどれなのか現場で切り分けられない。
       const detail = (await res.text().catch(() => "")).slice(0, 300);
       return {
-        transcript: "", summary: EMPTY, body: "",
+        transcript: "", summary: EMPTY, body: "", client: "",
         raw: { status: res.status, detail },
         warning: `AIが応答しませんでした（HTTP ${res.status}）${detail ? `: ${detail}` : ""}`,
       };
@@ -150,7 +168,7 @@ export async function readLessonAudio(
     try {
       parsed = JSON.parse(text) as Record<string, unknown>;
     } catch {
-      return { transcript: "", summary: EMPTY, body: "", raw: text, warning: "AIの返事を読み取れませんでした" };
+      return { transcript: "", summary: EMPTY, body: "", client: "", raw: text, warning: "AIの返事を読み取れませんでした" };
     }
 
     const s = (parsed.summary ?? {}) as Record<string, unknown>;
@@ -163,11 +181,13 @@ export async function readLessonAudio(
     };
     const transcript = typeof parsed.transcript === "string" ? parsed.transcript.slice(0, 40000) : "";
     const body = typeof parsed.body === "string" ? parsed.body.trim().slice(0, 2000) : "";
+    const client = typeof parsed.client === "string" ? parsed.client.trim().slice(0, 2000) : "";
     const empty = !transcript && !body && !summary.today.length;
     return {
       transcript,
       summary,
       body,
+      client,
       raw: parsed,
       warning: empty ? "会話を聞き取れませんでした。マイクが遠い可能性があります" : null,
     };

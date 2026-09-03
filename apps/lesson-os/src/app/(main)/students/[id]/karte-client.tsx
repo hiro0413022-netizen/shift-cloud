@@ -11,6 +11,7 @@ import { ProgressPanel, type ProgressItem } from "./progress-panel";
 import { ProfileForm } from "./profile-form";
 import { MeasurePanel, type MeasurementItem } from "./measure-panel";
 import { LessonNotePanel } from "./lesson-note";
+import { TRACKMAN_FIELDS } from "@/lib/trackman";
 import type { LessonNoteItem } from "./actions";
 import {
   createVideoUploadUrl,
@@ -65,6 +66,67 @@ const TABS: { id: Tab; label: string }[] = [
 
 const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 
+/**
+ * 本日のレッスンの1件（2026-09-03）
+ *
+ * それまで「本日のレッスン」は動画の羅列で、会話メモは別タブ、計測はさらに別タブだった。
+ * レッスン中にタブを行き来しないと今日の全体が見えないので、
+ * **スイング動画を軸に、その動画に紐づいた会話メモと計測を同じカードにまとめる**。
+ * 動画の無い日のメモは、日付だけのカードとして同じ並びに混ぜる（消さない）。
+ */
+type LessonEntry = {
+  key: string;
+  date: string;
+  video: VideoItem | null;
+  notes: LessonNoteItem[];
+  measures: MeasurementItem[];
+};
+
+function buildEntries(
+  videos: VideoItem[],
+  notes: LessonNoteItem[],
+  measures: MeasurementItem[]
+): LessonEntry[] {
+  // その日の最後のスイング＝保存したときに紐づく先。まだ保存していないメモも
+  // ここに出しておく（保存前と保存後で場所が変わると「消えた」と思われる）
+  const latestOfDay = new Map<string, string>();
+  for (const v of videos) if (!latestOfDay.has(v.shotAt)) latestOfDay.set(v.shotAt, v.id);
+
+  const entries: LessonEntry[] = videos.map((v) => ({
+    key: v.id,
+    date: v.shotAt,
+    video: v,
+    notes: notes.filter(
+      (n) => n.videoId === v.id || (!n.videoId && latestOfDay.get(n.lessonDate) === v.id)
+    ),
+    measures: measures.filter((m) => m.videoId === v.id),
+  }));
+
+  // その日に動画が1本も無いメモだけ、日付だけのレッスンとして並べる
+  const loose = notes.filter((n) => !n.videoId && !latestOfDay.has(n.lessonDate));
+  const dates = Array.from(new Set(loose.map((n) => n.lessonDate)));
+  for (const d of dates) {
+    entries.push({
+      key: `date-${d}`,
+      date: d,
+      video: null,
+      notes: loose.filter((n) => n.lessonDate === d),
+      // その日の、どの動画にも紐づいていない計測も一緒に見せる
+      measures: measures.filter((m) => !m.videoId && m.measuredAt === d),
+    });
+  }
+  // 新しい順。同じ日なら動画のあるカードを先に出す
+  return entries.sort((a, b) => (a.date === b.date ? (a.video ? -1 : 1) : a.date < b.date ? 1 : -1));
+}
+
+/** 前回のレッスン（今日より前でいちばん新しい、中身のあるメモ） */
+function previousNote(notes: LessonNoteItem[], today: string): LessonNoteItem | null {
+  const past = notes
+    .filter((n) => n.lessonDate < today && (n.body || n.summary))
+    .sort((a, b) => (a.lessonDate < b.lessonDate ? 1 : -1));
+  return past[0] ?? null;
+}
+
 export function KarteClient({
   student,
   videos,
@@ -91,6 +153,13 @@ export function KarteClient({
   /** 描画・フェーズ編集を開いている動画（通常のタップはその場で再生するだけ） */
   const [editVideo, setEditVideo] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // 本日のレッスン＝スイング動画＋その動画に紐づいた会話メモ・計測（2026-09-03）
+  const entries = buildEntries(videos, lessonNotes, measurements);
+  const prev = previousNote(lessonNotes, jstToday());
+  // 紐づけ先の選択に出す動画（会話メモ・計測の両方で使う）
+  const linkVideos = videos.map((v) => ({ id: v.id, shotAt: v.shotAt, club: v.club }));
+
   const fileRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
   const clubRef = useRef<HTMLSelectElement>(null);
@@ -333,86 +402,177 @@ export function KarteClient({
             />
           )}
 
-          {/* 動画タイムライン */}
-          {videos.length === 0 && <p className="text-sm text-(--color-dim)">まだスイングがありません</p>}
-          {videos.map((v) => (
-            <div key={v.id} className={`overflow-hidden rounded-xl border bg-(--color-panel) ${v.isBest ? "border-(--color-gold)" : "border-(--color-line)"}`}>
+          {/* 前回のふりかえり（2026-09-03）。今日いちばん最初に見たいのはこれ */}
+          {prev && (
+            <div className="rounded-xl border border-(--color-active)/50 bg-(--color-panel) p-4">
+              <p className="text-sm font-medium text-(--color-active)">前回のレッスン（{prev.lessonDate}）で話したこと</p>
+              {prev.summary && (
+                <div className="mt-2 grid gap-1 text-xs sm:grid-cols-3">
+                  {([
+                    ["直したこと", prev.summary.today],
+                    ["出した宿題", prev.summary.homework],
+                    ["次回みるところ", prev.summary.next],
+                  ] as [string, string[]][])
+                    .filter(([, v]) => v.length)
+                    .map(([label, v]) => (
+                      <div key={label}>
+                        <span className="text-(--color-dim)">{label}</span>
+                        <ul className="ml-4 list-disc">{v.map((x, i) => <li key={i}>{x}</li>)}</ul>
+                      </div>
+                    ))}
+                </div>
+              )}
+              {prev.body && <p className="mt-2 whitespace-pre-wrap text-sm text-(--color-dim)">{prev.body}</p>}
+              {!prev.summary && !prev.body && (
+                <p className="mt-1 text-xs text-(--color-dim)">前回のメモはまだ確定していません</p>
+              )}
+            </div>
+          )}
+
+          {/* レッスンの並び（スイング動画＋その日の会話メモ＋計測） */}
+          {entries.length === 0 && <p className="text-sm text-(--color-dim)">まだスイングがありません</p>}
+          {entries.map((e) => {
+            const v = e.video;
+            return (
+            <div key={e.key} className={`overflow-hidden rounded-xl border bg-(--color-panel) ${v?.isBest ? "border-(--color-gold)" : "border-(--color-line)"}`}>
               <div className="flex flex-wrap items-center gap-2 px-4 pt-4 text-sm">
-                <span className="font-medium">{v.shotAt}</span>
-                {v.club && <span className="rounded bg-(--color-header)/40 px-2 py-0.5 text-xs">{v.club}</span>}
-                {v.distanceYd != null && <span className="rounded bg-(--color-panel-2) px-2 py-0.5 text-xs text-(--color-dim)">{v.distanceYd}yd</span>}
-                {v.isBest && <span className="rounded bg-(--color-gold)/20 px-2 py-0.5 text-xs text-(--color-gold)">★ ベストスイング</span>}
-                <span className="ml-auto text-xs text-(--color-dim)">{v.uploadedBy}</span>
+                <span className="font-medium">{e.date}</span>
+                {v?.club && <span className="rounded bg-(--color-header)/40 px-2 py-0.5 text-xs">{v.club}</span>}
+                {v?.distanceYd != null && <span className="rounded bg-(--color-panel-2) px-2 py-0.5 text-xs text-(--color-dim)">{v.distanceYd}yd</span>}
+                {v?.isBest && <span className="rounded bg-(--color-gold)/20 px-2 py-0.5 text-xs text-(--color-gold)">★ ベストスイング</span>}
+                {!v && <span className="rounded bg-(--color-panel-2) px-2 py-0.5 text-xs text-(--color-dim)">スイング動画なし</span>}
+                <span className="ml-auto text-xs text-(--color-dim)">{v?.uploadedBy}</span>
               </div>
-              {v.note && <p className="px-4 pt-1 text-sm text-(--color-dim)">{v.note}</p>}
+              {v?.note && <p className="px-4 pt-1 text-sm text-(--color-dim)">{v.note}</p>}
 
               {/* 押す前から1コマ目が見えていて、押せばその場で再生される */}
-              <div className="mt-3">
-                {editVideo === v.id && v.url ? (
-                  <div className="px-4">
-                    <VideoPlayer videoId={v.id} src={v.url} initial={v.annotations} initialPhases={v.phases} />
-                    <button onClick={() => setEditVideo(null)} className="btn-ghost mt-2 text-xs">描画・フェーズを閉じる</button>
-                  </div>
-                ) : v.url ? (
-                  <video
-                    src={v.posterUrl ? v.url : `${v.url}#t=0.1`}
-                    poster={v.posterUrl ?? undefined}
-                    controls
-                    playsInline
-                    // サムネイルがあるなら動画本体は押されるまで読まない（4Gでの待ちとギガを節約）
-                    preload={v.posterUrl ? "none" : "metadata"}
-                    className="max-h-[70vh] w-full bg-black"
-                  />
-                ) : (
-                  <p className="px-4 pb-2 text-xs text-(--color-danger)">再生URLを取得できませんでした。再読み込みしてください</p>
-                )}
-              </div>
+              {v && (
+                <div className="mt-3">
+                  {editVideo === v.id && v.url ? (
+                    <div className="px-4">
+                      <VideoPlayer videoId={v.id} src={v.url} initial={v.annotations} initialPhases={v.phases} />
+                      <button onClick={() => setEditVideo(null)} className="btn-ghost mt-2 text-xs">描画・フェーズを閉じる</button>
+                    </div>
+                  ) : v.url ? (
+                    <video
+                      src={v.posterUrl ? v.url : `${v.url}#t=0.1`}
+                      poster={v.posterUrl ?? undefined}
+                      controls
+                      playsInline
+                      // サムネイルがあるなら動画本体は押されるまで読まない（4Gでの待ちとギガを節約）
+                      preload={v.posterUrl ? "none" : "metadata"}
+                      className="max-h-[70vh] w-full bg-black"
+                    />
+                  ) : (
+                    <p className="px-4 pb-2 text-xs text-(--color-danger)">再生URLを取得できませんでした。再読み込みしてください</p>
+                  )}
+                </div>
+              )}
 
-              <div className="flex flex-wrap gap-2 px-4 pt-2 text-xs">
-                {editVideo !== v.id && (
-                  <button onClick={() => setEditVideo(v.id)} disabled={!v.url} className="btn-ghost !py-1.5 disabled:opacity-40">
-                    ✎ 描画・フェーズ・スロー
+              {v && (
+                <div className="flex flex-wrap gap-2 px-4 pt-2 text-xs">
+                  {editVideo !== v.id && (
+                    <button onClick={() => setEditVideo(v.id)} disabled={!v.url} className="btn-ghost !py-1.5 disabled:opacity-40">
+                      ✎ 描画・フェーズ・スロー
+                    </button>
+                  )}
+                  <button onClick={() => startTransition(async () => { await markBest(v.id); })} disabled={pending} className="btn-ghost !py-1.5 hover:text-(--color-gold)">
+                    {v.isBest ? "★ ベスト解除" : "☆ ベストにする"}
                   </button>
-                )}
-                <button onClick={() => startTransition(async () => { await markBest(v.id); })} disabled={pending} className="btn-ghost !py-1.5 hover:text-(--color-gold)">
-                  {v.isBest ? "★ ベスト解除" : "☆ ベストにする"}
-                </button>
-                <button
-                  onClick={() => { if (window.confirm("この動画を削除しますか？")) startTransition(async () => { await removeVideo(v.id); }); }}
-                  disabled={pending}
-                  className="btn-ghost !py-1.5"
-                >
-                  🗑 削除
-                </button>
-              </div>
+                  <button
+                    onClick={() => { if (window.confirm("この動画を削除しますか？")) startTransition(async () => { await removeVideo(v.id); }); }}
+                    disabled={pending}
+                    className="btn-ghost !py-1.5"
+                  >
+                    🗑 削除
+                  </button>
+                </div>
+              )}
+
+              {/* このスイングの計測（レッスンデータ）。紐づけていなければ何も出さない */}
+              {e.measures.map((m) => (
+                <div key={m.id} className="mt-3 border-t border-(--color-line) px-4 py-3">
+                  <p className="text-xs font-medium text-(--color-gold)">
+                    レッスンデータ{m.club ? ` ・ ${m.club}` : ""}
+                  </p>
+                  {m.note && <p className="mt-0.5 text-xs text-(--color-dim)">{m.note}</p>}
+                  <div className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs md:grid-cols-4">
+                    {TRACKMAN_FIELDS.filter((f) => typeof m.values[f.key] === "number").map((f) => (
+                      <div key={f.key} className="flex justify-between border-b border-(--color-line)/40 py-0.5">
+                        <span className="text-(--color-dim)">{f.label}</span>
+                        <span className="tabular-nums">
+                          {m.values[f.key]}
+                          <span className="ml-0.5 text-(--color-dim)">{m.values._units?.[f.key] ?? f.unit}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* このレッスンの会話メモ（本文はコピーせず、会話メモの正典をそのまま出す） */}
+              {e.notes.map((n) => (
+                <div key={n.id} className="mt-3 border-t border-(--color-line) px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xs font-medium text-(--color-gold)">会話メモ</p>
+                    {n.status !== "saved" && (
+                      <span className="rounded bg-(--color-panel-2) px-2 py-0.5 text-[11px] text-(--color-dim)">
+                        {n.status === "summarized" ? "下書き（未確定）" : n.status === "failed" ? "失敗" : "作成中"}
+                      </span>
+                    )}
+                    <button onClick={() => setTab("note")} className="ml-auto text-[11px] text-(--color-dim) underline">
+                      会話メモを開く
+                    </button>
+                  </div>
+                  {n.body && <p className="mt-1 whitespace-pre-wrap text-sm">{n.body}</p>}
+                  {n.shareBody && (
+                    <div className="mt-2 rounded-lg border border-(--color-gold)/40 bg-(--color-panel-2) px-3 py-2">
+                      <p className="text-[11px] text-(--color-gold)">お客様への説明（お客様の画面に出ています）</p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm">{n.shareBody}</p>
+                    </div>
+                  )}
+                  {n.symptoms.filter((t) => !t.rejected).length > 0 && (
+                    <p className="mt-1.5 text-[11px] text-(--color-dim)">
+                      症状: {n.symptoms.filter((t) => !t.rejected).map((t) => t.symptom).join(" / ")}
+                    </p>
+                  )}
+                </div>
+              ))}
 
               {/* コーチコメント */}
-              <div className="mt-3 space-y-2 border-t border-(--color-line) px-4 py-3">
-                <p className="text-xs font-medium text-(--color-gold)">コーチからのアドバイス</p>
-                {v.comments.map((c) => (
-                  <div key={c.id} className="rounded-lg bg-(--color-panel-2) px-3 py-2">
-                    <p className="text-xs text-(--color-dim)">{c.coach} ・ {c.at}</p>
-                    <p className="mt-0.5 whitespace-pre-wrap text-sm">{c.body}</p>
+              {v && (
+                <div className="mt-3 space-y-2 border-t border-(--color-line) px-4 py-3">
+                  <p className="text-xs font-medium text-(--color-gold)">コーチからのアドバイス</p>
+                  {v.comments.map((c) => (
+                    <div key={c.id} className="rounded-lg bg-(--color-panel-2) px-3 py-2">
+                      <p className="text-xs text-(--color-dim)">{c.coach} ・ {c.at}</p>
+                      <p className="mt-0.5 whitespace-pre-wrap text-sm">{c.body}</p>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <input
+                      value={drafts[v.id] ?? ""}
+                      onChange={(e2) => setDrafts({ ...drafts, [v.id]: e2.target.value })}
+                      placeholder="アドバイス・次回の課題を書く"
+                      className="input-dark min-w-0 flex-1"
+                    />
+                    <button onClick={() => comment(v.id)} disabled={pending || !(drafts[v.id] ?? "").trim()} className="btn-gold !px-3">送信</button>
                   </div>
-                ))}
-                <div className="flex gap-2">
-                  <input
-                    value={drafts[v.id] ?? ""}
-                    onChange={(e) => setDrafts({ ...drafts, [v.id]: e.target.value })}
-                    placeholder="アドバイス・次回の課題を書く"
-                    className="input-dark min-w-0 flex-1"
-                  />
-                  <button onClick={() => comment(v.id)} disabled={pending || !(drafts[v.id] ?? "").trim()} className="btn-gold !px-3">送信</button>
                 </div>
-              </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* 会話を録音してAIがメモの下書きを作る（2026-08-28）。確定はコーチが行う */}
-      {tab === "note" && <LessonNotePanel studentId={student.id} initial={lessonNotes} />}
-      {tab === "measure" && <MeasurePanel studentId={student.id} items={measurements} />}
+      {/* 会話を録音してAIがメモの下書きを作る（2026-08-28）。確定はコーチが行う。
+          **タブを移っても閉じない**（hidden にするだけ）。閉じてしまうと録音が止まり、
+          裏で走っているAIの進み具合も見失う（2026-09-03） */}
+      <div className={tab === "note" ? "" : "hidden"}>
+        <LessonNotePanel studentId={student.id} initial={lessonNotes} videos={linkVideos} />
+      </div>
+      {tab === "measure" && <MeasurePanel studentId={student.id} items={measurements} videos={linkVideos} />}
       {tab === "progress" && <ProgressPanel studentId={student.id} items={progress} />}
       {tab === "profile" && (
         <ProfileForm

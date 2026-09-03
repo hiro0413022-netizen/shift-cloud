@@ -410,6 +410,8 @@ export async function saveMeasurement(
     note?: string;
     values: TrackmanValues;
     aiRaw?: unknown;
+    /** 本日のレッスンのどのスイングの数値か（既定＝その日の最後の1本・2026-09-03） */
+    videoId?: string | null;
   }
 ): Promise<{ error?: string }> {
   const { actor, admin, ok } = await ownStudent(studentId);
@@ -423,9 +425,17 @@ export async function saveMeasurement(
   const day = /^\d{4}-\d{2}-\d{2}$/.test(input.measuredAt ?? "")
     ? `${input.measuredAt}T00:00:00+09:00`
     : new Date().toISOString();
+  // 動画への紐づけ。他人の動画IDを渡されても入らないように必ず持ち主を確かめる
+  let videoId: string | null = null;
+  if (input.videoId) {
+    const { video } = await ownVideo(input.videoId);
+    if (video && video.studentId === studentId) videoId = video.id;
+  }
+
   const { error } = await admin.from("lsn_measurements").insert({
     company_id: actor.companyId,
     student_id: studentId,
+    video_id: videoId,
     source: "trackman",
     measured_at: day,
     club: input.club?.trim().slice(0, 20) || null,
@@ -697,6 +707,8 @@ export type LessonNoteItem = {
   } | null;
   transcript: string | null;
   shareBody: string | null;
+  /** 紐づけたスイング動画（その日の最後の1本）。null=動画の無い日 */
+  videoId: string | null;
   symptoms: NoteSymptom[];
   coach: string;
   error: string | null;
@@ -768,14 +780,94 @@ export async function createNoteUploadUrl(
   return { url: data.signedUrl, path };
 }
 
+/**
+ * 録音しながら送るための、途中の断片1つぶんのURL（2026-09-03）
+ *
+ * それまでは「止める→12MBを丸ごと送る」だったので、4Gだと止めてから
+ * 1分以上コーチを待たせていた。MediaRecorder が5秒ごとに出す塊を
+ * そのつど送っておけば、止めた時点で残っているのは最後の数秒だけになる。
+ *
+ * 断片は結合してはじめて1本の音声になる（先頭の断片にヘッダがある）。
+ * 結合は finishNoteParts がサーバー側でやる。
+ */
+export async function createNotePartUploadUrl(
+  noteId: string,
+  index: number,
+  ext: string
+): Promise<{ url?: string; path?: string; error?: string }> {
+  const { actor, admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  if (!Number.isInteger(index) || index < 0 || index > 999) return { error: "断片の番号が不正です" };
+  const safeExt = /^[a-z0-9]{2,5}$/.test(ext) ? ext : "webm";
+  const path = `${actor.companyId}/${note.studentId}/notes/parts/${note.id}_${String(index).padStart(3, "0")}.${safeExt}`;
+  const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error || !data) return { error: error?.message ?? "URLの発行に失敗しました" };
+  return { url: data.signedUrl, path };
+}
+
+/**
+ * 送っておいた断片を1本につないで、音声として確定する。
+ * つなぐのはサーバー側（Storage→Storage）なので、コーチの回線は使わない。
+ * 途中の断片が1つでも欠けていたら**つながない**（欠けた音声で要約すると嘘が混ざる）。
+ * その場合は画面側が丸ごと1本を送り直す（従来のやり方にそのまま落ちる）。
+ */
+export async function finishNoteParts(
+  noteId: string,
+  paths: string[],
+  seconds: number
+): Promise<{ error?: string; bytes?: number }> {
+  const { actor, admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  if (!paths.length) return { error: "録音が空でした" };
+  const prefix = `${actor.companyId}/${note.studentId}/notes/parts/${note.id}_`;
+  if (paths.some((p) => !p.startsWith(prefix))) return { error: "不正なパスです" };
+
+  const buffers: Buffer[] = [];
+  for (const path of paths) {
+    const dl = await admin.storage.from(BUCKET).download(path);
+    if (dl.error || !dl.data) return { error: "録音の一部を読めませんでした" };
+    buffers.push(Buffer.from(await dl.data.arrayBuffer()));
+  }
+  const merged = Buffer.concat(buffers);
+  if (merged.byteLength > MAX_NOTE_AUDIO) return { error: "録音が長すぎます。分けて録音してください" };
+
+  const ext = paths[0].split(".").pop() ?? "webm";
+  const full = `${actor.companyId}/${note.studentId}/notes/${Date.now()}.${ext}`;
+  const up = await admin.storage.from(BUCKET).upload(full, merged, {
+    contentType: ext === "m4a" || ext === "mp4" ? "audio/mp4" : ext === "ogg" ? "audio/ogg" : "audio/webm",
+    upsert: true,
+  });
+  if (up.error) return { error: up.error.message };
+  await admin.storage.from(BUCKET).remove(paths);
+
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({
+      audio_path: full,
+      audio_seconds: Math.max(0, Math.round(seconds)) || null,
+      audio_bytes: merged.byteLength,
+      status: "uploaded",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", note.id);
+  return error ? { error: error.message } : { bytes: merged.byteLength };
+}
+
 export async function finishNoteUpload(
   noteId: string,
   path: string,
   seconds: number,
-  bytes: number
+  bytes: number,
+  /** 分割送信が途中で失敗して丸ごと送り直したときに残っている断片。ここで消す */
+  staleParts?: string[]
 ): Promise<{ error?: string }> {
-  const { admin, note } = await ownNote(noteId);
+  const { actor, admin, note } = await ownNote(noteId);
   if (!note) return { error: "メモが見つかりません" };
+  if (staleParts?.length) {
+    const prefix = `${actor.companyId}/${note.studentId}/notes/parts/${note.id}_`;
+    const mine = staleParts.filter((p) => p.startsWith(prefix));
+    if (mine.length) await admin.storage.from(BUCKET).remove(mine);
+  }
   const { error } = await admin
     .from("lsn_lesson_notes")
     .update({
@@ -789,19 +881,81 @@ export async function finishNoteUpload(
   return error ? { error: error.message } : {};
 }
 
-/** コーチが直した本文を確定する。カルテに出るのはこれだけ */
-export async function saveLessonNote(noteId: string, body: string): Promise<{ error?: string }> {
-  const { admin, note } = await ownNote(noteId);
+/**
+ * コーチが確認した内容を確定する（2026-09-03 に1ボタンへ統合）
+ *
+ * それまでは「確認して保存」が**先生の記録しか保存していなかった**（お客様への説明は
+ * 欄から離れたときに裏で保存）。押した内容と保存される内容が違うのは事故のもとなので、
+ * 1回の保存で 先生の記録 と お客様への説明 の両方を確定する。
+ *
+ * 同時に、その日のレッスンに紐づける:
+ *   保存した時点で **その日の最後に撮ったスイング動画** を video_id に入れる。
+ *   これで「本日のレッスン」の動画の下にこのメモが並ぶ（本文はコピーしない・0142参照）。
+ *   その日に動画が無ければ null のまま＝日付だけのカードとして残る。
+ */
+export async function saveLessonNote(
+  noteId: string,
+  body: string,
+  shareBody?: string
+): Promise<{ error?: string; videoId?: string | null }> {
+  const { actor, admin, note } = await ownNote(noteId);
   if (!note) return { error: "メモが見つかりません" };
   const text = body.trim().slice(0, 4000);
-  if (!text) return { error: "本文を入力してください" };
+  if (!text) return { error: "先生の記録を入力してください" };
+
+  const { data: cur } = await admin
+    .from("lsn_lesson_notes")
+    .select("student_id, lesson_date, video_id")
+    .eq("id", note.id)
+    .maybeSingle();
+  const row = cur as { student_id: string; lesson_date: string; video_id: string | null } | null;
+  const studentId = row?.student_id ?? note.studentId;
+
+  // その日の最後の1本。すでに紐づけてあるなら動かさない（先生が選び直した意思を上書きしない）
+  let videoId = row?.video_id ?? null;
+  if (!videoId && row?.lesson_date) {
+    const { data: v } = await admin
+      .from("lsn_videos")
+      .select("id")
+      .eq("student_id", studentId)
+      .eq("company_id", actor.companyId)
+      .eq("shot_at", row.lesson_date)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    videoId = (v as { id: string } | null)?.id ?? null;
+  }
+
+  const patch: Record<string, unknown> = {
+    body: text,
+    status: "saved",
+    video_id: videoId,
+    updated_at: new Date().toISOString(),
+  };
+  // 未指定（undefined）のときは触らない。空文字で渡されたら「お客様には出さない」の意思とみなす
+  if (shareBody !== undefined) patch.share_body = shareBody.trim().slice(0, 3000) || null;
+
+  const { error } = await admin.from("lsn_lesson_notes").update(patch).eq("id", note.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/students/${studentId}`);
+  return { videoId };
+}
+
+/** 紐づけ先の動画を変える（違う動画に付けたいとき・外したいときは null） */
+export async function setNoteVideo(noteId: string, videoId: string | null): Promise<{ error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  if (videoId) {
+    const { video } = await ownVideo(videoId);
+    if (!video || video.studentId !== note.studentId) return { error: "動画が見つかりません" };
+  }
   const { error } = await admin
     .from("lsn_lesson_notes")
-    .update({ body: text, status: "saved", updated_at: new Date().toISOString() })
+    .update({ video_id: videoId, updated_at: new Date().toISOString() })
     .eq("id", note.id);
   if (error) return { error: error.message };
-  const { data } = await admin.from("lsn_lesson_notes").select("student_id").eq("id", note.id).maybeSingle();
-  revalidatePath(`/students/${(data as { student_id: string } | null)?.student_id ?? note.studentId}`);
+  revalidatePath(`/students/${note.studentId}`);
   return {};
 }
 
@@ -853,7 +1007,7 @@ export async function loadLessonNote(noteId: string): Promise<{ note?: LessonNot
   if (!note) return { error: "メモが見つかりません" };
   const { data, error } = await admin
     .from("lsn_lesson_notes")
-    .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, share_body, error, staff:coach_staff_id(name)")
+    .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, share_body, video_id, error, staff:coach_staff_id(name)")
     .eq("id", note.id)
     .maybeSingle();
   if (error || !data) return { error: error?.message ?? "読み込めませんでした" };
@@ -870,6 +1024,7 @@ export async function loadLessonNote(noteId: string): Promise<{ note?: LessonNot
       summary: (r.summary as LessonNoteItem["summary"]) ?? null,
       transcript: (r.transcript as string | null) ?? null,
       shareBody: (r.share_body as string | null) ?? null,
+      videoId: (r.video_id as string | null) ?? null,
       symptoms: tags.items ?? [],
       coach: ((r.staff as { name: string } | null)?.name) ?? "",
       error: (r.error as string | null) ?? null,

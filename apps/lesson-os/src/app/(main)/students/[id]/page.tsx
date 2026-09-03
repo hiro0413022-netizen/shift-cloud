@@ -55,7 +55,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     // トラックマン計測（2026-08-22）。写真は一覧では出さず、押されたときだけ署名URLを出す
     admin
       .from("lsn_measurements")
-      .select("id, measured_at, club, note, data, photo_path")
+      .select("id, measured_at, club, note, data, photo_path, video_id")
       .eq("student_id", id)
       .is("deleted_at", null)
       .order("measured_at", { ascending: false })
@@ -63,7 +63,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     // レッスンメモ（会話の録音→AI要約）。音声そのものは一覧では触らない
     admin
       .from("lsn_lesson_notes")
-      .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, share_body, error, staff:coach_staff_id(name)")
+      .select("id, lesson_date, status, audio_path, audio_seconds, body, summary, transcript, share_body, video_id, error, staff:coach_staff_id(name)")
       .eq("student_id", id)
       .is("deleted_at", null)
       .order("lesson_date", { ascending: false })
@@ -127,6 +127,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     club: (m.club as string | null) ?? null,
     note: (m.note as string | null) ?? null,
     hasPhoto: Boolean(m.photo_path),
+    videoId: (m.video_id as string | null) ?? null,
     values: ((m.data as TrackmanValues | null) ?? {}) as TrackmanValues,
   }));
 
@@ -150,6 +151,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     summary: (n.summary as LessonNoteItem["summary"]) ?? null,
     transcript: (n.transcript as string | null) ?? null,
     shareBody: (n.share_body as string | null) ?? null,
+    videoId: (n.video_id as string | null) ?? null,
     symptoms: (tagRows ?? []).filter((t) => String((t as { note_id: string }).note_id) === String(n.id)).map(mapNoteSymptom),
     coach: (n.staff as unknown as { name: string } | null)?.name ?? "",
     error: (n.error as string | null) ?? null,

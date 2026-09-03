@@ -4,6 +4,7 @@ import { Radar } from "@/components/radar";
 import type { Phases } from "@/lib/phases";
 import { ShareVideo } from "./share-video";
 import { brandOf } from "@/lib/brand";
+import { CLIENT_FIELDS, type TrackmanValues } from "@/lib/trackman";
 
 /**
  * 生徒向けマイページ（DECISIONS #50 / PGA NOTEユーザーアプリ準拠・青×白テーマ）
@@ -74,7 +75,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
    */
   const { data: notes } = await admin
     .from("lsn_lesson_notes")
-    .select("id, lesson_date, share_body, staff:coach_staff_id(name)")
+    .select("id, lesson_date, share_body, video_id, staff:coach_staff_id(name)")
     .eq("student_id", student.id)
     .is("deleted_at", null)
     .not("share_body", "is", null)
@@ -82,6 +83,21 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
     .limit(10);
 
   const videoIds = (videos ?? []).map((v) => v.id);
+
+  /**
+   * 計測（レッスンデータ）2026-09-03。
+   * **紐づいたものだけ**をそのスイングの下に出す（紐づけていない日は枠ごと出さない）。
+   * 前回比を出すために、紐づいていないものも含めて古い順に読む。
+   */
+  const { data: measures } = await admin
+    .from("lsn_measurements")
+    .select("id, measured_at, club, video_id, data")
+    .eq("student_id", student.id)
+    .is("deleted_at", null)
+    // 新しい順で取ってから古い順に並べ直す（昇順のまま limit すると古い60件になる）
+    .order("measured_at", { ascending: false })
+    .limit(60);
+
   const { data: comments } = videoIds.length
     ? await admin
         .from("lsn_comments")
@@ -96,6 +112,27 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
    * 生徒のスマホで「レッスン記録20本＋お手本6本」を開くと往復が26回発生し、
    * ページが出るまで数秒かかっていた（createSignedUrls なら1回）。
    */
+  /* 前回比。同じクラブの1つ前を基準にする（ドライバーと7番アイアンを比べても意味がない）。
+     同じクラブの記録が無ければ比較しない＝「前回比」は出さない。 */
+  type Shot = { id: string; videoId: string | null; club: string | null; values: TrackmanValues; prev: TrackmanValues | null };
+  const shots: Shot[] = [];
+  for (const m of [...(measures ?? [])].reverse()) {
+    const club = (m.club as string | null) ?? null;
+    const before = shots.filter((x) => x.club === club).at(-1) ?? null;
+    shots.push({
+      id: String(m.id),
+      videoId: (m.video_id as string | null) ?? null,
+      club,
+      values: ((m.data as TrackmanValues | null) ?? {}) as TrackmanValues,
+      prev: before?.values ?? null,
+    });
+  }
+  const shotsByVideo = new Map<string, Shot[]>();
+  for (const sh of shots) {
+    if (!sh.videoId) continue;
+    shotsByVideo.set(sh.videoId, [...(shotsByVideo.get(sh.videoId) ?? []), sh]);
+  }
+
   const paths: string[] = [];
   for (const v of videos ?? []) {
     paths.push(v.storage_path as string);
@@ -134,6 +171,13 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
   const radarItems = (items ?? []).map((it) => ({ name: it.name, percent: progMap.get(it.id) ?? 0 }));
   // ブランドは生徒の所属店舗で決める（#168）。直書きすると必ずどちらかの店で嘘になる
   const brand = brandOf(student.store_id as string | null);
+  const looseNotes = (notes ?? []).filter((n) => !n.video_id);
+  const notesByVideo = new Map<string, typeof looseNotes>();
+  for (const n of notes ?? []) {
+    const vid = n.video_id as string | null;
+    if (!vid) continue;
+    notesByVideo.set(vid, [...(notesByVideo.get(vid) ?? []), n]);
+  }
   const lessonCount = (videos ?? []).length;
   const latest = videos?.[0]?.shot_at ?? null;
 
@@ -184,11 +228,12 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
           </section>
         )}
 
-        {/* コーチからのアドバイス（コーチが確認して保存したものだけ） */}
-        {(notes ?? []).length > 0 && (
+        {/* コーチからのアドバイス（動画に紐づいていない日のぶん。紐づいているものは
+            下の「レッスン記録」でその動画の下に出すので、ここには出さない） */}
+        {looseNotes.length > 0 && (
           <section className="space-y-3">
             <p className="px-1 text-sm font-semibold" style={{ color: brand.accent }}>コーチからのアドバイス</p>
-            {(notes ?? []).map((n) => (
+            {looseNotes.map((n) => (
               <div key={n.id as string} className="rounded-xl bg-white p-4 shadow-sm">
                 <div className="flex items-center gap-2 text-xs text-gray-600">
                   <span className="text-sm font-semibold text-[#1c2733]">{String(n.lesson_date)}</span>
@@ -225,6 +270,51 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
               )}
               <div className="space-y-2 px-4 py-3">
                 {v.note && <p className="text-xs text-gray-500">{v.note}</p>}
+
+                {/* このスイングのレッスンの説明（先生が確認して保存したものだけ） */}
+                {(notesByVideo.get(v.id) ?? []).map((n) => (
+                  <div key={String(n.id)} className="rounded-lg border border-[#e3d5ae] bg-[#fdf9ee] px-3 py-2">
+                    <p className="text-[10px] text-[#8a6d1f]">
+                      今日のレッスン ・ {(n.staff as unknown as { name: string } | null)?.name ?? ""}
+                    </p>
+                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">{String(n.share_body)}</p>
+                  </div>
+                ))}
+
+                {/* レッスンデータ（計測）。紐づいた計測が無い日は、この枠ごと出ない */}
+                {(shotsByVideo.get(v.id) ?? []).map((sh) => {
+                  const fields = CLIENT_FIELDS.filter((f) => typeof sh.values[f.key] === "number");
+                  if (!fields.length) return null;
+                  return (
+                    <div key={sh.id} className="rounded-lg border border-gray-200 bg-[#f7f9fc] px-3 py-2">
+                      <p className="text-[10px] text-gray-500">レッスンデータ{sh.club ? ` ・ ${sh.club}` : ""}</p>
+                      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1">
+                        {fields.map((f) => {
+                          const now = sh.values[f.key] as number;
+                          const before = sh.prev?.[f.key];
+                          // 前回との差。良し悪しは決めつけず、増えた/減っただけを出す
+                          const diff = typeof before === "number" ? Math.round((now - before) * 10) / 10 : null;
+                          const unit = sh.values._units?.[f.key] ?? f.unit;
+                          return (
+                            <div key={f.key} className="flex items-baseline justify-between border-b border-gray-100 py-0.5 text-xs">
+                              <span className="text-gray-500">{f.label}</span>
+                              <span className="tabular-nums">
+                                {now}
+                                <span className="ml-0.5 text-gray-400">{unit}</span>
+                                {diff !== null && diff !== 0 && (
+                                  <span className="ml-1 text-[10px] text-gray-500">
+                                    （前回 {diff > 0 ? "+" : ""}{diff}）
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
                 {(comments ?? []).filter((c) => c.video_id === v.id).map((c, i) => (
                   <div key={i} className="rounded-lg border border-[#e3d5ae] bg-[#fdf9ee] px-3 py-2">
                     <p className="text-[10px] text-[#8a6d1f]">コーチからのアドバイス ・ {(c.staff as unknown as { name: string } | null)?.name}</p>
