@@ -1390,3 +1390,15 @@
   **(f) 署名URLはページ表示時に1回でまとめて発行**（`createSignedUrls`）。1本ずつ取ると本数ぶん往復して数秒待たされる（#143 と同じ理由）。サムネイルがある動画は `preload="none"`＝**お客様のギガを使わない**。開いた時点で `karte_seen_at` を進めるので、新着バッジは次に増えたときだけ出る。
 
   実装: `packages/core/src/lesson-share.ts`（新規）、`apps/member-os/src/app/member/lesson/{page.tsx, lesson-video.tsx}`（新規）、`apps/member-os/src/app/member/karte/route.ts`、`apps/member-os/src/app/member/page.tsx`、`apps/member-os/src/lib/frank-portal.ts`、`apps/lesson-os/src/{lib/trackman.ts, app/s/[token]/page.tsx}`、`tests/lesson-share.test.ts`（新規）。member-os / lesson-os の `tsc --noEmit` 通過・テスト602件通過
+
+- #211 (2026-09-03) **林 和希をコーチに変更し、シフトで「キャディ」を選べるようにした**（migration 0147適用済・**コード変更なし**）。ユーザー指示「林君はコーチになりましたので変更お願いします。またシフトを組むときに林君がキャディーの選択ができるようにしてください」。
+
+  **(a) どちらも「人ごとの設定」で決まる作りだったので、設定を変えただけ。** 会員ページに出す肩書きは `staff.member_page_role`（#209 のオプトイン欄）、シフトで選べる業務は `staff_schedule_types`（#147 の本人ごとの許可リスト）。**名前を条件に書いたコードは1行も足していない**——ここを場当たりに書くと、次に人が増えたときに必ずコードを触ることになる。
+
+  **(b) キャディが出ていなかった理由。** 林さんだけ `staff_schedule_types` に行が無かった（古川博庸・小川うらら・穴田 賢太 の3名は #147 の時点で入っていた）。行が無い人は業務のプルダウンごと出ない。1行入れて解決。
+
+  **(c) 同じことは画面からもできる。** `/admin/staff` → 本人 → **「シフトで選べる業務（この人のプルダウンに出るもの）」**のチェック。会員ページの肩書きも `staff.member_page_role` に文字を入れるだけ（空＝出さない）。**次からは私を通さずに変えられる**ことを申し送りとして残す。
+
+  **(d) 業務区分は終日扱いのまま**（#147 の設計）。「キャディ 8:00〜15:00」のように時間を持たせたい場合は、いまの `shifts` は1人1日1行（`unique (staff_id, store_id, date)`）なので設計変更が要る。今回は要望に無いので触っていない。
+
+  実装: `supabase/migrations/0147_hayashi_coach_and_caddy.sql`（新規・適用済）のみ。
