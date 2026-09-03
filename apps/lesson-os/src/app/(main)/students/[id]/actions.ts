@@ -508,12 +508,19 @@ type DiagVerdictIn = {
   ok: boolean; reason: string | null; advice: string | null;
   belowHands: number; vRangePct: number; sweepDeg: number; handSpeedPct: number;
 };
+type PoseFixIn = {
+  swapped: number; lowVis: number; stretched: number; spikes: number;
+  left: number; asym: number; body: number;
+};
 type ClubDiagIn = {
   frames: number; withPose: number; withRay: number; kept: number; final: number;
   thr: number; fill: number; conf: number; gap: number;
   verdict?: DiagVerdictIn;
+  pose?: PoseFixIn;
 };
 const DIAG_KEYS = ["frames", "withPose", "withRay", "kept", "final", "thr", "fill", "conf", "gap"] as const;
+/** 2026-09-03: 骨格をどれだけ直したか。ここを通し忘れると再訪時に消える（#185 の verdict と同じ轍） */
+const POSE_KEYS = ["swapped", "lowVis", "stretched", "spikes", "left", "asym", "body"] as const;
 function cleanDiag(d: unknown): ClubDiagIn | null {
   if (!d || typeof d !== "object") return null;
   const src = d as Record<string, unknown>;
@@ -536,6 +543,16 @@ function cleanDiag(d: unknown): ClubDiagIn | null {
       sweepDeg: Math.round(Number(vv.sweepDeg) || 0),
       handSpeedPct: isFinite(Number(vv.handSpeedPct)) ? Number(vv.handSpeedPct) : 0,
     } satisfies DiagVerdictIn;
+  }
+  const pf = src.pose;
+  if (pf && typeof pf === "object") {
+    const pp = pf as Record<string, unknown>;
+    const o = {} as Record<string, number>;
+    for (const k of POSE_KEYS) {
+      const n = Number(pp[k]);
+      o[k] = isFinite(n) ? Math.round(n) : 0;
+    }
+    out.pose = o as unknown as PoseFixIn;
   }
   return out as unknown as ClubDiagIn;
 }

@@ -13,8 +13,14 @@ import { cp, mkdir, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-const MODEL =
-  "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+/**
+ * 2026-09-03: lite → full。
+ * 解析は「撮り終わった動画のコマ送り」でリアルタイムではないので、
+ * 1コマの推論が少し遅くなるより、手首から先・足首から先が飛ばないほうが価値がある。
+ * full は約9MB。落とせなければ実行時に lite → CDN の順に落ちる（src/lib/pose.ts の MODELS）。
+ */
+const MODEL_NAME = "pose_landmarker_full";
+const MODEL = `https://storage.googleapis.com/mediapipe-models/pose_landmarker/${MODEL_NAME}/float16/1/${MODEL_NAME}.task`;
 
 const out = path.join(process.cwd(), "public", "mp");
 const warn = (m) => console.warn(`[prepare-mediapipe] ${m}（実行時はCDNに落ちます）`);
@@ -51,7 +57,7 @@ try {
   }
 
   // 2) モデル（既にあれば触らない＝ビルドのたびに落とさない）
-  const model = path.join(out, "pose_landmarker_lite.task");
+  const model = path.join(out, `${MODEL_NAME}.task`);
   if (!(await exists(model))) {
     try {
       const res = await fetch(MODEL);

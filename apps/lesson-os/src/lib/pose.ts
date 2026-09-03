@@ -28,17 +28,40 @@
 import type { PoseLandmarker } from "@mediapipe/tasks-vision";
 
 const PKG_VERSION = "1.0.1";
-const MODEL_FILE = "pose_landmarker_lite.task";
+
+/**
+ * 使うモデルは上から順に探す（2026-09-03: 既定を lite → full に変更）。
+ *
+ * なぜ lite をやめたか:
+ *   ここは「撮り終わった動画をコマ送りする」処理で、撮影中のリアルタイム推論ではない。
+ *   1コマあたりの待ち時間は動画のシークのほうが長く、軽いモデルを選ぶ理由がそもそも無かった。
+ *   lite は手首から先・足首から先が特に弱く、コックやかかとが数コマおきに飛ぶ。
+ *   full は約9MB（lite の約1.6倍）。初回だけ読んで、以降はブラウザのキャッシュに乗る。
+ *
+ * 端末に用意できていなければ lite → CDN の順に落ちる。ここでは絶対に止めない。
+ */
+const MODELS = ["pose_landmarker_full", "pose_landmarker_lite"] as const;
 
 const LOCAL_WASM = "/mp/wasm";
-const LOCAL_MODEL = `/mp/${MODEL_FILE}`;
 const CDN_WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${PKG_VERSION}/wasm`;
-const CDN_MODEL = `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/${MODEL_FILE}`;
+const localModel = (name: string) => `/mp/${name}.task`;
+const cdnModel = (name: string) =>
+  `https://storage.googleapis.com/mediapipe-models/pose_landmarker/${name}/float16/1/${name}.task`;
 
 /** 解析にかける最大コマ数。長い動画・高fps指定で端末が固まらないための保険 */
 const MAX_FRAMES = 1200;
-/** 推論とスキャンに使う画像の最大辺。モデルの入力は256pxなので上げても精度は伸びない */
+/** クラブのフレーム間差分に使う画像の最大辺。ここは全画素を毎コマ読むので上げると重い */
 const WORK_EDGE = 640;
+/**
+ * 骨格の推論に渡す画像の最大辺（2026-09-03 で 640 から分離）。
+ *
+ * 「モデルの入力は256pxだから上げても無駄」と書いていたのは誤り。
+ * 256px に縮められるのは *人物を切り抜いたあと* で、切り抜き元はここで渡した画像。
+ * 640 の画面に人が6割で写ると切り抜きは約380px、後方から小さく写ると256pxを割って
+ * 手足の先から情報が落ちる。差分用の画像とは別に、大きいまま推論へ渡す。
+ * 推論はGPUテクスチャで読むので getImageData のような画素の読み出しは増えない。
+ */
+const POSE_EDGE = 960;
 /** 1コマのシークがこれ以上返ってこなければ打ち切る */
 const SEEK_TIMEOUT = 4000;
 
@@ -172,9 +195,16 @@ let cached: { lm: PoseLandmarker; engine: string } | null = null;
 async function getLandmarker(): Promise<{ lm: PoseLandmarker; engine: string }> {
   if (cached) return cached;
   const { FilesetResolver, PoseLandmarker: PL } = await import("@mediapipe/tasks-vision");
-  const local = await headOk(LOCAL_MODEL);
-  const wasmBase = local ? LOCAL_WASM : CDN_WASM;
-  const modelPath = local ? LOCAL_MODEL : CDN_MODEL;
+
+  // 端末に置いてあるモデルを上から探す。1つも無ければ CDN の full。
+  let name: string = MODELS[0];
+  let modelPath = cdnModel(MODELS[0]);
+  let local = false;
+  for (const m of MODELS) {
+    if (await headOk(localModel(m))) { name = m; modelPath = localModel(m); local = true; break; }
+  }
+  // wasm の有無はモデルとは別に見る（片方だけ用意できている端末があるため）
+  const wasmBase = (await headOk(`${LOCAL_WASM}/vision_wasm_internal.wasm`)) ? LOCAL_WASM : CDN_WASM;
   const fileset = await FilesetResolver.forVisionTasks(wasmBase);
 
   const build = (delegate: "GPU" | "CPU") =>
@@ -195,7 +225,7 @@ async function getLandmarker(): Promise<{ lm: PoseLandmarker; engine: string }> 
     delegate = "CPU";
     lm = await build("CPU");
   }
-  cached = { lm, engine: `mediapipe/${MODEL_FILE.replace(".task", "")}@${PKG_VERSION}/${delegate}${local ? "" : "/cdn"}` };
+  cached = { lm, engine: `mediapipe/${name}@${PKG_VERSION}/${delegate}${local ? "" : "/cdn"}` };
   return cached;
 }
 
@@ -203,6 +233,232 @@ async function getLandmarker(): Promise<{ lm: PoseLandmarker; engine: string }> 
 export function disposePose() {
   try { cached?.lm.close(); } catch { /* 破棄の失敗は無視してよい */ }
   cached = null;
+}
+
+/* ------------------------------------------------------------------ */
+/* 骨格の後処理（2026-09-03）                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * MediaPipe が返した33関節をそのまま保存せず、スイング1本ぶんまとめて見直してから使う。
+ *
+ * なぜコマ単位ではなくスイング全体で見るか:
+ *   1コマだけ眺めても「この手首が正しいか」は判断できない。前後のコマ・骨の長さ・
+ *   左右の対応と突き合わせて、はじめて「おかしい」と分かる。
+ *   多視点3次元再構成の研究（AniPose 系）でも、骨の長さの一定性・左右対称性・
+ *   時間方向の滑らかさを *まとめて* 最適化している。単眼のうちでは最適化まではできないが、
+ *   同じ3つを「明らかにおかしい点を見つける物差し」としてなら使える。
+ *
+ * ⚠ ここでやらないこと: なめらかにするための平滑化。
+ *   ダウンスイングは30fpsでも1コマで手元が画面の1割動く。低域通過をかけると
+ *   いちばん速いところが鈍って、インパクトが別のスイングになる。
+ *   直すのは「行って戻ってくる飛び」だけで、素直に速い動きには手を触れない。
+ *
+ * ⚠ ここでやらないこと: 左右対称性を使った「補正」。
+ *   3次元なら左右の骨は同じ長さだが、画面に映った長さは向きで縮む（投影）ので、
+ *   2Dで左右を揃えにいくのは嘘になる。食い違いは数字として報告するだけにする。
+ */
+
+/** 左右で対になる関節（BlazePose 33点）。0＝鼻だけ対がない */
+const MIRROR_PAIRS: [number, number][] = [
+  [1, 4], [2, 5], [3, 6], [7, 8], [9, 10],
+  [11, 12], [13, 14], [15, 16], [17, 18], [19, 20], [21, 22],
+  [23, 24], [25, 26], [27, 28], [29, 30], [31, 32],
+];
+
+/** 長さが変わらないはずの骨（近い側, 遠い側）。おかしいときは遠い側の点を疑う */
+const LIMBS: [number, number][] = [
+  [LM.lShoulder, LM.lElbow], [LM.lElbow, LM.lWrist],   // 0,1 左上腕・左前腕
+  [LM.rShoulder, LM.rElbow], [LM.rElbow, LM.rWrist],   // 2,3 右上腕・右前腕
+  [LM.lHip, LM.lKnee], [LM.lKnee, LM.lAnkle],          // 4,5 左大腿・左下腿
+  [LM.rHip, LM.rKnee], [LM.rKnee, LM.rAnkle],          // 6,7 右大腿・右下腿
+];
+/** 左右で同じ長さのはずの組（上の添字）。上腕・前腕・大腿・下腿 */
+const LIMB_MIRROR: [number, number][] = [[0, 2], [1, 3], [4, 6], [5, 7]];
+
+/** 信頼度がこれ未満の点は、前後のコマから引き直す */
+const VIS_MIN = 0.35;
+/**
+ * 骨が「本来の長さ」のこの倍を超えたら、遠い側の点が飛んでいる。
+ * 画面に映る長さは向きによって縮むことはあっても伸びることはないので、
+ * 本来の長さの目安はスイング中の長さの90パーセンタイル（＝いちばん伸びて写ったとき）を採る。
+ */
+const LIMB_LONG = 1.3;
+/** 左右を入れ替えたほうが前のコマにこの割合まで近づくなら、ラベルが入れ替わっている */
+const SWAP_GAIN = 0.6;
+/** 引き直しでまたぐことを許すコマ数。これを超える穴は埋めない（作り話になる） */
+const FILL_MAX = 5;
+/** 「行って戻る」と見なす形の厳しさ。前後2コマの距離が往復の和のこの割合未満なら飛び */
+const SPIKE_RATIO = 0.4;
+/** 体の大きさに対してこれ未満の揺れは、飛びとして扱わない（ただのブレ） */
+const SPIKE_MIN_PCT = 0.05;
+
+/** 骨格をどれだけ直したか。「取れました」だけでは現場で打つ手が無いので必ず残す */
+export type PoseFix = {
+  /** 左右のラベルが入れ替わっていて直したコマ数 */
+  swapped: number;
+  /** 信頼度が低くて引き直した点の数 */
+  lowVis: number;
+  /** 骨が伸びていて引き直した点の数 */
+  stretched: number;
+  /** 行って戻る飛びとして引き直した点の数 */
+  spikes: number;
+  /** 引き直せずに残した点の数（穴が大きすぎた） */
+  left: number;
+  /** 左右の骨の長さの食い違い（%）。直さず数字だけ出す。40%を超えるなら撮り方を疑う */
+  asym: number;
+  /** 体の物差し（肩〜足首）の中央値・px。数字の分母に使う */
+  body: number;
+};
+
+const median = (a: number[]) => (a.length ? [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)] : 0);
+
+/**
+ * 骨格を1本ぶんまとめて直す。p は破壊的に書き換える（×1000の整数のまま）。
+ *
+ * @param p   33関節×(x,y,z)×1000 の整数。未検出コマは []
+ * @param vis 同じコマ数の 33関節ぶんの信頼度（0〜1）。未検出コマは []
+ */
+export function cleanPose(p: number[][], vis: number[][], W: number, H: number): PoseFix {
+  const n = p.length;
+  const fix: PoseFix = { swapped: 0, lowVis: 0, stretched: 0, spikes: 0, left: 0, asym: 0, body: 0 };
+  const has = (i: number) => Array.isArray(p[i]) && p[i].length === 99;
+  const X = (i: number, k: number) => (p[i][k * 3] / 1000) * W;
+  const Y = (i: number, k: number) => (p[i][k * 3 + 1] / 1000) * H;
+  const dist = (i: number, k: number, j: number, k2: number) =>
+    Math.hypot(X(i, k) - X(j, k2), Y(i, k) - Y(j, k2));
+
+  /* 0) 体の物差しをスイング全体で1つ決める -----------------------------
+     コマごとに肩幅で割ると、肩幅そのものがブレたぶんまで数字に乗る。
+     スイング中は身長も肩幅も変わらないのだから、分母は1本につき1つでよい。
+     （多視点の研究でも、腰の平均位置と人物の平均高さでスイング全体を共通に正規化していた） */
+  const scales: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (!has(i)) continue;
+    const smx = (X(i, LM.lShoulder) + X(i, LM.rShoulder)) / 2;
+    const smy = (Y(i, LM.lShoulder) + Y(i, LM.rShoulder)) / 2;
+    const amx = (X(i, LM.lAnkle) + X(i, LM.rAnkle)) / 2;
+    const amy = (Y(i, LM.lAnkle) + Y(i, LM.rAnkle)) / 2;
+    const b = Math.hypot(amx - smx, amy - smy);
+    if (b > 20) scales.push(b);
+  }
+  const body = scales.length ? median(scales) : H * 0.5;
+  fix.body = Math.round(body);
+
+  /* 1) 左右のラベルの入れ替わりを直す ---------------------------------
+     後方（DTL）から撮ると体が真横を向くので、MediaPipe は数コマだけ左右を取り違える。
+     取り違えたコマは「前のコマと比べて、入れ替えたほうが明らかに近い」形になる。
+     腰から下だけ入れ替わることは無い（モデルは全身1組として出す）ので、全対をまとめて見る。 */
+  let prev = -1;
+  for (let i = 0; i < n; i++) {
+    if (!has(i)) continue;
+    if (prev >= 0 && i - prev <= 3) {
+      let asIs = 0;
+      let sw = 0;
+      for (const [a, b] of MIRROR_PAIRS) {
+        asIs += dist(i, a, prev, a) + dist(i, b, prev, b);
+        sw += dist(i, a, prev, b) + dist(i, b, prev, a);
+      }
+      if (asIs > 0 && sw < asIs * SWAP_GAIN) {
+        for (const [a, b] of MIRROR_PAIRS) {
+          for (let c = 0; c < 3; c++) {
+            const t = p[i][a * 3 + c];
+            p[i][a * 3 + c] = p[i][b * 3 + c];
+            p[i][b * 3 + c] = t;
+          }
+          if (vis[i]?.length === 33) {
+            const tv = vis[i][a];
+            vis[i][a] = vis[i][b];
+            vis[i][b] = tv;
+          }
+        }
+        fix.swapped++;
+      }
+    }
+    prev = i;
+  }
+
+  /* 2) 疑わしい点に印を付ける ----------------------------------------- */
+  const bad: Uint8Array[] = Array.from({ length: n }, () => new Uint8Array(33));
+
+  // 2-a) モデル自身が「見えていない」と言っている点
+  for (let i = 0; i < n; i++) {
+    if (!has(i)) continue;
+    const v = vis[i];
+    if (v?.length !== 33) continue;
+    for (let k = 0; k < 33; k++) {
+      if (v[k] < VIS_MIN) { bad[i][k] = 1; fix.lowVis++; }
+    }
+  }
+
+  // 2-b) 骨が伸びている点（投影は縮みこそすれ伸びない）
+  const refLen: number[] = [];
+  LIMBS.forEach(([a, b], li) => {
+    const arr: number[] = [];
+    for (let i = 0; i < n; i++) if (has(i) && !bad[i][a] && !bad[i][b]) arr.push(dist(i, a, i, b));
+    arr.sort((x, y) => x - y);
+    refLen[li] = arr.length >= 5 ? arr[Math.floor((arr.length - 1) * 0.9)] : 0;
+  });
+  LIMBS.forEach(([a, b], li) => {
+    if (!(refLen[li] > 5)) return;
+    for (let i = 0; i < n; i++) {
+      if (!has(i) || bad[i][b]) continue;
+      if (dist(i, a, i, b) > refLen[li] * LIMB_LONG) { bad[i][b] = 1; fix.stretched++; }
+    }
+  });
+
+  // 2-c) 行って戻る飛び。速い動きを消さないよう「距離が大きいか」ではなく「戻ってきたか」で見る
+  const spikeFloor = body * SPIKE_MIN_PCT;
+  const idx: number[] = [];
+  for (let i = 0; i < n; i++) if (has(i)) idx.push(i);
+  for (let m = 1; m + 1 < idx.length; m++) {
+    const a = idx[m - 1];
+    const c = idx[m];
+    const b = idx[m + 1];
+    if (b - a > 4) continue; // 間が空いていると「戻ってきた」かどうか判断できない
+    for (let k = 0; k < 33; k++) {
+      if (bad[c][k] || bad[a][k] || bad[b][k]) continue;
+      const out = dist(a, k, c, k);
+      const back = dist(c, k, b, k);
+      if (out < spikeFloor) continue;
+      if (dist(a, k, b, k) < (out + back) * SPIKE_RATIO) { bad[c][k] = 1; fix.spikes++; }
+    }
+  }
+
+  /* 3) 印を付けた点を前後から引き直す ---------------------------------
+     引き直しは短い穴だけ。長い穴は埋めずに元の値を残す（作り話をしない）。 */
+  for (let k = 0; k < 33; k++) {
+    for (let m = 0; m < idx.length; m++) {
+      const i = idx[m];
+      if (!bad[i][k]) continue;
+      let lo = -1;
+      let hi = -1;
+      for (let q = m - 1; q >= 0 && m - q <= FILL_MAX; q--) if (!bad[idx[q]][k]) { lo = idx[q]; break; }
+      for (let q = m + 1; q < idx.length && q - m <= FILL_MAX; q++) if (!bad[idx[q]][k]) { hi = idx[q]; break; }
+      if (lo < 0 && hi < 0) { fix.left++; continue; }
+      for (let c = 0; c < 3; c++) {
+        if (lo >= 0 && hi >= 0) {
+          const w = (i - lo) / (hi - lo);
+          p[i][k * 3 + c] = Math.round(p[lo][k * 3 + c] * (1 - w) + p[hi][k * 3 + c] * w);
+        } else {
+          p[i][k * 3 + c] = p[lo >= 0 ? lo : hi][k * 3 + c];
+        }
+      }
+    }
+  }
+
+  /* 4) 左右対称性は「点検」だけ（直さない） ---------------------------
+     3次元なら左右の骨は同じ長さ。2Dでは向きで縮むので多少は食い違って当たり前だが、
+     いちばん伸びて写ったときの長さ同士で大きく違うなら、そもそも片側が取れていない。 */
+  const gaps: number[] = [];
+  for (const [l, r] of LIMB_MIRROR) {
+    const a = refLen[l];
+    const b = refLen[r];
+    if (a > 5 && b > 5) gaps.push((Math.abs(a - b) / ((a + b) / 2)) * 100);
+  }
+  fix.asym = gaps.length ? Math.round(Math.max(...gaps)) : 0;
+
+  return fix;
 }
 
 /* ------------------------------------------------------------------ */
@@ -383,6 +639,8 @@ export type ClubDiag = {
   gap: number;        // 実際に使った「何コマ前と比べたか」の中央値
   /** #185: 出来上がった軌跡が「スイングとしてありうるか」の判定 */
   verdict?: TrackVerdict;
+  /** 2026-09-03: 骨格をどれだけ直したか（cleanPose の結果） */
+  pose?: PoseFix;
 };
 
 /** DPに渡すコマごとの候補 */
@@ -802,6 +1060,7 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
     const srcFps = await detectFps(video).catch(() => null);
     video.currentTime = 0;
 
+    // 差分用（毎コマ全画素を読むので小さく）
     const scale = Math.min(1, WORK_EDGE / Math.max(W, H));
     const cw = Math.max(2, Math.round(W * scale));
     const ch = Math.max(2, Math.round(H * scale));
@@ -811,9 +1070,22 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) throw new Error("canvas を作れませんでした");
 
+    // 骨格の推論用（人物の切り抜きが 256px を割らないよう、こちらは大きいまま渡す）。
+    // 元動画がそもそも小さいときは引き伸ばさない（無い情報は増えない）。
+    const pscale = Math.min(1, POSE_EDGE / Math.max(W, H));
+    const pw = Math.max(2, Math.round(W * pscale));
+    const ph = Math.max(2, Math.round(H * pscale));
+    const same = pw === cw && ph === ch;
+    const poseCanvas = same ? canvas : document.createElement("canvas");
+    const pctx = same ? ctx : poseCanvas.getContext("2d");
+    if (!pctx) throw new Error("canvas を作れませんでした");
+    if (!same) { poseCanvas.width = pw; poseCanvas.height = ph; }
+
     const total = Math.min(MAX_FRAMES, Math.max(1, Math.floor(dur * fps)));
     const t: number[] = [];
     const p: number[][] = [];
+    /** 関節ごとの信頼度。保存はせず、あとで cleanPose が「疑わしい点」を選ぶのに使う */
+    const visRows: number[][] = [];
     let detected = 0;
     let lastTs = -1;
 
@@ -843,6 +1115,7 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
       });
 
       ctx.drawImage(video, 0, 0, cw, ch);
+      if (!same) pctx.drawImage(video, 0, 0, pw, ph);
 
       // 輝度だけ取り出す（差分に色は要らない）
       const gCur = ringAt(i);
@@ -856,21 +1129,26 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
       lastTs = ts;
 
       let row: number[] = [];
+      let vrow: number[] = [];
       let one: { x: number; y: number; z?: number; visibility?: number }[] | undefined;
       try {
-        const res = lm.detectForVideo(canvas, ts);
+        const res = lm.detectForVideo(poseCanvas, ts);
         one = res.landmarks?.[0];
         if (one && one.length >= 33) {
           row = new Array(99);
+          vrow = new Array(33);
           for (let k = 0; k < 33; k++) {
             row[k * 3] = Math.round(one[k].x * 1000);
             row[k * 3 + 1] = Math.round(one[k].y * 1000);
             row[k * 3 + 2] = Math.round((one[k].z ?? 0) * 1000);
+            // visibility が無いビルドもあるので、無ければ「見えている」扱いにして素通しする
+            vrow[k] = typeof one[k].visibility === "number" ? (one[k].visibility as number) : 1;
           }
           detected++;
         }
       } catch {
         row = []; // このコマだけ落ちても続ける
+        vrow = [];
       }
 
       // クラブ: 骨格から手首と体の大きさが取れたときだけ
@@ -931,6 +1209,7 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
 
       t.push(ts);
       p.push(row);
+      visRows.push(vrow);
 
       if (i % 5 === 0) {
         opts.onProgress?.(i + 1, total, "解析中");
@@ -939,6 +1218,11 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
     }
 
     opts.onProgress?.(total, total, "解析中");
+
+    // 骨格を1本ぶんまとめて直してから、これ以降（軌跡の判定・プレーン・角度）に渡す。
+    // クラブの候補集めはこれより前に終わっているが、あちらが使うのは
+    // 両手首・両肩・両足首の *中点* だけで、左右が入れ替わっても中点は動かないので影響しない。
+    const poseFix = cleanPose(p, visRows, W, H);
 
     const built = buildClub(frameCands, t, cw, ch);
     // #185: 線が出たことと、それがクラブであることは別。形を見て、違えば捨てる。
@@ -957,6 +1241,7 @@ export async function analyzeSwing(src: string, opts: AnalyzeOptions = {}): Prom
       conf: Math.round(percentile(confs, 0.5) * 100),
       gap: Math.round(percentile(gaps.filter((n) => n != null), 0.5)),
       verdict,
+      pose: poseFix,
     };
 
     return {

@@ -487,6 +487,25 @@ export function VideoPlayer({
                   {poseInfo.srcFps ? ` ・元動画 ${poseInfo.srcFps}fps` : ""}
                 </span>
               )}
+              {/* 2026-09-03: 骨格をどれだけ直したか。「きれいに出た」のか「直した結果きれいに見えている」のかは
+                  コーチが数字を読むときに知っておくべき差なので、黙って直さず件数を出す */}
+              {diag?.pose && diag.pose.lowVis + diag.pose.stretched + diag.pose.spikes + diag.pose.swapped > 0 && (
+                <span
+                  className="rounded bg-(--color-header)/40 px-2 py-0.5 text-(--color-dim)"
+                  title={`信頼度が低い ${diag.pose.lowVis} ／ 骨が伸びた ${diag.pose.stretched} ／ 行って戻る飛び ${diag.pose.spikes} ／ 埋められず残した ${diag.pose.left}`}
+                >
+                  🔧 骨格を直した点 {diag.pose.lowVis + diag.pose.stretched + diag.pose.spikes}
+                  {diag.pose.swapped > 0 ? ` ・左右の入れ替わり ${diag.pose.swapped}コマ` : ""}
+                </span>
+              )}
+              {diag?.pose && diag.pose.asym >= 40 && (
+                <span
+                  className="rounded bg-amber-500/15 px-2 py-0.5 text-amber-300"
+                  title="3次元では左右の骨は同じ長さです。画面上でここまで違うのは、片側が体に隠れて取れていないとき。角度の数字は当てにしないでください"
+                >
+                  ⚠ 左右の骨の長さが {diag.pose.asym}% 違います
+                </span>
+              )}
               {vp && (
                 <span className="rounded bg-(--color-header)/40 px-2 py-0.5 text-(--color-dim)" title="前回と近い数字なら、角度も前回と比べられます">
                   📷 {vp.label}{vp.deg}° ・体の大きさ {vp.fill}%
