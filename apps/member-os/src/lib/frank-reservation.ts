@@ -370,8 +370,10 @@ export async function loadLiveItems(companyId: string, limit = 5): Promise<LiveI
         : String(r.customer_kind ?? "") === "member"
           ? "member"
           : "dropin";
+    // 法人の方は「会社名＋お名前」（#206）。会社名が無ければお名前だけが返る
+    const memberName = r.frunk_members ? memberDisplayName(r.frunk_members as never) || null : null;
     const name =
-      (r.frunk_members ? memberDisplayName(r.frunk_members as never) : null) ||
+      memberName ??
       (r.mbr_trial_requests as { name?: string } | null)?.name ??
       (r.guest_name as string | null) ??
       null;
