@@ -1,5 +1,6 @@
 import { requireCoachActor } from "@/lib/auth";
 import Nav from "./nav";
+import VoiceBar from "./voice-bar";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireCoachActor();
@@ -34,6 +35,9 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           </button>
         </form>
       </header>
+
+      {/* 録音バーはレイアウトに置く。ページの中に置くと画面遷移で作り直されて録音が止まる（2026-09-03） */}
+      <VoiceBar />
 
       <div className="flex-1">{children}</div>
       <Nav />
