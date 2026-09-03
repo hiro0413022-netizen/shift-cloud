@@ -5,6 +5,7 @@ import { loadBookingCfg, businessHours } from "@/lib/frank-booking";
 import { bookableRange } from "@yozan/core/frank-booking";
 import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
 import { birthDateError, normalizeBirthDate } from "@yozan/core/birth-date";
+import { canTakeTrial, type Span } from "@yozan/core/frank-coach-capacity";
 import { buildTrialConfirmMail, sendFrankMail } from "@/lib/frank-mail";
 
 /**
@@ -86,6 +87,53 @@ function pickBay(bays: Bay[], busy: Record<string, { s: number; e: number }[]>, 
   return null;
 }
 
+/**
+ * その日の「体験を担当できるコーチ」の在席時間帯（#212）
+ *
+ * 返り値が **null = その日のシフトがまだ確定していない**（下書きしか無い／まだ組んでいない）。
+ * 数に入れるのは会員ページの出勤予定に出している人（staff.member_page_role が入っている人・#209）。
+ * 出す人と担当する人を1か所で管理するため、専用のフラグは増やしていない。
+ */
+async function coachCover(admin: ReturnType<typeof createAdmin>, dateStr: string): Promise<Span[] | null> {
+  const { data } = await admin
+    .from("shifts")
+    .select("start_time, end_time, is_day_off, staff:staff_id(member_page_role)")
+    .eq("store_id", FRANK_STORE)
+    .eq("date", dateStr)
+    .eq("status", "published") // 確定したシフトだけ。下書きで受け入れを増やさない
+    .is("deleted_at", null)
+    .limit(50);
+
+  type Row = { start_time: string | null; end_time: string | null; is_day_off: boolean | null; staff: { member_page_role?: string | null } | null };
+  const rows = ((data ?? []) as unknown as Row[]).filter((r) => String(r.staff?.member_page_role ?? "").trim() !== "");
+  // コーチの行が1件も無い = その日はまだ決まっていない（休みの行があれば「決まっている」）
+  if (rows.length === 0) return null;
+
+  const cover: Span[] = [];
+  for (const r of rows) {
+    if (r.is_day_off) continue;
+    if (!r.start_time || !r.end_time) continue; // 業務区分（キャディ等）は終日扱いで時刻が無い＝店にいない
+    cover.push({ s: toMin(String(r.start_time)), e: toMin(String(r.end_time)) });
+  }
+  return cover;
+}
+
+/** その日すでに入っている体験の時間帯（キャンセル以外） */
+async function trialSpans(admin: ReturnType<typeof createAdmin>, dateStr: string): Promise<Span[]> {
+  const { data } = await admin
+    .from("frunk_bookings")
+    .select("start_time, end_time")
+    .eq("booked_date", dateStr)
+    .eq("customer_kind", "trial")
+    .neq("status", "cancelled")
+    .is("deleted_at", null)
+    .limit(100);
+  return ((data ?? []) as { start_time: string; end_time: string }[]).map((b) => ({
+    s: toMin(String(b.start_time)),
+    e: toMin(String(b.end_time)),
+  }));
+}
+
 export type TrialSlots = {
   date: string;
   closed: boolean;
@@ -120,7 +168,12 @@ export async function getTrialSlots(dateStr: string): Promise<TrialSlots> {
   };
   if (!hours) return { ...base, closed: true, slots: [], leftySlots: [] };
 
-  const [bays, busy] = await Promise.all([trialBays(admin), busyByBay(admin, dateStr)]);
+  const [bays, busy, cover, trials] = await Promise.all([
+    trialBays(admin),
+    busyByBay(admin, dateStr),
+    coachCover(admin, dateStr),
+    trialSpans(admin, dateStr),
+  ]);
   const open = toMin(hours.open);
   const close = toMin(hours.close);
   const today = jstToday();
@@ -135,6 +188,8 @@ export async function getTrialSlots(dateStr: string): Promise<TrialSlots> {
   for (let s = first; s + TRIAL_MINUTES <= close; s += TRIAL_START_STEP) {
     if (s < earliest) continue;
     const e = s + TRIAL_MINUTES;
+    // コーチの人数ぶんまで（#212）。打席が空いていても担当がいなければ出さない
+    if (!canTakeTrial(cover, trials, s, s + TRIAL_LABEL_MINUTES)) continue;
     if (pickBay(bays, busy, s, e, false)) slots.push(toTime(s));
     if (pickBay(bays, busy, s, e, true)) leftySlots.push(toTime(s));
   }
@@ -229,8 +284,19 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
   }
 
   const lefty = Boolean(input.lefty);
-  const [bays, busy] = await Promise.all([trialBays(admin), busyByBay(admin, input.date)]);
+  const [bays, busy, cover, trials] = await Promise.all([
+    trialBays(admin),
+    busyByBay(admin, input.date),
+    coachCover(admin, input.date),
+    trialSpans(admin, input.date),
+  ]);
   if (bays.length === 0) return { ok: false, error: "ただいま体験のご予約を承れません。お手数ですが店舗までご連絡ください。" };
+
+  // コーチの人数を超える体験は受けない（#212）。画面を経由しない直接POSTもここで止まる。
+  // スタッフの代理登録（member-os）もこのAPIを通るので、同じ判定が効く。
+  if (!canTakeTrial(cover, trials, s, s + TRIAL_LABEL_MINUTES)) {
+    return { ok: false, error: "その時間は体験のご案内がいっぱいです。別の時間をお選びください。" };
+  }
 
   const bay = pickBay(bays, busy, s, e, lefty);
   if (!bay) {
