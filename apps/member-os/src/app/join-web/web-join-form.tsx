@@ -156,41 +156,30 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
             </p>
           </div>
 
-          <div className="space-y-3 border-t border-(--color-line) pt-4">
-            <div>
-              <p className="text-sm font-semibold text-(--color-txt)">ご利用者のご登録 <span className="text-rose-400">*</span></p>
-              <p className="mt-1 text-xs text-(--color-dim)">
-                実際にご利用になる方を{spec.maxUsers}名様までご登録ください（あとから店頭で入れ替えもできます）。
-                おひとりずつ会員番号を発行しますので、
-                <span className="font-medium text-(--color-txt)">会員ページのログインに使う電話番号は、おひとりずつ違う番号</span>をご入力ください。
+          {/* ご利用者は入会後に会員ページからご登録いただく（#204・無記名で申し込める）
+              ここで全員のお名前を required にしていたため、
+              「まだ誰が使うか決まっていない」会社はお申し込みできなかった。 */}
+          <div className="space-y-2 border-t border-(--color-line) pt-4">
+            <p className="text-sm font-semibold text-(--color-txt)">ご利用者のご登録について</p>
+            <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 text-xs leading-relaxed text-(--color-dim)">
+              <p>
+                お申し込みの時点では、ご利用になる方のご入力は不要です。
+                ご入会後、<span className="font-medium text-(--color-txt)">会員ページの【ご利用者の管理】</span>から、
+                ご担当者様がいつでもご登録・入れ替えいただけます。
+              </p>
+              <p className="mt-2">
+                ご登録いただける人数は
+                <span className="font-medium text-(--color-txt)">
+                  {spec.usersUnlimited ? "制限がありません" : `${spec.maxUsers}名様まで`}
+                </span>
+                です。ご担当者様ご自身がご利用になる場合も、同じ画面からご登録ください。
+              </p>
+              <p className="mt-2">
+                ※ 打席をご利用になる方は、ご登録が必要です（おひとりずつ会員番号を発行し、
+                会員証QRとレッスンカルテを分けてお作りするため）。
+                ご予約は御社の合計{spec.maxOpenSlots}コマ（1コマ=1時間）まで、ご登録者で分け合ってお取りいただけます。
               </p>
             </div>
-            {Array.from({ length: spec.maxUsers }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3">
-                <p className="mb-2 text-xs font-semibold text-(--color-dim)">
-                  ご利用者 {i + 1}
-                  {i === 0 ? <span className="ml-2 font-normal">（ご担当者様がご利用になる場合は、同じ内容をご入力ください）</span> : <span className="ml-2 font-normal">（空欄可・あとからご登録いただけます）</span>}
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className={label}>お名前{i === 0 ? <span className="text-rose-400"> *</span> : null}</label>
-                    <input name={`cu_name_${i}`} required={i === 0} placeholder="山田 太郎" className={field} />
-                  </div>
-                  <div>
-                    <label className={label}>フリガナ</label>
-                    <input name={`cu_kana_${i}`} placeholder="ヤマダ タロウ" className={field} />
-                  </div>
-                  <div>
-                    <label className={label}>電話番号{i === 0 ? <span className="text-rose-400"> *</span> : null}</label>
-                    <input name={`cu_phone_${i}`} type="tel" required={i === 0} placeholder="090-1234-5678" className={field} />
-                  </div>
-                  <div>
-                    <label className={label}>メールアドレス</label>
-                    <input name={`cu_email_${i}`} type="email" placeholder="taro@example.co.jp" className={field} />
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}

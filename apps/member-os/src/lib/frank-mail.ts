@@ -240,3 +240,44 @@ export function buildApprovalMail(input: {
     ].join("\n"),
   };
 }
+
+/**
+ * 法人プランのご利用者に追加したときのご案内（#204）
+ *
+ * ご契約者が会員ページから追加した瞬間に、ご本人へお送りする。
+ * 会社の中で会員番号を伝え忘れると、その方は会員ページに入れないまま終わる。
+ * 必要なのは (1)会員番号 (2)ログイン方法 (3)御社の枠は分け合うこと の3点。
+ */
+export function buildCorporateUserMail(input: {
+  name: string;
+  memberNo: string;
+  companyName?: string | null;
+  maxOpenSlots?: number | null;
+}): { subject: string; text: string } {
+  const slots = Number(input.maxOpenSlots ?? 4);
+  return {
+    subject: `【FRANK GOLF】会員ページのご案内（会員番号 ${input.memberNo}）`,
+    text: [
+      `${input.name} 様`,
+      "",
+      `${input.companyName ? `${input.companyName} の法人プラン` : "法人プラン"}のご利用者としてご登録いただきました。`,
+      "本日から打席のご予約をお取りいただけます。",
+      "",
+      `■ あなたの会員番号: ${input.memberNo}`,
+      "",
+      "■ 会員ページ（打席のご予約・会員証QR・レッスンカルテ）",
+      FRANK_LINKS.home,
+      "ログインは 会員番号 と ご自身の電話番号の下4桁 です。",
+      "",
+      "■ ご予約について",
+      `打席のご予約は御社の合計 ${slots}コマ（1コマ=1時間）を、ご登録者のみなさまで分け合ってお取りいただきます。`,
+      "ご利用が済むと（その時間を過ぎるか、ご来店いただくと）、また次のご予約をお取りいただけます。",
+      "会員ページに「御社のご予約」として、いま何コマ使われているかが表示されます。",
+      "",
+      "月会費は御社へご請求しておりますので、お客様個人へのご請求はございません。",
+      "",
+      "ご不明な点はこのメールにご返信ください。",
+      ...SIGNATURE,
+    ].join("\n"),
+  };
+}

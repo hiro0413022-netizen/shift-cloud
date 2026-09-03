@@ -19,6 +19,8 @@ import {
   uncancelSubscription,
 } from "@/lib/frank-square";
 import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
+import { nextMemberNo } from "@/lib/frank-member-no";
+import { corporateSpec, corporateSeats, corporateSeatFullMessage } from "@yozan/core/frank-corporate";
 import { grantJoinCampaignTickets, JOIN_TICKET_CAMPAIGN, ticketBalance } from "@yozan/core/frank-lesson-tickets";
 import { receiveTicketPayment, useTicket } from "@/lib/frank-tickets";
 import {
@@ -481,7 +483,7 @@ export async function setMemberStatus(formData: FormData) {
 /** 契約者の行を取り、法人の設定を返す（利用者の行から呼ばれたら親をたどる） */
 async function corporateRoot(admin: ReturnType<typeof createAdmin>, companyId: string, memberId: string) {
   const cols =
-    "id, corporate_parent_id, company_id, store_id, plan_id, company_name, corporate_users, frunk_plans(name, is_corporate, max_users)";
+    "id, corporate_parent_id, company_id, store_id, plan_id, company_name, corporate_users, corporate_self_use, frunk_plans(name, is_corporate, max_users)";
   const { data: me } = await admin
     .from("frunk_members").select(cols)
     .eq("id", memberId).eq("company_id", companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
@@ -491,26 +493,6 @@ async function corporateRoot(admin: ReturnType<typeof createAdmin>, companyId: s
   const { data: root } = await admin
     .from("frunk_members").select(cols).eq("id", rootId).eq("company_id", companyId).maybeSingle();
   return root ?? null;
-}
-
-/** 会員番号 FR#### の採番（genesis assignMemberNo と同じ数え方・company単位） */
-async function nextMemberNo(admin: ReturnType<typeof createAdmin>, companyId: string, memberId: string): Promise<string | null> {
-  for (let i = 0; i < 5; i++) {
-    const { count } = await admin
-      .from("frunk_members").select("id", { count: "exact", head: true })
-      .eq("company_id", companyId).not("member_no", "is", null);
-    const no = `FR${String((count ?? 0) + 1 + i).padStart(4, "0")}`;
-    const { data: up, error } = await admin
-      .from("frunk_members").update({ member_no: no, updated_at: new Date().toISOString() })
-      .eq("id", memberId).is("member_no", null).select("member_no");
-    if (!error) {
-      if ((up ?? []).length > 0) return no;
-      const { data: cur } = await admin.from("frunk_members").select("member_no").eq("id", memberId).maybeSingle();
-      return cur?.member_no ? String(cur.member_no) : null;
-    }
-    if (!String(error.code ?? "").includes("23505")) return null;
-  }
-  return null;
 }
 
 export async function addCorporateUser(formData: FormData) {
@@ -526,17 +508,22 @@ export async function addCorporateUser(formData: FormData) {
   }
 
   const root = await corporateRoot(admin, actor.companyId, id);
-  const plan = (root as unknown as { frunk_plans: { is_corporate?: boolean; max_users?: number } | null } | null)?.frunk_plans;
+  const plan = (root as unknown as { frunk_plans: { is_corporate?: boolean; max_users?: number | null } | null } | null)?.frunk_plans;
   if (!root || !plan?.is_corporate) redirect(`${dest}?err=` + encodeURIComponent("法人プランの会員ではありません"));
 
-  const maxUsers = Number(plan?.max_users ?? 2);
+  // 人数の上限。法人プレミアムは max_users = null（無制限・#204）。
+  // ご担当者ご自身（corporate_self_use）も1名として数える
+  const spec = corporateSpec(plan as never);
   const { count } = await admin
     .from("frunk_members").select("id", { count: "exact", head: true })
     .eq("corporate_parent_id", String(root.id)).is("deleted_at", null);
-  if ((count ?? 0) >= maxUsers) {
-    redirect(`${dest}?err=` + encodeURIComponent(
-      `このプランのご登録上限（${maxUsers}名）に達しています。入れ替える場合は、先に外す方の【登録を外す】を押してください`,
-    ));
+  const seats = corporateSeats({
+    maxUsers: spec.maxUsers,
+    registered: count ?? 0,
+    selfUse: !!(root as { corporate_self_use?: boolean }).corporate_self_use,
+  });
+  if (!seats.canAdd) {
+    redirect(`${dest}?err=` + encodeURIComponent(corporateSeatFullMessage(seats.limit ?? 0)));
   }
   // 同じ電話番号は会員ページのログインが取り違えるので受けない
   const { data: dup } = await admin

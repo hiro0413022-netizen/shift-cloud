@@ -7,13 +7,21 @@ import {
   checkOpenSlots,
   normalizeCorporateUsers,
   corporateSpec,
+  corporateSeats,
+  corporateSeatFullMessage,
+  memberDisplayName,
+  canBookAsCorporate,
+  slotUsageLabel,
 } from "../packages/core/src/frank-corporate.ts";
 
 /* ============================================================
    法人プランと「予約は消化してから次を取る」（2026-09-01 ユーザー確定）
 
    法人ライト   利用者2名まで・先の予約は合計4コマ
-   法人プレミアム 利用者4名まで・先の予約は合計8コマ・同伴ビジター無料
+   法人プレミアム 利用者は人数制限なし（max_users = null）・先の予約は合計8コマ・同伴ビジター無料
+
+   #204（2026-09-03）で「入会は無記名・使う人だけ記名」に変えた。
+   入会フォームは0名で通す（minUsers=0）／会員ページからの追加は1名必須（minUsers=1）。
    数え方は全会員共通（個人プランも同じ判定を通す）。1コマ=1時間。
 
    ここがズレると「○を押したのに予約できません」か、上限を超えて取れてしまう。
@@ -140,15 +148,84 @@ test("利用者の検証: 電話番号は必須（ログインに下4桁を使�
     4,
   );
   assert.match(dup.error ?? "", /重複/);
-  assert.match(normalizeCorporateUsers([], 4).error ?? "", /1名以上/);
+  // 会員ページからの追加は1名必須（minUsers=1）
+  assert.match(normalizeCorporateUsers([], 4, 1).error ?? "", /1名以上/);
+  // 入会フォームは無記名で通す（#204）。0名でもエラーにしない
+  assert.equal(normalizeCorporateUsers([], 4).error, undefined);
+  assert.equal(normalizeCorporateUsers([], null).users.length, 0);
+});
+
+test("人数制限なし（法人プレミアム）は何名でも受ける", () => {
+  const many = normalizeCorporateUsers(
+    Array.from({ length: 9 }).map((_, i) => ({ name: `社員${i}`, phone: `0901111${String(i).padStart(4, "0")}` })),
+    null,
+    1,
+  );
+  assert.equal(many.error, undefined);
+  assert.equal(many.users.length, 9);
+});
+
+test("席数: ご担当者ご自身も1名として数える（法人ライトは2名まで）", () => {
+  assert.deepEqual(corporateSeats({ maxUsers: 2, registered: 1, selfUse: false }), {
+    used: 1, limit: 2, remaining: 1, canAdd: true, full: false,
+  });
+  // ご担当者が自分も使う場合、残りは1名
+  assert.deepEqual(corporateSeats({ maxUsers: 2, registered: 1, selfUse: true }), {
+    used: 2, limit: 2, remaining: 0, canAdd: false, full: true,
+  });
+  // 無制限は常に追加できる
+  assert.deepEqual(corporateSeats({ maxUsers: null, registered: 30, selfUse: true }), {
+    used: 31, limit: null, remaining: null, canAdd: true, full: false,
+  });
+  assert.match(corporateSeatFullMessage(2), /2名/);
+});
+
+test("会員表記は法人名＋個人名（#204）", () => {
+  assert.equal(memberDisplayName({ name: "山田 太郎", company_name: "株式会社ヨザン" }), "株式会社ヨザン 山田 太郎");
+  // 個人会員は今までどおりお名前だけ
+  assert.equal(memberDisplayName({ name: "山田 太郎", company_name: null }), "山田 太郎");
+  // 会社名だけ／氏名だけでも頭が空かない
+  assert.equal(memberDisplayName({ name: "", company_name: "株式会社ヨザン" }), "株式会社ヨザン");
+  assert.equal(memberDisplayName(null), "");
+});
+
+test("使う人は利用者登録が必須。契約者の行は登録するまで予約できない（#204）", () => {
+  const corp = { isCorporate: true };
+  // ご利用者（親にぶら下がっている）は予約できる
+  assert.equal(canBookAsCorporate(corp, { corporate_parent_id: "root" }).ok, true);
+  // ご契約者は、ご自身を登録するまで予約できない
+  const contract = canBookAsCorporate(corp, { corporate_parent_id: null, corporate_self_use: false });
+  assert.equal(contract.ok, false);
+  assert.match(contract.error ?? "", /ご利用者/);
+  // 登録すれば取れる
+  assert.equal(canBookAsCorporate(corp, { corporate_parent_id: null, corporate_self_use: true }).ok, true);
+  // 個人会員には関係ない
+  assert.equal(canBookAsCorporate({ isCorporate: false }, { corporate_parent_id: null }).ok, true);
+});
+
+test("予約枠の見せ方: 残りと満杯を同じ言い方にする（画面とサーバーでズレない）", () => {
+  const half = slotUsageLabel({ used: 3, limit: 8, corporate: true });
+  assert.match(half.headline, /御社のご予約 3／8コマ/);
+  assert.match(half.detail, /あと5コマ/);
+  assert.equal(half.full, false);
+  const full = slotUsageLabel({ used: 8, limit: 8, corporate: true });
+  assert.equal(full.full, true);
+  assert.match(full.detail, /埋まっています/);
 });
 
 test("プランから法人の設定を読む（列が無くても壊れない）", () => {
-  assert.deepEqual(corporateSpec({ is_corporate: true, max_users: 4, max_open_slots: 8, companion_free: true }), {
-    isCorporate: true, maxUsers: 4, maxOpenSlots: 8, companionFree: true,
+  assert.deepEqual(corporateSpec({ is_corporate: true, max_users: 2, max_open_slots: 4, companion_free: false }), {
+    isCorporate: true, maxUsers: 2, usersUnlimited: false, maxOpenSlots: 4, companionFree: false,
+  });
+  // 法人プレミアムは max_users = null（人数制限なし・#204）。
+  // 「未設定だから2名」と読み替えると、無制限のはずのプランが2名で止まる
+  assert.deepEqual(corporateSpec({ is_corporate: true, max_users: null, max_open_slots: 8, companion_free: true }), {
+    isCorporate: true, maxUsers: null, usersUnlimited: true, maxOpenSlots: 8, companionFree: true,
   });
   assert.deepEqual(corporateSpec({ max_bookings_per_day: 2 }), {
-    isCorporate: false, maxUsers: 1, maxOpenSlots: 2, companionFree: false,
+    isCorporate: false, maxUsers: 1, usersUnlimited: false, maxOpenSlots: 2, companionFree: false,
   });
-  assert.deepEqual(corporateSpec(null), { isCorporate: false, maxUsers: 1, maxOpenSlots: 1, companionFree: false });
+  assert.deepEqual(corporateSpec(null), {
+    isCorporate: false, maxUsers: 1, usersUnlimited: false, maxOpenSlots: 1, companionFree: false,
+  });
 });

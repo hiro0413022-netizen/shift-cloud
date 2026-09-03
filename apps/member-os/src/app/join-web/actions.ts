@@ -6,7 +6,7 @@ import { resolveHimeji } from "@/lib/member";
 import { logEvent } from "@/lib/kernel";
 import { sendFrankMail, buildWebSignupReceiptMail } from "@/lib/frank-mail";
 import { validCoupon, normalizeCoupon, isJoinCampaignActive, JOIN_CAMPAIGN } from "@/lib/frank-billing-pure";
-import { corporateSpec, normalizeCorporateUsers } from "@yozan/core/frank-corporate";
+import { corporateSpec } from "@yozan/core/frank-corporate";
 import { joinAddress } from "@/lib/address";
 import { readName } from "@/lib/name";
 import { FRANK_PORTAL } from "@yozan/core/frank-links";
@@ -84,24 +84,16 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     return { error: "選択されたプランは現在お申し込みいただけません。画面を更新して再度お試しください。" };
   }
 
-  // ---- 法人プラン（#195） ----
+  // ---- 法人プラン（#195／#204で無記名に） ----
   // 会社が契約し、社員の方が使う。月会費のお支払いは契約者（ご担当者）に1本だけ。
-  // ご利用者は申込のときに全員ぶんいただき、確定時にお一人ずつ会員番号を発行する。
+  //
+  // ご利用者はここでは伺わない（#204・2026-09-03 ユーザー確定）。
+  // お申し込みの時点では「まだ誰が使うか決まっていない」会社が多く、
+  // 全員のお名前を必須にしていたせいで申し込めない状態だった。
+  // ご入会後、会員ページの【ご利用者の管理】からご契約者が登録・入れ替えできる。
   const spec = corporateSpec(plan);
   const companyName = str(formData.get("company_name"));
-  let corporateUsers: ReturnType<typeof normalizeCorporateUsers>["users"] = [];
-  if (spec.isCorporate) {
-    if (!companyName) return { error: "会社名・団体名をご入力ください" };
-    const rows = Array.from({ length: spec.maxUsers }).map((_, i) => ({
-      name: str(formData.get(`cu_name_${i}`)),
-      nameKana: str(formData.get(`cu_kana_${i}`)),
-      phone: str(formData.get(`cu_phone_${i}`)),
-      email: str(formData.get(`cu_email_${i}`)),
-    }));
-    const norm = normalizeCorporateUsers(rows, spec.maxUsers);
-    if (norm.error) return { error: norm.error };
-    corporateUsers = norm.users;
-  }
+  if (spec.isCorporate && !companyName) return { error: "会社名・団体名をご入力ください" };
 
   const values = {
     company_id: store.companyId,
@@ -139,7 +131,8 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     billing_postal_code: spec.isCorporate ? orNull(formData.get("billing_postal_code")) : null,
     billing_address1: spec.isCorporate ? orNull(formData.get("billing_address1")) : null,
     billing_email: spec.isCorporate ? orNull(formData.get("billing_email")) : null,
-    corporate_users: spec.isCorporate ? corporateUsers : null,
+    // ご利用者は入会後に会員ページからご登録いただく（#204）。申込時点では空
+    corporate_users: null,
   };
 
   // 決済未完了の申込が残っていれば行を使い回す（同じ人が2行にならないように）。

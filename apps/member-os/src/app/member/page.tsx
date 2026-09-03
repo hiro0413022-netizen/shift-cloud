@@ -6,6 +6,7 @@ import { BOOKING_STATUS_LABEL, jstToday } from "@yozan/core/frank-booking";
 import { checkinQrPayload } from "@yozan/core/frank-portal";
 import { ensureCheckinToken, currentVisit, karteShareUrl, karteHasNew } from "@/lib/frank-portal";
 import { ticketBalance, pendingTicketCount } from "@yozan/core/frank-lesson-tickets";
+import { openSlots, slotUsageLabel } from "@yozan/core/frank-corporate";
 import { memberLogout, cancelMyBooking } from "./actions";
 import { VisitPanel } from "./visit-panel";
 import { AddToHome } from "./add-to-home";
@@ -75,6 +76,41 @@ export default async function MemberHomePage({
     ? await Promise.all([ticketBalance(admin, memberId), pendingTicketCount(admin, memberId)])
     : [0, 0];
 
+  // 法人プラン（#204）: 御社ぶんの枠は登録者全員で分け合う。
+  // 誰かが押さえ切ると他の方は取れないので、押す前に見えるところへ出す。
+  const corp = member.corporate;
+  let corpUsage: { used: number; limit: number; label: ReturnType<typeof slotUsageLabel> } | null = null;
+  if (corp && memberId) {
+    const rootId = corp.parentId ?? memberId;
+    const { data: group } = await admin
+      .from("frunk_members").select("id")
+      .or(`id.eq.${rootId},corporate_parent_id.eq.${rootId}`)
+      .is("deleted_at", null);
+    const ids = (group ?? []).map((g) => String((g as Row).id));
+    const { data: openRows } = await admin
+      .from("frunk_bookings")
+      .select("booked_date, start_time, end_time, status")
+      .in("member_id", ids.length > 0 ? ids : [rootId])
+      .gte("booked_date", jstToday())
+      .neq("status", "cancelled").is("deleted_at", null);
+    const hm = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
+    const nowHm = new Date(Date.now() + 9 * 3600_000).toISOString().slice(11, 16);
+    const usedSlots = openSlots(
+      (openRows ?? []).map((b) => ({
+        date: String(b.booked_date),
+        endTime: String(b.end_time),
+        minutes: hm(String(b.end_time)) - hm(String(b.start_time)),
+        status: String(b.status ?? ""),
+      })),
+      jstToday(), nowHm,
+    );
+    corpUsage = {
+      used: usedSlots,
+      limit: corp.maxOpenSlots,
+      label: slotUsageLabel({ used: usedSlots, limit: corp.maxOpenSlots, corporate: true }),
+    };
+  }
+
   const { data: bookings } = memberId
     ? await admin
         .from("frunk_bookings")
@@ -98,7 +134,7 @@ export default async function MemberHomePage({
       <header className="mb-5 flex items-center justify-between">
         <div>
           <p className="text-xs tracking-[0.4em] text-(--color-gold)">FRANK GOLF {store?.name ?? "姫路"}</p>
-          <h1 className="text-xl font-bold tracking-wide">{member.name} 様</h1>
+          <h1 className="text-xl font-bold tracking-wide">{member.displayName} 様</h1>
           <p className="text-xs text-(--color-dim)">会員番号 {member.memberNo}{member.isProvisional ? "（仮登録）" : ""}</p>
         </div>
         <form action={memberLogout}>
@@ -115,13 +151,41 @@ export default async function MemberHomePage({
       {/* ① 会員証QR ⇄ 来店中モード（かざした瞬間に切り替わる） */}
       {!member.isProvisional && <VisitPanel initial={visit} qrDataUrl={qrDataUrl} token={token} />}
 
+      {/* 法人プラン（#204）: 御社の枠と、ご契約者だけに出す【ご利用者の管理】 */}
+      {corp && corpUsage && (
+        <section className={`mb-3 rounded-xl border p-4 ${corpUsage.label.full ? "border-amber-500/50 bg-amber-500/5" : "border-(--color-line) bg-(--color-panel)"}`}>
+          <div className="flex items-baseline justify-between">
+            <p className="text-xs text-(--color-dim)">{corp.companyName ? `${corp.companyName} 名義のご予約` : "法人名義のご予約"}</p>
+            <p className="text-sm font-bold text-(--color-gold)">
+              {corpUsage.used}<span className="text-xs font-normal text-(--color-txt)">／{corpUsage.limit}コマ</span>
+            </p>
+          </div>
+          <p className="mt-1 text-xs text-(--color-dim)">{corpUsage.label.detail}</p>
+          {corp.isContract && !corp.selfUse && (
+            <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700">
+              この会員番号（ご契約者）ではご予約をお取りいただけません。ご担当者様ご自身がご利用になる場合は、【ご利用者の管理】から「自分も利用する」をご登録ください。
+            </p>
+          )}
+          {corp.isContract && (
+            <Link
+              href="/member/corporate"
+              className="mt-3 block w-full rounded-lg border border-(--color-gold)/50 py-2.5 text-center text-sm font-semibold text-(--color-gold) hover:bg-(--color-panel-2)"
+            >
+              ご利用者の管理
+            </Link>
+          )}
+        </section>
+      )}
+
       {/* ② 予約 — 予約画面もポータルの中（#188。別ドメインへ飛ばさない） */}
-      <Link
-        href="/member/book"
-        className="mb-3 block w-full rounded-xl border border-(--color-line) bg-(--color-panel) py-3.5 text-center font-semibold text-(--color-txt) transition-colors hover:bg-(--color-panel-2)"
-      >
-        ＋ 打席を予約する
-      </Link>
+      {!(corp?.isContract && !corp.selfUse) && (
+        <Link
+          href="/member/book"
+          className="mb-3 block w-full rounded-xl border border-(--color-line) bg-(--color-panel) py-3.5 text-center font-semibold text-(--color-txt) transition-colors hover:bg-(--color-panel-2)"
+        >
+          ＋ 打席を予約する
+        </Link>
+      )}
 
       {upcoming.length > 0 && (
         <section className="mb-4">

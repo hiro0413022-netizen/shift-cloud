@@ -16,6 +16,7 @@ import {
   visitClosed,
 } from "@yozan/core/frank-portal";
 import { chargeOrderOnFile } from "@/lib/frank-square";
+import { memberDisplayName } from "@yozan/core/frank-corporate";
 
 /**
  * FRANK 会員ポータルのサーバー側処理（#154）
@@ -151,7 +152,7 @@ export async function checkInMember(memberId: string, source: "qr" | "manual" | 
 
   const { data: m } = await admin
     .from("frunk_members")
-    .select("id, company_id, store_id, member_no, name, birth_date, note, status, frunk_plans(name)")
+    .select("id, company_id, store_id, member_no, name, company_name, birth_date, note, status, frunk_plans(name)")
     .eq("id", memberId).is("deleted_at", null).maybeSingle();
   if (!m) return { ok: false, reason: "unknown", message: "会員が見つかりません" };
   const mem = m as Row;
@@ -217,7 +218,8 @@ export async function checkInMember(memberId: string, source: "qr" | "manual" | 
     checkinId,
     memberId,
     memberNo: s(mem.member_no),
-    name: s(mem.name),
+    // 法人の方は「会社名＋お名前」で受付に出す（#204）
+    name: memberDisplayName(mem as never) || s(mem.name),
     planName: plan?.name ?? null,
     bayId,
     bayName: (booking?.frunk_bays as { name?: string } | null)?.name ?? (bayId ? await bayName(bayId) : null),

@@ -8,6 +8,7 @@ import { loadMenu } from "@/lib/frank-portal";
 import { markServed, cancelOrder, addStaffOrder, checkOutSeat, assignSeatBay } from "./actions";
 import { OrdersLive } from "./live";
 import { orderLine, type LiveItem } from "@/lib/live-feed-pure";
+import { memberDisplayName } from "@yozan/core/frank-corporate";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -38,11 +39,11 @@ export default async function OrdersPage() {
   const [{ data: bayRows }, { data: orderRows }, { data: checkinRows }] = await Promise.all([
     admin.from("frunk_bays").select("id, name").eq("active", true).is("deleted_at", null).order("sort", { ascending: true }),
     admin.from("frunk_orders")
-      .select("id, order_no, bay_id, member_id, guest_label, status, payment_status, amount, subtotal, tax_amount, ordered_at, payment_error, source, frunk_members(member_no, name), frunk_order_items(id, name, qty, unit_price, amount)")
+      .select("id, order_no, bay_id, member_id, guest_label, status, payment_status, amount, subtotal, tax_amount, ordered_at, payment_error, source, frunk_members(member_no, name, company_name), frunk_order_items(id, name, qty, unit_price, amount)")
       .eq("ordered_on", today).neq("status", "cancelled").is("deleted_at", null)
       .order("ordered_at", { ascending: true }),
     admin.from("frunk_checkins")
-      .select("id, bay_id, checked_in_at, checked_out_at, frunk_members(member_no, name)")
+      .select("id, bay_id, checked_in_at, checked_out_at, frunk_members(member_no, name, company_name)")
       .eq("visited_on", today).is("deleted_at", null),
   ]);
 
@@ -62,14 +63,14 @@ export default async function OrdersPage() {
     .sort((a, b) => (s(a.ordered_at) < s(b.ordered_at) ? 1 : -1))
     .slice(0, 5)
     .map((o) => {
-      const m = (o.frunk_members as { name?: string } | null) ?? null;
+      const m = (o.frunk_members as { name?: string; company_name?: string | null } | null) ?? null;
       return {
         key: `o${s(o.id)}`,
         kind: "order" as const,
         at: s(o.ordered_at),
         text: orderLine({
           bay: bays.find((b) => b.id === s(o.bay_id))?.name ?? null,
-          who: m?.name ? `${m.name} 様` : s(o.guest_label) || null,
+          who: m?.name ? `${memberDisplayName(m as never)} 様` : s(o.guest_label) || null,
           items: ((o.frunk_order_items ?? []) as Row[]).map((i) => ({ name: s(i.name), qty: n(i.qty) })),
           at: s(o.ordered_at),
         }),
@@ -88,11 +89,11 @@ export default async function OrdersPage() {
   const openVisits = checkins
     .filter((c) => !s(c.checked_out_at))
     .map((c) => {
-      const m = (c.frunk_members as { member_no?: string; name?: string } | null) ?? null;
+      const m = (c.frunk_members as { member_no?: string; name?: string; company_name?: string | null } | null) ?? null;
       const bay = bays.find((b) => b.id === s(c.bay_id)) ?? null;
       return {
         id: s(c.id),
-        name: m?.name ? `${m.name} 様` : "会員",
+        name: m?.name ? `${memberDisplayName(m as never)} 様` : "会員",
         memberNo: m?.member_no ?? "",
         bayName: bay?.name ?? null,
         since: hhmmJST(s(c.checked_in_at)),
@@ -102,8 +103,8 @@ export default async function OrdersPage() {
 
   const seatOf = (bayId: string): { label: string; checkinId: string } | null => {
     const c = checkins.find((x) => s(x.bay_id) === bayId && !s(x.checked_out_at));
-    const m = (c?.frunk_members as { member_no?: string; name?: string } | null) ?? null;
-    return c && m ? { label: `${m.name} 様（${m.member_no}）`, checkinId: s(c.id) } : null;
+    const m = (c?.frunk_members as { member_no?: string; name?: string; company_name?: string | null } | null) ?? null;
+    return c && m ? { label: `${memberDisplayName(m as never)} 様（${m.member_no}）`, checkinId: s(c.id) } : null;
   };
   const groups: Array<{ id: string | null; name: string; seat: ReturnType<typeof seatOf>; rows: Row[] }> = [
     ...bays.map((b) => ({ id: b.id, name: b.name, seat: seatOf(b.id), rows: orders.filter((o) => s(o.bay_id) === b.id) })),
@@ -184,7 +185,7 @@ export default async function OrdersPage() {
                 <div className="space-y-2">
                   {g.rows.map((o) => {
                     const items = (o.frunk_order_items ?? []) as Row[];
-                    const mem = (o.frunk_members as { member_no?: string; name?: string } | null) ?? null;
+                    const mem = (o.frunk_members as { member_no?: string; name?: string; company_name?: string | null } | null) ?? null;
                     const served = s(o.status) === "served";
                     const paid = s(o.payment_status) === "paid";
                     // 提供までの経過。3分を超えたら赤くする＝音と画面で同じ基準を使う（#189）
@@ -206,7 +207,7 @@ export default async function OrdersPage() {
                           </span>
                         </div>
                         <p className="text-xs text-(--color-dim)">
-                          {mem ? `${mem.name} 様` : (s(o.guest_label) || "ビジター")}
+                          {mem ? `${memberDisplayName(mem as never)} 様` : (s(o.guest_label) || "ビジター")}
                           {s(o.source) === "staff" ? " ・ 口頭" : ""}
                         </p>
                         {/* 明細は税抜（#166）。合計だけが税込＝お客様の請求額 */}

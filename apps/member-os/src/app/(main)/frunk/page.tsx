@@ -16,6 +16,7 @@ import { jstYmd } from "@/lib/jst";
 import { monthEndLabel, monthFromLabel } from "@yozan/core/frank-membership";
 import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment } from "./actions";
 import { joinPaymentView } from "@/lib/frunk-join-view";
+import { memberDisplayName } from "@yozan/core/frank-corporate";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -144,7 +145,7 @@ export default async function FrunkPage({
                   <div>
                     <div className="flex items-center gap-2">
                       <Link href={`/frunk/${String(m.id)}`} className="text-base font-semibold text-indigo-600 underline">
-                        {String(m.name)}
+                        {memberDisplayName(m as never) || String(m.name)}
                       </Link>
                       {m.name_kana ? <span className="text-xs text-(--color-dim)">{String(m.name_kana)}</span> : null}
                       <Badge tone="accent">{planName(m.plan_id) ?? "プラン未選択"}</Badge>
@@ -337,7 +338,7 @@ export default async function FrunkPage({
                       <td className="px-2 py-2 tabular-nums text-(--color-dim)">{m.member_no ?? "—"}</td>
                       <td className="px-2 py-2">
                         <Link href={`/frunk/${m.id}`} className="font-semibold text-indigo-600 underline">
-                          {m.name ?? "（氏名未入力）"}
+                          {memberDisplayName(m as never) || "（氏名未入力）"}
                         </Link>
                         {m.name_kana ? <div className="text-[11px] text-(--color-dim)">{m.name_kana}</div> : null}
                       </td>

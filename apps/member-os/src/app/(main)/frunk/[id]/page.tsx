@@ -21,7 +21,7 @@ import {
   suspendApplyDeadline,
   mdLabel,
 } from "@yozan/core/frank-membership";
-import { corporateSpec } from "@yozan/core/frank-corporate";
+import { corporateSpec, corporateSeats, memberDisplayName } from "@yozan/core/frank-corporate";
 import { ticketBalance, listTickets, ticketRowLabel } from "@yozan/core/frank-lesson-tickets";
 import {
   setMemberStatus,
@@ -166,6 +166,14 @@ export default async function FrunkMemberPage({
         .order("member_no")
     : { data: [] };
   const corpUsers = (corpRows ?? []).filter((u) => String((u as Row).status) !== "left") as Row[];
+  // 人数は「ご利用者＋ご担当者ご自身（corporate_self_use）」で数える（#204）。
+  // 上限は max_users。法人プレミアムは null = 無制限
+  const corpSelfUse = !!m.corporate_self_use;
+  const corpSeats = corporateSeats({
+    maxUsers: corpSpec.maxUsers,
+    registered: corpUsers.length,
+    selfUse: corpSelfUse,
+  });
 
   // 退会・休会の受付ルール（#192）。選択肢の生成も検証もサーバーアクションと同じ関数を通す
   const leaveOpts = leaveDateOptions(today);
@@ -210,7 +218,8 @@ export default async function FrunkMemberPage({
       <header className="reveal flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">{String(m.name ?? "（氏名未入力）")}</h1>
+            {/* 法人の方は「会社名＋お名前」（#204） */}
+            <h1 className="text-2xl font-bold tracking-tight">{memberDisplayName(m as never) || "（氏名未入力）"}</h1>
             {m.name_kana ? <span className="text-sm text-(--color-dim)">{String(m.name_kana)}</span> : null}
             <Badge tone={FRUNK_STATUS_TONE[status] ?? "default"}>{FRUNK_STATUS_LABEL[status] ?? status}</Badge>
             {scheduledLeave ? <Badge tone="warn">{monthEndLabel(scheduledLeave)}で退会予定</Badge> : null}
@@ -330,7 +339,7 @@ export default async function FrunkMemberPage({
         <Panel title="会員情報" className="d1">
           <Info label="会員番号">{memberNo || "—"}</Info>
           <Info label="お名前">
-            {String(m.name ?? "—")}
+            {memberDisplayName(m as never) || "—"}
             {m.name_kana ? <span className="ml-2 text-xs text-(--color-dim)">{String(m.name_kana)}</span> : null}
           </Info>
           <Info label="生年月日">{m.birth_date ? String(m.birth_date) : "—"}</Info>
@@ -524,7 +533,9 @@ export default async function FrunkMemberPage({
           月会費のサブスクを持つのは契約者だけなので、ここで人を足しても請求は増えない。 */}
       {corpSpec.isCorporate && (
         <Panel
-          title={`法人プラン　${m.company_name ? String(m.company_name) : "（会社名未登録）"}　ご利用者 ${corpUsers.length}/${corpSpec.maxUsers}名`}
+          title={`法人プラン　${m.company_name ? String(m.company_name) : "（会社名未登録）"}　ご利用者 ${
+            corpSeats.limit === null ? `${corpSeats.used}名（人数制限なし）` : `${corpSeats.used}/${corpSeats.limit}名`
+          }`}
           className="d2"
         >
           {corpParentId ? (
@@ -540,7 +551,12 @@ export default async function FrunkMemberPage({
             <div className="space-y-3">
               <div className="grid gap-1 text-sm sm:grid-cols-2">
                 <Info label="会社名">{m.company_name ? String(m.company_name) : "—"}</Info>
-                <Info label="ご担当者">{String(m.name ?? "")}</Info>
+                <Info label="ご担当者">
+                  {String(m.name ?? "")}
+                  <span className={corpSelfUse ? "ml-2 text-emerald-700" : "ml-2 text-(--color-dim)"}>
+                    {corpSelfUse ? "（ご自身もご利用者として登録済み）" : "（お支払いのみ・この番号では予約できません）"}
+                  </span>
+                </Info>
                 <Info label="請求先メール">{m.billing_email ? String(m.billing_email) : `${m.email ? String(m.email) : "—"}（ご担当者）`}</Info>
                 <Info label="請求先住所">
                   {[m.billing_postal_code, m.billing_address1].filter(Boolean).join(" ") || "—（ご担当者の住所へ）"}
@@ -569,7 +585,7 @@ export default async function FrunkMemberPage({
                 ))}
               </div>
 
-              {corpUsers.length < corpSpec.maxUsers ? (
+              {corpSeats.canAdd ? (
                 <form action={addCorporateUser} className="grid grid-cols-2 items-end gap-2 border-t border-(--color-line) pt-3 sm:grid-cols-5">
                   <input type="hidden" name="id" value={id} />
                   <input type="hidden" name="back" value={back} />
@@ -580,11 +596,12 @@ export default async function FrunkMemberPage({
                   <button className={btnCls}>＋ ご利用者を追加</button>
                   <p className="col-span-2 text-xs text-(--color-dim) sm:col-span-5">
                     追加すると会員番号を発行します。ログインは会員番号とご本人の電話番号の下4桁です（番号はおひとりずつ違うものをご登録ください）。
+                    ご契約者様ご自身も、会員ページの【ご利用者の管理】から追加・入れ替えができます（#204）。
                   </p>
                 </form>
               ) : (
                 <p className="border-t border-(--color-line) pt-3 text-xs text-(--color-dim)">
-                  ご登録上限（{corpSpec.maxUsers}名）です。入れ替えるときは、先に外す方の【登録を外す】を押してください。
+                  ご登録上限（{corpSeats.limit}名・ご担当者ご自身を含む）です。入れ替えるときは、先に外す方の【登録を外す】を押してください。
                 </p>
               )}
             </div>

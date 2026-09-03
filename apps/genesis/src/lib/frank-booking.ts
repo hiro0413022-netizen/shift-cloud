@@ -15,7 +15,7 @@ import {
   type BookingCfg,
 } from "@yozan/core/frank-booking";
 import { handoffSecret, verifyHandoff } from "@yozan/core/frank-handoff";
-import { checkOpenSlots, corporateSpec } from "@yozan/core/frank-corporate";
+import { checkOpenSlots, corporateSpec, canBookAsCorporate } from "@yozan/core/frank-corporate";
 
 /**
  * FRANK GOLF 打席予約（#86 §3-3・台帳一本化 #93）
@@ -93,7 +93,7 @@ export async function verifyMember(admin: Admin, memberNo: string, phoneLast4: s
 
   const { data } = await admin
     .from("frunk_members")
-    .select("id, company_id, name, member_no, phone, status, plan_id, corporate_parent_id, frunk_plans(name, max_bookings_per_day, max_open_slots, is_corporate, max_users, companion_free)")
+    .select("id, company_id, name, member_no, phone, status, plan_id, corporate_parent_id, corporate_self_use, frunk_plans(name, max_bookings_per_day, max_open_slots, is_corporate, max_users, companion_free)")
     .eq("member_no", no)
     .is("deleted_at", null)
     .maybeSingle();
@@ -124,7 +124,7 @@ export async function verifyMemberByHandoff(admin: Admin, token: string) {
   if (!no) return null;
   const { data } = await admin
     .from("frunk_members")
-    .select("id, company_id, name, member_no, phone, status, plan_id, corporate_parent_id, frunk_plans(name, max_bookings_per_day, max_open_slots, is_corporate, max_users, companion_free)")
+    .select("id, company_id, name, member_no, phone, status, plan_id, corporate_parent_id, corporate_self_use, frunk_plans(name, max_bookings_per_day, max_open_slots, is_corporate, max_users, companion_free)")
     .eq("member_no", no)
     .is("deleted_at", null)
     .maybeSingle();
@@ -295,6 +295,14 @@ export async function createBooking(input: {
   //   数え方は @yozan/core/frank-corporate。ここで書き直さないこと
   //   （お客様の画面とサーバーでズレると「○を押したのに予約できません」になる）。
   const spec = corporateSpec(plan);
+
+  // 法人は「使う人はご利用者としてご登録いただく」（#204・2026-09-03 ユーザー確定）。
+  // ご契約者の行は月会費のお支払いを持つだけで、そのままでは予約できない
+  // （会員ページで【自分も利用する】を登録すれば取れる）。
+  // ここで通してしまうと「会社名義の誰か」の予約が1件混ざり、来店したのが誰か分からなくなる。
+  const asUser = canBookAsCorporate(spec, member as { corporate_parent_id?: string | null; corporate_self_use?: boolean | null });
+  if (!asUser.ok) return { ok: false, error: asUser.error ?? "ご利用者としてのご登録が必要です" };
+
   const nowHm = new Date(Date.now() + 9 * 3600_000).toISOString().slice(11, 16);
   // 法人は契約者と利用者を全部集める。契約者の行は corporate_parent_id が null なので、
   // 自分が利用者なら親を、契約者なら自分を起点にする

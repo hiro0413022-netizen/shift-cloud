@@ -15,6 +15,7 @@ import {
   type BookingCfg,
 } from "@yozan/core/frank-booking";
 import { monthRange, EMPTY_DAY_COUNT, type DayCount } from "@/lib/bay-timeline-pure";
+import { memberDisplayName } from "@yozan/core/frank-corporate";
 
 /**
  * スタッフ画面（member-os）から FRANK の予約台帳を読む（#93 台帳一本化）
@@ -59,7 +60,7 @@ export type BookingRow = {
   lesson_option_minutes: number | null;
   lesson_option_fee: number | null;
   lesson_option_note: string | null;
-  frunk_members: { name: string; member_no: string; alert_note: string | null } | null;
+  frunk_members: { name: string; member_no: string; alert_note: string | null; company_name: string | null } | null;
   frunk_bays: { name: string } | null;
   mbr_trial_requests: { name: string; phone: string | null; lefty: boolean; experience: string | null; message: string | null } | null;
 };
@@ -81,7 +82,7 @@ const BOOKING_COLS =
   "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, " +
   "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
   LESSON_OPT_COLS +
-  "frunk_members(name, member_no, alert_note), frunk_bays(name), " +
+  "frunk_members(name, member_no, alert_note, company_name), frunk_bays(name), " +
   "mbr_trial_requests(name, phone, lefty, experience, message)";
 
 /** 予約1件の詳細（カレンダーの名前クリックで開く・#139）。
@@ -116,7 +117,7 @@ const DETAIL_COLS =
   "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, source, created_at, " +
   "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
   LESSON_OPT_COLS +
-  "frunk_members(id, name, name_kana, member_no, alert_note, phone, email, status, frunk_plans(name)), " +
+  "frunk_members(id, name, name_kana, member_no, alert_note, company_name, corporate_parent_id, corporate_self_use, phone, email, status, frunk_plans(name, is_corporate, max_users, max_open_slots, companion_free)), " +
   "frunk_bays(name, floor, equipment, is_lefty), " +
   "mbr_trial_requests(id, name, name_kana, phone, email, lefty, experience, message, status, source)";
 
@@ -152,7 +153,7 @@ export type LessonDetail = {
 type LessonBookingRow = {
   id: string;
   status: string;
-  frunk_members: { name: string | null; member_no: string | null } | null;
+  frunk_members: { name: string | null; member_no: string | null; company_name?: string | null } | null;
 };
 
 export async function loadLessonDetail(id: string, companyId: string): Promise<LessonDetail | null> {
@@ -171,7 +172,7 @@ export async function loadLessonDetail(id: string, companyId: string): Promise<L
   // 予約者（1枠1人・取消は除く）。カレンダーから「誰のレッスンか」を辿れるようにする
   const { data: bk } = await admin
     .from("frunk_lesson_bookings")
-    .select("id, status, frunk_members(name, member_no)")
+    .select("id, status, frunk_members(name, member_no, company_name)")
     .eq("slot_id", id)
     .eq("company_id", companyId)
     .in("status", ["confirmed", "done"])
@@ -187,7 +188,7 @@ export async function loadLessonDetail(id: string, companyId: string): Promise<L
           id: b.id,
           status: b.status,
           member_no: b.frunk_members?.member_no ?? null,
-          member_name: b.frunk_members?.name ?? null,
+          member_name: b.frunk_members ? memberDisplayName(b.frunk_members as never) : null,
         }
       : null,
   };
@@ -343,7 +344,7 @@ export async function loadLiveItems(companyId: string, limit = 5): Promise<LiveI
   const [{ data: bookings }, { data: trials }] = await Promise.all([
     admin
       .from("frunk_bookings")
-      .select("id, updated_at, booked_date, start_time, status, customer_kind, guest_name, frunk_bays(name), frunk_members(name), mbr_trial_requests(name)")
+      .select("id, updated_at, booked_date, start_time, status, customer_kind, guest_name, frunk_bays(name), frunk_members(name, company_name), mbr_trial_requests(name)")
       .eq("company_id", companyId)
       .eq("store_id", FRANK_STORE_ID)
       .is("deleted_at", null)
@@ -370,7 +371,7 @@ export async function loadLiveItems(companyId: string, limit = 5): Promise<LiveI
           ? "member"
           : "dropin";
     const name =
-      (r.frunk_members as { name?: string } | null)?.name ??
+      (r.frunk_members ? memberDisplayName(r.frunk_members as never) : null) ||
       (r.mbr_trial_requests as { name?: string } | null)?.name ??
       (r.guest_name as string | null) ??
       null;

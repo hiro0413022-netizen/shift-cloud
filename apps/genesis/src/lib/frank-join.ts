@@ -141,6 +141,7 @@ export type WebJoinMemberRow = {
     joining_fee: number | null;
     is_corporate?: boolean | null;
     max_users?: number | null;
+    max_open_slots?: number | null;
   } | null;
 };
 
@@ -169,7 +170,7 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   const { data } = await admin
     .from("frunk_members")
     .select(
-      "id, company_id, store_id, plan_id, status, name, name_kana, gender, birth_date, phone, email, postal_code, address1, start_date, signature, joining_fee_waived, join_campaign, square_customer_id, square_checkout_breakdown, company_name, corporate_users, frunk_plans(name, monthly_price, joining_fee, is_corporate, max_users)"
+      "id, company_id, store_id, plan_id, status, name, name_kana, gender, birth_date, phone, email, postal_code, address1, start_date, signature, joining_fee_waived, join_campaign, square_customer_id, square_checkout_breakdown, company_name, corporate_users, frunk_plans(name, monthly_price, joining_fee, is_corporate, max_users, max_open_slots)"
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -350,6 +351,18 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
             ...corporateUsers.map((u) => `　${u.name} 様: ${u.memberNo}`),
             "各ご利用者様には、会員番号とご自身の電話番号の下4桁で会員ページにログインしていただけます。",
             "打席のご予約は御社の合計枠から消化され、ご利用が済むとまた次のご予約をお取りいただけます。",
+            "",
+          ]
+        : []),
+      // ご利用者が0名で確定した法人（#204・無記名でのご入会）。
+      // ここで案内しないと「ログインしたのに予約ボタンで断られる」ところで初めて気づく
+      ...(m.frunk_plans?.is_corporate && corporateUsers.length === 0
+        ? [
+            "■ 次にお願いしたいこと（ご利用者のご登録）",
+            "打席をご利用になる方は、会員ページの【ご利用者の管理】からご登録をお願いします。",
+            "お一人ずつ会員番号を発行し、その番号とご自身の電話番号の下4桁で会員ページにログインしていただけます。",
+            "ご担当者様ご自身がご利用になる場合も、同じ画面で【ご自身も利用する】をご登録ください。",
+            `打席のご予約は御社の合計枠（${Number(m.frunk_plans?.max_open_slots ?? 4)}コマ・1コマ=1時間）をご登録者で分け合ってお取りいただきます。`,
             "",
           ]
         : []),
