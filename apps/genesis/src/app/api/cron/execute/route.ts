@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { runDueActions } from "@/lib/ai-execution";
 import { publishDueContent } from "@/lib/content-loop";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
+import { runFrankAutoVisited } from "@/lib/frank-visit-cron";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -34,5 +35,9 @@ export async function GET(req: NextRequest) {
       results.push({ company: c.id, error: String(e) });
     }
   }
-  return NextResponse.json({ ok: true, results });
+  /* FRANK: 終了時刻を過ぎた予約を自動で「来店」にする（#205）。
+     10分ごとに回るこのtickに乗せることで、**レッスンが終われば最大10分で来店になる**
+     （翌朝までのタイムラグを作らない）。会社ループの外＝1回だけ。 */
+  const frankVisited = await runFrankAutoVisited().catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ok: true, results, frankVisited });
 }

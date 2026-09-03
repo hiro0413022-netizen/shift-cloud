@@ -1307,12 +1307,12 @@
 
   **(a) 押させる運用に賭けない。** 実測で9月の体験予約30件すべてが `confirmed` のまま＝**【来店】は一度も押されていなかった**。押す前提の数字（体験人数・入会率・来店履歴）は、押されない限り永遠に出ない。**押さなくても正しい方に倒す**。
 
-  **(b) 日次cron（6:00 JST）で「日付が過ぎた confirmed」を visited にする**（`lib/frank-visit-cron.ts` → `/api/cron/daily`）。触るのはその条件だけ: **cancelled / no_show / visited には触らない**（スタッフが決めた事実を上書きしない）、**当日ぶんは触らない**（まだ来る）、**GOLF WING は対象外**（あちらは Smart Hello が正典）。体験は申込側も `done` にそろえ、受付台帳に `arrived_at`（予約開始時刻）を入れる＝打刻の代わり。
+  **(b) 判定は「終了時刻を過ぎたか」**（ユーザー追加指示「翌朝ではなく、レッスン時間を過ぎたら来店済みに」）。`lib/frank-visit-cron.ts` を **10分ごとの `/api/cron/execute`** に乗せた＝**レッスンが終われば最大10分で来店になる**（翌朝までのタイムラグを作らない）。前日以前は全部、当日は `end_time` を過ぎたものだけ（**まだ打っている人を来店済にしない**）。日次cronからも呼ぶ（10分cronが止まっていても翌朝には必ず揃う二重の保険）。触るのは `confirmed` だけで **cancelled / no_show / visited には触らない**（スタッフが決めた事実を上書きしない）、**GOLF WING は対象外**（あちらは Smart Hello が正典）。体験は申込側も `done` にそろえ、受付台帳に `arrived_at`（予約開始時刻）を入れる＝打刻の代わり。
 
   **(c) 自動で来店にする以上、「来なかった人」を外す道が要る。** 【無断欠】を押したら**受付台帳から下げる**ようにした（従来はキャンセルのみ下げ、no_show は台帳に残って体験人数に混ざっていた）。来店に戻せばまた載る。予約画面には「【来店】は押さなくて大丈夫。**来られなかった方だけ【無断欠】**」と常時書いておく。
 
-  **(d) 既存データも合わせた**（2026-09-03 実行）: 9/2以前の confirmed 8件を visited に、体験申込7件を done に、受付台帳7行に arrived_at を投入。9/3（当日）と9/4以降は触っていない。
+  **(d) 既存データも合わせた**（2026-09-03 18:08 JST 実行）: 9/2以前の8件＋当日の終了済み3件（10:00/11:00×2/14:00開始）を visited に、体験申込10件を done に、受付台帳10行に arrived_at を投入。**その時点で進行中だった18:00〜と19:00〜は confirmed のまま**＝終了時刻を過ぎてから自動で切り替わる。
 
   **(e) KPI は変わらない。** #204 の体験人数・入会率は元から日付ベース（visited_on <= 今日）で数えているので、status とついに一致した形。無断欠が台帳から下がるぶん、これからは実態に近づく。
 
-  実装: `apps/genesis/src/lib/frank-visit-cron.ts`（新規）、`apps/genesis/src/app/api/cron/daily/route.ts`、`apps/member-os/src/app/(main)/reservations/{actions.ts, page.tsx}`。genesis / member-os の `tsc --noEmit` と `next build` 通過・テスト571件通過
+  実装: `apps/genesis/src/lib/frank-visit-cron.ts`（新規）、`apps/genesis/src/app/api/cron/{execute,daily}/route.ts`、`apps/member-os/src/app/(main)/reservations/{actions.ts, page.tsx}`。genesis / member-os の `tsc --noEmit` と `next build` 通過・テスト571件通過

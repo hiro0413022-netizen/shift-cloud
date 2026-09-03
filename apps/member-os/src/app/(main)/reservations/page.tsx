@@ -47,7 +47,6 @@ import { BookingDetailPanel, LessonDetailPanel } from "@/components/booking-deta
 import { setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption } from "./actions";
 import { BookingSheet } from "./booking-sheet";
 import { LiveRefresh } from "@/components/live-refresh";
-import { memberDisplayName } from "@yozan/core/frank-corporate";
 
 const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
 
@@ -79,8 +78,7 @@ function kindTone(kind: string): "accent" | "gold" | "ok" {
 }
 /** 予約の相手を1行で（会員／体験／都度で参照先が違う） */
 function who(b: BookingRow): string {
-  // 法人の方は「会社名＋お名前」（#206）。台帳でどの会社の方か分からないと、御社の枠の話が通じない
-  if (b.frunk_members) return `${memberDisplayName(b.frunk_members as never)}（${b.frunk_members.member_no}）`;
+  if (b.frunk_members) return `${b.frunk_members.name}（${b.frunk_members.member_no}）`;
   if (b.mbr_trial_requests) return b.mbr_trial_requests.name;
   return b.guest_name ?? "（名称未入力）";
 }
@@ -247,7 +245,7 @@ export default async function ReservationsPage({
       {/* #205: 来店は押さなくてよい。押させる運用に賭けない代わりに、
           「来られなかった方だけ押す」ことをその場に書いておく */}
       <p className="rounded-lg border border-(--color-line) bg-(--color-panel) px-3 py-2 text-xs text-(--color-dim)">
-        【来店】は押さなくて大丈夫です。日付が過ぎた予約は翌朝おのずと来店になります。
+        【来店】は押さなくて大丈夫です。終了時刻を過ぎた予約はおのずと来店になります（最大10分）。
         <span className="font-semibold text-(--color-txt)">来られなかった方だけ【無断欠】</span>を押してください（体験人数から外れます）。
       </p>
 
