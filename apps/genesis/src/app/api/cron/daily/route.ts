@@ -9,6 +9,7 @@ import { runMorningDigest } from "@/lib/morning-digest";
 import { runContentLoop, refreshContentMetrics } from "@/lib/content-loop";
 import { runFrankReminders } from "@/lib/frank-mail";
 import { runFrankMembershipSchedule } from "@/lib/frank-membership-cron";
+import { runFrankAutoVisited } from "@/lib/frank-visit-cron";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
 
 export const dynamic = "force-dynamic";
@@ -62,5 +63,7 @@ export async function GET(req: NextRequest) {
   const frankReminders = await runFrankReminders().catch((e) => ({ error: String(e) }));
   // FRANK 退会・休会の予約を当日反映（#192・会社ループの外＝1回だけ）
   const frankMembership = await runFrankMembershipSchedule().catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, results, frankReminders, frankMembership });
+  // FRANK 日が過ぎた予約を自動で「来店」に（#205・押さなくても数字が出るように）
+  const frankVisited = await runFrankAutoVisited().catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ok: true, results, frankReminders, frankMembership, frankVisited });
 }

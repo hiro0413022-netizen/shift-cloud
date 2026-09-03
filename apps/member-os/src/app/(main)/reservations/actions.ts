@@ -523,8 +523,16 @@ export async function setBookingStatus(formData: FormData) {
       .from("mbr_trial_requests")
       .update({ status: trialStatus, reviewed_by: actor.staffId, reviewed_at: new Date().toISOString() })
       .eq("id", bk.trial_request_id);
-    // 受付台帳も追随（キャンセルは台帳から下げる・戻したら復活させる）
-    await syncTrialWalkin(admin, String(bk.trial_request_id), { receptionStaffId: actor.staffId });
+    /* 受付台帳も追随。
+       ・キャンセル → 下げる（戻したら復活する）
+       ・無断欠(no_show) → **下げる**（#205）。FRANKは日が過ぎたら自動で来店になるので、
+         来られなかった方をそのまま残すと体験人数に混ざる。
+         押されたときだけ台帳から外し、来店に戻せばまた載る。 */
+    if (status === "no_show") {
+      await removeTrialWalkin(admin, String(bk.trial_request_id));
+    } else {
+      await syncTrialWalkin(admin, String(bk.trial_request_id), { receptionStaffId: actor.staffId });
+    }
   }
 
   await logAudit(actor, "frank.booking.status", "frunk_bookings", id, null, { status });

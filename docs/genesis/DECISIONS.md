@@ -1284,3 +1284,17 @@
   ⚠ 残（運用の判断）: **30件の体験予約すべてが `status='confirmed'` のままで、【来店】を誰も押していない**。いまは「日付が過ぎた＝来た」とみなしているので、無断キャンセルも体験に数える。正確に出すなら来店を押す運用が要る（押さなくても数字は出るので、業務は止まらない）。
 
   実装: `supabase/migrations/0143_frank_trial_kpi_fix.sql`（`app.trial_kpi_monthly` 新設・`refresh_member_kpis` 差し替え）、`apps/member-os/src/app/(main)/dashboard/page.tsx`。member-os の `tsc --noEmit` と `next build` 通過
+
+- #205 (2026-09-03) **FRANK は【来店】を押さなくても来店として扱う**（migrationなし・既存データは投入済み）。ユーザー指示「フランクゴルフに関しては来店を押さなくても来店としてください」（#204 で「30件すべて未押下」と報告した回答）。
+
+  **(a) 押させる運用に賭けない。** 実測で9月の体験予約30件すべてが `confirmed` のまま＝**【来店】は一度も押されていなかった**。押す前提の数字（体験人数・入会率・来店履歴）は、押されない限り永遠に出ない。**押さなくても正しい方に倒す**。
+
+  **(b) 日次cron（6:00 JST）で「日付が過ぎた confirmed」を visited にする**（`lib/frank-visit-cron.ts` → `/api/cron/daily`）。触るのはその条件だけ: **cancelled / no_show / visited には触らない**（スタッフが決めた事実を上書きしない）、**当日ぶんは触らない**（まだ来る）、**GOLF WING は対象外**（あちらは Smart Hello が正典）。体験は申込側も `done` にそろえ、受付台帳に `arrived_at`（予約開始時刻）を入れる＝打刻の代わり。
+
+  **(c) 自動で来店にする以上、「来なかった人」を外す道が要る。** 【無断欠】を押したら**受付台帳から下げる**ようにした（従来はキャンセルのみ下げ、no_show は台帳に残って体験人数に混ざっていた）。来店に戻せばまた載る。予約画面には「【来店】は押さなくて大丈夫。**来られなかった方だけ【無断欠】**」と常時書いておく。
+
+  **(d) 既存データも合わせた**（2026-09-03 実行）: 9/2以前の confirmed 8件を visited に、体験申込7件を done に、受付台帳7行に arrived_at を投入。9/3（当日）と9/4以降は触っていない。
+
+  **(e) KPI は変わらない。** #204 の体験人数・入会率は元から日付ベース（visited_on <= 今日）で数えているので、status とついに一致した形。無断欠が台帳から下がるぶん、これからは実態に近づく。
+
+  実装: `apps/genesis/src/lib/frank-visit-cron.ts`（新規）、`apps/genesis/src/app/api/cron/daily/route.ts`、`apps/member-os/src/app/(main)/reservations/{actions.ts, page.tsx}`。genesis / member-os の `tsc --noEmit` と `next build` 通過・テスト571件通過
