@@ -1362,3 +1362,15 @@
   **(e) それでも決済ページを出せなかったら、黙って承認待ちにしない。** `frunk.join_checkout_failed`（severity=warning・理由と連絡先つき）を events に残し、お客様の画面にも**「お支払いはまだ完了していません」**と明記する（従来は緑の✓で成功と見分けが付かなかった）。/frunk 承認待ちの決済状況表示（#188）と合わせて、未入金のまま会員番号を出さない。
 
   実装: `packages/core/src/jp-phone.ts`（新規）・`packages/core/package.json`、`apps/genesis/src/lib/{frank-pos-pure.ts, frank-square-billing.ts}`、`apps/member-os/src/app/join-web/{actions.ts, web-join-form.tsx}`、`tests/jp-phone.test.ts`（新規）。genesis / member-os の `tsc --noEmit` 通過・テスト598件通過。
+
+- #209 (2026-09-03) **会員ページからコーチの出勤予定を見られるようにした。出す人は「出すと決めた人だけ」（migration 0146適用済）。** ユーザー指示「会員ページにプロの出勤状況を確認できるようにしてください。藤田プロは絶対に表示しないように」。
+
+  **(a) 除外リストにしなかった。** 「藤田プロを出さない」を素直に書くと除外リスト（この人だけ出さない）になるが、それは**新しく入ったスタッフ・店舗ログイン用のアカウント・他店の人が、何もしなくてもお客様の画面に出る**という意味になる。出してよい人を1人ずつ決める形（オプトイン）に変えた。`staff.member_page_role`（会員ページに出すときの肩書き）が**入っている人だけ**を返し、空の人は関数の入口で落とす。藤田プロは空＝どのルートを通っても出ない。初期設定は 小川うらら＝コーチ／穴田 賢太＝コーチ／林 和希＝スタッフ。
+
+  **(b) 確定したシフトだけ出す。** `status='published'` のみ。下書きは店の中で検討している予定で、これを出すと「いると思って来たのにいない」を作る。休みの行（`is_day_off`）と、時間が入っていない行も出さない。
+
+  **(c) 「定休日」と「未定」を書き分けた。** 誰もいない日を全部「未定」にすると、定休日に「そのうち決まるのかな」と待たせてしまう。営業時間の設定（`businessHours`）で店が開いていない日は**定休日**と出す。
+
+  **(d) 開かないと分からない、を作らない。** マイページの一覧に「🏌️ コーチの出勤予定／本日 ◯◯・◯◯」と**本日いる人の名前まで**出す。詳細（/member/coaches）はこれから2週間ぶんを日付順に並べ、**予定は変更になる場合があります**と必ず添える。仮会員（入金前）には出さない。
+
+  実装: `supabase/migrations/0146_staff_member_page_role.sql`（新規）、`apps/member-os/src/lib/frank-coach-shifts.ts`（新規）、`apps/member-os/src/app/member/coaches/page.tsx`（新規）、`apps/member-os/src/app/member/page.tsx`。member-os の `tsc --noEmit` 通過・`next build` 成功・テスト598件通過。
