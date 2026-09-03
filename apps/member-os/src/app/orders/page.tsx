@@ -7,6 +7,7 @@ import { jstYmd } from "@yozan/core/jst";
 import { loadMenu } from "@/lib/frank-portal";
 import { markServed, cancelOrder, addStaffOrder, checkOutSeat, assignSeatBay } from "./actions";
 import { OrdersLive } from "./live";
+import { orderLine, type LiveItem } from "@/lib/live-feed-pure";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -55,6 +56,25 @@ export default async function OrdersPage() {
   const signature = `${open.length}:${s(open[open.length - 1]?.id)}`;
   // 未提供のまま3分たったら鳴らし直す（#189・ユーザー依頼）。判定は画面側でする
   const openOrders = open.map((o) => ({ id: s(o.id), orderedAt: s(o.ordered_at) }));
+  /* 鳴った理由を1行で出す（#202）。伝票カードは下にあるが、
+     手が離せないときは**鳴った瞬間に「どこへ・何を」だけ**読めたほうが早い */
+  const liveItems: LiveItem[] = [...open]
+    .sort((a, b) => (s(a.ordered_at) < s(b.ordered_at) ? 1 : -1))
+    .slice(0, 5)
+    .map((o) => {
+      const m = (o.frunk_members as { name?: string } | null) ?? null;
+      return {
+        key: `o${s(o.id)}`,
+        kind: "order" as const,
+        at: s(o.ordered_at),
+        text: orderLine({
+          bay: bays.find((b) => b.id === s(o.bay_id))?.name ?? null,
+          who: m?.name ? `${m.name} 様` : s(o.guest_label) || null,
+          items: ((o.frunk_order_items ?? []) as Row[]).map((i) => ({ name: s(i.name), qty: n(i.qty) })),
+          at: s(o.ordered_at),
+        }),
+      };
+    });
   // 経過分。10秒ごとに描き直すので、表示のズレは最大10秒
   const nowMs = Date.now();
   const waitedMin = (iso: string): number => {
@@ -103,7 +123,7 @@ export default async function OrdersPage() {
         <div className="flex items-center gap-4">
           <Link href="/orders/menu" className="text-xs text-(--color-dim) underline underline-offset-4">メニュー管理</Link>
           <Link href="/orders/qr" className="text-xs text-(--color-dim) underline underline-offset-4">打席QRを印刷</Link>
-          <OrdersLive signature={signature} unserved={open.length} openOrders={openOrders} />
+          <OrdersLive signature={signature} unserved={open.length} openOrders={openOrders} items={liveItems} />
         </div>
       </header>
 

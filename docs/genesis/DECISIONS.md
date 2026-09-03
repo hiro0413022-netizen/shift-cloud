@@ -1228,3 +1228,19 @@
   ・**会話メモのパネルはタブを移っても閉じない**（`hidden` にするだけ）。閉じると録音が止まり、裏の進み具合も見失う。**録音したまま本日のレッスンで撮影できる**。
 
   実装: `supabase/migrations/0142_lesson_note_video_link.sql`、`apps/lesson-os/src/app/(main)/students/[id]/{actions.ts, karte-client.tsx, lesson-note.tsx, measure-panel.tsx, page.tsx}`、`apps/lesson-os/src/app/s/[token]/page.tsx`、`apps/lesson-os/src/lib/{lesson-note-ai.ts, trackman.ts}`、`apps/lesson-os/src/app/api/lesson-note/summarize/route.ts`。lesson-os の `tsc --noEmit` 通過
+
+- #202 (2026-09-03) **音が鳴ったときに「何が届いたのか」を1行で出すようにした**（migrationなし）。ユーザー依頼「体験予約や通知が来たときに音が鳴るのはいいですが、それが何の内容なのかを通知するようにしてください」。
+
+  **(a) これまでは音と「予約に動きがありました」だけだった。** 鳴った理由が分からないと、どの画面のどこを探せばいいのか分からない。**そのうち鳴っても何もしなくなり、本当に困る通知まで見逃す**——通知として最悪の壊れ方になる手前だった。
+
+  **(b) 鳴った理由を1行にする。** 「体験 ／ 9/5(土) 13:00 ／ 岸田 拓也 様 ／ C打席」「注文 ／ A打席 ／ 福島 晃 様 ／ コーヒー×1・トースト×2 ／ 14:32」。**区分・いつ・だれ・どこ（注文は何を）**を必ず入れる。日程が決まっていない体験申込は「日程未定」と言い切る（空欄で流さない）。
+
+  **(c) 直近5件は消さずに残す。** 手が離せなくて見逃しても、あとから読み返せる。消すのは「確認したので消す」を押したときだけ。**流れて消える通知は、忙しいときほど役に立たない。**
+
+  **(d) 文字を作るところは純関数に切り出した**（`lib/live-feed-pure.ts`）。DBもReactも触らないのでテストで固定できる（`tests/live-feed.test.ts` 8件）。曜日は #200 と同じく `T00:00:00Z` で読む＝**同じ日付ズレを二度作らない**。
+
+  **(e) 出す場所は3画面**（ユーザー選択「電子伝票も含めて全部」）: 予約（/reservations）・体験申込（/trials）・電子伝票（/orders）。電子伝票は伝票カードが下に並んでいるが、**鳴った瞬間に「どこへ・何を」だけ読めたほうが速い**ので上部に出す。
+
+  **(f) 開いた瞬間には出さない。** 画面を開いた時点で並んでいるものは既読として扱う（開くたびに5件の帯が出ると、それも見なくなる）。
+
+  実装: `apps/member-os/src/lib/live-feed-pure.ts`（新規）、`apps/member-os/src/lib/frank-reservation.ts`（`loadLiveItems`）、`apps/member-os/src/components/live-refresh.tsx`、`apps/member-os/src/app/(main)/{reservations,trials}/page.tsx`、`apps/member-os/src/app/orders/{page.tsx,live.tsx}`、`tests/live-feed.test.ts`（新規）。member-os の `tsc --noEmit` と `next build` 通過・テスト571件通過（クラウドでcloneして実走）

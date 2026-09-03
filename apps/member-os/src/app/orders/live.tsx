@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useChime } from "@/components/chime";
+import { pickNew, type LiveItem } from "@/lib/live-feed-pure";
 
 /**
  * 電子伝票の自動更新と通知音（#154 → #189 で音を作り直し）
@@ -40,11 +41,14 @@ export function OrdersLive({
   unserved,
   openOrders = [],
   intervalSec = 10,
+  items = [],
 }: {
   signature: string;
   unserved: number;
   openOrders?: LiveOrder[];
   intervalSec?: number;
+  /** 未提供の注文（新しい順）。鳴った理由をこの中から出す（#202） */
+  items?: LiveItem[];
 }) {
   const router = useRouter();
   const prev = useRef(signature);
@@ -53,6 +57,11 @@ export function OrdersLive({
   // 音の面倒（自動再生の制限・どこを触っても復帰・状態表示）は共通フックが持つ（#197で共通化）
   const { sound, setSound, ready, chime, arm } = useChime(true);
   const [now, setNow] = useState("");
+  /* 鳴った理由（#202・2026-09-03 ユーザー依頼）。
+     伝票カードは下に並んでいるが、**鳴った瞬間に「どこへ・何を」だけ**読めたほうが速い。
+     見逃してもいいように直近5件は残す。 */
+  const [notices, setNotices] = useState<Array<{ key: string; text: string; at: string }>>([]);
+  const seen = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const id = setInterval(() => router.refresh(), intervalSec * 1000);
@@ -74,12 +83,26 @@ export function OrdersLive({
     document.title = unserved > 0 ? `(${unserved}) 電子伝票 — FRANK GOLF` : "電子伝票 — FRANK GOLF";
   }, [unserved]);
 
+  // 開いた時点で並んでいる注文は「新着」ではない
+  useEffect(() => {
+    for (const i of items) seen.current.add(i.key);
+    // 初回だけ。以降は signature の変化で拾う
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 新しい注文が入った
   useEffect(() => {
     if (prev.current === signature) return;
     prev.current = signature;
+    const fresh = pickNew(items, seen.current);
+    if (fresh.length > 0) {
+      const d = new Date();
+      const stamp = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+      for (const f of fresh) seen.current.add(f.key);
+      setNotices((p) => [...fresh.map((f) => ({ key: f.key, text: f.text, at: stamp })).reverse(), ...p].slice(0, 5));
+    }
     if (sound && ready) chime("new");
-  }, [signature, chime, sound, ready]);
+  }, [signature, chime, sound, ready, items]);
 
   /**
    * 未提供のまま3分たった注文を鳴らし直す。
@@ -112,6 +135,7 @@ export function OrdersLive({
   }, [openOrders, sound, ready, chime]);
 
   return (
+    <div className="flex flex-col items-end gap-2">
     <div className="flex items-center gap-3 text-sm text-(--color-dim)">
       <span className="tabular-nums">{now}</span>
       {!sound ? (
@@ -148,6 +172,32 @@ export function OrdersLive({
           🔔 画面を一度タップすると音が鳴ります
         </button>
       )}
+    </div>
+
+    {/* 鳴った理由（#202）。いちばん上が最新。見逃してもここに残る */}
+    {notices.length > 0 && (
+      <ul className="w-full max-w-md space-y-1">
+        {notices.map((x, i) => (
+          <li
+            key={x.key}
+            className={`flex items-start gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
+              i === 0
+                ? "border-emerald-300 bg-emerald-50 font-semibold text-emerald-800"
+                : "border-(--color-line) bg-white text-(--color-dim)"
+            }`}
+          >
+            <span aria-hidden>🔔</span>
+            <span className="flex-1 text-left">{x.text}</span>
+            <span className="shrink-0 tabular-nums">{x.at}</span>
+          </li>
+        ))}
+        <li className="text-right">
+          <button onClick={() => setNotices([])} className="text-[11px] text-(--color-dim) underline">
+            確認したので消す
+          </button>
+        </li>
+      </ul>
+    )}
     </div>
   );
 }

@@ -1,5 +1,9 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
+import { bookingLine, type LiveItem } from "@/lib/live-feed-pure";
+
+/** 通知の1行を組み立てるときだけ使う緩い行の型（列は select で絞っている） */
+type FeedRow = Record<string, unknown>;
 import {
   loadBookingCfg,
   businessHours,
@@ -327,6 +331,80 @@ export async function loadUnpaid(companyId: string): Promise<BookingRow[]> {
  *   最後に動いた時刻も混ぜる。
  * ★ 体験の申込（mbr_trial_requests）も一緒に見る。体験は予約と同じくらい取りこぼせない。
  */
+/**
+ * 「何が届いたか」を数件ぶん返す（#202・2026-09-03 ユーザー依頼）
+ *
+ * 音と一緒に「予約に動きがありました」としか出ていなかったので、
+ * **鳴った理由が読んだだけで分かる**ように、直近で動いた予約・体験申込を1行ずつにする。
+ * 指紋（signature）の判定は従来どおり別で取る。ここは軽い問い合わせに留める。
+ */
+export async function loadLiveItems(companyId: string, limit = 5): Promise<LiveItem[]> {
+  const admin = createAdmin();
+  const [{ data: bookings }, { data: trials }] = await Promise.all([
+    admin
+      .from("frunk_bookings")
+      .select("id, updated_at, booked_date, start_time, status, customer_kind, guest_name, frunk_bays(name), frunk_members(name), mbr_trial_requests(name)")
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .is("deleted_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(limit),
+    // 日程がまだ決まっていない申込こそ知らせたい（打席予約の行が無いので上では拾えない）
+    admin
+      .from("mbr_trial_requests")
+      .select("id, updated_at, name, booked_date, start_time, status")
+      .eq("company_id", companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .is("deleted_at", null)
+      .is("booked_date", null)
+      .order("updated_at", { ascending: false })
+      .limit(limit),
+  ]);
+
+  const items: LiveItem[] = [];
+  for (const r of (bookings ?? []) as FeedRow[]) {
+    const kind =
+      String(r.customer_kind ?? "") === "trial"
+        ? "trial"
+        : String(r.customer_kind ?? "") === "member"
+          ? "member"
+          : "dropin";
+    const name =
+      (r.frunk_members as { name?: string } | null)?.name ??
+      (r.mbr_trial_requests as { name?: string } | null)?.name ??
+      (r.guest_name as string | null) ??
+      null;
+    items.push({
+      key: `b${String(r.id)}@${String(r.updated_at ?? "")}`,
+      kind,
+      at: String(r.updated_at ?? ""),
+      text: bookingLine({
+        kind,
+        date: r.booked_date as string | null,
+        start: r.start_time as string | null,
+        name,
+        bay: (r.frunk_bays as { name?: string } | null)?.name ?? null,
+        cancelled: String(r.status ?? "") === "cancelled",
+      }),
+    });
+  }
+  for (const r of (trials ?? []) as FeedRow[]) {
+    items.push({
+      key: `t${String(r.id)}@${String(r.updated_at ?? "")}`,
+      kind: "trial",
+      at: String(r.updated_at ?? ""),
+      text: bookingLine({
+        kind: "trial",
+        date: null,
+        start: null,
+        name: (r.name as string | null) ?? null,
+        cancelled: String(r.status ?? "") === "canceled",
+      }),
+    });
+  }
+  return items.sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, limit);
+}
+
 export async function loadLiveSignature(companyId: string): Promise<string> {
   const admin = createAdmin();
   const today = jstToday();

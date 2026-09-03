@@ -12,6 +12,7 @@ import {
   loadBookingDetail,
   loadLessonDetail,
   loadLiveSignature,
+  loadLiveItems,
   type BookingRow,
 } from "@/lib/frank-reservation";
 import {
@@ -100,7 +101,7 @@ export default async function ReservationsPage({
   const weekFrom = weekStart(date); // 週は日曜はじまり（Smart Helloと同じ）
   const days = mode === "week" ? Array.from({ length: 7 }, (_, i) => addDaysStr(weekFrom, i)) : [date];
 
-  const [dayViews, monthData, unpaidRows, coaches, memberOptions, detail, canGw, liveSig] = await Promise.all([
+  const [dayViews, monthData, unpaidRows, coaches, memberOptions, detail, canGw, liveSig, liveItems] = await Promise.all([
     Promise.all(days.map((d) => loadDay(d, actor.companyId))),
     loadMonthCounts(month, actor.companyId),
     loadUnpaid(actor.companyId),
@@ -109,6 +110,7 @@ export default async function ReservationsPage({
     loadSelection(sp.sel ?? null, actor.companyId),
     canAccessGolfWing(actor),
     loadLiveSignature(actor.companyId), // 自動更新の判定（#197）
+    loadLiveItems(actor.companyId), // 鳴った理由を1行で出す（#202）
   ]);
 
   const dayView = dayViews.find((v) => v.date === date) ?? dayViews[0];
@@ -211,7 +213,7 @@ export default async function ReservationsPage({
           </p>
           {/* お客様の予約は24時間いつでも入る。リロード待ちにすると見落とすので自動で取り直す（#197） */}
           <div className="mt-1.5">
-            <LiveRefresh signature={liveSig} intervalSec={15} label="予約に動きがありました" />
+            <LiveRefresh signature={liveSig} intervalSec={15} label="予約に動きがありました" items={liveItems} />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">

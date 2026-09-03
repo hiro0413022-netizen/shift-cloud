@@ -7,6 +7,7 @@ import { Badge, Empty, fmtDate } from "@/components/ui";
 import { TRIAL_STATUS_LABEL, TRIAL_STATUS_TONE } from "@/lib/trial";
 import { setTrialStatus, saveTrialNote } from "./actions";
 import { LiveRefresh } from "@/components/live-refresh";
+import { bookingLine, type LiveItem } from "@/lib/live-feed-pure";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -30,6 +31,22 @@ export default async function TrialsPage() {
   // 自動更新の判定（#197）。件数だけだと「1件増えて1件対応済み」で同じ数になるので
   // 最後に動いた時刻も混ぜる
   const liveSig = `t${rows.length}:${pending}:${String(rows[0]?.updated_at ?? rows[0]?.created_at ?? "")}`;
+  /* 鳴った理由を1行で出す（#202）。いちばん新しい申込から5件 */
+  const liveItems: LiveItem[] = [...rows]
+    .sort((a, b) => (String(a.updated_at ?? a.created_at ?? "") < String(b.updated_at ?? b.created_at ?? "") ? 1 : -1))
+    .slice(0, 5)
+    .map((r) => ({
+      key: `t${String(r.id)}@${String(r.updated_at ?? r.created_at ?? "")}`,
+      kind: "trial" as const,
+      at: String(r.updated_at ?? r.created_at ?? ""),
+      text: bookingLine({
+        kind: "trial",
+        date: (r.booked_date as string | null) ?? null,
+        start: (r.start_time as string | null) ?? null,
+        name: (r.name as string | null) ?? null,
+        cancelled: String(r.status ?? "") === "canceled",
+      }),
+    }));
 
   return (
     <div className="space-y-5">
@@ -39,7 +56,7 @@ export default async function TrialsPage() {
           <p className="mt-1 text-sm text-(--color-dim)">公式サイトの体験フォームからの申込です。未対応 {pending} 件。</p>
           {/* 体験の申込も24時間いつでも届く。リロード待ちにすると見落とす（#197） */}
           <div className="mt-1.5">
-            <LiveRefresh signature={liveSig} intervalSec={20} label="体験の申込が届きました" />
+            <LiveRefresh signature={liveSig} intervalSec={20} label="体験の申込が届きました" items={liveItems} />
           </div>
         </div>
       </div>
