@@ -1,5 +1,4 @@
 import "server-only";
-import { randomBytes } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstYmd } from "@yozan/core/jst";
 import { FRANK_STORE_CODE } from "@yozan/core/frank-booking";
@@ -508,8 +507,12 @@ export async function karteHasContent(companyId: string, memberNo: string): Prom
 }
 
 /**
- * 会員番号 → Lesson OS の共有ページURL。**無ければその場で発行する**（#207）。
- * 発行は会員ご本人が【レッスンカルテを見る】を押したときだけ＝ホームのHTMLには載らない。
+ * 会員番号 → Lesson OS の共有ページURL（**発行はしない**・無ければ null）。
+ *
+ * ⚠ 会員ご本人がご自分のレッスンノートを見るのに、このURLはもう使わない（#210）。
+ *   会員ページの `/member/lesson` が、ログインしている会員ご本人であることだけを根拠に
+ *   その場で中身を描く。**見るためにトークンを1本増やす作りをやめる**というユーザー判断。
+ *   共有URLは「LINEで送る」「会員でない方に見せる」ときにコーチが Lesson OS で作るもの。
  */
 export async function karteShareUrl(companyId: string, memberNo: string): Promise<string | null> {
   const studentId = await karteStudentId(companyId, memberNo);
@@ -518,13 +521,8 @@ export async function karteShareUrl(companyId: string, memberNo: string): Promis
   const { data: tok } = await admin
     .from("lsn_share_tokens").select("token")
     .eq("student_id", studentId).is("revoked_at", null).limit(1).maybeSingle();
-  const existing = s((tok as Row | null)?.token);
-  if (existing) return `${LESSON_OS_URL}/s/${existing}`;
-
-  const token = randomBytes(18).toString("base64url");
-  const { error } = await admin
-    .from("lsn_share_tokens").insert({ company_id: companyId, student_id: studentId, token });
-  return error ? null : `${LESSON_OS_URL}/s/${token}`;
+  const t = s((tok as Row | null)?.token);
+  return t ? `${LESSON_OS_URL}/s/${t}` : null;
 }
 
 /**

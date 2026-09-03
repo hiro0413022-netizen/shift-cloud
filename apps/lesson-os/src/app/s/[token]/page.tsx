@@ -4,7 +4,8 @@ import { Radar } from "@/components/radar";
 import type { Phases } from "@/lib/phases";
 import { ShareVideo } from "./share-video";
 import { brandOf } from "@/lib/brand";
-import { CLIENT_FIELDS, type TrackmanValues } from "@/lib/trackman";
+import { type TrackmanValues } from "@/lib/trackman";
+import { CLIENT_FIELDS, latestVideoByDay, noteVideoId as pickNoteVideo, diffOf } from "@yozan/core/lesson-share";
 
 /**
  * 生徒向けマイページ（DECISIONS #50 / PGA NOTEユーザーアプリ準拠・青×白テーマ）
@@ -175,13 +176,11 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
      video_id で紐づいていない古いメモも、**同じ日の最後のスイング**の下に出す。
      ここを日付でも拾うようにしないと、#201 より前のメモが全部
      上の一覧に落ちて「動画とバラバラに見える」ままになる（過去データは書き換えない）。 */
-  const latestOfDay = new Map<string, string>();
-  for (const v of videos ?? []) {
-    const d = String(v.shot_at ?? v.created_at).slice(0, 10);
-    if (!latestOfDay.has(d)) latestOfDay.set(d, v.id as string);
-  }
+  const latestOfDay = latestVideoByDay(
+    (videos ?? []).map((v) => ({ id: v.id as string, shotAt: String(v.shot_at ?? v.created_at).slice(0, 10) }))
+  );
   const noteVideoId = (n: { video_id: string | null; lesson_date: unknown }): string | null =>
-    (n.video_id as string | null) ?? latestOfDay.get(String(n.lesson_date)) ?? null;
+    pickNoteVideo({ videoId: (n.video_id as string | null) ?? null, lessonDate: String(n.lesson_date) }, latestOfDay);
 
   const looseNotes = (notes ?? []).filter((n) => !noteVideoId(n));
   const notesByVideo = new Map<string, typeof looseNotes>();
@@ -305,7 +304,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
                           const now = sh.values[f.key] as number;
                           const before = sh.prev?.[f.key];
                           // 前回との差。良し悪しは決めつけず、増えた/減っただけを出す
-                          const diff = typeof before === "number" ? Math.round((now - before) * 10) / 10 : null;
+                          const diff = diffOf(now, typeof before === "number" ? before : undefined);
                           const unit = sh.values._units?.[f.key] ?? f.unit;
                           return (
                             <div key={f.key} className="flex items-baseline justify-between border-b border-gray-100 py-0.5 text-xs">
@@ -313,7 +312,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
                               <span className="tabular-nums">
                                 {now}
                                 <span className="ml-0.5 text-gray-400">{unit}</span>
-                                {diff !== null && diff !== 0 && (
+                                {diff !== null && (
                                   <span className="ml-1 text-[10px] text-gray-500">
                                     （前回 {diff > 0 ? "+" : ""}{diff}）
                                   </span>

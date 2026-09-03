@@ -24,6 +24,7 @@
     "./jp-phone": "./src/jp-phone.ts",
     "./jst": "./src/jst.ts",
     "./kernel": "./src/kernel.ts",
+    "./lesson-share": "./src/lesson-share.ts",
     "./members": "./src/members.ts",
     "./middleware": "./src/middleware.ts",
     "./supabase/admin": "./src/supabase/admin.ts",

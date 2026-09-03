@@ -58,28 +58,11 @@ export const TM_GROUP_LABEL: Record<TmField["group"], string> = {
 export const TM_KEYS = new Set(TRACKMAN_FIELDS.map((f) => f.key));
 
 /**
- * お客様の画面（共有ページ）に出す項目（2026-09-03 ユーザー判断）
- *
- * 22項目を全部並べるとお客様には読めず、その場で先生が説明する時間が要る。
- * 「今日どう変わったか」が伝わる8つに絞る。数字を隠す意図ではなく、
- * 残りは先生が計測タブで見て口頭で足す。
- *
- * ⚠ ここを増やすときは「お客様が一人で見て分かるか」で決める。
+ * お客様の画面に出す項目は **@yozan/core/lesson-share が正典**（2026-09-03・#210）。
+ * 会員ページ（member-os）と共有ページ（lesson-os）の2か所で同じものを描くので、
+ * どちらかに書くと「会員ページには出るのに共有URLには出ない」が起きる。
  */
-export const CLIENT_FIELD_KEYS = [
-  "club_speed",
-  "ball_speed",
-  "smash_factor",
-  "launch_angle",
-  "spin_rate",
-  "carry",
-  "club_path",
-  "face_angle",
-] as const;
-
-export const CLIENT_FIELDS: TmField[] = CLIENT_FIELD_KEYS
-  .map((k) => TRACKMAN_FIELDS.find((f) => f.key === k))
-  .filter((f): f is TmField => !!f);
+export { CLIENT_FIELDS, CLIENT_FIELD_KEYS } from "@yozan/core/lesson-share";
 
 /** 計測値（確定値）。`_units` は写真に写っていた単位をそのまま持つ */
 export type TrackmanValues = Record<string, number> & { _units?: Record<string, string> };

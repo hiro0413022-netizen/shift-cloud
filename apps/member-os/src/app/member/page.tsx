@@ -62,10 +62,10 @@ export default async function MemberHomePage({
     ? await currentVisit(memberId)
     : { checkedIn: false, bayName: null, bayCode: null, endTime: null };
 
-  // レッスンカルテ（Lesson OS・#129）: member_no ⇄ lsn_students.member_code。
-  // リンク先は /member/karte（既読を記録し、共有トークンを発行してから飛ばす）。
+  // レッスンノート（#129 → #207 → #210）: member_no ⇄ lsn_students.member_code。
   // ⚠ 出す条件は**お客様に見せるものがあるか**（#207）。トークンの有無で決めると、
   //   コーチが【生徒へ共有リンク】を押していない会員にリンクが出ない。
+  // 中身は会員ページの中（/member/lesson）で直接描く＝**共有URLを発行しない**（#210）。
   const hasKarte = await karteHasContent(member.companyId, member.memberNo);
   let karteNew = false;
   if (hasKarte && memberId) {
@@ -222,14 +222,14 @@ export default async function MemberHomePage({
       {/* ③ レッスンカルテ（新着があれば目立たせる＝「書いても届かない」を塞ぐ・#155） */}
       {hasKarte && (
         <a
-          href="/member/karte"
+          href="/member/lesson"
           className={`mb-3 flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-center font-semibold transition-colors ${
             karteNew
               ? "bg-(--color-gold) text-white hover:bg-(--color-gold)/90"
               : "border border-(--color-gold)/50 bg-(--color-panel) text-(--color-gold) hover:bg-(--color-panel-2)"
           }`}
         >
-          📋 レッスンカルテを見る
+          📋 レッスンノートを見る
           {karteNew && (
             <span className="rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-(--color-gold)">新着</span>
           )}

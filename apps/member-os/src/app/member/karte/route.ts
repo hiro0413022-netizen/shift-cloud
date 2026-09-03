@@ -1,32 +1,19 @@
 import { NextResponse } from "next/server";
-import { getMemberSession } from "@/lib/member";
-import { createAdmin } from "@/lib/supabase/admin";
-import { karteShareUrl } from "@/lib/frank-portal";
 
 export const dynamic = "force-dynamic";
 
 /**
- * レッスンカルテを開く（#155）
+ * 旧・レッスンカルテの入口（#155 → #210 で置き換え）
  *
- * 直接 lesson-os の共有URLへリンクせず、ここを通す理由は2つ:
- *   1. 「ここまでは見た」を記録する（frunk_members.karte_seen_at）→ 次に更新されたら新着バッジが出る
- *   2. 共有トークンをホーム画面のHTMLに埋めない（押した人にだけ渡す）
+ * かつてはここで lesson-os の共有URL（/s/<token>）を引いて外へ飛ばしていた。
+ * **見るためにトークンを1本発行する**作りだったので、
+ *   - コーチが【生徒へ共有リンク】を押していない会員には出ない（#207 の事故）
+ *   - 押すたびに秘密のURLが増える
+ * ユーザー指示「リンクを発行せずに即時に見えるようにしてください」を受けて、
+ * 会員ページの中で直接描く `/member/lesson` に移した。
+ *
+ * ここは**古いブックマークとメールのリンクのために残す**だけ（転送）。
  */
 export async function GET(req: Request) {
-  const session = await getMemberSession();
-  if (!session) return NextResponse.redirect(new URL("/member/login", req.url));
-
-  const admin = createAdmin();
-  const { data: me } = await admin
-    .from("frunk_members").select("id")
-    .eq("company_id", session.companyId).eq("member_no", session.memberNo)
-    .is("deleted_at", null).maybeSingle();
-
-  const url = await karteShareUrl(session.companyId, session.memberNo);
-  if (me) {
-    await admin.from("frunk_members")
-      .update({ karte_seen_at: new Date().toISOString() })
-      .eq("id", (me as { id: string }).id);
-  }
-  return NextResponse.redirect(url ? new URL(url) : new URL("/member", req.url));
+  return NextResponse.redirect(new URL("/member/lesson", req.url));
 }

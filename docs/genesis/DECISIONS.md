@@ -1374,3 +1374,19 @@
   **(d) 開かないと分からない、を作らない。** マイページの一覧に「🏌️ コーチの出勤予定／本日 ◯◯・◯◯」と**本日いる人の名前まで**出す。詳細（/member/coaches）はこれから2週間ぶんを日付順に並べ、**予定は変更になる場合があります**と必ず添える。仮会員（入金前）には出さない。
 
   実装: `supabase/migrations/0146_staff_member_page_role.sql`（新規）、`apps/member-os/src/lib/frank-coach-shifts.ts`（新規）、`apps/member-os/src/app/member/coaches/page.tsx`（新規）、`apps/member-os/src/app/member/page.tsx`。member-os の `tsc --noEmit` 通過・`next build` 成功・テスト598件通過。
+
+- #210 (2026-09-03) **レッスンノートを、共有URLを発行せずに会員ページの中で直接見られるようにした**（migrationなし）。ユーザー指示「リンクを発行せずに即時に見えるようにしてください」。
+
+  **(a) それまでは「見るために秘密のURLを1本作る」作りだった。** 会員ページの【レッスンカルテ】は lesson-os の共有ページ `/s/<token>` へ飛ばしていた。#207 でトークンが無ければその場で発行するようにしたが、**見るたびに秘密のURLが増える**のは筋が悪い（漏れたら誰でも見られる・失効の管理が要る・会員ごとに何本あるか誰も把握していない）。
+
+  **(b) 根拠を「秘密のURLを持っているか」から「誰としてログインしているか」に変えた。** `/member/lesson` を会員ページの中に作り、**ログインしている会員ご本人であること**（member セッション）だけを根拠に、会員番号 → `lsn_students.member_code` で引いたそのカルテの中身だけを描く。**トークンは1本も作らない**。
+
+  **(c) 共有URL（`/s/<token>`）は残す。** 用途が違う——LINEで送る／会員でない体験の方に見せる。コーチが Lesson OS で必要なときだけ作る。`karteShareUrl` は**発行をやめて、あれば返すだけ**に戻した。旧 `/member/karte` は `/member/lesson` への転送だけにして、古いブックマークを死なせない。
+
+  **(d) 出すものは共有ページと同じ**（スイング動画＝スロー・コマ送りつき／今日のレッスンの説明＝**先生が確認して保存した `share_body` だけ**／レッスンデータ＝紐づいた計測の8項目＋同じクラブの前回比／コーチからのアドバイス／お手本スイング）。文字起こしもAIの下書きもお客様には出さない（#179 の柱）。
+
+  **(e) 同じものを2か所で描くことになったので、規則を `@yozan/core/lesson-share` に出した**（`CLIENT_FIELDS` 8項目・`latestVideoByDay`・`noteVideoId`・`diffOf`）。どちらかに書くと「会員ページには出るのに共有URLには出ない」が必ず起きる。`tests/lesson-share.test.ts` で 項目数と並び／古いメモの拾い方／変化なしの前回比を出さないこと を固定した（602件通過）。
+
+  **(f) 署名URLはページ表示時に1回でまとめて発行**（`createSignedUrls`）。1本ずつ取ると本数ぶん往復して数秒待たされる（#143 と同じ理由）。サムネイルがある動画は `preload="none"`＝**お客様のギガを使わない**。開いた時点で `karte_seen_at` を進めるので、新着バッジは次に増えたときだけ出る。
+
+  実装: `packages/core/src/lesson-share.ts`（新規）、`apps/member-os/src/app/member/lesson/{page.tsx, lesson-video.tsx}`（新規）、`apps/member-os/src/app/member/karte/route.ts`、`apps/member-os/src/app/member/page.tsx`、`apps/member-os/src/lib/frank-portal.ts`、`apps/lesson-os/src/{lib/trackman.ts, app/s/[token]/page.tsx}`、`tests/lesson-share.test.ts`（新規）。member-os / lesson-os の `tsc --noEmit` 通過・テスト602件通過
