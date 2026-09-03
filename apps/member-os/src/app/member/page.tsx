@@ -7,6 +7,7 @@ import { checkinQrPayload } from "@yozan/core/frank-portal";
 import { ensureCheckinToken, currentVisit, karteHasContent, karteHasNew } from "@/lib/frank-portal";
 import { ticketBalance, pendingTicketCount } from "@yozan/core/frank-lesson-tickets";
 import { openSlots, slotUsageLabel } from "@yozan/core/frank-corporate";
+import { loadCoachShifts } from "@/lib/frank-coach-shifts";
 import { memberLogout, cancelMyBooking } from "./actions";
 import { VisitPanel } from "./visit-panel";
 import { AddToHome } from "./add-to-home";
@@ -72,6 +73,10 @@ export default async function MemberHomePage({
       .from("frunk_members").select("karte_seen_at").eq("id", memberId).maybeSingle();
     karteNew = await karteHasNew(member.companyId, member.memberNo, ((seen as Row | null)?.karte_seen_at as string | null) ?? null);
   }
+
+  // コーチの出勤（#209）: 本日いる人はホームに名前まで出す（開かないと分からない、を作らない）
+  const coachDays = await loadCoachShifts(1);
+  const todayCoaches = (coachDays[0]?.people ?? []).map((p) => p.name);
 
   // レッスンチケット（#199）: 残枚数はホームに出す（開かないと分からない、を作らない）
   const [ticketCount, ticketPending] = memberId
@@ -241,6 +246,19 @@ export default async function MemberHomePage({
           <span className="text-sm text-(--color-dim)">
             残り <span className="text-base font-bold text-(--color-gold)">{ticketCount}</span> 枚
             {ticketPending > 0 ? <span className="ml-2 text-amber-600">お支払い待ち{ticketPending}枚</span> : null}
+          </span>
+        </Link>
+      )}
+
+      {/* ④-2 コーチの出勤予定（#209）。本日いる人はここで分かる */}
+      {!member.isProvisional && (
+        <Link
+          href="/member/coaches"
+          className="mb-3 flex w-full items-center justify-between gap-3 rounded-xl border border-(--color-line) bg-(--color-panel) px-4 py-3.5 font-semibold text-(--color-txt) transition-colors hover:bg-(--color-panel-2)"
+        >
+          <span className="shrink-0">🏌️ コーチの出勤予定</span>
+          <span className="truncate text-right text-sm font-normal text-(--color-dim)">
+            {todayCoaches.length > 0 ? `本日 ${todayCoaches.join("・")}` : "本日は未定"}
           </span>
         </Link>
       )}
