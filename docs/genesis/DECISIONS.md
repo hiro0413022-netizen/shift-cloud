@@ -1186,6 +1186,6 @@
 
   **(g) 会員ページ `/member/tickets`** — 残枚数を大きく／購入（枚数±・押す前に税込総額を表示）／履歴（付与・購入・利用）。マイページにも「残り◯枚」を出す（**開かないと分からない、を作らない**）。スタッフ側は会員カードに残枚数・履歴・受領・付与・1枚使う。
 
-  ⚠ **未対応（要判断）**: 公式サイトの料金表記は「25分マンツーマン 2,500円 ／ **4回チケット 9,000円 ／ 8回チケット 16,000円**」だが、今回の会員ページは**1枚2,500円のみ**（ユーザー選択）。回数券は当面レジ（Square POS）で売り、スタッフが会員カードから付与する運用。
+  **(h) 公式サイトの回数券の表記を取り下げた**（2026-09-03 ユーザー指示「4回チケット 9,000円／8回チケット 16,000円 これは削除しておいてください」）。サイトは「25分マンツーマン 2,500円 ／ 4回チケット 9,000円 ／ 8回チケット 16,000円」と出していたが、**売っているのは1枚2,500円だけ**なので、残すとお客様の期待と店の実務が食い違う（「HPに書いてある4回券をください」に応えられない）。`sites/frank-golf/assets/site-data.js` の `price.lessonPrice` を **「25分マンツーマン 2,500円」** に変更（**静的サイトのデータ1行・_build.py の再実行は不要**、frank-golf のデプロイのみ）。「レッスンチケットもご用意しています」「チケット制も選べます」の表現は**そのまま残す**（1枚単位のチケットは実在するため嘘にならない）。
 
   実装: `supabase/migrations/0141_frank_lesson_tickets.sql`、`packages/core/src/frank-lesson-tickets.ts`（新規）、`apps/member-os/src/lib/frank-tickets.ts`（新規）、`apps/member-os/src/app/member/tickets/*`（新規）、`apps/member-os/src/app/member/page.tsx`、`apps/member-os/src/app/(main)/frunk/{actions.ts, [id]/page.tsx}`、`apps/member-os/src/app/(main)/reservations/{actions.ts, page.tsx}`、`apps/genesis/src/lib/frank-join.ts`。member-os / genesis の `tsc --noEmit` と `next build` 通過・テスト561件通過（クラウドでcloneして実走）
