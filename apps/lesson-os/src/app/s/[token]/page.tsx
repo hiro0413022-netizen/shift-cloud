@@ -171,10 +171,22 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
   const radarItems = (items ?? []).map((it) => ({ name: it.name, percent: progMap.get(it.id) ?? 0 }));
   // ブランドは生徒の所属店舗で決める（#168）。直書きすると必ずどちらかの店で嘘になる
   const brand = brandOf(student.store_id as string | null);
-  const looseNotes = (notes ?? []).filter((n) => !n.video_id);
+  /* メモをその日のスイングの下に出す（#207）。
+     video_id で紐づいていない古いメモも、**同じ日の最後のスイング**の下に出す。
+     ここを日付でも拾うようにしないと、#201 より前のメモが全部
+     上の一覧に落ちて「動画とバラバラに見える」ままになる（過去データは書き換えない）。 */
+  const latestOfDay = new Map<string, string>();
+  for (const v of videos ?? []) {
+    const d = String(v.shot_at ?? v.created_at).slice(0, 10);
+    if (!latestOfDay.has(d)) latestOfDay.set(d, v.id as string);
+  }
+  const noteVideoId = (n: { video_id: string | null; lesson_date: unknown }): string | null =>
+    (n.video_id as string | null) ?? latestOfDay.get(String(n.lesson_date)) ?? null;
+
+  const looseNotes = (notes ?? []).filter((n) => !noteVideoId(n));
   const notesByVideo = new Map<string, typeof looseNotes>();
   for (const n of notes ?? []) {
-    const vid = n.video_id as string | null;
+    const vid = noteVideoId(n);
     if (!vid) continue;
     notesByVideo.set(vid, [...(notesByVideo.get(vid) ?? []), n]);
   }

@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstYmd } from "@yozan/core/jst";
 import { FRANK_STORE_CODE } from "@yozan/core/frank-booking";
@@ -473,19 +474,57 @@ export async function checkOut(checkinId: string): Promise<void> {
 // ---------------------------------------------------------------
 const LESSON_OS_URL = process.env.NEXT_PUBLIC_LESSON_OS_URL || "https://lesson-os.vercel.app";
 
-/** 会員番号 → Lesson OS の共有ページURL（無ければ null） */
-export async function karteShareUrl(companyId: string, memberNo: string): Promise<string | null> {
+/** 会員番号 → カルテ（lsn_students）のID。無ければ null */
+async function karteStudentId(companyId: string, memberNo: string): Promise<string | null> {
   const admin = createAdmin();
-  const { data: student } = await admin
+  const { data } = await admin
     .from("lsn_students").select("id")
     .eq("company_id", companyId).eq("member_code", memberNo)
     .is("deleted_at", null).limit(1).maybeSingle();
-  if (!student) return null;
+  return data ? s((data as Row).id) : null;
+}
+
+/**
+ * 会員ページに【レッスンカルテを見る】を出してよいか（#207・2026-09-03）
+ *
+ * ⚠ ここが**共有トークンの有無**で決まっていたのが事故だった。
+ *   トークンは Lesson OS でコーチが【生徒へ共有リンク】を押したときにしか作られないので、
+ *   動画もレッスンメモもあるのに**リンクがまったく出ない会員**がいた（実測: 穴田様 FR0006・
+ *   動画2本／メモ2件でトークン0）。押し忘れに誰も気づけない形で機能が消えていた。
+ *
+ * 出す条件は「お客様に見せるものがあるか」だけにする。トークンは押したときに作る。
+ */
+export async function karteHasContent(companyId: string, memberNo: string): Promise<boolean> {
+  const studentId = await karteStudentId(companyId, memberNo);
+  if (!studentId) return false;
+  const admin = createAdmin();
+  const [{ count: videos }, { count: notes }] = await Promise.all([
+    admin.from("lsn_videos").select("id", { count: "exact", head: true })
+      .eq("student_id", studentId).is("deleted_at", null),
+    admin.from("lsn_lesson_notes").select("id", { count: "exact", head: true })
+      .eq("student_id", studentId).is("deleted_at", null).not("share_body", "is", null),
+  ]);
+  return (videos ?? 0) > 0 || (notes ?? 0) > 0;
+}
+
+/**
+ * 会員番号 → Lesson OS の共有ページURL。**無ければその場で発行する**（#207）。
+ * 発行は会員ご本人が【レッスンカルテを見る】を押したときだけ＝ホームのHTMLには載らない。
+ */
+export async function karteShareUrl(companyId: string, memberNo: string): Promise<string | null> {
+  const studentId = await karteStudentId(companyId, memberNo);
+  if (!studentId) return null;
+  const admin = createAdmin();
   const { data: tok } = await admin
     .from("lsn_share_tokens").select("token")
-    .eq("student_id", s((student as Row).id)).is("revoked_at", null).limit(1).maybeSingle();
-  const t = s((tok as Row | null)?.token);
-  return t ? `${LESSON_OS_URL}/s/${t}` : null;
+    .eq("student_id", studentId).is("revoked_at", null).limit(1).maybeSingle();
+  const existing = s((tok as Row | null)?.token);
+  if (existing) return `${LESSON_OS_URL}/s/${existing}`;
+
+  const token = randomBytes(18).toString("base64url");
+  const { error } = await admin
+    .from("lsn_share_tokens").insert({ company_id: companyId, student_id: studentId, token });
+  return error ? null : `${LESSON_OS_URL}/s/${token}`;
 }
 
 /**
@@ -509,12 +548,25 @@ export async function karteHasNew(companyId: string, memberNo: string, seenAt: s
     .eq("student_id", studentId).is("deleted_at", null)
     .order("created_at", { ascending: false }).limit(50);
   const videos = (vids ?? []) as Row[];
-  if (videos.length === 0) return false;
 
-  // 一度も開いていない人は、動画が1本でもあれば新着扱い（最初の1回を必ず届ける）
+  /* レッスンの説明（会話メモ）も新着に数える（#207）。
+     動画を撮らない日でもレッスンの説明は届く。動画だけを見ていると、
+     「説明は増えているのにバッジが出ない」＝ 開かない → 届かない に戻る。 */
+  const { data: shareNotes } = await admin
+    .from("lsn_lesson_notes").select("updated_at")
+    .eq("student_id", studentId).is("deleted_at", null)
+    .not("share_body", "is", null)
+    .order("updated_at", { ascending: false }).limit(1);
+  const latestNote = s(((shareNotes ?? []) as Row[])[0]?.updated_at);
+
+  if (videos.length === 0 && !latestNote) return false;
+
+  // 一度も開いていない人は、中身が1つでもあれば新着扱い（最初の1回を必ず届ける）
   if (!seenAt) return true;
   const seen = new Date(seenAt).getTime();
   if (videos.some((v) => new Date(s(v.created_at)).getTime() > seen)) return true;
+  if (latestNote && new Date(latestNote).getTime() > seen) return true;
+  if (videos.length === 0) return false;
 
   const { data: cmts } = await admin
     .from("lsn_comments").select("created_at")

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   startLessonNote, createNoteUploadUrl, finishNoteUpload, saveLessonNote,
-  createNotePartUploadUrl, finishNoteParts, setNoteVideo,
+  createNotePartUploadUrl, finishNoteParts, setNoteVideo, makeClientExplanation,
   deleteNoteAudio, deleteNoteTranscript, removeLessonNote, loadLessonNote,
   listCompanySymptoms, setNoteSymptomRejected, addNoteSymptom,
   type LessonNoteItem, type SymptomOption,
@@ -280,6 +280,20 @@ export function LessonNotePanel({
     }
   };
 
+  /** 先生の記録からお客様への説明を作り直す（過去のメモ用・#207） */
+  const makeClient = async (id: string) => {
+    setBusy(`client:${id}`);
+    try {
+      const r = await makeClientExplanation(id);
+      if (r.error) { setMsg(r.error); return; }
+      if (r.text) setShareDrafts((p) => ({ ...p, [id]: r.text as string }));
+      await refresh(id);
+      setMsg("お客様への説明の下書きを作りました。内容を確認して保存してください");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   /** 確認して保存。先生の記録・お客様への説明・動画への紐づけを1回で確定する */
   const save = async (id: string) => {
     const n = notes.find((x) => x.id === id);
@@ -493,6 +507,17 @@ export function LessonNotePanel({
 
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <button onClick={() => void save(n.id)} className="btn-gold !px-3 !py-1.5">確認して保存</button>
+              {/* #201より前のメモには お客様への説明 が無い。音声は消えているので、
+                  残っている先生の記録と文字起こしから作り直す（#207） */}
+              {!(shareDrafts[n.id] ?? n.shareBody ?? "").trim() && !!n.body && (
+                <button
+                  onClick={() => void makeClient(n.id)}
+                  disabled={busy === `client:${n.id}`}
+                  className="btn-ghost !px-2 !py-1.5"
+                >
+                  {busy === `client:${n.id}` ? "作っています…" : "✍ お客様への説明を作る"}
+                </button>
+              )}
               {n.status === "failed" && !!n.hasAudio && (
                 <button onClick={() => summarize(n.id)} disabled={inFlight} className="btn-ghost !px-2 !py-1.5">
                   もう一度AIに聞かせる

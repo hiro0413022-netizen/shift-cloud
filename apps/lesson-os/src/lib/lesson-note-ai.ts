@@ -312,3 +312,62 @@ export async function matchSymptoms(
     return [];
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* お客様への説明を、あとから作り直す（2026-09-03・#207）              */
+/*                                                                      */
+/* #201 より前のメモには お客様への説明 が入っていない。音声はすでに    */
+/* 消えている（約束どおり）ので、録音からは作り直せない。               */
+/* 残っている**先生の記録と文字起こし**から作る。                       */
+/*                                                                      */
+/* ⚠ ここでも「無いことは書かない」を守る。材料に無い助言・数値を        */
+/*   足すと、先生が言っていないことをお客様に伝えることになる。          */
+/* ------------------------------------------------------------------ */
+
+const CLIENT_SYSTEM = [
+  "あなたはゴルフスクールのコーチ助手。コーチが書いたレッスンの記録を、**そのお客様本人に見せる説明**に書き直す。",
+  "厳守すること:",
+  "- **材料に書かれていないことは足さない。** 新しい助言・数値・約束を作らない。",
+  "- お客様に語りかける文体（「〜しましょう」「〜がよくなりました」）。150〜250字。",
+  "- 専門用語は必ず言い換えるか、ひとこと説明を付ける（例: フェースの向き＝クラブの面の向き）。",
+  "- 「今日できるようになったこと」→「まだ残っている課題」→「次までにやること」の順。",
+  "- お客様を評価・否定しない。できていないことも「次の一歩」の形で書く。",
+  "- 材料が短くて書けないなら、空文字を返す。",
+  ' 出力は次のJSONのみ: { "client": "..." }',
+].join("\n");
+
+/** 先生の記録（＋あれば文字起こし）から、お客様への説明の下書きを作る */
+export async function writeClientExplanation(material: string): Promise<string | null> {
+  const apiKey = geminiKey();
+  if (!apiKey || !material.trim()) return null;
+  const model = process.env.LESSON_NOTE_MODEL || process.env.CORTEX_GEMINI_MODEL || DEFAULT_MODEL;
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: CLIENT_SYSTEM }] },
+          contents: [{ role: "user", parts: [{ text: `【今日のレッスンの記録】\n${material.slice(0, 12000)}` }] }],
+          generationConfig: { maxOutputTokens: 2000, temperature: 0.3, responseMimeType: "application/json" },
+        }),
+        signal: AbortSignal.timeout(60000),
+      }
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+    const out = (json.candidates ?? [])
+      .flatMap((c) => c.content?.parts ?? [])
+      .filter((p) => !p.thought)
+      .map((p) => p.text ?? "")
+      .join("")
+      .trim();
+    if (!out) return null;
+    const parsed = JSON.parse(out) as { client?: unknown };
+    const text = typeof parsed.client === "string" ? parsed.client.trim().slice(0, 2000) : "";
+    return text || null;
+  } catch {
+    return null;
+  }
+}

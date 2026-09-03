@@ -10,6 +10,7 @@ import type { Annotations } from "@/lib/lesson";
 import { sanitizePhases, type Phases } from "@/lib/phases";
 import { sanitizeTrackman, type TrackmanValues } from "@/lib/trackman";
 import { readTrackmanImage } from "@/lib/trackman-ai";
+import { writeClientExplanation } from "@/lib/lesson-note-ai";
 
 /**
  * 生徒カルテのアクション（DECISIONS #49/#50）
@@ -957,6 +958,37 @@ export async function saveLessonNote(
   if (error) return { error: error.message };
   revalidatePath(`/students/${studentId}`);
   return { videoId };
+}
+
+/**
+ * お客様への説明を、あとから作り直す（2026-09-03・#207）
+ *
+ * #201 より前のメモには お客様への説明 が無い。音声は約束どおり消えているので、
+ * 残っている**先生の記録と文字起こし**から作る。**下書きなので保存はコーチが押す**
+ * （ここでは share_body を書き換えるだけで status は動かさない）。
+ */
+export async function makeClientExplanation(noteId: string): Promise<{ text?: string; error?: string }> {
+  const { admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const { data } = await admin
+    .from("lsn_lesson_notes")
+    .select("body, transcript, summary")
+    .eq("id", note.id)
+    .maybeSingle();
+  const r = (data ?? null) as { body: string | null; transcript: string | null; summary: unknown } | null;
+  const material = [r?.body ?? "", r?.transcript ?? ""].filter(Boolean).join("\n\n");
+  if (!material.trim()) return { error: "元になる先生の記録がありません" };
+
+  const text = await writeClientExplanation(material);
+  if (!text) return { error: "作れませんでした（AIのキーか通信をご確認ください）" };
+
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({ share_body: text, updated_at: new Date().toISOString() })
+    .eq("id", note.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/students/${note.studentId}`);
+  return { text };
 }
 
 /** 紐づけ先の動画を変える（違う動画に付けたいとき・外したいときは null） */

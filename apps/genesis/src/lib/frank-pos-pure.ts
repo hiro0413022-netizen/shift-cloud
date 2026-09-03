@@ -97,13 +97,15 @@ export function mapSquarePayment(p: SquarePayment): MappedSale | null {
 /** 税抜プラン価格→税込請求額。Stripe時代の unit_amount=round(税抜×1.1) と同じ式（9,800/13,800/19,800で exTax と往復一致） */
 export const monthlyFeeTaxIncluded = (priceExTax: number) => Math.round(priceExTax * 1.1);
 
-/** 日本の電話番号 → E.164（+81…）。Squareの pre_populated_data 用。変換できなければ null（省略する） */
-export function toE164Jp(phone: string | null | undefined): string | null {
-  const digits = (phone ?? "").replace(/\D/g, "");
-  if (digits.startsWith("81") && digits.length >= 11) return `+${digits}`;
-  if (digits.startsWith("0") && digits.length >= 10) return `+81${digits.slice(1)}`;
-  return null;
-}
+/**
+ * 日本の電話番号 → E.164（+81…）。Squareの pre_populated_data 用。変換できなければ null（＝渡さない）。
+ *
+ * ⚠ 判定の正典は @yozan/core/jp-phone。ここでは中身を書かない（#207）。
+ *   旧実装は「0始まり10桁以上」を無条件で通していたため、携帯なのに10桁の
+ *   「0905655867」を +81905655867 として Square に渡し、決済リンクの発行ごと
+ *   "Invalid phone number." で失敗させていた（2026-09-03 実障害）。
+ */
+export { toE164Jp } from "@yozan/core/jp-phone";
 
 /** 入会金の自動課金noteの接頭辞。frank-square-billing.chargeCardOnFile が付け、Webhookがこれで判定する */
 export const JOINING_FEE_NOTE_PREFIX = "FRANK入会金";

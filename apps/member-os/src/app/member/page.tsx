@@ -4,7 +4,7 @@ import { requireMember, resolveHimeji } from "@/lib/member";
 import { createAdmin } from "@/lib/supabase/admin";
 import { BOOKING_STATUS_LABEL, jstToday } from "@yozan/core/frank-booking";
 import { checkinQrPayload } from "@yozan/core/frank-portal";
-import { ensureCheckinToken, currentVisit, karteShareUrl, karteHasNew } from "@/lib/frank-portal";
+import { ensureCheckinToken, currentVisit, karteHasContent, karteHasNew } from "@/lib/frank-portal";
 import { ticketBalance, pendingTicketCount } from "@yozan/core/frank-lesson-tickets";
 import { openSlots, slotUsageLabel } from "@yozan/core/frank-corporate";
 import { memberLogout, cancelMyBooking } from "./actions";
@@ -61,9 +61,11 @@ export default async function MemberHomePage({
     ? await currentVisit(memberId)
     : { checkedIn: false, bayName: null, bayCode: null, endTime: null };
 
-  // レッスンカルテ（Lesson OS・#129）: member_no ⇄ lsn_students.member_code、閲覧は共有トークン。
-  // リンク先は /member/karte（既読を記録してから飛ばす）。ここでは有無だけ見る。
-  const hasKarte = Boolean(await karteShareUrl(member.companyId, member.memberNo));
+  // レッスンカルテ（Lesson OS・#129）: member_no ⇄ lsn_students.member_code。
+  // リンク先は /member/karte（既読を記録し、共有トークンを発行してから飛ばす）。
+  // ⚠ 出す条件は**お客様に見せるものがあるか**（#207）。トークンの有無で決めると、
+  //   コーチが【生徒へ共有リンク】を押していない会員にリンクが出ない。
+  const hasKarte = await karteHasContent(member.companyId, member.memberNo);
   let karteNew = false;
   if (hasKarte && memberId) {
     const { data: seen } = await admin

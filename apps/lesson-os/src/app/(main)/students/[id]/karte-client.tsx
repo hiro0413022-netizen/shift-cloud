@@ -422,8 +422,21 @@ export function KarteClient({
                     ))}
                 </div>
               )}
-              {prev.body && <p className="mt-2 whitespace-pre-wrap text-sm text-(--color-dim)">{prev.body}</p>}
-              {!prev.summary && !prev.body && (
+              {/* お客様にお伝えした説明と、コーチ向けの記録の両方を出す（#207）。
+                  お客様の前で開く画面なので、**お客様に見せた文章を先**に置く */}
+              {prev.shareBody && (
+                <div className="mt-2 rounded-lg border border-(--color-gold)/40 bg-(--color-panel-2) px-3 py-2">
+                  <p className="text-[11px] text-(--color-gold)">前回お客様にお伝えした説明</p>
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm">{prev.shareBody}</p>
+                </div>
+              )}
+              {prev.body && (
+                <div className="mt-2">
+                  <p className="text-[11px] text-(--color-dim)">前回のコーチ向けレッスン内容</p>
+                  <p className="mt-0.5 whitespace-pre-wrap text-sm text-(--color-dim)">{prev.body}</p>
+                </div>
+              )}
+              {!prev.summary && !prev.body && !prev.shareBody && (
                 <p className="mt-1 text-xs text-(--color-dim)">前回のメモはまだ確定していません</p>
               )}
             </div>
@@ -510,54 +523,83 @@ export function KarteClient({
                 </div>
               ))}
 
-              {/* このレッスンの会話メモ（本文はコピーせず、会話メモの正典をそのまま出す） */}
-              {e.notes.map((n) => (
-                <div key={n.id} className="mt-3 border-t border-(--color-line) px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-xs font-medium text-(--color-gold)">会話メモ</p>
-                    {n.status !== "saved" && (
-                      <span className="rounded bg-(--color-panel-2) px-2 py-0.5 text-[11px] text-(--color-dim)">
-                        {n.status === "summarized" ? "下書き（未確定）" : n.status === "failed" ? "失敗" : "作成中"}
-                      </span>
-                    )}
-                    <button onClick={() => setTab("note")} className="ml-auto text-[11px] text-(--color-dim) underline">
-                      会話メモを開く
-                    </button>
-                  </div>
-                  {n.body && <p className="mt-1 whitespace-pre-wrap text-sm">{n.body}</p>}
-                  {n.shareBody && (
-                    <div className="mt-2 rounded-lg border border-(--color-gold)/40 bg-(--color-panel-2) px-3 py-2">
-                      <p className="text-[11px] text-(--color-gold)">お客様への説明（お客様の画面に出ています）</p>
-                      <p className="mt-0.5 whitespace-pre-wrap text-sm">{n.shareBody}</p>
-                    </div>
-                  )}
-                  {n.symptoms.filter((t) => !t.rejected).length > 0 && (
-                    <p className="mt-1.5 text-[11px] text-(--color-dim)">
-                      症状: {n.symptoms.filter((t) => !t.rejected).map((t) => t.symptom).join(" / ")}
-                    </p>
-                  )}
-                </div>
-              ))}
-
-              {/* コーチコメント */}
-              {v && (
+              {/* コーチからのアドバイス（#207）
+                  会話メモの2つの文章をここに出す。順番は **お客様への説明 → コーチ向け**。
+                  お客様の隣で開く画面なので、まずお客様に見せる文章が目に入る位置に置く。
+                  本文はコピーせず、会話メモ（lsn_lesson_notes）の正典をそのまま映す。
+                  動画の無い日のレッスンでも出す（v が無くても描く）。 */}
+              {(e.notes.length > 0 || !!v) && (
                 <div className="mt-3 space-y-2 border-t border-(--color-line) px-4 py-3">
                   <p className="text-xs font-medium text-(--color-gold)">コーチからのアドバイス</p>
-                  {v.comments.map((c) => (
-                    <div key={c.id} className="rounded-lg bg-(--color-panel-2) px-3 py-2">
-                      <p className="text-xs text-(--color-dim)">{c.coach} ・ {c.at}</p>
-                      <p className="mt-0.5 whitespace-pre-wrap text-sm">{c.body}</p>
+
+                  {e.notes.map((n) => (
+                    <div key={n.id} className="space-y-2">
+                      {n.shareBody ? (
+                        <div className="rounded-lg border border-(--color-gold)/40 bg-(--color-panel-2) px-3 py-2">
+                          <p className="text-[11px] text-(--color-gold)">
+                            お客様への説明（お客様の画面に出ています）
+                            {n.status !== "saved" && <span className="ml-1 text-(--color-dim)">※保存するまでお客様には出ません</span>}
+                          </p>
+                          <p className="mt-0.5 whitespace-pre-wrap text-sm">{n.shareBody}</p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2">
+                          <p className="text-[11px] text-(--color-dim)">
+                            お客様への説明はまだありません
+                            <button onClick={() => setTab("note")} className="ml-2 underline">会話メモで作る</button>
+                          </p>
+                        </div>
+                      )}
+
+                      {n.body && (
+                        <div className="rounded-lg bg-(--color-panel-2) px-3 py-2">
+                          <p className="text-[11px] text-(--color-dim)">
+                            コーチ向けのレッスン内容
+                            {n.status !== "saved" && (
+                              <span className="ml-1">
+                                （{n.status === "summarized" ? "下書き・未確定" : n.status === "failed" ? "失敗" : "作成中"}）
+                              </span>
+                            )}
+                            {n.coach ? ` ・ ${n.coach}` : ""}
+                          </p>
+                          <p className="mt-0.5 whitespace-pre-wrap text-sm">{n.body}</p>
+                        </div>
+                      )}
+
+                      {n.symptoms.filter((t) => !t.rejected).length > 0 && (
+                        <p className="text-[11px] text-(--color-dim)">
+                          症状: {n.symptoms.filter((t) => !t.rejected).map((t) => t.symptom).join(" / ")}
+                        </p>
+                      )}
+
+                      <div className="text-[11px]">
+                        <button onClick={() => setTab("note")} className="text-(--color-dim) underline">
+                          会話メモを開いて直す
+                        </button>
+                      </div>
                     </div>
                   ))}
-                  <div className="flex gap-2">
-                    <input
-                      value={drafts[v.id] ?? ""}
-                      onChange={(e2) => setDrafts({ ...drafts, [v.id]: e2.target.value })}
-                      placeholder="アドバイス・次回の課題を書く"
-                      className="input-dark min-w-0 flex-1"
-                    />
-                    <button onClick={() => comment(v.id)} disabled={pending || !(drafts[v.id] ?? "").trim()} className="btn-gold !px-3">送信</button>
-                  </div>
+
+                  {/* 手で書き足すアドバイス（動画に対して残す一言） */}
+                  {v && (
+                    <>
+                      {v.comments.map((c) => (
+                        <div key={c.id} className="rounded-lg bg-(--color-panel-2) px-3 py-2">
+                          <p className="text-xs text-(--color-dim)">{c.coach} ・ {c.at}</p>
+                          <p className="mt-0.5 whitespace-pre-wrap text-sm">{c.body}</p>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <input
+                          value={drafts[v.id] ?? ""}
+                          onChange={(e2) => setDrafts({ ...drafts, [v.id]: e2.target.value })}
+                          placeholder="アドバイス・次回の課題を書く"
+                          className="input-dark min-w-0 flex-1"
+                        />
+                        <button onClick={() => comment(v.id)} disabled={pending || !(drafts[v.id] ?? "").trim()} className="btn-gold !px-3">送信</button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
