@@ -10,6 +10,7 @@
     "./fitting-walkin": "./src/fitting-walkin.ts",
     "./frank-booking": "./src/frank-booking.ts",
     "./frank-handoff": "./src/frank-handoff.ts",
+    "./frank-lesson-tickets": "./src/frank-lesson-tickets.ts",
     "./frank-links": "./src/frank-links.ts",
     "./frank-corporate": "./src/frank-corporate.ts",
     "./frank-corporate-members": "./src/frank-corporate-members.ts",

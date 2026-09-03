@@ -22,6 +22,7 @@ import {
   mdLabel,
 } from "@yozan/core/frank-membership";
 import { corporateSpec } from "@yozan/core/frank-corporate";
+import { ticketBalance, listTickets, ticketRowLabel } from "@yozan/core/frank-lesson-tickets";
 import {
   setMemberStatus,
   changePlan,
@@ -32,6 +33,9 @@ import {
   resendApprovalMail,
   saveAlertNote,
   updateMemberProfile,
+  receiveTicketPaid,
+  grantTicketsManual,
+  useTicketManual,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -184,6 +188,13 @@ export default async function FrunkMemberPage({
     return live0?.token ?? null;
   })();
 
+  // レッスンチケット（#199）。残枚数は台帳の合計＝画面と履歴が食い違わない
+  const [ticketCount, ticketRows] = await Promise.all([
+    ticketBalance(admin, id),
+    listTickets(admin, id, 20),
+  ]);
+  const ticketPending = ticketRows.filter((t) => t.status === "pending_payment");
+
   const status = String(m.status ?? "");
   const inMinTerm = m.min_term_until != null && String(m.min_term_until) > today;
   const back = `/frunk/${id}`;
@@ -248,6 +259,70 @@ export default async function FrunkMemberPage({
           />
           <button className={btnCls}>保存</button>
         </form>
+      </Panel>
+
+      {/* レッスンチケット（#199）。お支払い待ちはここで受領する */}
+      <Panel title={`レッスンチケット（パーソナル25分）　残り ${ticketCount} 枚`} className="d1">
+        {ticketPending.length > 0 && (
+          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <p className="text-sm font-semibold text-amber-800">店頭でのお支払い待ち</p>
+            <p className="mt-0.5 text-xs text-amber-700">
+              受け取ってから【受領】を押してください。押すまでお客様の残枚数には入りません。
+            </p>
+            <div className="mt-2 space-y-2">
+              {ticketPending.map((t) => (
+                <form key={t.id} action={receiveTicketPaid} className="flex flex-wrap items-center gap-2 text-sm">
+                  <input type="hidden" name="ticket_id" value={t.id} />
+                  <input type="hidden" name="back" value={back} />
+                  <span>
+                    {String(t.created_at).slice(0, 10)}　{t.qty}枚　
+                    {t.amount ? `${t.amount.toLocaleString("ja-JP")}円（税込）` : ""}
+                  </span>
+                  <button className={btnCls}>受領（お支払い済みにする）</button>
+                </form>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-end gap-2">
+          <form action={grantTicketsManual} className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="back" value={back} />
+            <Field label="付与する枚数">
+              <input name="qty" defaultValue="1" inputMode="numeric" className={`${inputCls} w-20`} />
+            </Field>
+            <Field label="理由（履歴に残ります）">
+              <input name="note" placeholder="例: キャンペーン・お詫び" className={`${inputCls} min-w-48`} />
+            </Field>
+            <button className={btnGhostCls}>付与する</button>
+          </form>
+          <form action={useTicketManual} className="flex items-end gap-2">
+            <input type="hidden" name="id" value={id} />
+            <input type="hidden" name="back" value={back} />
+            <button className={btnGhostCls} disabled={ticketCount < 1}>
+              1枚使う（店頭でレッスン）
+            </button>
+          </form>
+        </div>
+
+        {ticketRows.length === 0 ? (
+          <Empty>まだ記録はありません</Empty>
+        ) : (
+          <ul className="mt-3 divide-y divide-(--color-line) text-sm">
+            {ticketRows.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-3 py-1.5">
+                <span className={t.status === "void" ? "text-(--color-dim) line-through" : ""}>
+                  {String(t.created_at).slice(0, 10)}　{ticketRowLabel(t)}
+                  {t.note ? <span className="ml-2 text-xs text-(--color-dim)">{t.note}</span> : null}
+                </span>
+                <span className={`shrink-0 font-semibold ${t.status === "void" ? "text-(--color-dim) line-through" : t.qty > 0 ? "text-emerald-600" : ""}`}>
+                  {t.qty > 0 ? `＋${t.qty}` : t.qty}枚
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">

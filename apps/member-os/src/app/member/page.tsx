@@ -5,6 +5,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { BOOKING_STATUS_LABEL, jstToday } from "@yozan/core/frank-booking";
 import { checkinQrPayload } from "@yozan/core/frank-portal";
 import { ensureCheckinToken, currentVisit, karteShareUrl, karteHasNew } from "@/lib/frank-portal";
+import { ticketBalance, pendingTicketCount } from "@yozan/core/frank-lesson-tickets";
 import { memberLogout, cancelMyBooking } from "./actions";
 import { VisitPanel } from "./visit-panel";
 import { AddToHome } from "./add-to-home";
@@ -68,6 +69,11 @@ export default async function MemberHomePage({
       .from("frunk_members").select("karte_seen_at").eq("id", memberId).maybeSingle();
     karteNew = await karteHasNew(member.companyId, member.memberNo, ((seen as Row | null)?.karte_seen_at as string | null) ?? null);
   }
+
+  // レッスンチケット（#199）: 残枚数はホームに出す（開かないと分からない、を作らない）
+  const [ticketCount, ticketPending] = memberId
+    ? await Promise.all([ticketBalance(admin, memberId), pendingTicketCount(admin, memberId)])
+    : [0, 0];
 
   const { data: bookings } = memberId
     ? await admin
@@ -157,6 +163,20 @@ export default async function MemberHomePage({
             <span className="rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-(--color-gold)">新着</span>
           )}
         </a>
+      )}
+
+      {/* ④ レッスンチケット（#199） */}
+      {!member.isProvisional && (
+        <Link
+          href="/member/tickets"
+          className="mb-3 flex w-full items-center justify-between rounded-xl border border-(--color-line) bg-(--color-panel) px-4 py-3.5 font-semibold text-(--color-txt) transition-colors hover:bg-(--color-panel-2)"
+        >
+          <span>🎫 レッスンチケット</span>
+          <span className="text-sm text-(--color-dim)">
+            残り <span className="text-base font-bold text-(--color-gold)">{ticketCount}</span> 枚
+            {ticketPending > 0 ? <span className="ml-2 text-amber-600">お支払い待ち{ticketPending}枚</span> : null}
+          </span>
+        </Link>
       )}
 
       {/* ⑤ 公式LINE */}

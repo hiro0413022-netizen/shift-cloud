@@ -11,6 +11,7 @@ import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import { logEvent } from "@/lib/kernel";
 import { FRANK_LINKS } from "@yozan/core/frank-links";
 import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
+import { grantJoinCampaignTickets, JOIN_TICKET_CAMPAIGN } from "@yozan/core/frank-lesson-tickets";
 
 type Admin = ReturnType<typeof createAdmin>;
 
@@ -228,6 +229,22 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   });
 
   // ---- ここからベストエフォート（失敗しても入会は確定済み） ----
+
+  // 9月入会キャンペーン（#199）: 対象かどうかの判定は @yozan/core に1か所だけ置く。
+  // 店頭の承認（member-os /frunk）から入っても同じ行になる。
+  try {
+    const granted = await grantJoinCampaignTickets(admin, m.id);
+    if (granted > 0) {
+      await logEvent(m.company_id, {
+        event_type: "frank.ticket.campaign_grant",
+        title: `${JOIN_TICKET_CAMPAIGN.label}: ${m.name}様（${memberNo}）に${granted}枚`.slice(0, 120),
+        source: "frank_billing",
+        source_type: "system",
+      });
+    }
+  } catch (e) {
+    console.error("[frank-join] campaign tickets failed:", e);
+  }
 
   // 月会費は「入会金＋前取り月数分」を決済ページで1回いただいている（#131b）。
   // 以前あった「決済後に2回目をカード課金」は廃止（見積と決済額がズレる原因だった）。

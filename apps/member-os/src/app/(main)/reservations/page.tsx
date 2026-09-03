@@ -435,7 +435,12 @@ export default async function ReservationsPage({
                       open={b.lesson_option_status === "requested"}
                     >
                       <summary className="cursor-pointer text-xs font-semibold text-(--color-dim)">
-                        パーソナルレッスン（{b.lesson_option_minutes ?? 25}分・{yen(b.lesson_option_fee ?? 2500)}）
+                        {/* #199: チケットで承ったぶんは料金ではなく「チケット1枚」と出す（レジで二重に請求しない） */}
+                        パーソナルレッスン（{b.lesson_option_minutes ?? 25}分・
+                        {b.lesson_option_status === "confirmed" && Number(b.lesson_option_fee ?? -1) === 0
+                          ? "チケット1枚"
+                          : yen(b.lesson_option_fee ?? 2500)}
+                        ）
                         {b.lesson_option_status === "requested" ? " — 担当と時間を決めて確定" : " — 内容を変更"}
                       </summary>
                       {b.lesson_option_note ? (

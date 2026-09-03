@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/kernel";
 import { FRANK_STORE_ID, toMin, toTime } from "@/lib/frank-reservation";
 import { requireStoreAccess } from "@/lib/store-scope";
 import { loadBookingCfg, businessHours } from "@yozan/core/frank-booking";
+import { useTicket, refundTicket } from "@/lib/frank-tickets";
 import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
 import { sendFrankMail, buildBookingRescheduleMail } from "@/lib/frank-mail";
 import { readName } from "@/lib/name";
@@ -542,7 +543,7 @@ export async function setLessonOption(formData: FormData) {
 
   const { data: bk } = await admin
     .from("frunk_bookings")
-    .select("id, start_time, end_time, lesson_option_minutes")
+    .select("id, start_time, end_time, lesson_option_minutes, member_id, store_id")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID)
@@ -550,13 +551,23 @@ export async function setLessonOption(formData: FormData) {
     .maybeSingle();
   if (!bk) return;
 
+  const cfg = await loadBookingCfg(admin);
   const now = new Date().toISOString();
   let patch: Record<string, unknown>;
 
+  /* チケット（#199）
+     確定＝1枚使う。お持ちでなければ従来どおり当日お支払い（料金はそのまま）。
+     お受けできない／取り消しのときは使ったぶんを戻す。
+     二重消費は「予約1件につき1枚」の一意索引が止める（画面の作りに頼らない）。 */
+  const memberId = bk.member_id ? String(bk.member_id) : null;
+  const storeId = (bk.store_id as string | null) ?? FRANK_STORE_ID;
+
   if (mode === "decline") {
-    patch = { lesson_option_status: "declined", lesson_option_staff_id: null, lesson_option_start: null };
+    if (memberId) await refundTicket(id);
+    patch = { lesson_option_status: "declined", lesson_option_staff_id: null, lesson_option_start: null, lesson_option_fee: null };
   } else if (mode === "clear") {
-    patch = { lesson_option_status: null, lesson_option_staff_id: null, lesson_option_start: null };
+    if (memberId) await refundTicket(id);
+    patch = { lesson_option_status: null, lesson_option_staff_id: null, lesson_option_start: null, lesson_option_fee: null };
   } else {
     const staffId = str(formData.get("staff_id"));
     const start = str(formData.get("lesson_start"));
@@ -565,11 +576,25 @@ export async function setLessonOption(formData: FormData) {
     // レッスンは打席のお時間の中で行う（はみ出す指定は受け付けない）
     const s = toMin(start);
     if (s < toMin(String(bk.start_time)) || s + minutes > toMin(String(bk.end_time))) return back(date);
+    // チケットがあれば1枚引いて、この予約のレッスン料は0円にする
+    let usedTicket = false;
+    if (memberId) {
+      const r = await useTicket({
+        companyId: actor.companyId,
+        memberId,
+        storeId,
+        bookingId: id,
+        staffId: actor.staffId,
+        note: "打席予約のパーソナルレッスン",
+      });
+      usedTicket = r.ok;
+    }
     patch = {
       lesson_option_status: "confirmed",
       lesson_option_staff_id: staffId,
       lesson_option_start: `${toTime(s)}:00`,
       lesson_option_minutes: minutes,
+      lesson_option_fee: usedTicket ? 0 : (cfg.lesson_option?.price ?? 2500),
     };
   }
 

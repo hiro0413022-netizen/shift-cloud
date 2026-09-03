@@ -1169,3 +1169,23 @@
   **(i) /notice の送信が「積んだだけで永久に届かない」状態だったのを直した。** `sendStaffNotice` は `gn_line_outbox` に status='pending' で積み、n8nが拾う設計のままだったが、**その拾い役は #102 以降存在しない**。スタッフ用OAのトークンでその場でPushし、outboxは履歴（sent / error）として残す。送れなかったグループ名は画面に返す（「送ったつもりで届いていない」を作らない）。
 
   実装: `apps/genesis/src/lib/{ceo-ai.ts, jarvis.ts, judgment-feed.ts, staff-notice.ts}`、`apps/genesis/src/app/(main)/notice/notice-client.tsx`、`apps/member-os/src/{lib/walkin.ts, app/(main)/actions.ts（updateCounseling）, app/(main)/visit-row.tsx, app/api/ledger-export/route.ts}`。member-os / genesis の `tsc --noEmit` と `next build` 通過・テスト561件通過（クラウドでcloneして実走）
+
+- #199 (2026-09-03) **パーソナルレッスン(25分)のチケットを作り、9月入会に2枚プレゼントし、会員ページで買えるようにした**（migration 0141適用済）。ユーザー指示「現在９月入会でパーソナルチケット２５分のチケット２枚プレゼントキャンペーンをしています。９月入会の方はそれを付与しておいてください。また会員ページからもレッスンチケットを購入、チケット保有枚数などを確認できるようにしてください」。
+
+  **(a) チケットは「1行=1枚」ではなく増減の台帳（`frunk_lesson_tickets`）。** 残枚数＝`sum(qty) where status='granted'`。付与(+2)・購入(+1)・利用(-1) が1本の時系列に並ぶので、**お客様に「なぜ2枚なのか」を聞かれてその場で答えられる**。会員行に枚数カラムを持たせると、必ず履歴と食い違う。
+
+  **(b) 付与の条件は `@yozan/core/frank-lesson-tickets` に1か所。** 入口が2つある（店頭の承認＝member-os `/frunk`／Web入会の入金確定＝genesis `activateWebJoin`）ので、条件をどちらかに書くと必ずズレる。対象は**入会日が9/1〜9/30・在籍中・一般公開プラン（`public_signup`）・法人でない・法人の利用者行でない**（ユーザー選択「一般プランのみ・9月中自動」）＝スタッフ／テスト／モニターには付かない。**二重付与はDBの一意索引（member_id × campaign）が最後の砦**で、画面の作りに頼らない。既に9月入会だった方には 0141 の中で付与済み（実測1名＝FR0009 木之下様。他の9月入会5名はスタッフプランのため対象外）。
+
+  **(c) お支払いは「カード → 無ければ店頭」**（ユーザー選択）。登録カードがあればその場で決済して**すぐ使える**。無い／失敗したら**お申し込みは残して `status='pending_payment'`＝残枚数には入れない**。スタッフが店頭で受け取り【受領】を押して初めて有効になる。**お客様の前で申し込みを失敗させない**（モバイルオーダー #154 と同じ方針）が、**払っていないチケットは使えない**の両立。
+
+  **(d) 有効期限なし**（ユーザー選択）。期限切れの苦情も、期限を管理する仕事も作らない。
+
+  **(e) 消費は打席予約のレッスン確定時に自動。** `/reservations` でパーソナルレッスンを confirmed にした瞬間に1枚引き、その予約の `lesson_option_fee` を0にする（画面表示も「¥2,500」→「チケット1枚」＝**レジで二重に請求しない**）。お断り・取り消しで戻す。**二重消費は「予約1件につき1枚」の一意索引**で止める。戻しは +1 の行を足さず**使った行を `void`** にする（残高は合うのに履歴が読めない、を作らない）。予約を通さない店頭レッスンは会員カードの【1枚使う】。
+
+  **(f) 金額の正典は `BookingCfg.lesson_option.price`（税抜2,500）。** 料金変更は `gn_site_content` の1か所でデプロイ不要。**お客様に見せるのは必ず税込**（2,750円・総額表示義務／`frank-tax.ts`）。一度に買えるのは10枚まで（押し間違いの事故防止）。
+
+  **(g) 会員ページ `/member/tickets`** — 残枚数を大きく／購入（枚数±・押す前に税込総額を表示）／履歴（付与・購入・利用）。マイページにも「残り◯枚」を出す（**開かないと分からない、を作らない**）。スタッフ側は会員カードに残枚数・履歴・受領・付与・1枚使う。
+
+  ⚠ **未対応（要判断）**: 公式サイトの料金表記は「25分マンツーマン 2,500円 ／ **4回チケット 9,000円 ／ 8回チケット 16,000円**」だが、今回の会員ページは**1枚2,500円のみ**（ユーザー選択）。回数券は当面レジ（Square POS）で売り、スタッフが会員カードから付与する運用。
+
+  実装: `supabase/migrations/0141_frank_lesson_tickets.sql`、`packages/core/src/frank-lesson-tickets.ts`（新規）、`apps/member-os/src/lib/frank-tickets.ts`（新規）、`apps/member-os/src/app/member/tickets/*`（新規）、`apps/member-os/src/app/member/page.tsx`、`apps/member-os/src/app/(main)/frunk/{actions.ts, [id]/page.tsx}`、`apps/member-os/src/app/(main)/reservations/{actions.ts, page.tsx}`、`apps/genesis/src/lib/frank-join.ts`。member-os / genesis の `tsc --noEmit` と `next build` 通過・テスト561件通過（クラウドでcloneして実走）

@@ -19,6 +19,8 @@ import {
   uncancelSubscription,
 } from "@/lib/frank-square";
 import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
+import { grantJoinCampaignTickets, JOIN_TICKET_CAMPAIGN, ticketBalance } from "@yozan/core/frank-lesson-tickets";
+import { receiveTicketPayment, useTicket } from "@/lib/frank-tickets";
 import {
   canLeaveOn,
   canSuspendFrom,
@@ -245,6 +247,16 @@ export async function approveSignup(formData: FormData) {
     ));
   }
   await logAudit(actor, "frunk.signup_approve", "frunk_members", null, null, { id, member_no: memberNo });
+
+  // 9月入会キャンペーン（#199）: 付与の条件は @yozan/core に1か所。
+  // 失敗しても承認は止めない（チケットは後から手で付けられる）。
+  const grantedTickets = await grantJoinCampaignTickets(admin, id);
+  if (grantedTickets > 0) {
+    await logAudit(actor, "frunk.ticket_campaign_grant", "frunk_lesson_tickets", id, null, {
+      campaign: JOIN_TICKET_CAMPAIGN.code,
+      qty: grantedTickets,
+    });
+  }
 
   // 法人プラン（#195）: 現金・振込での承認でも、ご利用者ぶんの会員番号を発行する。
   // Web入会（入金Webhook）は genesis 側の同じ関数を通る。行の形は @yozan/core に1か所だけ置く。
@@ -856,4 +868,103 @@ export async function confirmJoinPayment(formData: FormData) {
     );
   }
   redirect(`${dest}?err=` + encodeURIComponent(`確定できませんでした: ${r.error ?? "原因不明"}`));
+}
+
+
+/* ------------------------------------------------------------
+   レッスンチケット（#199）
+
+   スタッフが触るのは3つだけ:
+     ①店頭でお支払いをいただいた（受領）… 押すまでお客様の残枚数に入らない
+     ②付与する                        … キャンペーン・お詫びなど。理由を履歴に残す
+     ③1枚使う                         … 打席予約を通さない店頭レッスン
+   予約のレッスンを確定したときの消費は /reservations 側（confirmLessonOption）で行う。
+------------------------------------------------------------ */
+
+/** 店頭でお支払いをいただいた（お支払い待ち → 有効） */
+export async function receiveTicketPaid(formData: FormData) {
+  const actor = await requireFrankActor();
+  const dest = backTo(formData);
+  const ticketId = str(formData.get("ticket_id"));
+  if (!ticketId) return;
+
+  const ok = await receiveTicketPayment(ticketId, actor.staffId);
+  await logAudit(actor, "frunk.ticket_receive", "frunk_lesson_tickets", ticketId, null, { ok });
+  revalidatePath("/frunk");
+  redirect(
+    ok
+      ? `${dest}?msg=` + encodeURIComponent("お支払いを受領しました。チケットがお使いいただけます。")
+      : `${dest}?err=` + encodeURIComponent("受領できませんでした（既に受領済みかもしれません）")
+  );
+}
+
+/** スタッフが手でチケットを付ける */
+export async function grantTicketsManual(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  const qty = Math.floor(Number(str(formData.get("qty")) || "1"));
+  const note = orNull(formData.get("note"));
+  if (!id) return;
+  if (!Number.isFinite(qty) || qty < 1 || qty > 20) {
+    redirect(`${dest}?err=` + encodeURIComponent("枚数は1〜20で入れてください"));
+  }
+
+  const { data: m } = await admin
+    .from("frunk_members").select("id, company_id, store_id")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID)
+    .is("deleted_at", null).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+
+  const { error } = await admin.from("frunk_lesson_tickets").insert({
+    company_id: actor.companyId,
+    store_id: (m as Record<string, unknown>).store_id ?? FRANK_STORE_ID,
+    member_id: id,
+    kind: "grant",
+    qty,
+    status: "granted",
+    payment_method: "free",
+    note,
+    source: "staff",
+    created_by: actor.staffId,
+  });
+  await logAudit(actor, "frunk.ticket_grant", "frunk_lesson_tickets", id, null, { qty, note });
+  revalidateMember(id);
+  redirect(
+    error
+      ? `${dest}?err=` + encodeURIComponent(`付与できませんでした: ${error.message}`)
+      : `${dest}?msg=` + encodeURIComponent(`チケットを${qty}枚付与しました。`)
+  );
+}
+
+/** 店頭レッスンで1枚使う（予約を通さないぶん） */
+export async function useTicketManual(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  const { data: m } = await admin
+    .from("frunk_members").select("id, store_id")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID)
+    .is("deleted_at", null).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+
+  const r = await useTicket({
+    companyId: actor.companyId,
+    memberId: id,
+    storeId: ((m as Record<string, unknown>).store_id as string | null) ?? FRANK_STORE_ID,
+    staffId: actor.staffId,
+    note: "店頭でのレッスン",
+  });
+  const left = await ticketBalance(admin, id);
+  await logAudit(actor, "frunk.ticket_use", "frunk_lesson_tickets", id, null, { ok: r.ok, left });
+  revalidateMember(id);
+  redirect(
+    r.ok
+      ? `${dest}?msg=` + encodeURIComponent(`チケットを1枚使いました（残り${left}枚）。`)
+      : `${dest}?err=` + encodeURIComponent(r.reason ?? "使えませんでした")
+  );
 }
