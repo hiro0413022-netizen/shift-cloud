@@ -84,10 +84,10 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     return { error: "選択されたプランは現在お申し込みいただけません。画面を更新して再度お試しください。" };
   }
 
-  // ---- 法人プラン（#195／#204で無記名に） ----
+  // ---- 法人プラン（#195／#206で無記名に） ----
   // 会社が契約し、社員の方が使う。月会費のお支払いは契約者（ご担当者）に1本だけ。
   //
-  // ご利用者はここでは伺わない（#204・2026-09-03 ユーザー確定）。
+  // ご利用者はここでは伺わない（#206・2026-09-03 ユーザー確定）。
   // お申し込みの時点では「まだ誰が使うか決まっていない」会社が多く、
   // 全員のお名前を必須にしていたせいで申し込めない状態だった。
   // ご入会後、会員ページの【ご利用者の管理】からご契約者が登録・入れ替えできる。
@@ -131,7 +131,7 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     billing_postal_code: spec.isCorporate ? orNull(formData.get("billing_postal_code")) : null,
     billing_address1: spec.isCorporate ? orNull(formData.get("billing_address1")) : null,
     billing_email: spec.isCorporate ? orNull(formData.get("billing_email")) : null,
-    // ご利用者は入会後に会員ページからご登録いただく（#204）。申込時点では空
+    // ご利用者は入会後に会員ページからご登録いただく（#206）。申込時点では空
     corporate_users: null,
   };
 

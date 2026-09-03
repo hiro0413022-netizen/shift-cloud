@@ -20,7 +20,7 @@ import {
    法人ライト   利用者2名まで・先の予約は合計4コマ
    法人プレミアム 利用者は人数制限なし（max_users = null）・先の予約は合計8コマ・同伴ビジター無料
 
-   #204（2026-09-03）で「入会は無記名・使う人だけ記名」に変えた。
+   #206（2026-09-03）で「入会は無記名・使う人だけ記名」に変えた。
    入会フォームは0名で通す（minUsers=0）／会員ページからの追加は1名必須（minUsers=1）。
    数え方は全会員共通（個人プランも同じ判定を通す）。1コマ=1時間。
 
@@ -150,7 +150,7 @@ test("利用者の検証: 電話番号は必須（ログインに下4桁を使�
   assert.match(dup.error ?? "", /重複/);
   // 会員ページからの追加は1名必須（minUsers=1）
   assert.match(normalizeCorporateUsers([], 4, 1).error ?? "", /1名以上/);
-  // 入会フォームは無記名で通す（#204）。0名でもエラーにしない
+  // 入会フォームは無記名で通す（#206）。0名でもエラーにしない
   assert.equal(normalizeCorporateUsers([], 4).error, undefined);
   assert.equal(normalizeCorporateUsers([], null).users.length, 0);
 });
@@ -180,7 +180,7 @@ test("席数: ご担当者ご自身も1名として数える（法人ライト�
   assert.match(corporateSeatFullMessage(2), /2名/);
 });
 
-test("会員表記は法人名＋個人名（#204）", () => {
+test("会員表記は法人名＋個人名（#206）", () => {
   assert.equal(memberDisplayName({ name: "山田 太郎", company_name: "株式会社ヨザン" }), "株式会社ヨザン 山田 太郎");
   // 個人会員は今までどおりお名前だけ
   assert.equal(memberDisplayName({ name: "山田 太郎", company_name: null }), "山田 太郎");
@@ -189,7 +189,7 @@ test("会員表記は法人名＋個人名（#204）", () => {
   assert.equal(memberDisplayName(null), "");
 });
 
-test("使う人は利用者登録が必須。契約者の行は登録するまで予約できない（#204）", () => {
+test("使う人は利用者登録が必須。契約者の行は登録するまで予約できない（#206）", () => {
   const corp = { isCorporate: true };
   // ご利用者（親にぶら下がっている）は予約できる
   assert.equal(canBookAsCorporate(corp, { corporate_parent_id: "root" }).ok, true);
@@ -217,7 +217,7 @@ test("プランから法人の設定を読む（列が無くても壊れない�
   assert.deepEqual(corporateSpec({ is_corporate: true, max_users: 2, max_open_slots: 4, companion_free: false }), {
     isCorporate: true, maxUsers: 2, usersUnlimited: false, maxOpenSlots: 4, companionFree: false,
   });
-  // 法人プレミアムは max_users = null（人数制限なし・#204）。
+  // 法人プレミアムは max_users = null（人数制限なし・#206）。
   // 「未設定だから2名」と読み替えると、無制限のはずのプランが2名で止まる
   assert.deepEqual(corporateSpec({ is_corporate: true, max_users: null, max_open_slots: 8, companion_free: true }), {
     isCorporate: true, maxUsers: null, usersUnlimited: true, maxOpenSlots: 8, companionFree: true,

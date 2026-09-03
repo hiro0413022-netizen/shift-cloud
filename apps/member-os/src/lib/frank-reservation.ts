@@ -494,13 +494,15 @@ export type MemberOption = {
   name_kana: string | null;
   phone: string | null;
   status: string | null;
+  /** 法人の会社名（#206）。候補は「会社名＋お名前」で出し、会社名でも引ける */
+  company_name: string | null;
 };
 
 export async function loadMemberOptions(companyId: string): Promise<MemberOption[]> {
   const admin = createAdmin();
   const { data } = await admin
     .from("frunk_members")
-    .select("id, member_no, name, name_kana, phone, status")
+    .select("id, member_no, name, name_kana, phone, status, company_name")
     .eq("company_id", companyId)
     .eq("store_id", FRANK_STORE_ID)
     .in("status", ["active", "suspended"])
@@ -513,6 +515,7 @@ export async function loadMemberOptions(companyId: string): Promise<MemberOption
     name_kana: (r.name_kana as string | null) ?? null,
     phone: (r.phone as string | null) ?? null,
     status: (r.status as string | null) ?? null,
+    company_name: (r.company_name as string | null) ?? null,
   }));
 }
 

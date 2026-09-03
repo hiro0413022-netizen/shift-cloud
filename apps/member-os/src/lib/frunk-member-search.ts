@@ -28,6 +28,8 @@ export type FrunkMemberLike = {
   leave_date?: string | null;
   alert_note?: string | null;
   note?: string | null;
+  /** 法人の会社名（#206）。法人の方は「会社名でも」引けるようにする */
+  company_name?: string | null;
 };
 
 /** 全角→半角・記号落とし・小文字化。ひらがなはカタカナへ寄せる */
@@ -53,7 +55,8 @@ export function matchesMember(m: FrunkMemberLike, query: string): boolean {
   const q = normalizeKey(query);
   if (q === "") return true;
 
-  const fields = [m.name, m.name_kana, m.member_no, m.email, m.note, m.alert_note];
+  // 会社名も入れる（#206）。法人は「株式会社ヨザンの誰か」で探されることが多い
+  const fields = [m.name, m.name_kana, m.member_no, m.email, m.note, m.alert_note, m.company_name];
   if (fields.some((f) => normalizeKey(f).includes(q))) return true;
 
   // 電話は数字だけで比較（検索語が数字を含むときのみ）。

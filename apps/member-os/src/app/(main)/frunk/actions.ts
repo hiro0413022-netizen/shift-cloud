@@ -511,7 +511,7 @@ export async function addCorporateUser(formData: FormData) {
   const plan = (root as unknown as { frunk_plans: { is_corporate?: boolean; max_users?: number | null } | null } | null)?.frunk_plans;
   if (!root || !plan?.is_corporate) redirect(`${dest}?err=` + encodeURIComponent("法人プランの会員ではありません"));
 
-  // 人数の上限。法人プレミアムは max_users = null（無制限・#204）。
+  // 人数の上限。法人プレミアムは max_users = null（無制限・#206）。
   // ご担当者ご自身（corporate_self_use）も1名として数える
   const spec = corporateSpec(plan as never);
   const { count } = await admin

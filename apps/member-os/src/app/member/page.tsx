@@ -76,7 +76,7 @@ export default async function MemberHomePage({
     ? await Promise.all([ticketBalance(admin, memberId), pendingTicketCount(admin, memberId)])
     : [0, 0];
 
-  // 法人プラン（#204）: 御社ぶんの枠は登録者全員で分け合う。
+  // 法人プラン（#206）: 御社ぶんの枠は登録者全員で分け合う。
   // 誰かが押さえ切ると他の方は取れないので、押す前に見えるところへ出す。
   const corp = member.corporate;
   let corpUsage: { used: number; limit: number; label: ReturnType<typeof slotUsageLabel> } | null = null;
@@ -151,7 +151,7 @@ export default async function MemberHomePage({
       {/* ① 会員証QR ⇄ 来店中モード（かざした瞬間に切り替わる） */}
       {!member.isProvisional && <VisitPanel initial={visit} qrDataUrl={qrDataUrl} token={token} />}
 
-      {/* 法人プラン（#204）: 御社の枠と、ご契約者だけに出す【ご利用者の管理】 */}
+      {/* 法人プラン（#206）: 御社の枠と、ご契約者だけに出す【ご利用者の管理】 */}
       {corp && corpUsage && (
         <section className={`mb-3 rounded-xl border p-4 ${corpUsage.label.full ? "border-amber-500/50 bg-amber-500/5" : "border-(--color-line) bg-(--color-panel)"}`}>
           <div className="flex items-baseline justify-between">

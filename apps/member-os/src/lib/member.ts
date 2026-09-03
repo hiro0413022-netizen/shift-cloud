@@ -22,13 +22,13 @@ export type MemberSession = {
   memberNo: string;
   /** お名前だけ（従来どおり） */
   name: string;
-  /** 画面に出す名前。法人の方は「会社名＋お名前」（#204） */
+  /** 画面に出す名前。法人の方は「会社名＋お名前」（#206） */
   displayName: string;
   isProvisional: boolean;
   /** frunk_members.id（法人の画面で必要。旧台帳の会員は null） */
   memberId: string | null;
   /**
-   * 法人プランのときだけ入る（#204）。
+   * 法人プランのときだけ入る（#206）。
    *   isContract  ご契約者の行か（＝ご利用者の管理ができるのはこの方だけ）
    *   selfUse     ご担当者ご自身もご利用者として登録済みか（予約できるか）
    *   maxUsers    ご登録人数の上限。null = 無制限
@@ -155,7 +155,7 @@ export async function getMemberSession(): Promise<MemberSession | null> {
       if (["left", "rejected"].includes(String(fm.status))) return null;
       if (fm.name) name = fm.name as string;
       memberId = String(fm.id);
-      // 法人の方は「会社名＋お名前」で出す（#204。受付でも台帳でもどの会社か分かるように）
+      // 法人の方は「会社名＋お名前」で出す（#206。受付でも台帳でもどの会社か分かるように）
       displayName = memberDisplayName(fm as never) || name;
       const plan = (fm as unknown as { frunk_plans: { name?: string } | null }).frunk_plans;
       const spec = corporateSpec(plan as never);

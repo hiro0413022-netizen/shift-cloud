@@ -38,7 +38,7 @@ export default async function MemberBookPage() {
     );
   }
 
-  // 法人プラン（#204）: ご契約者の行は「お支払い専用」。ご利用者としてご登録いただくまで予約できない。
+  // 法人プラン（#206）: ご契約者の行は「お支払い専用」。ご利用者としてご登録いただくまで予約できない。
   // ここで止めておかないと、枠を選んでから genesis のAPIに断られる（押してから知る、を作らない）
   const corp = member.corporate;
   if (corp?.isContract && !corp.selfUse) {
@@ -101,7 +101,7 @@ export default async function MemberBookPage() {
         </p>
       </header>
 
-      {/* 法人は御社ぶんの枠を分け合う。残りが見えないと、押してから断られることになる（#204） */}
+      {/* 法人は御社ぶんの枠を分け合う。残りが見えないと、押してから断られることになる（#206） */}
       {corp && corpUsage && (
         <div className={`mb-4 rounded-xl border px-4 py-3 ${corpUsage.full ? "border-amber-500/50 bg-amber-500/5" : "border-(--color-line) bg-(--color-panel)"}`}>
           <div className="flex items-baseline justify-between">

@@ -156,7 +156,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
             </p>
           </div>
 
-          {/* ご利用者は入会後に会員ページからご登録いただく（#204・無記名で申し込める）
+          {/* ご利用者は入会後に会員ページからご登録いただく（#206・無記名で申し込める）
               ここで全員のお名前を required にしていたため、
               「まだ誰が使うか決まっていない」会社はお申し込みできなかった。 */}
           <div className="space-y-2 border-t border-(--color-line) pt-4">

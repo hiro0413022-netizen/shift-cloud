@@ -1267,6 +1267,24 @@
 
   実装: `apps/lesson-os/src/lib/pose.ts`（`cleanPose` 新規・`MODELS`・`POSE_EDGE`）、`apps/lesson-os/scripts/prepare-mediapipe.mjs`、`apps/lesson-os/src/app/(main)/students/[id]/{actions.ts, video-player.tsx}`、`tests/pose-clean.test.ts`（新規9件）。lesson-os の `tsc --noEmit` と `next build` 通過・テスト580件通過（クラウドでcloneして実走）
 
+- #206 (2026-09-03) **FRANK 法人プランを「無記名でご入会・使う人だけ記名」に変えた**（migration 0144適用済）。ユーザー指摘「法人の入会が記名制になっていますよ、無記名で使えるようにしたいです。利用者登録は会員ページで追加できるようにしてください。会員表記は法人名＋個人名。利用する人に関しては利用者登録は必須。法人名義での予約数なども制限のために表示してください」。
+
+  **(a) 何が詰まっていたか。** #195 の申込フォームは、ご利用者のお名前と電話番号を**その場で全員ぶん**必須にしていた。法人の商談は「まず契約して、使う人はあとで決める」順に進むので、**決裁が下りた会社ほど申し込めない**。人事異動のたびに店舗へ電話が来て、スタッフが member-os で入れ替えていた（会社側からは何も直せなかった）。
+
+  **(b) 入会は無記名、利用は記名。** 申込は会社名・ご担当者・請求先だけで成立させる（`corporate_users` は null で登録）。そのうえで**打席を使う人は必ずご登録いただく**。ここを緩めなかったのは、誰が来たかが会社名しか残らないと**レッスンカルテを分けられず、会員証QRも出せない**ため。ご利用者の追加・削除はご契約者が **会員ページ `/member/corporate`** から行う（正典 `apps/member-os/src/app/member/corporate/actions.ts`。店頭の `frunk/actions.ts` と**行の作り方は `@yozan/core/frank-corporate-members` の1か所**のまま）。
+
+  **(c) ご契約者は「お支払い専用」にした。** ご担当者ご自身が使う場合は `corporate_self_use` を立てていただく（人数にも1名として数える）。判定は `canBookAsCorporate`。⚠ **既存の法人契約者は migration で true に埋めている** — #195 の申込フォームが「ご担当者様がご利用になる場合は同じ内容をご入力ください」と案内しており、契約者行で予約できる前提で運用が始まっていたため。false のまま出すと、その方が翌日から予約できなくなる。
+
+  **(d) 人数はライト2名・プレミアム無制限**（ユーザー確定）。`frunk_plans.max_users` の **null を「無制限」に読み替えた**。⚠ `?? 2` のように既定値へ落とすと、無制限のはずのプランが2名で止まる（`corporateSpec` で null を保つ）。プランの違いは**同時に押さえられるコマ数**（ライト4・プレミアム8）に寄せた。
+
+  **(e) 枠は必ず画面に出す。** 人数が無制限でも同時に押さえられるのは8コマのまま＝**1人が押さえ切ると他の方は取れない**。会員ホーム・予約画面・【ご利用者の管理】・スタッフの会員カードの4か所に「御社名義のご予約 n／8コマ」を出す（言い回しは `slotUsageLabel` の1か所）。数え方は #195 の `openSlots` のまま変えていない。
+
+  **(f) 会員表記は「法人名＋個人名」。** `memberDisplayName` を core に置き、会員ポータル・会員一覧/詳細・予約台帳・電子伝票・チェックイン・予約の会員候補で通す。会員検索（`frunk-member-search`）も `company_name` を対象に加えた＝「株式会社◯◯の誰か」で引ける。
+
+  **(g) 外すときは先のご予約を見る。** 予約を残したまま登録を外すと、本人はログインできなくなり、その予約を**誰もキャンセルできないまま御社の枠が埋まり続ける**（枠は消化されるまで戻らない）。件数を出して止める。
+
+  実装: `packages/core/src/frank-corporate.ts`（`corporateSeats`・`memberDisplayName`・`canBookAsCorporate`・`slotUsageLabel`）、`apps/member-os/src/app/member/corporate/{page.tsx,actions.ts}`（新規）、`apps/member-os/src/lib/{member.ts,frank-mail.ts,frank-member-no.ts,frank-portal.ts,frank-reservation.ts,frunk-member-search.ts}`、`apps/member-os/src/app/join-web/*`、`apps/genesis/src/lib/{frank-booking.ts,frank-join.ts}`、`supabase/migrations/0144_frank_corporate_open.sql`、`sites/frank-golf/{_build.py,assets/site-data.js}`、`tests/frank-corporate.test.ts`（18件）。member-os / genesis の `tsc --noEmit` 通過・全585件パス
+
 - #204 (2026-09-03) **当月体験人数と入会率の数え方を直した**（migration 0143適用済）。ユーザー報告「当月体験人数と入会率の数字がおかしいですチェックしてください」。実測すると**2つ壊れていた**。
 
   **(a) 体験人数に「まだ来ていない予約」が混ざっていた。** FRANKは体験予約が入った瞬間に受付台帳へ行を作る（#139）。`visited_on` は**予約日**なので、9/4以降の予約15件も「当月の体験」として数えていた（9月28件のうち**来店済は13件**）。開店直後で先の予約が積み上がるほど、実績が実態より大きく見える。

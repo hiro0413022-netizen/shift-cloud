@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { filterMembers, sortMembers, type FrunkMemberLike } from "@/lib/frunk-member-search";
+import { memberDisplayName } from "@yozan/core/frank-corporate";
 
 /**
  * 予約作成の会員指定（#189）
@@ -20,7 +21,7 @@ import { filterMembers, sortMembers, type FrunkMemberLike } from "@/lib/frunk-me
  * - 会員を選ばずに名前だけ入れた予約は、従来どおり「都度利用」として登録される。
  */
 
-export type PickerMember = FrunkMemberLike & { id: string; name?: string | null };
+export type PickerMember = FrunkMemberLike & { id: string; name?: string | null; company_name?: string | null };
 
 export function MemberPicker({ members, inputCls }: { members: PickerMember[]; inputCls: string }) {
   const [q, setQ] = useState("");
@@ -34,7 +35,7 @@ export function MemberPicker({ members, inputCls }: { members: PickerMember[]; i
   }, [members, q]);
 
   const label = (m: PickerMember) =>
-    `${m.name ?? ""}${m.member_no ? `（${m.member_no}）` : ""}${m.status === "suspended" ? " ・休会中" : ""}`;
+    `${memberDisplayName(m as never) || (m.name ?? "")}${m.member_no ? `（${m.member_no}）` : ""}${m.status === "suspended" ? " ・休会中" : ""}`;
 
   if (picked) {
     return (
@@ -93,7 +94,7 @@ export function MemberPicker({ members, inputCls }: { members: PickerMember[]; i
                   }}
                   className="block w-full px-3 py-2 text-left text-sm hover:bg-(--color-panel-2)"
                 >
-                  <span className="font-medium">{m.name}</span>
+                  <span className="font-medium">{memberDisplayName(m as never) || m.name}</span>
                   <span className="ml-2 text-xs text-(--color-dim)">
                     {[m.member_no, m.name_kana, m.phone].filter(Boolean).join("　")}
                     {m.status === "suspended" ? "　休会中" : ""}

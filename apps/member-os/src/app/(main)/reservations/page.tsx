@@ -79,7 +79,7 @@ function kindTone(kind: string): "accent" | "gold" | "ok" {
 }
 /** 予約の相手を1行で（会員／体験／都度で参照先が違う） */
 function who(b: BookingRow): string {
-  // 法人の方は「会社名＋お名前」（#204）。台帳でどの会社の方か分からないと、御社の枠の話が通じない
+  // 法人の方は「会社名＋お名前」（#206）。台帳でどの会社の方か分からないと、御社の枠の話が通じない
   if (b.frunk_members) return `${memberDisplayName(b.frunk_members as never)}（${b.frunk_members.member_no}）`;
   if (b.mbr_trial_requests) return b.mbr_trial_requests.name;
   return b.guest_name ?? "（名称未入力）";

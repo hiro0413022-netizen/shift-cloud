@@ -354,7 +354,7 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
             "",
           ]
         : []),
-      // ご利用者が0名で確定した法人（#204・無記名でのご入会）。
+      // ご利用者が0名で確定した法人（#206・無記名でのご入会）。
       // ここで案内しないと「ログインしたのに予約ボタンで断られる」ところで初めて気づく
       ...(m.frunk_plans?.is_corporate && corporateUsers.length === 0
         ? [

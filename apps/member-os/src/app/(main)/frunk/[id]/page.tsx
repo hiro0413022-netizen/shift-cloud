@@ -21,7 +21,7 @@ import {
   suspendApplyDeadline,
   mdLabel,
 } from "@yozan/core/frank-membership";
-import { corporateSpec, corporateSeats, memberDisplayName } from "@yozan/core/frank-corporate";
+import { corporateSpec, corporateSeats, memberDisplayName, openSlots, slotUsageLabel } from "@yozan/core/frank-corporate";
 import { ticketBalance, listTickets, ticketRowLabel } from "@yozan/core/frank-lesson-tickets";
 import {
   setMemberStatus,
@@ -166,7 +166,7 @@ export default async function FrunkMemberPage({
         .order("member_no")
     : { data: [] };
   const corpUsers = (corpRows ?? []).filter((u) => String((u as Row).status) !== "left") as Row[];
-  // 人数は「ご利用者＋ご担当者ご自身（corporate_self_use）」で数える（#204）。
+  // 人数は「ご利用者＋ご担当者ご自身（corporate_self_use）」で数える（#206）。
   // 上限は max_users。法人プレミアムは null = 無制限
   const corpSelfUse = !!m.corporate_self_use;
   const corpSeats = corporateSeats({
@@ -174,6 +174,32 @@ export default async function FrunkMemberPage({
     registered: corpUsers.length,
     selfUse: corpSelfUse,
   });
+
+  // 御社名義で今いくつ押さえているか（#206）。
+  // 法人は登録者全員で枠を分け合うので、店頭で「取れません」と言う前にここを見る
+  let corpUsage: { used: number; label: ReturnType<typeof slotUsageLabel> } | null = null;
+  if (corpSpec.isCorporate) {
+    const holderIds = [corpRootId, ...corpUsers.map((u) => String(u.id))];
+    const { data: openRows } = await admin
+      .from("frunk_bookings")
+      .select("booked_date, start_time, end_time, status")
+      .in("member_id", holderIds)
+      .gte("booked_date", today)
+      .neq("status", "cancelled")
+      .is("deleted_at", null);
+    const hm = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
+    const nowHm = new Date(Date.now() + 9 * 3600_000).toISOString().slice(11, 16);
+    const usedSlots = openSlots(
+      (openRows ?? []).map((b) => ({
+        date: String(b.booked_date),
+        endTime: String(b.end_time),
+        minutes: hm(String(b.end_time)) - hm(String(b.start_time)),
+        status: String(b.status ?? ""),
+      })),
+      today, nowHm,
+    );
+    corpUsage = { used: usedSlots, label: slotUsageLabel({ used: usedSlots, limit: corpSpec.maxOpenSlots, corporate: true }) };
+  }
 
   // 退会・休会の受付ルール（#192）。選択肢の生成も検証もサーバーアクションと同じ関数を通す
   const leaveOpts = leaveDateOptions(today);
@@ -218,7 +244,7 @@ export default async function FrunkMemberPage({
       <header className="reveal flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* 法人の方は「会社名＋お名前」（#204） */}
+            {/* 法人の方は「会社名＋お名前」（#206） */}
             <h1 className="text-2xl font-bold tracking-tight">{memberDisplayName(m as never) || "（氏名未入力）"}</h1>
             {m.name_kana ? <span className="text-sm text-(--color-dim)">{String(m.name_kana)}</span> : null}
             <Badge tone={FRUNK_STATUS_TONE[status] ?? "default"}>{FRUNK_STATUS_LABEL[status] ?? status}</Badge>
@@ -562,7 +588,16 @@ export default async function FrunkMemberPage({
                   {[m.billing_postal_code, m.billing_address1].filter(Boolean).join(" ") || "—（ご担当者の住所へ）"}
                 </Info>
                 <Info label="打席のご予約">
-                  御社合計 {corpSpec.maxOpenSlots} コマ（1コマ＝1時間）まで先にお取りいただけます。ご利用が済むと次が取れます
+                  {corpUsage ? (
+                    <>
+                      <span className={corpUsage.label.full ? "font-semibold text-amber-700" : "font-semibold"}>
+                        いま {corpUsage.used}／{corpSpec.maxOpenSlots} コマ
+                      </span>
+                      <span className="ml-2 text-xs text-(--color-dim)">{corpUsage.label.detail}</span>
+                    </>
+                  ) : (
+                    <>御社合計 {corpSpec.maxOpenSlots} コマ（1コマ＝1時間）まで先にお取りいただけます</>
+                  )}
                 </Info>
                 <Info label="同伴ビジター">{corpSpec.companionFree ? "無料（回数制限なし）" : "同伴の無料枠はありません"}</Info>
               </div>
@@ -596,7 +631,7 @@ export default async function FrunkMemberPage({
                   <button className={btnCls}>＋ ご利用者を追加</button>
                   <p className="col-span-2 text-xs text-(--color-dim) sm:col-span-5">
                     追加すると会員番号を発行します。ログインは会員番号とご本人の電話番号の下4桁です（番号はおひとりずつ違うものをご登録ください）。
-                    ご契約者様ご自身も、会員ページの【ご利用者の管理】から追加・入れ替えができます（#204）。
+                    ご契約者様ご自身も、会員ページの【ご利用者の管理】から追加・入れ替えができます（#206）。
                   </p>
                 </form>
               ) : (

@@ -218,7 +218,7 @@ export async function checkInMember(memberId: string, source: "qr" | "manual" | 
     checkinId,
     memberId,
     memberNo: s(mem.member_no),
-    // 法人の方は「会社名＋お名前」で受付に出す（#204）
+    // 法人の方は「会社名＋お名前」で受付に出す（#206）
     name: memberDisplayName(mem as never) || s(mem.name),
     planName: plan?.name ?? null,
     bayId,
