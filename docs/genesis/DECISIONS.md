@@ -1348,3 +1348,17 @@
   **(f) 過去のメモに【お客様への説明を作る】を足した。** #201 より前のメモには説明が無く、**音声は約束どおり消えている**ので録音からは作り直せない。残っている**先生の記録と文字起こし**から作る（`writeClientExplanation`）。材料に無い助言・数値は足さない。作るのは下書きまでで、**お客様に出るのはコーチが保存を押したもの**という柱は変えていない。
 
   実装: `apps/member-os/src/lib/frank-portal.ts`、`apps/member-os/src/app/member/page.tsx`、`apps/lesson-os/src/app/(main)/students/[id]/{actions.ts, karte-client.tsx, lesson-note.tsx}`、`apps/lesson-os/src/lib/lesson-note-ai.ts`、`apps/lesson-os/src/app/s/[token]/page.tsx`。member-os / lesson-os の `tsc --noEmit` 通過・テスト592件通過
+
+- #208 (2026-09-03) **入会申込が決済ページに飛ばないことがあったのを直した。原因は「電話番号の打ち間違い」で、Squareが決済リンクの発行そのものを断っていた**（migrationなし）。ユーザー報告「フランクゴルフの入会申し込み後に決済ページに飛ばないことがあります」。
+
+  **(a) 何が起きていたか（実測・2026-09-03 18:53 JST）。** 立岩様の申込の電話番号が `0905655867`＝**携帯なのに10桁**（1桁足りない）。旧 `toE164Jp` は「0始まり10桁以上」を無条件で通すので `+81905655867` を作り、Squareの決済リンクAPIが `Invalid phone number.` で **400** を返した（Vercel runtime log `POST /api/public/frank/join-checkout 400` で確認）。電話番号は決済画面にあらかじめ入れておくだけの**おまけ**なのに、それが原因で**決済リンクごと作られなかった**。member-os はリンクが取れないと「承認待ち」画面に落ちるので、**お客様には申込成功に見えて、決済ページには一度も行けない**。DBにも足跡が残る＝`billing_status` が `checkout` にならず `none` のまま（Web入会の他の申込はすべて11桁で `checkout`/`active`。9桁のテスト入力は `toE164Jp` が null を返して**渡さなかった**ので通っていた＝10桁だけが地雷だった）。
+
+  **(b) お客様の入力で決済を止めない。** `pre_populated_data`（メール・電話の事前入力）が原因と分かる失敗のときだけ、**prefill を外してもう一度だけリンクを作り直す**（`createPaymentLink`）。400は注文が作られないので二重注文にならない。それ以外のエラーは握りつぶさずそのまま投げる。
+
+  **(c) 電話番号の判定は1か所に置いた（正典 `@yozan/core/jp-phone`）。** 携帯・IP（070/080/090/050）と020は11桁、0120は10桁、0800は11桁、それ以外の固定は10桁。ハイフン・全角・+81は正規化する。**画面（/join-web）とサーバー（actions.ts）が同じ関数を通す**（生年月日 #190 と同じ考え方）。`frank-pos-pure.toE164Jp` は中身を消してここへ再export＝**検証を通った番号しか E.164 を返さない**（怪しければ null＝渡さない）。テスト `tests/jp-phone.test.ts` 6件で実障害の番号を固定。
+
+  **(d) 打ち間違いはその場で教える。** 入会フォームの電話番号欄に「携帯電話の番号は11桁です（入力は10桁です）」とその場で出す（[[alerts-must-be-fixable]]＝直せるところまで作る）。**会員ページのログインは電話番号の下4桁**なので、間違ったまま入会するとご本人が後で入れない。保存はハイフンなしの数字にそろえた。
+
+  **(e) それでも決済ページを出せなかったら、黙って承認待ちにしない。** `frunk.join_checkout_failed`（severity=warning・理由と連絡先つき）を events に残し、お客様の画面にも**「お支払いはまだ完了していません」**と明記する（従来は緑の✓で成功と見分けが付かなかった）。/frunk 承認待ちの決済状況表示（#188）と合わせて、未入金のまま会員番号を出さない。
+
+  実装: `packages/core/src/jp-phone.ts`（新規）・`packages/core/package.json`、`apps/genesis/src/lib/{frank-pos-pure.ts, frank-square-billing.ts}`、`apps/member-os/src/app/join-web/{actions.ts, web-join-form.tsx}`、`tests/jp-phone.test.ts`（新規）。genesis / member-os の `tsc --noEmit` 通過・テスト598件通過。
