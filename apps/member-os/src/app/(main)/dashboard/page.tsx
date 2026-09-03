@@ -131,9 +131,20 @@ export default async function DashboardPage({
   const isRepeat = (v: Row) =>
     v.repeat_date != null || String(v.discount ?? "") === "再来" || String(v.referral_source ?? "") === "再来";
 
-  const trials = vs.filter((v) => v.visit_type === "trial");
+  /* 予約は入った瞬間に台帳へ行を作る（体験 #139 / フィッティング #186）ので、
+     **まだ来ていない先の予約**も台帳に並んでいる。
+     率（入会率・購入率）を先の予約で割ると、予約が入るほど率が下がる＝実態と逆に動く。
+     実績＝来店済（今日以前）で数え、これから来る分は件数の内訳として出す（#204）。 */
+  const todayYmd = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  const done = (v: Row) => String(v.visited_on ?? "") <= todayYmd;
+
+  const trialsAll = vs.filter((v) => v.visit_type === "trial");
+  const trials = trialsAll.filter(done);
+  const trialsUpcoming = trialsAll.length - trials.length;
   const trialJoins = trials.filter((v) => v.result === "join");
-  const fittings = vs.filter((v) => v.visit_type === "fitting");
+  const fittingsAll = vs.filter((v) => v.visit_type === "fitting");
+  const fittings = fittingsAll.filter(done);
+  const fittingsUpcoming = fittingsAll.length - fittings.length;
   const fittingBuys = fittings.filter((v) => v.result === "purchase");
   const fittingRepeats = fittings.filter(isRepeat);
 
@@ -251,7 +262,13 @@ export default async function DashboardPage({
 
       {/* 主要4指標（ボタンで内訳展開） */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="体験数" value={trials.length} tone="indigo" hint={`体験→入会率 ${rate(trialJoins.length, trials.length)}`} groups={trialGroups} />
+        <StatCard
+          label="体験数"
+          value={trials.length}
+          tone="indigo"
+          hint={`体験→入会率 ${rate(trialJoins.length, trials.length)}${trialsUpcoming > 0 ? ` ／ これから ${trialsUpcoming}件` : ""}`}
+          groups={trialGroups}
+        />
         <StatCard
           label="入会者数"
           value={joinTally.total}
@@ -264,7 +281,13 @@ export default async function DashboardPage({
           groups={joinGroups}
         />
         <StatCard label="退会者数" value={leaveList.length} tone="rose" hint="今月退会（会員名簿の退会日より）" groups={leaveGroups} />
-        <StatCard label="フィッティング件数" value={fittings.length} tone="amber" hint={`購入率 ${rate(fittingBuys.length, fittings.length)}`} groups={fittingGroups} />
+        <StatCard
+          label="フィッティング件数"
+          value={fittings.length}
+          tone="amber"
+          hint={`購入率 ${rate(fittingBuys.length, fittings.length)}${fittingsUpcoming > 0 ? ` ／ これから ${fittingsUpcoming}件` : ""}`}
+          groups={fittingGroups}
+        />
       </div>
 
       {/* 補助指標 */}
@@ -280,6 +303,7 @@ export default async function DashboardPage({
           <li>・<span className="text-(--color-txt)">入会者</span>は会員名簿（Smart Hello取込）が正確な人数です。名簿を取り込むまでの間は、受付台帳の「成約＝入会」を足した<span className="text-(--color-txt)">暫定の人数</span>を表示します（氏名・カナで突き合わせるので、名簿を取り込めば二重に数えません）。</li>
           <li>・<span className="text-(--color-txt)">退会者</span>は会員名簿の退会日から抽出。退会は「6月末退会＝6月」に集計されます。</li>
           <li>・<span className="text-(--color-txt)">体験／フィッティング</span>は一時利用者台帳から集計。再来者は「割引=再来 / 経路=再来 / 再来日あり」で判定。</li>
+          <li>・件数は<span className="text-(--color-txt)">今日までに来られた分</span>です。先の予約は台帳に入っていますが「これから◯件」として別に出します（率を先の予約で割ると実態と逆に動くため・#204）。</li>
           <li>・右上の月セレクタ（←／→）で対象月を切り替えられます。</li>
         </ul>
       </Panel>
