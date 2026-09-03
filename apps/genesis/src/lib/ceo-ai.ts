@@ -418,68 +418,113 @@ export async function runDailyCeoReport(
     const storeName = new Map((storesRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
     const staffName = new Map((staffRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
 
-    const briefLines: string[] = [`おはようございます。${today} の連絡です。`];
+    /* ------------------------------------------------------------
+       朝連絡は「店舗ごとに1通」にする（2026-09-02 古川さん指示）
 
-    const shifts = shiftsRes.data ?? [];
-    if (shifts.length > 0) {
-      briefLines.push("", "▼本日の出勤");
-      const byStore = new Map<string, string[]>();
-      for (const sh of shifts) {
-        const key = storeName.get(String(sh.store_id)) ?? "その他";
-        const nm = staffName.get(String(sh.staff_id)) ?? "スタッフ";
-        const time = sh.start_time ? `${String(sh.start_time).slice(0, 5)}〜${String(sh.end_time ?? "").slice(0, 5)}` : "";
-        (byStore.get(key) ?? byStore.set(key, []).get(key)!).push(time ? `${nm}(${time})` : nm);
-      }
-      for (const [store, names] of byStore) briefLines.push(`・${store}: ${names.join(" / ")}`);
-    }
+       それまでは全店ぶんを1つの本文にまとめ、登録済みの全グループへ同じものを送っていた。
+       登録されていた配信先は GOLF WING 宝塚 のグループだけだったので、
+       **GOLF WINGのLINEに FRANK GOLF の出勤者とやることが流れていた**。
+       店の情報は、その店のグループにしか出さない。
+       ・出勤 / やること / 持ち越し … その店舗の行だけ
+       ・店舗の無いタスク（store_id が null＝全社共通）… どの店にも出す
+       LINEグループが未登録の店舗は送り先が無い。**GOLF WINGへ寄せるようなことはせず**、
+       送れなかったことをイベントに残す（黙って別の店に流さない）。
+       ------------------------------------------------------------ */
+    const { data: groupRows } = await admin
+      .from("gn_line_groups")
+      .select("store_id")
+      .eq("company_id", companyId)
+      .is("deleted_at", null);
+    const groupStores = new Set(
+      (groupRows ?? []).map((g) => String(g.store_id ?? "")).filter((x) => x !== "")
+    );
 
     // #134: タスクもスコープ内だけ。store_id が無い行＝全社共通なので残す
     const inScope = (storeId: unknown) =>
       !allowedStores || storeId == null || allowedStores.has(String(storeId));
-    const tasks = (tasksRes.data ?? []).filter((t) => inScope(t.store_id));
-    if (tasks.length > 0) {
-      briefLines.push("", "▼今日のやることリスト");
-      for (const t of tasks) {
-        const store = t.store_id ? storeName.get(String(t.store_id)) : null;
-        const who = t.staff_id ? staffName.get(String(t.staff_id)) : null;
-        briefLines.push(`・${String(t.title)}${store ? `【${store}】` : ""}${who ? `（${who}さん）` : ""}`);
+
+    const shifts = (shiftsRes.data ?? []).filter((sh) => inScope(sh.store_id));
+    const tasksAll = (tasksRes.data ?? []).filter((t) => inScope(t.store_id));
+    const carryAll = (carryoverRes.data ?? []).filter((t) => inScope(t.store_id));
+
+    /** その店舗ぶんの本文を組み立てる（他店の行は1行も入れない） */
+    const buildBrief = (storeId: string) => {
+      const lines: string[] = [`おはようございます。${today} の連絡です。`];
+
+      const mine = shifts.filter((sh) => String(sh.store_id ?? "") === storeId);
+      if (mine.length > 0) {
+        lines.push("", "▼本日の出勤");
+        for (const sh of mine) {
+          const nm = staffName.get(String(sh.staff_id)) ?? "スタッフ";
+          const time = sh.start_time
+            ? `${String(sh.start_time).slice(0, 5)}〜${String(sh.end_time ?? "").slice(0, 5)}`
+            : "";
+          lines.push(`・${time ? `${nm}(${time})` : nm}`);
+        }
       }
-    } else {
-      briefLines.push("", "▼今日のやることリスト", "・登録なし（追加はスタッフポータル/店舗ダッシュボードから）");
+
+      // 全社共通（store_id が null）はどの店にも出す
+      const tasks = tasksAll.filter((t) => t.store_id == null || String(t.store_id) === storeId);
+      if (tasks.length > 0) {
+        lines.push("", "▼今日のやることリスト");
+        for (const t of tasks) {
+          const who = t.staff_id ? staffName.get(String(t.staff_id)) : null;
+          const common = t.store_id == null ? "【全店共通】" : "";
+          lines.push(`・${String(t.title)}${common}${who ? `（${who}さん）` : ""}`);
+        }
+      } else {
+        lines.push("", "▼今日のやることリスト", "・登録なし（追加はスタッフポータル/店舗ダッシュボードから）");
+      }
+
+      // 未完了の再指示（#84）: 済にならない限り毎朝出続ける
+      const carry = carryAll.filter((t) => t.store_id == null || String(t.store_id) === storeId);
+      if (carry.length > 0) {
+        lines.push("", "▼持ち越し（未完了・完了したら済にしてください）");
+        for (const t of carry) {
+          const d = String(t.date).slice(5).replace("-", "/");
+          const common = t.store_id == null ? "【全店共通】" : "";
+          lines.push(`・${String(t.title)}${common}（${d}〜）`);
+        }
+      }
+
+      lines.push("", "予約状況は店頭タブレットの店舗ダッシュボードで確認してください。", "気になる点があれば店長・本部まで。");
+      return { body: lines.join("\n"), shifts: mine.length, tasks: tasks.length, carry: carry.length };
+    };
+
+    // 送り先＝スコープ内の店舗すべて（LINEグループの有無は次で分ける）
+    const targetStores = Array.from(storeName.keys()).filter((id) => inScope(id));
+    const missing: string[] = [];
+
+    for (const storeId of targetStores) {
+      if (!groupStores.has(storeId)) {
+        missing.push(storeName.get(storeId) ?? storeId);
+        continue;
+      }
+      const b = buildBrief(storeId);
+      await enqueueAction(admin, {
+        companyId,
+        actionType: "staff_directive",
+        title: `スタッフ朝連絡 ${today}｜${storeName.get(storeId) ?? ""}（出勤${b.shifts}名・タスク${b.tasks}件${b.carry > 0 ? `・持ち越し${b.carry}件` : ""}）`.slice(0, 200),
+        // store_id 指定＝その店舗のグループにだけ送る（sendStaffLine の絞り込み）
+        payload: { body: b.body, store_id: storeId },
+        originKind: "ceo_ai_daily",
+        originId: report?.id ?? null,
+        dedupeKey: `staff-brief-${ymd}-${storeId}`,
+        createdBy: null,
+      });
     }
 
-    // 未完了の再指示（#84）: 済にならない限り毎朝出続ける
-    const carryover = (carryoverRes.data ?? []).filter((t) => inScope(t.store_id));
-    if (carryover.length > 0) {
-      briefLines.push("", "▼持ち越し（未完了・完了したら済にしてください）");
-      for (const t of carryover) {
-        const store = t.store_id ? storeName.get(String(t.store_id)) : null;
-        const d = String(t.date).slice(5).replace("-", "/");
-        briefLines.push(`・${String(t.title)}${store ? `【${store}】` : ""}（${d}〜）`);
-      }
+    if (missing.length > 0) {
+      await logEvent(companyId, {
+        event_type: "staff.brief_no_group",
+        title: `朝連絡の送り先が未登録: ${missing.join(" / ")}`,
+        description:
+          "この店舗のLINEグループが gn_line_groups に登録されていないため、朝連絡を送っていません（他店のグループへは流しません）。YOZAN公式アカウントをその店舗のスタッフグループに招待すると自動で登録されます。",
+        source: "ceo_ai",
+        source_type: "ai",
+        severity: "notice",
+      });
     }
-
-    briefLines.push("", "予約状況は店頭タブレットの店舗ダッシュボードで確認してください。", "気になる点があれば店長・本部まで。");
-
-    await enqueueAction(admin, {
-      companyId,
-      actionType: "staff_directive",
-      title: `スタッフ朝連絡 ${today}（出勤${shifts.length}名・タスク${tasks.length}件${carryover.length > 0 ? `・持ち越し${carryover.length}件` : ""}）`,
-      // #85: 既定は登録済み全スタッフグループへ（GW/FRANK両方）。
-      // #134: 1店舗にスコープされている場合は、その店舗のグループにだけ送る（他店に他店の話を流さない）
-      payload:
-        allowedStores && allowedStores.size === 1
-          ? { body: briefLines.join("\n"), store_id: Array.from(allowedStores)[0] }
-          : { body: briefLines.join("\n"), target: "all" },
-      originKind: "ceo_ai_daily",
-      originId: report?.id ?? null,
-      // 店舗別に出す場合はキーも分ける（全社版と潰し合わないように）
-      dedupeKey:
-        allowedStores && allowedStores.size === 1
-          ? `staff-brief-${ymd}-${Array.from(allowedStores)[0]}`
-          : `staff-brief-${ymd}`,
-      createdBy: null,
-    });
   } catch {
     /* 連絡投入の失敗はレポート生成を止めない */
   }

@@ -191,6 +191,92 @@ export async function updateVisit(formData: FormData) {
   revalidatePath("/");
 }
 
+/* ------------------------------------------------------------
+   体験カウンセリング（紙シート → 受付台帳 / 2026-09-02）
+
+   お客様が紙に書いた内容をスタッフが入力する。器は survey(jsonb) ＝ 列は増やさない。
+   ⚠ survey には予約でいただいた内容（survey.reserve）やタブレットの回答が既に入っている。
+     まるごと置き換えると消えるので **読んでからマージ** する（受付フォームと同じ作法）。
+   ⑤⑥は紙と同じく最大2つ。画面でも止めるが、サーバーでも切り詰める（画面を信じない）。
+   ------------------------------------------------------------ */
+const GOLF_YEARS = ["未経験・始めたばかり", "1年未満", "1〜3年", "3〜10年", "10年以上"];
+const PRACTICE_FREQ = ["ほぼしない", "月1〜2回", "週1回", "週2回以上"];
+const ROUND_FREQ = ["ほぼしない", "月1回程度", "月2回以上"];
+const AVG_SCORES = ["120以上", "110台", "100台", "90台", "80台以下", "まだコースに出たことがない"];
+const IMPROVE_POINTS = [
+  "ドライバー", "アイアン", "アプローチ", "飛距離アップ",
+  "スライス・フックなど方向性", "スイングを基礎から整えたい", "スコアアップ", "その他",
+];
+const CHOOSE_FACTORS = [
+  "通いやすさ", "完全個室", "シミュレーター・設備", "レッスンを受けられる",
+  "好きな時間に練習できる", "落ち着いて練習できる", "料金", "その他",
+];
+
+/** 選択肢にあるものだけを最大2つまで通す（自由入力の混入と入れすぎを防ぐ） */
+function picks(formData: FormData, key: string, allowed: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const v of formData.getAll(key)) {
+    const s = String(v).trim();
+    if (!allowed.includes(s) || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+    if (out.length >= 2) break;
+  }
+  return out;
+}
+function oneOf(formData: FormData, key: string, allowed: string[]): string | null {
+  const s = str(formData.get(key));
+  return allowed.includes(s) ? s : null;
+}
+
+export async function updateCounseling(formData: FormData) {
+  const actor = await requireReceptionActor();
+  const admin = createAdmin();
+  const id = str(formData.get("id"));
+  if (!id) return;
+  if (!(await loadOwnVisit(admin, actor, id))) return;
+
+  // 既存の survey を読んでからマージ（予約由来 survey.reserve / タブレット回答を消さない）
+  const { data: cur } = await admin
+    .from("mbr_walkin_visits")
+    .select("survey")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const prev = (cur?.survey ?? {}) as Record<string, unknown>;
+
+  const survey = {
+    ...prev,
+    golf_years: oneOf(formData, "golf_years", GOLF_YEARS),
+    practice_freq: oneOf(formData, "practice_freq", PRACTICE_FREQ),
+    round_freq: oneOf(formData, "round_freq", ROUND_FREQ),
+    practice_place: orNull(formData.get("practice_place")),
+    avg_score: oneOf(formData, "avg_score", AVG_SCORES),
+    improve_points: picks(formData, "improve_points", IMPROVE_POINTS),
+    choose_factors: picks(formData, "choose_factors", CHOOSE_FACTORS),
+    // ⑧「今日の体験で知りたいこと」は既存のコメント欄と同じ器（重複を作らない）
+    comment: orNull(formData.get("comment")) ?? (prev.comment ?? null),
+    counseled_at: new Date().toISOString(),
+  };
+
+  const patch: Record<string, unknown> = { survey, updated_at: new Date().toISOString() };
+  // ⑦きっかけは既存の「何で知ったか」。カウンセリング欄からも直せるようにする
+  if (formData.has("referral_source")) patch.referral_source = orNull(formData.get("referral_source"));
+  if (formData.has("referral_source_other")) patch.referral_source_other = orNull(formData.get("referral_source_other"));
+
+  await admin
+    .from("mbr_walkin_visits")
+    .update(patch)
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null);
+
+  await logAudit(actor, "walkin.counseling", "mbr_walkin_visits", id, null, survey);
+  revalidatePath("/");
+}
+
 /** 受付台帳から顧客情報（住所・連絡先・職業など）を後追いで登録/編集。
  *  visitにguestが未紐付け（電話のみ登録等）の場合は新規guestを作成して紐付ける。 */
 export async function updateGuest(formData: FormData) {

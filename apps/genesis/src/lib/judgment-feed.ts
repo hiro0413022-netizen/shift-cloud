@@ -88,7 +88,8 @@ function buildPlan(
   type: string,
   payload: Record<string, unknown>,
   channels: Map<string, string>,
-  staffGroupCount: number
+  staffGroupCount: number,
+  storeLabel: (id: unknown) => string
 ): ExecutionPlan | null {
   const cron = "承認後、最大10分以内（10分ごとの実行キュー）";
   if (type === "line_broadcast") {
@@ -102,12 +103,13 @@ function buildPlan(
     };
   }
   if (type === "staff_directive") {
+    // #198: どの店のグループに出るのかを名前で見せる（承認する前に分かること）
     const target = String(payload.target ?? "") === "all"
       ? `スタッフLINEグループ 全${staffGroupCount}件`
       : payload.group_id
         ? "指定のスタッフLINEグループ 1件"
         : payload.store_id
-          ? "指定店舗のスタッフLINEグループ"
+          ? `${storeLabel(payload.store_id)} のスタッフLINEグループ（他店には出ません）`
           : "既定のスタッフLINEグループ 1件";
     return { what: "スタッフ用OAからLINEグループへ送信", target, timing: cron, irreversible: true };
   }
@@ -264,7 +266,7 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
       href: "/executions",
       scheduledAt: s(r.scheduled_at),
       body: fullBody,
-      plan: buildPlan(type, payload, channels, staffGroupCount),
+      plan: buildPlan(type, payload, channels, staffGroupCount, storeLabel),
       // 文面がある承認待ちのみ修正指示可（LINE配信・スタッフ連絡・SNS投稿 #101）
       revisable:
         !isUndo && fullBody != null && (type === "line_broadcast" || type === "staff_directive" || type === "sns_post"),

@@ -131,7 +131,10 @@ function systemPrompt(b: JarvisBriefing): string {
     "     booking_create … FRANKの打席予約を入れる。args: {date:'YYYY-MM-DD', start:'HH:MM', minutes:60, guest_name または member_no, phone?, party_size?, bay_name?, lefty?, note?}",
     "     booking_cancel … 予約を取り消す。args: {booking_id}（IDが分からなければ act にせず data で先に調べる）",
     "     walkin_add     … 受付台帳に来店/体験を1件。args: {guest_name, visited_on:'YYYY-MM-DD', visit_type:'trial'|'visit', kana?, phone?, note?}",
-    "     staff_directive… スタッフへ公式LINEで連絡。args: {body}",
+    "     staff_directive… スタッフへ公式LINEで連絡。args: {body, store?}",
+    "                      store は宛先の店舗名（例: 'FRANK' / '姫路' / 'GOLF WING' / '宝塚'）。",
+    "                      **その店の話はその店のグループにしか流さない**（他店のLINEに出さない）。",
+    "                      全店に伝えることだけ store を省く。",
     "   **日付は必ず YYYY-MM-DD に直す**（「明日」は上の日付から計算）。時刻は HH:MM。",
     "   **足りない情報があるときは act にしない**。talk で1つだけ聞き返す（例: お名前は？ 何時からですか？）。",
     "   reply には「何を・いつ・誰の分で入れるか」と「5分以内なら取り消せる」ことを必ず入れる。",
@@ -299,6 +302,33 @@ async function enqueueJarvisAction(args: {
   if (args.type === "walkin_add" && !payload.store_id) {
     payload.store_id = args.actor.primaryStoreId ?? args.actor.storeIds[0] ?? null;
   }
+  /* スタッフ連絡の宛先（#198）:
+       これまでは宛先を書かないと「既定のグループ」＝GOLF WING だけに届き、
+       **FRANKのスタッフには一生届かない**（しかもFRANKの話がGWに出る）。
+       ①言われた店舗名 → ②本人が1店舗しか持たないならその店 → ③どれでもなければ全店（両方のグループ）。 */
+  if (args.type === "staff_directive" && !payload.store_id && !payload.group_id && !payload.target) {
+    const wantStore = String(payload.store ?? "").trim();
+    delete payload.store;
+    let storeId: string | null = null;
+    if (wantStore) {
+      const { data: stores } = await args.admin
+        .from("stores")
+        .select("id, name")
+        .eq("company_id", args.actor.companyId)
+        .is("deleted_at", null);
+      const norm = (s: string) => s.toLowerCase().replace(/[\s\u3000]/g, "");
+      const w = norm(wantStore);
+      const hit = (stores ?? []).filter((s) => {
+        const n = norm(String(s.name));
+        return n.includes(w) || w.includes(n);
+      });
+      // 1つに決まらないときは寄せない（間違った店に流すより全店の方が安全）
+      if (hit.length === 1) storeId = String(hit[0].id);
+    }
+    if (!storeId && !args.actor.isOwner && args.actor.storeIds.length === 1) storeId = args.actor.storeIds[0];
+    if (storeId) payload.store_id = storeId;
+    else payload.target = "all";
+  }
   const title = actionTitle(args.type, args.args);
   try {
     const r = await enqueueAction(args.admin, {
@@ -325,8 +355,10 @@ function actionTitle(type: string, a: Record<string, unknown>): string {
       return "予約を取り消す";
     case "walkin_add":
       return `受付台帳に登録: ${String(a.visited_on ?? "")} ${who}`.trim();
-    case "staff_directive":
-      return `スタッフへ連絡: ${String(a.body ?? "").slice(0, 40)}`;
+    case "staff_directive": {
+      const to = String(a.store ?? "").trim();
+      return `スタッフへ連絡${to ? `（${to}）` : "（全店）"}: ${String(a.body ?? "").slice(0, 40)}`;
+    }
     default:
       return type;
   }

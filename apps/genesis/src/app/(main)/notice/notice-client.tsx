@@ -62,13 +62,15 @@ export function NoticeClient({ groups, notices }: { groups: LineGroup[]; notices
           {groups.length > 1 && (
             <label className="flex items-center gap-2 text-sm text-(--color-dim)">
               配信先
+              {/* #198: どの店のグループか名前で分かるようにし、「両方」を選ばないと
+                  他店のLINEには出ないようにした（店の話が他店に流れる事故の再発防止） */}
               <select name="group_id" className="rounded border border-(--color-line) bg-(--color-bg) px-2 py-1 text-sm">
                 {groups.map((g) => (
                   <option key={g.id} value={g.line_group_id}>
-                    {g.label ?? "グループ"}
-                    {g.is_default ? "（既定）" : ""}
+                    {g.store_name ?? g.label ?? "グループ"}
                   </option>
                 ))}
+                <option value="all">全店に送る（{groups.length}グループ）</option>
               </select>
             </label>
           )}

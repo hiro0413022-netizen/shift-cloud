@@ -18,7 +18,10 @@ const HEADERS = [
   "1（体験理由）", "2（体験理由）", "3（体験理由）", "4（体験理由）", "5（体験理由）", "その他",
   "ゴルフスクールに通う目的　1", "ゴルフスクールに通う目的　2", "ゴルフスクールに通う目的　3",
   "入会興味の有無", "体験後のコメント、フォロー状況", "体験から\nの入会", "再アプローチ\n(日付)",
-  "", "", "", "", "", "", "", "", "", "", "", "", "",
+  // 体験カウンセリングシート（FRANK・2026-09-02）。現行シートの空き列に足す＝57列のまま
+  "ゴルフ歴", "練習の頻度", "ラウンドの頻度", "普段の練習場所", "平均スコア",
+  "改善したいこと1", "改善したいこと2", "場所選びで重視1", "場所選びで重視2",
+  "", "", "", "",
 ];
 
 const RESULT_LABEL: Record<string, string> = { join: "入会", purchase: "購入", none: "" };
@@ -95,6 +98,16 @@ export async function GET(request: Request) {
     row[41] = s(survey.comment);
     row[42] = v.visit_type === "trial" && result === "join" ? "入会" : "";
     row[43] = ymdSlash(v.reapproach_date);
+    // 体験カウンセリング（survey に入れた ①〜⑥）
+    const improve = (survey.improve_points as string[]) ?? [];
+    const factors = (survey.choose_factors as string[]) ?? [];
+    row[44] = s(survey.golf_years);
+    row[45] = s(survey.practice_freq);
+    row[46] = s(survey.round_freq);
+    row[47] = s(survey.practice_place);
+    row[48] = s(survey.avg_score);
+    for (let i = 0; i < 2; i++) row[49 + i] = improve[i] ?? "";
+    for (let i = 0; i < 2; i++) row[51 + i] = factors[i] ?? "";
     ws.addRow(row);
   }
 

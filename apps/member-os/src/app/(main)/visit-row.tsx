@@ -12,8 +12,16 @@ import {
   GENDER_LABEL,
   OCCUPATIONS,
   CONTACT_METHODS,
+  REFERRAL_SOURCES,
+  GOLF_YEARS,
+  PRACTICE_FREQ,
+  ROUND_FREQ,
+  AVG_SCORES,
+  IMPROVE_POINTS,
+  CHOOSE_FACTORS,
+  COUNSELING_MAX_PICK,
 } from "@/lib/walkin";
-import { updateVisit, updateGuest, deleteVisit } from "./actions";
+import { updateVisit, updateGuest, deleteVisit, updateCounseling } from "./actions";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
 
@@ -33,6 +41,7 @@ function s(v: unknown): string {
 
 export function VisitRow({ v, guest, rec }: { v: Row; guest: Row | null; rec: Row | null }) {
   const [open, setOpen] = useState(false);
+  const [counsel, setCounsel] = useState(false);
   const vtype = s(v.visit_type);
   const name = guest?.name ? s(guest.name) : "（氏名未入力）";
   const selfDone = !!v.consent_at;
@@ -51,7 +60,19 @@ export function VisitRow({ v, guest, rec }: { v: Row; guest: Row | null; rec: Ro
     if (reasons.length) surveyLines.push(`目的・きっかけ: ${reasons.join("、")}`);
     if (survey.join_interest) surveyLines.push(`入会意向: ${s(survey.join_interest)}`);
     if (survey.comment) surveyLines.push(`コメント: ${s(survey.comment)}`);
+    // 体験カウンセリング（紙シートの取り込み分）
+    if (survey.golf_years) surveyLines.push(`ゴルフ歴: ${s(survey.golf_years)}`);
+    const freq = [
+      survey.practice_freq ? `練習 ${s(survey.practice_freq)}` : "",
+      survey.round_freq ? `ラウンド ${s(survey.round_freq)}` : "",
+    ].filter(Boolean);
+    if (freq.length) surveyLines.push(freq.join(" / "));
+    if (survey.practice_place) surveyLines.push(`普段の練習場所: ${s(survey.practice_place)}`);
+    if (survey.avg_score) surveyLines.push(`平均スコア: ${s(survey.avg_score)}`);
+    if (arr("improve_points").length) surveyLines.push(`改善したいこと: ${arr("improve_points").join("、")}`);
+    if (arr("choose_factors").length) surveyLines.push(`場所選びで重視: ${arr("choose_factors").join("、")}`);
   }
+  const counseled = !!(survey && survey.counseled_at);
 
   return (
     <div className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
@@ -70,6 +91,18 @@ export function VisitRow({ v, guest, rec }: { v: Row; guest: Row | null; rec: Ro
           {v.result === "join" ? <Badge tone="gold">入会</Badge> : null}
           {v.result === "purchase" ? <Badge tone="ok">購入</Badge> : null}
           {selfDone ? <Badge tone="ok">自己入力済</Badge> : null}
+          {counseled ? <Badge tone="ok">カウンセリング済</Badge> : null}
+          {/* 体験カウンセリングシート（紙）の入力。体験のときだけ出す */}
+          {vtype === "trial" ? (
+            <button
+              type="button"
+              onClick={() => setCounsel((c) => !c)}
+              className="rounded border border-(--color-line) px-2 py-0.5 text-xs text-(--color-dim) hover:border-accent hover:text-accent"
+              title="紙のカウンセリングシートの内容を入力します"
+            >
+              {counsel ? "カウンセリングを閉じる" : counseled ? "カウンセリングを見る・直す" : "カウンセリングを入力"}
+            </button>
+          ) : null}
         </div>
         <div className="text-xs text-(--color-dim)">
           {[
@@ -191,6 +224,108 @@ export function VisitRow({ v, guest, rec }: { v: Row; guest: Row | null; rec: Ro
         </div>
       ) : null}
 
+      {/* 体験カウンセリング（紙シートの取り込み・スタッフ入力 / 2026-09-02）
+          ⑦きっかけ＝既存の「何で知ったか」、⑧知りたいこと＝既存のコメント欄を使い回す（重複を作らない） */}
+      {counsel ? (
+        <form
+          key={`counsel-${s(v.id)}-${s(v.updated_at ?? "")}`}
+          action={updateCounseling}
+          className="mt-3 rounded-xl border border-(--color-line) bg-(--color-panel) p-4"
+        >
+          <input type="hidden" name="id" value={s(v.id)} />
+          <p className="mb-3 text-xs font-semibold text-(--color-dim)">
+            体験カウンセリングシート（お客様の記入内容をそのまま入力してください）
+          </p>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Field label="① ゴルフ歴">
+              <select name="golf_years" defaultValue={s(survey?.golf_years)} className={inputCls}>
+                <option value="">選択</option>
+                {GOLF_YEARS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="② 練習の頻度">
+              <select name="practice_freq" defaultValue={s(survey?.practice_freq)} className={inputCls}>
+                <option value="">選択</option>
+                {PRACTICE_FREQ.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="② ラウンドの頻度">
+              <select name="round_freq" defaultValue={s(survey?.round_freq)} className={inputCls}>
+                <option value="">選択</option>
+                {ROUND_FREQ.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="④ 平均スコア">
+              <select name="avg_score" defaultValue={s(survey?.avg_score)} className={inputCls}>
+                <option value="">選択</option>
+                {AVG_SCORES.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="③ 普段どこで練習していますか">
+              <input
+                name="practice_place"
+                defaultValue={s(survey?.practice_place)}
+                placeholder="〇〇ゴルフガーデン など"
+                className={`${inputCls} col-span-2 sm:col-span-4`}
+              />
+            </Field>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <PickGroup
+              label="⑤ 今、一番改善したいこと（最大2つ）"
+              name="improve_points"
+              options={IMPROVE_POINTS}
+              selected={(Array.isArray(survey?.improve_points) ? (survey!.improve_points as unknown[]).map(String) : [])}
+            />
+            <PickGroup
+              label="⑥ 練習する場所を選ぶうえで重視すること（最大2つ）"
+              name="choose_factors"
+              options={CHOOSE_FACTORS}
+              selected={(Array.isArray(survey?.choose_factors) ? (survey!.choose_factors as unknown[]).map(String) : [])}
+            />
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Field label="⑦ 知ったきっかけ">
+              <select name="referral_source" defaultValue={s(v.referral_source)} className={inputCls}>
+                <option value="">選択</option>
+                {REFERRAL_SOURCES.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="⑦ （紹介・その他）詳細">
+              <input name="referral_source_other" defaultValue={s(v.referral_source_other)} placeholder="紹介者名など" className={inputCls} />
+            </Field>
+            <Field label="⑧ 今日の体験で知りたいこと">
+              <input
+                name="comment"
+                defaultValue={s(survey?.comment)}
+                placeholder="お客様のご質問・ご要望"
+                className={`${inputCls} col-span-2`}
+              />
+            </Field>
+          </div>
+
+          <p className="mt-2 text-[11px] text-(--color-dim)">
+            スタッフ記入欄は下の「備考・フォロー状況」に書いてください。
+          </p>
+          <div className="mt-2 flex justify-end">
+            <button className={btnGhostCls}>カウンセリングを保存</button>
+          </div>
+        </form>
+      ) : null}
+
       {/* スタッフ追記（保存のたびにupdated_atで再マウント→編集値が確実に反映される） */}
       <form
         key={`edit-${s(v.id)}-${s(v.updated_at ?? "")}`}
@@ -248,6 +383,52 @@ export function VisitRow({ v, guest, rec }: { v: Row; guest: Row | null; rec: Ro
           <input type="hidden" name="id" value={s(v.id)} />
           <button className="text-xs text-(--color-dim) hover:text-red-400">削除</button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/** 最大2つまでのチェック欄。2つ選んだら残りは押せなくする（紙と同じ制限を画面で守る）。
+ *  サーバー側でも切り詰めているので、ここは「押し間違いを防ぐ」ための親切。 */
+function PickGroup({
+  label,
+  name,
+  options,
+  selected,
+}: {
+  label: string;
+  name: string;
+  options: string[];
+  selected: string[];
+}) {
+  const [picked, setPicked] = useState<string[]>(selected);
+  const full = picked.length >= COUNSELING_MAX_PICK;
+  return (
+    <div>
+      <p className="mb-1 text-xs text-(--color-dim)">{label}</p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {options.map((o) => {
+          const on = picked.includes(o);
+          return (
+            <label
+              key={o}
+              className={`flex items-center gap-1.5 rounded border px-2 py-1.5 text-xs ${
+                on ? "border-accent bg-accent/10 text-(--color-txt)" : "border-(--color-line) text-(--color-dim)"
+              } ${!on && full ? "opacity-40" : ""}`}
+            >
+              <input
+                type="checkbox"
+                name={name}
+                value={o}
+                checked={on}
+                disabled={!on && full}
+                onChange={() => setPicked((prev) => (prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]))}
+                className="h-4 w-4 accent-(--color-accent)"
+              />
+              {o}
+            </label>
+          );
+        })}
       </div>
     </div>
   );
