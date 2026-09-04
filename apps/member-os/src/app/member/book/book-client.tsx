@@ -35,6 +35,8 @@ type Slots = {
   taken: Record<string, string[]>;
   minutes_options?: number[];
   lesson_option?: { minutes: number; price: number } | null;
+  /** その日出勤しているコーチ（#213）。指名はこの中からだけ */
+  coaches?: { id: string; name: string; from: string; to: string }[];
 };
 
 const LABEL: Record<number, string> = { 30: "30分", 60: "1時間", 90: "1時間30分", 120: "2時間", 150: "2時間30分", 180: "3時間" };
@@ -52,6 +54,7 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
   const [status, setStatus] = useState("読み込み中…");
   const [sel, setSel] = useState<{ bay: string; t: string } | null>(null);
   const [lesson, setLesson] = useState(false);
+  const [coachId, setCoachId] = useState(""); // 空＝おまかせ（#213）
   const [sending, setSending] = useState(false);
   const [err, setErr] = useState("");
   // オープン前の日付を1度だけ自動で先送りする（毎回やると日付を選び直せなくなる）
@@ -110,6 +113,21 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
     [data, minutes, freeAt],
   );
 
+  const opts = data?.minutes_options ?? [60];
+  const lessonOpt = data?.lesson_option ?? null;
+  /**
+   * 選んだ時間に「レッスンぶん一緒にいられる」コーチだけ出す（#213）。
+   * 出勤していない人を選ばせて、あとから店舗が断る——を作らない。
+   * サーバー側でも同じ条件を確かめている（画面だけの制限にしない）。
+   */
+  const coachChoices = (() => {
+    const list = data?.coaches ?? [];
+    if (!sel || !lessonOpt || list.length === 0) return [];
+    const s0 = toM(sel.t);
+    const e0 = s0 + minutes;
+    return list.filter((c) => Math.min(toM(c.to), e0) - Math.max(toM(c.from), s0) >= lessonOpt.minutes);
+  })();
+
   async function book() {
     if (!sel || sending) return;
     setSending(true);
@@ -125,6 +143,7 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
           start: sel.t,
           minutes,
           lesson: lesson && !!data?.lesson_option,
+          lesson_staff_id: lesson && coachChoices.some((c) => c.id === coachId) ? coachId : "",
           t: token,
         }),
       });
@@ -144,8 +163,6 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
     }
   }
 
-  const opts = data?.minutes_options ?? [60];
-  const lessonOpt = data?.lesson_option ?? null;
 
   return (
     <div className="space-y-4">
@@ -245,10 +262,42 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
               パーソナルレッスン（{lessonOpt.minutes}分）を追加する　＋{lessonOpt.price.toLocaleString()}円（当日精算）
               <br />
               <span className="text-xs text-(--color-dim)">
-                担当プロと開始時刻は店舗で調整のうえ、確定をご連絡します。
+                開始時刻は打席のお時間の中で店舗が調整し、確定をご連絡します。
               </span>
             </span>
           </label>
+
+          {/* コーチのご指名（#213）。出勤予定のある人しか出さない */}
+          {lesson && (
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-semibold text-(--color-dim)">担当コーチ（ご指名）</label>
+              {!sel ? (
+                <p className="text-xs text-(--color-dim)">先に日時と打席をお選びください。</p>
+              ) : coachChoices.length === 0 ? (
+                <p className="text-xs text-(--color-dim)">
+                  この時間は出勤予定が未定のため、ご指名は承れません。担当は店舗でお決めします。
+                </p>
+              ) : (
+                <>
+                  <select
+                    value={coachChoices.some((c) => c.id === coachId) ? coachId : ""}
+                    onChange={(e) => setCoachId(e.target.value)}
+                    className="w-full rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm"
+                  >
+                    <option value="">おまかせ（店舗が決めます）</option>
+                    {coachChoices.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}（{c.from}〜{c.to}）
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-(--color-dim)">
+                    ご指名はご希望として承ります。当日の状況により担当が変わる場合があります。
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </section>
       )}
 

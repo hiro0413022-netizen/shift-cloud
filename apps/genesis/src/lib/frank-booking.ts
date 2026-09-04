@@ -1,5 +1,7 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
+import { loadCoachRoster } from "@/lib/frank-coach-roster";
+import { coachesForLesson } from "@yozan/core/frank-coach-capacity";
 import { logEvent } from "@/lib/kernel";
 import {
   FRANK_STORE_ID,
@@ -177,6 +179,9 @@ export async function getSlots(dateStr: string) {
     .neq("status", "cancelled")
     .is("deleted_at", null);
 
+  // コーチの指名（#213）。出勤していない人を選ばせないため、その日の確定シフトを渡す
+  const roster = lesson.enabled ? await loadCoachRoster(admin, dateStr) : { scheduled: false, coaches: [] };
+
   // レッスン枠（#88 §3-4）: プロが打席指定で公開した枠は打席予約から除外
   const lessonSlots = await lessonBaySlots(admin, dateStr);
 
@@ -202,6 +207,11 @@ export async function getSlots(dateStr: string) {
     step: STEP,
     minutes_options: minutesOptions,
     lesson_option: lesson.enabled ? { minutes: lesson.minutes, price: lesson.price } : null,
+    /**
+     * その日出勤しているコーチ（#213）。画面は「選んだ時間に25分いられる人」だけを出す。
+     * シフト未確定の日は空配列＝「おまかせ」だけになる（指名させてから断らない）。
+     */
+    coaches: roster.coaches.map((c) => ({ id: c.id, name: c.name, from: toTime(c.s), to: toTime(c.e) })),
   };
 }
 
@@ -212,8 +222,10 @@ export async function createBooking(input: {
   bayCode: string;
   start: string; // "HH:MM"（毎時00分）
   minutes: number; // 60 | 120
-  /** パーソナルレッスン（25分）の希望。担当プロと時間は店舗が確定する */
+  /** パーソナルレッスン（25分）の希望。時間は店舗が確定する */
   lesson?: boolean;
+  /** ご指名のコーチ（#213）。空＝おまかせ。出勤していない人は受け付けない */
+  lessonStaffId?: string | null;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const admin = createAdmin();
   const member = await authMember(admin, input.auth);
@@ -350,6 +362,19 @@ export async function createBooking(input: {
   const lesson = lessonOption(cfg);
   const wantsLesson = input.lesson === true && lesson.enabled;
 
+  /**
+   * ご指名のコーチ（#213）。
+   * 画面が出す一覧と同じ条件をサーバーでも確かめる＝出勤していない人を指名して確定させない。
+   * 指名なし（おまかせ）はこれまでどおり店舗が担当を決める。
+   */
+  let lessonStaffId: string | null = null;
+  if (wantsLesson && input.lessonStaffId) {
+    const roster = await loadCoachRoster(admin, input.date);
+    const ok = coachesForLesson(roster.coaches, startMin, endMin, lesson.minutes).some((c) => c.id === input.lessonStaffId);
+    if (!ok) return { ok: false, error: "ご指名のコーチはその時間の出勤予定がありません。別のコーチかおまかせをお選びください。" };
+    lessonStaffId = String(input.lessonStaffId);
+  }
+
   const { data: bay } = await admin
     .from("frunk_bays")
     .select("id, name")
@@ -392,6 +417,7 @@ export async function createBooking(input: {
             lesson_option_status: "requested",
             lesson_option_minutes: lesson.minutes,
             lesson_option_fee: lesson.price,
+            lesson_option_staff_id: lessonStaffId,
           }
         : {}),
     })

@@ -685,3 +685,61 @@ export async function setLessonOption(formData: FormData) {
 /* 店頭カレンダーのトークンURL発行は廃止した。
  * 店頭では店舗アカウントでログインして `/board` を開く（ログイン必須）。
  * お客様Web予約のトークンURLも廃止済み（#93・予約はサイトに集約）。 */
+
+/**
+ * 連絡事項の追加（#215）
+ *
+ * ★ 期間は既定で「その日1日」。長い連絡だけ終了日を入れてもらう。
+ *   期間を必須にすると、急ぎの申し送りを書くのに2回考えることになる。
+ * ★ 全店共通（store_id = null）はGOLF WINGの朝のLINEにも載る。FRANK専用と押し間違えないよう、
+ *   画面ではチェックボックスにして既定はこの店だけにしている。
+ */
+export async function addNotice(formData: FormData) {
+  const actor = await requireReceptionActor();
+  await requireStoreAccess(actor, FRANK_STORE_ID);
+  const admin = createAdmin();
+
+  const date = String(formData.get("date") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+  const from = String(formData.get("date_from") ?? "") || date;
+  const to = String(formData.get("date_to") ?? "") || from;
+  const level = String(formData.get("level") ?? "") === "warn" ? "warn" : "info";
+  const allStores = String(formData.get("all_stores") ?? "") === "1";
+
+  if (!body) return back(date);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return back(date);
+  if (to < from) return back(date);
+
+  const { data: row } = await admin
+    .from("store_notices")
+    .insert({
+      company_id: actor.companyId,
+      store_id: allStores ? null : FRANK_STORE_ID,
+      date_from: from,
+      date_to: to,
+      body: body.slice(0, 1000),
+      level,
+      created_by: actor.staffId,
+    })
+    .select("id")
+    .single();
+  await logAudit(actor, "frank.notice.add", "store_notices", row?.id ?? null, null, { from, to, level, allStores });
+  return back(date);
+}
+
+/** 連絡事項を下げる（消したい＝もう伝え終わった）。行は残して deleted_at を入れる */
+export async function removeNotice(formData: FormData) {
+  const actor = await requireReceptionActor();
+  await requireStoreAccess(actor, FRANK_STORE_ID);
+  const admin = createAdmin();
+  const id = String(formData.get("id") ?? "");
+  const date = String(formData.get("date") ?? "");
+  if (!id) return back(date);
+  await admin
+    .from("store_notices")
+    .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+  await logAudit(actor, "frank.notice.remove", "store_notices", id, null, {});
+  return back(date);
+}

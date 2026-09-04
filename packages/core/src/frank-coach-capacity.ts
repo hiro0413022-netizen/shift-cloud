@@ -44,3 +44,19 @@ export function trialsAt(trials: Span[], s: number, e: number): number {
 export function canTakeTrial(cover: Span[] | null, trials: Span[], s: number, e: number): boolean {
   return trialsAt(trials, s, e) < coachCapacity(cover, s, e);
 }
+
+/**
+ * 打席の予約時間の中で、指定のレッスン時間ぶん一緒にいられるコーチだけ残す（#213）
+ *
+ * 会員ページからコーチを指名できるようにしたので、**出勤していない人が選べてはいけない**。
+ * 打席が2時間でも、レッスンは25分なので「予約時間の全部にいる」までは求めない。
+ * 25分ぶん重なっていれば指名できる（何時から教えるかは店舗が決める）。
+ */
+export function overlapMinutes(a: Span, s: number, e: number): number {
+  return Math.max(0, Math.min(a.e, e) - Math.max(a.s, s));
+}
+
+export function coachesForLesson<T extends Span>(coaches: T[], s: number, e: number, lessonMinutes: number): T[] {
+  const need = Math.max(1, lessonMinutes);
+  return coaches.filter((c) => overlapMinutes(c, s, e) >= need);
+}

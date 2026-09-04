@@ -60,6 +60,17 @@ export type TimelineItem = {
   alert: boolean;
   /** ⚠のツールチップ本文 */
   alertNote: string;
+  /**
+   * 25分パーソナルレッスンの状態（#214）。予約の色と印をここで決める。
+   * null＝レッスンなし / "requested"＝ご希望（担当と時間が未確定）/ "confirmed"＝確定
+   */
+  lessonOpt: "requested" | "confirmed" | null;
+  /** チケットでお支払い済み（レジで二重に請求しない） */
+  lessonTicket: boolean;
+  /** 担当コーチ名（確定していれば名前、ご指名だけなら指名された人） */
+  lessonCoach: string;
+  /** レッスンの開始時刻 "HH:MM"（確定時のみ） */
+  lessonStart: string;
 };
 
 /** ブロックの表示用時刻「10:00-10:55」 */
@@ -83,6 +94,23 @@ export type BookingLike = {
   party_size: number | null;
   frunk_members: { name: string; alert_note: string | null } | null;
   mbr_trial_requests: { name: string; lefty: boolean } | null;
+  /** 25分パーソナル（0136）。#214 で表にも出すようにした */
+  lesson_option_status?: string | null;
+  lesson_option_staff_id?: string | null;
+  lesson_option_start?: string | null;
+  lesson_option_minutes?: number | null;
+  lesson_option_fee?: number | null;
+};
+
+/**
+ * レッスン付き予約の見分け（#214・2026-09-04 ユーザー依頼「レッスンチケットを買うになっているかが分かりづらい」）
+ *
+ * 種別（会員/体験/都度）の色は変えない——変えると「何のお客様か」が読めなくなる。
+ * **左端の太い縁と行の印**を足して、レッスン付きだけが目に入るようにする。
+ */
+export const LESSON_OPT_EDGE: Record<"requested" | "confirmed", string> = {
+  requested: "border-l-4 border-l-amber-500",
+  confirmed: "border-l-4 border-l-violet-600",
 };
 
 /** frunk_lesson_slots の1行 */
@@ -98,7 +126,7 @@ function kindOf(customerKind: string): TimelineKind {
   return customerKind === "trial" ? "trial" : customerKind === "member" ? "member" : "dropin";
 }
 
-export function bookingToItem(b: BookingLike): TimelineItem {
+export function bookingToItem(b: BookingLike, coachName?: (staffId: string) => string): TimelineItem {
   const note = b.frunk_members?.alert_note?.trim() ?? "";
   const sub = [
     CUSTOMER_KIND_LABEL[b.customer_kind] ?? "",
@@ -108,6 +136,7 @@ export function bookingToItem(b: BookingLike): TimelineItem {
   ]
     .filter(Boolean)
     .join("・");
+  const st = b.lesson_option_status === "requested" || b.lesson_option_status === "confirmed" ? b.lesson_option_status : null;
   return {
     id: b.id,
     kind: kindOf(b.customer_kind),
@@ -118,6 +147,11 @@ export function bookingToItem(b: BookingLike): TimelineItem {
     sub,
     alert: note !== "",
     alertNote: note,
+    lessonOpt: st,
+    // チケットで承ったぶんは料金0で保存している（#199）
+    lessonTicket: st === "confirmed" && Number(b.lesson_option_fee ?? -1) === 0,
+    lessonCoach: b.lesson_option_staff_id && coachName ? coachName(String(b.lesson_option_staff_id)) : "",
+    lessonStart: st === "confirmed" && b.lesson_option_start ? String(b.lesson_option_start).slice(0, 5) : "",
   };
 }
 
@@ -132,13 +166,29 @@ export function lessonToItem(l: LessonLike): TimelineItem {
     sub: l.staff?.name ?? "",
     alert: false,
     alertNote: "",
+    lessonOpt: null,
+    lessonTicket: false,
+    lessonCoach: "",
+    lessonStart: "",
   };
 }
 
+/** ブロックに出す1行「🎫 レッスン14:30 小川うらら」（#214）。空文字＝出さない */
+export function lessonBadge(item: TimelineItem): string {
+  if (!item.lessonOpt) return "";
+  const head = item.lessonOpt === "requested" ? "レッスン希望" : `レッスン${item.lessonStart ? item.lessonStart : ""}`;
+  return [item.lessonTicket ? "🎫" : "", head, item.lessonCoach].filter(Boolean).join(" ");
+}
+
 /** 1日ぶんのカレンダーに載せるもの全部。キャンセル済みは載せない（空き枠として見せる） */
-export function toTimelineItems(bookings: BookingLike[], lessons: LessonLike[]): TimelineItem[] {
+export function toTimelineItems(
+  bookings: BookingLike[],
+  lessons: LessonLike[],
+  /** 担当コーチのidから名前を引く（#214）。渡さなければ名前は出さない */
+  coachName?: (staffId: string) => string,
+): TimelineItem[] {
   return [
-    ...bookings.filter((b) => b.status !== "cancelled").map(bookingToItem),
+    ...bookings.filter((b) => b.status !== "cancelled").map((b) => bookingToItem(b, coachName)),
     ...lessons.map(lessonToItem),
   ];
 }

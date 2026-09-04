@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
     start: String(body.start ?? ""),
     minutes: Number(body.minutes ?? 60),
     lesson: body.lesson === true || body.lesson === "1",
+    lessonStaffId: typeof body.lesson_staff_id === "string" && body.lesson_staff_id ? body.lesson_staff_id : null,
   });
   return NextResponse.json(r, { status: r.ok ? 200 : 400, headers: CORS });
 }

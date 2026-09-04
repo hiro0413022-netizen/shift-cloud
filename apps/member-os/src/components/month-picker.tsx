@@ -46,6 +46,7 @@ export function MonthMiniCalendar({
   view,
   counts,
   isClosed,
+  noticeDays,
 }: {
   month: string;
   selected: string;
@@ -54,6 +55,8 @@ export function MonthMiniCalendar({
   view: CalendarView;
   counts?: Map<string, DayCount>;
   isClosed?: (date: string) => boolean;
+  /** 連絡事項がある日（#215）。日付の右上に📌を出す */
+  noticeDays?: Set<string>;
 }) {
   const weeks = monthGrid(month);
   const [y, m] = month.split("-");
@@ -116,9 +119,13 @@ export function MonthMiniCalendar({
                                 : "text-(--color-txt) hover:bg-(--color-panel-2)"
                               : "text-(--color-dim) opacity-40 hover:bg-(--color-panel-2)"
                       }`}
-                      title={closed ? "定休日" : c.total > 0 ? `${c.total}件` : ""}
+                      title={[closed ? "定休日" : c.total > 0 ? `${c.total}件` : "", noticeDays?.has(d) ? "連絡事項あり" : ""]
+                        .filter(Boolean)
+                        .join("・")}
                     >
                       <span>{Number(d.slice(8))}</span>
+                      {/* #215: 連絡事項がある日は📌。予約の点（下）とぶつからないよう右上に置く */}
+                      {noticeDays?.has(d) && <i className="absolute top-0 right-0.5 text-[9px] not-italic leading-none">📌</i>}
                       {c.total > 0 && (
                         <i className={`absolute bottom-0.5 h-1 w-1 rounded-full ${sel ? "bg-white" : dayTone(c)}`} />
                       )}
@@ -211,12 +218,15 @@ export function MonthCalendar({
   counts,
   href,
   isClosed,
+  noticeDays,
 }: {
   month: string;
   today: string;
   counts: Map<string, DayCount>;
   href: CalendarHref;
   isClosed?: (date: string) => boolean;
+  /** 連絡事項がある日（#215） */
+  noticeDays?: Set<string>;
 }) {
   const weeks = monthGrid(month);
   return (
@@ -265,6 +275,7 @@ export function MonthCalendar({
                       >
                         {Number(d.slice(8))}
                         {closed && <span className="ml-1 text-[10px] font-normal text-(--color-dim)">定休</span>}
+                        {noticeDays?.has(d) && <span className="ml-1 text-[10px]" title="連絡事項あり">📌</span>}
                       </span>
                       {c.total > 0 && (
                         <span className="flex flex-wrap gap-0.5">

@@ -8,11 +8,13 @@ import {
   loadUnpaid,
   loadMonthCounts,
   loadCoaches,
+  loadCoachesOnDuty,
   loadMemberOptions,
   loadBookingDetail,
   loadLessonDetail,
   loadLiveSignature,
   loadLiveItems,
+  FRANK_STORE_ID,
   type BookingRow,
 } from "@/lib/frank-reservation";
 import {
@@ -44,7 +46,8 @@ import {
   type CalendarView,
 } from "@/components/month-picker";
 import { BookingDetailPanel, LessonDetailPanel } from "@/components/booking-detail";
-import { setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption } from "./actions";
+import { setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption, addNotice, removeNotice } from "./actions";
+import { loadNoticesFor, loadNoticeDays, noticeRangeLabel } from "@/lib/store-notices";
 import { BookingSheet } from "./booking-sheet";
 import { LiveRefresh } from "@/components/live-refresh";
 
@@ -101,16 +104,20 @@ export default async function ReservationsPage({
   const weekFrom = weekStart(date); // 週は日曜はじまり（Smart Helloと同じ）
   const days = mode === "week" ? Array.from({ length: 7 }, (_, i) => addDaysStr(weekFrom, i)) : [date];
 
-  const [dayViews, monthData, unpaidRows, coaches, memberOptions, detail, canGw, liveSig, liveItems] = await Promise.all([
+  const [dayViews, monthData, unpaidRows, coaches, onDuty, memberOptions, detail, canGw, liveSig, liveItems, notices, noticeDays] =
+    await Promise.all([
     Promise.all(days.map((d) => loadDay(d, actor.companyId))),
     loadMonthCounts(month, actor.companyId),
     loadUnpaid(actor.companyId),
     loadCoaches(actor.companyId),
+    loadCoachesOnDuty(date), // 担当プロは「その日いる人」だけ（#214）
     loadMemberOptions(actor.companyId), // 予約作成の会員検索（氏名でも引ける・#189）
     loadSelection(sp.sel ?? null, actor.companyId),
     canAccessGolfWing(actor),
     loadLiveSignature(actor.companyId), // 自動更新の判定（#197）
     loadLiveItems(actor.companyId), // 鳴った理由を1行で出す（#202）
+    loadNoticesFor(actor.companyId, FRANK_STORE_ID, date), // その日の連絡事項（#215）
+    loadNoticeDays(actor.companyId, FRANK_STORE_ID, month), // カレンダーの印（#215）
   ]);
 
   const dayView = dayViews.find((v) => v.date === date) ?? dayViews[0];
@@ -123,7 +130,24 @@ export default async function ReservationsPage({
 
   // 縦＝時間・横＝打席のタイムライン（#135）
   const gridSlots = dayView.hours ? genSlots(dayView.hours, step) : [];
-  const items = toTimelineItems(dayView.bookings, dayView.lessons);
+  // 担当コーチの名前を表に出す（#214）。id→名前は在籍スタッフ全員から引く（休みの人が担当でも名前は出す）
+  const coachNameById = new Map(coaches.map((c) => [c.id, c.name]));
+  const coachName = (id: string) => coachNameById.get(id) ?? "";
+  const items = toTimelineItems(dayView.bookings, dayView.lessons, coachName);
+
+  /**
+   * 担当プロの選択肢（#214）。その日の確定シフトに入っている人だけ出す。
+   * シフト未確定の日は全員から選べる（確定できずに詰まない）。
+   * すでに担当になっている人は、休みでも選択肢に残す（消えると誤って上書きしてしまう）。
+   */
+  const coachOptions = (b: { lesson_option_staff_id: string | null }) => {
+    const base = onDuty.scheduled
+      ? onDuty.coaches.map((c) => ({ id: c.id, name: `${c.name}（${c.from}〜${c.to}）` }))
+      : coaches.map((c) => ({ id: c.id, name: c.name }));
+    const cur = b.lesson_option_staff_id;
+    if (cur && !base.some((c) => c.id === cur)) base.unshift({ id: cur, name: `${coachName(cur)}（出勤予定なし）` });
+    return base;
+  };
   const bookableSlots = new Set(dayView.slots); // 予約を作れる開始時刻（表示粒度とは別）
 
   // 体験を入れられる開始時刻（毎時00分・約55分＝60分押さえ）。空きの有無はGenesis側が最終判定する
@@ -166,7 +190,7 @@ export default async function ReservationsPage({
 
   const calendar =
     mode === "month" ? (
-      <MonthCalendar month={month} today={today} counts={counts} href={href} isClosed={isClosed} />
+      <MonthCalendar month={month} today={today} counts={counts} href={href} isClosed={isClosed} noticeDays={noticeDays} />
     ) : mode === "week" ? (
       <WeekTimeline
         days={dayViews.map(toWeekDay)}
@@ -249,6 +273,74 @@ export default async function ReservationsPage({
         <span className="font-semibold text-(--color-txt)">来られなかった方だけ【無断欠】</span>を押してください（体験人数から外れます）。
       </p>
 
+      {/* 当日の連絡事項（#215）。シフトボードの申し送りにあたるもの。
+          朝6時のLINE（Genesis）も同じ表を読むので、ここに書けばそのまま朝の連絡になる */}
+      <section className="rounded-lg border border-(--color-line) bg-(--color-panel) px-3 py-2">
+        <div className="mb-1.5 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-bold">📌 連絡事項　<span className="text-xs font-normal text-(--color-dim)">{labelJa(date)}</span></h2>
+          <span className="text-xs text-(--color-dim)">翌朝6時のLINEにも流れます</span>
+        </div>
+
+        {notices.length === 0 ? (
+          <p className="text-xs text-(--color-dim)">この日の連絡事項はありません。</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {notices.map((n) => (
+              <li
+                key={n.id}
+                className={`flex items-start justify-between gap-3 rounded-lg border px-2.5 py-1.5 text-sm ${
+                  n.level === "warn"
+                    ? "border-amber-300 bg-amber-50 text-amber-900"
+                    : "border-(--color-line) bg-(--color-panel-2)"
+                }`}
+              >
+                <span className="whitespace-pre-wrap break-words">
+                  <span className="mr-2 rounded bg-white/70 px-1.5 py-0.5 text-[11px] font-bold tabular-nums">
+                    {noticeRangeLabel(n)}
+                  </span>
+                  {n.store_id === null ? <span className="mr-1 text-[11px] font-bold">【全店共通】</span> : null}
+                  {n.body}
+                </span>
+                <form action={removeNotice} className="shrink-0">
+                  <input type="hidden" name="id" value={n.id} />
+                  <input type="hidden" name="date" value={date} />
+                  <button className="text-xs text-(--color-dim) underline hover:text-red-500">下げる</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs font-semibold text-(--color-dim)">連絡事項を追加</summary>
+          <form action={addNotice} className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto]">
+            <input type="hidden" name="date" value={date} />
+            <input
+              name="body"
+              placeholder="例）本日15時から〇〇様のフィッティング。2Fは使えません"
+              className={inputCls}
+              maxLength={1000}
+              required
+            />
+            <Field label="開始">
+              <input type="date" name="date_from" defaultValue={date} className={inputCls} />
+            </Field>
+            <Field label="終了（同じなら1日だけ）">
+              <input type="date" name="date_to" defaultValue={date} className={inputCls} />
+            </Field>
+            <div className="flex items-end gap-3">
+              <label className="flex items-center gap-1 text-xs text-(--color-dim)">
+                <input type="checkbox" name="level" value="warn" /> 重要
+              </label>
+              <label className="flex items-center gap-1 text-xs text-(--color-dim)">
+                <input type="checkbox" name="all_stores" value="1" /> 全店
+              </label>
+              <button className={btnCls}>追加</button>
+            </div>
+          </form>
+        </details>
+      </section>
+
       {canGw && (
         <p className="text-right text-xs">
           <Link href="/dashboard?store=gw" className="text-(--color-dim) underline hover:text-(--color-txt)">
@@ -278,6 +370,7 @@ export default async function ReservationsPage({
               view={mode}
               counts={counts}
               isClosed={isClosed}
+              noticeDays={noticeDays}
             />
             <CalendarViewSwitch view={mode} step={step} date={date} href={href} />
             <div className="flex flex-col gap-1.5 text-xs">
@@ -407,12 +500,26 @@ export default async function ReservationsPage({
                         <span className="font-semibold">{who(b)}</span>
                       )}
                       {t?.lefty ? <Badge tone="warn">レフティ</Badge> : null}
-                      {b.lesson_option_status === "requested" ? <Badge tone="warn">パーソナル{b.lesson_option_minutes ?? 25}分 希望</Badge> : null}
+                      {/* #214: 担当コーチとチケットの有無を、開かなくても分かる位置に出す */}
+                      {b.lesson_option_status === "requested" ? (
+                        <Badge tone="warn">
+                          パーソナル{b.lesson_option_minutes ?? 25}分 希望
+                          {b.lesson_option_staff_id ? `／ご指名 ${coachName(b.lesson_option_staff_id)}` : ""}
+                        </Badge>
+                      ) : null}
                       {b.lesson_option_status === "confirmed" ? (
                         <Badge tone="ok">
                           パーソナル{b.lesson_option_minutes ?? 25}分
                           {b.lesson_option_start ? ` ${b.lesson_option_start.slice(0, 5)}〜` : ""}
+                          {b.lesson_option_staff_id ? `／${coachName(b.lesson_option_staff_id)}` : ""}
                         </Badge>
+                      ) : null}
+                      {b.lesson_option_status === "confirmed" ? (
+                        Number(b.lesson_option_fee ?? -1) === 0 ? (
+                          <Badge tone="ok">🎫 チケット1枚（当日精算なし）</Badge>
+                        ) : (
+                          <Badge tone="warn">当日精算 {yen(b.lesson_option_fee ?? 2500)}</Badge>
+                        )
                       ) : null}
                       {b.lesson_option_status === "declined" ? <Badge tone="default">パーソナル お断り</Badge> : null}
                       <span className="text-xs text-(--color-dim)">
@@ -475,7 +582,7 @@ export default async function ReservationsPage({
                         <Field label="担当プロ">
                           <select name="staff_id" defaultValue={b.lesson_option_staff_id ?? ""} className={inputCls}>
                             <option value="">選択してください</option>
-                            {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            {coachOptions(b).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                           </select>
                         </Field>
                         <Field label={`開始（${b.start_time.slice(0, 5)}〜${b.end_time.slice(0, 5)} の中で）`}>

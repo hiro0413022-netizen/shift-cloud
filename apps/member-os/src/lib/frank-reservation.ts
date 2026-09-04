@@ -480,6 +480,49 @@ export async function loadCoaches(companyId: string): Promise<{ id: string; name
 }
 
 /**
+ * その日の出勤コーチ（#213/#214）
+ *
+ * 担当プロの選択肢を「その日いる人」だけにする。全スタッフを並べると、
+ * 休みの人・他店の人を担当にしてしまい、会員様には確定として届く。
+ * 数に入れるのは会員ページの出勤予定に出している人（staff.member_page_role・#209）で、
+ * 会員ページのコーチ指名（Genesis側）と同じ名簿。
+ *
+ * scheduled=false は「その日のシフトがまだ確定していない」。
+ * このときは在籍スタッフ全員から選べるようにする（確定できずに詰むのを避ける）。
+ */
+export async function loadCoachesOnDuty(
+  dateStr: string,
+): Promise<{ scheduled: boolean; coaches: { id: string; name: string; from: string; to: string }[] }> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("shifts")
+    .select("staff_id, start_time, end_time, is_day_off, staff:staff_id(name, member_page_role)")
+    .eq("store_id", FRANK_STORE_ID)
+    .eq("date", dateStr)
+    .eq("status", "published")
+    .is("deleted_at", null)
+    .limit(50);
+  type Row = {
+    staff_id: string;
+    start_time: string | null;
+    end_time: string | null;
+    is_day_off: boolean | null;
+    staff: { name?: string | null; member_page_role?: string | null } | null;
+  };
+  const rows = ((data ?? []) as unknown as Row[]).filter((r) => String(r.staff?.member_page_role ?? "").trim() !== "");
+  if (rows.length === 0) return { scheduled: false, coaches: [] };
+  const coaches = rows
+    .filter((r) => !r.is_day_off && r.start_time && r.end_time)
+    .map((r) => ({
+      id: String(r.staff_id),
+      name: String(r.staff?.name ?? "").trim(),
+      from: String(r.start_time).slice(0, 5),
+      to: String(r.end_time).slice(0, 5),
+    }));
+  return { scheduled: true, coaches };
+}
+
+/**
  * 予約作成の会員指定に出す候補（#189）
  *
  * ユーザー依頼「スタッフがPCで予約を取るとき、会員番号だけでなく名前でも検索したい」。

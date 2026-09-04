@@ -6,6 +6,7 @@ import { bookableRange } from "@yozan/core/frank-booking";
 import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
 import { birthDateError, normalizeBirthDate } from "@yozan/core/birth-date";
 import { canTakeTrial, type Span } from "@yozan/core/frank-coach-capacity";
+import { loadCoachRoster, rosterCover } from "@/lib/frank-coach-roster";
 import { buildTrialConfirmMail, sendFrankMail } from "@/lib/frank-mail";
 
 /**
@@ -95,27 +96,7 @@ function pickBay(bays: Bay[], busy: Record<string, { s: number; e: number }[]>, 
  * 出す人と担当する人を1か所で管理するため、専用のフラグは増やしていない。
  */
 async function coachCover(admin: ReturnType<typeof createAdmin>, dateStr: string): Promise<Span[] | null> {
-  const { data } = await admin
-    .from("shifts")
-    .select("start_time, end_time, is_day_off, staff:staff_id(member_page_role)")
-    .eq("store_id", FRANK_STORE)
-    .eq("date", dateStr)
-    .eq("status", "published") // 確定したシフトだけ。下書きで受け入れを増やさない
-    .is("deleted_at", null)
-    .limit(50);
-
-  type Row = { start_time: string | null; end_time: string | null; is_day_off: boolean | null; staff: { member_page_role?: string | null } | null };
-  const rows = ((data ?? []) as unknown as Row[]).filter((r) => String(r.staff?.member_page_role ?? "").trim() !== "");
-  // コーチの行が1件も無い = その日はまだ決まっていない（休みの行があれば「決まっている」）
-  if (rows.length === 0) return null;
-
-  const cover: Span[] = [];
-  for (const r of rows) {
-    if (r.is_day_off) continue;
-    if (!r.start_time || !r.end_time) continue; // 業務区分（キャディ等）は終日扱いで時刻が無い＝店にいない
-    cover.push({ s: toMin(String(r.start_time)), e: toMin(String(r.end_time)) });
-  }
-  return cover;
+  return rosterCover(await loadCoachRoster(admin, dateStr));
 }
 
 /** その日すでに入っている体験の時間帯（キャンセル以外） */

@@ -377,7 +377,7 @@ export async function runDailyCeoReport(
   //    予約状況はSmart HelloにAPIが無く自動取得不可のため載せない（店頭のday-feed/店舗ダッシュボード参照を案内）。
   try {
     const ymd = jstYmd();
-    const [tasksRes, carryoverRes, shiftsRes, storesRes, staffRes] = await Promise.all([
+    const [tasksRes, carryoverRes, shiftsRes, storesRes, staffRes, noticesRes] = await Promise.all([
       admin
         .from("sp_tasks")
         .select("title, store_id, staff_id, status")
@@ -414,6 +414,18 @@ export async function runDailyCeoReport(
         return allowedStores ? q.in("id", storeInValues(allowedStores)) : q;
       })(),
       admin.from("staff").select("id, name").eq("company_id", companyId).is("deleted_at", null),
+      // 本日の連絡事項（#215）。店頭で書いた申し送りをそのまま朝のLINEに載せる。
+      // 期間の連絡は「今日が期間の中」なら毎朝出る（当日だけの連絡は date_from=date_to）
+      admin
+        .from("store_notices")
+        .select("store_id, body, level, date_from, date_to")
+        .eq("company_id", companyId)
+        .lte("date_from", ymd)
+        .gte("date_to", ymd)
+        .is("deleted_at", null)
+        .order("level", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(30),
     ]);
     const storeName = new Map((storesRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
     const staffName = new Map((staffRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
@@ -446,10 +458,25 @@ export async function runDailyCeoReport(
     const shifts = (shiftsRes.data ?? []).filter((sh) => inScope(sh.store_id));
     const tasksAll = (tasksRes.data ?? []).filter((t) => inScope(t.store_id));
     const carryAll = (carryoverRes.data ?? []).filter((t) => inScope(t.store_id));
+    const noticesAll = (noticesRes.data ?? []).filter((n) => inScope(n.store_id));
 
     /** その店舗ぶんの本文を組み立てる（他店の行は1行も入れない） */
     const buildBrief = (storeId: string) => {
       const lines: string[] = [`おはようございます。${today} の連絡です。`];
+
+      /* 本日の連絡事項（#215）
+         いちばん上に置く。出勤やタスクの下に埋めると、長い日はスクロールされずに読まれない。
+         全店共通（store_id が null）はどの店にも出す。 */
+      const notices = noticesAll.filter((n) => n.store_id == null || String(n.store_id) === storeId);
+      if (notices.length > 0) {
+        lines.push("", "▼本日の連絡事項");
+        for (const n of notices) {
+          const mark = String(n.level) === "warn" ? "【重要】" : "";
+          const common = n.store_id == null ? "【全店共通】" : "";
+          const body = String(n.body).replace(/\s*\n\s*/g, " ").trim();
+          lines.push(`・${mark}${common}${body}`);
+        }
+      }
 
       const mine = shifts.filter((sh) => String(sh.store_id ?? "") === storeId);
       if (mine.length > 0) {
@@ -488,7 +515,7 @@ export async function runDailyCeoReport(
       }
 
       lines.push("", "予約状況は店頭タブレットの店舗ダッシュボードで確認してください。", "気になる点があれば店長・本部まで。");
-      return { body: lines.join("\n"), shifts: mine.length, tasks: tasks.length, carry: carry.length };
+      return { body: lines.join("\n"), shifts: mine.length, tasks: tasks.length, carry: carry.length, notices: notices.length };
     };
 
     // 送り先＝スコープ内の店舗すべて（LINEグループの有無は次で分ける）
@@ -504,7 +531,7 @@ export async function runDailyCeoReport(
       await enqueueAction(admin, {
         companyId,
         actionType: "staff_directive",
-        title: `スタッフ朝連絡 ${today}｜${storeName.get(storeId) ?? ""}（出勤${b.shifts}名・タスク${b.tasks}件${b.carry > 0 ? `・持ち越し${b.carry}件` : ""}）`.slice(0, 200),
+        title: `スタッフ朝連絡 ${today}｜${storeName.get(storeId) ?? ""}（出勤${b.shifts}名・タスク${b.tasks}件${b.carry > 0 ? `・持ち越し${b.carry}件` : ""}${b.notices > 0 ? `・連絡${b.notices}件` : ""}）`.slice(0, 200),
         // store_id 指定＝その店舗のグループにだけ送る（sendStaffLine の絞り込み）
         payload: { body: b.body, store_id: storeId },
         originKind: "ceo_ai_daily",

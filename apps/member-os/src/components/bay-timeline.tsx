@@ -8,6 +8,8 @@ import {
   labelJa,
   TIMELINE_KINDS,
   TIMELINE_TONE,
+  LESSON_OPT_EDGE,
+  lessonBadge,
   toMin,
   type TimelineItem,
   type UnplacedReason,
@@ -46,6 +48,16 @@ function BlockBody({ item, span }: { item: TimelineItem; span: number }) {
         {item.alert ? <span title={item.alertNote}>⚠</span> : null}
         {item.title}
       </span>
+      {/* レッスン付きはここで見分ける（#214）。チケットは🎫、担当が決まっていれば名前まで */}
+      {item.lessonOpt ? (
+        <span
+          className={`block truncate text-[10px] font-bold leading-tight ${
+            item.lessonOpt === "requested" ? "text-amber-700" : "text-violet-700"
+          }`}
+        >
+          {lessonBadge(item)}
+        </span>
+      ) : null}
       {span >= 2 && item.sub ? (
         <span className="block truncate text-[10px] leading-tight opacity-70">{item.sub}</span>
       ) : null}
@@ -163,9 +175,9 @@ export function BayTimeline({
                     // 営業時間からはみ出しているブロックは角を落として「まだ続いている」ことを示す
                     const cut = `${cutTop ? "rounded-t-none " : ""}${cutBottom ? "rounded-b-none" : ""}`;
                     const sel = selectedId != null && selectedId === item.id;
-                    const cls = `flex h-full flex-col justify-start overflow-hidden rounded-md border px-1.5 py-1 ${TIMELINE_TONE[item.kind].block} ${cut} ${
-                      sel ? "ring-2 ring-accent ring-offset-1" : ""
-                    }`;
+                    const cls = `flex h-full flex-col justify-start overflow-hidden rounded-md border px-1.5 py-1 ${TIMELINE_TONE[item.kind].block} ${
+                      item.lessonOpt ? LESSON_OPT_EDGE[item.lessonOpt] : ""
+                    } ${cut} ${sel ? "ring-2 ring-accent ring-offset-1" : ""}`;
                     const title = `${timeRange(item)} ${item.title}${item.sub ? `（${item.sub}）` : ""}${item.alertNote ? ` ⚠${item.alertNote}` : ""}`;
                     const href = itemHref?.(item);
                     return (
@@ -251,6 +263,15 @@ export function TimelineLegend({ children }: { children?: ReactNode }) {
       <span className="flex items-center gap-1.5">
         <i className="inline-block h-3 w-3 rounded border border-dashed border-(--color-line) bg-(--color-panel-2)" />
         空き
+      </span>
+      {/* #214: レッスン付きは左端の縦線で分かる */}
+      <span className="flex items-center gap-1.5">
+        <i className="inline-block h-3 w-3 rounded border-l-4 border-l-violet-600 bg-(--color-panel-2)" />
+        レッスン確定（🎫＝チケット）
+      </span>
+      <span className="flex items-center gap-1.5">
+        <i className="inline-block h-3 w-3 rounded border-l-4 border-l-amber-500 bg-(--color-panel-2)" />
+        レッスン希望（未確定）
       </span>
       {children}
     </div>
@@ -377,8 +398,9 @@ export function WeekTimeline({
                               {it.start.slice(0, 5)} {it.title}
                             </Link>
                           ) : (
-                            <span key={it.id} className={chip} title={`${timeRange(it)} ${it.title}`}>
+                            <span key={it.id} className={`${chip} ${it.lessonOpt ? LESSON_OPT_EDGE[it.lessonOpt] : ""}`} title={`${timeRange(it)} ${it.title}${it.lessonOpt ? ` / ${lessonBadge(it)}` : ""}`}>
                               {it.start.slice(0, 5)} {it.title}
+                              {it.lessonOpt ? (it.lessonTicket ? " 🎫" : " ⛳") : ""}
                             </span>
                           );
                         })}
