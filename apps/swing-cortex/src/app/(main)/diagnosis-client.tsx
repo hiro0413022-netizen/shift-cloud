@@ -6,6 +6,7 @@ import { matchSymptoms } from "@/lib/coaching";
 import { draftComment, saveKarteDraft, type DraftResult } from "./ai-actions";
 import { saveNote, createStudent } from "./student-actions";
 import type { Student } from "@/lib/data";
+import { normalize, similarity } from "@/lib/jp-search";
 
 function Icon({ d, cls = "h-6 w-6" }: { d: string; cls?: string }) {
   return (
@@ -328,9 +329,34 @@ function StudentPicker({
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  const filtered = q
-    ? students.filter((s) => s.name.includes(q) || (s.nameKana ?? "").includes(q))
-    : students;
+  // 氏名のあいまい一致。症状検索と同じ normalize を通すので
+  // 「やまだ/ヤマダ/山田」「山田太郎/山田 太郎」「全角半角」の差を吸収する。
+  // 姓だけ・名だけでも引ける（部分一致を1.0で拾う）。会員番号も対象。
+  const filtered = (() => {
+    const query = q.trim();
+    if (!query) return students;
+    const nq = normalize(query);
+    if (!nq) return students;
+    const scored = students
+      .map((s) => {
+        const terms = [s.name, s.nameKana, s.memberCode];
+        let best = 0;
+        for (const t of terms) {
+          if (!t) continue;
+          // 部分一致（姓だけ／名だけ／番号の一部）を最優先
+          if (normalize(t).includes(nq)) {
+            best = 1;
+            break;
+          }
+          const v = similarity(query, t);
+          if (v > best) best = v;
+        }
+        return { s, best };
+      })
+      .filter((r) => r.best >= 0.7)
+      .sort((a, b) => b.best - a.best);
+    return scored.map((r) => r.s);
+  })();
 
   const add = async () => {
     if (!name.trim()) return;
@@ -365,7 +391,7 @@ function StudentPicker({
         ) : (
           <>
             <div className="px-5 pb-2">
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="氏名で検索" className="input-lite" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="氏名・カナ・会員番号で検索（姓だけでもOK）" className="input-lite" />
             </div>
             <div className="no-scrollbar flex-1 space-y-1 overflow-y-auto px-5 pb-3">
               {filtered.map((s) => (
@@ -379,9 +405,23 @@ function StudentPicker({
                   </span>
                   <span className="font-semibold text-slate-800">{s.name}</span>
                   {s.nameKana && <span className="text-[11px] text-slate-400">{s.nameKana}</span>}
+                  {s.memberCode && <span className="ml-auto text-[11px] text-slate-300">{s.memberCode}</span>}
                 </button>
               ))}
-              {filtered.length === 0 && <div className="py-6 text-center text-sm text-slate-400">該当なし</div>}
+              {filtered.length === 0 &&
+                (students.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-slate-400">
+                    まだ生徒が登録されていません。
+                    <br />
+                    下の「新しい生徒を登録」から追加してください。
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-sm text-slate-400">
+                    「{q}」に一致する生徒はいません。
+                    <br />
+                    姓だけ・カナ・会員番号でも探せます。
+                  </div>
+                ))}
             </div>
             <div className="border-t border-slate-100 px-5 py-3">
               <button onClick={() => setAdding(true)} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-100 py-3 text-sm font-bold text-slate-700">

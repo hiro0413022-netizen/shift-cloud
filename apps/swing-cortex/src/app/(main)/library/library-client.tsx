@@ -81,8 +81,10 @@ export default function LibraryClient({ tree }: { tree: DiagnosisResult[] }) {
           )}
         </div>
 
-        {/* カテゴリ絞り込みチップ（横スクロール） */}
-        <div className="no-scrollbar mt-2 flex gap-2 overflow-x-auto pb-1">
+        {/* カテゴリ絞り込みチップ。折り返して全件見せる
+            （横スクロール＋スクロールバー非表示にしていたため、
+             途中のカテゴリで終わっているように見えていた 2026-09-04） */}
+        <div className="mt-2 flex flex-wrap gap-2 pb-1">
           {cats.map((c) => (
             <button
               key={c}
