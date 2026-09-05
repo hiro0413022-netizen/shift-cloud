@@ -1460,3 +1460,19 @@
   **(f) 消すのではなく「下げる」。** `deleted_at` を入れるだけで行は残す（誰が何を伝えたかは後から辿れる）。
 
   実装: `supabase/migrations/0148_store_notices.sql`（新規・適用済）、`apps/member-os/src/lib/store-notices.ts`（新規）、`apps/member-os/src/app/(main)/reservations/{actions.ts, page.tsx}`、`apps/member-os/src/components/month-picker.tsx`、`apps/genesis/src/lib/ceo-ai.ts`。member-os / genesis の `tsc --noEmit` 通過・`next build` 成功・テスト617件通過。
+
+- #217 (2026-09-04) **カードを持ってきていない方の「後日決済」を、店舗のiPadから会員に紐づけて開けるようにした**（migrationなし）。ユーザー依頼「会員登録はできるんですけども、クレジットカードを持ってきてないなどの理由で後日決済になることがあります。後日決済のページに飛べるようにしてほしい。ホームページからの通常方法ではなく、店舗のiPadを使って会員情報と紐付いた決済ページに飛ぶように」。
+
+  **(a) お客様にHPの入会フォームをやり直させない。** これまで後日決済の入口が無く、やり直すと**申込がもう1件でき、会員番号も請求も二重になる**。既存の行に対して決済リンクを作る入口を、スタッフ画面（`/frunk` の承認待ち・`/frunk/[id]` のプラン・請求）に置いた。
+
+  **(b) リンクを作るのは Genesis のまま**（`/api/public/frank/join-checkout`・#129）。Squareのキーは Genesis にしか無く、**Web入会と同じ経路**を通る＝金額の計算（入会金・日割り・前取り月数・キャンペーン）も、入金Webhookでの会員化（`activateWebJoin`）も、既存のものがそのまま効く。member-os 側に金額計算を作らない（2か所に置くと必ずずれる）。
+
+  **(c) すでにカード登録済み（`billing_status='active'`）の人には作らない。** 二重契約を作らないため、member-os 側でも Genesis 側でも弾く。
+
+  **(d) 戻り先はスタッフのiPadの会員カード**（`/frunk/<id>?paid=1`）。お客様の手元に決済画面を残さない。反映は入金Webhook待ちなので、戻った画面に「数十秒で『自動課金 稼働中』に変わります」と書く（黙って待たせない）。
+
+  **(e) 作れなかったときは理由をその場で直せる言葉にする**（`joinCheckoutError`）。0円プラン・`square_variation_id` 未設定・退会済み・Squareが電話番号を断った（#208）を書き分ける。
+
+  **(f) 一覧に「決済未」バッジを足した。** 在籍しているのにカードのお支払いが未登録の方は、探さないと分からなかった＝**請求漏れはここでしか気づけない**。月会費0円のプラン（スタッフ・モニター）と、現金・振込・口座振替の方は対象から外す（催促する相手ではない）。判定は `tests/frank-pay-later.test.ts` で固定（5件）。
+
+  実装: `apps/member-os/src/app/(main)/frunk/{actions.ts, page.tsx, [id]/page.tsx}`、`tests/frank-pay-later.test.ts`（新規5件）。member-os の `tsc --noEmit` 通過・`next build` 成功・テスト622件通過。

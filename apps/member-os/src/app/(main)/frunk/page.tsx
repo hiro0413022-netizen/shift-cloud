@@ -14,7 +14,7 @@ import {
 } from "@/lib/frunk-member-search";
 import { jstYmd } from "@/lib/jst";
 import { monthEndLabel, monthFromLabel } from "@yozan/core/frank-membership";
-import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment } from "./actions";
+import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment, openJoinCheckout } from "./actions";
 import { joinPaymentView } from "@/lib/frunk-join-view";
 import { memberDisplayName } from "@yozan/core/frank-corporate";
 
@@ -76,6 +76,18 @@ export default async function FrunkPage({
   const planList = (plans ?? []) as Row[];
   const memberList = (members ?? []) as Row[];
   const planName = (id: unknown) => planList.find((p) => p.id === id)?.name as string | undefined;
+
+  /**
+   * 後日決済（#217）: 在籍しているのに、カードのお支払いがまだ登録されていない方。
+   * 月会費が0円のプラン（スタッフ・モニター）は請求が無いので対象にしない。
+   * 現金・振込・口座振替でお受けしている方も外す（催促する相手ではない）。
+   */
+  const payLater = (m: Row) => {
+    const plan = planList.find((p) => p.id === (m as Row).plan_id) as { monthly_price?: number | null } | undefined;
+    if (!plan || Number(plan.monthly_price ?? 0) <= 0) return false;
+    if (["cash", "bank", "sb_payment"].includes(String(m.payment_method ?? ""))) return false;
+    return String(m.billing_status ?? "none") !== "active";
+  };
 
   const pending = memberList.filter((m) => m.status === "pending");
   const counts = countByStatus(memberList as unknown as FrunkMemberLike[], [...STATUS_TABS]);
@@ -205,6 +217,12 @@ export default async function FrunkPage({
                         <form action={confirmJoinPayment}>
                           <input type="hidden" name="id" value={String(m.id)} />
                           <button className={btnGhostCls}>入金を確認して入会を確定</button>
+                        </form>
+                        {/* 後日決済（#217）: カードを持ってきていない方は、後日このiPadでお支払いいただく。
+                            HPの入会フォームからやり直させると申込が二重になるので、必ずこの入口を使う */}
+                        <form action={openJoinCheckout}>
+                          <input type="hidden" name="id" value={String(m.id)} />
+                          <button className={btnCls}>💳 このiPadで決済ページを開く</button>
                         </form>
                       </div>
                       <p className="mt-1 opacity-70">
@@ -351,6 +369,16 @@ export default async function FrunkPage({
                             title="キャンペーン入会・6か月継続の対象"
                           >
                             継続中
+                          </span>
+                        ) : null}
+                        {/* 後日決済（#217）: 在籍しているのにカードのお支払いが未登録の方。
+                            探さなくても一覧で分かるようにする（請求漏れはここでしか気づけない） */}
+                        {st === "active" && payLater(m as Row) ? (
+                          <span
+                            className="ml-1 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700"
+                            title="カードのお支払いが未登録です。会員カードから「このiPadで決済ページを開く」でお手続きできます"
+                          >
+                            決済未
                           </span>
                         ) : null}
                       </td>

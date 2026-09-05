@@ -36,6 +36,7 @@ import {
   receiveTicketPaid,
   grantTicketsManual,
   useTicketManual,
+  openJoinCheckout,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -74,7 +75,7 @@ export default async function FrunkMemberPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ err?: string; msg?: string }>;
+  searchParams: Promise<{ err?: string; msg?: string; paid?: string }>;
 }) {
   const actor = await requireReceptionActor();
   if (!canAccessFrank(actor)) notFound(); // 店舗またぎ廃止（#134）
@@ -279,6 +280,13 @@ export default async function FrunkMemberPage({
 
       {sp.err && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{sp.err}</p>}
       {sp.msg && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{sp.msg}</p>}
+      {/* 後日決済から戻ってきたとき（#217）。反映は入金Webhook待ちなので、その場の見え方まで書く */}
+      {sp.paid === "1" && (
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+          お支払いのお手続きが終わりました。カードの登録は数十秒で「自動課金 稼働中」に変わります。
+          変わらないときは、この画面を開き直すか、入会申込一覧の「Squareで入金を確認」をお使いください。
+        </p>
+      )}
 
       {/* 重要説明事項（カレンダーの⚠と同じもの） */}
       <Panel title="重要説明事項（入力するとカレンダーの予約に⚠が付きます）" className="d1">
@@ -425,7 +433,21 @@ export default async function FrunkMemberPage({
                 </form>
               </>
             ) : (
-              <Badge tone="default">未登録（店頭払い）</Badge>
+              <>
+                <Badge tone="default">未登録（店頭払い）</Badge>
+                {/* 後日決済（#217）。カードを持ってきていない方は、その場では登録できない。
+                    後日ご来店のときに **この会員の行に紐づいた決済ページ** をこのiPadで開く。
+                    HPの入会フォームからやり直すと申込が二重になるので、入口をここに置く。 */}
+                <form action={openJoinCheckout} className="mt-1">
+                  <input type="hidden" name="id" value={id} />
+                  <input type="hidden" name="back" value={back} />
+                  <button className={btnGhostCls}>💳 このiPadで決済ページを開く（後日決済）</button>
+                </form>
+                <p className="mt-1 text-xs text-(--color-dim)">
+                  お客様にこのiPadをお渡しして、カード情報をご入力いただきます。
+                  終わるとこの画面に戻ります（入金の反映まで数十秒かかることがあります）。
+                </p>
+              </>
             )}
           </Info>
           <Info label="キャンペーン">

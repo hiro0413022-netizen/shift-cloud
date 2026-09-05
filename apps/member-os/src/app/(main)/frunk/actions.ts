@@ -799,6 +799,88 @@ async function askGenesis(memberId: string, confirm: boolean): Promise<JoinPayme
   }
 }
 
+/**
+ * 後日決済（#217・2026-09-04 ユーザー依頼）
+ *
+ * 「入会の手続きはできたが、カードを持ってきていないので決済は後日」という方がいる。
+ * そのとき **お客様のスマホからHPの入会フォームをやり直させない**——やり直すと
+ * 申込がもう1件できて、会員番号も請求も二重になる。
+ *
+ * ここは店舗のiPadから **その会員の行に紐づいた決済ページ** を開くだけ。
+ * リンクを作るのは Genesis（Squareのキーはあちらにしか無い・#129）で、
+ * Web入会とまったく同じ `/api/public/frank/join-checkout` を通る＝
+ * 金額の計算（入会金・日割り・キャンペーン）も、入金後の会員化も既存のまま動く。
+ *
+ * ★ すでにカード登録済み（billing_status='active'）の人には作らない＝二重契約を作らない。
+ * ★ 戻り先は今開いている画面（このiPad）。お客様の画面ではなくスタッフの画面に戻す。
+ */
+export async function openJoinCheckout(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  // 他店・他社の会員の決済リンクを作らせない（#134）
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("id, name, status, billing_status")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("対象の会員が見つかりません"));
+  if (String(m.billing_status) === "active") {
+    redirect(`${dest}?msg=` + encodeURIComponent("この方はすでにカードのお支払いが登録されています（二重には作りません）。"));
+  }
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  // 決済が終わったらこのiPadの会員カードに戻す（お客様の手元に画面を残さない）
+  const backUrl = `${proto}://${host}/frunk/${id}?paid=1`;
+
+  let out: { ok?: boolean; url?: string; error?: string } = {};
+  try {
+    const res = await fetch(`${GENESIS_URL}/api/public/frank/join-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ member_id: id, redirect_url: backUrl }),
+      cache: "no-store",
+    });
+    out = (await res.json().catch(() => ({}))) as typeof out;
+  } catch (e) {
+    console.error("[frunk] join-checkout failed:", e);
+    out = { ok: false, error: "network" };
+  }
+
+  await logAudit(actor, "frunk.join_checkout.open", "frunk_members", id, null, {
+    ok: !!out.ok,
+    error: out.error ?? null,
+  });
+
+  if (!out.ok || !out.url) {
+    redirect(`${dest}?err=` + encodeURIComponent(joinCheckoutError(out.error)));
+  }
+  // Squareの決済ページへ（このiPadの画面がそのままお客様の入力画面になる）
+  redirect(String(out.url));
+}
+
+/** 決済リンクを作れなかった理由を、その場で直せる言葉にする（[[alerts-must-be-fixable]]） */
+function joinCheckoutError(code?: string): string {
+  const c = String(code ?? "");
+  if (c === "already_active") return "この方はすでにカードのお支払いが登録されています。";
+  if (c === "plan_free") return "このプランは月会費が0円か、Squareの商品が未設定のため決済ページを作れません（プラン設定の square_variation_id をご確認ください）。";
+  if (c === "invalid_status") return "退会・却下された方には決済ページを作れません。";
+  if (c === "member_not_found") return "対象の会員が見つかりません。";
+  if (c === "square_env_missing") return "Squareの設定が未登録のため決済ページを作れません。";
+  if (c === "network") return "決済ページの発行に失敗しました（通信）。もう一度お試しください。";
+  if (c.startsWith("checkout_failed")) {
+    return `Squareが決済ページの発行を断りました（${c.replace("checkout_failed: ", "")}）。メールアドレスと電話番号（携帯は11桁）をご確認ください。`;
+  }
+  return "決済ページを作れませんでした。時間をおいてお試しください。";
+}
+
 /** Squareの入金を照会して結果を表示するだけ（何も書き換えない） */
 export async function checkJoinPayment(formData: FormData) {
   const actor = await requireFrankActor();
