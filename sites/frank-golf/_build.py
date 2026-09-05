@@ -113,7 +113,13 @@ def jsonld_business():
             {"@type": "LocationFeatureSpecification", "name": "ゴルフシミュレーター（全3打席／4打席目は増設予定）", "value": True},
             {"@type": "LocationFeatureSpecification", "name": "レフティ左右打席対応", "value": True},
         ],
-        # TODO(確定後): "telephone", "geo"{lat,lng}, "sameAs"[SNS], "image"[実写]。定休日=毎週火曜。
+        # 電話・SNSは2026-09-05に確定（site-data.js と同じ値をここにも置く＝検索結果に出る側）
+        "telephone": "+81-79-260-6671",
+        "sameAs": [
+            "https://www.instagram.com/frank_golf_himeji",
+            "https://lin.ee/yp2leQU",
+        ],
+        # TODO(確定後): "geo"{lat,lng}, "image"[実写]。定休日=毎週火曜。
     }
     if SITE_URL:
         d["url"] = SITE_URL
@@ -364,6 +370,12 @@ def foot():
         <p class="foot__about" style="margin-top:14px">
           <span data-frank="store.address">近日公開</span><br>
           TEL <a data-tel>近日公開</a>
+        </p>
+        <!-- SNS導線（#218・2026-09-05）。お問い合わせがLINEしか無く、写真を見たい人の行き先が無かった -->
+        <p class="foot__about" style="margin-top:10px">
+          <a href="#" data-cta="line">公式LINE</a>
+          ／
+          <a data-link="links.instagram" target="_blank" rel="noopener">Instagram</a>
         </p>
       </div>
       <div class="foot__nav">
@@ -2362,7 +2374,8 @@ def build_tokushoho():
       <div class="spec__row"><p class="spec__k">販売事業者</p><p class="spec__v" data-frank="store.company">株式会社YOZAN</p></div>
       <div class="spec__row"><p class="spec__k">運営統括責任者</p><p class="spec__v">古川 博庸</p></div>
       <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide></span><span data-frank="store.address">兵庫県姫路市土山6-6-1</span>（FRANK GOLF）</p></div>
-      <div class="spec__row"><p class="spec__k">電話番号・メールアドレス</p><p class="spec__v">お取引・サービスに関するお問い合わせは<a href="#" data-cta="line" style="color:var(--brass-2)">公式LINE</a>にて承ります。電話番号・メールアドレスは、ご請求をいただければ遅滞なく開示いたします。</p></div>
+      <div class="spec__row"><p class="spec__k">電話番号</p><p class="spec__v"><a data-tel>近日公開</a>（営業時間内）</p></div>
+      <div class="spec__row"><p class="spec__k">メールアドレス</p><p class="spec__v">お取引・サービスに関するお問い合わせは<a href="#" data-cta="line" style="color:var(--brass-2)">公式LINE</a>にて承ります。メールアドレスは、ご請求をいただければ遅滞なく開示いたします。</p></div>
       <div class="spec__row"><p class="spec__k">販売価格</p><p class="spec__v">各会員プランの月会費は<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に記載のとおりです（表示は税抜・別途消費税がかかります）。体験レッスンは通常3,300円（税込）、キャンペーン期間中は無料です。</p></div>
       <div class="spec__row"><p class="spec__k">商品代金以外の必要料金</p><p class="spec__v">消費税。Webサイトのご利用にかかる通信費はお客様のご負担となります。</p></div>
       <div class="spec__row"><p class="spec__k">支払方法</p><p class="spec__v">クレジットカード（毎月の自動決済）、口座振替、または店頭でのお支払い</p></div>

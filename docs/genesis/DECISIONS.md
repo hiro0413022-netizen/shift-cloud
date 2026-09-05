@@ -1476,3 +1476,45 @@
   **(f) 一覧に「決済未」バッジを足した。** 在籍しているのにカードのお支払いが未登録の方は、探さないと分からなかった＝**請求漏れはここでしか気づけない**。月会費0円のプラン（スタッフ・モニター）と、現金・振込・口座振替の方は対象から外す（催促する相手ではない）。判定は `tests/frank-pay-later.test.ts` で固定（5件）。
 
   実装: `apps/member-os/src/app/(main)/frunk/{actions.ts, page.tsx, [id]/page.tsx}`、`tests/frank-pay-later.test.ts`（新規5件）。member-os の `tsc --noEmit` 通過・`next build` 成功・テスト622件通過。
+
+- #218 (2026-09-05) **公式サイトに電話番号・公式LINE・Instagramを載せた**（migrationなし）。ユーザー報告「ホームページに電話番号が載っていない／公式LINEに飛べる／Instagramに飛べる」。
+
+  **(a) 値は `assets/site-data.js` の1か所だけ**（`store.tel` / `links.line` / `links.instagram`）。`site.js` が `[data-tel]`・`[data-cta="line"]`・`[data-link="links.instagram"]` を全ページで差し替えるので、**ここを直せば全ページに反映**される（ビルドも不要）。null のままだと「近日公開」と出る設計で、電話は開業から3日間ずっとそれだった。
+
+  **(b) 手書きの2ページ（`booking.html` / `lesson-booking.html`）にも同じフッターを入れた。** この2つは `_build.py` の生成対象外で、フッターがコピーで持たれている。片方だけ直すと**予約ページからだけSNSに行けない**——気づけない差になる。
+
+  **(c) 特商法ページの「電話番号は請求があれば開示」を実際の番号に差し替えた。** 番号がある以上、請求を待たせる理由がない。
+
+  **(d) 構造化データ（JSON-LD）にも `telephone` と `sameAs`（Instagram・LINE）を入れた。** 検索結果の店舗情報から直接電話できる。確定した事実だけを載せる方針は維持（住所の緯度経度と実写画像はまだ TODO のまま）。
+
+  実装: `sites/frank-golf/assets/site-data.js`、`sites/frank-golf/_build.py`、`sites/frank-golf/{booking,lesson-booking}.html` ＋ 再ビルドした19ページ。
+
+- #219 (2026-09-05) **体験の詳細に生年月日を出した**（migrationなし）。ユーザー依頼「体験の詳細画面に生年月日を反映して欲しい」。申込時に伺っている（#190・migration 0137）のに、**予約詳細にも体験一覧にも出していなかった**ので、カウンセリングや入会手続きのたびに聞き直していた。予約詳細（`booking-detail.tsx`）は `DETAIL_COLS` に `birth_date` が入っていなかったのが原因で、体験一覧（`/trials`）は `select("*")` なので表示を足すだけ。実装: `apps/member-os/src/lib/frank-reservation.ts`、`apps/member-os/src/components/booking-detail.tsx`、`apps/member-os/src/app/(main)/trials/page.tsx`。
+
+- #220 (2026-09-05) **利用時間を過ぎた在店を自動で「退店」にした**（migrationなし）。ユーザー報告「利用時間が過ぎても退店にならない」。
+
+  **(a) 原因。** チェックイン（QR・店頭・打席）は `frunk_checkins` に行を作るが、**退店は電子伝票の【退店】を押したときだけ** `checked_out_at` が入る（#164）。押し忘れると在店のまま残る。一方、**お客様のスマホ側は #163 の判定で来店中を閉じていた**（`visitClosed`・DBには書かない設計）。結果、**画面では帰った人が、DBでは在店**という食い違いが常態化していた。
+
+  **(b) その判定をそのままDBにも書くようにした**（予約ありは終了+30分、予約なしはチェックイン+2時間）。ルールは `@yozan/core/frank-portal` の1か所のままなので、会員のスマホ・店頭・DBが同じ答えになる。**新しい規則は作っていない**——増やすと必ずどれかがずれる。
+
+  **(c) スタッフが押した退店は上書きしない**（`checked_out_at is null` の行だけ）。前日以前の在店は時刻が取れなくても閉じる（日付が変われば在店ではない）。10分ごとのcronと日次cronの両方から呼ぶ（#205と同じ二重の保険）。
+
+  実装: `apps/genesis/src/lib/frank-visit-cron.ts`（`runFrankAutoCheckout`）、`apps/genesis/src/app/api/cron/{execute,daily}/route.ts`。
+
+- #221 (2026-09-05) **レッスンチケットの付与を見つけられるようにした**（migrationなし）。ユーザー報告「メンバーOSからチケット付与設定（が見つからない）」。**機能はあった**（会員カードの「レッスンチケット」パネル・#199）が、会員カードを開くまで存在が分からず、誰に何枚あるかは1人ずつ開かないと見えなかった。会員一覧に **🎫列**（残枚数／0枚なら「付与」リンク）を足し、押すとその会員のチケット欄に直接飛ぶようにした（`Panel` に `id` を足してアンカーにした）。残枚数はまとめて1回で数える（`ticketBalances`・会員数ぶんの往復を作らない）。実装: `packages/core/src/frank-lesson-tickets.ts`、`apps/member-os/src/app/(main)/frunk/page.tsx`、`apps/member-os/src/app/(main)/frunk/[id]/page.tsx`、`apps/member-os/src/components/ui.tsx`。
+
+- #222 (2026-09-05) **月会費・入会金の領収書を会員カードからPDFで出せるようにした**（migrationなし）。ユーザー依頼「月会費の領収書を出したい／明日の14:00 レギュラー2ヶ月分」。
+
+  **(a) 電子交付にした。** 5万円以上の領収書は紙だと収入印紙が要る（印紙税法）。**電子データで交付すれば課税文書に当たらない**ので、法人の年払い（13万円台の実例あり）でも印紙が不要になる。新しいタブでPDFを開き、その場で見せる／保存する／印刷するのどれでも渡せる。
+
+  **(b) 金額を人が打ち込む欄を作らなかった。** 選べるのは「どの入金ぶんか」だけで、金額は `mon_sales`（Squareの入金Webhookが書いた行）から取る＝**受け取っていない金額の領収書は作れない**。税込は `tax_included`、内消費税は10%で切り捨て（受領額を上回る税額を書かない）。
+
+  **(c) 適格請求書の登録番号は載せない。** 未取得のまま「適格」の体裁にすると、受け取った側の仕入税額控除で問題になる。
+
+  **(d) PDFの生成だけ Genesis に置いた**（日本語フォントと pdf-lib があちらにしかない）。ただし **URLを知っただけでは作れない**——member-os がスタッフ権限で内容を確定し、**HMAC署名（有効5分・鍵は両アプリが持つ service_role キー）**を付けて呼ぶ。新しい環境変数は増やしていない。金額を1文字でも書き換えると署名が合わない（テストで固定）。
+
+  **(e) 領収書番号は入金の組み合わせから決まる**ので、再発行しても同じ番号になる（二重発行を「別の領収書」に見せない）。
+
+  実装: `packages/core/src/admin-sign.ts`（新規）・`packages/core/package.json`、`apps/genesis/src/lib/frank-receipt-pdf.ts`（新規）、`apps/genesis/src/app/api/public/frank/admin/receipt/route.ts`（新規）、`apps/genesis/next.config.ts`、`apps/member-os/src/lib/frank-receipt{,-pure}.ts`（新規）、`apps/member-os/src/app/(main)/frunk/[id]/receipt/route.ts`（新規）、`apps/member-os/src/app/(main)/frunk/[id]/page.tsx`、`tests/frank-receipt.test.ts`（新規5件）。
+
+- #223 (2026-09-05) **小西様の重複会員（FR0012）を整理した**（コード変更なし・SQLのみ）。ユーザー指示「12番小西さん削除」。9/4にWeb入会（FR0012・未入金）→ 9/5にもう一度Web入会（FR0019・入金済）となっていた。**#217 で塞いだ「決済できずにフォームをやり直す」導線が、塞ぐ前に実際に起きていた事例**。FR0019 に寄せる形で、9/5の来店実績（予約1件）を付け替え、FR0012 側の重複キャンペーンチケットを無効化し、FR0012 を削除扱い（`status='rejected'` + `deleted_at`、理由をメモに残す）にした。**行は消さずに残す**——会員番号を振り直すと過去の伝票と合わなくなる。

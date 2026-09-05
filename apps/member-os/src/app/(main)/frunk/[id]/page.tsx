@@ -23,6 +23,7 @@ import {
 } from "@yozan/core/frank-membership";
 import { corporateSpec, corporateSeats, memberDisplayName, openSlots, slotUsageLabel } from "@yozan/core/frank-corporate";
 import { ticketBalance, listTickets, ticketRowLabel } from "@yozan/core/frank-lesson-tickets";
+import { loadMemberSales, saleLabel } from "@/lib/frank-receipt";
 import {
   setMemberStatus,
   changePlan,
@@ -230,6 +231,9 @@ export default async function FrunkMemberPage({
   ]);
   const ticketPending = ticketRows.filter((t) => t.status === "pending_payment");
 
+  // 領収書（#222）。金額はここで読んだ入金の行からしか作れない（人が打ち込む欄は無い）
+  const sales = await loadMemberSales(id, actor.companyId);
+
   const status = String(m.status ?? "");
   const inMinTerm = m.min_term_until != null && String(m.min_term_until) > today;
   const back = `/frunk/${id}`;
@@ -304,8 +308,9 @@ export default async function FrunkMemberPage({
         </form>
       </Panel>
 
-      {/* レッスンチケット（#199）。お支払い待ちはここで受領する */}
-      <Panel title={`レッスンチケット（パーソナル25分）　残り ${ticketCount} 枚`} className="d1">
+      {/* レッスンチケット（#199）。お支払い待ちはここで受領する。
+          #221: 一覧の🎫からここへ飛べるよう id を付けた（「付与がどこにあるか分からない」への対応） */}
+      <Panel id="tickets" title={`🎫 レッスンチケット（付与・購入受付）　残り ${ticketCount} 枚`} className="d1">
         {ticketPending.length > 0 && (
           <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
             <p className="text-sm font-semibold text-amber-800">店頭でのお支払い待ち</p>
@@ -575,6 +580,51 @@ export default async function FrunkMemberPage({
           </div>
         </Panel>
       </div>
+
+      {/* 領収書（#222）。5万円以上でも電子交付なら収入印紙が要らない＝紙で出さない */}
+      <Panel id="receipt" title="🧾 領収書（月会費・入会金）" className="d2">
+        {sales.length === 0 ? (
+          <p className="text-sm text-(--color-dim)">
+            カードでの入金がまだ記録されていません。現金・振込でお受けした分はここには出ません。
+          </p>
+        ) : (
+          <form action={`/frunk/${id}/receipt`} method="get" target="_blank" className="space-y-3">
+            <div className="space-y-1.5">
+              {sales.map((sale, i) => (
+                <label
+                  key={sale.id}
+                  className="flex items-center gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm"
+                >
+                  <input type="checkbox" name="sale" value={sale.id} defaultChecked={i === 0} />
+                  <span className="tabular-nums text-(--color-dim)">{sale.sold_on.replaceAll("-", "/")}</span>
+                  <span className="flex-1">{saleLabel(sale, plan?.name ? String(plan.name) : null)}</span>
+                  <span className="font-semibold tabular-nums">{yen(sale.amount_inc_tax)}</span>
+                </label>
+              ))}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Field label="宛名（空欄ならお名前）">
+                <input
+                  name="to_name"
+                  placeholder={`${String(m.company_name || m.name || "")} 様`}
+                  className={inputCls}
+                  maxLength={80}
+                />
+              </Field>
+              <Field label="但し書き（空欄なら「月会費として」）">
+                <input name="note" placeholder="月会費として" className={inputCls} maxLength={80} />
+              </Field>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button className={btnCls}>領収書を開く（PDF）</button>
+              <span className="text-xs text-(--color-dim)">
+                新しいタブで開きます。そのままお見せする・保存する・印刷する、のどれでもお使いいただけます。
+                電子交付のため収入印紙は不要です。
+              </span>
+            </div>
+          </form>
+        )}
+      </Panel>
 
       {/* ===== 法人プラン（#195） =====
           契約者の会員カードにご利用者を並べる。人は入れ替わるので、店頭で足したり外したりできる。

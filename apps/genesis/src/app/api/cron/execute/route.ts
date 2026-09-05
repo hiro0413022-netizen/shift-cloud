@@ -3,7 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { runDueActions } from "@/lib/ai-execution";
 import { publishDueContent } from "@/lib/content-loop";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
-import { runFrankAutoVisited } from "@/lib/frank-visit-cron";
+import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cron";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -39,5 +39,9 @@ export async function GET(req: NextRequest) {
      10分ごとに回るこのtickに乗せることで、**レッスンが終われば最大10分で来店になる**
      （翌朝までのタイムラグを作らない）。会社ループの外＝1回だけ。 */
   const frankVisited = await runFrankAutoVisited().catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, results, frankVisited });
+  /* FRANK: 利用時間を過ぎた在店を自動で「退店」にする（#220）。
+     【退店】の押し忘れで来店中が残り続けていた。お客様のスマホ側は同じ規則で
+     すでに閉じているので、DBを画面に合わせる。 */
+  const frankCheckout = await runFrankAutoCheckout().catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ok: true, results, frankVisited, frankCheckout });
 }

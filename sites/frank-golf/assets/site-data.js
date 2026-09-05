@@ -31,7 +31,7 @@ window.FRANK = {
     mapUrl: "https://www.google.com/maps/search/?api=1&query=%E5%85%B5%E5%BA%AB%E7%9C%8C%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1",  // ★Googleマップ
     // ★埋め込み地図。hl=ja を付けないと地名がローマ字（Tsuchiyama / 6 CHOME）で出る
     mapEmbed: "https://maps.google.com/maps?q=%E5%85%B5%E5%BA%AB%E7%9C%8C%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1&hl=ja&z=16&output=embed",
-    tel: null,                     // 例: "079-000-0000"（確定後）
+    tel: "079-260-6671",           // ★確定（2026-09-05）。ヘッダー・フッター・特商法・JSON-LDに自動反映
     email: null,
     hours: "平日 10:00〜22:00 ／ 土日祝 9:00〜20:00",  // ★確定（2026-08-07 更新）
     holiday: "毎週火曜日",          // ★確定
@@ -156,7 +156,7 @@ window.FRANK = {
     trialForm: null,
 
     // ★公式LINE（未設定の間はボタンが「近日公開」表示になります）
-    line: null,           // 例: "https://lin.ee/xxxxxxx"
+    line: "https://lin.ee/yp2leQU",   // ★確定（2026-09-05）
 
     // 会員向け（member-os / 稼働中）
     // ★会員ログインは「会員番号＋電話番号下4桁」。打席予約(booking.html)と同じ frunk_members を見ます。
@@ -168,7 +168,7 @@ window.FRANK = {
     memberBooking:  "booking.html",
     memberHome:     "https://my.frankgolf.jp/member",
 
-    instagram: null,
+    instagram: "https://www.instagram.com/frank_golf_himeji",  // ★確定（2026-09-05）
     youtube: null,
   },
 

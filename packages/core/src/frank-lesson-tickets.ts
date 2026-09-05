@@ -75,6 +75,30 @@ export async function ticketBalance(adminClient: SupabaseAdminLike, memberId: st
   return (data ?? []).reduce((n, r) => n + Number(r.qty ?? 0), 0);
 }
 
+/**
+ * 会員ごとの残枚数をまとめて返す（#221）。
+ *
+ * 会員一覧に残枚数を出すため。1人ずつ ticketBalance を呼ぶと会員数ぶんの往復になるので、
+ * 台帳を1回読んで数える（合計の出し方は ticketBalance と同じ＝画面ごとに違う数にならない）。
+ */
+export async function ticketBalances(adminClient: SupabaseAdminLike, memberIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (memberIds.length === 0) return out;
+  const { data } = await db(adminClient)
+    .from("frunk_lesson_tickets")
+    .select("member_id, qty")
+    .in("member_id", memberIds)
+    .eq("status", "granted")
+    .is("deleted_at", null)
+    .limit(5000);
+  for (const r of data ?? []) {
+    const id = String(r.member_id ?? "");
+    if (!id) continue;
+    out.set(id, (out.get(id) ?? 0) + Number(r.qty ?? 0));
+  }
+  return out;
+}
+
 /** お支払い待ちの枚数（会員画面の「店頭でお支払いください」表示に使う）。 */
 export async function pendingTicketCount(adminClient: SupabaseAdminLike, memberId: string): Promise<number> {
   const { data } = await db(adminClient)

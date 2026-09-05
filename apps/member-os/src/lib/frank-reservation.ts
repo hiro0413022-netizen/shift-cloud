@@ -106,6 +106,8 @@ export type BookingDetail = BookingRow & {
         id: string;
         name_kana: string | null;
         email: string | null;
+        /** 生年月日（#219）。申込時に伺っている（#190）ので、店頭で聞き直さない */
+        birth_date: string | null;
         status: string;
         source: string | null;
       })
@@ -119,7 +121,7 @@ const DETAIL_COLS =
   LESSON_OPT_COLS +
   "frunk_members(id, name, name_kana, member_no, alert_note, company_name, corporate_parent_id, corporate_self_use, phone, email, status, frunk_plans(name, is_corporate, max_users, max_open_slots, companion_free)), " +
   "frunk_bays(name, floor, equipment, is_lefty), " +
-  "mbr_trial_requests(id, name, name_kana, phone, email, lefty, experience, message, status, source)";
+  "mbr_trial_requests(id, name, name_kana, phone, email, birth_date, lefty, experience, message, status, source)";
 
 /** 予約1件を引く。会社＋FRANK店舗で必ず絞る（#134）。見つからなければ null */
 export async function loadBookingDetail(id: string, companyId: string): Promise<BookingDetail | null> {

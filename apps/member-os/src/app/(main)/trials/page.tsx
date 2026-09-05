@@ -78,7 +78,13 @@ export default async function TrialsPage() {
                       <Badge tone={TRIAL_STATUS_TONE[st] ?? "default"}>{TRIAL_STATUS_LABEL[st] ?? st}</Badge>
                     </div>
                     <div className="mt-1 text-sm text-(--color-dim)">
-                      {[r.phone && `TEL ${String(r.phone)}`, r.email && String(r.email), r.experience && String(r.experience)]
+                      {/* 生年月日（#219）: 体験カウンセリングと会員登録で毎回聞き直していた。申込時に伺っている（#190） */}
+                  {[
+                    r.phone && `TEL ${String(r.phone)}`,
+                    r.email && String(r.email),
+                    r.birth_date && `生年月日 ${String(r.birth_date).replace(/-/g, "/")}`,
+                    r.experience && String(r.experience),
+                  ]
                         .filter(Boolean)
                         .join("　")}
                     </div>

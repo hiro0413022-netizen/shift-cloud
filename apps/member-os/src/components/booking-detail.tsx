@@ -163,7 +163,9 @@ export function BookingDetailPanel({
           </div>
         </div>
 
-        {t?.experience ? <Row label="ゴルフ歴">{t.experience}</Row> : null}
+        {/* 生年月日（#219）。体験→入会のときに聞き直さないで済むよう、詳細に出す */}
+      {t?.birth_date ? <Row label="生年月日">{String(t.birth_date).replace(/-/g, "/")}</Row> : null}
+      {t?.experience ? <Row label="ゴルフ歴">{t.experience}</Row> : null}
         {t?.message ? <Row label="ご要望">{t.message}</Row> : null}
         {b.note ? <Row label="備考">{b.note}</Row> : null}
 

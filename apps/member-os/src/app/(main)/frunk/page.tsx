@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, FRANK_STORE_ID } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
+import { ticketBalances } from "@yozan/core/frank-lesson-tickets";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import {
@@ -75,6 +76,11 @@ export default async function FrunkPage({
 
   const planList = (plans ?? []) as Row[];
   const memberList = (members ?? []) as Row[];
+  // チケット残枚数（#221）。一覧に出さないと「誰に何枚あるか」が会員カードを1枚ずつ開くまで分からない
+  const ticketMap = await ticketBalances(
+    admin,
+    memberList.map((m) => String(m.id)),
+  );
   const planName = (id: unknown) => planList.find((p) => p.id === id)?.name as string | undefined;
 
   /**
@@ -342,6 +348,7 @@ export default async function FrunkPage({
                   <th className="px-2 py-2 font-medium">お名前</th>
                   <th className="px-2 py-2 font-medium">プラン</th>
                   <th className="px-2 py-2 font-medium">状態</th>
+                  <th className="px-2 py-2 font-medium">🎫</th>
                   <th className="px-2 py-2 font-medium">入会日</th>
                   <th className="px-2 py-2 font-medium">連絡先</th>
                   <th className="px-2 py-2 font-medium">⚠</th>
@@ -381,6 +388,18 @@ export default async function FrunkPage({
                             決済未
                           </span>
                         ) : null}
+                      </td>
+                      {/* チケット残（#221）。数字を押すと会員カードのチケット欄（付与・購入受付）に飛ぶ */}
+                      <td className="px-2 py-2 tabular-nums">
+                        {(ticketMap.get(String(m.id)) ?? 0) > 0 ? (
+                          <Link href={`/frunk/${m.id}#tickets`} className="font-semibold text-(--color-gold) underline">
+                            {ticketMap.get(String(m.id))}枚
+                          </Link>
+                        ) : (
+                          <Link href={`/frunk/${m.id}#tickets`} className="text-(--color-dim) underline">
+                            付与
+                          </Link>
+                        )}
                       </td>
                       <td className="px-2 py-2 tabular-nums text-(--color-dim)">{m.join_date ?? "—"}</td>
                       <td className="px-2 py-2 text-xs text-(--color-dim)">

@@ -3,9 +3,9 @@ import { CountUp } from "./count-up";
 
 /** Genesis共通UIプリミティブ（DECISIONS #10と同方針の自作最小セット） */
 
-export function Panel({ title, children, action, className = "" }: { title?: string; children: ReactNode; action?: ReactNode; className?: string }) {
+export function Panel({ title, children, action, className = "", id }: { title?: string; children: ReactNode; action?: ReactNode; className?: string; /** アンカー（一覧から特定のパネルへ飛ぶ・#221） */ id?: string }) {
   return (
-    <section className={`hud reveal rounded-2xl border border-(--color-line) bg-(--color-panel) p-5 ${className}`}>
+    <section id={id} className={`hud reveal scroll-mt-24 rounded-2xl border border-(--color-line) bg-(--color-panel) p-5 ${className}`}>
       {(title || action) && (
         <div className="mb-4 flex items-center justify-between gap-3">
           {title && (

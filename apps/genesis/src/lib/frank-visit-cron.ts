@@ -2,6 +2,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { jstYmd } from "@/lib/jst";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import { logEvent } from "@/lib/kernel";
+import { visitClosed, hhmmToMin, VISIT_GRACE_MIN, VISIT_NO_BOOKING_MIN } from "@yozan/core/frank-portal";
 
 /**
  * FRANK GOLF: 終わった予約を自動で「来店」にする（#205・2026-09-03 ユーザー指示
@@ -97,4 +98,78 @@ export async function runFrankAutoVisited(): Promise<Record<string, unknown>> {
   });
 
   return { date: today, now: nowHm, visited: list.length, trials };
+}
+
+
+/**
+ * FRANK GOLF: 利用時間を過ぎた在店を自動で「退店」にする（#220・2026-09-05 ユーザー報告
+ * 「利用時間が過ぎても退店にならない」）
+ *
+ * ★ 何が起きていたか
+ *   チェックイン（QR・店頭・打席）は `frunk_checkins` に行を作るが、**退店は電子伝票の
+ *   【退店】を押したときだけ** `checked_out_at` が入る（#164）。押し忘れると
+ *   「来店中」に残り続け、翌日以降も一覧に出る。
+ *   お客様のスマホ側は #163 の判定（`visitClosed`）で来店中を閉じているので、
+ *   **画面では帰った人が、DBでは在店のまま**という食い違いになっていた。
+ *
+ * ★ 直し方
+ *   その判定（予約があれば終了+30分、無ければチェックイン+2時間）を**そのままDBにも書く**。
+ *   ルールは `@yozan/core/frank-portal` の1か所のまま＝会員のスマホと店頭で食い違わない。
+ *
+ * ★ スタッフが押した退店は上書きしない（`checked_out_at is null` の行だけ）。
+ *   前日以前の在店は、時刻が取れなくても閉じる（日付が変われば在店ではない）。
+ */
+export async function runFrankAutoCheckout(): Promise<Record<string, unknown>> {
+  const admin = createAdmin();
+  const today = jstYmd();
+  const nowIso = new Date().toISOString();
+  const jstNow = new Date(Date.now() + 9 * 3600 * 1000);
+  const nowMin = jstNow.getUTCHours() * 60 + jstNow.getUTCMinutes();
+
+  const { data: rows } = await admin
+    .from("frunk_checkins")
+    .select("id, company_id, visited_on, checked_in_at, booking_id, frunk_bookings(end_time)")
+    .lte("visited_on", today)
+    .is("checked_out_at", null)
+    .is("deleted_at", null)
+    .order("visited_on", { ascending: true })
+    .limit(300);
+
+  type Row = {
+    id: string;
+    company_id: string;
+    visited_on: string;
+    checked_in_at: string | null;
+    frunk_bookings: { end_time: string | null } | null;
+  };
+  const list = ((rows ?? []) as unknown as Row[]).filter((r) => {
+    // 前日以前は無条件で閉じる（日付が変わっている＝もう在店ではない）
+    if (r.visited_on < today) return true;
+    const endMin = hhmmToMin(r.frunk_bookings?.end_time ?? null);
+    const inMin = r.checked_in_at
+      ? (() => {
+          const d = new Date(new Date(r.checked_in_at).getTime() + 9 * 3600 * 1000);
+          return d.getUTCHours() * 60 + d.getUTCMinutes();
+        })()
+      : null;
+    return visitClosed({ nowMin, endMin, checkedInMin: inMin });
+  });
+  if (list.length === 0) return { date: today, checkedOut: 0 };
+
+  await admin
+    .from("frunk_checkins")
+    .update({ checked_out_at: nowIso })
+    .in("id", list.map((r) => r.id))
+    .is("checked_out_at", null); // スタッフが押した退店は上書きしない
+
+  await logEvent(String(list[0].company_id), {
+    event_type: "frank.checkin.auto_checkout",
+    title: `FRANK: 利用時間を過ぎた在店 ${list.length}件を退店にしました`,
+    description: `予約ありは終了+${VISIT_GRACE_MIN}分、予約なしはチェックイン+${VISIT_NO_BOOKING_MIN}分で自動退店します（#220）`,
+    source: "cron",
+    source_type: "system",
+    severity: "info",
+  });
+
+  return { date: today, checkedOut: list.length };
 }
