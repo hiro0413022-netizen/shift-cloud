@@ -599,6 +599,35 @@ export async function recordPayment(formData: FormData) {
 }
 
 /**
+ * 予約の担当コーチを決める（#224・2026-09-05 ユーザー依頼
+ * 「パーソナルレッスンだけでなく、担当コーチの選択ができるようにしてほしい」）
+ *
+ * ★ レッスンの担当（lesson_option_staff_id）とは別に持つ。
+ *   レッスンを断っても担当は残る／担当を替えてもレッスン料の扱いは動かない、を保つため（0149）。
+ * ★ 選べるのはその日の確定シフトに入っている人だけ——にはしていない。
+ *   店頭では「今日は急きょ◯◯が見る」が起きるので、**スタッフの操作は縛らない**。
+ *   縛るのはお客様が選ぶ側（会員ページ・#224）だけにする。
+ */
+export async function setBookingCoach(formData: FormData) {
+  const actor = await requireReceptionActor();
+  await requireStoreAccess(actor, FRANK_STORE_ID);
+  const admin = createAdmin();
+  const id = str(formData.get("id"));
+  const date = str(formData.get("date"));
+  const staffId = str(formData.get("coach_staff_id"));
+  if (!id) return back(date);
+
+  const { error } = await admin
+    .from("frunk_bookings")
+    .update({ coach_staff_id: staffId || null, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("store_id", FRANK_STORE_ID);
+  if (error) refuse(date, id, `担当を保存できませんでした: ${error.message}`);
+  await logAudit(actor, "frank.booking.coach", "frunk_bookings", id, null, { coach_staff_id: staffId || null });
+  return back(date);
+}
+
+/**
  * 打席予約に付いた「パーソナルレッスン25分」の希望を確定する（0136 / 2026-09-01）
  *
  * お客様側では担当プロも時間も選ばせない（当日のシフト次第のため）。

@@ -1518,3 +1518,29 @@
   実装: `packages/core/src/admin-sign.ts`（新規）・`packages/core/package.json`、`apps/genesis/src/lib/frank-receipt-pdf.ts`（新規）、`apps/genesis/src/app/api/public/frank/admin/receipt/route.ts`（新規）、`apps/genesis/next.config.ts`、`apps/member-os/src/lib/frank-receipt{,-pure}.ts`（新規）、`apps/member-os/src/app/(main)/frunk/[id]/receipt/route.ts`（新規）、`apps/member-os/src/app/(main)/frunk/[id]/page.tsx`、`tests/frank-receipt.test.ts`（新規5件）。
 
 - #223 (2026-09-05) **小西様の重複会員（FR0012）を整理した**（コード変更なし・SQLのみ）。ユーザー指示「12番小西さん削除」。9/4にWeb入会（FR0012・未入金）→ 9/5にもう一度Web入会（FR0019・入金済）となっていた。**#217 で塞いだ「決済できずにフォームをやり直す」導線が、塞ぐ前に実際に起きていた事例**。FR0019 に寄せる形で、9/5の来店実績（予約1件）を付け替え、FR0012 側の重複キャンペーンチケットを無効化し、FR0012 を削除扱い（`status='rejected'` + `deleted_at`、理由をメモに残す）にした。**行は消さずに残す**——会員番号を振り直すと過去の伝票と合わなくなる。
+
+- #224 (2026-09-05) **予約に「担当コーチ」を持たせ、レッスンの有無に関わらず指名できるようにした**（migration 0149適用済）。ユーザー依頼「パーソナルレッスンだけでなく、担当コーチの選択ができるようにしてほしい」。
+
+  **(a) `lesson_option_staff_id`（0136）を使い回さなかった。** あちらは「25分パーソナルを誰が教えるか」で、確定するとチケットや料金と結びつく。担当コーチは「その打席のときに見る人」で、レッスンが無くても付く。同じ列に入れると、**レッスンをお断りしたときに担当まで消える／担当を替えるとレッスン料の扱いが動く**——別々に動くべきものが連動する。新しい列 `frunk_bookings.coach_staff_id` を足した。
+
+  **(b) お客様が選べる条件は、レッスンのときと同じ**（`coachesForLesson`＝選んだ時間に25分ぶん一緒にいられる確定シフトの人）。条件を2つに分けると「レッスンでは選べるのに担当では選べない人」が出て、説明できなくなる。
+
+  **(c) スタッフ側は出勤者に絞らない。** 店頭は「今日は急きょ◯◯が見る」が起きる。**縛るのはお客様が選ぶ側だけ**にして、店の運用を止めない。すでに担当になっている人は選択肢に残す。
+
+  **(d) レッスンのご指名があれば担当も同じ人にする**（画面に2つの担当が出ない）。予約表のブロック・一覧のバッジ・予約詳細に「担当 ◯◯」を出す。
+
+  実装: `supabase/migrations/0149_frank_booking_coach.sql`（新規・適用済）、`apps/genesis/src/lib/frank-booking.ts`、`apps/genesis/src/app/api/public/frank/booking/route.ts`、`apps/member-os/src/app/member/book/book-client.tsx`、`apps/member-os/src/app/(main)/reservations/{actions.ts, page.tsx}`、`apps/member-os/src/lib/{frank-reservation.ts, bay-timeline-pure.ts}`、`apps/member-os/src/components/{bay-timeline.tsx, booking-detail.tsx}`。
+
+- #225 (2026-09-05) **パーソナルレッスンの同時受入数を、その時間のコーチ人数までにした**（migrationなし）。ユーザー依頼「パーソナル シフト変動制 予約件数上限」＝**上限をシフトに連動**させる。
+
+  **(a) これまで上限が無かった。** ご指名の場合だけ「その人が出勤しているか」を見ていて（#213）、**おまかせは何件でも通っていた**。コーチ1人の時間に3件たまり、店頭で2件お断りする——という形が残っていた。
+
+  **(b) 体験（#212）と同じ考え方にした。** 受入数＝その時間に25分ぶん一緒にいられるコーチの人数、使用数＝重なっているレッスン付き予約（**ご希望・確定の両方／おまかせも数える**）。
+
+  **(c) まだ確定していない予約はレッスンの開始時刻が決まっていない**（店舗が後で決める）ので、**打席の予約時間まるごと**を占有として数える——実際に取り合いになる単位はここ。
+
+  **(d) 画面と受付の両方に同じ判定を置いた**（`canTakeLesson`）。満席の時間はチェックボックスを押せなくし、**「打席のご予約はこのままお取りいただけます」**と書く（予約ごと諦めさせない）。シフト未確定の日は体験と同じ2件まで。
+
+  実装: `packages/core/src/frank-coach-capacity.ts`、`apps/genesis/src/lib/frank-booking.ts`、`apps/member-os/src/app/member/book/book-client.tsx`、`tests/frank-coach-capacity.test.ts`（+5件）。member-os / genesis の `tsc --noEmit` 通過・`next build` 成功・テスト632件通過。
+
+  なお同時に依頼のあった「レッスンOSのパーソナル設定欄」は、ユーザー判断で**作らない**（2026-09-05）。

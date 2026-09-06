@@ -79,11 +79,14 @@ export function BookingDetailPanel({
   date,
   canEdit = true,
   bays = [],
+  coachName,
 }: {
   b: BookingDetail;
   backHref: string;
   date: string;
   canEdit?: boolean;
+  /** 担当コーチのidから名前を引く（#224） */
+  coachName?: (staffId: string) => string;
   /** 打席の選択肢。渡すと「日時・打席を変更」フォームが出る（#151） */
   bays?: Array<{ id: string; name: string }>;
 }) {
@@ -163,7 +166,9 @@ export function BookingDetailPanel({
           </div>
         </div>
 
-        {/* 生年月日（#219）。体験→入会のときに聞き直さないで済むよう、詳細に出す */}
+        {/* 担当コーチ（#224）。会員様がご指名された場合もここに出る */}
+      {b.coach_staff_id ? <Row label="担当コーチ">{coachName ? coachName(String(b.coach_staff_id)) : "指名あり"}</Row> : null}
+      {/* 生年月日（#219）。体験→入会のときに聞き直さないで済むよう、詳細に出す */}
       {t?.birth_date ? <Row label="生年月日">{String(t.birth_date).replace(/-/g, "/")}</Row> : null}
       {t?.experience ? <Row label="ゴルフ歴">{t.experience}</Row> : null}
         {t?.message ? <Row label="ご要望">{t.message}</Row> : null}

@@ -71,6 +71,8 @@ export type TimelineItem = {
   lessonCoach: string;
   /** レッスンの開始時刻 "HH:MM"（確定時のみ） */
   lessonStart: string;
+  /** 担当コーチ名（#224・レッスンが無くても付く） */
+  coachName: string;
 };
 
 /** ブロックの表示用時刻「10:00-10:55」 */
@@ -94,6 +96,8 @@ export type BookingLike = {
   party_size: number | null;
   frunk_members: { name: string; alert_note: string | null } | null;
   mbr_trial_requests: { name: string; lefty: boolean } | null;
+  /** 担当コーチ（#224） */
+  coach_staff_id?: string | null;
   /** 25分パーソナル（0136）。#214 で表にも出すようにした */
   lesson_option_status?: string | null;
   lesson_option_staff_id?: string | null;
@@ -151,6 +155,7 @@ export function bookingToItem(b: BookingLike, coachName?: (staffId: string) => s
     // チケットで承ったぶんは料金0で保存している（#199）
     lessonTicket: st === "confirmed" && Number(b.lesson_option_fee ?? -1) === 0,
     lessonCoach: b.lesson_option_staff_id && coachName ? coachName(String(b.lesson_option_staff_id)) : "",
+    coachName: b.coach_staff_id && coachName ? coachName(String(b.coach_staff_id)) : "",
     lessonStart: st === "confirmed" && b.lesson_option_start ? String(b.lesson_option_start).slice(0, 5) : "",
   };
 }
@@ -170,6 +175,7 @@ export function lessonToItem(l: LessonLike): TimelineItem {
     lessonTicket: false,
     lessonCoach: "",
     lessonStart: "",
+    coachName: l.staff?.name ?? "",
   };
 }
 

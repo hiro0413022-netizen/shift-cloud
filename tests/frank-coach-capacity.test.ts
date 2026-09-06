@@ -70,3 +70,46 @@ test("すでに上限を超えている時間帯は、増やさないだけで�
   assert.equal(trialsAt(already, t.s, t.e), 3);
   assert.equal(canTakeTrial(cover, already, t.s, t.e), false);
 });
+
+// ---------------------------------------------------------------
+// パーソナルレッスンの同時受入（#225）
+// ---------------------------------------------------------------
+import { canTakeLesson, lessonCapacity } from "@yozan/core/frank-coach-capacity";
+
+/** 打席予約1件ぶん（レッスンは打席時間の中で行うので、取り合いの単位は打席時間） */
+const bay = (a: string, mins = 60) => ({ s: hm(a), e: hm(a) + mins });
+
+test("レッスンの受入数はその時間のコーチ人数（#225）", () => {
+  const coaches = [span("09:45", "18:45"), span("13:15", "22:15")];
+  const b = bay("14:00");
+  assert.equal(lessonCapacity(coaches, b.s, b.e, 25), 2);
+  assert.equal(canTakeLesson(coaches, [], b.s, b.e, 25), true);
+  assert.equal(canTakeLesson(coaches, [bay("14:00")], b.s, b.e, 25), true);
+  // おまかせも数える＝2件入っていれば3件目は受けない
+  assert.equal(canTakeLesson(coaches, [bay("14:00"), bay("14:00")], b.s, b.e, 25), false);
+});
+
+test("コーチ1人の時間は1件まで", () => {
+  const coaches = [span("09:45", "18:45")];
+  const b = bay("10:00");
+  assert.equal(lessonCapacity(coaches, b.s, b.e, 25), 1);
+  assert.equal(canTakeLesson(coaches, [bay("10:00")], b.s, b.e, 25), false);
+});
+
+test("2時間の打席予約でも、25分ぶん重なるコーチは数に入る", () => {
+  const coaches = [span("13:15", "22:15")];
+  const b = bay("12:00", 120); // 12:00-14:00（13:15から45分重なる）
+  assert.equal(lessonCapacity(coaches, b.s, b.e, 25), 1);
+});
+
+test("重ならない時間のレッスンは使用数に数えない", () => {
+  const coaches = [span("09:45", "18:45")];
+  const b = bay("14:00");
+  assert.equal(canTakeLesson(coaches, [bay("10:00"), bay("16:00")], b.s, b.e, 25), true);
+});
+
+test("シフト未確定の日は2件まで（体験と同じ扱い）", () => {
+  const b = bay("14:00");
+  assert.equal(lessonCapacity(null, b.s, b.e, 25), NO_SHIFT_CAPACITY);
+  assert.equal(canTakeLesson(null, [bay("14:00"), bay("14:00")], b.s, b.e, 25), false);
+});

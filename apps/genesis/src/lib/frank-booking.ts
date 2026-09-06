@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { loadCoachRoster } from "@/lib/frank-coach-roster";
-import { coachesForLesson } from "@yozan/core/frank-coach-capacity";
+import { coachesForLesson, canTakeLesson, type Span } from "@yozan/core/frank-coach-capacity";
 import { logEvent } from "@/lib/kernel";
 import {
   FRANK_STORE_ID,
@@ -173,14 +173,26 @@ export async function getSlots(dateStr: string) {
 
   const { data: bookings } = await admin
     .from("frunk_bookings")
-    .select("bay_id, start_time, end_time")
+    .select("bay_id, start_time, end_time, lesson_option_status")
     .eq("booked_date", dateStr)
     // 来店済み・無断欠も枠は使われている。空くのは cancelled だけ（0084）
     .neq("status", "cancelled")
     .is("deleted_at", null);
 
-  // コーチの指名（#213）。出勤していない人を選ばせないため、その日の確定シフトを渡す
-  const roster = lesson.enabled ? await loadCoachRoster(admin, dateStr) : { scheduled: false, coaches: [] };
+  // コーチの指名（#213/#224）。出勤していない人を選ばせないため、その日の確定シフトを渡す
+  const roster = await loadCoachRoster(admin, dateStr);
+
+  /**
+   * すでにレッスン付きで入っている予約の時間帯（#225）。
+   * 画面が「この時間はもうレッスンを受けられない」を自分で判定できるようにする。
+   * 確定前は開始時刻が決まっていないので、打席の予約時間まるごとを占有として渡す。
+   */
+  const lessonTaken: Span[] = ((bookings ?? []) as Array<Record<string, unknown>>)
+    .filter((b) => {
+      const st = String(b.lesson_option_status ?? "");
+      return st === "requested" || st === "confirmed";
+    })
+    .map((b) => ({ s: toMin(String(b.start_time)), e: toMin(String(b.end_time)) }));
 
   // レッスン枠（#88 §3-4）: プロが打席指定で公開した枠は打席予約から除外
   const lessonSlots = await lessonBaySlots(admin, dateStr);
@@ -212,6 +224,12 @@ export async function getSlots(dateStr: string) {
      * シフト未確定の日は空配列＝「おまかせ」だけになる（指名させてから断らない）。
      */
     coaches: roster.coaches.map((c) => ({ id: c.id, name: c.name, from: toTime(c.s), to: toTime(c.e) })),
+    /** シフトが確定している日か（false＝未確定。画面は指名を出さない・#213） */
+    coaches_scheduled: roster.scheduled,
+    /** すでにレッスンが入っている時間帯（#225）。画面はこれとコーチ人数で満席を判定する */
+    lesson_taken: lessonTaken.map((x) => ({ start: toTime(x.s), end: toTime(x.e) })),
+    /** レッスン1件が占める分数（判定に使う） */
+    lesson_minutes: lesson.minutes,
   };
 }
 
@@ -226,6 +244,8 @@ export async function createBooking(input: {
   lesson?: boolean;
   /** ご指名のコーチ（#213）。空＝おまかせ。出勤していない人は受け付けない */
   lessonStaffId?: string | null;
+  /** 担当コーチのご指名（#224）。レッスンの有無に関わらず付けられる */
+  coachStaffId?: string | null;
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const admin = createAdmin();
   const member = await authMember(admin, input.auth);
@@ -367,12 +387,56 @@ export async function createBooking(input: {
    * 画面が出す一覧と同じ条件をサーバーでも確かめる＝出勤していない人を指名して確定させない。
    * 指名なし（おまかせ）はこれまでどおり店舗が担当を決める。
    */
+  const wantsCoach = Boolean(input.coachStaffId || input.lessonStaffId);
+  const roster = wantsCoach || wantsLesson ? await loadCoachRoster(admin, input.date) : null;
+  const onDuty = roster
+    ? coachesForLesson(roster.coaches, startMin, endMin, lesson.minutes).map((c) => c.id)
+    : [];
+
   let lessonStaffId: string | null = null;
   if (wantsLesson && input.lessonStaffId) {
-    const roster = await loadCoachRoster(admin, input.date);
-    const ok = coachesForLesson(roster.coaches, startMin, endMin, lesson.minutes).some((c) => c.id === input.lessonStaffId);
-    if (!ok) return { ok: false, error: "ご指名のコーチはその時間の出勤予定がありません。別のコーチかおまかせをお選びください。" };
+    if (!onDuty.includes(String(input.lessonStaffId))) {
+      return { ok: false, error: "ご指名のコーチはその時間の出勤予定がありません。別のコーチかおまかせをお選びください。" };
+    }
     lessonStaffId = String(input.lessonStaffId);
+  }
+
+  /** 担当コーチのご指名（#224）。レッスンが無くても付く。判定はレッスンと同じ名簿・同じ条件 */
+  let coachStaffId: string | null = null;
+  if (input.coachStaffId) {
+    if (!onDuty.includes(String(input.coachStaffId))) {
+      return { ok: false, error: "ご指名のコーチはその時間の出勤予定がありません。別のコーチかおまかせをお選びください。" };
+    }
+    coachStaffId = String(input.coachStaffId);
+  }
+  // レッスンのご指名があれば、担当も同じ人にしておく（画面に2つの担当が出ない）
+  if (!coachStaffId && lessonStaffId) coachStaffId = lessonStaffId;
+
+  /**
+   * レッスンの同時受入数はその時間のコーチ人数まで（#225）。
+   * ご指名なし（おまかせ）も数える——数えないとコーチ1人の時間に何件でも積み上がり、
+   * 店頭で断ることになる。すでに入っている予約は動かさない（増やさないだけ）。
+   */
+  if (wantsLesson) {
+    const { data: sameDay } = await admin
+      .from("frunk_bookings")
+      .select("start_time, end_time, lesson_option_status")
+      .eq("booked_date", input.date)
+      .neq("status", "cancelled")
+      .is("deleted_at", null)
+      .in("lesson_option_status", ["requested", "confirmed"])
+      .limit(100);
+    const taken = ((sameDay ?? []) as Array<{ start_time: string; end_time: string }>).map((b) => ({
+      s: toMin(String(b.start_time)),
+      e: toMin(String(b.end_time)),
+    }));
+    const cover = roster && roster.scheduled ? roster.coaches.map((c) => ({ s: c.s, e: c.e })) : null;
+    if (!canTakeLesson(cover, taken, startMin, endMin, lesson.minutes)) {
+      return {
+        ok: false,
+        error: "その時間はパーソナルレッスンの受付がいっぱいです。打席のご予約はそのまま、レッスンのチェックを外してお進みください。",
+      };
+    }
   }
 
   const { data: bay } = await admin
@@ -412,6 +476,7 @@ export async function createBooking(input: {
       end_time: toTime(endMin),
       status: "confirmed",
       source: "web",
+      coach_staff_id: coachStaffId,
       ...(wantsLesson
         ? {
             lesson_option_status: "requested",

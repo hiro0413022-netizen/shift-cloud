@@ -60,3 +60,34 @@ export function coachesForLesson<T extends Span>(coaches: T[], s: number, e: num
   const need = Math.max(1, lessonMinutes);
   return coaches.filter((c) => overlapMinutes(c, s, e) >= need);
 }
+
+
+/**
+ * パーソナルレッスン（25分）を、その時間にもう1件受けられるか（#225）
+ *
+ * ユーザー依頼「パーソナル シフト変動制 予約件数上限」＝**上限をシフトのコーチ人数に連動**させる。
+ * 体験（#212）と同じ考え方だが、数えるものが違う:
+ *   ・受入数 = その時間に25分ぶん一緒にいられるコーチの人数
+ *   ・使用数 = 同じ時間に重なっている**レッスン付きの打席予約**（ご希望・確定の両方）
+ *
+ * ★ 「おまかせ」も数える。指名なしの申込を数えないと、
+ *   コーチ1人の時間に「おまかせ」が3件たまり、店頭で2件断ることになる。
+ * ★ まだ確定していない予約は、レッスンの開始時刻が決まっていない（店舗が後で決める）。
+ *   なので**打席の予約時間まるごと**を占有として扱う——これが実際に取り合いになる単位。
+ * ★ シフト未確定の日は体験と同じ2件まで（NO_SHIFT_CAPACITY）。
+ *   0にすると、シフトを組む前の申込が全部止まる。
+ */
+export function lessonCapacity(coaches: Span[] | null, s: number, e: number, lessonMinutes: number): number {
+  if (coaches === null) return NO_SHIFT_CAPACITY;
+  return coachesForLesson(coaches, s, e, lessonMinutes).length;
+}
+
+export function canTakeLesson(
+  coaches: Span[] | null,
+  taken: Span[],
+  s: number,
+  e: number,
+  lessonMinutes: number,
+): boolean {
+  return trialsAt(taken, s, e) < lessonCapacity(coaches, s, e, lessonMinutes);
+}

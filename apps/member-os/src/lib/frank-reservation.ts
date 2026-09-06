@@ -53,6 +53,8 @@ export type BookingRow = {
   payment_method: string | null;
   member_id: string | null;
   trial_request_id: string | null;
+  /** 担当コーチ（ご指名・#224）。レッスンの有無に関わらず付く */
+  coach_staff_id: string | null;
   /** 打席予約に付いた25分パーソナルレッスン（0136）。null=希望なし */
   lesson_option_status: string | null;
   lesson_option_staff_id: string | null;
@@ -80,7 +82,7 @@ const LESSON_OPT_COLS =
 
 const BOOKING_COLS =
   "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, " +
-  "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
+  "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, coach_staff_id, " +
   LESSON_OPT_COLS +
   "frunk_members(name, member_no, alert_note, company_name), frunk_bays(name), " +
   "mbr_trial_requests(name, phone, lefty, experience, message)";
@@ -117,7 +119,7 @@ export type BookingDetail = BookingRow & {
 
 const DETAIL_COLS =
   "id, bay_id, booked_date, start_time, end_time, status, customer_kind, guest_name, guest_phone, party_size, note, source, created_at, " +
-  "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, " +
+  "amount, paid_amount, payment_status, payment_method, member_id, trial_request_id, coach_staff_id, " +
   LESSON_OPT_COLS +
   "frunk_members(id, name, name_kana, member_no, alert_note, company_name, corporate_parent_id, corporate_self_use, phone, email, status, frunk_plans(name, is_corporate, max_users, max_open_slots, companion_free)), " +
   "frunk_bays(name, floor, equipment, is_lefty), " +

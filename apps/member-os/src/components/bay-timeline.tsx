@@ -58,6 +58,10 @@ function BlockBody({ item, span }: { item: TimelineItem; span: number }) {
           {lessonBadge(item)}
         </span>
       ) : null}
+      {/* 担当コーチ（#224）。レッスンの行に名前が出ているときは重ねない */}
+      {item.coachName && !item.lessonCoach ? (
+        <span className="block truncate text-[10px] leading-tight text-(--color-dim)">担当 {item.coachName}</span>
+      ) : null}
       {span >= 2 && item.sub ? (
         <span className="block truncate text-[10px] leading-tight opacity-70">{item.sub}</span>
       ) : null}

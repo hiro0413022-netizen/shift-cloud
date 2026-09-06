@@ -46,7 +46,7 @@ import {
   type CalendarView,
 } from "@/components/month-picker";
 import { BookingDetailPanel, LessonDetailPanel } from "@/components/booking-detail";
-import { setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption, addNotice, removeNotice } from "./actions";
+import { setBookingStatus, deleteBooking, recordPayment, updateBooking, setLessonOption, setBookingCoach, addNotice, removeNotice } from "./actions";
 import { loadNoticesFor, loadNoticeDays, noticeRangeLabel } from "@/lib/store-notices";
 import { BookingSheet } from "./booking-sheet";
 import { LiveRefresh } from "@/components/live-refresh";
@@ -140,11 +140,11 @@ export default async function ReservationsPage({
    * シフト未確定の日は全員から選べる（確定できずに詰まない）。
    * すでに担当になっている人は、休みでも選択肢に残す（消えると誤って上書きしてしまう）。
    */
-  const coachOptions = (b: { lesson_option_staff_id: string | null }) => {
+  const coachOptions = (b: { lesson_option_staff_id?: string | null; coach_staff_id?: string | null }) => {
     const base = onDuty.scheduled
       ? onDuty.coaches.map((c) => ({ id: c.id, name: `${c.name}（${c.from}〜${c.to}）` }))
       : coaches.map((c) => ({ id: c.id, name: c.name }));
-    const cur = b.lesson_option_staff_id;
+    const cur = b.lesson_option_staff_id ?? b.coach_staff_id ?? null;
     if (cur && !base.some((c) => c.id === cur)) base.unshift({ id: cur, name: `${coachName(cur)}（出勤予定なし）` });
     return base;
   };
@@ -389,6 +389,7 @@ export default async function ReservationsPage({
                     backHref={href({})}
                     date={detail.booking.booked_date}
                     bays={bays.map((x) => ({ id: x.id, name: x.name }))}
+                    coachName={coachName}
                   />
                 ) : (
                   <LessonDetailPanel l={detail.lesson} backHref={href({})} />
@@ -500,6 +501,8 @@ export default async function ReservationsPage({
                         <span className="font-semibold">{who(b)}</span>
                       )}
                       {t?.lefty ? <Badge tone="warn">レフティ</Badge> : null}
+                      {/* 担当コーチ（#224）。レッスンが無い予約にも付く */}
+                      {b.coach_staff_id ? <Badge tone="accent">担当 {coachName(b.coach_staff_id)}</Badge> : null}
                       {/* #214: 担当コーチとチケットの有無を、開かなくても分かる位置に出す */}
                       {b.lesson_option_status === "requested" ? (
                         <Badge tone="warn">
@@ -615,6 +618,23 @@ export default async function ReservationsPage({
                       </div>
                     </details>
                   ) : null}
+
+                  {/* 担当コーチ（#224）。レッスンの担当とは別に、その予約を見る人を決める。
+                      店頭は当日の入れ替わりがあるので、スタッフ側は出勤者に絞らない */}
+                  <form action={setBookingCoach} className="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="id" value={b.id} />
+                    <input type="hidden" name="date" value={date} />
+                    <span className="text-xs text-(--color-dim)">担当コーチ</span>
+                    <select name="coach_staff_id" defaultValue={b.coach_staff_id ?? ""} className={`${inputCls} !w-auto !py-1`}>
+                      <option value="">未定（おまかせ）</option>
+                      {coachOptions(b).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button className={btnGhostCls}>保存</button>
+                  </form>
 
                   {/* 日時・打席の変更（#151）。消して作り直さずに直せる */}
                   <details className="rounded-lg border border-(--color-line) bg-white/60 px-2 py-1.5">

@@ -37,6 +37,11 @@ type Slots = {
   lesson_option?: { minutes: number; price: number } | null;
   /** その日出勤しているコーチ（#213）。指名はこの中からだけ */
   coaches?: { id: string; name: string; from: string; to: string }[];
+  /** その日のシフトが確定しているか（#213）。false＝指名は出さない */
+  coaches_scheduled?: boolean;
+  /** すでにレッスンが入っている時間帯（#225）。コーチ人数と突き合わせて満席を判定する */
+  lesson_taken?: { start: string; end: string }[];
+  lesson_minutes?: number;
 };
 
 const LABEL: Record<number, string> = { 30: "30分", 60: "1時間", 90: "1時間30分", 120: "2時間", 150: "2時間30分", 180: "3時間" };
@@ -120,12 +125,33 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
    * 出勤していない人を選ばせて、あとから店舗が断る——を作らない。
    * サーバー側でも同じ条件を確かめている（画面だけの制限にしない）。
    */
+  /**
+   * 指名できるコーチ（#224）。
+   * レッスンを付けるかどうかに関係なく選べる（ユーザー依頼「パーソナルレッスンだけでなく、
+   * 担当コーチの選択ができるように」）。条件はレッスンのときと同じ＝**選んだ時間に25分ぶん一緒にいられる人**。
+   * 条件を2つに分けると「レッスンでは選べるのに担当では選べない人」が出て説明できなくなる。
+   */
+  const lessonMin = data?.lesson_minutes ?? lessonOpt?.minutes ?? 25;
   const coachChoices = (() => {
     const list = data?.coaches ?? [];
-    if (!sel || !lessonOpt || list.length === 0) return [];
+    if (!sel || list.length === 0) return [];
     const s0 = toM(sel.t);
     const e0 = s0 + minutes;
-    return list.filter((c) => Math.min(toM(c.to), e0) - Math.max(toM(c.from), s0) >= lessonOpt.minutes);
+    return list.filter((c) => Math.min(toM(c.to), e0) - Math.max(toM(c.from), s0) >= lessonMin);
+  })();
+
+  /**
+   * その時間にレッスンをもう1件受けられるか（#225）。
+   * 受入数＝上の coachChoices の人数（シフト未確定の日は2件）。使用数＝重なっているレッスン付き予約。
+   * サーバー側でも同じ判定をしている（画面だけの制限にしない）。
+   */
+  const lessonFull = (() => {
+    if (!sel) return false;
+    const s0 = toM(sel.t);
+    const e0 = s0 + minutes;
+    const capacity = data?.coaches_scheduled === false ? 2 : coachChoices.length;
+    const used = (data?.lesson_taken ?? []).filter((t) => s0 < toM(t.end) && e0 > toM(t.start)).length;
+    return used >= capacity;
   })();
 
   async function book() {
@@ -142,8 +168,9 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
           bay_code: sel.bay,
           start: sel.t,
           minutes,
-          lesson: lesson && !!data?.lesson_option,
-          lesson_staff_id: lesson && coachChoices.some((c) => c.id === coachId) ? coachId : "",
+          lesson: lesson && !lessonFull && !!data?.lesson_option,
+          lesson_staff_id: lesson && !lessonFull && coachChoices.some((c) => c.id === coachId) ? coachId : "",
+          coach_staff_id: coachChoices.some((c) => c.id === coachId) ? coachId : "",
           t: token,
         }),
       });
@@ -253,53 +280,68 @@ export function BookClient({ apiBase, token }: { apiBase: string; token: string 
         )}
       </section>
 
-      {lessonOpt && (
-        <section className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-4">
-          <h2 className="mb-2 text-sm font-semibold">3. オプション（任意）</h2>
-          <label className="flex items-start gap-2 text-sm">
-            <input type="checkbox" checked={lesson} onChange={(e) => setLesson(e.target.checked)} className="mt-1" />
-            <span>
-              パーソナルレッスン（{lessonOpt.minutes}分）を追加する　＋{lessonOpt.price.toLocaleString()}円（当日精算）
-              <br />
-              <span className="text-xs text-(--color-dim)">
-                開始時刻は打席のお時間の中で店舗が調整し、確定をご連絡します。
-              </span>
-            </span>
-          </label>
+      {/* 3. 担当コーチのご指名（#224）とオプション（#199/#225） */}
+      <section className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-4">
+        <h2 className="mb-2 text-sm font-semibold">3. 担当コーチ・オプション（任意）</h2>
 
-          {/* コーチのご指名（#213）。出勤予定のある人しか出さない */}
-          {lesson && (
-            <div className="mt-3">
-              <label className="mb-1 block text-xs font-semibold text-(--color-dim)">担当コーチ（ご指名）</label>
-              {!sel ? (
-                <p className="text-xs text-(--color-dim)">先に日時と打席をお選びください。</p>
-              ) : coachChoices.length === 0 ? (
-                <p className="text-xs text-(--color-dim)">
-                  この時間は出勤予定が未定のため、ご指名は承れません。担当は店舗でお決めします。
-                </p>
-              ) : (
-                <>
-                  <select
-                    value={coachChoices.some((c) => c.id === coachId) ? coachId : ""}
-                    onChange={(e) => setCoachId(e.target.value)}
-                    className="w-full rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm"
-                  >
-                    <option value="">おまかせ（店舗が決めます）</option>
-                    {coachChoices.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}（{c.from}〜{c.to}）
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-(--color-dim)">
-                    ご指名はご希望として承ります。当日の状況により担当が変わる場合があります。
-                  </p>
-                </>
-              )}
-            </div>
+        {/* コーチのご指名。レッスンを付けるかどうかに関係なく選べる（#224） */}
+        <div className="mb-3">
+          <label className="mb-1 block text-xs font-semibold text-(--color-dim)">担当コーチ（ご指名）</label>
+          {!sel ? (
+            <p className="text-xs text-(--color-dim)">先に日時と打席をお選びください。</p>
+          ) : coachChoices.length === 0 ? (
+            <p className="text-xs text-(--color-dim)">
+              この時間は出勤予定がまだ決まっていないため、ご指名は承れません。担当は店舗でお決めします。
+            </p>
+          ) : (
+            <>
+              <select
+                value={coachChoices.some((c) => c.id === coachId) ? coachId : ""}
+                onChange={(e) => setCoachId(e.target.value)}
+                className="w-full rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm"
+              >
+                <option value="">おまかせ（店舗が決めます）</option>
+                {coachChoices.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}（{c.from}〜{c.to}）
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-(--color-dim)">
+                ご指名はご希望として承ります。当日の状況により担当が変わる場合があります。
+              </p>
+            </>
           )}
-        </section>
-      )}
+        </div>
+
+        {lessonOpt && (
+          <>
+            <label className={`flex items-start gap-2 text-sm ${lessonFull ? "opacity-50" : ""}`}>
+              <input
+                type="checkbox"
+                checked={lesson && !lessonFull}
+                disabled={lessonFull}
+                onChange={(e) => setLesson(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                パーソナルレッスン（{lessonOpt.minutes}分）を追加する　＋{lessonOpt.price.toLocaleString()}円（当日精算）
+                <br />
+                <span className="text-xs text-(--color-dim)">
+                  開始時刻は打席のお時間の中で店舗が調整し、確定をご連絡します。
+                </span>
+              </span>
+            </label>
+            {/* 受付上限はその時間のコーチ人数（#225）。取れない理由をその場に書く */}
+            {lessonFull && sel && (
+              <p className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                申し訳ございません。この時間のパーソナルレッスンは満席です。
+                打席のご予約はこのままお取りいただけます（別のお時間ならレッスンをお付けできます）。
+              </p>
+            )}
+          </>
+        )}
+      </section>
 
       {err && <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-600">{err}</p>}
 
