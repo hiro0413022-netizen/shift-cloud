@@ -219,18 +219,106 @@
       window.addEventListener("scroll", onScroll, { passive: true });
     }
 
+    /* --- スマホのドロワーメニュー（2026-09-07 作り直し） -------------------
+       以前は is-open を付け外しするだけだったので、
+         ・背面のページが一緒にスクロールする（メニューの端まで送ると背面が動く）
+         ・スクリムが無く、外側をタップしても閉じられない
+         ・下の固定CTAバー（z-index:70）がメニューの上に重なる
+         ・Escキーで閉じられない／閉じたあとフォーカスが迷子になる
+       という状態だった。開閉を open()/close() に集約し、
+       背面ロック・スクリム・Esc・フォーカス復帰をまとめて面倒を見る。 */
     if (burger && menu) {
-      burger.addEventListener("click", function () {
-        var open = burger.getAttribute("aria-expanded") === "true";
-        burger.setAttribute("aria-expanded", String(!open));
-        menu.classList.toggle("is-open", !open);
-      });
-      menu.addEventListener("click", function (e) {
-        if (e.target.closest("a")) {
-          burger.setAttribute("aria-expanded", "false");
-          menu.classList.remove("is-open");
+      if (!menu.id) menu.id = "nav-menu";
+      burger.setAttribute("aria-controls", menu.id);
+
+      var scrim = document.querySelector(".nav-scrim");
+      if (!scrim) {
+        scrim = document.createElement("div");
+        scrim.className = "nav-scrim";
+        scrim.setAttribute("aria-hidden", "true");
+        document.body.appendChild(scrim);
+      }
+
+      var lockY = 0;
+      var isOpen = function () { return menu.classList.contains("is-open"); };
+
+      /* 背面ロック。iOS Safari は overflow:hidden だけでは止まらないので、
+         body を position:fixed にして、閉じるときに元のスクロール位置へ戻す。 */
+      function lockScroll() {
+        lockY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        document.body.style.top = -lockY + "px";
+        document.body.classList.add("nav-open");
+      }
+      function unlockScroll() {
+        if (!document.body.classList.contains("nav-open")) return;
+        var html = document.documentElement;
+        var prev = html.style.scrollBehavior;
+        html.style.scrollBehavior = "auto";   // scroll-behavior:smooth で戻りが滑らないように
+        document.body.classList.remove("nav-open");
+        document.body.style.top = "";
+        window.scrollTo(0, lockY);
+        html.style.scrollBehavior = prev;
+      }
+
+      function openMenu() {
+        if (isOpen()) return;
+        lockScroll();
+        menu.classList.add("is-open");
+        menu.scrollTop = 0;
+        burger.setAttribute("aria-expanded", "true");
+        scrim.classList.add("is-on");
+        document.addEventListener("keydown", onKey);
+      }
+      function closeMenu(focusBack) {
+        if (!isOpen()) return;
+        menu.classList.remove("is-open");
+        burger.setAttribute("aria-expanded", "false");
+        scrim.classList.remove("is-on");
+        unlockScroll();
+        document.removeEventListener("keydown", onKey);
+        if (focusBack && burger.focus) burger.focus();
+      }
+
+      /* 開いている間は Tab をメニューの中で回す（背面のリンクに飛ばない） */
+      function focusables() {
+        return Array.prototype.filter.call(
+          menu.querySelectorAll('a[href], button:not([disabled])'),
+          function (n) { return n.offsetParent !== null; }
+        );
+      }
+      function onKey(e) {
+        if (e.key === "Escape" || e.key === "Esc") { e.preventDefault(); closeMenu(true); return; }
+        if (e.key !== "Tab") return;
+        var list = focusables();
+        if (!list.length) return;
+        var first = list[0], last = list[list.length - 1];
+        var cur = document.activeElement;
+        if (e.shiftKey && (cur === first || cur === burger || !menu.contains(cur))) {
+          e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && cur === last) {
+          e.preventDefault(); burger.focus();
         }
+      }
+
+      burger.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (isOpen()) closeMenu(false); else openMenu();
       });
+
+      scrim.addEventListener("click", function () { closeMenu(false); });
+      /* iOS: スクリムの上を指でなぞっても背面が動かないように */
+      scrim.addEventListener("touchmove", function (e) { e.preventDefault(); }, { passive: false });
+
+      menu.addEventListener("click", function (e) {
+        if (e.target.closest("a")) closeMenu(false);
+      });
+
+      /* PC幅に戻したとき・戻る操作で復元されたときに、開きっぱなし＋body固定が残らないように */
+      var mq = window.matchMedia("(min-width: 861px)");
+      var onMq = function (ev) { if (ev.matches) closeMenu(false); };
+      if (mq.addEventListener) mq.addEventListener("change", onMq);
+      else if (mq.addListener) mq.addListener(onMq);
+      window.addEventListener("pageshow", function () { closeMenu(false); });
     }
 
     // 現在ページをハイライト

@@ -197,6 +197,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 .burger {
   display: none; margin-left: auto;
+  flex: none;                       /* 幅の狭い端末で潰れて画面外に出ないように */
   width: 44px; height: 44px;
   background: none; border: 1px solid var(--border-str); border-radius: 10px;
   color: var(--txt); cursor: pointer;
@@ -212,6 +213,43 @@ ul { margin: 0; padding: 0; list-style: none; }
 .burger[aria-expanded="true"] span { background: transparent; }
 .burger[aria-expanded="true"] span::before { top: 0; transform: rotate(45deg); }
 .burger[aria-expanded="true"] span::after { top: 0; transform: rotate(-45deg); }
+
+/* ============================ メニューの背面カバー（スクリム） ============================
+   スマホのドロワーを開いている間、背面をタップ／スクロールさせないための一枚。
+   JS（site.js の nav()）が body 直下に1つだけ作る。 */
+.nav-scrim {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(28, 32, 27, .45);
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity .24s var(--ease), visibility .24s var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-scrim.is-on { opacity: 1; visibility: visible; pointer-events: auto; }
+@media (min-width: 861px) { .nav-scrim { display: none; } }
+
+/* ドロワーを開いている間は背面（body）を固定する。
+   位置は JS が body.style.top に記録し、閉じるときに元の位置へ戻す。 */
+body.nav-open { position: fixed; left: 0; right: 0; width: 100%; overflow: hidden; }
+/* ヘッダーと告知バーだけはスクリムより手前に残す（メニューが暗くならないように） */
+body.nav-open .nav { z-index: 90; }
+/* 開いている間はヘッダーのぼかしを止め、地を白で塗る
+   （ぼかしが残るとメニューの背面が透けて文字が読みにくくなる） */
+body.nav-open .nav {
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  background: #FFFFFF;
+}
+body.nav-open .notice-bar { z-index: 90; }
+/* 下の固定CTAバーはメニューと重なるので、開いている間は引っ込める */
+body.nav-open .sticky-cta { transform: translateY(115%); }
+
+@keyframes navDrawerIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav__menu.is-open { animation: none; }
+  .nav-scrim { transition: none; }
+}
 
 /* ============================ ボタン ============================ */
 .btn {
@@ -838,17 +876,33 @@ ul { margin: 0; padding: 0; list-style: none; }
   .nav__cta { display: flex; margin-left: auto; }
   .nav__cta .nav__member { display: none; }
   .burger { display: inline-flex; margin-left: 8px; }
+  /* ---- スマホのメニュー（ドロワー）・2026-09-07 作り直し ----
+     ★ 以前は position:fixed だったが、親の .nav に backdrop-filter が効いているため
+       fixed の基準がビューポートではなく .nav になり（＝包含ブロックが .nav）、
+       メニュー全体がヘッダーの高さぶん下にズレて、下端が画面外にはみ出していた。
+       その結果、指で送っても最後まで出せず、背面のページが一緒に動いて見えた。
+       基準が .nav なのは変わらないので、素直に absolute でヘッダー直下に置く。
+     ★ 背面スクロールは overscroll-behavior と body.nav-open（JSで付与）で止める。 */
   .nav__menu.is-open {
     display: flex; flex-direction: column; align-items: stretch; gap: 0;
-    position: fixed; inset: calc(var(--bar-h) + var(--nav-h)) 0 auto 0;
-    background: rgba(255, 253, 248, .99);
-    /* backdrop-filter は外した: 背景が.99不透明でぼかしの意味がない上、
-       iOS系WebKit(LINE内ブラウザ等)でメニュー内ボタンの文字が描画されない
-       合成バグの原因になり得るため（2026-08-11 実機報告） */
-    padding: 12px 22px 30px;
+    position: absolute; top: 100%; left: 0; right: 0;
+    /* ★ 半透明(.99)をやめて完全な不透明にした。親の .nav に backdrop-filter が
+       効いていると、わずかな透過でも背面がぼけて透けて見え、メニューの文字と
+       重なって読みにくかった（2026-09-07 検証）。
+       backdrop-filter をメニュー自身に付けないのは、iOS系WebKit(LINE内ブラウザ等)で
+       メニュー内ボタンの文字が描画されない合成バグの原因になり得るため（2026-08-11 実機報告） */
+    background: #FFFDF8;
+    padding: 12px 22px calc(30px + env(safe-area-inset-bottom));
     border-bottom: 1px solid var(--border);
-    max-height: calc(100svh - var(--bar-h) - var(--nav-h));
+    /* 画面いっぱいにせず下を48px空ける: 背面が少し見えることで
+       「外側をタップすれば閉じられる」ことが伝わる（閉じる手段を2つ用意する） */
+    max-height: calc(100svh - var(--bar-h) - var(--nav-h) - 48px);
+    max-height: calc(100dvh - var(--bar-h) - var(--nav-h) - 48px);
     overflow-y: auto;
+    overscroll-behavior: contain;     /* メニュー端まで送っても背面に伝えない */
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 26px 44px -30px rgba(43, 50, 41, .6);
+    animation: navDrawerIn .2s var(--ease) both;
   }
   .nav__menu.is-open a { padding: 15px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
   .nav__menu.is-open .nav__m-cta { display: flex; flex-direction: column; gap: 12px; padding-top: 22px; border: 0; }
@@ -863,9 +917,22 @@ ul { margin: 0; padding: 0; list-style: none; }
   .notice-bar { font-size: 11px; letter-spacing: .06em; gap: 8px; }
   .notice-bar__tag { display: none; }
   .foot__nav { grid-template-columns: 1fr; }
-  .nav__cta .btn--sm { padding: 9px 14px; font-size: 12px; }
+  /* ★ 画面幅が 320〜375px の端末では、ロゴ＋体験予約ボタン＋三本線が横に収まらず、
+     三本線がヘッダーからはみ出して押せなかった（2026-09-07 実測: 320px幅で
+     三本線の左端が x=325 ＝画面の外）。余白と文字を詰めて必ず収める。 */
+  .nav__in { gap: 12px; }
+  .nav__cta { gap: 6px; flex: 0 1 auto; min-width: 0; }
+  .nav__cta .btn--sm { padding: 9px 12px; font-size: 11.5px; }
+  .burger { width: 42px; height: 42px; margin-left: 4px; }
   .logo__sub { display: none; }
-  .logo__mark { font-size: 17px; letter-spacing: .12em; }
+  .logo__mark { font-size: 16px; letter-spacing: .09em; }
+}
+
+/* さらに狭い端末（iPhone SE 第1世代・古いAndroid など） */
+@media (max-width: 360px) {
+  .nav__in { gap: 8px; }
+  .nav__cta .btn--sm { padding: 8px 10px; font-size: 11px; }
+  .logo__mark { font-size: 15px; letter-spacing: .06em; }
 }
 
 /* ---- スマホの可読性（余白と行送りを詰めすぎない） ---- */
