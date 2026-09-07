@@ -209,6 +209,8 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
         compareSources={compareSources}
         measurements={measurements}
         lessonNotes={lessonNotes}
+        meId={actor.staffId}
+        meName={actor.name}
       />
     </div>
   );

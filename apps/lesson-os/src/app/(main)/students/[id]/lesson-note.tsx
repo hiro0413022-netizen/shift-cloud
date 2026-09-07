@@ -5,7 +5,7 @@ import {
   startLessonNote, createNoteUploadUrl, finishNoteUpload, saveLessonNote,
   createNotePartUploadUrl, finishNoteParts, setNoteVideo, makeClientExplanation,
   deleteNoteAudio, deleteNoteTranscript, removeLessonNote, loadLessonNote,
-  listCompanySymptoms, setNoteSymptomRejected, addNoteSymptom,
+  listCompanySymptoms, setNoteSymptomRejected, addNoteSymptom, listNoteCoaches, setNoteCoach,
   type LessonNoteItem, type SymptomOption,
 } from "./actions";
 
@@ -44,10 +44,15 @@ export function LessonNotePanel({
   studentId,
   initial,
   videos = [],
+  meId = "",
+  meName = "",
 }: {
   studentId: string;
   initial: LessonNoteItem[];
   videos?: NoteVideo[];
+  /** ログインしているコーチ（#228・担当プロの初期値） */
+  meId?: string;
+  meName?: string;
 }) {
   const [notes, setNotes] = useState<LessonNoteItem[]>(initial);
   const [consent, setConsent] = useState(false);
@@ -63,6 +68,9 @@ export function LessonNotePanel({
   /** 店のメソッド（AIカルテナレッジ）の症状一覧。手でタグを足すときだけ読む */
   const [options, setOptions] = useState<SymptomOption[] | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
+  /** 担当プロ（#228）。既定はログインしている人。受付や別のコーチが代わりに入力するときに選び直す */
+  const [coachId, setCoachId] = useState(meId);
+  const [coaches, setCoaches] = useState<Array<{ id: string; name: string }> | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -166,7 +174,7 @@ export function LessonNotePanel({
 
   const start = async () => {
     setMsg(null);
-    const made = await startLessonNote(studentId, jstToday(), consent);
+    const made = await startLessonNote(studentId, jstToday(), consent, coachId || meId);
     if (made.error || !made.id) { setMsg(made.error ?? "作成に失敗しました"); return; }
     noteIdRef.current = made.id;
     all.current = [];
@@ -333,6 +341,35 @@ export function LessonNotePanel({
           </span>
         </label>
 
+        {/* 担当プロ（#228）。ログインしている人が自動で担当になると、
+            受付や別のコーチが代わりに入力したときに**お客様に見える記録の名前が変わる** */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-(--color-dim)">担当プロ</span>
+          <select
+            value={coachId || meId}
+            disabled={rec}
+            onFocus={async () => {
+              if (coaches) return;
+              const r = await listNoteCoaches();
+              setCoaches(r.items);
+            }}
+            onChange={(e) => setCoachId(e.target.value)}
+            className="rounded-lg border border-(--color-line) bg-(--color-panel-2) px-2 py-1"
+          >
+            {/* 一覧を読むまでは自分だけ出す（押してから読む＝開くたびの通信を増やさない） */}
+            {coaches ? (
+              coaches.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))
+            ) : (
+              <option value={meId}>{meName || "自分"}</option>
+            )}
+          </select>
+          {coachId && coachId !== meId && <span className="text-xs text-(--color-dim)">（代理で入力しています）</span>}
+        </div>
+
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {!rec ? (
             <button onClick={start} disabled={!consent || !!busy} className="btn-gold disabled:opacity-40">
@@ -374,7 +411,31 @@ export function LessonNotePanel({
           <div key={n.id} className="rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium">{n.lessonDate}</span>
-              {n.coach && <span className="text-xs text-(--color-dim)">{n.coach}</span>}
+              {/* 担当プロ（#228）。あとからでも直せる＝「これは◯◯が見た日だった」に対応できる */}
+              <select
+                value=""
+                onFocus={async () => {
+                  if (coaches) return;
+                  const r = await listNoteCoaches();
+                  setCoaches(r.items);
+                }}
+                onChange={async (e) => {
+                  const id = e.target.value;
+                  if (!id) return;
+                  const r = await setNoteCoach(n.id, id);
+                  if (r.error) { setMsg(r.error); return; }
+                  setNotes((prev) => prev.map((x) => (x.id === n.id ? { ...x, coach: r.coach ?? x.coach } : x)));
+                }}
+                className="rounded border border-(--color-line) bg-(--color-panel-2) px-1.5 py-0.5 text-xs text-(--color-dim)"
+                title="担当プロを変える"
+              >
+                <option value="">{n.coach || "担当プロ"}</option>
+                {(coaches ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
               {n.seconds != null && <span className="text-xs text-(--color-dim)">{mmss(n.seconds)}</span>}
               <span
                 className={`rounded px-2 py-0.5 text-xs ${n.status === "saved" ? "bg-(--color-gold)/20 text-(--color-gold)" : "bg-(--color-panel-2) text-(--color-dim)"}`}

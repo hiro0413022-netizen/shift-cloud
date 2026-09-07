@@ -733,17 +733,85 @@ export type LessonNoteItem = {
 };
 
 /**
+ * 担当プロの候補（#228）。在籍中のスタッフから選ぶ。
+ *
+ * 会員ページの出勤予定（`member_page_role`）では絞らない——記録は**過去の日付**にも書くので、
+ * 「今そこに出ている人」ではなく「その日教えた人」を選べる必要がある。
+ */
+export async function listNoteCoaches(): Promise<{ items: Array<{ id: string; name: string }> }> {
+  const actor = await requireLessonActor();
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("staff")
+    .select("id, name, sort_order")
+    .eq("company_id", actor.companyId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true })
+    .limit(100);
+  return {
+    items: ((data ?? []) as Array<{ id: string; name: string }>).map((r) => ({ id: String(r.id), name: String(r.name) })),
+  };
+}
+
+/** 指定された担当プロが自社の在籍スタッフか確かめる。違えば操作した人に倒す（黙って他社の人を入れない） */
+async function resolveCoachId(
+  admin: ReturnType<typeof createAdmin>,
+  companyId: string,
+  wanted: string | null | undefined,
+  fallback: string
+): Promise<string> {
+  const id = String(wanted ?? "").trim();
+  if (!id || id === fallback) return fallback;
+  const { data } = await admin
+    .from("staff")
+    .select("id")
+    .eq("id", id)
+    .eq("company_id", companyId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .maybeSingle();
+  return data ? id : fallback;
+}
+
+/**
+ * 書いたあとで担当プロを直す（#228）。
+ * 録音を始めてから「これは◯◯が見た日だった」と分かることがあるので、あとからでも直せるようにする。
+ */
+export async function setNoteCoach(noteId: string, coachStaffId: string): Promise<{ error?: string; coach?: string }> {
+  const { actor, admin, note } = await ownNote(noteId);
+  if (!note) return { error: "メモが見つかりません" };
+  const coachId = await resolveCoachId(admin, actor.companyId, coachStaffId, actor.staffId);
+  const { error } = await admin
+    .from("lsn_lesson_notes")
+    .update({ coach_staff_id: coachId, updated_at: new Date().toISOString() })
+    .eq("id", note.id);
+  if (error) return { error: "保存できませんでした" };
+  const { data } = await admin.from("staff").select("name").eq("id", coachId).maybeSingle();
+  revalidatePath(`/students/${note.studentId}`);
+  return { coach: String((data as { name?: string } | null)?.name ?? "") };
+}
+
+/**
  * 録音を始める前に呼ぶ。**同意の記録がこの行の存在意義**なので、
  * 同意なしでは作らない（録音ボタンはこの戻り値が無いと押せない）。
  */
 export async function startLessonNote(
   studentId: string,
   lessonDate: string,
-  consent: boolean
+  consent: boolean,
+  /**
+   * 担当プロ（#228・2026-09-05 ユーザー依頼「担当プロを選択できるようにしてほしい」）。
+   * 空なら操作している人。**受付や別のスタッフが代わりに入力する**ことがあるので、
+   * ログインしている人＝担当、で固定しない（お客様に見える記録の名前が変わってしまう）。
+   */
+  coachStaffId?: string | null
 ): Promise<{ id?: string; error?: string }> {
   const { actor, admin, ok } = await ownStudent(studentId);
   if (!ok) return { error: "生徒が見つかりません" };
   if (!consent) return { error: "お客様の同意を確認してから録音してください" };
+  const coachId = await resolveCoachId(admin, actor.companyId, coachStaffId, actor.staffId);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(lessonDate) ? lessonDate : new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const { data, error } = await admin
     .from("lsn_lesson_notes")
@@ -751,7 +819,7 @@ export async function startLessonNote(
       company_id: actor.companyId,
       student_id: studentId,
       lesson_date: date,
-      coach_staff_id: actor.staffId,
+      coach_staff_id: coachId,
       status: "draft",
       consent_at: new Date().toISOString(),
       consent_by: actor.staffId,

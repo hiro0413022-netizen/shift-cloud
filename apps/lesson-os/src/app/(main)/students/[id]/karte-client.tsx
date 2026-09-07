@@ -134,6 +134,8 @@ export function KarteClient({
   compareSources,
   measurements,
   lessonNotes,
+  meId = "",
+  meName = "",
 }: {
   student: StudentData;
   videos: VideoItem[];
@@ -141,6 +143,9 @@ export function KarteClient({
   compareSources: CompareSource[];
   measurements: MeasurementItem[];
   lessonNotes: LessonNoteItem[];
+  /** ログインしているコーチ（#228・会話メモの担当プロの初期値） */
+  meId?: string;
+  meName?: string;
 }) {
   const [tab, setTab] = useState<Tab>("lesson");
   const [msg, setMsg] = useState<string | null>(null);
@@ -612,7 +617,7 @@ export function KarteClient({
           **タブを移っても閉じない**（hidden にするだけ）。閉じてしまうと録音が止まり、
           裏で走っているAIの進み具合も見失う（2026-09-03） */}
       <div className={tab === "note" ? "" : "hidden"}>
-        <LessonNotePanel studentId={student.id} initial={lessonNotes} videos={linkVideos} />
+        <LessonNotePanel studentId={student.id} initial={lessonNotes} videos={linkVideos} meId={meId} meName={meName} />
       </div>
       {tab === "measure" && <MeasurePanel studentId={student.id} items={measurements} videos={linkVideos} />}
       {tab === "progress" && <ProgressPanel studentId={student.id} items={progress} />}
