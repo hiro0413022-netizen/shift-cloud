@@ -560,20 +560,28 @@ export default async function ReservationsPage({
                     <p className="text-xs text-(--color-dim)">ご要望: {t.message}</p>
                   ) : null}
 
-                  {/* パーソナルレッスン25分（0136）。打席のお時間の中で、誰が・何時から教えるかを決めて確定する */}
-                  {b.lesson_option_status ? (
+                  {/* パーソナルレッスン25分（0136）。打席のお時間の中で、誰が・何時から教えるかを決めて確定する。
+                      #230: 希望が付いていない通常予約にも出す＝お電話で「やっぱりレッスンも」を受けたら、
+                      その場で担当と時間を入れて確定できる（体験・取消・無断欠は対象外） */}
+                  {b.lesson_option_status || (b.customer_kind !== "trial" && b.status !== "cancelled" && b.status !== "no_show") ? (
                     <details
                       className="rounded-lg border border-(--color-line) bg-white/60 px-2 py-1.5"
                       open={b.lesson_option_status === "requested"}
                     >
                       <summary className="cursor-pointer text-xs font-semibold text-(--color-dim)">
                         {/* #199: チケットで承ったぶんは料金ではなく「チケット1枚」と出す（レジで二重に請求しない） */}
-                        パーソナルレッスン（{b.lesson_option_minutes ?? 25}分・
-                        {b.lesson_option_status === "confirmed" && Number(b.lesson_option_fee ?? -1) === 0
-                          ? "チケット1枚"
-                          : yen(b.lesson_option_fee ?? 2500)}
-                        ）
-                        {b.lesson_option_status === "requested" ? " — 担当と時間を決めて確定" : " — 内容を変更"}
+                        {b.lesson_option_status ? (
+                          <>
+                            パーソナルレッスン（{b.lesson_option_minutes ?? 25}分・
+                            {b.lesson_option_status === "confirmed" && Number(b.lesson_option_fee ?? -1) === 0
+                              ? "チケット1枚"
+                              : yen(b.lesson_option_fee ?? 2500)}
+                            ）
+                            {b.lesson_option_status === "requested" ? " — 担当と時間を決めて確定" : " — 内容を変更"}
+                          </>
+                        ) : (
+                          <>＋ パーソナルレッスンを追加（お電話でのご希望など） — 担当と時間を決めて確定</>
+                        )}
                       </summary>
                       {b.lesson_option_note ? (
                         <p className="mt-2 text-xs text-(--color-dim)">会員様のご要望: {b.lesson_option_note}</p>
@@ -604,18 +612,26 @@ export default async function ReservationsPage({
                           <button className={btnCls}>確定</button>
                         </div>
                       </form>
-                      <div className="mt-2 flex gap-3">
-                        <form action={setLessonOption}>
-                          <input type="hidden" name="id" value={b.id} /><input type="hidden" name="date" value={date} />
-                          <input type="hidden" name="mode" value="decline" />
-                          <button className="text-xs text-(--color-dim) underline hover:text-red-400">お断り（要ご連絡）</button>
-                        </form>
-                        <form action={setLessonOption}>
-                          <input type="hidden" name="id" value={b.id} /><input type="hidden" name="date" value={date} />
-                          <input type="hidden" name="mode" value="clear" />
-                          <button className="text-xs text-(--color-dim) underline">この希望を取り消す</button>
-                        </form>
-                      </div>
+                      {b.lesson_option_status ? (
+                        <div className="mt-2 flex gap-3">
+                          <form action={setLessonOption}>
+                            <input type="hidden" name="id" value={b.id} /><input type="hidden" name="date" value={date} />
+                            <input type="hidden" name="mode" value="decline" />
+                            <button className="text-xs text-(--color-dim) underline hover:text-red-400">お断り（要ご連絡）</button>
+                          </form>
+                          <form action={setLessonOption}>
+                            <input type="hidden" name="id" value={b.id} /><input type="hidden" name="date" value={date} />
+                            <input type="hidden" name="mode" value="clear" />
+                            <button className="text-xs text-(--color-dim) underline">
+                              {b.lesson_option_status === "requested" ? "この希望を取り消す" : "レッスンを外す（通常予約に戻す）"}
+                            </button>
+                          </form>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-xs text-(--color-dim)">
+                          確定すると会員様のチケットがあれば1枚使い、無ければ当日精算（{yen(cfg.lesson_option?.price ?? 2500)}）になります。
+                        </p>
+                      )}
                     </details>
                   ) : null}
 

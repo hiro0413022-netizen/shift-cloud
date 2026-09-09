@@ -646,13 +646,15 @@ export async function setLessonOption(formData: FormData) {
 
   const { data: bk } = await admin
     .from("frunk_bookings")
-    .select("id, start_time, end_time, lesson_option_minutes, member_id, store_id")
+    .select("id, start_time, end_time, lesson_option_minutes, member_id, store_id, coach_staff_id, customer_kind, status")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID)
     .is("deleted_at", null)
     .maybeSingle();
   if (!bk) return;
+  // #230: 体験・取消済み・無断欠の予約にはレッスンを付けない（画面では出していないが、サーバーでも止める）
+  if (mode === "confirm" && (bk.customer_kind === "trial" || bk.status === "cancelled" || bk.status === "no_show")) return back(date);
 
   const cfg = await loadBookingCfg(admin);
   const now = new Date().toISOString();
@@ -699,6 +701,8 @@ export async function setLessonOption(formData: FormData) {
       lesson_option_minutes: minutes,
       lesson_option_fee: usedTicket ? 0 : (cfg.lesson_option?.price ?? 2500),
     };
+    // #224 の約束「レッスンの指名があれば担当も同じ人」。担当が未定のときだけ揃える（決まっている担当は動かさない）
+    if (!bk.coach_staff_id) patch.coach_staff_id = staffId;
   }
 
   await admin
