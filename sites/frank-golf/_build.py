@@ -44,6 +44,14 @@ def page_file(page):
     return PAGE_FILE.get(page, "index.html")
 
 
+def page_url(page):
+    """canonical / sitemap / パンくずに使う正規URL。ホームだけは index.html ではなく / （#229 SEO）。
+    Google が https://frankgolf.jp/ と /index.html を別ページとして扱う二重化を防ぐ。"""
+    if page == "home":
+        return (SITE_URL.rstrip("/") + "/") if SITE_URL else "index.html"
+    return abs_url(page_file(page))
+
+
 PAGE_LABEL = {
     "concept": "コンセプト", "facility": "施設・設備", "lesson": "レッスン",
     "lounge": "バー・ラウンジ", "community": "コミュニティ", "plan": "料金・会員プラン",
@@ -68,13 +76,14 @@ def jsonld_business():
     import json
     d = {
         "@context": "https://schema.org",
-        "@type": "GolfCourse",
-        "additionalType": "SportsActivityLocation",
+        # #229: GolfCourse（＝屋外コース）は誤り。屋内練習施設＋スクールなので SportsActivityLocation。
+        "@type": ["SportsActivityLocation", "LocalBusiness"],
+        "@id": (SITE_URL.rstrip("/") + "/#business") if SITE_URL else "#business",
         "name": "FRANK GOLF",
         "alternateName": ["フランクゴルフ", "FRANK GOLF 姫路"],
         "description": "姫路・土山の会員制インドアゴルフラウンジ。練習打席・プロによるレッスン・"
                        "シミュレーターでのデータ分析・バーラウンジでの交流がひとつになった大人のためのゴルフ基地。"
-                       "2026年9月2日プレオープン。",
+                       "2026年9月オープン。",
         "slogan": "打って、教わって、語れる。姫路・土山のフランクなゴルフ基地。",
         "knowsAbout": ["インドアゴルフ", "ゴルフレッスン", "ゴルフシミュレーター", "スイング分析", "ゴルフバー"],
         "address": {
@@ -82,8 +91,34 @@ def jsonld_business():
             "streetAddress": "土山6-6-1",
             "addressRegion": "兵庫県",
             "addressLocality": "姫路市",
+            "postalCode": "670-0996",
             "addressCountry": "JP",
         },
+        # Googleビジネスプロフィールのピンと同じ座標（2026-09-09 実測）
+        "geo": {"@type": "GeoCoordinates", "latitude": 34.8327823, "longitude": 134.667118},
+        "hasMap": "https://www.google.com/maps/search/?api=1&query=FRANK+GOLF+%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1",
+        "currenciesAccepted": "JPY",
+        "paymentAccepted": "クレジットカード, 現金",
+        "publicAccess": True,
+        "makesOffer": [
+            {"@type": "Offer", "name": "体験レッスン（約55分）", "price": "0", "priceCurrency": "JPY",
+             "description": "通常3,300円（税込）のところ、プレオープン記念で無料。所属プロのマンツーマン。",
+             "url": abs_url("trial.html")},
+            {"@type": "Offer", "name": "ライト会員（月4回まで）", "price": "10780", "priceCurrency": "JPY",
+             "priceSpecification": {"@type": "UnitPriceSpecification", "price": "10780", "priceCurrency": "JPY",
+                                    "unitCode": "MON", "valueAddedTaxIncluded": True},
+             "url": abs_url("plan.html")},
+            {"@type": "Offer", "name": "レギュラー会員（1日1時間 通い放題）", "price": "15180", "priceCurrency": "JPY",
+             "priceSpecification": {"@type": "UnitPriceSpecification", "price": "15180", "priceCurrency": "JPY",
+                                    "unitCode": "MON", "valueAddedTaxIncluded": True},
+             "url": abs_url("plan.html")},
+            {"@type": "Offer", "name": "マスター会員（1日最大2時間）", "price": "21780", "priceCurrency": "JPY",
+             "priceSpecification": {"@type": "UnitPriceSpecification", "price": "21780", "priceCurrency": "JPY",
+                                    "unitCode": "MON", "valueAddedTaxIncluded": True},
+             "url": abs_url("plan.html")},
+            {"@type": "Offer", "name": "25分マンツーマンレッスン", "price": "2750", "priceCurrency": "JPY",
+             "url": abs_url("lesson.html")},
+        ],
         "employee": {
             "@type": "Person",
             "name": "小川 うらら",
@@ -119,11 +154,11 @@ def jsonld_business():
             "https://www.instagram.com/frank_golf_himeji",
             "https://lin.ee/yp2leQU",
         ],
-        # TODO(確定後): "geo"{lat,lng}, "image"[実写]。定休日=毎週火曜。
+        # 定休日=毎週火曜（openingHoursSpecification に火曜を含めないことで表現）
     }
     if SITE_URL:
-        d["url"] = SITE_URL
-        d["image"] = abs_url("assets/ogp.png")
+        d["url"] = SITE_URL.rstrip("/") + "/"
+        d["image"] = [abs_url("assets/ogp.png"), abs_url("assets/img/hero-1.jpg"), abs_url("assets/img/hero-2.jpg")]
     return json.dumps(d, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -131,10 +166,10 @@ def jsonld_breadcrumb(page, label):
     """パンくずリスト（SEO）。SITE_URL 未設定でも相対itemで出す。"""
     import json
     items = [{"@type": "ListItem", "position": 1, "name": "ホーム",
-              "item": abs_url("index.html")}]
+              "item": page_url("home")}]
     if page != "home":
         items.append({"@type": "ListItem", "position": 2, "name": label,
-                      "item": abs_url(page_file(page))})
+                      "item": page_url(page)})
     return json.dumps({"@context": "https://schema.org", "@type": "BreadcrumbList",
                        "itemListElement": items}, ensure_ascii=False, separators=(",", ":"))
 
@@ -172,6 +207,7 @@ FOOT_NAV = [
         ("lesson.html", "レッスン"),
         ("lounge.html", "バー・ラウンジ"),
         ("community.html", "会員コミュニティ"),
+        ("column.html", "コラム・読みもの"),
     ]),
     ("VISIT", [
         ("plan.html", "料金・会員プラン"),
@@ -194,10 +230,15 @@ FOOT_NAV = [
 ]
 
 
-def head(title, desc, page, jsonld=""):
-    """<head> と 告知バー・ヘッダー"""
+def head(title, desc, page, jsonld="", noindex=False, og_type="website"):
+    """<head> と 告知バー・ヘッダー
+    noindex=True … 検索結果に出したくないページ（会員専用の予約画面・広告LP・404）。
+                   canonical も出さない（noindex と canonical の併用は矛盾シグナルになる）。"""
     ogp = abs_url("assets/ogp.png")
-    canonical = f'<link rel="canonical" href="{abs_url(page_file(page))}">\n' if SITE_URL else ""
+    canon_url = page_url(page)
+    canonical = (f'<link rel="canonical" href="{canon_url}">\n' if (SITE_URL and not noindex) else "")
+    og_url = f'<meta property="og:url" content="{canon_url}">\n' if SITE_URL else ""
+    robots = "noindex,follow" if noindex else "index,follow,max-image-preview:large"
     blocks = [jsonld_breadcrumb(page, PAGE_LABEL.get(page, ""))]
     if jsonld:
         blocks.append(jsonld)
@@ -209,15 +250,19 @@ def head(title, desc, page, jsonld=""):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google-site-verification" content="njgqkzKoh_eb6CZV84LxsT7y989O0Gr87etYLAPlWW4">
 <title>{title}</title>
 <meta name="description" content="{desc}">
 <meta name="format-detection" content="telephone=no">
 <meta property="og:site_name" content="{BRAND}">
 <meta property="og:title" content="{title}">
 <meta property="og:description" content="{desc}">
-<meta property="og:type" content="website">
-<meta name="keywords" content="姫路 インドアゴルフ,土山 ゴルフ,姫路 ゴルフレッスン,インドアゴルフ 会員制,ゴルフシミュレーター 姫路,ゴルフバー 姫路,FRANK GOLF">
-<meta name="robots" content="index,follow">
+<meta property="og:type" content="{og_type}">
+{og_url}<meta name="robots" content="{robots}">
+<meta name="geo.region" content="JP-28">
+<meta name="geo.placename" content="姫路市">
+<meta name="geo.position" content="34.8327823;134.667118">
+<meta name="ICBM" content="34.8327823, 134.667118">
 <meta property="og:image" content="{ogp}">
 <meta property="og:image:alt" content="FRANK GOLF｜打って、教わって、語れる。姫路・土山のフランクなゴルフ基地。">
 <meta property="og:image:width" content="1200">
@@ -241,8 +286,8 @@ def head(title, desc, page, jsonld=""):
 
 <!-- 1. プレオープン告知バー -->
 <div class="notice-bar" role="status">
-  <span class="notice-bar__tag">PRE-OPEN</span>
-  <span><b data-preopen>{PREOPEN}</b> 姫路・土山にプレオープン。いま<b>体験レッスン無料</b>（通常3,300円）</span>
+  <span class="notice-bar__tag">OPEN</span>
+  <span>姫路・土山に<b>オープンしました</b>。いま<b>体験レッスン無料</b>（通常3,300円）</span>
 </div>
 
 <!-- 2. ヘッダー -->
@@ -470,8 +515,113 @@ def floorplan():
 </div>"""
 
 
+# ------------------------------------------------------------------
+# site-data.js の値を静的HTMLに焼き込む（#229 SEO）
+# ------------------------------------------------------------------
+# これまで住所・営業時間・料金は site.js が実行時に流し込んでいたため、
+# HTMLソース上は「近日公開」のままだった。Googlebot は JS を後回しに描画するので、
+# 地域名・料金といった検索に効く文字列が初回クロールに入らない。
+# ここでビルド時に同じ値を差し込んでおく（site.js は従来どおり上書きするので表示は変わらない）。
+_SITE_DATA = None
+
+
+def site_data():
+    global _SITE_DATA
+    if _SITE_DATA is None:
+        import subprocess, json
+        js = "global.window={};require(process.argv[1]);process.stdout.write(JSON.stringify(window.FRANK||{}))"
+        try:
+            out = subprocess.run(["node", "-e", js, os.path.join(HERE, "assets", "site-data.js")],
+                                 capture_output=True, text=True, check=True, encoding="utf-8").stdout
+            _SITE_DATA = json.loads(out)
+        except Exception as e:  # node が無い環境でもビルド自体は通す
+            print("  !! site-data.js を読めませんでした（焼き込みをスキップ）:", e)
+            _SITE_DATA = {}
+    return _SITE_DATA
+
+
+def _pick(path):
+    cur = site_data()
+    for k in path.split("."):
+        if isinstance(cur, list) and k.isdigit():
+            cur = cur[int(k)] if int(k) < len(cur) else None
+        elif isinstance(cur, dict):
+            cur = cur.get(k)
+        else:
+            return None
+        if cur is None:
+            return None
+    return cur
+
+
+def _esc(t):
+    return str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _with_tax(text):
+    """site.js の withTax と同じ出力（税込を小さく併記）"""
+    import re as _re
+    h = _esc(text)
+    nums = [int(n.replace(",", "")) for n in _re.findall(r"([0-9][0-9,]*)円", h)]
+    nums = [n for n in nums if n]
+    if not nums:
+        return h
+    tag = lambda v: '<small class="tax">（税込 %s円）</small>' % format(int(v * 1.10 + 0.5), ",")
+    if len(nums) == 1:
+        return h + tag(nums[0])
+    return _re.sub(r"([0-9][0-9,]*)円",
+                   lambda m: m.group(0) + (tag(int(m.group(1).replace(",", ""))) if int(m.group(1).replace(",", "") or 0) else ""),
+                   h)
+
+
+def bake_site_data(html):
+    import re as _re
+
+    def fill(m):
+        tag, attrs, inner = m.group(1), m.group(2), m.group(3)
+        key = _re.search(r'data-frank="([^"]+)"', attrs).group(1)
+        v = _pick(key)
+        if v is None or v == "":
+            if "data-frank-hide" in attrs:
+                return f"<{tag}{attrs}></{tag}>"
+            return m.group(0)  # 未確定 → 作者が書いた「近日公開」等をそのまま
+        if isinstance(v, list):
+            inner = "".join("<li>%s</li>" % _esc(i) for i in v)
+        elif isinstance(v, (dict, bool)):
+            return m.group(0)
+        elif "data-tax" in attrs:
+            inner = _with_tax(v)
+        else:
+            inner = _esc(v)
+        return f"<{tag}{attrs}>{inner}</{tag}>"
+
+    html = _re.sub(r'<(\w+)((?:\s[^<>]*?)?\sdata-frank="[^"]+"[^<>]*)>(.*?)</\1>', fill, html, flags=_re.S)
+
+    tel = _pick("store.tel")
+    if tel:
+        html = html.replace('<a data-tel>近日公開</a>', f'<a data-tel href="tel:{tel.replace("-", "")}">{tel}</a>')
+    for key in ("links.instagram", "store.mapUrl", "links.line"):
+        v = _pick(key)
+        if v:
+            html = html.replace(f'<a data-link="{key}"', f'<a data-link="{key}" href="{v}"')
+    line = _pick("links.line")
+    if line:
+        html = html.replace('href="#" data-cta="line"', f'href="{line}" data-cta="line" target="_blank" rel="noopener"')
+    trial = _pick("links.trialBooking")
+    if trial:
+        html = html.replace('href="#" data-cta="trial"', f'href="{trial}" data-cta="trial"')
+    join = _pick("links.joinWeb")
+    if join:
+        html = html.replace('<a data-link="links.joinWeb"', f'<a data-link="links.joinWeb" href="{join}"')
+    # ホームへのリンクは / に統一（canonical と揃える）
+    html = html.replace('href="index.html"', 'href="/"')
+    return html
+
+
 def write(name, body):
     path = os.path.join(HERE, name)
+    if name.endswith(".html"):
+        body = bake_site_data(body)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(body)
     print("  wrote", name, "(%d bytes)" % len(body.encode("utf-8")))
@@ -490,8 +640,8 @@ def build_index():
     ★ 各ブロックの文章は2〜4行まで。詳しい話は下層ページに逃がすこと。
     """
     b = head(
-        "FRANK GOLF｜姫路・土山のインドアゴルフ｜体験レッスン無料",
-        "姫路・土山のインドアゴルフスクール。所属レッスンプロ「らら」のマンツーマンレッスンと最新シミュレーター。体験レッスン（約55分）は通常3,300円のところ無料。2026年9月2日プレオープン。",
+        "姫路のインドアゴルフ・ゴルフスクール｜FRANK GOLF（土山）｜体験レッスン無料",
+        "姫路市土山のインドアゴルフスクール FRANK GOLF（フランクゴルフ）。TrackMan 4など最新シミュレーター3打席、所属レッスンプロのマンツーマンレッスン、駐車場20台無料。月額9,800円〜。体験レッスン（約55分）は通常3,300円のところ無料。",
         "home",
         jsonld=jsonld_business(),
     )
@@ -502,8 +652,9 @@ def build_index():
 <section class="phero">
   <div class="wrap phero__in">
     <div>
-      <p class="pill pill--green"><span data-preopen>{PREOPEN}</span> プレオープン ／ 姫路・土山</p>
+      <p class="pill pill--green">2026年9月 OPEN ／ 姫路・土山（駐車場20台無料）</p>
       <h1 class="phero__copy">
+        <span class="s0">姫路・土山のインドアゴルフスクール</span>
         <span class="s1">ゴルフは、</span>
         <span class="s2">教わると<span class="hl">面白い</span>。</span>
       </h1>
@@ -546,6 +697,24 @@ def build_index():
         <span class="bnr__note">通い放題プランあり ／ 全営業日ご利用OK</span>
       </a>
     </div>
+  </div>
+</section>
+
+<!-- 2.5 お悩みから探す（#229: 検索意図ごとの記事へ） -->
+<section class="sec" style="padding-top:0">
+  <div class="wrap rv">
+    <p class="pill">FIND YOURS</p>
+    <h2 class="ph" style="font-size:clamp(1.3rem,3.4vw,2rem)">あなたに近いものから、どうぞ。</h2>
+    <ul class="intent-grid">
+      <li><a href="himeji-golf-school-beginner.html"><b>初心者</b>なら<span>握り方から。手ぶらで体験</span></a></li>
+      <li><a href="himeji-golf-lesson-women.html"><b>女性一人</b>でも<span>完全予約制・女性プロ在籍</span></a></li>
+      <li><a href="himeji-golf-lesson-private.html"><b>マンツーマン</b>で直したい<span>所属プロ×TrackMan 4</span></a></li>
+      <li><a href="himeji-golf-range-unlimited.html"><b>通い放題</b>で練習したい<span>月13,800円・1日1時間</span></a></li>
+      <li><a href="indoor-golf-cost.html"><b>料金</b>を先に知りたい<span>初期費用と月額の内訳</span></a></li>
+      <li><a href="himeji-golf-bar.html"><b>ゴルフバー</b>を探している<span>打席とバーがひと続き</span></a></li>
+      <li><a href="corporate.html"><b>法人・接待</b>で使いたい<span>会社契約・同伴無料プラン</span></a></li>
+      <li><a href="area.html"><b>たつの・太子・高砂・加古川</b>から<span>駐車場20台・平日22時まで</span></a></li>
+    </ul>
   </div>
 </section>
 
@@ -719,6 +888,26 @@ def build_index():
   </div>
 </section>
 
+<!-- 基本情報（#229: 検索エンジン・AIが引用しやすい定義文＋一覧） -->
+<section class="sec sec--alt">
+  <div class="wrap rv" style="max-width:880px">
+    <p class="pill">ABOUT</p>
+    <h2 class="ph" style="font-size:clamp(1.3rem,3.4vw,2rem)">FRANK GOLF とは</h2>
+    <p class="ph-sub" style="text-align:left">FRANK GOLF（フランクゴルフ）は、兵庫県姫路市土山にある会員制のインドアゴルフスクール・ラウンジです。TrackMan 4 など3台のシミュレーター打席、所属レッスンプロによるマンツーマンレッスン、バーカウンター併設のラウンジをひとつにし、株式会社YOZANが運営しています。2026年9月オープン。</p>
+    <dl class="spec spec--wide">
+      <div class="spec__row"><dt class="spec__k">所在地</dt><dd class="spec__v">〒670-0996 <span data-frank="store.address">兵庫県姫路市土山6-6-1</span></dd></div>
+      <div class="spec__row"><dt class="spec__k">電話</dt><dd class="spec__v"><a data-tel>近日公開</a></dd></div>
+      <div class="spec__row"><dt class="spec__k">営業時間</dt><dd class="spec__v" data-frank="store.hours">近日公開</dd></div>
+      <div class="spec__row"><dt class="spec__k">定休日</dt><dd class="spec__v" data-frank="store.holiday">近日公開</dd></div>
+      <div class="spec__row"><dt class="spec__k">駐車場</dt><dd class="spec__v" data-frank="store.parking">近日公開</dd></div>
+      <div class="spec__row"><dt class="spec__k">打席・計測器</dt><dd class="spec__v" data-frank="store.simulator">近日公開</dd></div>
+      <div class="spec__row"><dt class="spec__k">月会費（税抜）</dt><dd class="spec__v">ライト 9,800円（月4回）／ レギュラー 13,800円（1日1時間 通い放題）／ マスター 19,800円（1日最大2時間）</dd></div>
+      <div class="spec__row"><dt class="spec__k">体験</dt><dd class="spec__v">無料（通常3,300円 税込）・約55分・手ぶらOK</dd></div>
+      <div class="spec__row"><dt class="spec__k">運営</dt><dd class="spec__v" data-frank="store.company">株式会社YOZAN</dd></div>
+    </dl>
+  </div>
+</section>
+
 <!-- 10. 新着情報（0件なら自動で非表示） -->
 <section class="sec" id="news" data-news-section hidden>
   <div class="wrap" style="max-width:880px">
@@ -807,23 +996,25 @@ HOME_FAQ = [
      "体験のご予約は、本サイトの「体験予約」ボタンから、カレンダーで日時を選ぶだけでその場で確定します（会員登録・ログイン不要）。会員の方の打席予約は、会員ログイン後のWeb予約からお取りいただけます。"),
     ("お酒が飲めなくてもラウンジは使えますか。",
      "もちろんです。ソフトドリンクもご用意します。ラウンジは、お酒を飲む場所というより、ゴルフの話をする場所だと考えています。"),
-    ("プレオープンはいつですか。",
-     f"{PREOPEN}に、姫路・土山でプレオープンいたします。料金・営業時間・設備の詳細は、決まり次第このサイトと公式LINEでお知らせいたします。"),
+    ("場所はどこですか。駐車場はありますか。",
+     "兵庫県姫路市土山6-6-1（〒670-0996）です。駐車場は20台・無料でご用意しています。営業時間は平日10:00〜22:00、土日祝9:00〜20:00、定休日は毎週火曜日です。"),
 ]
 
 ALL_FAQ = HOME_FAQ + [
-    ("駐車場はありますか。",
-     "ご用意する予定です。台数については近日公開いたします。"),
+    ("姫路市外からでも通えますか。",
+     "はい。お車でのご来店に便利な立地で、駐車場20台を無料でご用意しています。姫路市南部（土山・御着・別所）のほか、たつの市・太子町・高砂市・加古川市方面からのご来店も想定しています。"),
     ("レッスンは毎回受けられますか。",
-     "レッスンの形式・回数については現在検討中です。決まり次第お知らせいたします。"),
+     "会員の方は、所属プロによるワンポイントレッスン（約5分）を無料で受けられます。じっくり見てほしいときは25分のマンツーマンレッスン（2,500円・税抜）をチケット制でご利用いただけます。"),
     ("クラブを持っていません。",
-     "お持ちでなくても始められます。レンタルの有無や内容については近日公開いたします。"),
+     "お持ちでなくても始められます。体験レッスンは手ぶらでOKです。ご入会後のレンタルについては、受付でお気軽にお尋ねください。"),
+    ("どんなシミュレーターがありますか。",
+     "TrackMan 4・DTECT・OKONGOLF の3台を全3打席に備えています（うち1打席はレフティ左右打席対応）。飛距離やクラブ軌道などの数字を見ながら、感覚ではなくデータで練習できます。"),
     ("法人での利用はできますか。",
      "はい。接待・商談でのご利用、福利厚生としての導入、法人同士の交流の場としてのご利用を想定しています。詳しくは「法人でのご利用」をご覧いただくか、公式LINEからお問い合わせください。"),
     ("女性一人でも利用しやすいですか。",
      "はい。完全予約制で落ち着いた少人数制の環境です。ラウンジもカウンター中心で、お一人でも過ごしやすい設計にしています。"),
     ("見学だけでもできますか。",
-     "はい。公式LINEからお気軽にご連絡ください。プレオープン日に向けて、順次ご案内いたします。"),
+     "はい。公式LINEまたはお電話（079-260-6671）でお気軽にご連絡ください。営業時間内であればご案内できます。"),
 ]
 
 
@@ -831,7 +1022,7 @@ ALL_FAQ = HOME_FAQ + [
 # 下層ページ
 # ------------------------------------------------------------------
 def build_concept():
-    b = head("ブランドコンセプト｜FRANK GOLF",
+    b = head("ブランドコンセプト｜姫路・土山のインドアゴルフ FRANK GOLF",
              "打って、教わって、語れる。姫路・土山のフランクなゴルフ基地。FRANK GOLFのブランドコンセプトと、名前に込めた意味。",
              "concept")
     b += page_head("コンセプト", "CONCEPT", "打って、教わって、語れる。",
@@ -930,8 +1121,8 @@ def build_concept():
 
 
 def build_facility():
-    b = head("施設・設備｜FRANK GOLF",
-             "打席とラウンジがひと続きに。FRANK GOLFでの過ごし方をご紹介します。姫路・土山、2026年9月2日プレオープン。",
+    b = head("施設・設備｜TrackMan 4 完備の姫路のインドアゴルフ練習場｜FRANK GOLF",
+             "姫路・土山のインドアゴルフ FRANK GOLF の施設・設備。TrackMan 4・DTECT・OKONGOLF のシミュレーター3打席（レフティ対応打席あり）、バーカウンター併設のラウンジ、駐車場20台無料。",
              "facility")
     b += page_head("施設・設備", "FACILITY", "打って、終わりじゃない。",
                    "設備の一覧ではなく、ここでの過ごし方でご紹介します。")
@@ -1062,8 +1253,8 @@ def build_facility():
 
 
 def build_lesson():
-    b = head("レッスン｜FRANK GOLF",
-             "プロによるレッスンと、シミュレーターのデータ分析。感覚ではなく、数字で自分のスイングを知る。姫路・土山のFRANK GOLF。",
+    b = head("姫路のゴルフレッスン｜所属プロのマンツーマン×データ分析｜FRANK GOLF（土山）",
+             "姫路でゴルフレッスンなら FRANK GOLF（土山）。所属レッスンプロが常駐し、会員はワンポイントレッスンを無料で受けられます。25分マンツーマンは2,500円（税抜）。TrackMan 4 の数字でスイングを確かめる、初心者歓迎のゴルフスクールです。",
              "lesson")
     b += page_head("レッスン", "LESSON", "プロに教わる。データで確かめる。",
                    "自己流の限界は、たいてい「何が悪いか分からない」ところから来ます。")
@@ -1154,7 +1345,7 @@ def build_lesson():
 
 
 def build_lounge():
-    b = head("バー・ラウンジ｜FRANK GOLF",
+    b = head("ゴルフバー・ラウンジ｜姫路でゴルフ談義ができるバー｜FRANK GOLF",
              "打席とひと続きのバー・ラウンジ。FRANK GOLFの中心的な価値です。気取らずに集まれる、大人の社交場。",
              "lounge")
     b += page_head("バー・ラウンジ", "BAR &amp; LOUNGE", "ここが、FRANK GOLFの中心です。",
@@ -1222,7 +1413,7 @@ def build_lounge():
 
 
 def build_community():
-    b = head("会員コミュニティ・イベント｜FRANK GOLF",
+    b = head("会員コミュニティ・イベント｜姫路のゴルフ仲間づくり｜FRANK GOLF",
              "会員限定コンペ、ラウンドイベント、初心者向け交流会、ゴルフ観戦、法人交流。一緒に回る仲間が見つかる場所。",
              "community")
     b += page_head("コミュニティ", "COMMUNITY", "練習仲間ができると、ゴルフはもっと面白い。",
@@ -1290,8 +1481,8 @@ def build_community():
 
 
 def build_plan():
-    b = head("料金・会員プラン｜FRANK GOLF",
-             "FRANK GOLFの会員プランと料金。2026年9月2日プレオープン、姫路・土山。",
+    b = head("料金・会員プラン｜姫路のインドアゴルフ 月額9,800円〜｜FRANK GOLF",
+             "姫路・土山のインドアゴルフ FRANK GOLF の料金。ライト9,800円／レギュラー13,800円（1日1時間 通い放題）／マスター19,800円（税抜・月額）。法人プランあり。2026年内のご入会は入会金5,500円が無料。",
              "plan")
     b += page_head("料金・会員プラン", "PLAN &amp; PRICE", "会員プラン",
                    "料金・プラン内容は現在準備中です。決まり次第、本ページと公式LINEでお知らせいたします。")
@@ -1397,7 +1588,7 @@ def build_plan():
 
 
 def build_beginner():
-    b = head("はじめての方へ｜FRANK GOLF",
+    b = head("ゴルフ初心者の方へ｜姫路で手ぶら・人目を気にせず始める｜FRANK GOLF",
              "クラブを持ったことがなくても大丈夫。屋内で人目を気にせず、プロが握り方から。初心者向けの交流会・ラウンド会もご用意します。",
              "beginner")
     b += page_head("はじめての方へ", "FOR BEGINNERS", "はじめての方こそ、フランクに。",
@@ -1466,7 +1657,7 @@ def build_beginner():
 
 
 def build_corporate():
-    b = head("法人でのご利用｜FRANK GOLF",
+    b = head("法人プラン・接待でのご利用｜姫路のインドアゴルフ FRANK GOLF",
              "法人ライト（月39,800円・ご利用者2名様）／法人プレミアム（月59,800円・ご利用者の人数制限なし・同伴無料）。ご利用者は入会後に会員ページからご登録いただけます。接待・商談、福利厚生、法人交流。姫路・土山。",
              "corporate")
     b += page_head("法人でのご利用", "CORPORATE", "接待の前に、まずここで一度。",
@@ -1612,11 +1803,11 @@ def build_corporate():
 
 
 def build_access():
-    b = head("アクセス｜FRANK GOLF",
-             "FRANK GOLF は姫路・土山に2026年9月2日プレオープン。所在地・営業時間・駐車場のご案内。",
+    b = head("アクセス・駐車場20台｜兵庫県姫路市土山6-6-1｜FRANK GOLF",
+             "FRANK GOLF（フランクゴルフ）は 〒670-0996 兵庫県姫路市土山6-6-1。TEL 079-260-6671。平日10:00〜22:00／土日祝9:00〜20:00、火曜定休。駐車場20台無料。姫路市南部・たつの市・太子町・高砂市・加古川市からもお車で。",
              "access")
-    b += page_head("アクセス", "ACCESS", "姫路・土山",
-                   "2026年9月2日プレオープン。詳細は決まり次第お知らせいたします。")
+    b += page_head("アクセス", "ACCESS", "兵庫県姫路市土山6-6-1（駐車場20台・無料）",
+                   "姫路バイパス・国道2号方面からお車でお越しいただきやすい立地です。姫路市内はもちろん、たつの市・太子町・高砂市・加古川市からのご来店も多くお迎えする想定です。")
     b += """
 <section class="sec">
   <div class="wrap">
@@ -1675,7 +1866,7 @@ def build_access():
 
 
 def build_faq():
-    b = head("よくあるご質問｜FRANK GOLF",
+    b = head("よくあるご質問｜姫路のインドアゴルフ FRANK GOLF",
              "FRANK GOLF についてよくいただくご質問。初心者の方、一人での利用、予約方法、ラウンジについてなど。",
              "faq", jsonld=jsonld_faq(ALL_FAQ))
     b += page_head("よくあるご質問", "FAQ", "よくあるご質問",
@@ -1695,7 +1886,7 @@ def build_faq():
 
 
 def build_trial():
-    b = head("体験レッスン無料｜体験のご予約｜FRANK GOLF",
+    b = head("無料体験レッスン（約55分）｜姫路のインドアゴルフ FRANK GOLF",
              "FRANK GOLF の体験レッスンは約55分・通常3,300円のところ無料。プロのマンツーマン指導つき。2026年9月2日、姫路・土山にプレオープン。",
              "trial")
     b += page_head("体験のご予約", "TRIAL", "まずは、一度打ちに来てください。",
@@ -2210,7 +2401,7 @@ def build_lp_trial():
     ])
     b = head("【無料】プロの体験レッスン55分｜姫路・土山のインドアゴルフ FRANK GOLF",
              "姫路・土山のインドアゴルフ FRANK GOLF。所属レッスンプロのマンツーマン体験レッスン（約55分・通常3,300円）がいまなら無料。最新シミュレーター完備・手ぶらでOK・強引な勧誘なし。",
-             "lp-trial", jsonld=faq)
+             "lp-trial", noindex=True, jsonld=faq)
     b += f"""
 <section class="page-head">
   <div class="wrap rv">
@@ -2542,7 +2733,7 @@ def build_terms():
 def build_404():
     b = head("ページが見つかりません｜FRANK GOLF",
              "お探しのページは見つかりませんでした。",
-             "404")
+             "404", noindex=True)
     b += """
 <section class="sec" style="padding-top:calc(var(--nav-h) + var(--bar-h) + 90px)">
   <div class="wrap center" style="max-width:640px">
@@ -2570,14 +2761,19 @@ def build_sitemap():
     if not SITE_URL:
         print("  skip sitemap.xml (SITE_URL 未設定 — ドメイン確定後に _build.py の SITE_URL を設定して再実行)")
         return
-    urls = ["index.html", "concept.html", "facility.html", "lesson.html", "lounge.html",
-            "community.html", "plan.html", "beginner.html", "corporate.html",
-            "access.html", "faq.html", "trial.html", "trial-booking.html",
-            "lp-trial.html", "lp-campaign.html",
-            "tokushoho.html", "privacy.html", "terms.html"]
+    import datetime
+    today = datetime.date.today().isoformat()
+    # (URL, priority)。noindex のページ（lp-trial / 404 / 会員専用の予約画面）は載せない
+    urls = [("home", "1.0"),
+            ("trial", "0.9"), ("plan", "0.9"), ("lesson", "0.9"), ("access", "0.8"),
+            ("facility", "0.8"), ("beginner", "0.8"), ("faq", "0.7"), ("trial-booking", "0.7"),
+            ("concept", "0.6"), ("lounge", "0.6"), ("community", "0.6"), ("corporate", "0.6"),
+            ("lp-campaign", "0.5"),
+            ("column", "0.6")] + [(c["page"], "0.7") for c in COLUMNS + INTENT_COLUMNS] + [
+            ("tokushoho", "0.3"), ("privacy", "0.3"), ("terms", "0.3")]
     body = "\n".join(
-        f"  <url><loc>{abs_url(u)}</loc><priority>{'1.0' if u == 'index.html' else '0.7'}</priority></url>"
-        for u in urls
+        f"  <url><loc>{page_url(p)}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>"
+        for p, pr in urls
     )
     xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -2585,7 +2781,557 @@ def build_sitemap():
 </urlset>
 '''
     write("sitemap.xml", xml)
-    write("robots.txt", f"User-agent: *\nAllow: /\n\nSitemap: {abs_url('sitemap.xml')}\n")
+    ai_bots = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "anthropic-ai",
+               "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "Bytespider", "CCBot", "Amazonbot", "meta-externalagent"]
+    txt = "User-agent: *\nAllow: /\n\n"
+    txt += "# AI検索・AIアシスタントのクローラーも明示的に許可（店舗情報を正しく引用してもらうため）\n"
+    for ua in ai_bots:
+        txt += f"User-agent: {ua}\nAllow: /\n\n"
+    txt += f"Sitemap: {abs_url('sitemap.xml')}\n# AI向けサイト概要: {abs_url('llms.txt')}\n"
+    write("robots.txt", txt)
+
+
+
+# ==================================================================
+# コラム（#229 SEO）— 「姫路 インドアゴルフ」「姫路 ゴルフ 初心者」の検索意図に答える読みもの
+# ==================================================================
+# ★書き方のルール
+#   ・他店の料金・設備を書かない（比較サイトではない。事実確認できない数字は載せない）
+#   ・FRANK の数字は site-data.js と一致させる（ずれると問い合わせで食い違う）
+#   ・「上達します」と言い切らない → 「〜しやすくなります」
+COLUMNS = [
+    {"page": "guide-indoor-golf-himeji", "file": "guide-indoor-golf-himeji.html",
+     "title": "姫路でインドアゴルフを選ぶときの5つのチェックポイント",
+     "sub": "料金・シミュレーター・レッスン・立地・続けやすさ",
+     "desc": "姫路でインドアゴルフを探している方へ。月額料金の見方、シミュレーター（TrackMan など）の違い、レッスンの形式、駐車場・営業時間、続けやすさの5つの観点で、自分に合う施設の選び方をまとめました。",
+     "date": "2026-09-09", "img": "hero-2.jpg",
+     "alt": "姫路のインドアゴルフ FRANK GOLF の打席とシミュレーター"},
+    {"page": "guide-golf-beginner-himeji", "file": "guide-golf-beginner-himeji.html",
+     "title": "ゴルフ初心者が姫路で始めるなら｜最初の3か月の進め方と費用の目安",
+     "sub": "道具は後でいい。まず「打ってみる」から",
+     "desc": "姫路でゴルフを始めたい初心者の方へ。最初に決めること、道具を買う順番、最初の3か月の練習の進め方、インドアゴルフで始める場合の費用の目安、よくある不安への答えをまとめました。",
+     "date": "2026-09-09", "img": "lesson-rara.jpg",
+     "alt": "所属プロによる初心者向けマンツーマンレッスンの様子"},
+    {"page": "guide-trackman", "file": "guide-trackman.html",
+     "title": "TrackMan 4 で何が分かる？｜インドアゴルフの計測データの見方",
+     "sub": "初心者がまず見るべき3つの数字",
+     "desc": "TrackMan 4 はレーダー式の弾道計測器。ボールスピード・ミート率・打ち出し角・スピン量・キャリー・クラブ軌道など、インドアゴルフのシミュレーターで表示される数字の意味と、初心者がまず見るべき3つを解説します。",
+     "date": "2026-09-09", "img": "hero-2.jpg",
+     "alt": "TrackMan 4 を備えたインドアゴルフの打席"},
+]
+for _c in COLUMNS:
+    PAGE_FILE[_c["page"]] = _c["file"]
+    PAGE_LABEL[_c["page"]] = _c["title"]
+PAGE_FILE["column"] = "column.html"
+PAGE_LABEL["column"] = "コラム・読みもの"
+
+
+def jsonld_article(c):
+    import json
+    return json.dumps({
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": c["title"],
+        "description": c["desc"],
+        "image": abs_url("assets/img/" + c["img"]),
+        "datePublished": c["date"],
+        "dateModified": c["date"],
+        "inLanguage": "ja",
+        "mainEntityOfPage": page_url(c["page"]),
+        "author": {"@type": "Organization", "name": "FRANK GOLF", "url": page_url("home")},
+        "publisher": {"@type": "Organization", "name": "FRANK GOLF（株式会社YOZAN）",
+                      "logo": {"@type": "ImageObject", "url": abs_url("assets/ogp.png")}},
+        "about": {"@id": (SITE_URL.rstrip("/") + "/#business") if SITE_URL else "#business"},
+    }, ensure_ascii=False, separators=(",", ":"))
+
+
+def column_head(c):
+    b = head(f'{c["title"]}｜FRANK GOLF 姫路', c["desc"], c["page"], jsonld=jsonld_article(c), og_type="article")
+    b += f"""
+<section class="page-head">
+  <div class="wrap rv">
+    <p class="crumb"><a href="/">HOME</a><span>/</span><a href="column.html">コラム</a><span>/</span>{c["sub"]}</p>
+    <h1 class="article__t">{c["title"]}</h1>
+    <p class="article__meta"><time datetime="{c["date"]}">{c["date"].replace("-", ".")}</time> ／ FRANK GOLF 姫路・土山</p>
+  </div>
+</section>
+<section class="sec" style="padding-top:0">
+  <div class="wrap article rv">
+    <figure class="article__hero"><img src="assets/img/{c["img"]}" alt="{c["alt"]}" width="1600" height="900" loading="lazy"></figure>
+"""
+    return b
+
+
+def column_foot(c, related):
+    lis = "".join(f'<li><a href="{PAGE_FILE[p]}">{PAGE_LABEL[p]}</a></li>' for p in related)
+    return f"""
+    <aside class="article__cta">
+      <p class="article__cta-t">まずは、無料の体験レッスンで打ってみませんか。</p>
+      <p>FRANK GOLF（兵庫県姫路市土山6-6-1・駐車場20台無料）では、所属プロのマンツーマン体験レッスン（約55分・通常3,300円）を無料でご案内しています。手ぶらでOK、強引な勧誘はしません。</p>
+      <p><a class="btn btn--brass" href="#" data-cta="trial">体験レッスンを予約する</a></p>
+    </aside>
+    <nav class="article__rel"><p class="article__rel-t">あわせて読む</p><ul>{lis}</ul></nav>
+  </div>
+</section>
+"""
+
+
+def build_column_index():
+    b = head("コラム・読みもの｜姫路のインドアゴルフ FRANK GOLF",
+             "姫路のインドアゴルフ FRANK GOLF のコラム。インドアゴルフの選び方、初心者の始め方、TrackMan 4 の計測データの見方など、ゴルフを始める・続けるための読みものです。",
+             "column")
+    b += page_head("コラム", "COLUMN", "ゴルフを始める・続けるための読みもの",
+                   "姫路でインドアゴルフやレッスンを探している方に向けて、選び方や練習の進め方をまとめています。")
+    cards = ""
+    for c in INTENT_COLUMNS + COLUMNS:
+        cards += f"""      <a class="card rv column-card" href="{c["file"]}">
+        <img src="assets/img/{c["img"]}" alt="{c["alt"]}" width="800" height="450" loading="lazy">
+        <p class="column-card__date"><time datetime="{c["date"]}">{c["date"].replace("-", ".")}</time></p>
+        <h2 class="column-card__t">{c["title"]}</h2>
+        <p class="card__b">{c["desc"]}</p>
+      </a>
+"""
+    b += f"""
+<section class="sec">
+  <div class="wrap">
+    <div class="grid grid--3">
+{cards}    </div>
+  </div>
+</section>
+"""
+    b += cta_block()
+    b += foot()
+    write("column.html", b)
+
+
+def build_column_indoor():
+    c = COLUMNS[0]
+    b = column_head(c)
+    b += """
+    <p class="article__lead">姫路市内にも、ここ数年でインドアゴルフの施設が増えました。雨でも夜でも打てて、打った球の数字がその場で見える。屋外の練習場とは別の良さがある一方で、「どこを選べばいいのか」は分かりにくいものです。ここでは、施設を見学・体験するときに確かめておきたい5つのポイントをまとめました。</p>
+
+    <h2>1. 料金は「月に何回・1回何時間」で考える</h2>
+    <p>インドアゴルフの料金は、月額定額（通い放題・回数制）と都度払いに大きく分かれます。安く見えても、ご自身の通い方に合っていなければ割高になります。先に決めておきたいのは次の2つです。</p>
+    <ul>
+      <li><b>月に何回行けそうか</b>（週1回なら月4回、仕事帰りに週2〜3回なら月10回前後）</li>
+      <li><b>1回にどれくらい打つか</b>（30分で集中／1時間じっくり／2時間かけてラウンド練習）</li>
+    </ul>
+    <p>そのうえで、入会金・レッスン料・シミュレーターの利用料が月額に含まれているか、別料金かを確認します。FRANK GOLF の場合は、月4回までのライト会員（9,800円）、1日1時間通い放題のレギュラー会員（13,800円）、1日最大2時間のマスター会員（19,800円）の3つで、いずれも税抜・月額です。会員は所属プロのワンポイントレッスンを無料で受けられ、25分のマンツーマンだけ別料金（2,500円・税抜）にしています。</p>
+
+    <h2>2. シミュレーターは「何を測れるか」で選ぶ</h2>
+    <p>シミュレーターは大きく、レーダーで球とクラブを追いかける方式（TrackMan など）と、カメラで撮影して解析する方式に分かれます。飛距離や方向だけなら多くの機種で分かりますが、<b>クラブの軌道・フェースの向き・スピン量</b>まで見たいなら、計測項目を確認してください。数字が多ければよいわけではなく、レッスンで「どの数字を見て直すか」まで案内してもらえるかが大切です。</p>
+    <p>FRANK GOLF では TrackMan 4・DTECT・OKONGOLF の3機種を全3打席に置き、うち1打席はレフティ（左打ち）にも対応しています。数字の見方は <a href="guide-trackman.html">TrackMan 4 で何が分かる？</a> にまとめています。</p>
+
+    <h2>3. レッスンは「誰が・いつ・いくらで」</h2>
+    <p>インドアゴルフには、打席だけを貸す施設と、スクールとして指導がつく施設があります。指導つきでも、プロが常駐しているのか、予約したときだけ来るのか、レッスンは月額に含まれるのかで、実際の使い勝手が大きく変わります。</p>
+    <p>初心者の方ほど、<b>短いワンポイントを高い頻度で受けられる</b>形が向いています。自己流の癖がつく前に、その日のうちに直せるからです。FRANK GOLF は所属レッスンプロが常駐し、会員はワンポイント（約5分）を無料で、じっくり見てほしいときは25分のマンツーマンをチケットで、という2段構えにしています。</p>
+
+    <h2>4. 立地・駐車場・営業時間</h2>
+    <p>姫路はお車で移動する方が多い街です。駅前でない限り、<b>駐車場の台数と無料かどうか</b>は毎回の通いやすさに直結します。あわせて、平日の夜と土日の営業時間、定休日も確認しておきましょう。「行ける時間に開いているか」は、料金と同じくらい続けやすさを左右します。</p>
+    <p>FRANK GOLF は兵庫県姫路市土山6-6-1、駐車場は20台・無料です。営業時間は平日10:00〜22:00、土日祝9:00〜20:00、定休日は毎週火曜日。姫路市南部のほか、たつの市・太子町・高砂市・加古川市方面からもお車で来やすい場所です（<a href="access.html">アクセス</a>）。</p>
+
+    <h2>5. 続けやすい雰囲気かどうか</h2>
+    <p>最後は、見学や体験で感じる雰囲気です。個室・半個室で人目を気にせず打てるか、一人で行っても居心地がよいか、逆に、聞きたいときに聞ける人がいるか。ゴルフは続けた人が上手くなるスポーツなので、<b>「また来たい」と思えるか</b>を大事にしてください。</p>
+    <p>FRANK GOLF は打席とバーカウンターのラウンジがひと続きになっていて、練習の前後にコーヒー一杯分の時間を過ごせます。交流は任意で、打って帰るだけでもまったく問題ありません。</p>
+
+    <h2>まとめ：まず一度、体験で打ってみる</h2>
+    <p>料金・シミュレーター・レッスン・立地・雰囲気の5つは、Webの情報だけでは半分しか分かりません。多くの施設が体験や見学を受け付けているので、候補を2〜3に絞ったら、実際に打席に立ってみることをおすすめします。</p>
+"""
+    b += column_foot(c, ["guide-golf-beginner-himeji", "guide-trackman", "plan", "trial"])
+    b += cta_block()
+    b += foot()
+    write(c["file"], b)
+
+
+def build_column_beginner():
+    c = COLUMNS[1]
+    b = column_head(c)
+    b += """
+    <p class="article__lead">「ゴルフを始めたいけれど、何から手をつければいいのか分からない」。姫路でこの相談をいただくとき、私たちがお伝えしている順番をそのまま書きます。結論から言うと、<b>道具を買う前に、まず一度打ってみる</b>のがいちばんの近道です。</p>
+
+    <h2>最初に決めるのは「何のために」</h2>
+    <p>コースデビューを目指すのか、会社や友人の付き合いで恥をかかない程度に打てればよいのか、運動不足の解消なのか。目的によって、最初の3か月でやることが変わります。決まっていなくても大丈夫ですが、体験のときにコーチへ伝えておくと、練習の組み立てが具体的になります。</p>
+
+    <h2>道具は後でいい。買う順番</h2>
+    <p>クラブ一式を先に買ってしまい、合わなくて買い直す方は少なくありません。おすすめの順番は次のとおりです。</p>
+    <ol>
+      <li><b>まず手ぶらで体験</b>。FRANK GOLF の体験レッスンはクラブをこちらでご用意します</li>
+      <li><b>グローブ</b>（手に合うものを1枚。数千円）</li>
+      <li><b>シューズ</b>（インドアなら普段のスニーカーでも始められます）</li>
+      <li><b>クラブ</b>は、数回レッスンを受けて自分の振り方が見えてから。コーチに相談して選ぶと失敗しにくいです</li>
+    </ol>
+
+    <h2>最初の3か月の進め方（一例）</h2>
+    <h3>1か月目：握り方・構え・7番アイアン</h3>
+    <p>いちばん大事な時期です。握り方と構えは、あとから直すほど時間がかかります。7番アイアンなど1本に絞って、「まっすぐ当たる」感覚を体で覚えます。週1回でも、その日のうちにプロに見てもらえる環境だと、癖がつく前に直せます。</p>
+    <h3>2か月目：ドライバーとアプローチ</h3>
+    <p>飛ばすクラブ（ドライバー）と、グリーン周りの短い距離（アプローチ）を加えます。シミュレーターの数字で、キャリー（落ちるまでの距離）と方向のばらつきを見ながら、番手ごとの「自分の距離」を知っていきます。</p>
+    <h3>3か月目：シミュレーターでラウンド体験 → コースデビュー</h3>
+    <p>シミュレーターの実在コースを回ってみると、ルールの流れや番手選びが自然に身につきます。ここまで来れば、コースデビューは十分現実的です。兵庫県はゴルフ場の多い県で、姫路周辺から行けるコースも豊富です。FRANK GOLF では初心者向けのラウンド会も企画します。</p>
+
+    <h2>費用の目安（インドアゴルフで始める場合）</h2>
+    <p>FRANK GOLF で始める場合の例です（金額は税抜・2026年9月時点）。</p>
+    <ul>
+      <li>体験レッスン（約55分・所属プロのマンツーマン）：<b>0円</b>（通常3,300円・税込）</li>
+      <li>入会金：5,000円 → <b>2026年内のご入会は無料</b></li>
+      <li>月会費：ライト 9,800円（月4回まで）／レギュラー 13,800円（1日1時間 通い放題）／マスター 19,800円（1日最大2時間）</li>
+      <li>レッスン：ワンポイント（約5分）は会員無料／25分マンツーマンは 2,500円</li>
+    </ul>
+    <p>屋外の練習場と違って球数ごとの料金がかからないので、「今日は30分だけ」という通い方でも費用が読みやすいのが、月額制のインドアゴルフの良さです。</p>
+
+    <h2>よくある不安に答えます</h2>
+    <h3>下手なのに行っていいの？</h3>
+    <p>いちばん歓迎しているのが、これから始める方です。屋内の打席なので周りの目はほとんど気になりません。</p>
+    <h3>女性一人でも大丈夫？</h3>
+    <p>完全予約制の少人数制で、打席とラウンジは落ち着いた雰囲気です。お一人でのご利用も多く想定しています。</p>
+    <h3>運動が苦手でも？</h3>
+    <p>ゴルフは力より「同じ動きを繰り返せるか」のスポーツです。数字で確かめながら少しずつ進めれば、運動経験に関係なく上達を実感しやすくなります。</p>
+
+    <h2>まとめ</h2>
+    <p>目的をざっくり決める → 手ぶらで体験 → 道具はあとから → 3か月でコースデビューを目指す。この順番なら、無駄な買い物も遠回りも減らせます。姫路・土山の FRANK GOLF で、最初の一球をご一緒できたらうれしいです。</p>
+"""
+    b += column_foot(c, ["beginner", "guide-indoor-golf-himeji", "trial", "lesson"])
+    b += cta_block()
+    b += foot()
+    write(c["file"], b)
+
+
+def build_column_trackman():
+    c = COLUMNS[2]
+    b = column_head(c)
+    b += """
+    <p class="article__lead">インドアゴルフの打席に立つと、画面にたくさんの数字が出ます。全部を理解する必要はありません。この記事では、FRANK GOLF でも使っている TrackMan 4 を例に、数字の意味と、初心者がまず見るべき3つをまとめます。</p>
+
+    <h2>TrackMan とは</h2>
+    <p>TrackMan（トラックマン）は、レーダーでボールとクラブの動きを追いかける弾道計測器です。ツアープロの練習やクラブフィッティングでも広く使われており、TrackMan 4 は2つのレーダーでクラブの動きとボールの飛びを別々に捉えます。屋内では、打った直後の数値からその先の弾道を計算して表示します。</p>
+
+    <h2>画面に出る主な数字</h2>
+    <dl class="article__dl">
+      <dt>ボールスピード（Ball Speed）</dt><dd>打った直後の球の速さ。飛距離にいちばん直結します。</dd>
+      <dt>クラブスピード（Club Speed）</dt><dd>インパクト時のヘッドの速さ。「振る速さ」です。</dd>
+      <dt>ミート率（Smash Factor）</dt><dd>ボールスピード ÷ クラブスピード。芯に当たっているほど高くなります。ドライバーで1.4台後半が一つの目安です。</dd>
+      <dt>打ち出し角（Launch Angle）</dt><dd>球が飛び出す角度。低すぎても高すぎても距離をロスします。</dd>
+      <dt>スピン量（Spin Rate）</dt><dd>バックスピンの回転数。多すぎると吹け上がり、少なすぎると失速します。</dd>
+      <dt>キャリー（Carry）</dt><dd>球が地面に落ちるまでの距離。コースで番手を選ぶときの基準になります。</dd>
+      <dt>クラブパス／フェース角（Club Path / Face Angle）</dt><dd>ヘッドの通り道と、当たった瞬間のフェースの向き。球の曲がり方（スライス・フック）の原因がここに出ます。</dd>
+    </dl>
+
+    <h2>初心者がまず見る3つ</h2>
+    <h3>1. キャリー ── 自分の「番手ごとの距離」を知る</h3>
+    <p>最初に知るべきは、最大飛距離ではなく<b>平均のキャリー</b>です。同じ番手を10球打って、飛びすぎた球と当たり損ないを除いた真ん中あたりが、コースで頼れる距離になります。</p>
+    <h3>2. ミート率 ── 「芯に当たったか」を数字で確かめる</h3>
+    <p>感覚では分かりにくい「芯に当たった」が、ミート率なら一目で分かります。振る速さを上げるより、まずミート率を安定させるほうが、初心者の飛距離は伸びやすい傾向があります。</p>
+    <h3>3. フェース角の傾向 ── 曲がりの原因を一つに絞る</h3>
+    <p>スライスが続くとき、原因は軌道かフェースの向きか、その両方です。数球の傾向を見ると「毎回フェースが開いている」のように原因が絞れるので、直すポイントが一つになります。ここはプロと一緒に見るのがいちばん早いところです。</p>
+
+    <h2>数字との付き合い方</h2>
+    <ul>
+      <li><b>毎回同じ番手・同じ設定で記録する</b>。条件が揃わないと比べられません</li>
+      <li><b>1球ではなく平均で見る</b>。良い球だけ覚えていても上達につながりません</li>
+      <li><b>一度に直すのは一つ</b>。数字が多いほど、あれもこれもと欲張りがちです</li>
+      <li><b>プロの目と組み合わせる</b>。数字は「何が起きたか」を教えてくれますが、「どう直すか」は指導の領域です</li>
+    </ul>
+
+    <h2>FRANK GOLF での使い方</h2>
+    <p>FRANK GOLF（姫路・土山）では TrackMan 4 のほか DTECT・OKONGOLF を全3打席に備えています。所属レッスンプロが常駐しているので、会員はワンポイントレッスン（約5分）で「今日はこの数字を見よう」と一緒に決めることができます。体験レッスン（無料・約55分）でも、実際に数字を見ながら打っていただけます。</p>
+"""
+    b += column_foot(c, ["lesson", "facility", "guide-indoor-golf-himeji", "trial"])
+    b += cta_block()
+    b += foot()
+    write(c["file"], b)
+
+
+
+# ---- 検索意図ごとのランディング記事（#229・ユーザー指示「初心者 スクール → 初心者ならFRANK GOLFへ」）----
+# Google はキーワードごとにトップページの見出しを出し分ける仕組み（クローキング）を禁止しているので、
+# 代わりに「キーワード1つ＝記事1本」を用意し、トップの「お悩みから探す」から内部リンクで束ねる。
+# 各記事: page / title / sub / desc / img / alt / h1（検索者に向けた一言）/ body / faq（Q&A 3つ → FAQPage 構造化データ）/ related
+INTENT_COLUMNS = [
+ {"page": "himeji-golf-school-beginner", "file": "himeji-golf-school-beginner.html",
+  "kw": "姫路 ゴルフスクール 初心者", "title": "姫路でゴルフスクールを探している初心者の方へ｜初心者なら FRANK GOLF",
+  "sub": "はじめての人をいちばん歓迎するスクールです", "date": "2026-09-09", "img": "lesson-rara.jpg",
+  "alt": "姫路のゴルフスクール FRANK GOLF で初心者がプロのレッスンを受けている様子",
+  "desc": "姫路で初心者向けのゴルフスクールをお探しなら FRANK GOLF（土山）。所属プロのマンツーマン、屋内で人目を気にしない打席、手ぶらでOKの無料体験（約55分）、月額9,800円〜。初心者がスクール選びで確かめたい点もまとめました。",
+  "body": """
+    <p class="article__lead"><b>結論から。姫路で「初心者歓迎」のゴルフスクールを探しているなら、FRANK GOLF（兵庫県姫路市土山6-6-1）へ一度打ちに来てください。</b>クラブを握ったことがなくても大丈夫です。所属レッスンプロが握り方から見て、屋内の打席なので周りの目も気になりません。体験レッスン（約55分・通常3,300円）は無料で、手ぶらでお越しいただけます。</p>
+    <h2>初心者がゴルフスクールを選ぶとき、確かめたい4つ</h2>
+    <h3>1. 「初心者専用の時間」ではなく「初心者でも普通に通える」か</h3>
+    <p>初心者向けクラスがある施設は多いのですが、クラスの時間に予定を合わせられないと続きません。予約制で、行ける時間にプロがいる形のほうが、仕事帰りや休日に無理なく続けられます。FRANK GOLF は完全予約制で、所属プロが常駐しています。</p>
+    <h3>2. 短いレッスンを、高い頻度で受けられるか</h3>
+    <p>初心者に必要なのは、長いレッスンを月に1回受けることより、<b>その日の癖をその日に直してもらう</b>ことです。FRANK GOLF では会員の方はワンポイントレッスン（約5分）を無料で何度でも受けられ、じっくり見てほしいときだけ25分のマンツーマン（2,500円・税抜）を足せます。</p>
+    <h3>3. 数字で確かめられるか</h3>
+    <p>「今のは良かった」を感覚だけで終わらせないために、TrackMan 4 などの計測器があると上達が見えやすくなります。飛距離や芯に当たった度合い（ミート率）が数字で出るので、初心者ほど「変わった」が分かります。</p>
+    <h3>4. 通いやすさ（駐車場・営業時間）</h3>
+    <p>姫路はお車で通う方が大半です。駐車場20台・無料、平日は22時まで営業しているので、仕事帰りにも寄れます。定休日は毎週火曜日です。</p>
+    <h2>FRANK GOLF の初心者向け体験レッスン（約55分・無料）</h2>
+    <p>受付 → カウンセリング（ゴルフ歴・目標をうかがいます） → 打席のご案内 → プロのマンツーマン体験レッスン（約30分） → 料金のご説明。強引な勧誘はいたしません。持ち帰ってご検討いただいて大丈夫です。</p>
+    <h2>費用の目安</h2>
+    <ul>
+      <li>体験レッスン：0円（通常3,300円・税込）</li>
+      <li>入会金：5,000円（税抜）→ 2026年内のご入会は無料</li>
+      <li>月会費：ライト 9,800円／レギュラー 13,800円（1日1時間 通い放題）／マスター 19,800円（税抜）</li>
+      <li>ワンポイントレッスン：会員無料　／　25分マンツーマン：2,500円（税抜）</li>
+    </ul>
+    <p>最初の3か月の進め方は <a href="guide-golf-beginner-himeji.html">ゴルフ初心者が姫路で始めるなら</a> に、道具の買い方も含めて書いています。</p>
+""",
+  "faq": [
+    ("まったくの未経験でもゴルフスクールに通っていいですか？", "はい。FRANK GOLF がいちばん歓迎しているのは、これから始める方です。握り方・構えからプロがお伝えします。"),
+    ("初心者の体験レッスンは何を持っていけばいいですか？", "手ぶらでお越しください。クラブはこちらでご用意します。動きやすい服装と、あればグローブをお持ちください。"),
+    ("姫路のどこにありますか？", "兵庫県姫路市土山6-6-1（〒670-0996）です。駐車場20台・無料。平日10:00〜22:00、土日祝9:00〜20:00、火曜定休です。"),
+  ],
+  "related": ["guide-golf-beginner-himeji", "beginner", "trial", "plan"]},
+
+ {"page": "himeji-golf-lesson-women", "file": "himeji-golf-lesson-women.html",
+  "kw": "姫路 ゴルフレッスン 女性", "title": "女性が一人でも通いやすい姫路のゴルフレッスン｜FRANK GOLF",
+  "sub": "人目を気にせず、自分のペースで", "date": "2026-09-09", "img": "lesson-rara.jpg",
+  "alt": "女性プロコーチによるマンツーマンのゴルフレッスン（姫路 FRANK GOLF）",
+  "desc": "姫路で女性が一人でも通いやすいゴルフレッスンをお探しの方へ。FRANK GOLF（土山）は完全予約制の屋内打席、女性の所属レッスンプロ、無料の体験レッスン（約55分・手ぶらOK）。始めやすさと続けやすさをまとめました。",
+  "body": """
+    <p class="article__lead">「興味はあるけれど、打ちっぱなしに一人で行くのは気が引ける」。姫路で女性の方からいちばん多くいただく声です。<b>FRANK GOLF（姫路・土山）は、完全予約制の屋内打席で、女性の所属レッスンプロがマンツーマンで見ます。</b>周りの目を気にせず、ご自身のペースで始められます。</p>
+    <h2>女性が一人でも通いやすい理由</h2>
+    <ul>
+      <li><b>完全予約制の屋内打席</b>。隣の打席から見られる屋外練習場とは違い、落ち着いて打てます</li>
+      <li><b>女性のレッスンプロが所属</b>。メインコーチの「らら」（小川うらら／USGTF レベルⅢ）が常駐。YouTube「RaRa LESSON」でも初心者向けに発信しています</li>
+      <li><b>手ぶらでOK</b>。体験はクラブをこちらでご用意。道具は始めてから、コーチと相談して選べます</li>
+      <li><b>お車で来やすい</b>。駐車場20台・無料。平日は22時まで、土日祝は9時から</li>
+      <li><b>カフェ感覚のラウンジ</b>。コーヒーやソフトドリンクがあり、お酒が飲めなくても過ごせます。交流は任意です</li>
+    </ul>
+    <h2>レッスンの形</h2>
+    <p>会員の方は、所属プロのワンポイントレッスン（約5分）を無料で受けられます。「今日はスライスを直したい」「番手ごとの距離を知りたい」といった一点を、その日のうちに。じっくり見てほしいときは25分のマンツーマン（2,500円・税抜）を足せます。TrackMan 4 の数字で、変化を自分の目で確かめられます。</p>
+    <h2>まずは無料の体験レッスンから</h2>
+    <p>約55分、通常3,300円のところ無料です。カウンセリングで目標をうかがってから、実際に打っていただきます。ご入会の説明はしますが、強引なお誘いはしません。</p>
+""",
+  "faq": [
+    ("女性一人でも浮きませんか？", "完全予約制で、打席は屋内。お一人でのご利用を前提に設計しています。女性の所属プロもいます。"),
+    ("服装は？", "動きやすい服装で大丈夫です。インドアなのでスニーカーでも始められます。"),
+    ("お酒を飲まなくてもラウンジは使えますか？", "はい。コーヒー・紅茶・ソフトドリンクをご用意しています。ラウンジの利用も交流も任意です。"),
+  ],
+  "related": ["himeji-golf-school-beginner", "lesson", "lounge", "trial"]},
+
+ {"page": "himeji-golf-lesson-private", "file": "himeji-golf-lesson-private.html",
+  "kw": "姫路 ゴルフレッスン マンツーマン", "title": "姫路でマンツーマンのゴルフレッスンを受けるなら｜所属プロ×TrackMan 4 の FRANK GOLF",
+  "sub": "感覚ではなく、数字で直す", "date": "2026-09-09", "img": "lesson-rara-wide.jpg",
+  "alt": "TrackMan 4 のデータを見ながらのマンツーマンレッスン（姫路 FRANK GOLF）",
+  "desc": "姫路でマンツーマンのゴルフレッスンをお探しの方へ。FRANK GOLF（土山）は所属レッスンプロが常駐、TrackMan 4 の計測データで原因を一つに絞って直します。会員はワンポイント無料、25分マンツーマン2,500円（税抜）。",
+  "body": """
+    <p class="article__lead">グループレッスンで「順番待ちの時間が長い」「自分の番になると質問が浮かばない」と感じたことはありませんか。<b>FRANK GOLF（姫路・土山）のレッスンは、所属プロによるマンツーマンが基本です。</b>TrackMan 4 の計測データを一緒に見て、「今日はこの一点」を決めて直します。</p>
+    <h2>FRANK GOLF のマンツーマンレッスン</h2>
+    <dl class="article__dl">
+      <dt>ワンポイント（約5分）</dt><dd>会員は無料・回数制限なしの感覚で。練習中に「ちょっと見てください」と呼べる距離感です</dd>
+      <dt>25分マンツーマン</dt><dd>2,500円（税抜）。チケット制。スイングの組み立てから見直したいとき、コースデビュー前の総点検に</dd>
+      <dt>体験レッスン（約55分）</dt><dd>無料（通常3,300円・税込）。カウンセリング＋約30分のマンツーマン</dd>
+    </dl>
+    <h2>「数字で直す」とはどういうことか</h2>
+    <p>スライスが出るとき、原因はクラブの軌道か、フェースの向きか、その両方です。目で見ただけでは切り分けにくいのですが、TrackMan 4 はクラブパス・フェース角・打ち出し角・スピン量を1球ごとに出します。プロがその数字を読み、<b>直すポイントを一つに絞る</b>。だから短いレッスンでも変化が出やすくなります。数字の見方は <a href="guide-trackman.html">TrackMan 4 で何が分かる？</a> にまとめました。</p>
+    <h2>コーチ</h2>
+    <p>メインコーチは所属レッスンプロの「らら」（小川うらら）。USGTF レベルⅢ、YouTube「RaRa LESSON」で6万人超に向けて発信しています。初心者から100切り・90切りを目指す方まで、目的に合わせて組み立てます。</p>
+    <h2>場所・営業時間</h2>
+    <p>兵庫県姫路市土山6-6-1（駐車場20台・無料）。平日10:00〜22:00、土日祝9:00〜20:00、火曜定休。仕事帰りの30分レッスンにも使えます。</p>
+""",
+  "faq": [
+    ("レッスンは予約が必要ですか？", "打席が完全予約制です。ワンポイントはご利用中にお声がけください。25分マンツーマンはご予約時にレッスンを選べます。"),
+    ("経験者・中級者でも受けられますか？", "はい。TrackMan 4 の数字をもとに、スコアの詰まっているところを一緒に探します。"),
+    ("レッスンだけ受けて、練習は他でしてもいいですか？", "もちろんです。ただ、同じ計測器で継続して数字を見るほうが変化が追いやすいので、会員プランとの組み合わせをおすすめしています。"),
+  ],
+  "related": ["lesson", "guide-trackman", "himeji-golf-school-beginner", "plan"]},
+
+ {"page": "himeji-golf-bar", "file": "himeji-golf-bar.html",
+  "kw": "姫路 ゴルフバー", "title": "姫路のゴルフバーなら FRANK GOLF｜打席とバーカウンターがひと続きのラウンジ",
+  "sub": "打って、教わって、語れる", "date": "2026-09-09", "img": "lounge.jpg",
+  "alt": "姫路のゴルフバー FRANK GOLF のバーカウンター",
+  "desc": "姫路でゴルフバーをお探しなら FRANK GOLF（土山）。シミュレーター3打席とバーカウンターのラウンジがひと続き。会員制で落ち着いた雰囲気、ゴルフ談義・ラウンドの反省会・コンペの打ち上げに。駐車場20台無料。",
+  "body": """
+    <p class="article__lead">FRANK GOLF は、元ゴルフバーのバーカウンターを受け継いだ、姫路・土山のインドアゴルフラウンジです。<b>打席とバーがひと続き</b>なので、練習の前後にゴルフの話をしながら一杯──という時間の使い方ができます。</p>
+    <h2>ゴルフバーとしての使い方</h2>
+    <ul>
+      <li><b>ラウンド後の反省会</b>。シミュレーターで「あのホールのあの1打」を打ち直しながら</li>
+      <li><b>ゴルフ仲間との待ち合わせ</b>。カウンターでコーヒーやソーダを飲みながら、次のラウンドの相談</li>
+      <li><b>会員限定コンペの打ち上げ</b>。ソファ席・パーティースペースもあります</li>
+      <li><b>一人でふらっと</b>。カウンター中心なので、お一人でも過ごしやすい席配置です</li>
+    </ul>
+    <h2>ドリンク</h2>
+    <p>コーヒー・紅茶・ソフトドリンク 350円〜、FRANK オリジナルソーダ・ノンアルコールカクテル 500円〜（税込・会員価格あり）。お酒が飲めない方も、お車の方も過ごせるメニューにしています。</p>
+    <h2>会員制について</h2>
+    <p>FRANK GOLF は会員制のインドアゴルフです。ラウンジは会員の方と、体験・見学でお越しの方にご利用いただいています。「バーだけ」の営業ではなく、練習とセットで過ごしていただく場所です。まずは無料の体験レッスン（約55分）でラウンジの雰囲気もご覧ください。</p>
+    <h2>場所</h2>
+    <p>兵庫県姫路市土山6-6-1。駐車場20台・無料。平日10:00〜22:00、土日祝9:00〜20:00、火曜定休。</p>
+""",
+  "faq": [
+    ("会員でなくてもバーだけ利用できますか？", "ラウンジは会員の方と、体験・見学でお越しの方にご利用いただいています。まずは無料の体験レッスンでご来店ください。"),
+    ("お酒は飲めますか？", "現在のメニューはコーヒー・紅茶・ソフトドリンク・オリジナルソーダ・ノンアルコールカクテルです。お車の方も安心してお過ごしいただけます。"),
+    ("何人くらいで使えますか？", "カウンターのほか、ソファ席・パーティースペースがあります。コンペの打ち上げなど人数の多いご利用は公式LINEでご相談ください。"),
+  ],
+  "related": ["lounge", "community", "facility", "trial"]},
+
+ {"page": "himeji-golf-range-unlimited", "file": "himeji-golf-range-unlimited.html",
+  "kw": "姫路 ゴルフ練習場 打ち放題 安い", "title": "姫路で「通い放題」のゴルフ練習場を探している方へ｜月額制インドアという選択",
+  "sub": "球数を数えない練習に変える", "date": "2026-09-09", "img": "hero-2.jpg",
+  "alt": "月額制で通い放題のインドアゴルフ練習場（姫路 FRANK GOLF）",
+  "desc": "姫路で打ち放題・通い放題のゴルフ練習場をお探しの方へ。月額制インドアゴルフ FRANK GOLF（土山）はレギュラー会員13,800円（税抜）で1日1時間通い放題、平日22時まで営業、TrackMan 4 で毎球計測。球数課金との違いを解説します。",
+  "body": """
+    <p class="article__lead">打ちっぱなしの「球数×単価」は、練習するほど費用が増えます。<b>月額制のインドアゴルフなら、球数を気にせず「今日は30分だけ」でも「週3回」でも定額</b>です。FRANK GOLF（姫路・土山）のレギュラー会員は月13,800円（税抜）で1日1時間の通い放題。平日は22時まで開いています。</p>
+    <h2>球数課金と月額制、どちらが向いているか</h2>
+    <p>月に2回、まとめて何百球も打つ方は球数課金でも構いません。一方で、<b>週1回以上・短時間で通いたい方</b>は月額制のほうが費用が読みやすく、ムダ打ちも減ります。1球ごとにお金がかかると「とにかく打つ」練習になりがちですが、定額だと1球ずつ数字を見ながら打てるからです。</p>
+    <h2>FRANK GOLF の会員プラン（税抜・月額）</h2>
+    <ul>
+      <li><b>ライト</b> 9,800円 ── 月4回まで。週1回ペースの方に</li>
+      <li><b>レギュラー</b> 13,800円 ── 全営業日・1日1時間 通い放題。いちばん人気</li>
+      <li><b>マスター</b> 19,800円 ── 全営業日・1日最大2時間。たっぷり打ちたい方に</li>
+    </ul>
+    <p>入会金5,000円（税抜）は2026年内のご入会で無料。会員は所属プロのワンポイントレッスン（約5分）も無料です。</p>
+    <h2>屋外の練習場との違い</h2>
+    <dl class="article__dl">
+      <dt>天候・時間</dt><dd>雨でも夏の夜でも同じ環境。平日は22時まで</dd>
+      <dt>計測</dt><dd>TrackMan 4・DTECT・OKONGOLF が毎球のキャリー・方向・ミート率を表示。「なんとなく良かった」で終わらない</dd>
+      <dt>距離感</dt><dd>実在コースのシミュレーションでラウンド練習も可能</dd>
+      <dt>人目</dt><dd>完全予約制の屋内打席。3打席（うち1打席はレフティ対応）</dd>
+    </dl>
+    <h2>場所・営業時間</h2>
+    <p>兵庫県姫路市土山6-6-1。駐車場20台・無料。平日10:00〜22:00、土日祝9:00〜20:00、火曜定休。姫路市南部・たつの市・太子町・高砂市・加古川市からもお車で。</p>
+""",
+  "faq": [
+    ("1日1時間通い放題とは？", "レギュラー会員は、営業日であれば毎日1時間まで打席を予約してご利用いただけます。予約は前の予約を消化してから次を取る形です。"),
+    ("夜は何時まで？", "平日は22:00まで、土日祝は20:00までです（火曜定休）。"),
+    ("ビジター（都度払い）はありますか？", "現在は会員制でのご案内です。まずは無料の体験レッスン（約55分）をご利用ください。"),
+  ],
+  "related": ["plan", "facility", "guide-indoor-golf-himeji", "trial"]},
+
+ {"page": "indoor-golf-cost", "file": "indoor-golf-cost.html",
+  "kw": "インドアゴルフ 料金 相場 初期費用", "title": "インドアゴルフはいくらかかる？初期費用と月額の内訳｜姫路 FRANK GOLF の場合",
+  "sub": "「安い／高い」の前に、内訳を知る", "date": "2026-09-09", "img": "play.jpg",
+  "alt": "インドアゴルフの打席（姫路 FRANK GOLF）",
+  "desc": "インドアゴルフの料金はいくら？初期費用（入会金・道具）と月額（会費・レッスン）の内訳、月額制と都度払いの違い、続けやすい料金の考え方を解説。姫路 FRANK GOLF の実例（体験0円・入会金2026年内無料・月額9,800円〜）つき。",
+  "body": """
+    <p class="article__lead">「インドアゴルフはいくらくらいしますか？」という質問に一言で答えるのは難しく、<b>初期費用・月額・レッスン料の3つに分けて見る</b>と比べやすくなります。この記事では内訳の考え方と、姫路 FRANK GOLF の実例を書きます。</p>
+    <h2>1. 初期費用</h2>
+    <ul>
+      <li><b>入会金</b>：施設によって無料〜数万円まで幅があります。キャンペーンで無料になる時期も多いので、確認する価値があります</li>
+      <li><b>道具</b>：最初は不要です。体験は手ぶらでOKの施設がほとんど。買うならグローブ→シューズ→クラブの順で、クラブはレッスンを受けてから選ぶと失敗しにくいです</li>
+    </ul>
+    <h2>2. 月額（会費）</h2>
+    <p>月額制は「月◯回まで」「1日◯時間まで通い放題」のように、回数か時間で上限が決まります。安いプランほど回数が少ないので、<b>自分が月に何回・1回何分打つか</b>を先に決めてから選ぶのがコツです。都度払い（ビジター）は1回あたりの単価が高めなので、月2回以上通うなら月額制のほうが割安になることが多いです。</p>
+    <h2>3. レッスン料</h2>
+    <p>ここがいちばん差の出るところです。「打席だけ」の施設はレッスンが別料金か、そもそも無い場合があります。スクール型は月額にレッスンが含まれることが多く、初心者ほどレッスン込みの施設が結果的に安くつきます。</p>
+    <h2>姫路 FRANK GOLF の場合（2026年9月時点・税抜）</h2>
+    <dl class="article__dl">
+      <dt>体験レッスン</dt><dd>0円（通常3,300円・税込）・約55分・所属プロのマンツーマン</dd>
+      <dt>入会金</dt><dd>5,000円 → 2026年内のご入会は無料</dd>
+      <dt>ライト会員</dt><dd>9,800円／月（月4回まで）</dd>
+      <dt>レギュラー会員</dt><dd>13,800円／月（全営業日・1日1時間 通い放題）</dd>
+      <dt>マスター会員</dt><dd>19,800円／月（全営業日・1日最大2時間）</dd>
+      <dt>レッスン</dt><dd>ワンポイント（約5分）は会員無料／25分マンツーマン 2,500円</dd>
+      <dt>法人プラン</dt><dd>ライト 39,800円／プレミアム 59,800円（月額・会社契約）</dd>
+    </dl>
+    <p>表示金額は税抜、カッコ内や店頭表示では税込（消費税10%）を併記しています。</p>
+    <h2>「続けられる料金」が、いちばん安い</h2>
+    <p>3か月で辞めてしまえば、安いプランでも高くつきます。行ける時間に開いているか、駐車場があるか、聞ける人がいるか──料金表に出ない部分が、結局は費用対効果を決めます。まずは体験で確かめてください。</p>
+""",
+  "faq": [
+    ("インドアゴルフの月額はいくらくらい？", "回数制か通い放題かで変わります。FRANK GOLF は月4回9,800円、1日1時間通い放題13,800円、1日2時間19,800円（いずれも税抜）です。"),
+    ("初期費用はいくらかかりますか？", "FRANK GOLF の場合、入会金5,000円（税抜）が2026年内は無料、体験も無料なので、初月の会費から始められます。道具は手ぶらで大丈夫です。"),
+    ("レッスンは別料金ですか？", "所属プロのワンポイントレッスン（約5分）は会員無料です。25分マンツーマンのみ2,500円（税抜）です。"),
+  ],
+  "related": ["plan", "guide-indoor-golf-himeji", "himeji-golf-range-unlimited", "trial"]},
+
+ {"page": "area", "file": "area.html",
+  "kw": "たつの 太子町 高砂 加古川 土山 ゴルフ レッスン", "title": "土山・御着・別所、たつの市・太子町・高砂市・加古川市からのインドアゴルフ｜FRANK GOLF 姫路",
+  "sub": "お車で通いやすい、姫路市南東部の立地", "date": "2026-09-09", "img": "hero-1.jpg",
+  "alt": "駐車場20台を備えた FRANK GOLF 姫路・土山の外観",
+  "desc": "姫路市土山・御着・別所のほか、たつの市・太子町・揖保郡・高砂市・加古川市からインドアゴルフやゴルフレッスンをお探しの方へ。FRANK GOLF は兵庫県姫路市土山6-6-1、駐車場20台無料、平日22時まで。",
+  "body": """
+    <p class="article__lead">FRANK GOLF は兵庫県姫路市土山6-6-1、姫路市の南東部にあります。<b>お車でのご来店を前提に、駐車場を20台・無料</b>でご用意しています。姫路市内はもちろん、近隣の市町からも通いやすい立地です。</p>
+    <h2>対応エリア</h2>
+    <ul>
+      <li><b>姫路市</b>：土山・御着・別所・四郷・花田・飾磨・広畑・網干 ほか市内全域</li>
+      <li><b>たつの市・揖保郡太子町</b>：国道2号・姫路バイパス方面から</li>
+      <li><b>高砂市・加古川市</b>：加古川バイパス・国道2号方面から</li>
+    </ul>
+    <p>いずれも、仕事帰りの1時間で通える距離感を想定しています。平日は22時まで営業しています。</p>
+    <h2>近隣にお住まいの方の使い方</h2>
+    <dl class="article__dl">
+      <dt>仕事帰りに30分</dt><dd>レギュラー会員（1日1時間 通い放題）で、帰り道に寄って打つ</dd>
+      <dt>週末にじっくり</dt><dd>マスター会員（1日最大2時間）でシミュレーターのラウンド練習</dd>
+      <dt>まず月4回から</dt><dd>ライト会員で週1ペース。所属プロのワンポイントは無料</dd>
+    </dl>
+    <h2>店舗情報</h2>
+    <dl class="article__dl">
+      <dt>住所</dt><dd>〒670-0996 兵庫県姫路市土山6-6-1</dd>
+      <dt>電話</dt><dd>079-260-6671</dd>
+      <dt>営業時間</dt><dd>平日 10:00〜22:00 ／ 土日祝 9:00〜20:00</dd>
+      <dt>定休日</dt><dd>毎週火曜日</dd>
+      <dt>駐車場</dt><dd>20台・無料</dd>
+      <dt>打席</dt><dd>3打席（うち1打席はレフティ左右打席対応）／TrackMan 4・DTECT・OKONGOLF</dd>
+    </dl>
+    <p>地図・道順は <a href="access.html">アクセス</a> をご覧ください。体験レッスン（約55分・無料）は <a href="trial-booking.html">Webから日時を選ぶだけ</a>で予約できます。</p>
+""",
+  "faq": [
+    ("たつの市・太子町から通っている人はいますか？", "はい、姫路市外からのご来店も想定した立地です。駐車場20台無料で、平日は22時まで営業しています。"),
+    ("最寄りの高速・バイパスは？", "姫路バイパス・国道2号方面からお越しいただく方が多い想定です。詳しい道順はGoogleマップ（アクセスページ）でご確認ください。"),
+    ("送迎や公共交通は？", "送迎はありません。お車でのご来店を前提に駐車場をご用意しています。"),
+  ],
+  "related": ["access", "plan", "guide-indoor-golf-himeji", "trial"]},
+]
+for _c in INTENT_COLUMNS:
+    PAGE_FILE[_c["page"]] = _c["file"]
+    PAGE_LABEL[_c["page"]] = _c["title"]
+
+
+def build_intent_column(c):
+    import json
+    faq_ld = jsonld_faq(c["faq"])
+    b = head(f'{c["title"]}', c["desc"], c["page"], jsonld=jsonld_article(c) + "</script>\n<script type=\"application/ld+json\">" + faq_ld, og_type="article")
+    b += f"""
+<section class="page-head">
+  <div class="wrap rv">
+    <p class="crumb"><a href="/">HOME</a><span>/</span><a href="column.html">コラム</a><span>/</span>{c["sub"]}</p>
+    <h1 class="article__t">{c["title"]}</h1>
+    <p class="article__meta"><time datetime="{c["date"]}">{c["date"].replace("-", ".")}</time> ／ FRANK GOLF 姫路・土山</p>
+  </div>
+</section>
+<section class="sec" style="padding-top:0">
+  <div class="wrap article rv">
+    <figure class="article__hero"><img src="assets/img/{c["img"]}" alt="{c["alt"]}" width="1600" height="900" loading="lazy"></figure>
+{c["body"]}
+    <h2>よくあるご質問</h2>
+    <div class="faq">
+{faq_items(c["faq"])}    </div>
+"""
+    b += column_foot(c, c["related"])
+    b += cta_block()
+    b += foot()
+    write(c["file"], b)
+
+
+def build_intent_columns():
+    for c in INTENT_COLUMNS:
+        build_intent_column(c)
+
+
+# ---- AI検索（ChatGPT / Perplexity / Google AI）向け: llms.txt ----
+def build_llms_txt():
+    lines = ["# FRANK GOLF（フランクゴルフ）— 姫路・土山のインドアゴルフスクール", "",
+             "> 兵庫県姫路市土山6-6-1にある会員制インドアゴルフラウンジ。TrackMan 4 など3台のシミュレーター打席、所属レッスンプロのマンツーマンレッスン、バーカウンター併設のラウンジ。運営は株式会社YOZAN。2026年9月オープン。", "",
+             "## 基本情報", "- 住所: 〒670-0996 兵庫県姫路市土山6-6-1", "- 電話: 079-260-6671",
+             "- 営業時間: 平日 10:00〜22:00 ／ 土日祝 9:00〜20:00 ／ 定休日 毎週火曜日",
+             "- 駐車場: 20台・無料", "- 打席: 3打席（うち1打席はレフティ左右打席対応）／ TrackMan 4・DTECT・OKONGOLF",
+             "- コーチ: 所属レッスンプロ らら（小川うらら）／ USGTF レベルⅢ", "",
+             "## 料金（税抜）", "- 体験レッスン: 無料（通常3,300円 税込）・約55分・手ぶらOK・マンツーマン",
+             "- 入会金: 5,000円（2026年内のご入会は無料）",
+             "- ライト会員: 9,800円/月（月4回まで）", "- レギュラー会員: 13,800円/月（全営業日・1日1時間 通い放題）",
+             "- マスター会員: 19,800円/月（全営業日・1日最大2時間）",
+             "- レッスン: ワンポイント（約5分）会員無料 ／ 25分マンツーマン 2,500円",
+             "- 法人: ライト 39,800円/月（利用者2名まで・4コマ）／ プレミアム 59,800円/月（人数制限なし・8コマ・同伴無料）", "",
+             "## 主要ページ"]
+    for p, label in [("home", "トップ"), ("trial", "体験レッスン"), ("trial-booking", "体験の予約フォーム"), ("plan", "料金・会員プラン"),
+                     ("lesson", "レッスン"), ("facility", "施設・設備"), ("access", "アクセス"), ("faq", "よくあるご質問"),
+                     ("beginner", "はじめての方へ"), ("corporate", "法人でのご利用"), ("lounge", "バー・ラウンジ"), ("column", "コラム一覧")]:
+        lines.append(f"- [{label}]({page_url(p)})")
+    lines += ["", "## コラム（検索の目的別）"]
+    for c in COLUMNS + INTENT_COLUMNS:
+        lines.append(f"- [{c['title']}]({page_url(c['page'])}): {c['desc']}")
+    lines += ["", "## SNS・予約", "- Instagram: https://www.instagram.com/frank_golf_himeji", "- 公式LINE: https://lin.ee/yp2leQU",
+              "- 会員ページ: https://my.frankgolf.jp/", "- Web入会: https://my.frankgolf.jp/join-web", ""]
+    write("llms.txt", "\n".join(lines))
 
 
 # ==================================================================
@@ -2610,5 +3356,11 @@ if __name__ == "__main__":
     build_privacy()
     build_terms()
     build_404()
+    build_column_index()
+    build_column_indoor()
+    build_column_beginner()
+    build_column_trackman()
+    build_intent_columns()
+    build_llms_txt()
     build_sitemap()
     print("done.")
