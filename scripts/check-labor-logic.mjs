@@ -11,6 +11,10 @@
 //   3. `${ym}-31` のような月末日決め打ち（31日が無い月で壊れる / AUDIT D-1）→ monthRange() を使う
 //
 // 追加が必要になったら ALLOW に理由つきで書く（無言で緩めない）。
+//
+// ファイル丸ごとの除外が広すぎる場合は、その行（または直前の行）に
+//   // labor-check-ok: <理由>
+// と書く。理由なしの `labor-check-ok` は除外しない（黙って緩めさせないため）。
 
 import { readFileSync, globSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -52,8 +56,10 @@ const violations = [];
 for (const f of files) {
   const path = join(ROOT, f);
   const lines = readFileSync(path, "utf8").split("\n");
+  const exempt = /labor-check-ok:\s*\S/; // 理由が書かれているときだけ除外
   lines.forEach((line, i) => {
     if (line.trim().startsWith("*") || line.trim().startsWith("//")) return; // コメントは対象外
+    if (exempt.test(line) || (i > 0 && exempt.test(lines[i - 1]))) return;   // 行単位の除外（理由必須）
     for (const rule of RULES) {
       if (rule.re.test(line)) {
         violations.push({ file: relative(ROOT, path).split("\\").join("/"), line: i + 1, rule: rule.id, msg: rule.msg, src: line.trim() });

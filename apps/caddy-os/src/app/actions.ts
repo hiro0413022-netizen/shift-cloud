@@ -541,6 +541,8 @@ export async function saveGolfwingBulk(
   const rows: Array<Record<string, unknown>> = [];
   const months = new Set<string>();
   for (const v of parsed.data) {
+    // 社員の派遣は原価0（DECISIONS #45）。ここは委託先(partner_id)への外注費なので給与計算は通さない。
+    // labor-check-ok: 社員の給与ではなく委託先への外注費（fee_amount）
     const fee = Math.round(v.hours * v.hourly_wage);
     months.add(v.work_date.slice(0, 7));
     rows.push({
