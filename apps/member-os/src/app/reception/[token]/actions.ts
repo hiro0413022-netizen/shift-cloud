@@ -5,6 +5,7 @@ import { hashToken } from "@/lib/intake";
 import { logEvent } from "@/lib/kernel";
 import { normalizeAddress } from "@/lib/address";
 import { readName } from "@/lib/name";
+import { isSearchable, readCandidates, type ReceptionCandidate } from "@/lib/reception-search-pure";
 
 export type ReceptionState = { ok?: boolean; error?: string };
 
@@ -71,6 +72,10 @@ export async function submitReception(
 ): Promise<ReceptionState> {
   const visitToken = str(formData.get("visit_token"));
   if (visitToken) return submitReservedReception(visitToken, formData);
+
+  // ③ 2回目以降の方（お名前で選んでいただいた）。お客様の行は作らない・上書きもしない
+  const returningGuestId = str(formData.get("guest_id"));
+  if (returningGuestId) return submitReturningReception(returningGuestId, formData);
 
   const token = str(formData.get("token"));
   if (!token) return { error: "受付情報が見つかりません" };
@@ -192,6 +197,115 @@ async function submitReservedReception(rawToken: string, formData: FormData): Pr
   await logEvent(companyId, {
     event_type: "member.walkin_intake",
     title: `予約からの受付入力が完了: ${String(guestFields.name)} 様（${String(visit.visit_type)}）`,
+    source: "tablet",
+    source_type: "external",
+    severity: "info",
+  });
+
+  return { ok: true };
+}
+
+/* ============================================================
+   2回目以降の方（DECISIONS #226）
+
+   お名前で引いて、候補を選んでいただく。前回書いていただいた個人情報は
+   **画面に出さずサーバー側で guest_id からたどる** ── 店頭のタブレットは
+   誰でも触れるので、名前を打っただけで他人の住所が読める作りにしない。
+   ============================================================ */
+
+/** 受付URLの検証（無効・停止中なら null）。検索と登録で同じ入口を通す */
+async function readWalkinToken(token: string) {
+  if (!token) return null;
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("mbr_walkin_tokens")
+    .select("id, company_id, store_id, active")
+    .eq("token_hash", hashToken(token))
+    .maybeSingle();
+  return data && data.active ? data : null;
+}
+
+export type ReceptionSearchState = { candidates: ReceptionCandidate[]; error?: string };
+
+/**
+ * お名前（漢字・カナ・ひらがな）で受付台帳のお客様を引く。
+ * 返るのは 氏名・カナ・電話下4桁・前回来店日・来店回数だけ（0150）。
+ */
+export async function searchReturningGuests(token: string, q: string): Promise<ReceptionSearchState> {
+  const tok = await readWalkinToken(str(token));
+  if (!tok) return { candidates: [], error: "受付URLが無効です。スタッフにお声がけください" };
+  if (!isSearchable(q)) return { candidates: [], error: "お名前を2文字以上入れてください" };
+
+  const admin = createAdmin();
+  const { data, error } = await admin.rpc("search_reception_guests", {
+    p_company_id: tok.company_id as string,
+    p_store_id: (tok.store_id as string | null) ?? null,
+    p_q: String(q).trim(),
+    p_limit: 8,
+  });
+  if (error) return { candidates: [], error: "検索できませんでした。スタッフにお声がけください" };
+  return { candidates: readCandidates(data) };
+}
+
+/**
+ * 2回目以降のご来店を台帳に足す。
+ *   ・mbr_guests は作らない／個人情報も上書きしない（前回の内容がそのまま正）
+ *   ・アンケートは今日の利用区分のぶんを毎回いただく（ユーザー指示 2026-09-06）
+ *   ・前回来店日を repeat_date に入れる ＝ 台帳P列「再来の場合日付」が自動で埋まり、
+ *     ダッシュボードの再来カウントもスタッフの手入力なしで正しくなる
+ */
+async function submitReturningReception(guestId: string, formData: FormData): Promise<ReceptionState> {
+  const tok = await readWalkinToken(str(formData.get("token")));
+  if (!tok) return { error: "無効な受付URLです。スタッフにお声がけください" };
+  if (str(formData.get("consent")) !== "1")
+    return { error: "個人情報の取扱いへの同意が必要です" };
+
+  const admin = createAdmin();
+
+  // 会社をまたいだIDを送られても拾わない（画面から来た値を信用しない）
+  const { data: guest } = await admin
+    .from("mbr_guests")
+    .select("id, name")
+    .eq("id", guestId)
+    .eq("company_id", tok.company_id as string)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!guest) return { error: "お客様情報が見つかりません。スタッフにお声がけください" };
+
+  const visitType = VISIT_TYPES.includes(str(formData.get("visit_type")))
+    ? str(formData.get("visit_type"))
+    : "trial";
+  const today = new Date().toISOString().slice(0, 10);
+
+  // 前回のご来店（今日より前の最新）。無ければ null のまま＝再来として数えない
+  const { data: prev } = await admin
+    .from("mbr_walkin_visits")
+    .select("visited_on")
+    .eq("guest_id", guest.id as string)
+    .is("deleted_at", null)
+    .lt("visited_on", today)
+    .order("visited_on", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { error } = await admin.from("mbr_walkin_visits").insert({
+    company_id: tok.company_id as string,
+    store_id: (tok.store_id as string | null) ?? null,
+    guest_id: guest.id as string,
+    visited_on: today,
+    visit_type: visitType,
+    repeat_date: (prev?.visited_on as string | null) ?? null,
+    referral_source: orNull(formData.get("referral_source")),
+    referral_source_other: orNull(formData.get("referral_source_other")),
+    survey: readSurvey(formData),
+    consent_at: new Date().toISOString(),
+    signature: orNull(formData.get("signature")),
+  });
+  if (error) return { error: error.message };
+
+  await logEvent(tok.company_id as string, {
+    event_type: "member.walkin_intake",
+    title: `再来のお客様の受付入力が完了: ${String(guest.name)} 様（${visitType}）`,
     source: "tablet",
     source_type: "external",
     severity: "info",

@@ -2,32 +2,15 @@
 
 import { useActionState, useRef, useState } from "react";
 import { submitReception, type ReceptionState } from "./actions";
-import {
-  VISIT_TYPES, OCCUPATIONS, CONTACT_METHODS, REFERRAL_SOURCES,
-  TRIAL_REASONS, FITTING_REASONS, SCHOOL_GOALS, JOIN_INTEREST,
-} from "@/lib/walkin";
+import { VISIT_TYPES, OCCUPATIONS, CONTACT_METHODS } from "@/lib/walkin";
 import { AddressFields } from "@/components/address-fields";
 import { BirthDateInput } from "@/components/birth-date-input";
 import { NameFields } from "@/components/name-fields";
 import { joinName } from "@/lib/name";
-
-const field =
-  "w-full rounded-xl border border-(--color-line) bg-white px-4 py-3 text-base text-(--color-txt) placeholder:text-(--color-dim)/60 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/15";
-const labelCls = "mb-1 block text-sm font-medium text-(--color-dim)";
-const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5 shadow-sm";
-
-function CheckGroup({ name, options }: { name: string; options: string[] }) {
-  return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {options.map((o) => (
-        <label key={o} className="flex items-center gap-2 rounded-lg border border-(--color-line) bg-white px-3 py-2.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent/5">
-          <input type="checkbox" name={name} value={o} className="h-5 w-5 accent-(--color-accent)" />
-          {o}
-        </label>
-      ))}
-    </div>
-  );
-}
+import {
+  field, labelCls, cardCls,
+  VisitTypePicker, SurveyFields, ConsentField, ReceptionDone, ConfirmSheet,
+} from "./reception-ui";
 
 export type ReceptionDefaults = {
   name?: string | null;
@@ -46,13 +29,14 @@ export type ReceptionDefaults = {
 };
 
 /**
- * 店頭タブレットの受付フォーム。
+ * 店頭タブレットの受付フォーム（初めてのご来店・予約からのご来店）。
  *
- * 2つの入り方がある（DECISIONS #186）:
- *   ① /reception/[token]        … 予約なしのご来店。全部お客様に書いていただく（従来）
+ * 入り方（DECISIONS #186 / #226）:
+ *   ① /reception/[token] →「初めてのご来店」… 全部お客様に書いていただく
  *   ② /reception/v/[intakeToken] … フィッティング予約からのご来店。
  *      予約フォームでいただいた氏名・カナ・電話・メールは **入力済みで開く**。
  *      同じことを二度書かせない（ユーザー指示 2026-08-29）。
+ *   ③ 2回目以降の方は returning-form.tsx（お名前で選ぶだけ・#226）
  */
 export function ReceptionForm({
   token,
@@ -60,6 +44,7 @@ export function ReceptionForm({
   visitToken,
   defaults,
   reserve,
+  onBack,
 }: {
   token: string | null;
   storeName: string | null;
@@ -67,6 +52,8 @@ export function ReceptionForm({
   defaults?: ReceptionDefaults;
   /** 予約でいただいた内容の読み上げ（スタッフとお客様が確認するだけ・入力欄ではない） */
   reserve?: { label: string; value: string }[];
+  /** 入口選択に戻る（/reception/[token] のときだけ） */
+  onBack?: () => void;
 }) {
   const [state, action, pending] = useActionState<ReceptionState, FormData>(submitReception, {});
   const [visitType, setVisitType] = useState(defaults?.visit_type ?? "trial");
@@ -104,25 +91,9 @@ export function ReceptionForm({
     });
   }
 
-  // 受付完了
+  // 受付完了（予約由来の受付URLは1回きり。読み込み直すと「使用済み」になるので戻るボタンは出さない）
   if (state.ok) {
-    return (
-      <div className="rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-sm">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-3xl text-emerald-600">✓</div>
-        <p className="mt-3 text-lg font-semibold">ご記入ありがとうございました</p>
-        <p className="mt-2 text-sm text-(--color-dim)">受付が完了しました。タブレットをスタッフにお渡しください。</p>
-        {/* 予約由来の受付URLは1回きり。読み込み直すと「使用済み」になるので戻るボタンは出さない */}
-        {!visitToken && (
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-6 w-full rounded-xl bg-accent py-4 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
-          >
-            最初の画面に戻る（次の方へ）
-          </button>
-        )}
-      </div>
-    );
+    return <ReceptionDone onAgain={visitToken ? undefined : () => window.location.reload()} />;
   }
 
   return (
@@ -154,36 +125,17 @@ export function ReceptionForm({
         )}
 
         {/* 利用区分（予約由来のときは選ばせない。何で来られたかは確定している） */}
-        <div className={`${cardCls} space-y-3`}>
-          <p className="text-sm font-semibold text-(--color-txt)">本日のご利用 <span className="text-rose-500">*</span></p>
-          {visitToken ? (
-            <>
-              <input type="hidden" name="visit_type" value={visitType} />
-              <p className="rounded-xl border border-accent bg-accent/10 px-4 py-3 text-center text-sm font-medium text-accent">
-                {VISIT_TYPES.find((v) => v.value === visitType)?.label ?? ""}
-              </p>
-            </>
-          ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {VISIT_TYPES.map((v) => (
-              <label
-                key={v.value}
-                className={`flex cursor-pointer items-center justify-center rounded-xl border px-3 py-3.5 text-sm font-medium transition-colors ${
-                  visitType === v.value
-                    ? "border-accent bg-accent/10 text-accent"
-                    : "border-(--color-line) bg-white text-(--color-dim)"
-                }`}
-              >
-                <input
-                  type="radio" name="visit_type" value={v.value} className="sr-only"
-                  checked={visitType === v.value} onChange={() => setVisitType(v.value)}
-                />
-                {v.label}
-              </label>
-            ))}
+        {visitToken ? (
+          <div className={`${cardCls} space-y-3`}>
+            <p className="text-sm font-semibold text-(--color-txt)">本日のご利用 <span className="text-rose-500">*</span></p>
+            <input type="hidden" name="visit_type" value={visitType} />
+            <p className="rounded-xl border border-accent bg-accent/10 px-4 py-3 text-center text-sm font-medium text-accent">
+              {VISIT_TYPES.find((v) => v.value === visitType)?.label ?? ""}
+            </p>
           </div>
-          )}
-        </div>
+        ) : (
+          <VisitTypePicker value={visitType} onChange={setVisitType} />
+        )}
 
         {/* お客様情報 */}
         <div className={`${cardCls} space-y-4`}>
@@ -254,57 +206,8 @@ export function ReceptionForm({
           </div>
         </div>
 
-        {/* アンケート */}
-        <div className={`${cardCls} space-y-4`}>
-          <p className="text-sm font-semibold text-(--color-txt)">アンケート（任意）</p>
-          <div>
-            <label className={labelCls}>当店を何で知りましたか</label>
-            <select name="referral_source" defaultValue="" className={field}>
-              <option value="">選択</option>
-              {REFERRAL_SOURCES.map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>（紹介・その他の場合）詳細</label>
-            <input name="referral_source_other" placeholder="紹介者名など" className={field} />
-          </div>
-
-          {visitType === "fitting" ? (
-            <div>
-              <label className={labelCls}>フィッティングでご興味のある点</label>
-              <CheckGroup name="fitting_reasons" options={FITTING_REASONS} />
-            </div>
-          ) : (
-            <div>
-              <label className={labelCls}>ご利用の目的・ご興味</label>
-              <CheckGroup name="trial_reasons" options={TRIAL_REASONS} />
-            </div>
-          )}
-
-          <div>
-            <label className={labelCls}>ゴルフスクールに通う目的</label>
-            <CheckGroup name="school_goals" options={SCHOOL_GOALS} />
-          </div>
-          <div>
-            <label className={labelCls}>入会へのご興味</label>
-            <select name="join_interest" defaultValue="" className={field}>
-              <option value="">選択</option>
-              {JOIN_INTEREST.map((o) => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>ご要望・ご質問</label>
-            <input name="comment" placeholder="自由記述" className={field} />
-          </div>
-        </div>
-
-        {/* 同意 */}
-        <div className={`${cardCls} space-y-3`}>
-          <label className="flex items-start gap-3 text-sm">
-            <input type="checkbox" name="consent" value="1" required className="mt-0.5 h-5 w-5 accent-(--color-accent)" />
-            <span>個人情報をサービス提供・入会手続きの目的で利用することに同意します。<span className="text-rose-500">*</span></span>
-          </label>
-        </div>
+        <SurveyFields visitType={visitType} />
+        <ConsentField />
 
         {(localError || state.error) && (
           <p className="text-center text-sm text-rose-600">{localError ?? state.error}</p>
@@ -318,43 +221,28 @@ export function ReceptionForm({
         >
           入力内容を確認する
         </button>
+
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="w-full rounded-xl border border-(--color-line) bg-white py-3 text-sm font-medium text-(--color-dim)"
+          >
+            ← 最初の画面に戻る
+          </button>
+        )}
       </form>
 
-      {/* 確認画面（オーバーレイ・フォームはマウントしたまま） */}
       {confirm && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-lg font-semibold text-(--color-txt)">この内容で受付しますか？</p>
-            <dl className="mt-4 divide-y divide-(--color-line)">
-              {Object.entries(confirm).map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-3 py-2 text-sm">
-                  <dt className="shrink-0 text-(--color-dim)">{k}</dt>
-                  <dd className="text-right font-medium text-(--color-txt)">{v || "—"}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirm(null)}
-                className="rounded-xl border border-(--color-line) bg-white py-3.5 text-base font-semibold text-(--color-dim) transition-colors hover:bg-(--color-panel-2)"
-              >
-                修正する
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => {
-                  setConfirm(null);
-                  formRef.current?.requestSubmit();
-                }}
-                className="rounded-xl bg-accent py-3.5 text-base font-semibold text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
-              >
-                {pending ? "送信中..." : "この内容で受付する"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmSheet
+          rows={confirm}
+          pending={pending}
+          onCancel={() => setConfirm(null)}
+          onSubmit={() => {
+            setConfirm(null);
+            formRef.current?.requestSubmit();
+          }}
+        />
       )}
     </>
   );

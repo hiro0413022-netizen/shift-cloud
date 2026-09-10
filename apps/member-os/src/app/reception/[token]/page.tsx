@@ -1,6 +1,6 @@
 import { createAdmin } from "@/lib/supabase/admin";
 import { hashToken } from "@/lib/intake";
-import { ReceptionForm } from "./reception-form";
+import { ReceptionEntry } from "./reception-entry";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,7 @@ export default async function ReceptionPage({ params }: { params: Promise<{ toke
 
   return (
     <Shell>
-      <ReceptionForm token={token} storeName={store?.name ?? null} />
+      <ReceptionEntry token={token} storeName={store?.name ?? null} />
     </Shell>
   );
 }
