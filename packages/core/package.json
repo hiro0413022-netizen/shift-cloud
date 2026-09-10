@@ -31,6 +31,7 @@
     "./lesson-share": "./src/lesson-share.ts",
     "./members": "./src/members.ts",
     "./middleware": "./src/middleware.ts",
+    "./night-payroll": "./src/night-payroll.ts",
     "./supabase/admin": "./src/supabase/admin.ts",
     "./supabase/server": "./src/supabase/server.ts"
   },
