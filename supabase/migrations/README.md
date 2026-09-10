@@ -2,7 +2,7 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0117` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0158` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
 - **関数を作ったら必ず service_role に EXECUTE を付ける**（0065 適用後のルール）:
   `grant execute on function public.<名前>(<引数型>) to service_role;`
   0065 で「新関数への PUBLIC 既定 EXECUTE」を止めたため、書かないと service_role から呼べない。
@@ -50,3 +50,6 @@
 - `0044_lesson_os_phases.sql` — Lesson OS: lsn_videos.phases（スイング7フェーズの秒数JSONB）/ duration_sec / source、lsn_model_videosにも同様（#51）
 
 - ✅ `0107_incidents.sql` — 適用済（2026-08-10、MCP name=incidents。sp_incidents/sp_incident_insights。日報の置き換え #125）
+
+- ✅ `0156_compe_os.sql` — 適用済（2026-09-10、MCP name=compe_os。Compe OS `cmp_*` 8テーブル＋`use_compe` 権限付与 #232）
+- ✅ `0157_compe_import_9th.sql` — 適用済（2026-09-10、第9回ゴルフウィング親睦ゴルフコンペの移行データ #232）
