@@ -1037,3 +1037,82 @@ export async function useTicketManual(formData: FormData) {
       : `${dest}?err=` + encodeURIComponent(r.reason ?? "使えませんでした")
   );
 }
+
+/**
+ * 保存カードから月会費の自動課金を立てる（#233・2026-09-10）
+ *
+ * 発端: 中尾様（FR0047）— 入会の決済でカード会社の3Dセキュア（ワンタイムパスワード）が
+ * もう使っていないメールアドレスに送られて受信できず、決済リンクを完走できなかった。
+ * 店側で Square の顧客にカードを保存し、前取り分（10月分・11月分）は「一回きりの決済」で
+ * 受領したため、**入金は済み・会員にもなっている・サブスクだけ無い** 状態が残った。
+ *
+ * この状態は既存の導線では救えなかった:
+ *   - 【💳 このiPadで決済ページを開く】(#217) は billing_status='active' には出さない（二重契約を防ぐため）
+ *   - Squareダッシュボードでも作れない。プランはAPIで作っているため
+ *     「サードパーティを介して作成されたプラン」となり、サブスク作成でプランが選べない
+ *
+ * Square の実行は Genesis 側（SQUARE_LOCATION_ID があちらにしか無い・#188と同じ形）。
+ * 開始日を省略すると「入会日＋前取り月数＋1か月」＝入会完了メールで案内した日付になる。
+ */
+export async function startSquareBilling(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  const startDate = str(formData.get("start_date"));
+  if (!id) return;
+
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("id, name, member_no, square_customer_id, square_subscription_id")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+  if (m.square_subscription_id) {
+    redirect(`${dest}?err=` + encodeURIComponent("この会員にはすでにカードの自動課金が登録されています"));
+  }
+  if (!m.square_customer_id) {
+    redirect(`${dest}?err=` + encodeURIComponent(
+      "Squareにカードが保存されていません。先に【💳 このiPadで決済ページを開く】でカードをご登録ください。",
+    ));
+  }
+
+  let res: { ok?: boolean; error?: string; suggested?: string; startDate?: string; planName?: string; monthlyTaxIncluded?: number } = {};
+  try {
+    const r = await fetch(`${GENESIS_URL}/api/public/frank/admin/start-billing`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ member_id: id, ...(startDate ? { start_date: startDate } : {}) }),
+      cache: "no-store",
+    });
+    res = (await r.json().catch(() => ({}))) as typeof res;
+  } catch (e) {
+    console.error("[frunk] start-billing failed:", e);
+    res = { ok: false, error: "通信に失敗しました" };
+  }
+
+  await logAudit(actor, "frunk.square.start_billing", "frunk_members", id, null, { start_date: startDate || null, result: res });
+  revalidateMember(id);
+
+  if (res.ok) {
+    redirect(`${dest}?msg=` + encodeURIComponent(
+      `${String(m.name ?? "")}様の月会費の自動課金を登録しました（${String(res.planName ?? "")}・${Number(res.monthlyTaxIncluded ?? 0).toLocaleString()}円税込／初回 ${String(res.startDate ?? "").replaceAll("-", "/")}）。`,
+    ));
+  }
+  redirect(`${dest}?err=` + encodeURIComponent(startBillingError(res)));
+}
+
+/** Genesis が返した理由を、現場の言葉に言い換える（#233） */
+function startBillingError(res: { error?: string; suggested?: string }): string {
+  const e = String(res.error ?? "");
+  if (e === "no_card") return "Squareにカードが保存されていません。Squareのお客さま情報にカードを追加してから、もう一度お試しください。";
+  if (e === "no_customer") return "この会員にSquareのお客さまが紐づいていません。決済ページからのご登録が必要です。";
+  if (e === "already_subscribed") return "すでに自動課金が登録されています。";
+  if (e === "plan_free") return "月会費0円のプラン（スタッフ・モニター）は自動課金を作りません。";
+  if (e === "plan_no_variation") return "このプランのSquare設定が未登録です。scripts/frank-square-setup.mjs を実行してください。";
+  if (e === "past_date") {
+    return `開始日が過ぎています。${String(res.suggested ?? "").replaceAll("-", "/")} 以降でご指定ください（過ぎた分は店頭で精算してください）。`;
+  }
+  if (e === "square_env_missing") return "Square未接続のため登録できませんでした。";
+  if (e === "invalid_status") return "退会済みの会員には自動課金を作れません。";
+  return `登録できませんでした（${e || "原因不明"}）。Squareダッシュボードでご確認ください。`;
+}

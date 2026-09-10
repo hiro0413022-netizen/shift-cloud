@@ -11,6 +11,7 @@ import { BirthDateInput } from "@/components/birth-date-input";
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_METHODS, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import { OCCUPATIONS, CONTACT_METHODS, GENDER_LABEL, GENDERS } from "@/lib/walkin";
 import { jstYmd } from "@/lib/jst";
+import { nextBillingDateAfterPrepay } from "@yozan/core/frank-billing-start";
 import { BOOKING_STATUS_LABEL, CUSTOMER_KIND_LABEL, PAYMENT_STATUS_LABEL, outstanding } from "@yozan/core/frank-booking";
 import {
   leaveDateOptions,
@@ -29,6 +30,7 @@ import {
   changePlan,
   cancelScheduledChange,
   stopSquareBilling,
+  startSquareBilling,
   addCorporateUser,
   removeCorporateUser,
   resendApprovalMail,
@@ -448,6 +450,30 @@ export default async function FrunkMemberPage({
                   <input type="hidden" name="back" value={back} />
                   <button className={btnGhostCls}>💳 このiPadで決済ページを開く（後日決済）</button>
                 </form>
+                {/* 3Dセキュアで決済リンクを完走できず、店側でカードだけ保存した方の救済（#233）。
+                    カードは保存済み・前取り分も受領済みなのにサブスクだけ無い、という状態は
+                    上の【決済ページ】では作れない（billing_status='active' なので二重契約になる）。
+                    Squareダッシュボードからも作れない（APIで作ったプランは選択肢に出ない）ので、
+                    ここから API で1本だけ立てる。開始日の既定＝入会完了メールで案内した次回請求日。 */}
+                {m.square_customer_id ? (
+                  <form action={startSquareBilling} className="mt-2 flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="id" value={id} />
+                    <input type="hidden" name="back" value={back} />
+                    <label className="text-xs text-(--color-dim)">初回請求日</label>
+                    <input
+                      type="date"
+                      name="start_date"
+                      defaultValue={nextBillingDateAfterPrepay({
+                        startDateYmd: String(m.start_date ?? jstYmd()),
+                        prepaidMonths: Number(
+                          (m.square_checkout_breakdown as { prepaidMonths?: number } | null)?.prepaidMonths ?? 0,
+                        ),
+                      })}
+                      className={`${inputCls} w-auto`}
+                    />
+                    <button className={btnCls}>保存カードから自動課金を開始する</button>
+                  </form>
+                ) : null}
                 <p className="mt-1 text-xs text-(--color-dim)">
                   お客様にこのiPadをお渡しして、カード情報をご入力いただきます。
                   終わるとこの画面に戻ります（入金の反映まで数十秒かかることがあります）。

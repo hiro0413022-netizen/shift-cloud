@@ -1,4 +1,5 @@
 import "server-only";
+import { addMonthsYmd } from "@yozan/core/frank-billing-start";
 import { randomBytes } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstYmd } from "@/lib/jst";
@@ -145,14 +146,7 @@ export type WebJoinMemberRow = {
   } | null;
 };
 
-/** JST日付に月を足す（毎月同日・末日は繰り下げ） */
-function addMonthsYmd(ymd: string, months: number): string {
-  const d = new Date(`${ymd}T12:00:00+09:00`);
-  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, d.getUTCDate()));
-  // 例 8/31+1か月 → 10/1 になったら 9/30 に繰り下げ
-  if (target.getUTCMonth() !== ((d.getUTCMonth() + months) % 12 + 12) % 12) target.setUTCDate(0);
-  return target.toISOString().slice(0, 10);
-}
+// 日付の式の正典は @yozan/core/frank-billing-start（#233・自動課金の開始日と共用）
 
 /** 「2026-09-11」→ [9月, 10月, 11月] */
 function monthLabels3(ymd: string): [string, string, string] {

@@ -5,6 +5,7 @@ import { authMember, type MemberAuth } from "@/lib/frank-booking";
 import { monthlyFeeTaxIncluded, toE164Jp, JOIN_CHECKOUT_NOTE_PREFIX } from "@/lib/frank-pos-pure";
 import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { jstYmd } from "@/lib/jst";
+import { resolveBillingStartDate } from "@yozan/core/frank-billing-start";
 import { FRANK_PORTAL } from "@yozan/core/frank-links";
 
 /**
@@ -425,5 +426,136 @@ export async function chargeCardOnFile(input: {
   } catch (e) {
     console.error("[frank-square-billing] charge failed:", e);
     return { ok: false, error: String(e) };
+  }
+}
+
+/**
+ * 保存カードから月会費の自動課金だけを立てる（#233・2026-09-10）
+ *
+ * 発端: 中尾様（FR0047）— 入会の決済でカード会社の3Dセキュア（ワンタイムパスワード）が
+ * もう使っていないメールアドレスに送られて受信できず、決済リンクを完走できなかった。
+ * 店側で Square の顧客にカードを保存し、前取り分は「一回きりの決済」で受領したので、
+ * **入金は済み・会員にもなっている・サブスクだけ無い** 状態が残った。
+ *
+ * この状態は既存の導線では救えない:
+ *   - 会員カードの【💳 このiPadで決済ページを開く】(#217) は billing_status='active' には出さない
+ *     （出すと二重契約になる）
+ *   - Square ダッシュボードからも作れない。プランは scripts/frank-square-setup.mjs が API で
+ *     作っているため「サードパーティを介して作成されたプラン」扱いになり、
+ *     ダッシュボードのサブスク作成でプランが選べない（2026-09-10 実機で確認）
+ * ＝ **API から作るしかない**。その入口がここ。
+ *
+ * やること:
+ *   1. 顧客に保存されているカードを1枚選ぶ（無ければ何もしない）
+ *   2. 前取り済みフラグを先に立てる ★
+ *   3. POST /v2/subscriptions（開始日 = 次に請求すべき日）
+ *   4. 会員行にサブスクIDを控える
+ *
+ * ★ 2 が肝。frank-pos.ts の ensurePrepaySetup() は subscription.created の Webhook で
+ *   「前取り月数ぶん pause する」を実行する。前取りを一括で受領済みのこのケースで走らせると
+ *   **開始日からさらに2周期飛んで2か月ぶん取り損ねる**。Square に投げる前にフラグを立てて黙らせる。
+ */
+export async function startSubscriptionOnFile(
+  memberId: string,
+  requestedStartYmd?: string | null,
+): Promise<
+  | { ok: true; subscriptionId: string; startDate: string; planName: string; monthlyTaxIncluded: number }
+  | { ok: false; error: string; suggested?: string }
+> {
+  const token = accessToken();
+  const locationId = process.env.SQUARE_LOCATION_ID;
+  if (!token || !locationId) return { ok: false, error: "square_env_missing" };
+
+  const admin = createAdmin();
+  const { data: row } = await admin
+    .from("frunk_members")
+    .select(
+      "id, name, member_no, status, start_date, square_customer_id, square_subscription_id, square_checkout_breakdown, prepay_pause_done_at, frunk_plans(name, monthly_price, square_variation_id, square_variation_nofee_id)",
+    )
+    .eq("id", memberId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!row) return { ok: false, error: "member_not_found" };
+  if (!["pending", "active"].includes(String(row.status))) return { ok: false, error: "invalid_status" };
+  if (row.square_subscription_id) return { ok: false, error: "already_subscribed" };
+
+  const customerId = row.square_customer_id ? String(row.square_customer_id) : null;
+  if (!customerId) return { ok: false, error: "no_customer" };
+
+  const plan = (row as unknown as {
+    frunk_plans: {
+      name: string;
+      monthly_price: number | null;
+      square_variation_id: string | null;
+      square_variation_nofee_id: string | null;
+    } | null;
+  }).frunk_plans;
+  const priceExTax = Number(plan?.monthly_price ?? 0);
+  if (!plan || priceExTax <= 0) return { ok: false, error: "plan_free" };
+  // 入会金なしバリエーションを優先する（入会金は入会時に精算済み＝二重請求しない）
+  const variationId = plan.square_variation_nofee_id ?? plan.square_variation_id;
+  if (!variationId) return { ok: false, error: "plan_no_variation" };
+
+  const breakdown = (row.square_checkout_breakdown ?? {}) as { prepaidMonths?: number };
+  const resolved = resolveBillingStartDate({
+    startDateYmd: String(row.start_date ?? jstYmd()),
+    prepaidMonths: Number(breakdown.prepaidMonths ?? 0),
+    todayYmd: jstYmd(),
+    requestedYmd: requestedStartYmd ?? null,
+  });
+  if (!resolved.ok) return { ok: false, error: "past_date", suggested: resolved.suggested };
+
+  try {
+    // 1. 保存カード
+    const cardsRes = await fetch(`${SQUARE_API}/cards?customer_id=${encodeURIComponent(customerId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const cardsJson = (await cardsRes.json().catch(() => ({}))) as { cards?: Array<{ id?: string; enabled?: boolean }> };
+    const card = (cardsJson.cards ?? []).find((c) => c.enabled !== false);
+    if (!card?.id) return { ok: false, error: "no_card" };
+
+    // 2. ★ Square に投げる前にフラグを立てる（Webhook の二重スキップ止め）
+    if (!row.prepay_pause_done_at) {
+      await admin
+        .from("frunk_members")
+        .update({ prepay_pause_done_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", memberId);
+    }
+
+    // 3. サブスク作成
+    const json = await squarePost(token, "/subscriptions", {
+      idempotency_key: randomUUID(),
+      location_id: locationId,
+      plan_variation_id: variationId,
+      customer_id: customerId,
+      card_id: card.id,
+      start_date: resolved.date,
+      timezone: "Asia/Tokyo",
+      source: { name: "FRANK GOLF member-os" },
+    });
+    const sub = (json.subscription as { id?: string } | undefined) ?? undefined;
+    if (!sub?.id) throw new Error("subscription missing id");
+
+    // 4. 会員行に控える（Webhook より先にここで確定させる＝画面がすぐ「稼働中」になる）
+    await admin
+      .from("frunk_members")
+      .update({
+        square_subscription_id: sub.id,
+        billing_status: "active",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", memberId);
+
+    return {
+      ok: true,
+      subscriptionId: sub.id,
+      startDate: resolved.date,
+      planName: String(plan.name ?? ""),
+      monthlyTaxIncluded: monthlyFeeTaxIncluded(priceExTax),
+    };
+  } catch (e) {
+    console.error("[frank-square-billing] start subscription failed:", e);
+    const detail = String(e instanceof Error ? e.message : e).slice(0, 160);
+    return { ok: false, error: `subscription_failed: ${detail}` };
   }
 }

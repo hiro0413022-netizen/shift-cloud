@@ -10,6 +10,7 @@
     "./birth-date": "./src/birth-date.ts",
     "./compe-score": "./src/compe-score.ts",
     "./fitting-walkin": "./src/fitting-walkin.ts",
+    "./frank-billing-start": "./src/frank-billing-start.ts",
     "./frank-booking": "./src/frank-booking.ts",
     "./frank-coach-capacity": "./src/frank-coach-capacity.ts",
     "./frank-corporate": "./src/frank-corporate.ts",
