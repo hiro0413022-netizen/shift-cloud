@@ -2,7 +2,7 @@
 
 ## 採番ルール（DECISIONS #38）
 
-- **次に使う番号: `0158` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+- **次に使う番号: `0159` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
 - **関数を作ったら必ず service_role に EXECUTE を付ける**（0065 適用後のルール）:
   `grant execute on function public.<名前>(<引数型>) to service_role;`
   0065 で「新関数への PUBLIC 既定 EXECUTE」を止めたため、書かないと service_role から呼べない。
@@ -53,3 +53,5 @@
 
 - ✅ `0156_compe_os.sql` — 適用済（2026-09-10、MCP name=compe_os。Compe OS `cmp_*` 8テーブル＋`use_compe` 権限付与 #232）
 - ✅ `0157_compe_import_9th.sql` — 適用済（2026-09-10、第9回ゴルフウィング親睦ゴルフコンペの移行データ #232）
+
+- ✅ `0158_compe_entry.sql` — 適用済（2026-09-10、MCP name=compe_entry。募集ページ用 entry_*/play_fee・参加者の entry_status #233）

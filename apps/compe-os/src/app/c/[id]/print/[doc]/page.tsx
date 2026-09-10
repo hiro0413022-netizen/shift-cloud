@@ -107,6 +107,7 @@ async function Announcement(id: string, comp: Awaited<ReturnType<typeof getComp>
           <Row label="コース" value={comp.course ?? "—"} />
           <Row label="競技形式" value={formatLabel(comp.format)} />
           <Row label="参加費" value={yen(comp.fee)} />
+          {comp.play_fee != null && <Row label="プレー代" value={`${yen(comp.play_fee)}（当日精算）`} />}
           {comp.contact && <Row label="お問合せ" value={comp.contact} />}
           {comp.notes && <Row label="備考" value={comp.notes} />}
         </tbody>

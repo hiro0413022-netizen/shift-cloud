@@ -7,12 +7,12 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
-A-232. **Compe OS（コンペ管理）を本番に出す**（#232・コードとDBは完了済み）
-   1. Vercel で新規プロジェクト作成: **Root Directory = `apps/compe-os`**、Framework = Next.js
-   2. 環境変数3つ（`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`）
-   3. デプロイが **READY** を確認（#180: pushしただけでは本番に届きません）
-   4. 開いてログイン → 「第9回ゴルフウィング親睦ゴルフコンペ」が一覧に出る → 受付タブで23名が受付済みになっていることを確認
-   5. `vault_systems` に登録（#26）／ネットワークマップ `topology.ts` にノード追加（#47）
+A-232. **Compe OS（コンペ管理）— 残りの登録作業**（本番は稼働中: https://compe-os.vercel.app ・#232/#233）
+   1. ~~Vercelプロジェクト作成・env3つ~~ → **完了（2026-09-10・Production READY）**
+   2. `vault_systems` に登録（#26）／ネットワークマップ `topology.ts` にノード追加（#47）
+   3. 第10回の**競技形式の確認**（第9回と同じダブルペリア上限36で仮置き。違えばコンペ設定から変更）
+   4. 第10回の**集合時刻**が未入力（トップスタート9:07のみ登録済み）
+
 
 
 A-207. **AIカルテナレッジの音声メモ（#207）を動かす**
