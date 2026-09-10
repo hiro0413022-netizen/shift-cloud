@@ -21,7 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # tests/ は依存パッケージ不要（純粋ロジックのみを対象にしているため install しない）
+      # かつては「tests/ は依存パッケージ不要」だったが、@yozan/core を import するテストが増えて
+      # install 無しでは 6本が ERR_MODULE_NOT_FOUND で落ちるようになっていた（2026-09-10 修正）。
+      # ここが赤いままだと、金額ロジックの回帰を誰も検知できない。
+      - run: npm install
       - run: npm test
       # 給与・労働時間ロジックの二重実装ガード（DECISIONS #53）
       # 画面ごとに work_minutes を合計したり hourly_wage を掛けたりすると、
@@ -36,6 +39,7 @@ jobs:
       matrix:
         app:
           - caddy-os
+          - compe-os
           - lesson-os
           - corporate
           - genesis
