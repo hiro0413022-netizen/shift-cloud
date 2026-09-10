@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  /* Night OS の配色。夜の店だが「数字が読めること」を優先してライト基調（デザイン案 2026-09-09）。
+     暗い店内でiPadを見るので、背景は白より少し温かい生成りにして白飛びを抑える。 */
+  --color-bg: #faf8f6;
+  --color-panel: #ffffff;
+  --color-panel-2: #f5f1ec;
+  --color-line: #e7e1da;
+  --color-txt: #1c1917;
+  --color-dim: #78716c;
+  --color-mute: #a8a29e;
+  --color-accent: #9b3f50;   /* ワイン: 主要アクション・指名まわり */
+  --color-accent-2: #7a2f3e;
+  --color-accent-soft: #f7ecee;
+  --color-gold: #8a6b25;     /* ゴールド: ボトル・バック金額 */
+  --color-gold-soft: #f6f0e2;
+  --color-ok: #3f6b4f;
+  --color-ok-soft: #eef2ed;
+  --color-warn: #b07d1f;
+  --color-warn-soft: #fdf6e8;
+  --color-danger: #9b3f50;
+}
+
+html,
+body {
+  background: var(--color-bg);
+}
+
+body {
+  font-family: "Zen Kaku Gothic New", system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-variant-numeric: tabular-nums;
+  @apply text-(--color-txt) antialiased;
+}
+
+/* 金額・店名の見出し。明朝で少し格を出す（デザイン案） */
+.mn {
+  font-family: "Zen Old Mincho", "Hiragino Mincho ProN", serif;
+}
+
+/* iPadで誤タップを減らす: 画面全体で選択とダブルタップ拡大を切る */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
