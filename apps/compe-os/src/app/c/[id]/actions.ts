@@ -49,8 +49,46 @@ export async function saveSetup(formData: FormData): Promise<void> {
         .filter(Boolean),
       notes: strOrNull(formData, "notes"),
       status: str(formData, "status") || "planning",
+      play_fee: str(formData, "play_fee") === "" ? null : intOr(formData, "play_fee", 0),
     })
     .eq("id", compId);
+  refresh(compId);
+}
+
+/* ========== 募集ページ（#233） ========== */
+
+export async function saveEntrySettings(formData: FormData): Promise<void> {
+  const compId = str(formData, "comp_id");
+  const { admin } = await guard(compId);
+  const slug = str(formData, "entry_slug")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "");
+  await admin
+    .from("cmp_comps")
+    .update({
+      entry_slug: slug || null,
+      entry_open: str(formData, "entry_open") === "1",
+      entry_capacity: str(formData, "entry_capacity") === "" ? null : intOr(formData, "entry_capacity", 0),
+      entry_opens_on: strOrNull(formData, "entry_opens_on"),
+      entry_closes_on: strOrNull(formData, "entry_closes_on"),
+      entry_note: strOrNull(formData, "entry_note"),
+    })
+    .eq("id", compId);
+  refresh(compId);
+}
+
+/** 申込→確定、キャンセル待ち→確定、取消 などの状態変更 */
+export async function setEntryStatus(
+  compId: string,
+  participantId: string,
+  status: "confirmed" | "applied" | "waitlist" | "cancelled"
+): Promise<void> {
+  const { admin } = await guard(compId);
+  await admin
+    .from("cmp_participants")
+    .update({ entry_status: status })
+    .eq("id", participantId)
+    .eq("comp_id", compId);
   refresh(compId);
 }
 

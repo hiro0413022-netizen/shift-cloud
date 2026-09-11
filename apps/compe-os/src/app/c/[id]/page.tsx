@@ -75,6 +75,29 @@ export default async function CompDashboard({ params }: { params: Promise<{ id: 
         </dl>
       </section>
 
+      {comp.entry_slug && (
+        <section className={`${cardCls} mb-5`}>
+          <h2 className="mb-2 text-sm font-bold">
+            募集ページ
+            <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${comp.entry_open ? "bg-emerald-50 text-emerald-700" : "bg-(--color-panel-2) text-(--color-dim)"}`}>
+              {comp.entry_open ? "受付中" : "停止中"}
+            </span>
+          </h2>
+          <p className="text-sm">
+            <a href={`/e/${comp.entry_slug}`} target="_blank" className="font-mono text-(--color-accent) underline">
+              /e/{comp.entry_slug}
+            </a>
+            {comp.entry_capacity != null && (
+              <span className="ml-3 text-xs text-(--color-dim)">
+                募集 {comp.entry_capacity}名 ／ 申込・確定{" "}
+                {participants.filter((p) => p.entry_status === "confirmed" || p.entry_status === "applied").length}名 ／
+                キャンセル待ち {participants.filter((p) => p.entry_status === "waitlist").length}名
+              </span>
+            )}
+          </p>
+        </section>
+      )}
+
       <section className={`${cardCls} mb-5`}>
         <h2 className="mb-2 text-sm font-bold">受付状況</h2>
         <p className="mb-2 text-xs text-(--color-dim)">

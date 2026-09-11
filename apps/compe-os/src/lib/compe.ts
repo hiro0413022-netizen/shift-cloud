@@ -50,6 +50,14 @@ export type Comp = {
   reception_fields: ReceptionField[];
   sheet_cols: { personal?: SheetCol[]; team?: SheetCol[] };
   status: "planning" | "running" | "closed";
+  /* 募集ページ（#233） */
+  entry_slug: string | null;
+  entry_open: boolean;
+  entry_capacity: number | null;
+  entry_opens_on: string | null;
+  entry_closes_on: string | null;
+  entry_note: string | null;
+  play_fee: number | null;
   created_at: string;
 };
 
@@ -69,6 +77,10 @@ export type Participant = {
   check_in_at: string | null;
   custom_fields: Record<string, string | boolean>;
   sort_order: number;
+  /** confirmed=参加確定 / applied=Web申込 / waitlist=キャンセル待ち / cancelled=取消（#233） */
+  entry_status: "confirmed" | "applied" | "waitlist" | "cancelled";
+  applied_at: string | null;
+  source: "staff" | "web";
 };
 
 export type Group = {
@@ -281,3 +293,56 @@ export const DEFAULT_TEAM_SHEET_COLS: SheetCol[] = [
   { id: "score", label: "スコア" },
   { id: "rank", label: "順位" },
 ];
+
+/* ========== 募集ページ（ログイン不要・#233） ========== */
+
+/**
+ * 募集URLのslugからコンペを引く。
+ * ★ ここはログインしていない人が触る経路なので、返すのは「掲示に出す情報」だけにする。
+ *   参加者名簿は返さない（誰が申し込んだかは、申し込む側からは見えない）。
+ */
+export async function getCompByEntrySlug(slug: string): Promise<Comp | null> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("cmp_comps")
+    .select("*")
+    .eq("entry_slug", slug)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const comp = data as Comp | null;
+  return comp ? normalizeComp(comp) : null;
+}
+
+/** 枠の残り。confirmed と applied を「席が埋まっている人」として数える（キャンセル待ちは数えない） */
+export async function countEntries(compId: string): Promise<{ taken: number; waitlist: number }> {
+  const admin = createAdmin();
+  const [{ count: taken }, { count: waitlist }] = await Promise.all([
+    admin
+      .from("cmp_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("comp_id", compId)
+      .is("deleted_at", null)
+      .in("entry_status", ["confirmed", "applied"]),
+    admin
+      .from("cmp_participants")
+      .select("id", { count: "exact", head: true })
+      .eq("comp_id", compId)
+      .is("deleted_at", null)
+      .eq("entry_status", "waitlist"),
+  ]);
+  return { taken: taken ?? 0, waitlist: waitlist ?? 0 };
+}
+
+/** 募集ページを開いてよいか（受付前・締切・停止を1か所で判定する） */
+export type EntryGate =
+  | { ok: true }
+  | { ok: false; reason: "closed" | "before" | "after"; opensOn?: string; closesOn?: string };
+
+export function entryGate(comp: Comp, todayJst: string): EntryGate {
+  if (!comp.entry_open) return { ok: false, reason: "closed" };
+  if (comp.entry_opens_on && todayJst < comp.entry_opens_on)
+    return { ok: false, reason: "before", opensOn: comp.entry_opens_on };
+  if (comp.entry_closes_on && todayJst > comp.entry_closes_on)
+    return { ok: false, reason: "after", closesOn: comp.entry_closes_on };
+  return { ok: true };
+}

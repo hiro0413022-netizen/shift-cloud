@@ -4,6 +4,7 @@ import { getComp, listParticipants } from "@/lib/compe";
 import { CompNav } from "@/components/nav";
 import { Badge, btnCls, cardCls, Empty, inputCls, labelCls } from "@/components/ui";
 import { deleteParticipant, importParticipants, upsertParticipant } from "../actions";
+import { EntryStatusCell } from "./entry-status";
 
 export default async function ParticipantsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -52,7 +53,15 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
 
       <section className={`${cardCls} mb-5`}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-bold">参加者一覧（{participants.length}名）</h2>
+          <h2 className="text-sm font-bold">
+            参加者一覧（{participants.length}名）
+            <span className="ml-2 text-xs font-normal text-(--color-dim)">
+              確定 {participants.filter((p) => p.entry_status === "confirmed").length}／
+              申込 {participants.filter((p) => p.entry_status === "applied").length}／
+              キャンセル待ち {participants.filter((p) => p.entry_status === "waitlist").length}／
+              取消 {participants.filter((p) => p.entry_status === "cancelled").length}
+            </span>
+          </h2>
           <a href={`/c/${id}/participants/export`} className="text-sm text-(--color-dim) underline hover:text-(--color-txt)">
             CSVを書き出す
           </a>
@@ -71,6 +80,7 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
                   <Th className="text-center">HCP</Th>
                   <Th>所属</Th>
                   <Th>連絡先</Th>
+                  <Th className="text-center">申込</Th>
                   <Th className="text-center">参加費</Th>
                   <Th className="w-24" />
                 </tr>
@@ -109,6 +119,9 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
                     <td className="px-3 py-2 text-xs text-(--color-dim)">
                       {p.tel ?? ""}
                       {p.email ? <div>{p.email}</div> : null}
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <EntryStatusCell compId={id} participantId={p.id} status={p.entry_status} source={p.source} />
                     </td>
                     <td className="px-3 py-2 text-center">
                       {p.paid ? <Badge tone="ok">徴収済</Badge> : <Badge tone="danger">未徴収</Badge>}
