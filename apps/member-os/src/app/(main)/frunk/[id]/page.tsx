@@ -11,7 +11,8 @@ import { BirthDateInput } from "@/components/birth-date-input";
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_METHODS, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import { OCCUPATIONS, CONTACT_METHODS, GENDER_LABEL, GENDERS } from "@/lib/walkin";
 import { jstYmd } from "@/lib/jst";
-import { nextBillingDateAfterPrepay } from "@yozan/core/frank-billing-start";
+import { nextBillingDateAfterPrepay, usageStartSchedule, usageStartMaxYmd, monthLabel } from "@yozan/core/frank-billing-start";
+import { getSubscriptionDetail, pendingPauseWindow } from "@/lib/frank-square";
 import { BOOKING_STATUS_LABEL, CUSTOMER_KIND_LABEL, PAYMENT_STATUS_LABEL, outstanding } from "@yozan/core/frank-booking";
 import {
   leaveDateOptions,
@@ -40,6 +41,7 @@ import {
   grantTicketsManual,
   useTicketManual,
   openJoinCheckout,
+  changeUsageStart,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -237,6 +239,25 @@ export default async function FrunkMemberPage({
   const sales = await loadMemberSales(id, actor.companyId);
 
   const status = String(m.status ?? "");
+
+  // ご利用開始日と、無料月・前取りの月・次回の自動課金（#234）。
+  // 式は入会画面・入会完了メール・Webhook と同じ @yozan/core/frank-billing-start。
+  const billingBd = (m.square_checkout_breakdown ?? {}) as { prepaidMonths?: number; applyDateYmd?: string };
+  const prepaidMonths = Number(billingBd.prepaidMonths ?? 0);
+  const joinYmd = m.join_date ? String(m.join_date) : billingBd.applyDateYmd ? String(billingBd.applyDateYmd) : "";
+  const usageSch = joinYmd && prepaidMonths > 0
+    ? usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd: m.start_date ? String(m.start_date) : null, prepaidMonths })
+    : null;
+  // Square に実際に入っている予定も並べる（DBの計算とずれていたら画面で気づけるように）。
+  // 前取りの休止がまだ効いている会員だけ読む＝一覧ではなくこの1枚を開いたときだけ・1回だけ
+  const squareWindow = usageSch && m.square_subscription_id && usageSch.nextBillingYmd >= today && ["active", "pending"].includes(status)
+    ? await getSubscriptionDetail(String(m.square_subscription_id)).then((r) =>
+        r.ok ? { status: r.sub.status, ...pendingPauseWindow(r.sub) } : null,
+      )
+    : null;
+  const squareNext = squareWindow?.resume ?? null;
+  const usageMismatch = !!(usageSch && squareWindow && squareWindow.status === "ACTIVE" && squareNext !== usageSch.nextBillingYmd);
+
   const inMinTerm = m.min_term_until != null && String(m.min_term_until) > today;
   const back = `/frunk/${id}`;
 
@@ -464,7 +485,9 @@ export default async function FrunkMemberPage({
                       type="date"
                       name="start_date"
                       defaultValue={nextBillingDateAfterPrepay({
-                        startDateYmd: String(m.start_date ?? jstYmd()),
+                        // 基準は入会日。ご利用開始日が先の月ならその分ずれる（#234）
+                        startDateYmd: String(m.join_date ?? m.start_date ?? jstYmd()),
+                        usageStartYmd: m.start_date ? String(m.start_date) : null,
                         prepaidMonths: Number(
                           (m.square_checkout_breakdown as { prepaidMonths?: number } | null)?.prepaidMonths ?? 0,
                         ),
@@ -485,6 +508,49 @@ export default async function FrunkMemberPage({
             {m.join_campaign ? String(m.join_campaign) : "—"}
             {inMinTerm ? <span className="ml-2 text-amber-700">6か月継続 {String(m.min_term_until)}まで</span> : null}
           </Info>
+          {/* ご利用開始日（#234）。先の月から使う方は、無料になるのが「ご利用開始月」。
+              入会後に分かった場合もここで変えられる（Square の自動課金の再開日も一緒にずらす） */}
+          {usageSch ? (
+            <Info label="ご利用開始">
+              <div>
+                <span className="font-medium">{usageSch.usageStartYmd.replaceAll("-", "/")}</span>
+                <span className="ml-2 text-xs text-(--color-dim)">
+                  無料 {monthLabel(usageSch.freeMonthYmd)}分／前取り {usageSch.prepaidMonthYmds.map(monthLabel).join("・")}分／
+                  次回の自動課金 {usageSch.nextBillingYmd.replaceAll("-", "/")}（予定）
+                </span>
+              </div>
+              {squareWindow ? (
+                <div className={`mt-1 text-xs ${usageMismatch ? "font-medium text-rose-600" : "text-(--color-dim)"}`}>
+                  Square上の予定: {squareWindow.status === "PAUSED" ? "休止中・" : ""}
+                  {squareNext ? `次回の自動課金 ${squareNext.replaceAll("-", "/")}` : "再開日の予約なし"}
+                  {squareNext === usageSch.nextBillingYmd
+                    ? " ✓ 一致"
+                    : usageMismatch
+                      ? " ⚠ 上の予定と違います。下の【ご利用開始日を変更する】を押すとSquareを合わせます"
+                      : " ⚠ 上の予定と違います（休止中のため本部にご相談ください）"}
+                </div>
+              ) : null}
+              {["active", "pending"].includes(status) ? (
+                <form action={changeUsageStart} className="mt-2 flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="id" value={id} />
+                  <input type="hidden" name="back" value={back} />
+                  <input
+                    type="date"
+                    name="usage_start"
+                    min={joinYmd}
+                    max={usageStartMaxYmd(joinYmd)}
+                    defaultValue={usageSch.usageStartYmd}
+                    className={`${inputCls} w-auto`}
+                  />
+                  <button className={usageMismatch ? btnCls : btnGhostCls}>ご利用開始日を変更する</button>
+                </form>
+              ) : null}
+              <p className="mt-1 text-xs text-(--color-dim)">
+                無料になるのはご利用開始月です。それより前の月の月会費はかからず、入会時の前取りはその翌月・翌々月分に充てます。
+                請求日は入会日と同じ日のままです。
+              </p>
+            </Info>
+          ) : null}
 
           <div className="mt-3 space-y-2 border-t border-(--color-line) pt-3">
             {status === "active" && planList.length > 1 && (

@@ -17,7 +17,9 @@ import {
   chargeCardOnFile,
   cancelSubscription,
   uncancelSubscription,
+  reschedulePrepayPause,
 } from "@/lib/frank-square";
+import { usageStartSchedule, monthLabel } from "@yozan/core/frank-billing-start";
 import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
 import { nextMemberNo } from "@/lib/frank-member-no";
 import { corporateSpec, corporateSeats, corporateSeatFullMessage } from "@yozan/core/frank-corporate";
@@ -1115,4 +1117,118 @@ function startBillingError(res: { error?: string; suggested?: string }): string 
   if (e === "square_env_missing") return "Square未接続のため登録できませんでした。";
   if (e === "invalid_status") return "退会済みの会員には自動課金を作れません。";
   return `登録できませんでした（${e || "原因不明"}）。Squareダッシュボードでご確認ください。`;
+}
+
+/**
+ * ご利用開始日を変える＝無料になる月と、Square の自動課金の再開日をずらす（#234・2026-09-11）
+ *
+ * 発端: 尾内様（FR0048）・大江様（FR0049）。9/11 に入会、ご利用開始は 11/2。
+ *   入会フォームの「ご利用開始日」が請求に反映されておらず、9月無料＋10月・11月前取り＋12/11 から自動課金になっていた。
+ *   ユーザー決定: 入会時の 21,560円は返金せず 12月・1月分に充当／11月無料／自動課金は 2027/2/11 から
+ *   ／請求日は入会日と同じ11日のまま／6か月継続はご利用開始日から。
+ *
+ * 式は @yozan/core/frank-billing-start の usageStartSchedule 1か所（入会画面・入会完了メール・Webhookと同じ）。
+ * Square 側は「前取り分の休止」の周期数を組み直すだけで、サブスクの作り直しも請求日の変更もしない。
+ * ご利用開始日がDBで同じでも Square の予定がずれていれば押し直せる（お二人はまさにこの状態）。
+ */
+export async function changeUsageStart(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  const requested = str(formData.get("usage_start"));
+  if (!id) return;
+  const fail = (msg: string): never => redirect(`${dest}?err=` + encodeURIComponent(msg));
+
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("id, name, member_no, status, join_date, start_date, join_campaign, min_term_until, square_subscription_id, square_checkout_breakdown, prepay_pause_done_at")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!m) return fail("会員が見つかりません");
+  if (!["active", "pending"].includes(String(m.status))) return fail("退会・休会中の会員のご利用開始日は変更できません");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(requested)) return fail("ご利用開始日を選んでください");
+
+  const bd = (m.square_checkout_breakdown ?? {}) as Record<string, unknown>;
+  const prepaid = Number(bd.prepaidMonths ?? 0);
+  // 基準日＝入会日（サブスクが始まった日＝毎月の請求日）
+  const joinYmd = String(m.join_date ?? bd.applyDateYmd ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinYmd)) return fail("入会日が未設定のため変更できません");
+  if (requested < joinYmd) return fail(`ご利用開始日は入会日（${joinYmd.replaceAll("-", "/")}）以降の日付を選んでください`);
+
+  const campaign = !!m.join_campaign;
+  const sch = usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd: requested, prepaidMonths: prepaid });
+  if (sch.usageStartYmd !== requested) {
+    return fail(`ご利用開始日は ${sch.usageStartYmd.replaceAll("-", "/")} までの日付を選んでください（入会月から3か月後の月まで）`);
+  }
+
+  const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
+  let squareLine = "自動課金（Square）は未登録のため、画面上の日付だけ変更しました。";
+  let squareResult: unknown = null;
+  if (subId && prepaid > 0) {
+    if (!m.prepay_pause_done_at) {
+      return fail("入会時の決済の処理（前取り分の休止の登録）がまだ終わっていません。数分おいてからもう一度お試しください。");
+    }
+    if (sch.nextBillingYmd <= today()) {
+      return fail(`この日付だと次回の請求日（${sch.nextBillingYmd.replaceAll("-", "/")}）が過ぎてしまいます。すでに始まった月は変更できません。`);
+    }
+    const r = await reschedulePrepayPause(subId, {
+      targetYmd: sch.nextBillingYmd,
+      fallbackRestoreCycles: Number(bd.pauseCycles ?? prepaid),
+    });
+    squareResult = r;
+    if (!r.ok) {
+      await logAudit(actor, "frunk.usage_start.change_failed", "frunk_members", id, null, { requested, schedule: sch, square: r });
+      const now = r.after?.resume ? `（Square上の次回請求は ${r.after.resume.replaceAll("-", "/")}）` : "";
+      if (r.skipped) return fail("Square未接続のため変更できませんでした。");
+      if (r.error === "already_paused") return fail("すでに前取り分の休止期間に入っているため、この画面では変更できません。本部にご相談ください。");
+      if (String(r.error ?? "").startsWith("status_")) {
+        return fail(`この会員の自動課金は開始日指定で作られている（${r.error}）ため、この画面では変更できません。本部にご相談ください。`);
+      }
+      return fail(
+        `Squareの変更に失敗しました（${r.error ?? "原因不明"}）${r.restored ? "。元の予定に戻しています" : ""}${now}。Squareダッシュボードでご確認ください。`,
+      );
+    }
+    const resume = r.after?.resume ?? null;
+    if (resume && resume !== sch.nextBillingYmd) {
+      // 予約は通ったが日付が合わない＝黙って成功にしない
+      await logAudit(actor, "frunk.usage_start.date_mismatch", "frunk_members", id, null, { requested, schedule: sch, square: r });
+      return fail(
+        `Squareに休止を登録しましたが、次回請求日が ${resume.replaceAll("-", "/")} になっています（予定 ${sch.nextBillingYmd.replaceAll("-", "/")}）。Squareダッシュボードでご確認ください。`,
+      );
+    }
+    squareLine = resume
+      ? `Square上の次回の自動課金は ${resume.replaceAll("-", "/")} です（確認済み）。`
+      : `Squareに ${r.cycles ?? 0} か月分の休止を登録しました（次回の自動課金は ${sch.nextBillingYmd.replaceAll("-", "/")} の予定・Squareで再開日をご確認ください）。`;
+  }
+
+  await admin
+    .from("frunk_members")
+    .update({
+      start_date: sch.usageStartYmd,
+      ...(campaign ? { min_term_until: sch.minTermUntilYmd } : {}),
+      square_checkout_breakdown: {
+        ...bd,
+        usageStartYmd: sch.usageStartYmd,
+        deferredMonths: sch.deferredMonths,
+        pauseCycles: sch.pauseCycles,
+        nextBillingYmd: sch.nextBillingYmd,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+
+  await logAudit(actor, "frunk.usage_start.change", "frunk_members", id, { start_date: m.start_date, min_term_until: m.min_term_until }, {
+    start_date: sch.usageStartYmd,
+    min_term_until: campaign ? sch.minTermUntilYmd : m.min_term_until,
+    schedule: sch,
+    square: squareResult,
+  });
+  revalidateMember(id);
+
+  const prepaidText = sch.prepaidMonthYmds.map(monthLabel).join("・");
+  redirect(`${dest}?msg=` + encodeURIComponent(
+    `${String(m.name ?? "")}様のご利用開始日を ${sch.usageStartYmd.replaceAll("-", "/")} にしました。` +
+      `${monthLabel(sch.freeMonthYmd)}分は無料${prepaidText ? `・${prepaidText}分は入会時にお支払い済み` : ""}。${squareLine}` +
+      (campaign ? `6か月継続は ${sch.minTermUntilYmd.replaceAll("-", "/")} までです。` : ""),
+  ));
 }

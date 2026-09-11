@@ -5,7 +5,7 @@ import { authMember, type MemberAuth } from "@/lib/frank-booking";
 import { monthlyFeeTaxIncluded, toE164Jp, JOIN_CHECKOUT_NOTE_PREFIX } from "@/lib/frank-pos-pure";
 import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { jstYmd } from "@/lib/jst";
-import { resolveBillingStartDate } from "@yozan/core/frank-billing-start";
+import { resolveBillingStartDate, usageStartSchedule } from "@yozan/core/frank-billing-start";
 import { FRANK_PORTAL } from "@yozan/core/frank-links";
 
 /**
@@ -252,7 +252,7 @@ export async function createJoinCheckoutForMember(
 
   const { data: row } = await admin
     .from("frunk_members")
-    .select("id, name, email, phone, status, billing_status, joining_fee_waived, frunk_plans(name, monthly_price, joining_fee, square_variation_id)")
+    .select("id, name, email, phone, status, billing_status, joining_fee_waived, start_date, frunk_plans(name, monthly_price, joining_fee, square_variation_id)")
     .eq("id", memberId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -279,6 +279,13 @@ export async function createJoinCheckoutForMember(
     joiningFeeWaived: !!row.joining_fee_waived,
   });
   const amount = est.total;
+  // ご利用開始日（#234）。金額は変わらない（前取り月数は同じ）が、無料月と自動課金を止める周期数が変わる。
+  // ここで控えるのは見込み。実際に止める周期数は入金Webhookの日付で数え直す（frank-pos.ts ensurePrepaySetup）
+  const schedule = usageStartSchedule({
+    applyDateYmd,
+    usageStartYmd: row.start_date ? String(row.start_date) : null,
+    prepaidMonths: est.prepaidMonths,
+  });
   try {
     // 電話番号は「国内番号として成り立つとき」だけ渡す（@yozan/core/jp-phone が判定・#208）
     const phone = toE164Jp(row.phone ? String(row.phone) : null);
@@ -314,6 +321,10 @@ export async function createJoinCheckoutForMember(
       prepaidMonths: est.prepaidMonths,
       campaign: est.campaign,
       applyDateYmd,
+      usageStartYmd: schedule.usageStartYmd,
+      deferredMonths: schedule.deferredMonths,
+      pauseCycles: schedule.pauseCycles,
+      nextBillingYmd: schedule.nextBillingYmd,
     });
     return { ok: true, url: String(link.url) };
   } catch (e) {
@@ -470,7 +481,7 @@ export async function startSubscriptionOnFile(
   const { data: row } = await admin
     .from("frunk_members")
     .select(
-      "id, name, member_no, status, start_date, square_customer_id, square_subscription_id, square_checkout_breakdown, prepay_pause_done_at, frunk_plans(name, monthly_price, square_variation_id, square_variation_nofee_id)",
+      "id, name, member_no, status, join_date, start_date, square_customer_id, square_subscription_id, square_checkout_breakdown, prepay_pause_done_at, frunk_plans(name, monthly_price, square_variation_id, square_variation_nofee_id)",
     )
     .eq("id", memberId)
     .is("deleted_at", null)
@@ -497,8 +508,10 @@ export async function startSubscriptionOnFile(
   if (!variationId) return { ok: false, error: "plan_no_variation" };
 
   const breakdown = (row.square_checkout_breakdown ?? {}) as { prepaidMonths?: number };
+  // 基準は入会日（請求日＝入会日と同じ日）。ご利用開始日が先の月なら、その月数ぶん後ろにずれる（#234）
   const resolved = resolveBillingStartDate({
-    startDateYmd: String(row.start_date ?? jstYmd()),
+    startDateYmd: String(row.join_date ?? row.start_date ?? jstYmd()),
+    usageStartYmd: row.start_date ? String(row.start_date) : null,
     prepaidMonths: Number(breakdown.prepaidMonths ?? 0),
     todayYmd: jstYmd(),
     requestedYmd: requestedStartYmd ?? null,

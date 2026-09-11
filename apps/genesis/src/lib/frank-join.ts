@@ -1,5 +1,5 @@
 import "server-only";
-import { addMonthsYmd } from "@yozan/core/frank-billing-start";
+import { usageStartSchedule, monthLabel } from "@yozan/core/frank-billing-start";
 import { randomBytes } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstYmd } from "@/lib/jst";
@@ -148,14 +148,6 @@ export type WebJoinMemberRow = {
 
 // 日付の式の正典は @yozan/core/frank-billing-start（#233・自動課金の開始日と共用）
 
-/** 「2026-09-11」→ [9月, 10月, 11月] */
-function monthLabels3(ymd: string): [string, string, string] {
-  const d = new Date(`${ymd}T12:00:00+09:00`);
-  const out: string[] = [];
-  for (let i = 0; i < 3; i++) out.push(`${new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1)).getUTCMonth() + 1}月`);
-  return out as [string, string, string];
-}
-
 /**
  * 初回入金を確認できた pending 会員を「入会確定」にする。
  * 戻り値は発行した会員番号（既に active なら null＝何もしない）。
@@ -204,13 +196,21 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
           joiningFeeWaived: !!m.joining_fee_waived,
         });
   const campaign = est.campaign || !!m.join_campaign;
+  // 無料月・前取りの月・次回請求日・6か月継続の期限は ご利用開始日 から決まる（#234）。
+  // 正典 @yozan/core/frank-billing-start。Webhook が Square で止める周期数（frank-pos.ts）と同じ式・同じ日付で数える
+  const sch = usageStartSchedule({
+    applyDateYmd: today,
+    usageStartYmd: m.start_date,
+    prepaidMonths: est.prepaidMonths,
+  });
   await admin
     .from("frunk_members")
     .update({
       status: "active",
       join_date: today,
-      // キャンペーン入会は6か月間の継続をお願いしている（#131・退会操作時にスタッフへ警告）
-      min_term_until: campaign ? addMonthsYmd(today, 6) : null,
+      // キャンペーン入会は6か月間の継続をお願いしている（#131・退会操作時にスタッフへ警告）。
+      // 数え始めはご利用開始日（#234・ユーザー決定）。空欄なら入会日＝従来どおり
+      min_term_until: campaign ? sch.minTermUntilYmd : null,
       reviewed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
@@ -276,14 +276,17 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   if (m.email) {
     // 実際に決済した内訳（est）と必ず一致させる。ここで独自計算しない（#136）
     const joinFee = est.joiningFee;
-    const [m0, m1, m2] = monthLabels3(today);
+    const m0 = monthLabel(sch.freeMonthYmd);
+    const [m1, m2] = sch.prepaidMonthYmds.map(monthLabel);
+    const deferred = sch.deferredMonths > 0;
+    const startSlash = sch.usageStartYmd.replaceAll("-", "/");
     const planName = String(m.frunk_plans?.name ?? "");
     // 控えPDFの費用欄（キャンペーンは 入会金0・入会月0・前取り2か月分を明示）
     const costRows: Array<[string, string]> = campaign
       ? [
           [`月会費 前取り（${m1}分）`, `${monthly.toLocaleString()}円（税込）`],
           [`月会費 前取り（${m2}分）`, `${monthly.toLocaleString()}円（税込）`],
-          [`月会費（${m0}分・入会月）キャンペーン`, "0円"],
+          [`月会費（${m0}分・${deferred ? "ご利用開始月" : "入会月"}）キャンペーン`, "0円"],
           ["入会金（年内入会キャンペーン）", "0円"],
         ]
       : [
@@ -316,7 +319,11 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
         signatureDataUrl: m.signature,
         costRows,
         totalOverride: totalDue,
-        remark: campaign ? `年内入会キャンペーン適用（6か月間の継続をお願いしています / ${addMonthsYmd(today, 6)}まで）` : null,
+        remark: campaign
+          ? `年内入会キャンペーン適用（ご利用開始日から6か月間の継続をお願いしています / ${sch.minTermUntilYmd}まで）${deferred ? ` ご利用開始 ${startSlash}` : ""}`
+          : deferred
+            ? `ご利用開始 ${startSlash}（それより前の月の月会費はかかりません）`
+            : null,
       });
       attachments = [{ filename: `FRANK_GOLF_入会申込書_${memberNo}.pdf`, content: Buffer.from(pdf).toString("base64") }];
     } catch (e) {
@@ -370,15 +377,17 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
       "■ 月会費のお支払い",
       ...(campaign
         ? [
-            `年内入会キャンペーンの適用で、入会金（5,500円税込）と入会月（${m0}分）の月会費は無料です。`,
+            ...(deferred ? [`ご利用開始日は ${startSlash} です。それより前の月の月会費はかかりません。`] : []),
+            `年内入会キャンペーンの適用で、入会金（5,500円税込）と${deferred ? "ご利用開始月" : "入会月"}（${m0}分）の月会費は無料です。`,
             `本日、${m1}分・${m2}分の月会費2か月分（${(monthly * 2).toLocaleString()}円税込）を1回でお支払いいただきました。`,
-            // 前取りした月（m1・m2）の自動課金はスキップするため、次回の請求は「前取り最終月の翌月」＝入会日+（前取り月数+1）か月（#137）
-            `${m2}分より後の月会費は、毎月${Number(today.slice(8, 10))}日ごろにご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, est.prepaidMonths + 1).replaceAll("-", "/")} 予定）。`,
-            `※ キャンペーンでのご入会は6か月間（${addMonthsYmd(today, 6).replaceAll("-", "/")}まで）の継続をお願いしています。`,
+            // 前取りした月の自動課金はスキップするため、次回の請求は「前取り最終月の翌月」（#137・#234）
+            `${m2}分より後の月会費は、毎月${Number(today.slice(8, 10))}日ごろにご登録のカードへ自動でご請求します（次回 ${sch.nextBillingYmd.replaceAll("-", "/")} 予定）。`,
+            `※ キャンペーンでのご入会は、ご利用開始日から6か月間（${sch.minTermUntilYmd.replaceAll("-", "/")}まで）の継続をお願いしています。`,
           ]
         : [
+            ...(deferred ? [`ご利用開始日は ${startSlash} です。それより前の月の月会費はかかりません。`] : []),
             `本日、入会金と${m1}分・${m2}分の月会費を1回でお支払いいただきました。`,
-            `${m2}分より後の月会費は、毎月ご登録のカードへ自動でご請求します（次回 ${addMonthsYmd(today, est.prepaidMonths + 1).replaceAll("-", "/")} 予定）。`,
+            `${m2}分より後の月会費は、毎月ご登録のカードへ自動でご請求します（次回 ${sch.nextBillingYmd.replaceAll("-", "/")} 予定）。`,
           ]),
       ...(attachments ? ["", "入会申込書の控え（PDF）を添付しています。"] : []),
       "",

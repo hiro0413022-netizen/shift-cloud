@@ -24,6 +24,8 @@ import {
 } from "@/lib/frank-square-billing";
 import { activateWebJoin } from "@/lib/frank-join";
 import { JOIN_PREPAID_MONTHS, joinInitialTotal } from "@/lib/frank-join-pure";
+import { jstYmd } from "@/lib/jst";
+import { usageStartSchedule } from "@yozan/core/frank-billing-start";
 
 export { verifySquareSignature };
 
@@ -176,6 +178,7 @@ type MemberRow = {
   joining_fee_charged_at: string | null;
   join_campaign: string | null;
   prepay_pause_done_at: string | null;
+  start_date: string | null;
   square_checkout_breakdown: {
     total?: number;
     joiningFee?: number;
@@ -187,7 +190,7 @@ type MemberRow = {
 };
 
 const MEMBER_COLS =
-  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, square_checkout_breakdown, frunk_plans(monthly_price, joining_fee)";
+  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, start_date, square_checkout_breakdown, frunk_plans(monthly_price, joining_fee)";
 
 async function memberByCheckoutOrder(admin: Admin, orderId: string | null | undefined): Promise<MemberRow | null> {
   if (!orderId) return null;
@@ -241,8 +244,16 @@ async function memberPendingWebJoinByEmail(admin: Admin, email: string | null): 
 async function ensurePrepaySetup(admin: Admin, member: MemberRow, subId: string, version?: number): Promise<void> {
   const months = Number(member.square_checkout_breakdown?.prepaidMonths ?? 0);
   if (member.prepay_pause_done_at || months <= 0) return;
+  // 止める周期数 = (入金日の月→ご利用開始月の月数) + 前取り月数（#234・正典 @yozan/core/frank-billing-start）。
+  // サブスクは入金した日から始まるので、決済リンクを作った日ではなく「いま」を基準に数える
+  // （月末に申し込んで翌月1日に支払った方の1か月ずれを防ぐ）。ご利用開始日が空欄なら前取り月数そのまま＝従来どおり
+  const cycles = usageStartSchedule({
+    applyDateYmd: jstYmd(),
+    usageStartYmd: member.start_date,
+    prepaidMonths: months,
+  }).pauseCycles;
   const cleared = await clearSubscriptionPriceOverride(subId, version);
-  const paused = await pauseSubscriptionCycles(subId, months);
+  const paused = await pauseSubscriptionCycles(subId, cycles);
   if (cleared.ok && paused.ok) {
     await admin
       .from("frunk_members")

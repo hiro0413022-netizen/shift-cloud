@@ -11,6 +11,7 @@ import { joinAddress } from "@/lib/address";
 import { readName } from "@/lib/name";
 import { FRANK_PORTAL } from "@yozan/core/frank-links";
 import { jpPhoneError, normalizeJpPhone } from "@yozan/core/jp-phone";
+import { usageStartError, usageStartSchedule } from "@yozan/core/frank-billing-start";
 
 export type WebSignupState = { ok?: boolean; error?: string };
 
@@ -74,6 +75,15 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
   const todayYmd = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
   const campaign = isJoinCampaignActive(todayYmd);
 
+  // ご利用開始日（#234）。無料月・前取りの月・初回の自動課金日がこれで決まるので、画面と同じ関数で検査する。
+  // 過去日は画面では選べないが、日付をまたいで開きっぱなしのタブもあるので本日に丸める（エラーにしない）
+  const startRaw = str(formData.get("start_date"));
+  const startInput = startRaw && startRaw < todayYmd ? todayYmd : startRaw;
+  const startErr = usageStartError({ applyDateYmd: todayYmd, usageStartYmd: startInput });
+  if (startErr) return { error: startErr };
+  const schedule = usageStartSchedule({ applyDateYmd: todayYmd, usageStartYmd: startInput, prepaidMonths: 2 });
+  const deferredNote = schedule.deferredMonths > 0 ? `・ご利用開始 ${schedule.usageStartYmd}（開始月無料）` : "";
+
   const { data: plan } = await admin
     .from("frunk_plans")
     .select("id, name, active, public_signup, is_corporate, max_users, max_open_slots, companion_free")
@@ -118,7 +128,7 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     phone,
     email,
     payment_method: "credit",
-    start_date: orNull(formData.get("start_date")),
+    start_date: startInput || null,
     consent_privacy: true,
     consent_terms: true,
     signature,
@@ -127,10 +137,10 @@ export async function submitWebSignup(_prev: WebSignupState, formData: FormData)
     joining_fee_waived: campaign || !!coupon,
     join_campaign: campaign ? JOIN_CAMPAIGN.id : null,
     note: campaign
-      ? `Web入会（即決済）年内キャンペーン: 入会金無料・入会月無料・2か月前取り・${JOIN_CAMPAIGN.minMonths}か月継続${coupon ? `・クーポン ${coupon}` : ""}`
+      ? `Web入会（即決済）年内キャンペーン: 入会金無料・${schedule.deferredMonths > 0 ? "ご利用開始月" : "入会月"}無料・2か月前取り・${JOIN_CAMPAIGN.minMonths}か月継続${coupon ? `・クーポン ${coupon}` : ""}${deferredNote}`
       : coupon
-        ? `Web入会（即決済）クーポン適用: ${coupon}`
-        : "Web入会（即決済）",
+        ? `Web入会（即決済）クーポン適用: ${coupon}${deferredNote}`
+        : `Web入会（即決済）${deferredNote}`,
     status: "pending" as const,
     // 法人（#195）。個人の申込では全部 null のまま
     company_name: spec.isCorporate ? companyName : null,

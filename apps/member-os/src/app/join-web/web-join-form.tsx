@@ -11,6 +11,7 @@ import { NameFields } from "@/components/name-fields";
 import { corporateSpec } from "@yozan/core/frank-corporate";
 import { jpPhoneError } from "@yozan/core/jp-phone";
 import { SignaturePad } from "@/components/signature-pad";
+import { addMonthsYmd, usageStartSchedule, usageStartMaxYmd, usageStartError, monthLabel } from "@yozan/core/frank-billing-start";
 
 type Plan = {
   id: string;
@@ -30,16 +31,8 @@ const field =
 const label = "mb-1 block text-sm font-medium text-(--color-dim)";
 const cardCls = "rounded-2xl border border-(--color-line) bg-(--color-panel) p-5";
 
-/** 「2026-09-11」→ その月から4か月分の「9月」「10月」「11月」「12月」表記 */
-function monthLabels(baseYmd: string): [string, string, string, string] {
-  const d = new Date(`${baseYmd}T12:00:00+09:00`);
-  const names: string[] = [];
-  for (let i = 0; i < 4; i++) {
-    const m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + i, 1));
-    names.push(`${m.getUTCMonth() + 1}月`);
-  }
-  return names as [string, string, string, string];
-}
+/** "2026-11-02" → "2026/11/2" */
+const slashDate = (ymd: string) => `${ymd.slice(0, 4)}/${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}`;
 
 export function WebJoinForm({ plans }: { plans: Plan[] }) {
   const [state, action, pending] = useActionState<WebSignupState, FormData>(submitWebSignup, {});
@@ -54,6 +47,8 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
   const [phoneTouched, setPhoneTouched] = useState(false);
   const phoneMsg = phone.trim() === "" ? null : jpPhoneError(phone);
   const [step, setStep] = useState<"input" | "estimate">("input");
+  // ご利用開始日（#234）。先の月から使う方は、無料になるのが「ご利用開始月」になる
+  const [startDate, setStartDate] = useState("");
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const todayYmd = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
@@ -68,6 +63,12 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
     if (jpPhoneError(phone)) {
       setPhoneTouched(true);
       form.querySelector<HTMLInputElement>('input[name="phone"]')?.focus();
+      return;
+    }
+    const startErr = usageStartError({ applyDateYmd: todayYmd, usageStartYmd: startDate });
+    if (startErr) {
+      alert(startErr);
+      form.querySelector<HTMLInputElement>('input[name="start_date"]')?.focus();
       return;
     }
     if (!signature) {
@@ -241,8 +242,21 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           <AddressFields inputClassName={field} labelClassName={label} wideClassName="col-span-2" />
         </div>
         <div>
-          <label className={label}>ご利用開始希望日</label>
-          <input type="date" name="start_date" className={field} />
+          <label className={label}>ご利用開始日</label>
+          <input
+            type="date"
+            name="start_date"
+            min={todayYmd}
+            max={usageStartMaxYmd(todayYmd)}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className={field}
+          />
+          <p className="mt-1 text-xs text-(--color-dim)">
+            来月以降からご利用の方はお選びください（{slashDate(usageStartMaxYmd(todayYmd))}まで）。
+            <span className="font-medium text-(--color-txt)">ご利用開始月より前の月の月会費はかかりません</span>（無料になるのもご利用開始月です）。
+            空欄の場合は本日からのご利用になります。
+          </p>
         </div>
         <div className="rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-sm text-(--color-dim)">
           <span className="font-medium text-(--color-txt)">お支払いはクレジットカードのみ</span>
@@ -303,7 +317,21 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           // クーポン入力を見積に反映（#136。実決済側と同じ分岐。キャンペーン終了後にズレていた）
           couponWaivesJoiningFee: !!validCoupon(coupon),
         });
-        const [m0, m1, m2, m3] = monthLabels(todayYmd);
+        // 無料月・前取りの月・初回の自動課金日は ご利用開始日 から決まる（#234・正典 @yozan/core/frank-billing-start）
+        const sch = usageStartSchedule({
+          applyDateYmd: todayYmd,
+          usageStartYmd: startDate,
+          prepaidMonths: est.prepaidMonths,
+          minMonths: JOIN_CAMPAIGN.minMonths,
+        });
+        const freeLabel = monthLabel(sch.freeMonthYmd);
+        const prepaidLabels = sch.prepaidMonthYmds.map(monthLabel);
+        const joinMonthLabel = monthLabel(todayYmd);
+        // ご利用開始月より前の月（例 9/11入会・11/2開始 → 「9月〜10月」）
+        const monthBeforeStart = addMonthsYmd(sch.freeMonthYmd, -1);
+        const lastBeforeStart = sch.deferredMonths > 1
+          ? `${joinMonthLabel}〜${monthLabel(monthBeforeStart)}`
+          : joinMonthLabel;
         const row = "flex items-baseline justify-between gap-3 py-2 border-b border-(--color-line)/60";
         return (
           <div id="join-estimate" className={`${cardCls} space-y-3 border-(--color-gold)/60`}>
@@ -328,9 +356,15 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
                   )}
                 </span>
               </div>
+              {sch.deferredMonths > 0 && (
+                <div className={row}>
+                  <span>月会費（{lastBeforeStart}分・ご利用開始前）</span>
+                  <span className="font-bold text-emerald-500">かかりません</span>
+                </div>
+              )}
               {est.campaign && (
                 <div className={row}>
-                  <span>月会費（{m0}分・入会月）</span>
+                  <span>月会費（{freeLabel}分・{sch.deferredMonths > 0 ? "ご利用開始月" : "入会月"}）</span>
                   <span>
                     <s className="text-(--color-dim)">{est.monthlyTaxIncluded.toLocaleString()}円</s>
                     <span className="ml-2 font-bold text-emerald-500">→ 0円（キャンペーン）</span>
@@ -338,7 +372,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
                 </div>
               )}
               <div className={row}>
-                <span>月会費 前取り（{m1}分＋{m2}分）</span>
+                <span>月会費 前取り（{prepaidLabels.join("分＋")}分）</span>
                 <span className="font-bold">{est.monthlyTaxIncluded.toLocaleString()}円 × {est.prepaidMonths} ＝ {(est.monthlyTaxIncluded * est.prepaidMonths).toLocaleString()}円（税込）</span>
               </div>
               <div className="flex items-baseline justify-between gap-3 pt-3">
@@ -347,9 +381,12 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
               </div>
             </div>
             <ul className="space-y-1 rounded-xl bg-(--color-panel-2) p-3 text-xs text-(--color-dim)">
-              {/* 前取りした{m1}{m2}分の自動課金はスキップされるため、カードへの自動請求は{m3}分から（#137） */}
-              <li>・{m3}以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります（{m1}分・{m2}分は本日お支払い済みのため請求されません）。</li>
-              <li>・キャンペーンでのご入会は、<span className="font-semibold text-(--color-txt)">{JOIN_CAMPAIGN.minMonths}か月間の継続</span>をお願いしています。</li>
+              {/* 前取りした月の自動課金はスキップされるため、カードへの自動請求は その翌月分から（#137・#234） */}
+              {sch.deferredMonths > 0 && (
+                <li>・ご利用開始日は<span className="font-semibold text-(--color-txt)">{slashDate(sch.usageStartYmd)}</span>です。それより前の月の月会費はかかりません。</li>
+              )}
+              <li>・{monthLabel(sch.nextBillingYmd)}分以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります（初回 {slashDate(sch.nextBillingYmd)}・{prepaidLabels.join("分・")}分は本日お支払い済みのため請求されません）。</li>
+              <li>・キャンペーンでのご入会は、<span className="font-semibold text-(--color-txt)">ご利用開始日から{JOIN_CAMPAIGN.minMonths}か月間（{slashDate(sch.minTermUntilYmd)}まで）の継続</span>をお願いしています。</li>
               <li>・上記の合計を、決済ページで<span className="font-semibold text-(--color-txt)">1回でお支払い</span>いただきます（分割されません）。</li>
               <li>・決済は安全な決済ページ（Square）で行います。決済完了と同時に会員番号を発行します。</li>
             </ul>

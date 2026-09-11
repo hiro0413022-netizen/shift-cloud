@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "crypto";
 import { squareOrderIdempotencyKey } from "@yozan/core/frank-portal";
+import { calendarMonthsBetween } from "@yozan/core/frank-billing-start";
 
 /**
  * FRANK GOLF member-os → Square 操作（#124）
@@ -187,4 +188,158 @@ export async function chargeOrderOnFile(input: {
     console.error("[frank-square] order charge failed:", e);
     return { ok: false, error: String(e) };
   }
+}
+
+/* ============================================================================
+ * ご利用開始月に合わせて「前取り分の休止」を組み直す（#234・2026-09-11）
+ *
+ * Web入会の決済でサブスクは「入会日」から始まり、Webhook が
+ * 「前取り月数ぶん（＋ご利用開始月までの月数ぶん）」の休止を Square に予約する（genesis frank-pos.ts）。
+ * 入会後に「ご利用開始は11月から」と分かった方（尾内様・大江様）は、この休止を長くすればよい。
+ * 請求日（毎月◯日）は動かさない＝サブスクを作り直さない・請求日の基準日も触らない（ユーザー決定）。
+ *
+ * Square の休止は「予約済みの PAUSE / RESUME アクション」として持たれている。
+ * 予約を上書きする API は無いので、①予約を消す ②周期数を指定して休止を予約し直す ③読み直して確かめる。
+ * ②が失敗したら元の周期数で予約し直す（消したままだと、止めるはずの月にそのまま引き落とされる）。
+ * ========================================================================== */
+
+export type SubscriptionAction = { id: string; type: string; effective_date?: string | null };
+export type SubscriptionDetail = {
+  id: string;
+  status: string;
+  start_date: string | null;
+  charged_through_date: string | null;
+  actions: SubscriptionAction[];
+};
+
+/** サブスク1件を「予約済みアクションつき」で読む */
+export async function getSubscriptionDetail(
+  subscriptionId: string,
+): Promise<{ ok: true; sub: SubscriptionDetail } | { ok: false; skipped?: boolean; error: string }> {
+  if (!token()) return { ok: false, skipped: true, error: "no_token" };
+  try {
+    const json = await sq("GET", `/subscriptions/${encodeURIComponent(subscriptionId)}?include=actions`);
+    const raw = (json.subscription ?? {}) as Record<string, unknown>;
+    const actions = ((json.actions ?? raw.actions ?? []) as Array<Record<string, unknown>>).map((a) => ({
+      id: String(a.id ?? ""),
+      type: String(a.type ?? "").toUpperCase(),
+      effective_date: a.effective_date ? String(a.effective_date) : null,
+    }));
+    return {
+      ok: true,
+      sub: {
+        id: String(raw.id ?? subscriptionId),
+        status: String(raw.status ?? "").toUpperCase(),
+        start_date: raw.start_date ? String(raw.start_date) : null,
+        charged_through_date: raw.charged_through_date ? String(raw.charged_through_date) : null,
+        actions,
+      },
+    };
+  } catch (e) {
+    console.error("[frank-square] get subscription failed:", e);
+    return { ok: false, error: String(e instanceof Error ? e.message : e).slice(0, 200) };
+  }
+}
+
+/** 予約中の休止（PAUSE の日＝止まる最初の請求日／RESUME の日＝次に請求される日）。無ければ null */
+export function pendingPauseWindow(sub: SubscriptionDetail): { pause: string | null; resume: string | null } {
+  const pause = sub.actions.filter((a) => a.type === "PAUSE" && a.effective_date).map((a) => String(a.effective_date)).sort()[0] ?? null;
+  const resume = sub.actions.filter((a) => a.type === "RESUME" && a.effective_date).map((a) => String(a.effective_date)).sort()[0] ?? null;
+  return { pause, resume };
+}
+
+export type ReschedulePauseResult = {
+  ok: boolean;
+  skipped?: boolean;
+  error?: string;
+  /** 変更前の Square の予定 */
+  before?: { pause: string | null; resume: string | null };
+  /** 変更後に読み直した Square の予定 */
+  after?: { pause: string | null; resume: string | null };
+  /** 新しく予約した休止の周期数 */
+  cycles?: number;
+  /** ②が失敗して元の周期数で予約し直したか */
+  restored?: boolean;
+};
+
+/**
+ * 次に自動課金される日が targetYmd になるように、前取り分の休止を予約し直す。
+ *
+ * 前提（満たさなければ何もしないで理由を返す）:
+ *   - サブスクが ACTIVE（休止がまだ始まっていない）。PAUSED＝休止に入っている・PENDING＝開始日指定のサブスク（#233）は対象外
+ *   - targetYmd が「次の請求サイクルの開始日」以降
+ *
+ * fallbackRestoreCycles: Square が RESUME の予約日を返さなかったときに、元に戻す周期数（DBの控え）
+ */
+export async function reschedulePrepayPause(
+  subscriptionId: string,
+  input: { targetYmd: string; fallbackRestoreCycles: number },
+): Promise<ReschedulePauseResult> {
+  if (!token()) return { ok: false, skipped: true };
+  const first = await getSubscriptionDetail(subscriptionId);
+  if (!first.ok) return { ok: false, skipped: first.skipped, error: first.error };
+  const sub = first.sub;
+  const before = pendingPauseWindow(sub);
+  if (sub.status === "PAUSED") return { ok: false, before, error: "already_paused" };
+  if (sub.status !== "ACTIVE") return { ok: false, before, error: `status_${sub.status || "unknown"}` };
+
+  // 次の請求サイクルの開始日。予約中の PAUSE があればその日（Square自身が決めた日）を正とする
+  const nextCycle = before.pause ?? sub.charged_through_date;
+  if (!nextCycle) return { ok: false, before, error: "no_next_cycle" };
+  const cycles = calendarMonthsBetween(nextCycle, input.targetYmd);
+  if (cycles < 0) return { ok: false, before, error: "target_before_next_cycle" };
+
+  const restoreCycles =
+    before.pause && before.resume
+      ? Math.max(0, calendarMonthsBetween(before.pause, before.resume))
+      : before.pause
+        ? Math.max(0, Math.trunc(input.fallbackRestoreCycles))
+        : 0;
+
+  try {
+    // ① 予約を消す（RESUME を先に。PAUSE を先に消して RESUME の削除に失敗すると、変な再開予約だけが残る）
+    const toDelete = [...sub.actions.filter((a) => a.type === "RESUME"), ...sub.actions.filter((a) => a.type === "PAUSE")];
+    for (const a of toDelete) {
+      if (!a.id) continue;
+      await sq("DELETE", `/subscriptions/${encodeURIComponent(subscriptionId)}/actions/${encodeURIComponent(a.id)}`);
+    }
+  } catch (e) {
+    console.error("[frank-square] delete subscription action failed:", e);
+    const again = await getSubscriptionDetail(subscriptionId);
+    return {
+      ok: false,
+      before,
+      after: again.ok ? pendingPauseWindow(again.sub) : undefined,
+      error: `delete_failed: ${String(e instanceof Error ? e.message : e).slice(0, 160)}`,
+    };
+  }
+
+  let restored = false;
+  let pauseError: string | null = null;
+  if (cycles > 0) {
+    try {
+      // ② 周期数で予約（開始日を省略＝次の請求サイクルの開始日から止まり、cycles 回ぶん後に自動で再開）
+      await sq("POST", `/subscriptions/${encodeURIComponent(subscriptionId)}/pause`, {
+        pause_cycle_duration: cycles,
+        pause_reason: "FRANK: ご利用開始月に合わせて前取り分の休止を組み直し（#234）",
+      });
+    } catch (e) {
+      pauseError = String(e instanceof Error ? e.message : e).slice(0, 160);
+      console.error("[frank-square] re-pause failed:", e);
+      if (restoreCycles > 0) {
+        try {
+          await sq("POST", `/subscriptions/${encodeURIComponent(subscriptionId)}/pause`, { pause_cycle_duration: restoreCycles });
+          restored = true;
+        } catch (e2) {
+          console.error("[frank-square] restore pause failed:", e2);
+        }
+      }
+    }
+  }
+
+  // ③ 読み直して、実際に Square に入っている予定を返す（画面にそのまま出す）
+  const again = await getSubscriptionDetail(subscriptionId);
+  const after = again.ok ? pendingPauseWindow(again.sub) : undefined;
+  if (pauseError) return { ok: false, before, after, cycles, restored, error: `pause_failed: ${pauseError}` };
+  return { ok: true, before, after, cycles };
 }
