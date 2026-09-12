@@ -83,3 +83,29 @@ export async function requireProAdmin(slug: string): Promise<{ id: string; slug:
     .maybeSingle();
   return data ?? null;
 }
+
+// ============================================================
+// お問い合わせフォームの「表示時刻スタンプ」（#235 スパム対策）。
+// ページ表示時に `時刻.署名` を埋め、送信時に「改ざんされていない」「表示から数秒たっている」を見る。
+// 機械的な連投は表示→即送信なので弾ける。人間は数秒で書き終わらない。
+// ============================================================
+
+export function issueFormStamp(proId: string): string {
+  const t = Date.now().toString();
+  return `${t}.${sign(`form|${proId}|${t}`)}`;
+}
+
+/** ok: 使えるスタンプ / tooFast: 表示から早すぎる / invalid: 改ざん・形式不正 */
+export function checkFormStamp(stamp: string, proId: string, minMs = 2500): "ok" | "tooFast" | "invalid" {
+  const [t, sig] = stamp.split(".");
+  if (!t || !sig || !/^\d{13}$/.test(t)) return "invalid";
+  const expect = sign(`form|${proId}|${t}`);
+  if (sig.length !== expect.length || !timingSafeEqual(Buffer.from(sig), Buffer.from(expect))) return "invalid";
+  if (Date.now() - Number(t) < minMs) return "tooFast";
+  return "ok";
+}
+
+/** 連投制限用のIPハッシュ（生IPは保存しない） */
+export function hashIp(ip: string): string {
+  return sign(`ip|${ip}`).slice(0, 32);
+}

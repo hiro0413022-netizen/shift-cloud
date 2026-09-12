@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { getPro, listCareer, listClubs, listProfileItems } from "@/lib/data";
+import { getPro, hasContactMethod, listCareer, listClubs, listProfileItems } from "@/lib/data";
+import ContactCta from "@/components/contact-cta";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "PROFILE" };
@@ -81,6 +82,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ slug: 
           </table>
         </section>
       ) : null}
+
+      {hasContactMethod(pro) ? <ContactCta slug={pro.slug} /> : null}
     </div>
   );
 }

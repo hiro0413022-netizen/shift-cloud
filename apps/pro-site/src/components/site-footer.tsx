@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef } from "react";
 
@@ -7,12 +8,13 @@ import { useRef } from "react";
  * フッター。コピーライト部分を「3秒以内に5回タップ」で管理ログインへ（隠しコマンド）。
  * リンクとしては一切露出しない。
  */
-export default function SiteFooter({ slug, name, instagram, x, youtube }: {
+export default function SiteFooter({ slug, name, instagram, x, youtube, hasContact }: {
   slug: string;
   name: string;
   instagram: string | null;
   x: string | null;
   youtube: string | null;
+  hasContact: boolean;
 }) {
   const router = useRouter();
   const taps = useRef<number[]>([]);
@@ -46,6 +48,16 @@ export default function SiteFooter({ slug, name, instagram, x, youtube }: {
           </a>
         ) : null}
       </div>
+      {hasContact ? (
+        <div className="mb-6">
+          <Link
+            href={`/${slug}/contact`}
+            className="inline-block rounded-full border border-(--color-gold-2) px-6 py-2.5 text-sm font-bold text-(--color-gold-2) transition hover:bg-(--color-gold-2) hover:text-(--color-ink)"
+          >
+            お問い合わせ
+          </Link>
+        </div>
+      ) : null}
       <p className="select-none text-xs text-neutral-400" onClick={secretTap}>
         © {new Date().getFullYear()} {name}. All Rights Reserved.
       </p>

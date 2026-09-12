@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import SiteHeader from "@/components/site-header";
 import SiteFooter from "@/components/site-footer";
-import { getPro } from "@/lib/data";
+import { getPro, hasContactMethod } from "@/lib/data";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -21,9 +21,16 @@ export default async function PublicLayout({ children, params }: { children: Rea
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader slug={pro.slug} name={pro.name} nameEn={pro.name_en} />
+      <SiteHeader slug={pro.slug} name={pro.name} nameEn={pro.name_en} hasContact={hasContactMethod(pro)} />
       <main className="flex-1">{children}</main>
-      <SiteFooter slug={pro.slug} name={pro.name} instagram={pro.instagram_username} x={pro.x_username} youtube={pro.youtube_url} />
+      <SiteFooter
+        slug={pro.slug}
+        name={pro.name}
+        instagram={pro.instagram_username}
+        x={pro.x_username}
+        youtube={pro.youtube_url}
+        hasContact={hasContactMethod(pro)}
+      />
     </div>
   );
 }

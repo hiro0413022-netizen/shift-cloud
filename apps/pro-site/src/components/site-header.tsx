@@ -11,10 +11,12 @@ const MENU = [
   { href: "/profile", label: "PROFILE" },
 ];
 
-export default function SiteHeader({ slug, name, nameEn }: { slug: string; name: string; nameEn: string | null }) {
+export default function SiteHeader({ slug, name, nameEn, hasContact }: { slug: string; name: string; nameEn: string | null; hasContact: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const base = `/${slug}`;
+  // CONTACT はプロが受信アドレスを設定しているときだけ出す（#235）
+  const menu = hasContact ? [...MENU, { href: "/contact", label: "CONTACT" }] : MENU;
 
   return (
     <header className="sticky top-0 z-40 border-b border-(--color-line) bg-white/90 backdrop-blur">
@@ -26,7 +28,7 @@ export default function SiteHeader({ slug, name, nameEn }: { slug: string; name:
           </span>
         </Link>
         <nav className="hidden gap-6 md:flex">
-          {MENU.map((m) => {
+          {menu.map((m) => {
             const href = `${base}${m.href}`;
             const active = m.href === "" ? pathname === base : pathname.startsWith(href);
             return (
@@ -53,7 +55,7 @@ export default function SiteHeader({ slug, name, nameEn }: { slug: string; name:
       </div>
       {open ? (
         <nav className="border-t border-(--color-line) bg-white md:hidden">
-          {MENU.map((m) => (
+          {menu.map((m) => (
             <Link
               key={m.label}
               href={`${base}${m.href}`}

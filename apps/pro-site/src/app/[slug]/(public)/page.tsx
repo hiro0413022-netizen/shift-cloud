@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import InstagramEmbed from "@/components/instagram-embed";
 import SponsorGrid from "@/components/sponsor-grid";
-import { getPro, listInstagram, listNews, listResults, listSchedule, listSponsors } from "@/lib/data";
+import ContactCta from "@/components/contact-cta";
+import { getPro, hasContactMethod, listInstagram, listNews, listResults, listSchedule, listSponsors } from "@/lib/data";
 import { fmtDateJa, fmtSpanJa } from "@/lib/jst";
 
 export const dynamic = "force-dynamic";
@@ -173,8 +174,18 @@ export default async function TopPage({ params }: { params: Promise<{ slug: stri
           <section className="reveal">
             <SectionTitle en="SPONSOR" ja="スポンサー" />
             <SponsorGrid sponsors={sponsors} />
+            {hasContactMethod(pro) ? (
+              <div className="mt-4 text-right">
+                <Link href={`${base}/contact?type=sponsor`} className="text-xs font-bold text-(--color-gold) underline-offset-4 hover:underline">
+                  スポンサー・協賛のご相談はこちら →
+                </Link>
+              </div>
+            ) : null}
           </section>
         ) : null}
+
+        {/* CONTACT（#235）: 受信アドレスが設定されているときだけ */}
+        {hasContactMethod(pro) ? <ContactCta slug={pro.slug} /> : null}
       </div>
     </div>
   );

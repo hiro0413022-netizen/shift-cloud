@@ -28,6 +28,9 @@ export function Msg({ ok, err }: { ok?: string; err?: string }) {
       filetype: "画像ファイル（PNG / JPG など）を選択してください。",
       filesize: "画像は5MB以下にしてください。スクリーンショットや縮小版でお試しください。",
       upload: "アップロードに失敗しました。少し時間をおいてもう一度お試しください。",
+      email: "メールアドレスの形式をご確認ください。",
+      line: "LINEの友だち追加URLをご確認ください（https://lin.ee/... などの形式）。",
+      phone: "電話番号をご確認ください。",
     };
     return <p className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm font-bold text-(--color-danger)">{map[err] ?? "エラーが発生しました。"}</p>;
   }

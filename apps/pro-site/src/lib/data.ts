@@ -17,7 +17,18 @@ export type Pro = {
   profile_image_url: string | null;
   world_ranking: string | null;
   ranking_note: string | null;
+  /** HPに出す連絡先（#235/#236）。入っているものだけが窓口として画面に出る */
+  contact_email: string | null;
+  contact_line_url: string | null;
+  contact_phone: string | null;
+  contact_ig_dm: boolean;
+  contact_note: string | null;
 };
+
+/** 窓口を1つでも出しているか（CONTACTの導線・フォーム受付の条件） */
+export function hasContactMethod(pro: Pro): boolean {
+  return Boolean(pro.contact_email || pro.contact_line_url || pro.contact_phone || (pro.contact_ig_dm && pro.instagram_username));
+}
 
 export type NewsItem = {
   id: string;
@@ -44,13 +55,26 @@ export type CareerRow = { id: string; season: string | null; event: string; resu
 export type ClubRow = { id: string; category: string; item: string; sort: number };
 export type ProfileItem = { id: string; label: string; value: string; sort: number };
 export type InstaPost = { id: string; post_url: string; created_at: string };
+export type Inquiry = {
+  id: string;
+  kind: string;
+  name: string;
+  company: string | null;
+  email: string;
+  phone: string | null;
+  message: string;
+  read_at: string | null;
+  created_at: string;
+};
 export type Sponsor = { id: string; name: string; image_url: string; image_path: string; link_url: string | null; size: "large" | "medium" | "small"; sort: number };
 
 export async function getPro(slug: string): Promise<Pro | null> {
   const admin = createAdmin();
   const { data } = await admin
     .from("pgw_pros")
-    .select("id, slug, name, name_en, catchphrase, bio, affiliation, instagram_username, x_username, youtube_url, hero_image_url, profile_image_url, world_ranking, ranking_note")
+    .select(
+      "id, slug, name, name_en, catchphrase, bio, affiliation, instagram_username, x_username, youtube_url, hero_image_url, profile_image_url, world_ranking, ranking_note, contact_email, contact_line_url, contact_phone, contact_ig_dm, contact_note",
+    )
     .eq("slug", slug)
     .is("deleted_at", null)
     .maybeSingle();
@@ -173,4 +197,28 @@ export async function listInstagram(proId: string, limit?: number): Promise<Inst
   if (limit) q = q.limit(limit);
   const { data } = await q;
   return (data as InstaPost[] | null) ?? [];
+}
+
+// ---------- お問い合わせフォームの控え（#235/#236） ----------
+export async function listInquiries(proId: string, limit = 100): Promise<Inquiry[]> {
+  const admin = createAdmin();
+  const { data } = await admin
+    .from("pgw_inquiries")
+    .select("id, kind, name, company, email, phone, message, read_at, created_at")
+    .eq("pro_id", proId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  return (data as Inquiry[] | null) ?? [];
+}
+
+export async function countUnreadInquiries(proId: string): Promise<number> {
+  const admin = createAdmin();
+  const { count } = await admin
+    .from("pgw_inquiries")
+    .select("id", { count: "exact", head: true })
+    .eq("pro_id", proId)
+    .is("deleted_at", null)
+    .is("read_at", null);
+  return count ?? 0;
 }

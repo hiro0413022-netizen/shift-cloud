@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdmin } from "@/lib/db";
 import { createSession, destroySession, hashPassword, requireProAdmin, verifyPassword } from "@/lib/auth";
 import { todayJst } from "@/lib/jst";
+import { isLineUrl, isValidEmail, normalizeEmail, normalizePhone } from "@/lib/inquiry";
 
 // ============================================================
 // 管理画面のサーバーアクション。全て「slugのプロにログイン済みか」を検証してから実行。
@@ -316,4 +317,38 @@ export async function deleteClubAction(fd: FormData) {
   const admin = createAdmin();
   await admin.from("pgw_clubs").update({ deleted_at: new Date().toISOString() }).eq("id", s(fd, "id")).eq("pro_id", pro.id);
   refresh(slug, "/clubs");
+}
+
+// ---------- お問い合わせの窓口（#235→#236） ----------
+// #236: システムからメールは送らない。HPに出す連絡先（押すとお客様のアプリが開く）を保存するだけ。
+export async function saveContactMethodsAction(fd: FormData) {
+  const slug = s(fd, "slug");
+  const pro = await guard(slug);
+  const email = normalizeEmail(s(fd, "contact_email"));
+  if (email && !isValidEmail(email)) redirect(`/${slug}/admin/inquiries?err=email`);
+  const line = s(fd, "contact_line_url");
+  if (line && !isLineUrl(line)) redirect(`/${slug}/admin/inquiries?err=line`);
+  const phone = normalizePhone(s(fd, "contact_phone"));
+  if (phone && phone.replace(/\D/g, "").length < 9) redirect(`/${slug}/admin/inquiries?err=phone`);
+
+  const admin = createAdmin();
+  await admin
+    .from("pgw_pros")
+    .update({
+      contact_email: email || null,
+      contact_line_url: line || null,
+      contact_phone: phone || null,
+      contact_ig_dm: s(fd, "contact_ig_dm") === "on",
+      contact_note: s(fd, "contact_note") || null,
+    })
+    .eq("id", pro.id);
+  refresh(slug, "/inquiries"); // CONTACTの導線の出し入れがHP全体に効くので layout ごと再検証
+}
+
+export async function deleteInquiryAction(fd: FormData) {
+  const slug = s(fd, "slug");
+  const pro = await guard(slug);
+  const admin = createAdmin();
+  await admin.from("pgw_inquiries").update({ deleted_at: new Date().toISOString() }).eq("id", s(fd, "id")).eq("pro_id", pro.id);
+  redirect(`/${slug}/admin/inquiries?deleted=1`);
 }
