@@ -55,3 +55,4 @@
 - ✅ `0157_compe_import_9th.sql` — 適用済（2026-09-10、第9回ゴルフウィング親睦ゴルフコンペの移行データ #232）
 
 - ✅ `0158_compe_entry.sql` — 適用済（2026-09-10、MCP name=compe_entry。募集ページ用 entry_*/play_fee・参加者の entry_status #233）
+- ✅ `0159_frank_billing_day.sql` — 適用済（2026-09-11、MCP name=frank_billing_day。frunk_members に10日払いへの作り直し状態の列＋尾内様・大江様のご利用開始月の控え #235）

@@ -4,6 +4,7 @@ import { runDueActions } from "@/lib/ai-execution";
 import { publishDueContent } from "@/lib/content-loop";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
 import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cron";
+import { runBillingDaySweep } from "@/lib/frank-billing-day";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -43,5 +44,8 @@ export async function GET(req: NextRequest) {
      【退店】の押し忘れで来店中が残り続けていた。お客様のスマホ側は同じ規則で
      すでに閉じているので、DBを画面に合わせる。 */
   const frankCheckout = await runFrankAutoCheckout().catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, results, frankVisited, frankCheckout });
+  /* FRANK: 入会したのに「毎月10日に翌月分」に作り直せていない方を拾い直す（#235）。
+     入会の Webhook が応答後に走らせる作り直しの取りこぼし用。1回2名まで */
+  const frankBillingDay = await runBillingDaySweep(2).catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ok: true, results, frankVisited, frankCheckout, frankBillingDay });
 }

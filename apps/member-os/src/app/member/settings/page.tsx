@@ -42,7 +42,7 @@ export default async function MemberSettingsPage({
 
       {sp.billing === "success" && (
         <p className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
-          ✅ カードのご登録が完了しました。月会費は毎月自動でお支払いになります。
+          ✅ カードのご登録が完了しました。月会費は毎月10日に翌月分を自動でお支払いいただきます。
         </p>
       )}
       {sp.billing === "cancel" && (
@@ -59,7 +59,7 @@ export default async function MemberSettingsPage({
           <h2 className="text-sm font-semibold">月会費のお支払い（クレジットカード）</h2>
           {cardDone ? (
             <p className="mt-1 text-xs leading-relaxed text-(--color-dim)">
-              ご登録済みです。月会費は毎月自動でお支払いになります。
+              ご登録済みです。月会費は毎月10日に翌月分を自動でお支払いいただきます。
               カードの変更・お支払い方法の変更は受付までお申し付けください。
             </p>
           ) : (

@@ -11,8 +11,14 @@ import { BirthDateInput } from "@/components/birth-date-input";
 import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_METHODS, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
 import { OCCUPATIONS, CONTACT_METHODS, GENDER_LABEL, GENDERS } from "@/lib/walkin";
 import { jstYmd } from "@/lib/jst";
-import { nextBillingDateAfterPrepay, usageStartSchedule, usageStartMaxYmd, monthLabel } from "@yozan/core/frank-billing-start";
-import { getSubscriptionDetail, pendingPauseWindow } from "@/lib/frank-square";
+import {
+  nextBillingDateAfterPrepay,
+  usageStartSchedule,
+  usageStartMaxYmd,
+  monthLabel,
+  billedMonthOfChargeDate,
+} from "@yozan/core/frank-billing-start";
+import { getSubscriptionDetail, nextInvoiceDateOf } from "@/lib/frank-square";
 import { BOOKING_STATUS_LABEL, CUSTOMER_KIND_LABEL, PAYMENT_STATUS_LABEL, outstanding } from "@yozan/core/frank-booking";
 import {
   leaveDateOptions,
@@ -42,9 +48,12 @@ import {
   useTicketManual,
   openJoinCheckout,
   changeUsageStart,
+  rebaseBillingDayOne,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
+// 10日払いへの作り直し（#235）で Square を数回呼ぶため
+export const maxDuration = 60;
 type Row = Record<string, unknown>;
 
 /**
@@ -240,23 +249,22 @@ export default async function FrunkMemberPage({
 
   const status = String(m.status ?? "");
 
-  // ご利用開始日と、無料月・前取りの月・次回の自動課金（#234）。
-  // 式は入会画面・入会完了メール・Webhook と同じ @yozan/core/frank-billing-start。
-  const billingBd = (m.square_checkout_breakdown ?? {}) as { prepaidMonths?: number; applyDateYmd?: string };
+  // ご利用開始日と、無料月・前取りの月・最初の10日の引き落とし（#234・#235）。
+  // 式は入会画面・入会完了メール・Genesis の作り直しと同じ @yozan/core/frank-billing-start。
+  // ⚠ ご利用開始日は「内訳に控えたもの」だけを見る（#234 より前の入会は入会月無料で決済済み）
+  const billingBd = (m.square_checkout_breakdown ?? {}) as { prepaidMonths?: number; applyDateYmd?: string; usageStartYmd?: string };
   const prepaidMonths = Number(billingBd.prepaidMonths ?? 0);
   const joinYmd = m.join_date ? String(m.join_date) : billingBd.applyDateYmd ? String(billingBd.applyDateYmd) : "";
   const usageSch = joinYmd && prepaidMonths > 0
-    ? usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd: m.start_date ? String(m.start_date) : null, prepaidMonths })
+    ? usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd: billingBd.usageStartYmd ?? null, prepaidMonths })
     : null;
-  // Square に実際に入っている予定も並べる（DBの計算とずれていたら画面で気づけるように）。
-  // 前取りの休止がまだ効いている会員だけ読む＝一覧ではなくこの1枚を開いたときだけ・1回だけ
-  const squareWindow = usageSch && m.square_subscription_id && usageSch.nextBillingYmd >= today && ["active", "pending"].includes(status)
-    ? await getSubscriptionDetail(String(m.square_subscription_id)).then((r) =>
-        r.ok ? { status: r.sub.status, ...pendingPauseWindow(r.sub) } : null,
-      )
+  // Square に実際に入っている次回の引き落とし日も並べる（DBの計算とずれていたら画面で気づけるように）
+  const squareSub = m.square_subscription_id && ["active", "pending", "suspended"].includes(status)
+    ? await getSubscriptionDetail(String(m.square_subscription_id)).then((r) => (r.ok ? r.sub : null))
     : null;
-  const squareNext = squareWindow?.resume ?? null;
-  const usageMismatch = !!(usageSch && squareWindow && squareWindow.status === "ACTIVE" && squareNext !== usageSch.nextBillingYmd);
+  const squareNext = squareSub ? nextInvoiceDateOf(squareSub) : null;
+  const rebased = !!m.billing_rebased_at;
+  const rebaseError = m.billing_rebase_error ? String(m.billing_rebase_error) : "";
 
   const inMinTerm = m.min_term_until != null && String(m.min_term_until) > today;
   const back = `/frunk/${id}`;
@@ -450,6 +458,25 @@ export default async function FrunkMemberPage({
                   {status === "suspended" ? "一時停止中（休会）" : "稼働中"}
                 </Badge>
                 <span className="ml-2 text-xs text-(--color-dim)">Square サブスクリプション</span>
+                {/* 毎月10日に翌月分（#235）。Square に入っている次回の引き落とし日をそのまま出す */}
+                <div className="mt-1 text-xs">
+                  {rebased ? <Badge tone="ok">10日払い</Badge> : <Badge tone="warn">10日払いに未切り替え</Badge>}
+                  <span className="ml-2 text-(--color-dim)">
+                    {squareSub
+                      ? squareNext
+                        ? `Square上の次回 ${squareNext.replaceAll("-", "/")}${Number(squareNext.slice(8, 10)) === 10 ? `（${monthLabel(billedMonthOfChargeDate(squareNext))}分）` : ""}`
+                        : `Square上の次回の引き落としなし（${squareSub.status}${squareSub.canceled_date ? `・${squareSub.canceled_date}で解約` : ""}）`
+                      : "Squareの状態を読めませんでした"}
+                  </span>
+                  {rebaseError ? <p className="mt-1 font-medium text-rose-600">⚠ 10日払いへの切り替えに失敗: {rebaseError}</p> : null}
+                  {(!rebased || rebaseError) && ["active", "pending"].includes(status) ? (
+                    <form action={rebaseBillingDayOne} className="mt-1">
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="back" value={back} />
+                      <button className={btnGhostCls}>10日払いに切り替える{rebaseError ? "（やり直す）" : ""}</button>
+                    </form>
+                  ) : null}
+                </div>
                 {/* 退会もプラン変更もせず「引き落としだけ止めたい」ときの出口（#192）。
                     0円プランに切り替えたのにサブスクだけ残っている、という状態を画面から潰せるようにする。 */}
                 <form action={stopSquareBilling} className="mt-1">
@@ -480,14 +507,14 @@ export default async function FrunkMemberPage({
                   <form action={startSquareBilling} className="mt-2 flex flex-wrap items-center gap-2">
                     <input type="hidden" name="id" value={id} />
                     <input type="hidden" name="back" value={back} />
-                    <label className="text-xs text-(--color-dim)">初回請求日</label>
+                    <label className="text-xs text-(--color-dim)">初回の引き落とし日（10日）</label>
                     <input
                       type="date"
                       name="start_date"
                       defaultValue={nextBillingDateAfterPrepay({
-                        // 基準は入会日。ご利用開始日が先の月ならその分ずれる（#234）
+                        // 前取りの次の月の分を引き落とす10日（#235）。ご利用開始月は内訳の控えだけ（#234）
                         startDateYmd: String(m.join_date ?? m.start_date ?? jstYmd()),
-                        usageStartYmd: m.start_date ? String(m.start_date) : null,
+                        usageStartYmd: billingBd.usageStartYmd ?? null,
                         prepaidMonths: Number(
                           (m.square_checkout_breakdown as { prepaidMonths?: number } | null)?.prepaidMonths ?? 0,
                         ),
@@ -509,25 +536,19 @@ export default async function FrunkMemberPage({
             {inMinTerm ? <span className="ml-2 text-amber-700">6か月継続 {String(m.min_term_until)}まで</span> : null}
           </Info>
           {/* ご利用開始日（#234）。先の月から使う方は、無料になるのが「ご利用開始月」。
-              入会後に分かった場合もここで変えられる（Square の自動課金の再開日も一緒にずらす） */}
+              入会後に分かった場合もここで変えられる（まだ引き落としが始まっていなければ、10日払いのサブスクを作り直す・#235） */}
           {usageSch ? (
             <Info label="ご利用開始">
               <div>
                 <span className="font-medium">{usageSch.usageStartYmd.replaceAll("-", "/")}</span>
                 <span className="ml-2 text-xs text-(--color-dim)">
                   無料 {monthLabel(usageSch.freeMonthYmd)}分／前取り {usageSch.prepaidMonthYmds.map(monthLabel).join("・")}分／
-                  次回の自動課金 {usageSch.nextBillingYmd.replaceAll("-", "/")}（予定）
+                  自動引き落とし {usageSch.nextBillingYmd.replaceAll("-", "/")} に{monthLabel(usageSch.firstBilledMonthYmd)}分から（予定）
                 </span>
               </div>
-              {squareWindow ? (
-                <div className={`mt-1 text-xs ${usageMismatch ? "font-medium text-rose-600" : "text-(--color-dim)"}`}>
-                  Square上の予定: {squareWindow.status === "PAUSED" ? "休止中・" : ""}
-                  {squareNext ? `次回の自動課金 ${squareNext.replaceAll("-", "/")}` : "再開日の予約なし"}
-                  {squareNext === usageSch.nextBillingYmd
-                    ? " ✓ 一致"
-                    : usageMismatch
-                      ? " ⚠ 上の予定と違います。下の【ご利用開始日を変更する】を押すとSquareを合わせます"
-                      : " ⚠ 上の予定と違います（休止中のため本部にご相談ください）"}
+              {rebased && squareSub && squareNext && squareNext !== usageSch.nextBillingYmd && squareNext < usageSch.nextBillingYmd ? (
+                <div className="mt-1 text-xs font-medium text-rose-600">
+                  ⚠ Square上の次回（{squareNext.replaceAll("-", "/")}）が予定より早いです。【ご利用開始日を変更する】をもう一度押すと合わせます
                 </div>
               ) : null}
               {["active", "pending"].includes(status) ? (
@@ -542,12 +563,12 @@ export default async function FrunkMemberPage({
                     defaultValue={usageSch.usageStartYmd}
                     className={`${inputCls} w-auto`}
                   />
-                  <button className={usageMismatch ? btnCls : btnGhostCls}>ご利用開始日を変更する</button>
+                  <button className={btnGhostCls}>ご利用開始日を変更する</button>
                 </form>
               ) : null}
               <p className="mt-1 text-xs text-(--color-dim)">
                 無料になるのはご利用開始月です。それより前の月の月会費はかからず、入会時の前取りはその翌月・翌々月分に充てます。
-                請求日は入会日と同じ日のままです。
+                引き落としは毎月10日に翌月分です。
               </p>
             </Info>
           ) : null}
@@ -599,8 +620,8 @@ export default async function FrunkMemberPage({
             </div>
 
             {/* 退会・休会は「いつから」を選んで受け付ける（#192・2026-09-01 ユーザー確定）
-                退会=月末・申し出の翌月末から／休会=月初・10日までなら翌月から。
-                受付と同時に Square の自動課金も同じ日付で止める。 */}
+                退会=月末・申し出の翌月末から／休会=月初・前々月末までの申し出（#235）。
+                受付と同時に Square の自動引き落としも止める（退会月の10日で解約／休会開始月の前月10日で停止）。 */}
             {status !== "left" && (
               <div className="mt-3 space-y-2 border-t border-(--color-line) pt-3">
                 {scheduledLeave ? (
@@ -642,7 +663,7 @@ export default async function FrunkMemberPage({
                         </select>
                         <button className={btnGhostCls}>休会を受け付ける</button>
                         <span className="text-xs text-(--color-dim)">
-                          10日までの申し出で翌月から（{monthFromLabel(suspendOpts[0])}なら {mdLabel(suspendApplyDeadline(suspendOpts[0]))}まで）
+                          休会したい月の前々月末までの申し出（{monthFromLabel(suspendOpts[0])}なら {mdLabel(suspendApplyDeadline(suspendOpts[0]))}まで）
                         </span>
                       </form>
                     )}

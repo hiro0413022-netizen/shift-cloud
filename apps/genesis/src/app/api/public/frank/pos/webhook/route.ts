@@ -3,6 +3,8 @@ import { verifySquareSignature, handleSquareEvent, DEFAULT_WEBHOOK_URL } from "@
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// 入会の入金で「10日払いへの作り直し」（Squareを数回呼ぶ・#235）まで行うため
+export const maxDuration = 60;
 
 /**
  * Square Webhook（FRANK GOLF 店頭POS #118 / 実行計画§3-7）

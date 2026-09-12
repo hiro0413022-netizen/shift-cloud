@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createAdmin } from "@/lib/supabase/admin";
 import { parseOrderNote } from "@yozan/core/frank-portal";
 import { logEvent } from "@/lib/kernel";
@@ -15,17 +16,10 @@ import {
   type SquarePayment,
   type SquareRefund,
 } from "@/lib/frank-pos-pure";
-import {
-  chargeCardOnFile,
-  pauseSubscriptionCycles,
-  clearSubscriptionPriceOverride,
-  getSquareCustomerEmail,
-  findSubscriptionForCustomer,
-} from "@/lib/frank-square-billing";
+import { chargeCardOnFile, getSquareCustomerEmail } from "@/lib/frank-square-billing";
 import { activateWebJoin } from "@/lib/frank-join";
 import { JOIN_PREPAID_MONTHS, joinInitialTotal } from "@/lib/frank-join-pure";
-import { jstYmd } from "@/lib/jst";
-import { usageStartSchedule } from "@yozan/core/frank-billing-start";
+import { rebaseToBillingDay } from "@/lib/frank-billing-day";
 
 export { verifySquareSignature };
 
@@ -179,6 +173,9 @@ type MemberRow = {
   join_campaign: string | null;
   prepay_pause_done_at: string | null;
   start_date: string | null;
+  square_subscription_id: string | null;
+  billing_rebased_at: string | null;
+  square_retired_subscription_ids: string[] | null;
   square_checkout_breakdown: {
     total?: number;
     joiningFee?: number;
@@ -190,7 +187,7 @@ type MemberRow = {
 };
 
 const MEMBER_COLS =
-  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, start_date, square_checkout_breakdown, frunk_plans(monthly_price, joining_fee)";
+  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, start_date, square_subscription_id, billing_rebased_at, square_retired_subscription_ids, square_checkout_breakdown, frunk_plans(monthly_price, joining_fee)";
 
 async function memberByCheckoutOrder(admin: Admin, orderId: string | null | undefined): Promise<MemberRow | null> {
   if (!orderId) return null;
@@ -235,44 +232,25 @@ async function memberPendingWebJoinByEmail(admin: Admin, email: string | null): 
 }
 
 /**
- * Web入会の後始末（#131b/#137）: 価格上書きの解除＋前取り分の課金スキップ。
- * 決済リンクの金額（入会金＋前取り月数分）を Square がサブスクの price_override_money として
- * 引き継ぐため、(1) 上書きを消してプラン月額へ戻し、(2) 前取りした月数ぶん自動課金を止める。
- * 前取りが無い会員（booking.htmlからのカード登録など）は対象外＝何もしない。
- * prepay_pause_done_at で1回だけ実行。payment側・subscription側のどちらから呼んでも冪等。
+ * 入会・カード登録で作られたサブスクを「毎月10日に翌月分」に作り直す（#235）。
+ *
+ * 以前（#131b/#137/#234）はここで「価格上書きの解除＋前取り月数ぶんの休止」をしていた。
+ * 10日払いでは、決済リンクのサブスクを今の期間の終わりで解約し、保存カードから
+ * 開始日＝前取りの次の月の分の10日 のサブスクを作り直す（lib/frank-billing-day.ts）。
+ * payment 側・subscription 側のどちらから呼んでも1回しか動かない（claim）。失敗は会員カードに赤で出る。
  */
-async function ensurePrepaySetup(admin: Admin, member: MemberRow, subId: string, version?: number): Promise<void> {
-  const months = Number(member.square_checkout_breakdown?.prepaidMonths ?? 0);
-  if (member.prepay_pause_done_at || months <= 0) return;
-  // 止める周期数 = (入金日の月→ご利用開始月の月数) + 前取り月数（#234・正典 @yozan/core/frank-billing-start）。
-  // サブスクは入金した日から始まるので、決済リンクを作った日ではなく「いま」を基準に数える
-  // （月末に申し込んで翌月1日に支払った方の1か月ずれを防ぐ）。ご利用開始日が空欄なら前取り月数そのまま＝従来どおり
-  const cycles = usageStartSchedule({
-    applyDateYmd: jstYmd(),
-    usageStartYmd: member.start_date,
-    prepaidMonths: months,
-  }).pauseCycles;
-  const cleared = await clearSubscriptionPriceOverride(subId, version);
-  const paused = await pauseSubscriptionCycles(subId, cycles);
-  if (cleared.ok && paused.ok) {
-    await admin
-      .from("frunk_members")
-      .update({
-        square_subscription_id: subId,
-        prepay_pause_done_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", member.id);
-    member.prepay_pause_done_at = new Date().toISOString();
-  } else {
-    await logEvent(String(member.company_id), {
-      event_type: "billing.prepay_setup_failed",
-      title: `入会後の継続課金の設定に失敗: ${member.name}様（${member.member_no ?? "採番前"}）${cleared.ok ? "" : "月額が初回一括の金額のままです。"}${paused.ok ? "" : "前取り分の停止ができていません。"}Squareで確認してください`.slice(0, 120),
-      source: "frank_billing",
-      source_type: "system",
-      severity: "warning",
-    });
-  }
+function ensureBillingDay(member: MemberRow): void {
+  if (member.billing_rebased_at) return;
+  const memberId = String(member.id);
+  // Square の呼び出しが数回あるので、Webhook の応答（Squareは10秒で再送する）を待たせないよう応答後に走らせる。
+  // 取りこぼしても cron（/api/cron/execute）が拾い直す
+  after(async () => {
+    try {
+      await rebaseToBillingDay(memberId, { source: "webhook" });
+    } catch (e) {
+      console.error("[frank-pos] rebase to billing day failed:", e);
+    }
+  });
 }
 
 async function memberBySquareCustomer(admin: Admin, customerId: string | null | undefined): Promise<MemberRow | null> {
@@ -360,13 +338,15 @@ async function tryRecordMonthlyFee(
 
     // #137: subscription.created/updated のWebhookに頼らず、入金側からもサブスクの後始末を行う。
     // （イベントの到着順は保証されず、subscription側が先に来ると顧客ID未紐付けで空振りしていた）
+    // #235: 後始末＝10日払いへの作り直し。Square側にまだサブスクが無ければ subscription 側でもう一度来る
     if (raw.customer_id) {
-      try {
-        const sub = await findSubscriptionForCustomer(raw.customer_id);
-        if (sub) await ensurePrepaySetup(admin, member, sub.id, sub.version);
-      } catch (e) {
-        console.error("[frank-pos] prepay setup from payment failed:", e);
+      if (String(member.billing_status) === "canceled" && member.billing_rebased_at) {
+        // 解約後のカード再登録＝新しいサブスク。作り直しをもう一度許す（同じ入金の再送では billing_status は canceled ではない）
+        // claim は触らない（走っている作り直しがあれば、その5分の失効を待つ）
+        await admin.from("frunk_members").update({ billing_rebased_at: null, billing_rebase_error: null }).eq("id", member.id);
+        member.billing_rebased_at = null;
       }
+      ensureBillingDay(member);
     }
     if (String(member.billing_status) !== "active") {
       await logEvent(String(member.company_id), {
@@ -589,6 +569,13 @@ async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown
     }
   }
   if (!member) return; // 初回決済のWebhookが先に届いて顧客IDが入ってから追従できる
+  // #235: 10日払いへの作り直しで引退させたサブスクのイベントは無視する
+  //   （無視しないと、解約日に届く CANCELED で「月会費が解約された」扱いになり、サブスクIDも古い方に戻る）
+  if ((member.square_retired_subscription_ids ?? []).map(String).includes(String(sub.id))) return;
+  if (member.billing_rebased_at && member.square_subscription_id && member.square_subscription_id !== sub.id) {
+    // 作り直した後に、別のサブスクのイベントが来た（決済リンクの古い方など）。今のサブスクを上書きしない
+    return;
+  }
   const status = (sub.status ?? "").toUpperCase();
   const patch: Record<string, unknown> = { square_subscription_id: sub.id, updated_at: new Date().toISOString() };
   if (status === "CANCELED" || status === "DEACTIVATED") {
@@ -607,11 +594,9 @@ async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown
   }
   await admin.from("frunk_members").update(patch).eq("id", member.id);
 
-  // Web入会の後始末（#131b/#137）: 価格上書きの解除＋前取り分のスキップ（ensurePrepaySetup・冪等）。
-  // 前取りの無い会員（booking.htmlからのカード登録など）は breakdown が無いので何もしない。
+  // #235: 10日払いへの作り直し（payment 側と同じ関数・1回しか動かない）
   if (["ACTIVE", "PENDING"].includes(status)) {
-    const version = typeof (sub as { version?: number }).version === "number" ? (sub as { version?: number }).version : undefined;
-    await ensurePrepaySetup(admin, member, sub.id, version);
+    ensureBillingDay(member);
   }
 }
 

@@ -131,6 +131,7 @@ export type WebJoinMemberRow = {
     monthly?: number;
     prepaidMonths?: number;
     campaign?: boolean;
+    usageStartYmd?: string;
   } | null;
   store_id: string | null;
   plan_id: string | null;
@@ -200,7 +201,8 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   // 正典 @yozan/core/frank-billing-start。Webhook が Square で止める周期数（frank-pos.ts）と同じ式・同じ日付で数える
   const sch = usageStartSchedule({
     applyDateYmd: today,
-    usageStartYmd: m.start_date,
+    // 決済リンク発行時に控えたご利用開始日だけを見る（10日払いへの作り直しと同じ・#235）
+    usageStartYmd: bd?.usageStartYmd ?? null,
     prepaidMonths: est.prepaidMonths,
   });
   await admin
@@ -381,13 +383,14 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
             `年内入会キャンペーンの適用で、入会金（5,500円税込）と${deferred ? "ご利用開始月" : "入会月"}（${m0}分）の月会費は無料です。`,
             `本日、${m1}分・${m2}分の月会費2か月分（${(monthly * 2).toLocaleString()}円税込）を1回でお支払いいただきました。`,
             // 前取りした月の自動課金はスキップするため、次回の請求は「前取り最終月の翌月」（#137・#234）
-            `${m2}分より後の月会費は、毎月${Number(today.slice(8, 10))}日ごろにご登録のカードへ自動でご請求します（次回 ${sch.nextBillingYmd.replaceAll("-", "/")} 予定）。`,
+            // 毎月10日に翌月分（#235）。次回＝前取りの次の月の分
+            `${monthLabel(sch.firstBilledMonthYmd)}分からの月会費は、毎月10日に翌月分をご登録のカードへ自動でご請求します（初回 ${sch.nextBillingYmd.replaceAll("-", "/")} に${monthLabel(sch.firstBilledMonthYmd)}分）。`,
             `※ キャンペーンでのご入会は、ご利用開始日から6か月間（${sch.minTermUntilYmd.replaceAll("-", "/")}まで）の継続をお願いしています。`,
           ]
         : [
             ...(deferred ? [`ご利用開始日は ${startSlash} です。それより前の月の月会費はかかりません。`] : []),
             `本日、入会金と${m1}分・${m2}分の月会費を1回でお支払いいただきました。`,
-            `${m2}分より後の月会費は、毎月ご登録のカードへ自動でご請求します（次回 ${sch.nextBillingYmd.replaceAll("-", "/")} 予定）。`,
+            `${monthLabel(sch.firstBilledMonthYmd)}分からの月会費は、毎月10日に翌月分をご登録のカードへ自動でご請求します（初回 ${sch.nextBillingYmd.replaceAll("-", "/")} に${monthLabel(sch.firstBilledMonthYmd)}分）。`,
           ]),
       ...(attachments ? ["", "入会申込書の控え（PDF）を添付しています。"] : []),
       "",

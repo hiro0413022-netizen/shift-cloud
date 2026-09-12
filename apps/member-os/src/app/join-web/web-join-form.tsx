@@ -264,7 +264,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           このあと安全な決済ページ（Square）に進み、<span className="font-medium text-(--color-txt)">入会時のお支払い（入会金＋前取りの月会費）を1回で</span>
           お済ませいただきます。同時にカードが登録され、
           <span className="font-medium text-(--color-txt)">決済完了と同時にご入会が確定し、会員番号を発行</span>
-          します（入会の控えPDFをメールでお送りします）。前取り期間のあとは、毎月自動でのお支払いになります。
+          します（入会の控えPDFをメールでお送りします）。前取り期間のあとは、<span className="font-medium text-(--color-txt)">毎月10日に翌月分</span>を自動でお支払いいただきます。
         </div>
         <div>
           <label className={label}>クーポンコード（お持ちの方のみ）</label>
@@ -385,7 +385,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
               {sch.deferredMonths > 0 && (
                 <li>・ご利用開始日は<span className="font-semibold text-(--color-txt)">{slashDate(sch.usageStartYmd)}</span>です。それより前の月の月会費はかかりません。</li>
               )}
-              <li>・{monthLabel(sch.nextBillingYmd)}分以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります（初回 {slashDate(sch.nextBillingYmd)}・{prepaidLabels.join("分・")}分は本日お支払い済みのため請求されません）。</li>
+              <li>・{monthLabel(sch.firstBilledMonthYmd)}分からの月会費は、<span className="font-semibold text-(--color-txt)">毎月10日に翌月分</span>をご登録カードへ自動でお支払いいただきます（初回は {slashDate(sch.nextBillingYmd)} に{monthLabel(sch.firstBilledMonthYmd)}分。{prepaidLabels.join("分・")}分は本日お支払い済みです）。</li>
               <li>・キャンペーンでのご入会は、<span className="font-semibold text-(--color-txt)">ご利用開始日から{JOIN_CAMPAIGN.minMonths}か月間（{slashDate(sch.minTermUntilYmd)}まで）の継続</span>をお願いしています。</li>
               <li>・上記の合計を、決済ページで<span className="font-semibold text-(--color-txt)">1回でお支払い</span>いただきます（分割されません）。</li>
               <li>・決済は安全な決済ページ（Square）で行います。決済完了と同時に会員番号を発行します。</li>

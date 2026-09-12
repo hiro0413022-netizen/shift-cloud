@@ -15,11 +15,13 @@ import {
 } from "@/lib/frunk-member-search";
 import { jstYmd } from "@/lib/jst";
 import { monthEndLabel, monthFromLabel } from "@yozan/core/frank-membership";
-import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment, openJoinCheckout } from "./actions";
+import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment, openJoinCheckout, rebaseBillingDayAll } from "./actions";
 import { joinPaymentView } from "@/lib/frunk-join-view";
 import { memberDisplayName } from "@yozan/core/frank-corporate";
 
 export const dynamic = "force-dynamic";
+// 10日払いへの一括切り替え（#235）は1人あたりSquareを数回呼ぶので、サーバーアクションの時間を延ばす
+export const maxDuration = 60;
 type Row = Record<string, unknown>;
 
 /**
@@ -96,6 +98,14 @@ export default async function FrunkPage({
   };
 
   const pending = memberList.filter((m) => m.status === "pending");
+
+  // 月会費を「毎月10日に翌月分」に作り直していない方（#235）。月会費0円のプランは対象外
+  const notRebased = memberList.filter((m) => {
+    if (!["active", "pending"].includes(String(m.status)) || !m.square_subscription_id || m.billing_rebased_at) return false;
+    const plan = planList.find((p) => p.id === m.plan_id) as { monthly_price?: number | null } | undefined;
+    return Number(plan?.monthly_price ?? 0) > 0;
+  });
+  const rebaseErrors = memberList.filter((m) => m.billing_rebase_error && ["active", "pending"].includes(String(m.status)));
   const counts = countByStatus(memberList as unknown as FrunkMemberLike[], [...STATUS_TABS]);
 
   // ---- 探す・絞る・並べる ----
@@ -150,6 +160,39 @@ export default async function FrunkPage({
               入会フォームを開く ↗
             </a>
           </div>
+        </Panel>
+      )}
+
+      {/* 月会費を「毎月10日に翌月分」にそろえる（#235・2026-09-11 ユーザー決定）。
+          それまでのサブスクは入会日と同じ日に請求していた。済んだ方は出てこない＝何度押しても二重にならない */}
+      {(notRebased.length > 0 || rebaseErrors.length > 0) && (
+        <Panel title="月会費の引き落とし日を「毎月10日に翌月分」にそろえる" className="d1">
+          <p className="text-sm text-(--color-dim)">
+            まだ切り替えていない方が <span className="font-bold text-(--color-txt)">{notRebased.length}名</span> います。
+            それぞれ「前取りが終わった次の月の分」を、その前月10日から引き落とします（例：9月入会の方は 11/10 に12月分）。
+            今のサブスクは支払い済みの期間の終わりで解約し、同じカードで10日払いのサブスクを作り直します（二重に引き落としません）。
+          </p>
+          {notRebased.length > 0 && (
+            <p className="mt-1 text-xs text-(--color-dim)">
+              {notRebased.map((m) => `${memberDisplayName(m as never)}（${String(m.member_no ?? "")}）`).join("・")}
+            </p>
+          )}
+          {rebaseErrors.length > 0 && (
+            <ul className="mt-2 space-y-1 text-xs text-rose-600">
+              {rebaseErrors.map((m) => (
+                <li key={String(m.id)}>
+                  ⚠ <Link href={`/frunk/${String(m.id)}`} className="underline">{memberDisplayName(m as never)}（{String(m.member_no ?? "")}）</Link>: {String(m.billing_rebase_error)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notRebased.length > 0 && (
+            <form action={rebaseBillingDayAll} className="mt-3">
+              <input type="hidden" name="back" value="/frunk" />
+              <button className={btnCls}>まとめて10日払いに切り替える（{notRebased.length}名）</button>
+              <span className="ml-2 text-xs text-(--color-dim)">数名ずつ進みます。「残り◯名」と出たらもう一度押してください</span>
+            </form>
+          )}
         </Panel>
       )}
 

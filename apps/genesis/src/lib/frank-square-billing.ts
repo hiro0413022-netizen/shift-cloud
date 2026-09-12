@@ -5,7 +5,7 @@ import { authMember, type MemberAuth } from "@/lib/frank-booking";
 import { monthlyFeeTaxIncluded, toE164Jp, JOIN_CHECKOUT_NOTE_PREFIX } from "@/lib/frank-pos-pure";
 import { joinInitialTotal } from "@/lib/frank-join-pure";
 import { jstYmd } from "@/lib/jst";
-import { resolveBillingStartDate, usageStartSchedule } from "@yozan/core/frank-billing-start";
+import { BILLING_DAY, resolveBillingStartDate, usageStartSchedule } from "@yozan/core/frank-billing-start";
 import { FRANK_PORTAL } from "@yozan/core/frank-links";
 
 /**
@@ -125,28 +125,6 @@ async function squarePost(token: string, path: string, body: Record<string, unkn
 }
 
 /**
- * サブスクを指定周期ぶんスキップ（#131・前取り用）。
- * 入会時に前取りした月数ぶんは自動課金を止める（止めないと二重取りになる）。
- * cycles 経過後は自動で再開される。
- */
-export async function pauseSubscriptionCycles(
-  subscriptionId: string,
-  cycles: number,
-): Promise<{ ok: boolean; error?: string }> {
-  const token = accessToken();
-  if (!token) return { ok: false, error: "square_env_missing" };
-  try {
-    await squarePost(token, `/subscriptions/${subscriptionId}/pause`, {
-      pause_cycle_duration: cycles,
-    });
-    return { ok: true };
-  } catch (e) {
-    console.error("[frank-square-billing] pause cycles failed:", e);
-    return { ok: false, error: String(e) };
-  }
-}
-
-/**
  * Square顧客のメールアドレスを取得（#137・Web入会Webhookのフォールバック照合用）。
  * 決済リンク（サブスク付き）の入金 payment は、リンク作成時に控えた order_id と
  * 別の注文IDで届くことがあり、注文IDだけでは会員に結べない（2026-08-15のテスト入会で実証）。
@@ -167,72 +145,6 @@ export async function getSquareCustomerEmail(customerId: string): Promise<string
   } catch (e) {
     console.error("[frank-square-billing] get customer failed:", e);
     return null;
-  }
-}
-
-/**
- * 顧客の生きているサブスクを1件返す（#137）。
- * 初回入金の payment Webhook が subscription.created より先に処理を終えると、
- * 「前取り分のスキップ」と「価格上書きの解除」を行う相手（サブスクID）がまだDBに無い。
- * 入金側からも Square に問い合わせて後始末できるようにする。
- */
-export async function findSubscriptionForCustomer(
-  customerId: string,
-): Promise<{ id: string; status: string; version?: number } | null> {
-  const token = accessToken();
-  if (!token) return null;
-  try {
-    const json = await squarePost(token, "/subscriptions/search", {
-      query: { filter: { customer_ids: [customerId] } },
-    });
-    const subs =
-      (json.subscriptions as Array<{ id?: string; status?: string; version?: number; created_at?: string }> | undefined) ?? [];
-    const live = subs.filter((s) => s.id && !["CANCELED", "DEACTIVATED"].includes((s.status ?? "").toUpperCase()));
-    live.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
-    const top = live[0];
-    if (!top?.id) return null;
-    return {
-      id: String(top.id),
-      status: String(top.status ?? ""),
-      version: typeof top.version === "number" ? top.version : undefined,
-    };
-  } catch (e) {
-    console.error("[frank-square-billing] subscription search failed:", e);
-    return null;
-  }
-}
-
-/**
- * サブスクの価格上書きを消してプラン価格に戻す（#131b）。
- *
- * 入会時は「入会金＋前取り月数分」を1回でお支払いいただくため、決済リンクの金額を
- * プラン月額と変えている。Squareはこの金額をサブスクの price_override_money として
- * 引き継ぐ（＝放置すると毎月その金額を請求してしまう）ので、初回入金を確認したら
- * null にしてプラン価格へ戻す。UpdateSubscription は「null を渡す＝その項目を消す」仕様。
- */
-export async function clearSubscriptionPriceOverride(
-  subscriptionId: string,
-  version?: number,
-): Promise<{ ok: boolean; error?: string }> {
-  const token = accessToken();
-  if (!token) return { ok: false, error: "square_env_missing" };
-  try {
-    const body: Record<string, unknown> = { price_override_money: null };
-    if (typeof version === "number") body.version = version;
-    const res = await fetch(`${SQUARE_API}/subscriptions/${subscriptionId}`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ subscription: body }),
-    });
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!res.ok) {
-      const errs = (json.errors as Array<{ detail?: string; code?: string }> | undefined) ?? [];
-      throw new Error(errs.map((e) => e.detail ?? e.code).join("; ") || `Square PUT /subscriptions (${res.status})`);
-    }
-    return { ok: true };
-  } catch (e) {
-    console.error("[frank-square-billing] clear price override failed:", e);
-    return { ok: false, error: String(e) };
   }
 }
 
@@ -269,8 +181,8 @@ export async function createJoinCheckoutForMember(
   if (!variationId) return { ok: false, error: "square_env_missing" };
 
   // 入会時のお支払いは「入会金＋月会費×前取り月数」の1回払い（#131b）。
-  // 決済リンクの金額をプラン月額と変えると、Squareはそれをサブスクの price_override_money
-  // として引き継ぐため、初回入金のWebhookで必ず null に戻す（frank-pos.ts）。
+  // 決済リンクで作られるサブスクは、入金Webhookが「10日払い」のサブスクに作り直す（#235・lib/frank-billing-day.ts）。
+  // 決済リンク側の金額（price_override）は作り直しで解約されるので、以後の請求には使われない。
   const applyDateYmd = jstYmd();
   const est = joinInitialTotal({
     monthlyExTax: priceExTax,
@@ -279,8 +191,8 @@ export async function createJoinCheckoutForMember(
     joiningFeeWaived: !!row.joining_fee_waived,
   });
   const amount = est.total;
-  // ご利用開始日（#234）。金額は変わらない（前取り月数は同じ）が、無料月と自動課金を止める周期数が変わる。
-  // ここで控えるのは見込み。実際に止める周期数は入金Webhookの日付で数え直す（frank-pos.ts ensurePrepaySetup）
+  // ご利用開始日（#234）。金額は変わらない（前取り月数は同じ）が、無料月と最初の10日の引き落とし（#235）が変わる。
+  // ⚠ usageStartYmd は「この入会は開始月無料で決済した」という控え。10日払いへの作り直しはこれだけを見る
   const schedule = usageStartSchedule({
     applyDateYmd,
     usageStartYmd: row.start_date ? String(row.start_date) : null,
@@ -323,7 +235,6 @@ export async function createJoinCheckoutForMember(
       applyDateYmd,
       usageStartYmd: schedule.usageStartYmd,
       deferredMonths: schedule.deferredMonths,
-      pauseCycles: schedule.pauseCycles,
       nextBillingYmd: schedule.nextBillingYmd,
     });
     return { ok: true, url: String(link.url) };
@@ -458,13 +369,12 @@ export async function chargeCardOnFile(input: {
  *
  * やること:
  *   1. 顧客に保存されているカードを1枚選ぶ（無ければ何もしない）
- *   2. 前取り済みフラグを先に立てる ★
- *   3. POST /v2/subscriptions（開始日 = 次に請求すべき日）
+ *   2. 「10日払いで作った」印を先に立てる ★
+ *   3. POST /v2/subscriptions（開始日 = 次に引き落とす10日・請求日10日）
  *   4. 会員行にサブスクIDを控える
  *
- * ★ 2 が肝。frank-pos.ts の ensurePrepaySetup() は subscription.created の Webhook で
- *   「前取り月数ぶん pause する」を実行する。前取りを一括で受領済みのこのケースで走らせると
- *   **開始日からさらに2周期飛んで2か月ぶん取り損ねる**。Square に投げる前にフラグを立てて黙らせる。
+ * ★ 2 が肝。subscription.created の Webhook は「10日払いへの作り直し」（frank-billing-day.ts）を呼ぶ。
+ *   印が無いと、スタッフが選んだ開始日のサブスクを解約して別の日で作り直してしまう。
  */
 export async function startSubscriptionOnFile(
   memberId: string,
@@ -507,16 +417,16 @@ export async function startSubscriptionOnFile(
   const variationId = plan.square_variation_nofee_id ?? plan.square_variation_id;
   if (!variationId) return { ok: false, error: "plan_no_variation" };
 
-  const breakdown = (row.square_checkout_breakdown ?? {}) as { prepaidMonths?: number };
-  // 基準は入会日（請求日＝入会日と同じ日）。ご利用開始日が先の月なら、その月数ぶん後ろにずれる（#234）
+  const breakdown = (row.square_checkout_breakdown ?? {}) as { prepaidMonths?: number; usageStartYmd?: string };
+  // 既定の開始日＝前取りの次の月の分を引き落とす10日（#235）。ご利用開始月は内訳の控えだけを見る（#234）
   const resolved = resolveBillingStartDate({
     startDateYmd: String(row.join_date ?? row.start_date ?? jstYmd()),
-    usageStartYmd: row.start_date ? String(row.start_date) : null,
+    usageStartYmd: breakdown.usageStartYmd ?? null,
     prepaidMonths: Number(breakdown.prepaidMonths ?? 0),
     todayYmd: jstYmd(),
     requestedYmd: requestedStartYmd ?? null,
   });
-  if (!resolved.ok) return { ok: false, error: "past_date", suggested: resolved.suggested };
+  if (!resolved.ok) return { ok: false, error: resolved.error, suggested: resolved.suggested };
 
   try {
     // 1. 保存カード
@@ -527,13 +437,23 @@ export async function startSubscriptionOnFile(
     const card = (cardsJson.cards ?? []).find((c) => c.enabled !== false);
     if (!card?.id) return { ok: false, error: "no_card" };
 
-    // 2. ★ Square に投げる前にフラグを立てる（Webhook の二重スキップ止め）
-    if (!row.prepay_pause_done_at) {
-      await admin
-        .from("frunk_members")
-        .update({ prepay_pause_done_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-        .eq("id", memberId);
-    }
+    // 2. ★ Square に投げる前に「10日払いで作った」印を立てる（#235）
+    //    subscription.created の Webhook が先に届くと、作り直し（lib/frank-billing-day.ts）が
+    //    スタッフの選んだ開始日を無視して作り直してしまう。作成に失敗したら下で戻す
+    const claimCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: claimed } = await admin
+      .from("frunk_members")
+      .update({
+        prepay_pause_done_at: row.prepay_pause_done_at ?? new Date().toISOString(),
+        billing_rebased_at: new Date().toISOString(),
+        billing_rebase_claimed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", memberId)
+      .or(`billing_rebase_claimed_at.is.null,billing_rebase_claimed_at.lt.${claimCutoff}`)
+      .select("id");
+    // 作り直しが走っている最中なら触らない（数分おいてもう一度）
+    if (!claimed || claimed.length === 0) return { ok: false, error: "busy" };
 
     // 3. サブスク作成
     const json = await squarePost(token, "/subscriptions", {
@@ -543,6 +463,8 @@ export async function startSubscriptionOnFile(
       customer_id: customerId,
       card_id: card.id,
       start_date: resolved.date,
+      // 毎月10日に翌月分（#235）。開始日も必ず10日（resolveBillingStartDate が10日以外を弾く）
+      monthly_billing_anchor_date: BILLING_DAY,
       timezone: "Asia/Tokyo",
       source: { name: "FRANK GOLF member-os" },
     });
@@ -555,6 +477,9 @@ export async function startSubscriptionOnFile(
       .update({
         square_subscription_id: sub.id,
         billing_status: "active",
+        billing_day: BILLING_DAY,
+        billing_rebase_claimed_at: null,
+        billing_rebase_error: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", memberId);
@@ -568,6 +493,12 @@ export async function startSubscriptionOnFile(
     };
   } catch (e) {
     console.error("[frank-square-billing] start subscription failed:", e);
+    // 作れなかった＝印を戻す（次に押したとき・Webhook がまた動けるように）
+    await admin
+      .from("frunk_members")
+      .update({ billing_rebased_at: null, billing_rebase_claimed_at: null })
+      .eq("id", memberId)
+      .is("square_subscription_id", null);
     const detail = String(e instanceof Error ? e.message : e).slice(0, 160);
     return { ok: false, error: `subscription_failed: ${detail}` };
   }
