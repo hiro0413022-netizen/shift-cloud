@@ -38,6 +38,7 @@ import {
   cancelScheduledChange,
   stopSquareBilling,
   startSquareBilling,
+  resetSquareBilling,
   addCorporateUser,
   removeCorporateUser,
   resendApprovalMail,
@@ -477,6 +478,31 @@ export default async function FrunkMemberPage({
                     </form>
                   ) : null}
                 </div>
+                {/* 初回のお支払いがカードで通っていないのにサブスクだけある＝カードが保存されていない疑い（#238）。
+                    画面は square_subscription_id しか見ていないので「稼働中」と出てしまい、
+                    引き落としの日まで誰も気づけなかった（山根様 FR0051）。ここで気づけるようにする。 */}
+                {String(m.billing_status ?? "") !== "active" ? (
+                  <div className="mt-2 rounded-lg border border-rose-500/40 bg-rose-500/5 px-3 py-2 text-xs leading-relaxed text-rose-700">
+                    <p className="font-semibold">⚠ カードが保存されていない自動課金かもしれません</p>
+                    <p className="mt-1">
+                      入会のお支払いがカードで完了していません（現金・お振込でお受けした方はこうなります）。
+                      このままだと次回の引き落としが失敗します。
+                    </p>
+                    <p className="mt-1">
+                      ① Squareの管理画面で「顧客 →{" "}
+                      {String(m.name ?? "")} → お支払い方法」にカードを保存 → ② 下の【解除する】→ ③
+                      入れ替わって出てくる【保存カードから自動課金を開始する】で引き落とし日（10日）を入れて登録、の順にお願いします。
+                    </p>
+                    <p className="mt-1">
+                      ※ 前取り分を現金・お振込ですでにお預かりしている方に、お客様ご自身のカード登録（会員ページ）をご案内しないでください。同じ分をもう一度頂いてしまいます。
+                    </p>
+                    <form action={resetSquareBilling} className="mt-2">
+                      <input type="hidden" name="id" value={id} />
+                      <input type="hidden" name="back" value={back} />
+                      <button className={btnGhostCls}>この自動課金を解除して登録し直せるようにする</button>
+                    </form>
+                  </div>
+                ) : null}
                 {/* 退会もプラン変更もせず「引き落としだけ止めたい」ときの出口（#192）。
                     0円プランに切り替えたのにサブスクだけ残っている、という状態を画面から潰せるようにする。 */}
                 <form action={stopSquareBilling} className="mt-1">

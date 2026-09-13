@@ -650,6 +650,77 @@ export async function stopSquareBilling(formData: FormData) {
   ));
 }
 
+/**
+ * 初回のお支払いが通らないまま作られた「カードの無い自動課金」を解除する（#238・2026-09-12）
+ *
+ * 発端: 山根様（FR0051）— Web入会の決済リンクでカードが通らず、前取り2か月ぶん（30,360円）は
+ * 店頭で現金をお預かりした。ところが Square のサブスクは**決済リンクを作った時点で1本立っており**、
+ * カードだけが無い状態が残った。次回（12/10）の引き落としは必ず失敗する。
+ *
+ * この状態は既存の導線では救えなかった:
+ *   - 会員カードは square_subscription_id を見て「自動課金 稼働中」と出す＝画面上は異常に見えない
+ *   - 【保存カードから自動課金を開始する】(#233) は square_subscription_id があるので弾かれる
+ *   - 【💳 このiPadで決済ページを開く】(#217) は未登録側にしか出ない。仮に押しても
+ *     現金でお預かりした前取り分を**もう一度カードから頂いてしまう**
+ *
+ * ここでやるのは「空のサブスクを解約して、DBの紐付けを外す」だけ。外れると画面が
+ * 「未登録（店頭払い）」側に戻り、Squareにカードを保存してあれば #233 のボタンで
+ * 正しい開始日（10日）で作り直せる。Square への新しい呼び出しは増やしていない。
+ *
+ * ★ すでに引き落としが始まっている方（billing_status='active'）には出さない＝
+ *   稼働中のサブスクをこのボタンで消させない。止めたいときは【自動課金を解約する】(#192)。
+ */
+export async function resetSquareBilling(formData: FormData) {
+  const actor = await requireFrankActor();
+  const admin = createAdmin();
+  const dest = backTo(formData);
+  const id = str(formData.get("id"));
+  if (!id) return;
+
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("name, member_no, billing_status, square_subscription_id")
+    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+  if (String(m.billing_status) === "active") {
+    redirect(`${dest}?err=` + encodeURIComponent(
+      "この方はカードの引き落としが始まっています。止めるときは【自動課金を解約する】をお使いください。",
+    ));
+  }
+  const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
+  if (!subId) {
+    redirect(`${dest}?msg=` + encodeURIComponent("すでに解除されています。【保存カードから自動課金を開始する】へお進みください。"));
+  }
+
+  const r = await cancelSubscription(String(subId));
+  if (!r.ok) {
+    await logAudit(actor, "frunk.square.reset_billing", "frunk_members", id, null, { square: r, cleared: false });
+    redirect(`${dest}?err=` + encodeURIComponent(
+      r.skipped
+        ? "Square未接続のため解除できませんでした。Squareダッシュボードで解約してください。"
+        : `Squareで解約できませんでした。ダッシュボードでご確認ください（${m.member_no ?? ""}）`,
+    ));
+  }
+
+  // Square で解約できたときだけ紐付けを外す。先に外すと、請求が残っていても画面から追えなくなる。
+  const { error } = await admin
+    .from("frunk_members")
+    .update({ square_subscription_id: null, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  await logAudit(actor, "frunk.square.reset_billing", "frunk_members", id, null, {
+    square: r,
+    cleared: !error,
+    prev_subscription_id: subId,
+  });
+  revalidateMember(id);
+  if (error) {
+    redirect(`${dest}?err=` + encodeURIComponent("Squareの解約はできましたが、画面の更新に失敗しました。もう一度お試しください。"));
+  }
+  redirect(`${dest}?msg=` + encodeURIComponent(
+    `${String(m.name ?? "")}様のカードの無い自動課金を解除しました。Squareにカードを保存したうえで【保存カードから自動課金を開始する】を押してください。`,
+  ));
+}
+
 /** 退会・休会の予約を取り消す（お客様の気が変わった／入力ミス） */
 export async function cancelScheduledChange(formData: FormData) {
   const actor = await requireFrankActor();
