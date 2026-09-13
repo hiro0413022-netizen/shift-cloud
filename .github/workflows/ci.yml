@@ -36,19 +36,28 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # 2026-09-13: craft-os / demo-sales / inventory-os / night-os / pro-site / swing-cortex を追加。
+      # Vercel にデプロイしているのに CI に無いアプリがあり、night-os の exports 漏れ（#231）や
+      # genesis の型エラー（#237）のような「push して初めて本番ビルドが落ちる」事故を CI で先に止める。
       matrix:
         app:
           - caddy-os
           - compe-os
+          - craft-os
+          - demo-sales
+          - inventory-os
           - lesson-os
           - corporate
           - genesis
           - legal-os
           - member-os
           - money-golfwing
+          - night-os
+          - pro-site
           - reserve-os
           - shift-cloud
           - survey-os
+          - swing-cortex
     env:
       # ビルド用ダミー（実キーはVercel envのみ。Publicリポジトリに実値を置かない #14/#26）
       NEXT_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
