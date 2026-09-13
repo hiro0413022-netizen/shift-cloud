@@ -15,6 +15,27 @@ async function mustQuote(id: number) {
   return { actor, full };
 }
 
+/**
+ * 行を足す・消すだけの操作用の軽い確認。
+ * getQuote は明細も工房も割引ルールも読んで金額まで計算する（6往復）。
+ * 1行足すたびにそれをやると、押してから画面が変わるまでが目に見えて遅い。
+ * ここでは「その伝票が自分の会社のもので、自分の店舗から見えるか」だけを確かめる。
+ */
+async function assertQuote(id: number) {
+  const actor = await requireActor();
+  const { data } = await admin()
+    .from("gw_quotes")
+    .select("id, store_id")
+    .eq("company_id", actor.companyId)
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!data) throw new Error("伝票が見つかりません");
+  const q = data as { id: number; store_id: string | null };
+  if (!actor.isOwner && q.store_id && !actor.storeIds.includes(q.store_id)) throw new Error("伝票が見つかりません");
+  return { actor };
+}
+
 function num(v: FormDataEntryValue | null): number | null {
   const s = String(v ?? "").trim();
   if (!s) return null;
@@ -62,7 +83,7 @@ async function insertProductLine(quoteId: number, companyId: string, p: ProductR
 export async function addProductLine(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
   const productId = Number(formData.get("product_id"));
-  const { actor } = await mustQuote(id);
+  const { actor } = await assertQuote(id);
   if (!productId) return;
   const { data } = await admin()
     .from("gw_products")
@@ -81,7 +102,7 @@ export async function addLaborLine(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
   const code = String(formData.get("labor_code") ?? "");
   const priceKind = String(formData.get("price_kind") ?? "price");
-  const { actor } = await mustQuote(id);
+  const { actor } = await assertQuote(id);
   const rates = await getLaborRates(actor);
   const r = rates.find((x) => x.code === code);
   if (!r) return;
@@ -105,7 +126,7 @@ export async function addLaborLine(formData: FormData): Promise<void> {
 /** マスタに無いものを手で入れる（Excelの自由度を殺さないための逃げ道。ここが無いと紙に戻る） */
 export async function addFreeLine(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
-  const { actor } = await mustQuote(id);
+  const { actor } = await assertQuote(id);
   const name = txt(formData.get("free_name"));
   if (!name) return;
   await admin().from("gw_quote_items").insert({
@@ -157,6 +178,11 @@ export async function updateItems(formData: FormData): Promise<void> {
   await admin()
     .from("gw_quotes")
     .update({
+      // 帳票の上で直接直せるようにした項目（件名・納期・支払条件・有効期限）
+      subject: txt(formData.get("subject")) ?? full.quote.subject,
+      delivery_note: txt(formData.get("delivery_note")) ?? full.quote.delivery_note,
+      payment_terms: txt(formData.get("payment_terms")) ?? full.quote.payment_terms,
+      validity_note: txt(formData.get("validity_note")) ?? full.quote.validity_note,
       tax_free_amount: num(formData.get("tax_free_amount")) ?? 0,
       prepaid_amount: num(formData.get("prepaid_amount")) ?? 0,
       refund_auto: formData.get("refund_auto") === "on",
@@ -182,7 +208,7 @@ export async function updateItems(formData: FormData): Promise<void> {
 export async function removeItem(itemId: number, formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
   if (!itemId) return;
-  const { actor } = await mustQuote(id);
+  const { actor } = await assertQuote(id);
   await admin().from("gw_quote_items").delete().eq("id", itemId).eq("company_id", actor.companyId);
   revalidatePath(`/q/${id}/quote`);
 }
@@ -206,7 +232,7 @@ export async function markReviewed(formData: FormData): Promise<void> {
 export async function setStatus(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
   const status = String(formData.get("status") ?? "");
-  const { actor } = await mustQuote(id);
+  const { actor } = await assertQuote(id);
   if (!["draft", "presented", "accepted", "void"].includes(status)) return;
   await admin().from("gw_quotes").update({ status, updated_at: new Date().toISOString() }).eq("id", id).eq("company_id", actor.companyId);
   revalidatePath(`/q/${id}/quote`);
@@ -232,7 +258,7 @@ export async function findProducts(
  */
 export async function issueQuoteDoc(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
-  const { actor } = await mustQuote(id);
+  const { actor } = await assertQuote(id);
   await admin()
     .from("gw_quotes")
     .update({ quote_issued_at: new Date().toISOString(), updated_at: new Date().toISOString() })
