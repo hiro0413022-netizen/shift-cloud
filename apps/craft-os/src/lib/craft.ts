@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import type { Actor } from "@/lib/auth";
 import {
@@ -14,6 +15,10 @@ import {
 
 /**
  * craft-os のデータ層。
+ *
+ * ★ 画面から何度呼んでも、1リクエストの中では1回しかDBに行かない（React の cache()）。
+ *   Next.js は layout と page を別々に実行するので、素で書くと同じ伝票を2回読む。
+ *   /q/[id] は layout がヘッダ用に、page が明細用に同じものを必要とするため、ここが効く。
  *
  * ★ 定価は持たない。gw_products（＝発注管理の商品マスタ golfwing.products の読み取りビュー）を引く。
  * ★ 金額の計算は @yozan/core/fitting-quote 1か所。ここでは「読んで渡す」だけにする。
@@ -232,14 +237,14 @@ const db = () => createAdmin();
 // マスタ
 // ---------------------------------------------------------------------------
 
-export async function getDiscountRules(actor: Actor): Promise<DiscountRule[]> {
+export const getDiscountRules = cache(async (actor: Actor): Promise<DiscountRule[]> => {
   const { data } = await db()
     .from("gw_discount_rules")
     .select("id, item_category, manufacturer, segment, member_kind, rate, priority, note, is_active, effective_from, effective_to")
     .eq("company_id", actor.companyId)
     .eq("is_active", true);
   return (data ?? []).map((r) => ({ ...r, rate: Number(r.rate) })) as DiscountRule[];
-}
+});
 
 export type LaborRate = {
   id: number;
@@ -255,7 +260,7 @@ export type LaborRate = {
   sort_order: number;
 };
 
-export async function getLaborRates(actor: Actor): Promise<LaborRate[]> {
+export const getLaborRates = cache(async (actor: Actor): Promise<LaborRate[]> => {
   const { data } = await db()
     .from("gw_labor_rates")
     .select("id, code, name, price, price_bring_in, price_no_purchase, unit, quote_section, discount_category, price_note, sort_order")
@@ -263,7 +268,7 @@ export async function getLaborRates(actor: Actor): Promise<LaborRate[]> {
     .eq("is_active", true)
     .order("sort_order");
   return (data ?? []) as LaborRate[];
-}
+});
 
 // ---------------------------------------------------------------------------
 // 試打シャフト台帳
@@ -338,25 +343,27 @@ export type DemoShaftStats = {
   haiban: number;
 };
 
-export async function getDemoShaftStats(actor: Actor): Promise<DemoShaftStats> {
-  const base = () => db().from("gw_demo_shafts").select("id", { count: "exact", head: true }).eq("company_id", actor.companyId);
-  const [total, matched, needsReview, unmatched, noShelf, haiban] = await Promise.all([
-    base(),
-    base().eq("match_status", "matched"),
-    base().eq("match_status", "needs_review"),
-    base().eq("match_status", "unmatched"),
-    base().is("shelf", null),
-    base().eq("status", "廃盤"),
-  ]);
+/**
+ * 試打台帳の件数。
+ * 6つの COUNT を別々に投げると往復が6回になる。1,490行しかないので、
+ * 必要な2列だけ1回で取って数える方が速い（トップ画面の下に毎回出るため）。
+ */
+export const getDemoShaftStats = cache(async (actor: Actor): Promise<DemoShaftStats> => {
+  const { data } = await db()
+    .from("gw_demo_shafts")
+    .select("match_status, status, shelf")
+    .eq("company_id", actor.companyId);
+  const rows = (data ?? []) as { match_status: string; status: string; shelf: string | null }[];
+  const n = (f: (r: (typeof rows)[number]) => boolean) => rows.reduce((a, r) => a + (f(r) ? 1 : 0), 0);
   return {
-    total: total.count ?? 0,
-    matched: matched.count ?? 0,
-    needsReview: needsReview.count ?? 0,
-    unmatched: unmatched.count ?? 0,
-    noShelf: noShelf.count ?? 0,
-    haiban: haiban.count ?? 0,
+    total: rows.length,
+    matched: n((r) => r.match_status === "matched"),
+    needsReview: n((r) => r.match_status === "needs_review"),
+    unmatched: n((r) => r.match_status === "unmatched"),
+    noShelf: n((r) => r.shelf == null),
+    haiban: n((r) => r.status === "廃盤"),
   };
-}
+});
 
 export async function listDemoShafts(
   actor: Actor,
@@ -513,7 +520,7 @@ async function getFittingsByIds(actor: Actor, ids: number[]): Promise<Map<number
 
 export async function listQuotes(
   actor: Actor,
-  opts: { status?: string | null; q?: string | null; fittingId?: number | null; limit?: number } = {},
+  opts: { status?: string | null; q?: string | null; fittingId?: number | null; guestId?: string | null; limit?: number } = {},
 ): Promise<QuoteListRow[]> {
   let query = db()
     .from("gw_quotes")
@@ -525,6 +532,7 @@ export async function listQuotes(
     .limit(opts.limit ?? 100);
   if (opts.status) query = query.eq("status", opts.status);
   if (opts.fittingId) query = query.eq("fitting_id", opts.fittingId);
+  if (opts.guestId) query = query.eq("guest_id", opts.guestId);
   if (opts.q) query = query.ilike("customer_name", `%${opts.q.trim()}%`);
   const { data } = await query;
   const quotes = (data ?? []) as Quote[];
@@ -635,7 +643,18 @@ export type FullFitting = {
   refund: { cap: number; used: number; remaining: number };
 };
 
-export async function getFitting(actor: Actor, id: number): Promise<FullFitting | null> {
+/**
+ * 表紙1件。
+ * withQuotes=false なら、ぶら下がっている伝票は読まない。
+ * 明細画面が「試打シャフトの一覧」だけを欲しいときに、兄弟の伝票を全部読んで
+ * 金額計算までしてしまうのを避けるため（表紙から伝票を何件でも作れる設計なので、
+ * ここを素直に書くと画面を1枚開くたびに伝票の数だけ重くなる）。
+ */
+export const getFitting = cache(async (
+  actor: Actor,
+  id: number,
+  opts: { withQuotes?: boolean } = {},
+): Promise<FullFitting | null> => {
   const { data } = await db()
     .from("gw_fittings")
     .select("*")
@@ -647,16 +666,20 @@ export async function getFitting(actor: Actor, id: number): Promise<FullFitting 
   const fitting = data as Fitting;
   if (!actor.isOwner && fitting.store_id && !actor.storeIds.includes(fitting.store_id)) return null;
 
+  const withQuotes = opts.withQuotes !== false;
   const [{ data: trialRows }, quotes] = await Promise.all([
     db().from("gw_fitting_trials").select("*").eq("fitting_id", id).order("line_no"),
-    listQuotes(actor, { fittingId: id, limit: 50 }),
+    withQuotes ? listQuotes(actor, { fittingId: id, limit: 50 }) : Promise.resolve([] as QuoteListRow[]),
   ]);
   const trials = await decorateTrials(actor, (trialRows ?? []) as Trial[]);
 
   const cap = fitting.fitting_minutes ? REFUND_CAP[fitting.fitting_minutes as 55 | 110] ?? 0 : 0;
-  const used = quotes.filter((q) => q.status !== "void").reduce((a, q) => a + Number(q.refund_amount ?? 0), 0);
+  // 返金の使用済み額は伝票を全部読まなくても出せる（金額計算までは要らない）
+  const used = withQuotes
+    ? quotes.filter((q) => q.status !== "void").reduce((a, q) => a + Number(q.refund_amount ?? 0), 0)
+    : ((await getRefundUsage(actor, [id])).get(id) ?? []).reduce((a, r) => a + r.amount, 0);
   return { fitting, trials, quotes, refund: { cap, used, remaining: Math.max(0, cap - used) } };
-}
+});
 
 // ---------------------------------------------------------------------------
 // 伝票（見積／注文）
@@ -675,7 +698,7 @@ export type FullQuote = {
   priced: ReturnType<typeof priceQuote>;
 };
 
-export async function getQuote(actor: Actor, id: number): Promise<FullQuote | null> {
+export const getQuote = cache(async (actor: Actor, id: number): Promise<FullQuote | null> => {
   const { data } = await db()
     .from("gw_quotes")
     .select("*")
@@ -715,7 +738,7 @@ export async function getQuote(actor: Actor, id: number): Promise<FullQuote | nu
     rules,
   );
   return { quote, fitting, refundUsedBefore, items: list, work: (work as WorkOrder | null) ?? null, specs, rules, priced };
-}
+});
 
 /** 返金の内訳（画面と印刷の両方で同じ文言を出すため、ここから配る） */
 export function refundBreakdown(full: Pick<FullQuote, "fitting" | "items" | "refundUsedBefore">) {
@@ -845,7 +868,8 @@ export async function getKarte(actor: Actor, guestId: string): Promise<Karte | n
     return { ...f, quoteCount: list.length, refundUsed: list.reduce((a, b) => a + b.amount, 0) };
   });
 
-  const quotes = quoteIds.length > 0 ? await listQuotes(actor, { limit: 100 }).then((rows) => rows.filter((q) => quoteIds.includes(q.id))) : [];
+  // お客様1人ぶんだけを引く（以前は会社の伝票を100件読んでからJSで絞っていた）
+  const quotes = quoteIds.length > 0 ? await listQuotes(actor, { guestId, limit: 100 }) : [];
 
   const [{ data: itemRows }, { data: trialRows }, { data: workRows }] = await Promise.all([
     quoteIds.length > 0

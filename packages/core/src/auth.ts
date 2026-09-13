@@ -48,12 +48,22 @@ export function createActorResolver(options: {
     if (!user) return null;
 
     const admin = createAdmin();
-    const { data: staffData } = await admin
-      .from("staff")
-      .select("id, company_id, name, email, status, staff_roles(deleted_at, roles(permissions))")
-      .eq("auth_user_id", user.id)
-      .is("deleted_at", null)
-      .single();
+    // 所属店舗は staff にぶら下げて一緒に取る（以前はスタッフ→店舗の2往復だった）。
+    // 毎リクエスト・全アプリで走る場所なので、往復1回ぶんがそのまま体感に出る。
+    const BASE = "id, company_id, name, email, status, staff_roles(deleted_at, roles(permissions))";
+    const fetchStaff = (select: string) =>
+      admin.from("staff").select(select).eq("auth_user_id", user.id).is("deleted_at", null).single();
+
+    let { data: staffData, error: staffError } = await fetchStaff(
+      `${BASE}, staff_store_assignments(store_id, is_primary, deleted_at)`
+    );
+    // 埋め込み取得が使えない環境（スキーマキャッシュ未更新など）でもログインだけは通す。
+    // ここで落ちると全アプリが一斉に入れなくなるため、必ず素の形で取り直す。
+    let assignmentsEmbedded = true;
+    if (staffError) {
+      assignmentsEmbedded = false;
+      ({ data: staffData } = await fetchStaff(BASE));
+    }
 
     // Supabaseのネスト取得の型推論に依存せず、自前の型に確定させる（環境差による型エラー回避）
     type StaffShape = {
@@ -65,6 +75,11 @@ export function createActorResolver(options: {
       staff_roles?: Array<{
         deleted_at: string | null;
         roles: { permissions: Record<string, boolean> | null } | null;
+      }>;
+      staff_store_assignments?: Array<{
+        store_id: string;
+        is_primary: boolean | null;
+        deleted_at: string | null;
       }>;
     };
     const staff = staffData as unknown as StaffShape | null;
@@ -96,6 +111,10 @@ export function createActorResolver(options: {
         .is("deleted_at", null);
       storeIds = (stores ?? []).map((s: { id: string }) => s.id);
       primaryStoreId = storeIds[0] ?? null;
+    } else if (assignmentsEmbedded) {
+      const rows = (staff.staff_store_assignments ?? []).filter((r) => r.deleted_at == null);
+      storeIds = rows.map((r) => r.store_id);
+      primaryStoreId = rows.find((r) => r.is_primary)?.store_id ?? storeIds[0] ?? null;
     } else {
       const { data: assigns } = await admin
         .from("staff_store_assignments")

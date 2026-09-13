@@ -23,7 +23,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   const refund = refundBreakdown(full);
   const isOwnQuote = q.created_by === actor.staffId;
   // 表紙が紐づいていれば、試打したシャフトをここからそのまま入れられる
-  const cover = full.fitting ? await getFitting(actor, full.fitting.id) : null;
+  const cover = full.fitting ? await getFitting(actor, full.fitting.id, { withQuotes: false }) : null;
   const coverTrials = (cover?.trials ?? []).filter((t) => t.product);
   const postings = await listSalesPostings(actor, Number(id));
 
