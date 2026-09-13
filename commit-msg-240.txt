@@ -1,0 +1,24 @@
+全システムチェック（20アプリ・DB・CI）と見つかった穴の修正 (#240)
+
+点検結果: Vercel 20プロジェクト全て READY / GitHub Actions 直近8回成功 / npm test 723件パス /
+全18アプリ tsc エラー0 / Supabase ACTIVE_HEALTHY・migration 0168 まで適用済・DBログにエラーなし。
+
+修正:
+  - security: anon/authenticated から /rest/v1/rpc で実行できた SECURITY DEFINER 関数12本
+    （search_visitors / search_reception_guests / find_guest_by_contact / inv_close_count /
+    sync_lesson_outsourcing_expense / trk_record 等）の実行権を service_role だけに（0054/0055 と同じ方針）。
+    公開されている anon キーだけで受付台帳 6,000人超の氏名・電話が検索できる状態だった。
+    search_path 未固定の関数12本を固定。重複索引2本を削除。migration 0169（適用済）
+  - fix(member-os): 領収書PDFの Content-Disposition に日本語をそのまま入れていて
+    "Cannot convert argument to a ByteString" で500（9/7 本番2件）。ASCII名＋filename*=UTF-8''
+  - fix(genesis): RESEND_API_KEY 未設定のとき体験の確認メール・前日リマインダーが痕跡なく飛んでいなかった。
+    失敗時は判断フィードに警告（trial.mail_failed / frunk.reminder_skipped）を残す
+  - fix(core/middleware): 期限切れ・使用済み refresh token の Cookie を捨てる。
+    毎リクエスト再試行で AuthApiError: refresh_token_not_found が8アプリのエラーログに積み上がっていた
+  - perf: craft-os / inventory-os に vercel.json（regions: hnd1）。この2つだけ米国リージョンで東京DBと往復していた
+
+残り（ユーザー作業）: Vercel yozan-genesis に RESEND_API_KEY / FRANK_MAIL_FROM を設定 →
+9/2以降の入会19名へ「承認メール再送」（NEXT_TASKS A-240）
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GDDnP4Yd9JGEdeNtKmGvS6

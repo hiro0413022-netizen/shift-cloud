@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 2026-09-13 — 全システムチェック（20アプリ・DB・CI）と見つかった穴の修正（#240）
+- **点検の結果**: Vercel 20プロジェクトすべて本番 READY（fde8533）、GitHub Actions 直近8回すべて成功、`npm test` 723件パス、全18アプリ `tsc --noEmit` エラー0、Supabase は ACTIVE_HEALTHY・migration は 0168 まで適用済・DBログにエラーなし。Money OS→事業別PL の転記（#237）は 9/12 の修正以降 204 で毎朝通っています
+- **security: anonキーで受付台帳を丸ごと引ける穴を塞ぎました**。`search_visitors` / `search_reception_guests` / `find_guest_by_contact` など **SECURITY DEFINER 関数12本**が `anon` / `authenticated` から `/rest/v1/rpc/...` で実行できる状態でした（公開されている anon キーだけで 6,000人超の氏名・電話が検索でき、`sync_lesson_outsourcing_expense` で経費を書き込め、`inv_close_count` で棚卸を確定できた）。0054/0055 と同じ方針で **service_role だけに戻しました**（呼び出し元は全て admin クライアント経由であることを grep で確認済み）
+- security: search_path が固定されていない関数12本（`app.kana` / `golfwing.norm_name` / `gn_ctx_*` 等）に search_path を設定。重複していた索引2本（`golfwing.receipt_items(receipt_id)`・`cad_availability(company_id,date)`）を片方削除
+- **fix: 領収書PDFが「ByteString」エラーで500になっていた**（member-os `/frunk/[id]/receipt`・9/7に本番で2件）。`Content-Disposition` に日本語ファイル名をそのまま入れていたため。ASCII名＋`filename*=UTF-8''` 形式に
+- **fix: 体験の確認メールが黙って飛んでいなかった**。`RESEND_API_KEY` 未設定のとき `sendFrankMail` は skip を返すだけで、体験予約（9/2以降28件）の確認メール・前日リマインダーは**どこにも痕跡なく送られていません**でした（入会完了メールは #188 で警告を出していたので 19件の「送信設定が未設定」が残っていた）。体験の確認メールも失敗時は判断フィードに警告（`trial.mail_failed`）、前日リマインダーは対象がある日に `frunk.reminder_skipped` を残すように
+- **fix: 壊れたセッションCookieを捨てる**（`@yozan/core/middleware`）。期限切れ・使用済みの refresh token が Cookie に残ると毎リクエストで再試行され、Vercel のエラーログに `AuthApiError: refresh_token_not_found` が積み上がっていました（lesson-os 46件・member-os 40件など8アプリ）。ミドルウェアで検知したら `sb-*-auth-token` Cookie を消して、次からは素直に未ログイン扱いに
+- perf: `craft-os` と `inventory-os` に `vercel.json`（regions: hnd1）を追加。この2つだけ実行リージョンが米国既定のままで、東京の Supabase と往復していました（compe-os が遅かったのと同じ原因）
+- ci: ビルド対象に craft-os / demo-sales / inventory-os / night-os / pro-site / swing-cortex を追加（Vercel にあるのに CI に無かった6アプリ。すべてダミーenvでビルド通過を確認済み）
+- db: migration **0169_security_hardening_0913.sql** 適用済
+- **⚠ 残りはユーザー作業**: Vercel `yozan-genesis` に `RESEND_API_KEY` と `FRANK_MAIL_FROM` を設定（NEXT_TASKS A-00 §3）。設定後、member-os の会員カードから **9/2以降にご入会の19名へ「承認メール再送」**を押してください（会員番号・控えPDF・会員ページURLが届いていません）
+
 ## 2026-09-13 — 募集ページに「ご参加にあたってのお願い」と同意チェックを入れた（#237c）
 - **feat: 同意事項＋必須チェック**。前回（第9回）のGoogleフォームと同じ文面で、「上記の注意事項を確認し、同意のうえ申し込みます。」にチェックしないと送信できません。**キャンセル料6,600円が発生する以上、同意を取った事実が残っていないと後で揉める**ため、チェックの有無ではなく**同意した日時**を参加者ごとに記録します（参加者一覧に「同意済」と出ます）
 - **feat: 当日オプションの設問**（第10回は「朝の練習会」「懇親会（表彰式）への参加」）。回答は**受付表にそのまま列として並びます**（前回は懇親会を手で列追加していました）。設問はコンペごとの設定なので、次に別の設問が要ってもコードは直りません

@@ -370,7 +370,18 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
       bayName: bay.name,
       cancelToken,
     });
-    await sendFrankMail({ to: email, ...mail });
+    const sent = await sendFrankMail({ to: email, ...mail });
+    // 確認メールはキャンセルURLの唯一の控え。落ちたことを黙って見送らない（入会完了メール #188 と同じ扱い）。
+    // 2026-09-13 の全チェックで、送信設定が無いまま体験予約 28 件ぶんの確認メールが黙って飛んでいなかったのが判明。
+    if (!sent.ok) {
+      await logEvent(bay.company_id, {
+        event_type: "trial.mail_failed",
+        title: `体験の確認メールを送れませんでした: ${name} 様 ${input.date} ${input.start}〜（${email}）${sent.skipped ? "送信設定が未設定（RESEND_API_KEY）" : (sent.error ?? "")}`.slice(0, 120),
+        source: "web",
+        source_type: "external",
+        severity: "warning",
+      });
+    }
   }
 
   return {

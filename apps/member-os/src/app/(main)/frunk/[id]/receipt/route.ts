@@ -75,12 +75,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   });
 
   const pdf = Buffer.from(await res.arrayBuffer());
+  // ⚠ HTTPヘッダーに日本語をそのまま入れると `Cannot convert argument to a ByteString` で落ちる
+  //   （2026-09-07 に本番で2件。PDFは作れているのにお客様には500）。
+  //   filename= は ASCII だけ、日本語名は RFC 5987 の filename*= で渡す。
+  const asciiName = `FRANK_GOLF_receipt_${String(m.member_no ?? "").replace(/[^A-Za-z0-9_-]/g, "")}.pdf`;
+  const utf8Name = encodeURIComponent(`FRANK_GOLF_領収書_${String(m.member_no ?? "")}.pdf`);
   return new NextResponse(pdf, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
       // 画面に表示（iPadでそのまま見せて、必要なら保存・印刷・メール添付）
-      "Content-Disposition": `inline; filename="FRANK_GOLF_領収書_${String(m.member_no ?? "")}.pdf"`,
+      "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${utf8Name}`,
       "Cache-Control": "no-store",
     },
   });

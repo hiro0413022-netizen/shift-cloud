@@ -7,6 +7,13 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-240. **全システムチェック（2026-09-13）の残り＝メール送信のenvと再送**（#240・詳細は CHANGELOG 2026-09-13）
+   1. **`.\deploy-240.ps1` を実行**（commit & push。migration 0169 は適用済みなのでコードだけ）→ Vercel の member-os / yozan-genesis / craft-os / inventory-os が READY になるまで待つ
+   2. **Vercel `yozan-genesis` に `RESEND_API_KEY` と `FRANK_MAIL_FROM`（例: `FRANK GOLF <info@frankgolf.jp>`）を設定**（Settings → Environment Variables → Production → Redeploy）。
+      ⚠ ここが空のため **9/2以降、入会完了メール19通・体験の確認メール28通・前日リマインダーが1通も出ていません**（予約・入会自体は成立しています）
+   3. 設定後、member-os `/frunk` で **9/2以降にご入会で「入会完了メールを送れませんでした」の警告が出ている19名（FR0009〜FR0053のうち19名・判断フィードで確認できます）の会員カード → 【承認メール再送】**（会員番号・控えPDF・会員ページURLをお客様に届ける）
+   4. 体験のお客様（9/2以降28件）には確認メールが届いていません。前日リマインダーは env 設定後の翌朝から自動で出ます
+
 A-232. **Compe OS（コンペ管理）— 残りの登録作業**（本番は稼働中: https://compe-os.vercel.app ・#232/#233）
    1. ~~Vercelプロジェクト作成・env3つ~~ → **完了（2026-09-10・Production READY）**
    2. `vault_systems` に登録（#26）／ネットワークマップ `topology.ts` にノード追加（#47）

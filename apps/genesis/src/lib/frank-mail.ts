@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
+import { logEvent } from "@/lib/kernel";
 import { FRANK_STORE_ID } from "@yozan/core/frank-booking";
 import { buildReminderMail, buildTrialConfirmMail } from "@/lib/frank-mail-pure";
 import { trialCancelUrl } from "@yozan/core/frank-links";
@@ -76,9 +77,34 @@ export async function sendFrankMail(input: {
  * 戻り値は送信件数（cronのログ用）。
  */
 export async function runFrankReminders(): Promise<{ trial: number; booking: number; skipped: boolean }> {
-  if (!process.env.RESEND_API_KEY) return { trial: 0, booking: 0, skipped: true };
   const admin = createAdmin();
   const tomorrow = new Date(Date.now() + 9 * 3600_000 + 86400_000).toISOString().slice(0, 10);
+  if (!process.env.RESEND_API_KEY) {
+    // 未設定のまま黙って skip すると、cron の戻り値にしか痕跡が残らず誰も気づけない
+    // （2026-09-13 の全チェックで、体験予約28件・入会19件のメールが9/2から一通も出ていないのが判明）。
+    // 明日の対象が1件でもある日は、判断フィードに1本だけ警告を残す。
+    const { count } = await admin
+      .from("mbr_trial_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("store_id", FRANK_STORE_ID)
+      .eq("status", "confirmed")
+      .eq("booked_date", tomorrow)
+      .not("email", "is", null)
+      .is("deleted_at", null);
+    if ((count ?? 0) > 0) {
+      const { data: store } = await admin.from("stores").select("company_id").eq("id", FRANK_STORE_ID).maybeSingle();
+      if (store?.company_id) {
+        await logEvent(String(store.company_id), {
+          event_type: "frunk.reminder_skipped",
+          title: `FRANK 前日リマインダーを送れていません（明日の体験 ${count} 件）: yozan-genesis に RESEND_API_KEY / FRANK_MAIL_FROM が未設定`,
+          source: "frank_mail",
+          source_type: "system",
+          severity: "warning",
+        });
+      }
+    }
+    return { trial: 0, booking: 0, skipped: true };
+  }
   let trial = 0;
   let booking = 0;
 

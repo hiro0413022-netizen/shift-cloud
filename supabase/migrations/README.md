@@ -61,3 +61,4 @@
 - ✅ `0162_shift_cloud_kpis_upsert_fix.sql` — 適用済（2026-09-12、MCP name=shift_cloud_kpis_upsert_partial_index_fix。在籍スタッフ数・総労働時間のKPIも同じ理由で止まっていた #237）
 
 - ✅ `0168_compe_entry_terms.sql` — 適用済（2026-09-13、MCP name=compe_entry_terms。募集ページの同意事項 entry_terms / 追加設問 entry_questions / 同意時刻 agreed_at #237c）
+- ✅ `0169_security_hardening_0913.sql` — 適用済（2026-09-13、MCP name=security_hardening_0913。anon/authenticated から REST で叩けた SECURITY DEFINER 関数12本（search_visitors / find_guest_by_contact 等）の実行権を service_role だけに。search_path 未固定の関数12本を固定。重複索引2本を削除 #240）

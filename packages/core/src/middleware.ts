@@ -34,13 +34,30 @@ export function createAuthMiddleware(options: { publicPrefixes: string[] }) {
 
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
     const path = request.nextUrl.pathname;
     const isPublic = options.publicPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
 
+    // 期限切れ・使用済みのリフレッシュトークン（refresh_token_not_found / refresh_token_already_used）は
+    // Cookie が残っている限り毎リクエストで再試行され、Vercel のエラーログに同じ AuthApiError が積み上がる
+    // （2026-09-13 の全チェック: lesson-os 46件・member-os 40件など）。壊れたセッション Cookie は
+    // ここで捨てて、次のリクエストからは素直に未ログインとして扱う（ログインし直せば新しい Cookie が入る）。
+    const staleSession = !user && !!authError && /refresh_token|session/i.test(authError.message ?? "");
+    const clearStale = (res: NextResponse) => {
+      if (!staleSession) return res;
+      for (const c of request.cookies.getAll()) {
+        if (c.name.startsWith("sb-") && c.name.includes("-auth-token")) res.cookies.delete(c.name);
+      }
+      return res;
+    };
+
     if (!user && !isPublic) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return clearStale(NextResponse.redirect(new URL("/login", request.url)));
+    }
+    if (!user && staleSession) {
+      response = clearStale(response);
     }
     // ログイン済みで /login に来たらホームへ。ただし denied=1（権限なしで弾かれた）は除く —
     // 弾く側は /login?denied=1 へ飛ばすため、ここで / に戻すと無限リダイレクトになる（実障害 2026-08-11）。

@@ -1,0 +1,8 @@
+ci: ビルド対象に craft-os / demo-sales / inventory-os / night-os / pro-site / swing-cortex を追加 (#240)
+
+Vercel にデプロイしているのに CI に無いアプリが6つあり、night-os の exports 漏れ（#231）や
+genesis の型エラー（#237）のような「push して初めて本番ビルドが落ちる」事故を CI で止められなかった。
+6アプリともダミーenvで next build 通過を確認済み（2026-09-13 クラウド）。
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GDDnP4Yd9JGEdeNtKmGvS6
