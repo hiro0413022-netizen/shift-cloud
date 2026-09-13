@@ -15,6 +15,8 @@ export type FeedShift = {
   store_name: string | null;
   template_name: string | null;
   template_color: string | null;
+  /** 下書き（未確定）。確定と同じ見た目で出すと決定事項に見えるので、画面側で必ず出し分ける（#241） */
+  is_draft: boolean;
 };
 
 /**
@@ -31,6 +33,8 @@ export type FeedCoworker = {
   is_day_off: boolean;
   store_name: string | null;
   is_self: boolean;
+  /** 下書き（未確定）。#241 */
+  is_draft: boolean;
 };
 
 export type FeedEvent = {

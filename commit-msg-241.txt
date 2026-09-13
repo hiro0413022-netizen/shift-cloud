@@ -1,0 +1,25 @@
+シフトの下書きを店舗ダッシュボードとスタッフ画面にも出す (#241)
+
+発端: GOLF WING の10〜12月はシフトを作ってあるのに、店舗ダッシュボードが丸ごと空に見えていた
+（実データ: 10月46件・11月53件・12月15件がすべて draft）。画面は status='published' だけを読む作りで、
+作りかけの月は存在しないのと同じだった。
+
+変更（すべて表示側のみ・migrationなし）:
+  - lib/store-dash.ts getStoreMonthFeed: draft も取得し StoreShift.is_draft を持たせる
+  - store/store-client.tsx: 下書きは点線＋薄色。凡例と選択日の出勤者に【下書き】
+  - (staff)/shifts, (staff)/calendar(+lib/day-feed.ts), (staff)/home: 同じく下書きを薄く表示。
+    下書きがある月は「まだ確定していない予定です」と画面に出す
+  - 同じ人・同じ日に確定と下書きが両方あれば確定が正（下書きは捨てる）。4画面とも同じ規則
+
+お金と予約には混ぜていない（確定のみのまま）:
+  勤怠 / 給与明細PDF / 銀行照合 / lib/attendance.ts /
+  FRANK予約枠(frank-reservation, frank-coach-shifts, frank-coach-roster) /
+  希望シフト提出・休暇申請のロック判定
+
+検証: クラウドで clone → apps/shift-cloud の tsc --noEmit エラー0 / next build 成功 / npm test 723件パス
+
+note: 紙シフト印刷(components/shift-print.tsx)は以前から status の絞りが無く下書きも印刷される。
+今回は対象外として挙動を変えていない（ユーザー判断待ち）。
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GDDnP4Yd9JGEdeNtKmGvS6

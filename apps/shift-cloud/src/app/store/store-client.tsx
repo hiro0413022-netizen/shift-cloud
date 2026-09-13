@@ -361,7 +361,7 @@ export function StoreDashClient({
             {rows.length === 0 && (
               <tr>
                 <td colSpan={gridDays.length + 1} className="px-3 py-6 text-center text-zinc-400">
-                  この月の確定シフトはまだありません
+                  この月のシフトはまだありません（下書きもありません）
                 </td>
               </tr>
             )}
@@ -409,13 +409,26 @@ export function StoreDashClient({
                       <span className="block space-y-0.5">
                         {cellShifts.map((s, j) =>
                           s.is_day_off ? (
-                            <span key={j} className="block rounded bg-rose-500 px-0.5 py-1 text-center text-[10px] font-semibold text-white">
+                            <span
+                              key={j}
+                              title={s.is_draft ? "下書き（未確定）" : undefined}
+                              className={
+                                s.is_draft
+                                  ? "block rounded border border-dashed border-rose-300 bg-rose-50 px-0.5 py-1 text-center text-[10px] font-semibold text-rose-400"
+                                  : "block rounded bg-rose-500 px-0.5 py-1 text-center text-[10px] font-semibold text-white"
+                              }
+                            >
                               休み
                             </span>
                           ) : (
                             <span
                               key={j}
-                              className="block rounded border border-sky-300 bg-sky-50 px-0.5 py-1 text-center text-[10px] font-semibold tabular-nums text-sky-700"
+                              title={s.is_draft ? "下書き（未確定）" : undefined}
+                              className={
+                                s.is_draft
+                                  ? "block rounded border border-dashed border-sky-300 bg-white px-0.5 py-1 text-center text-[10px] font-semibold tabular-nums text-sky-400"
+                                  : "block rounded border border-sky-300 bg-sky-50 px-0.5 py-1 text-center text-[10px] font-semibold tabular-nums text-sky-700"
+                              }
                             >
                               {hm(s.start_time)}-{hm(s.end_time)}
                             </span>
@@ -433,6 +446,7 @@ export function StoreDashClient({
         <div className="flex flex-wrap gap-3 border-t border-zinc-100 px-3 py-2 text-[10px] text-zinc-400">
           <span><span className="mr-1 inline-block rounded border border-sky-300 bg-sky-50 px-1 text-[9px] font-semibold text-sky-700">10:45-19:45</span>出勤（確定シフト）</span>
           <span><span className="mr-1 inline-block rounded bg-rose-500 px-1 text-[9px] font-semibold text-white">休み</span>休み</span>
+          <span><span className="mr-1 inline-block rounded border border-dashed border-sky-300 bg-white px-1 text-[9px] font-semibold text-sky-400">10:45-19:45</span>点線は<span className="font-semibold text-zinc-500">下書き（未確定）</span>。シフト作成で確定すると濃くなります</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />イベント</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-400" />体験予約</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-red-400" />やること</span>
@@ -456,8 +470,11 @@ export function StoreDashClient({
             {day.shifts.filter((s) => !s.is_day_off).length === 0 && <p className="text-zinc-400">出勤予定なし</p>}
             {day.shifts.filter((s) => !s.is_day_off).map((s, i) => (
               <p key={i}>
-                <span className="font-medium">{s.staff_name}</span>
+                <span className={s.is_draft ? "font-medium text-zinc-400" : "font-medium"}>{s.staff_name}</span>
                 <span className="ml-2 text-xs text-zinc-400">{hm(s.start_time)}〜{hm(s.end_time)}</span>
+                {s.is_draft && (
+                  <span className="ml-1 rounded border border-dashed border-zinc-300 px-1 text-[10px] text-zinc-400">下書き</span>
+                )}
               </p>
             ))}
             {day.events.map((e, i) => (

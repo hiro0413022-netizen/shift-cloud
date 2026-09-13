@@ -27,8 +27,10 @@ export default async function HomePage() {
     { data: company },
     { data: period },
   ] = await Promise.all([
+    // 下書き（未確定）も出す（#241）。確定が有ればそちらを優先（status降順で published が先）
     supabase.from("shifts").select("*, stores(name), shift_templates(name)")
-      .eq("staff_id", actor.staffId).eq("date", today).eq("status", "published").is("deleted_at", null).maybeSingle(),
+      .eq("staff_id", actor.staffId).eq("date", today).in("status", ["published", "draft"]).is("deleted_at", null)
+      .order("status", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("time_records").select("type, recorded_at")
       .eq("staff_id", actor.staffId)
       .gte("recorded_at", `${today}T00:00:00+09:00`).order("recorded_at"),
@@ -102,6 +104,9 @@ export default async function HomePage() {
           <>
             <p className="mt-2 text-2xl font-semibold tracking-tight">
               {hm(todayShift.start_time)}〜{hm(todayShift.end_time)}
+              {todayShift.status === "draft" && (
+                <span className="ml-2 align-middle rounded border border-dashed border-zinc-300 px-1 text-xs text-zinc-400">下書き</span>
+              )}
             </p>
             <p className="mt-1 text-sm text-zinc-500">
               {(todayShift.stores as unknown as { name: string } | null)?.name}

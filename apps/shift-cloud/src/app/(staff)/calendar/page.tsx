@@ -19,21 +19,22 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const [{ data: shifts }, { data: coworkers }, { data: events }, { data: memos }, { data: tasks }] = await Promise.all([
     admin
       .from("shifts")
-      .select("date, start_time, end_time, is_day_off, stores(name), shift_templates(name, color)")
+      .select("date, start_time, end_time, is_day_off, status, stores(name), shift_templates(name, color)")
       .eq("staff_id", actor.staffId)
-      .eq("status", "published")
+      // 下書き（未確定）も出す（#241）。画面では点線＋「下書き」で確定と区別する
+      .in("status", ["published", "draft"])
       .is("deleted_at", null)
       .gte("date", first)
       .lte("date", last)
       .order("date"),
-    // 店舗全体の出勤者（自分以外も含む・確定分のみ）。所属店舗がゼロなら空で返す
+    // 店舗全体の出勤者（自分以外も含む・下書きも含む #241）。所属店舗がゼロなら空で返す
     actor.storeIds.length
       ? admin
           .from("shifts")
-          .select("date, staff_id, start_time, end_time, is_day_off, staff(name), stores(name)")
+          .select("date, staff_id, start_time, end_time, is_day_off, status, staff(name), stores(name)")
           .eq("company_id", actor.companyId)
           .in("store_id", actor.storeIds)
-          .eq("status", "published")
+          .in("status", ["published", "draft"])
           .is("deleted_at", null)
           .gte("date", first)
           .lte("date", last)
@@ -67,28 +68,41 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       .order("sort"),
   ]);
 
+  // 同じ日に確定と下書きが両方あれば確定が正（下書きは出さない）
+  const myPublished = new Set((shifts ?? []).filter((s) => s.status === "published").map((s) => s.date));
+  const coworkerRows = (coworkers ?? []) as unknown as {
+    date: string; staff_id: string; start_time: string | null; end_time: string | null;
+    is_day_off: boolean; status: string; staff: { name: string } | null; stores: { name: string } | null;
+  }[];
+  const coworkerPublished = new Set(
+    coworkerRows.filter((c) => c.status === "published").map((c) => `${c.staff_id}|${c.date}`),
+  );
+
   const feed = buildMonthFeed(days, {
-    shifts: (shifts ?? []).map((s): FeedShift => ({
-      date: s.date,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      is_day_off: s.is_day_off,
-      store_name: (s.stores as unknown as { name: string } | null)?.name ?? null,
-      template_name: (s.shift_templates as unknown as { name: string } | null)?.name ?? null,
-      template_color: (s.shift_templates as unknown as { color: string } | null)?.color ?? null,
-    })),
-    coworkers: ((coworkers ?? []) as unknown as {
-      date: string; staff_id: string; start_time: string | null; end_time: string | null;
-      is_day_off: boolean; staff: { name: string } | null; stores: { name: string } | null;
-    }[]).map((c): FeedCoworker => ({
-      date: c.date,
-      staff_name: c.staff?.name ?? "（不明）",
-      start_time: c.start_time,
-      end_time: c.end_time,
-      is_day_off: c.is_day_off,
-      store_name: c.stores?.name ?? null,
-      is_self: c.staff_id === actor.staffId,
-    })),
+    shifts: (shifts ?? [])
+      .filter((s) => !(s.status === "draft" && myPublished.has(s.date)))
+      .map((s): FeedShift => ({
+        date: s.date,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        is_day_off: s.is_day_off,
+        store_name: (s.stores as unknown as { name: string } | null)?.name ?? null,
+        template_name: (s.shift_templates as unknown as { name: string } | null)?.name ?? null,
+        template_color: (s.shift_templates as unknown as { color: string } | null)?.color ?? null,
+        is_draft: s.status === "draft",
+      })),
+    coworkers: coworkerRows
+      .filter((c) => !(c.status === "draft" && coworkerPublished.has(`${c.staff_id}|${c.date}`)))
+      .map((c): FeedCoworker => ({
+        date: c.date,
+        staff_name: c.staff?.name ?? "（不明）",
+        start_time: c.start_time,
+        end_time: c.end_time,
+        is_day_off: c.is_day_off,
+        store_name: c.stores?.name ?? null,
+        is_self: c.staff_id === actor.staffId,
+        is_draft: c.status === "draft",
+      })),
     events: (events ?? []).map((e): FeedEvent => ({
       date: e.date,
       title: e.title,

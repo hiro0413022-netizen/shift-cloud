@@ -232,6 +232,11 @@ export type StoreShift = {
   /** staff.sort_order（スタッフ管理の▲▼／店舗ダッシュボードのドラッグで決まる行順・#147/#171）。同値なら氏名順 */
   staff_sort: number;
   template_color: string | null;
+  /**
+   * 下書き（未確定）＝シフト作成でまだ「確定」を押していない行（#241）。
+   * 確定と同じ見た目で出すと「決まった予定」に見えてしまうので、画面側で必ず薄く出し分ける。
+   */
+  is_draft: boolean;
 };
 
 export type StoreTask = {
@@ -267,10 +272,12 @@ export async function getStoreMonthFeed(
   const [shiftRes, eventRes, taskRes, trialRes] = await Promise.all([
     admin
       .from("shifts")
-      .select("date, start_time, end_time, is_day_off, staff(id, name, sort_order), shift_templates(color)")
+      .select("date, start_time, end_time, is_day_off, status, staff(id, name, sort_order), shift_templates(color)")
       .eq("company_id", companyId)
       .eq("store_id", storeId)
-      .eq("status", "published")
+      // 確定だけだと、作りかけの月が丸ごと空に見える（GOLF WINGの10〜12月が実際そうだった・#241）。
+      // 下書きも出して、画面側で「下書き」と分かるようにする。
+      .in("status", ["published", "draft"])
       .is("deleted_at", null)
       .gte("date", first)
       .lte("date", last)
@@ -310,10 +317,18 @@ export async function getStoreMonthFeed(
   const feed: StoreMonthFeed = {};
   for (const d of days) feed[d] = { shifts: [], events: [], tasks: [], reservations: [] };
 
-  for (const s of (shiftRes.data ?? []) as unknown as {
-    date: string; start_time: string | null; end_time: string | null; is_day_off: boolean;
+  const shiftRows = (shiftRes.data ?? []) as unknown as {
+    date: string; start_time: string | null; end_time: string | null; is_day_off: boolean; status: string;
     staff: { id: string; name: string; sort_order: number | null } | null; shift_templates: { color: string } | null;
-  }[]) {
+  }[];
+  // 同じ人・同じ日に確定と下書きが両方あったら確定が正（下書きは捨てる）。
+  // いまのDBに同居している行は無いが、確定の隣に古い下書きが並ぶ事故を先に潰しておく。
+  const publishedKey = new Set(
+    shiftRows.filter((s) => s.status === "published").map((s) => `${s.staff?.id ?? s.staff?.name ?? "?"}|${s.date}`),
+  );
+  for (const s of shiftRows) {
+    const isDraft = s.status === "draft";
+    if (isDraft && publishedKey.has(`${s.staff?.id ?? s.staff?.name ?? "?"}|${s.date}`)) continue;
     feed[s.date]?.shifts.push({
       date: s.date,
       start_time: s.start_time,
@@ -323,6 +338,7 @@ export async function getStoreMonthFeed(
       staff_name: s.staff?.name ?? "?",
       staff_sort: s.staff?.sort_order ?? 0,
       template_color: s.shift_templates?.color ?? null,
+      is_draft: isDraft,
     });
   }
   for (const e of (eventRes.data ?? []) as StoreEvent[]) feed[e.date]?.events.push(e);

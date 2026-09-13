@@ -70,13 +70,28 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
                 </span>
                 {shift && (
                   <span
-                    className="mt-0.5 block truncate rounded px-1 py-px text-[9px] font-medium text-white"
-                    style={{ background: shift.template_color ?? "var(--color-brand)" }}
+                    title={shift.is_draft ? "下書き（未確定）" : undefined}
+                    className={`mt-0.5 block truncate rounded px-1 py-px text-[9px] font-medium ${
+                      shift.is_draft ? "border border-dashed bg-white" : "text-white"
+                    }`}
+                    style={
+                      shift.is_draft
+                        ? { borderColor: shift.template_color ?? "var(--color-brand)", color: shift.template_color ?? "var(--color-brand)" }
+                        : { background: shift.template_color ?? "var(--color-brand)" }
+                    }
                   >
                     {hm(shift.start_time)}〜{hm(shift.end_time)}
                   </span>
                 )}
-                {dayOff && !shift && <span className="mt-0.5 block rounded bg-zinc-100 px-1 py-px text-center text-[9px] text-zinc-400">休</span>}
+                {dayOff && !shift && (
+                  <span
+                    className={`mt-0.5 block rounded px-1 py-px text-center text-[9px] text-zinc-400 ${
+                      f.shifts.some((s) => s.is_day_off && s.is_draft) ? "border border-dashed border-zinc-300" : "bg-zinc-100"
+                    }`}
+                  >
+                    休
+                  </span>
+                )}
                 <span className="mt-0.5 flex gap-0.5 px-0.5">
                   {f.events.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="イベント" />}
                   {f.reservations.length > 0 && <span className="h-1.5 w-1.5 rounded-full bg-sky-400" title="予約" />}
@@ -92,6 +107,7 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-sky-400" />予約</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-red-400" />やること</span>
           <span><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-zinc-400" />メモ</span>
+          <span className="w-full"><span className="mr-1 inline-block rounded border border-dashed border-zinc-300 px-1 text-[9px] text-zinc-400">点線</span>はまだ確定していない下書きです</span>
         </div>
       </div>
 
@@ -104,11 +120,15 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
             {day.shifts.length === 0 && <p className="text-zinc-400">シフトなし</p>}
             {day.shifts.map((s, i) =>
               s.is_day_off ? (
-                <p key={i} className="text-zinc-500">休み</p>
+                <p key={i} className="text-zinc-500">
+                  休み
+                  {s.is_draft && <span className="ml-1 rounded border border-dashed border-zinc-300 px-1 text-[10px] text-zinc-400">下書き</span>}
+                </p>
               ) : (
                 <p key={i}>
-                  <span className="font-medium">{hm(s.start_time)}〜{hm(s.end_time)}</span>
+                  <span className={s.is_draft ? "font-medium text-zinc-400" : "font-medium"}>{hm(s.start_time)}〜{hm(s.end_time)}</span>
                   <span className="ml-2 text-xs text-zinc-400">{s.store_name}{s.template_name ? ` ・ ${s.template_name}` : ""}</span>
+                  {s.is_draft && <span className="ml-1 rounded border border-dashed border-zinc-300 px-1 text-[10px] text-zinc-400">下書き</span>}
                 </p>
               )
             )}
@@ -125,16 +145,17 @@ export function CalendarClient({ ym, today, feed }: { ym: string; today: string;
             <p className="text-xs font-medium text-zinc-500">この日の出勤（店舗全体）</p>
             <div className="mt-1.5 space-y-1 text-sm">
               {day.coworkers.filter((c) => !c.is_day_off).length === 0 ? (
-                <p className="text-zinc-400">確定した出勤はまだありません</p>
+                <p className="text-zinc-400">出勤予定はまだありません</p>
               ) : (
                 day.coworkers
                   .filter((c) => !c.is_day_off)
                   .map((c, i) => (
-                    <p key={`cw${i}`} className="flex items-baseline gap-2">
-                      <span className={`min-w-0 flex-1 truncate ${c.is_self ? "font-semibold text-brand" : ""}`}>
+                    <p key={`cw${i}`} className={`flex items-baseline gap-2 ${c.is_draft ? "text-zinc-400" : ""}`}>
+                      <span className={`min-w-0 flex-1 truncate ${c.is_self && !c.is_draft ? "font-semibold text-brand" : ""}`}>
                         {c.staff_name}{c.is_self ? "（自分）" : ""}
                       </span>
-                      <span className="shrink-0 text-zinc-600">{hm(c.start_time)}〜{hm(c.end_time)}</span>
+                      {c.is_draft && <span className="shrink-0 rounded border border-dashed border-zinc-300 px-1 text-[10px] text-zinc-400">下書き</span>}
+                      <span className={`shrink-0 ${c.is_draft ? "text-zinc-400" : "text-zinc-600"}`}>{hm(c.start_time)}〜{hm(c.end_time)}</span>
                     </p>
                   ))
               )}
