@@ -10,6 +10,7 @@ export type Perms = {
   read_only?: boolean;
   use_lesson?: boolean;
   use_reception?: boolean;
+  use_craft?: boolean;
   manage_staff?: boolean;
 };
 export type StaffRow = {
@@ -38,6 +39,7 @@ function access(r: StaffRow) {
     kintai: r.hasLogin && r.status === "active", // Shift Cloud
     uketsuke: !!r.perms.use_reception || hq, // Member / Reserve
     lesson: !!r.perms.use_lesson || hq, // Lesson OS
+    craft: !!r.perms.use_craft || hq, // Craft OS（フィッティング・見積・工房）
   };
 }
 
@@ -70,7 +72,7 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
   return (
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto rounded-xl border border-(--color-line)">
-        <table className="w-full min-w-[940px] border-collapse text-sm">
+        <table className="w-full min-w-[1000px] border-collapse text-sm">
           <thead>
             <tr className="bg-(--color-panel-2) text-left text-xs whitespace-nowrap text-(--color-dim)">
               <th className="px-3 py-2.5 font-medium">氏名 / 役割</th>
@@ -79,6 +81,7 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
               <th className="px-2 py-2.5 text-center font-medium" title="Shift Cloud">勤怠</th>
               <th className="px-2 py-2.5 text-center font-medium" title="Member OS・Reserve OS">受付</th>
               <th className="px-2 py-2.5 text-center font-medium" title="Lesson OS">Lesson</th>
+              <th className="px-2 py-2.5 text-center font-medium" title="Craft OS（フィッティング・見積・工房）">工房</th>
               <th className="px-2 py-2.5 text-center font-medium">状態</th>
               <th className="px-2 py-2.5 text-right font-medium">操作</th>
             </tr>
@@ -86,7 +89,7 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
           <tbody className="divide-y divide-(--color-line)">
             {staff.map((r) => {
               const a = access(r);
-              const wantsButCant = !r.hasLogin && (a.hq || a.lesson || a.uketsuke);
+              const wantsButCant = !r.hasLogin && (a.hq || a.lesson || a.uketsuke || a.craft);
               const isOpen = open === r.id;
               return (
                 <Fragment key={r.id}>
@@ -127,6 +130,7 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
                     <td className="px-2 py-2 text-center"><Dot on={a.kintai} /></td>
                     <td className="px-2 py-2 text-center"><Dot on={a.uketsuke} /></td>
                     <td className="px-2 py-2 text-center"><Dot on={a.lesson} /></td>
+                    <td className="px-2 py-2 text-center"><Dot on={a.craft} /></td>
                     <td className="px-2 py-2 text-center">
                       <form action={(fd) => run(fd, toggleStatus, r.id, "状態を切替えました")}>
                         <input type="hidden" name="staff_id" value={r.id} />
@@ -153,14 +157,14 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
                   </tr>
                   {wantsButCant && (
                     <tr key={`${r.id}-warn`}>
-                      <td colSpan={8} className="bg-amber-500/10 px-3 py-1 text-xs text-amber-300">
+                      <td colSpan={9} className="bg-amber-500/10 px-3 py-1 text-xs text-amber-300">
                         ⚠ 権限は付与されていますが、ログイン未発行のため実際には入れません。右の「ログイン発行」で発行してください。
                       </td>
                     </tr>
                   )}
                   {isOpen && (
                     <tr key={`${r.id}-form`}>
-                      <td colSpan={8} className="bg-(--color-panel-2) px-3 py-3">
+                      <td colSpan={9} className="bg-(--color-panel-2) px-3 py-3">
                         {r.hasLogin ? (
                           <form
                             action={(fd) => run(fd, resetPassword, r.id, "パスワードを再発行しました")}
@@ -193,7 +197,7 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
                   )}
                   {msg?.id === r.id && (
                     <tr key={`${r.id}-msg`}>
-                      <td colSpan={8} className={`px-3 py-1 text-xs ${msg.ok ? "text-emerald-300" : "text-red-300"}`}>
+                      <td colSpan={9} className={`px-3 py-1 text-xs ${msg.ok ? "text-emerald-300" : "text-red-300"}`}>
                         {msg.text}
                       </td>
                     </tr>

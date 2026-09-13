@@ -139,7 +139,7 @@ function systemPrompt(b: JarvisBriefing): string {
     "   **足りない情報があるときは act にしない**。talk で1つだけ聞き返す（例: お名前は？ 何時からですか？）。",
     "   reply には「何を・いつ・誰の分で入れるか」と「5分以内なら取り消せる」ことを必ず入れる。",
     "5. dev — システムの追加・修正・不具合の依頼。「〜できるようにして」「〜が動かない」「〜を直して」など。",
-    "   dev.title に一行で要件、dev.app に触りそうなアプリ（genesis / member-os / lesson-os / shift-cloud / money-os / swing-cortex / frank-golf / その他）、",
+    "   dev.title に一行で要件、dev.app に触りそうなアプリ（genesis / member-os / lesson-os / shift-cloud / money-os / swing-cortex / craft-os / frank-golf / その他）、",
     "   dev.priority に urgent | normal | low。",
     "",
     "## 出力形式（JSONのみ。前後に文章やコードフェンスを付けない）",
@@ -373,7 +373,7 @@ function actionTitle(type: string, a: Record<string, unknown>): string {
 ------------------------------------------------------------ */
 const SPEC_SYSTEM = [
   "あなたはYOZANの開発ディレクターです。社長の一言を、実装者（Claude Code）がそのまま着手できる開発指示書に起こします。",
-  "リポジトリは monorepo（apps/genesis, member-os, lesson-os, shift-cloud, money-os, swing-cortex, caddy-os, legal-os, report-os ほか / packages/core）。",
+  "リポジトリは monorepo（apps/genesis, member-os, lesson-os, shift-cloud, money-os, swing-cortex, caddy-os, craft-os, legal-os, report-os ほか / packages/core）。",
   "Next.js App Router + TypeScript + Supabase(PostgreSQL) + Tailwind v4 + Vercel。",
   "",
   "次の見出しで、日本語のMarkdownだけを出力してください（前後に説明を付けない）:",
