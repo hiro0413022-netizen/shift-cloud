@@ -1,0 +1,15 @@
+fix(core/middleware): 壊れたセッションCookieの判定が実際のエラーメッセージと合っていなかった (#240b)
+
+#240 で入れた staleSession 判定は message を /refresh_token|session/ で見ていたが、
+auth-js が返す実際の文面は "Invalid Refresh Token: Refresh Token Not Found"（アンダースコアではなく空白）。
+アンダースコア付きの正規表現では一度も一致せず、Cookie は捨てられないまま＝#240 の修正が本番で効いていなかった。
+
+code（"refresh_token_not_found"）と message（空白区切り）の両方を拾うように直す。
+クラウドで clone して 全アプリ tsc --noEmit 通過を確認済み。
+
+⚠ 記録: この修正はセッション中に書いたが、PC への書き戻しが反映されないまま
+deploy-240.ps1 が走り、1つ前の版がコミットされていた（origin/main と PC の実体が一致・クラウド側だけ新しかった）。
+以後、device_commit_files のあとは stage し直して diff で着地を確認する。
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01GDDnP4Yd9JGEdeNtKmGvS6

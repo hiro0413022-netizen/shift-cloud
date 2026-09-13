@@ -44,7 +44,10 @@ export function createAuthMiddleware(options: { publicPrefixes: string[] }) {
     // Cookie が残っている限り毎リクエストで再試行され、Vercel のエラーログに同じ AuthApiError が積み上がる
     // （2026-09-13 の全チェック: lesson-os 46件・member-os 40件など）。壊れたセッション Cookie は
     // ここで捨てて、次のリクエストからは素直に未ログインとして扱う（ログインし直せば新しい Cookie が入る）。
-    const staleSession = !user && !!authError && /refresh_token|session/i.test(authError.message ?? "");
+    // auth-js は message が "Invalid Refresh Token: Refresh Token Not Found"、code が "refresh_token_not_found"。どちらでも拾う
+    const authCode = (authError as { code?: string } | null)?.code ?? "";
+    const staleSession =
+      !user && !!authError && (/refresh[ _]?token/i.test(authCode) || /refresh[ _]?token|session/i.test(authError.message ?? ""));
     const clearStale = (res: NextResponse) => {
       if (!staleSession) return res;
       for (const c of request.cookies.getAll()) {
