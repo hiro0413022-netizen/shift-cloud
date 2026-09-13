@@ -1,17 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
-import { getLaborRates, getQuote, lookupDemoShafts, searchProducts, type ProductRow } from "@/lib/craft";
+import { getLaborRates, getQuote, searchProducts, type ProductRow } from "@/lib/craft";
 
 const admin = () => createAdmin();
 
 async function mustQuote(id: number) {
   const actor = await requireActor();
   const full = await getQuote(actor, id);
-  if (!full) throw new Error("見積が見つかりません");
+  if (!full) throw new Error("伝票が見つかりません");
   return { actor, full };
 }
 
@@ -24,57 +23,6 @@ function num(v: FormDataEntryValue | null): number | null {
 function txt(v: FormDataEntryValue | null): string | null {
   const s = String(v ?? "").trim();
   return s === "" ? null : s;
-}
-
-// ---------------------------------------------------------------------------
-// 表紙
-// ---------------------------------------------------------------------------
-
-export async function saveCover(formData: FormData): Promise<void> {
-  const id = Number(formData.get("quote_id"));
-  const { actor, full } = await mustQuote(id);
-
-  await admin()
-    .from("gw_quotes")
-    .update({
-      customer_name: txt(formData.get("customer_name")) ?? full.quote.customer_name,
-      customer_contact: txt(formData.get("customer_contact")),
-      fitting_date: txt(formData.get("fitting_date")),
-      fitter_name: txt(formData.get("fitter_name")),
-      fitting_menu: txt(formData.get("fitting_menu")),
-      fitting_minutes: num(formData.get("fitting_minutes")),
-      member_kind: String(formData.get("member_kind") ?? full.quote.member_kind),
-      segment: String(formData.get("segment") ?? full.quote.segment),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .eq("company_id", actor.companyId);
-
-  // 試打11行。番号を入れたら、その場で商品マスタを引いて product_id を固定する
-  const demoNos: number[] = [];
-  for (const t of full.trials) {
-    const v = num(formData.get(`demo_${t.line_no}`));
-    if (v) demoNos.push(v);
-  }
-  const demoMap = await lookupDemoShafts(actor, demoNos);
-
-  for (const t of full.trials) {
-    const demoNo = num(formData.get(`demo_${t.line_no}`));
-    const found = demoNo != null ? demoMap.get(demoNo) ?? null : null;
-    await admin()
-      .from("gw_fitting_trials")
-      .update({
-        demo_no: demoNo,
-        product_id: found?.product?.id ?? null,
-        head_name: txt(formData.get(`head_${t.line_no}`)),
-        memo: txt(formData.get(`memo_${t.line_no}`)),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", t.id)
-      .eq("company_id", actor.companyId);
-  }
-
-  revalidatePath(`/q/${id}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,20 +55,6 @@ async function insertProductLine(quoteId: number, companyId: string, p: ProductR
     supplier_rate: p.default_rate,
     quantity: 1,
   });
-}
-
-/** 表紙の試打行から、そのまま見積に入れる（転記をなくす一番の要） */
-export async function adoptTrial(formData: FormData): Promise<void> {
-  const id = Number(formData.get("quote_id"));
-  const trialId = Number(formData.get("trial_id"));
-  const { actor, full } = await mustQuote(id);
-  const trial = full.trials.find((t) => t.id === trialId);
-  if (!trial || !trial.product) return;
-
-  await insertProductLine(id, actor.companyId, trial.product, { demoNo: trial.demo_no });
-  await admin().from("gw_fitting_trials").update({ picked: true }).eq("id", trialId).eq("company_id", actor.companyId);
-  revalidatePath(`/q/${id}/quote`);
-  redirect(`/q/${id}/quote`);
 }
 
 /** 商品を探して入れる（試打していないグリップ・スリーブ・ボールなど） */
@@ -281,4 +215,19 @@ export async function findProducts(
   } catch {
     return { error: "検索できませんでした" };
   }
+}
+
+/**
+ * 御見積書を発行した、という記録。
+ * 2026-09-13 ユーザー判断：注文書だけで済ませることが多いので、見積書は出したときだけ印をつける。
+ */
+export async function issueQuoteDoc(formData: FormData): Promise<void> {
+  const id = Number(formData.get("quote_id"));
+  const { actor } = await mustQuote(id);
+  await admin()
+    .from("gw_quotes")
+    .update({ quote_issued_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("company_id", actor.companyId);
+  revalidatePath(`/q/${id}/quote`);
 }

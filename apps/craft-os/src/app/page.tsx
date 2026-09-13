@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
-import { getDemoShaftStats, listQuotes, QUOTE_STATUS_LABELS, FITTING_MENUS, WORK_STEPS } from "@/lib/craft";
+import { getDemoShaftStats, listQuotes, QUOTE_STATUS_LABELS, WORK_STEPS } from "@/lib/craft";
 import { dateShort, yen } from "@/lib/format";
 import { Badge, btnCls, cardCls, Empty, inputCls, labelCls } from "@/components/ui";
 import { TopNav } from "@/components/nav";
@@ -46,10 +46,13 @@ export default async function HomePage({
   ]);
 
   const admin = createAdmin();
-  const [{ data: stores }, { data: staff }] = await Promise.all([
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null).order("name"),
-    admin.from("staff").select("id, name").eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null).order("sort_order"),
-  ]);
+  const { data: stores } = await admin
+    .from("stores")
+    .select("id, name")
+    .eq("company_id", actor.companyId)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .order("name");
   const visibleStores = ((stores ?? []) as { id: string; name: string }[]).filter(
     (s) => actor.isOwner || actor.storeIds.includes(s.id)
   );
@@ -57,7 +60,6 @@ export default async function HomePage({
   // 手が止まっているもの。「到着したのに組み上がっていない」「お渡ししたのに未入金」を上に出す
   const waiting = quotes.filter((q) => q.work && q.work.arrived_on && !q.work.assembled_on);
   const unpaid = quotes.filter((q) => q.work && q.work.delivered_on && !q.work.paid_on);
-  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
 
   return (
     <main className="mx-auto max-w-6xl p-6">
@@ -65,7 +67,7 @@ export default async function HomePage({
         <div>
           <p className="text-xs tracking-[0.4em] text-(--color-gold)">YOZAN</p>
           <h1 className="text-2xl font-bold tracking-widest">Craft OS</h1>
-          <p className="mt-1 text-sm text-(--color-dim)">フィッティング表紙 → 見積 → 注文書 → 工房</p>
+          <p className="mt-1 text-sm text-(--color-dim)">フィッティング表紙 ／ 見積・注文書 ／ 工房</p>
         </div>
         <form action="/api/logout" method="post">
           <button className="text-sm text-(--color-dim) hover:text-(--color-txt)">{actor.name} — ログアウト</button>
@@ -99,7 +101,16 @@ export default async function HomePage({
       )}
 
       <section className={`${cardCls} mb-6`}>
-        <h2 className="mb-4 text-sm font-bold">フィッティングを始める</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-(--color-line) pb-3">
+          <h2 className="text-sm font-bold">伝票をつくる</h2>
+          <Link href="/f" className="text-xs text-(--color-accent) underline">
+            フィッティングから始めるときは「フィッティング表紙」へ
+          </Link>
+        </div>
+        <p className="mb-4 text-xs text-(--color-dim)">
+          グリップ交換だけ、ボールだけ、のようにフィッティングを伴わないご注文はここから。
+          ご注文書だけで完結して構いません（御見積書は必要なときだけ出せます）。
+        </p>
         <form action={createQuote} className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3">
             <GuestPicker />
@@ -110,19 +121,6 @@ export default async function HomePage({
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block">
-              <span className={labelCls}>実施日</span>
-              <input type="date" name="fitting_date" defaultValue={today} className={inputCls} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>担当フィッター</span>
-              <input name="fitter_name" list="fitters" className={inputCls} placeholder="例: 井殿" />
-              <datalist id="fitters">
-                {((staff ?? []) as { id: string; name: string }[]).map((s) => (
-                  <option key={s.id} value={s.name} />
-                ))}
-              </datalist>
-            </label>
             <label className="block">
               <span className={labelCls}>お客様区分</span>
               <select name="member_kind" className={inputCls} defaultValue="ビジター">
@@ -140,25 +138,6 @@ export default async function HomePage({
                 <option value="from_demo_or_lesson">試打からのご購入／レッスン時のご購入</option>
               </select>
             </label>
-            <label className="block">
-              <span className={labelCls}>メニュー</span>
-              <select name="fitting_menu" className={inputCls} defaultValue="">
-                <option value="">（選択）</option>
-                {FITTING_MENUS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className={labelCls}>フィッティング料</span>
-              <select name="fitting_minutes" className={inputCls} defaultValue="">
-                <option value="">なし</option>
-                <option value="110">110分（22,000円）</option>
-                <option value="55">55分（16,500円）</option>
-              </select>
-            </label>
             {visibleStores.length > 1 && (
               <label className="block sm:col-span-2">
                 <span className={labelCls}>店舗</span>
@@ -173,7 +152,7 @@ export default async function HomePage({
               </label>
             )}
             <div className="sm:col-span-2">
-              <button className={btnCls}>表紙をつくる</button>
+              <button className={btnCls}>伝票をつくる</button>
             </div>
           </div>
         </form>
@@ -181,7 +160,7 @@ export default async function HomePage({
 
       <section className={cardCls}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-(--color-line) pb-3">
-          <h2 className="text-sm font-bold">見積・工房（{quotes.length}件）</h2>
+          <h2 className="text-sm font-bold">伝票・工房（{quotes.length}件）</h2>
           <form className="flex gap-2">
             <input name="q" defaultValue={sp.q ?? ""} placeholder="お客様名で絞る" className={`${inputCls} w-48`} />
             <select name="status" defaultValue={sp.status ?? ""} className={`${inputCls} w-40`}>
@@ -197,7 +176,7 @@ export default async function HomePage({
         </div>
 
         {quotes.length === 0 ? (
-          <Empty title="まだ1件もありません" hint="上の「フィッティングを始める」から作ってください" />
+          <Empty title="まだ1件もありません" hint="上の「伝票をつくる」か、フィッティング表紙から作ってください" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -205,8 +184,8 @@ export default async function HomePage({
                 <tr className="border-b border-(--color-line) text-left text-xs text-(--color-dim)">
                   <th className="py-2 pr-3">番号</th>
                   <th className="py-2 pr-3">お客様</th>
-                  <th className="py-2 pr-3">実施日</th>
-                  <th className="py-2 pr-3">担当</th>
+                  <th className="py-2 pr-3">日付</th>
+                  <th className="py-2 pr-3">表紙</th>
                   <th className="py-2 pr-3">状態</th>
                   <th className="py-2 pr-3 text-right">合計</th>
                   <th className="py-2">工房</th>
@@ -216,13 +195,21 @@ export default async function HomePage({
                 {quotes.map((q) => (
                   <tr key={q.id} className="border-b border-(--color-line) last:border-0">
                     <td className="py-2 pr-3 whitespace-nowrap">
-                      <Link href={`/q/${q.id}`} className="font-medium text-(--color-accent) underline">
+                      <Link href={`/q/${q.id}/quote`} className="font-medium text-(--color-accent) underline">
                         {q.quote_no}
                       </Link>
                     </td>
                     <td className="py-2 pr-3">{q.customer_name} 様</td>
-                    <td className="py-2 pr-3 whitespace-nowrap text-(--color-dim)">{dateShort(q.fitting_date ?? q.quote_date)}</td>
-                    <td className="py-2 pr-3 text-(--color-dim)">{q.fitter_name ?? "—"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-(--color-dim)">{dateShort(q.quote_date)}</td>
+                    <td className="py-2 pr-3 text-xs text-(--color-dim)">
+                      {q.fitting ? (
+                        <Link href={`/f/${q.fitting.id}`} className="underline">
+                          {q.fitting.fitting_no}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className="py-2 pr-3">
                       <Badge tone={q.status === "draft" ? "gray" : q.status === "void" ? "danger" : "ok"}>
                         {QUOTE_STATUS_LABELS[q.status] ?? q.status}

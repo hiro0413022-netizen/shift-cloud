@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getLaborRates, getQuote, refundBreakdown, QUOTE_STATUS_LABELS } from "@/lib/craft";
+import { getFitting, getLaborRates, getQuote, refundBreakdown, QUOTE_STATUS_LABELS } from "@/lib/craft";
 import { offLabel, yen, yenPlain } from "@/lib/format";
 import { btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
 import { ProductPicker } from "./product-picker";
-import { addFreeLine, addLaborLine, markReviewed, removeItem, setStatus, updateItems } from "../actions";
+import { addFreeLine, addLaborLine, issueQuoteDoc, markReviewed, removeItem, setStatus, updateItems } from "../actions";
+import { adoptTrialInto } from "@/app/f/[id]/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   if (!full) notFound();
   const { quote: q, items, priced } = full;
   const labor = await getLaborRates(actor);
-  const refund = refundBreakdown(q, items);
+  const refund = refundBreakdown(full);
   const isOwnQuote = q.created_by === actor.staffId;
+  // 表紙が紐づいていれば、試打したシャフトをここからそのまま入れられる
+  const cover = full.fitting ? await getFitting(actor, full.fitting.id) : null;
+  const coverTrials = (cover?.trials ?? []).filter((t) => t.product);
 
   return (
     <>
@@ -32,8 +36,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         <section className={cardCls}>
           <SectionTitle
             right={
-              <div className="flex gap-2">
-                <Link href={`/q/${id}/print/quote`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
+              <div className="flex flex-wrap gap-2">
+                <Link href={`/print/order/${id}`} className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-xs font-medium text-white">
+                  御注文書を印刷
+                </Link>
+                <Link href={`/print/quote/${id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
                   御見積書を印刷
                 </Link>
               </div>
@@ -44,7 +51,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
 
           {items.length === 0 ? (
             <p className="py-6 text-center text-sm text-(--color-dim)">
-              まだ明細がありません。表紙の【見積に入れる】か、下の商品検索から入れてください。
+              まだ明細がありません。下の商品検索から入れてください。
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -160,7 +167,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                   フィッティング料の返金を自動で計算する
                 </label>
                 <div className="mt-2 text-xs text-(--color-dim)">
-                  {q.fitting_minutes ? (
+                  {full.fitting?.fitting_minutes ? (
                     <>
                       <div>
                         DR {refund.counts.DR ?? 0}本／FW {refund.counts.FW ?? 0}本／UT {refund.counts.UT ?? 0}本
@@ -171,7 +178,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                       <div className="mt-1 font-medium text-(--color-txt)">返金 {yen(refund.amount)}</div>
                     </>
                   ) : (
-                    <div>フィッティング料のご利用がありません（表紙で設定できます）</div>
+                    <div>
+                      {full.fitting
+                        ? "この表紙ではフィッティング料のご利用がありません（表紙で設定できます）"
+                        : "フィッティングを伴わない伝票のため、返金はありません"}
+                    </div>
                   )}
                 </div>
                 {!q.refund_auto && (
@@ -230,6 +241,32 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
       <section className={`${cardCls} mt-6`}>
         <SectionTitle>明細を足す</SectionTitle>
         <div className="space-y-6">
+          {coverTrials.length > 0 && (
+            <div>
+              <p className={labelCls}>表紙（{full.fitting?.fitting_no}）で試打したシャフトから入れる</p>
+              <ul className="divide-y divide-(--color-line) rounded-lg border border-(--color-line)">
+                {coverTrials.map((t) => (
+                  <li key={t.id}>
+                    <form action={adoptTrialInto} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-(--color-panel-2)">
+                      <input type="hidden" name="fitting_id" value={full.fitting!.id} />
+                      <input type="hidden" name="quote_id" value={q.id} />
+                      <input type="hidden" name="trial_id" value={t.id} />
+                      <span className="w-16 shrink-0 text-xs text-(--color-dim)">試打 {t.demo_no}</span>
+                      <span className="w-28 shrink-0 text-xs text-(--color-dim)">{t.product?.manufacturer}</span>
+                      <span className="flex-1">
+                        {t.product?.name}
+                        {t.product?.spec ? ` ${t.product.spec}` : ""}
+                        {t.product?.club_type ? <span className="ml-1 text-xs text-(--color-dim)">{t.product.club_type}</span> : null}
+                      </span>
+                      <span className="w-24 shrink-0 text-right">{yenPlain(t.product?.list_price ?? 0)}</span>
+                      <button className="shrink-0 rounded border border-(--color-line) px-2 py-1 text-xs">入れる</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div>
             <p className={labelCls}>商品マスタから探す</p>
             <ProductPicker quoteId={q.id} />
@@ -324,12 +361,23 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
             </select>
             <button className={btnGhostCls}>状態を変える</button>
           </form>
+          {q.quote_issued_at ? (
+            <p className="text-xs text-(--color-dim)">
+              御見積書 発行済み（{new Date(q.quote_issued_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}）
+            </p>
+          ) : (
+            <form action={issueQuoteDoc}>
+              <input type="hidden" name="quote_id" value={q.id} />
+              <button className={btnGhostCls}>御見積書を出した</button>
+            </form>
+          )}
           <Link href={`/q/${id}/work`} className={btnCls}>
             注文書・工房へ
           </Link>
         </div>
         <p className="mt-3 text-xs text-(--color-dim)">
           「お客様にお渡しする前に、必ず他のスタッフのチェックを受けてから提示」— 誰がいつ確認したかを残します。
+          御見積書は出しても出さなくても構いません。ご注文書だけで完結する伝票が多いためです。
         </p>
       </section>
     </>

@@ -4,7 +4,21 @@ import { useActionState } from "react";
 import { addProductLine, findProducts } from "../actions";
 import { inputCls, btnGhostCls } from "@/components/ui";
 
-const CATEGORIES = ["", "シャフト", "クラブ", "グリップ", "スリーブ", "ボール", "グローブ", "練習機", "工具"];
+// 商品マスタ（発注管理）の item_category と同じ綴りで並べる。
+// ここに無い区分は「すべての区分」＋文字で探せば出るが、よく使うものは載せておく。
+const CATEGORIES = [
+  "",
+  "シャフト",
+  "クラブ",
+  "グリップ",
+  "スリーブ",
+  "ウッド用 ソケット",
+  "アイアン用 ソケット",
+  "ボール",
+  "グローブ",
+  "練習機",
+  "工具",
+];
 
 /**
  * 商品マスタから探して明細に入れる。

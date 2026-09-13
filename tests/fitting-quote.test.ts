@@ -305,3 +305,66 @@ test("通し: スタッフ購入は仕入掛け率で計算される", () => {
   assert.equal(r.items[0].amount, 27500);
   assert.match(r.items[0].discountReason, /スタッフ購入/);
 });
+
+// ---------------------------------------------------------------------------
+// 返金の上限は「表紙ごと」に数える
+// （2026-09-13 ユーザー判断：1回のフィッティングから見積を分けることがある。
+//   分けても22,000円を二重に返さない）
+// ---------------------------------------------------------------------------
+
+test("返金の枠は表紙ごと: 1枚目16,500 → 2枚目は残り5,500までしか引けない", () => {
+  const first = computeFittingRefund(110, { FW: 1, UT: 2 });
+  assert.equal(first.amount, 16500);
+  assert.equal(first.alreadyRefunded, 0);
+  assert.equal(first.remaining, 22000);
+
+  // 後日ドライバーを買った（単独なら16,500）が、枠はもう5,500しか残っていない
+  const second = computeFittingRefund(110, { DR: 1 }, { alreadyRefunded: first.amount });
+  assert.equal(second.entitled, 16500);
+  assert.equal(second.remaining, 5500);
+  assert.equal(second.amount, 5500);
+  assert.equal(first.amount + second.amount, 22000);
+});
+
+test("返金の枠は表紙ごと: 使い切っていたら2枚目は0円", () => {
+  const r = computeFittingRefund(110, { DR: 1, FW: 1 }, { alreadyRefunded: 22000 });
+  assert.equal(r.entitled, 22000);
+  assert.equal(r.remaining, 0);
+  assert.equal(r.amount, 0);
+});
+
+test("返金の枠は表紙ごと: 55分の枠は16,500で数える", () => {
+  const r = computeFittingRefund(55, { FW: 2 }, { alreadyRefunded: 8250 });
+  assert.equal(r.cap, 16500);
+  assert.equal(r.remaining, 8250);
+  assert.equal(r.amount, 8250);
+});
+
+test("返金の枠は表紙ごと: 何枚に分けても合計が上限を超えない（総当たり）", () => {
+  for (const m of [55, 110] as const) {
+    for (let used = 0; used <= 22000; used += 2750) {
+      for (let dr = 0; dr <= 2; dr += 1)
+        for (let fw = 0; fw <= 3; fw += 1)
+          for (let ut = 0; ut <= 3; ut += 1) {
+            const r = computeFittingRefund(m, { DR: dr, FW: fw, UT: ut }, { alreadyRefunded: used });
+            assert.ok(r.amount >= 0);
+            assert.ok(
+              used + r.amount <= r.cap || used > r.cap,
+              `${m}分 既に${used}円 DR${dr}FW${fw}UT${ut} で枠超え`,
+            );
+          }
+    }
+  }
+});
+
+test("通し: priceQuote に refundAlreadyUsed を渡すと合計に効く", () => {
+  const items = [
+    { line_kind: "product", item_category: "クラブ", manufacturer: "PING", club_type: "DR", list_price: 100000, quantity: 1 },
+  ];
+  const base = { segment: "member_paid_fitting", memberKind: "会員", fittingMinutes: 110 } as const;
+  const alone = priceQuote(items, { ...base }, RULES);
+  const after = priceQuote(items, { ...base, refundAlreadyUsed: 16500 }, RULES);
+  assert.equal(alone.refund.amount, 16500);
+  assert.equal(after.refund.amount, 5500);
+  assert.equal(after.totals.total, alone.totals.total + 11000);
+});

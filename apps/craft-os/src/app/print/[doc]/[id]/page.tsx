@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getQuote, refundBreakdown, WORK_STEPS, type QuoteItem, type WorkSpec } from "@/lib/craft";
+import { getFitting, getQuote, refundBreakdown, WORK_STEPS, type QuoteItem, type TrialRow, type WorkSpec } from "@/lib/craft";
 import { dateShort, range, yenPlain } from "@/lib/format";
 import { PrintToolbar } from "@/components/print-frame";
 
@@ -8,9 +8,13 @@ export const dynamic = "force-dynamic";
 
 /**
  * 帳票。いまファイルに綴じている紙と同じ形にしてある（運用を変えずに中身だけ置き換えるため）。
+ *   cover … フィッティング表紙（A4横）＝お客様にお渡しする紙。対象は表紙のID
  *   quote … 御見積書（A4縦）
  *   order … 御注文書（A4縦）＋仕上げ情報・進捗欄
  *   spec  … 工房の組立指示書（A4横）
+ *
+ * ルートを /print/<doc>/<id> にしてあるのは、表紙（cover）と伝票（quote/order/spec）で
+ * 対象のIDが別物だから。表紙は伝票が無くても存在する。
  */
 
 const ISSUER = {
@@ -25,12 +29,38 @@ const sheetCls = "print-sheet mx-auto bg-white p-10 shadow-sm";
 
 export default async function PrintPage({ params }: { params: Promise<{ id: string; doc: string }> }) {
   const { id, doc } = await params;
-  if (!["quote", "order", "spec"].includes(doc)) notFound();
+  if (!["cover", "quote", "order", "spec"].includes(doc)) notFound();
   const actor = await requireActor();
+
+  // 表紙だけは対象が gw_fittings。伝票を作っていなくても印刷できる
+  if (doc === "cover") {
+    const cover = await getFitting(actor, Number(id));
+    if (!cover) notFound();
+    const f = cover.fitting;
+    return (
+      <>
+        <style>{`@page { size: A4 landscape; margin: 12mm; }`}</style>
+        <PrintToolbar title="フィッティング表紙" note={`A4横 ／ ${f.fitting_no}`} />
+        <div className={`${sheetCls} max-w-[297mm]`}>
+          <CoverSheet
+            customer={f.customer_name}
+            fitter={f.fitter_name}
+            date={f.fitting_date}
+            menu={f.fitting_menu}
+            minutes={f.fitting_minutes}
+            fittingNo={f.fitting_no}
+            note={f.note}
+            trials={cover.trials}
+          />
+        </div>
+      </>
+    );
+  }
+
   const full = await getQuote(actor, Number(id));
   if (!full) notFound();
   const { quote: q, items, work, specs, priced } = full;
-  const refund = refundBreakdown(q, items);
+  const refund = refundBreakdown(full);
   const landscape = doc === "spec";
   const title = doc === "quote" ? "御見積書" : doc === "order" ? "御注文書" : "組立指示書";
 
@@ -43,8 +73,8 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         {doc === "spec" ? (
           <SpecSheet
             customer={q.customer_name}
-            fitter={q.fitter_name}
-            date={q.fitting_date ?? q.quote_date}
+            fitter={full.fitting?.fitter_name ?? null}
+            date={full.fitting?.fitting_date ?? q.quote_date}
             due={work?.due_date ?? null}
             assembledBy={work?.assembled_by_name ?? null}
             orderNo={work?.order_no ?? null}
@@ -69,7 +99,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
                 <p>{ISSUER.zip}</p>
                 <p>{ISSUER.address}</p>
                 <p>{ISSUER.tel}</p>
-                <p className="mt-2">担当：{q.staff_name ?? q.fitter_name ?? ""}</p>
+                <p className="mt-2">担当：{q.staff_name ?? full.fitting?.fitter_name ?? ""}</p>
               </div>
             </header>
 
@@ -182,9 +212,9 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
               </tfoot>
             </table>
 
-            {q.fitting_minutes && refund.amount > 0 && (
+            {full.fitting?.fitting_minutes && priced.totals.refund > 0 && (
               <p className="mt-3 text-[10px] text-gray-600">
-                フィッティング料（{q.fitting_minutes}分）のご返金：{refund.breakdown.join(" ／ ")}
+                フィッティング料（{full.fitting.fitting_minutes}分）のご返金：{refund.breakdown.join(" ／ ")}
               </p>
             )}
 
@@ -382,6 +412,102 @@ function SpecSheet({
           ))}
         </tbody>
       </table>
+    </>
+  );
+}
+
+/**
+ * フィッティング表紙（A4横）。紙（01_試打シャフト表紙.xlsm）と同じ並び。
+ * お客様にお渡しする紙なので、定価まで出す。
+ */
+function CoverSheet({
+  customer,
+  fitter,
+  date,
+  menu,
+  minutes,
+  fittingNo,
+  note,
+  trials,
+}: {
+  customer: string;
+  fitter: string | null;
+  date: string;
+  menu: string | null;
+  minutes: number | null;
+  fittingNo: string;
+  note: string | null;
+  trials: TrialRow[];
+}) {
+  const th = "border border-black px-1 py-1 text-[10px] font-normal";
+  const td = "border border-black px-1 py-2 text-[11px]";
+
+  return (
+    <>
+      <header className="mb-4 flex items-end justify-between">
+        <div>
+          <span className="border-b border-black pb-0.5 text-lg">{customer}</span>
+          <span className="ml-2 text-sm">様</span>
+        </div>
+        <table className="text-[11px]">
+          <tbody>
+            <tr>
+              <td className="px-2">フィッティング実施日</td>
+              <td className="border-b border-black px-3">{dateShort(date)}</td>
+              <td className="px-2">担当フィッター</td>
+              <td className="border-b border-black px-3">{fitter ?? ""}</td>
+            </tr>
+            <tr>
+              <td className="px-2">メニュー</td>
+              <td className="border-b border-black px-3">{menu ?? ""}</td>
+              <td className="px-2">フィッティング料</td>
+              <td className="border-b border-black px-3">{minutes ? `${minutes}分` : ""}</td>
+            </tr>
+          </tbody>
+        </table>
+      </header>
+
+      <table className="w-full border-collapse">
+        <thead>
+          <tr>
+            <th className={`${th} w-10`}>No</th>
+            <th className={`${th} w-16`}>試打NO.</th>
+            <th className={th}>シャフト</th>
+            <th className={`${th} w-28`}>メーカー名</th>
+            <th className={`${th} w-24`}>定価</th>
+            <th className={`${th} w-32`}>ヘッド</th>
+            <th className={th}>memo</th>
+            <th className={`${th} w-12`}>採用</th>
+          </tr>
+        </thead>
+        <tbody>
+          {trials.map((t) => (
+            <tr key={t.id}>
+              <td className={`${td} text-center`}>{t.line_no}</td>
+              <td className={`${td} text-center`}>{t.demo_no ?? ""}</td>
+              <td className={td}>
+                {t.product ? `${t.product.name}${t.product.spec ? ` ${t.product.spec}` : ""}` : ""}
+                {t.product?.club_type ? `（${t.product.club_type}）` : ""}
+              </td>
+              <td className={td}>{t.product?.manufacturer ?? ""}</td>
+              <td className={`${td} text-right`}>
+                {t.product?.list_price != null ? yenPlain(t.product.list_price) : ""}
+              </td>
+              <td className={td}>{t.head_name ?? ""}</td>
+              <td className={td}>{t.memo ?? ""}</td>
+              <td className={`${td} text-center`}>{t.picked ? "○" : ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {note && <p className="mt-3 text-[11px]">{note}</p>}
+      <div className="mt-6 flex items-end justify-between text-[10px] text-gray-600">
+        <p>定価は商品マスタの最新の価格です。お買い上げ時の金額はお見積り・ご注文書をご覧ください。</p>
+        <p>
+          {ISSUER.name}　{fittingNo}
+        </p>
+      </div>
     </>
   );
 }

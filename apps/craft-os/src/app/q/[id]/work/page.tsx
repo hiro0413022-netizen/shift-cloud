@@ -50,10 +50,10 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
           <SectionTitle
             right={
               <div className="flex gap-2">
-                <Link href={`/q/${id}/print/order`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
+                <Link href={`/print/order/${id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
                   御注文書を印刷
                 </Link>
-                <Link href={`/q/${id}/print/spec`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
+                <Link href={`/print/spec/${id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
                   工房の指示書を印刷
                 </Link>
               </div>

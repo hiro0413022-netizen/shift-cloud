@@ -17,6 +17,7 @@ export default async function QuoteLayout({
   const full = await getQuote(actor, Number(id));
   if (!full) notFound();
   const q = full.quote;
+  const f = full.fitting;
 
   return (
     <main className="mx-auto max-w-6xl p-6">
@@ -26,13 +27,21 @@ export default async function QuoteLayout({
             ← 一覧へ
           </Link>
           <h1 className="mt-1 text-xl font-bold">
-            {q.customer_name} 様{" "}
-            <span className="ml-2 text-sm font-normal text-(--color-dim)">{q.quote_no}</span>
+            {q.customer_name} 様 <span className="ml-2 text-sm font-normal text-(--color-dim)">{q.quote_no}</span>
           </h1>
           <p className="mt-1 text-xs text-(--color-dim)">
-            実施日 {dateShort(q.fitting_date ?? q.quote_date)} ／ 担当 {q.fitter_name ?? "—"} ／ {q.member_kind}
-            {q.fitting_menu ? ` ／ ${q.fitting_menu}` : ""}
-            {q.fitting_minutes ? `（${q.fitting_minutes}分）` : ""}
+            {dateShort(q.quote_date)} ／ {q.member_kind}
+            {f ? (
+              <>
+                {" ／ 表紙 "}
+                <Link href={`/f/${f.id}`} className="underline">
+                  {f.fitting_no}
+                </Link>
+                {f.fitting_minutes ? `（フィッティング料 ${f.fitting_minutes}分）` : ""}
+              </>
+            ) : (
+              " ／ フィッティングなし"
+            )}
           </p>
         </div>
         <Badge tone={q.status === "draft" ? "gray" : q.status === "void" ? "danger" : "ok"}>

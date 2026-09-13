@@ -228,13 +228,29 @@ export type ClubCounts = {
 };
 
 export type RefundResult = {
+  /** 実際に差し引く額（表紙の残枠まで） */
   amount: number;
   /** 上限で丸める前の積み上げ額 */
   rawAmount: number;
+  /** この明細だけで見たときの返金額（表紙の残枠を当てる前） */
+  entitled: number;
   cap: number;
+  /** 同じ表紙の、ほかの伝票で既に返金済みの額 */
+  alreadyRefunded: number;
+  /** この伝票で使える残り枠（cap − alreadyRefunded） */
+  remaining: number;
   /** 何をどう数えたか（画面と記録に出す） */
   breakdown: string[];
   capped: boolean;
+};
+
+export type RefundOptions = {
+  /**
+   * 同じ表紙の、ほかの伝票で既に返金した額。
+   * （2026-09-13 ユーザー判断：1回のフィッティングから見積を分けることがあるため、
+   *   22,000円の上限は伝票ごとではなく表紙ごとに数える。分けても二重に返さない）
+   */
+  alreadyRefunded?: number | null;
 };
 
 /** 上限（Excel「見積のルール」：110分は22,000、55分は16,500） */
@@ -269,6 +285,9 @@ function utRefund(_minutes: FittingMinutes, n: number): number {
  *                      UT 3本以上→11,000・2本→8,250・1本→0
  * FW と UT は積み上げてから上限で丸める（表の計算例②がこの形）。
  *
+ * ★ 上限は「表紙ごと」に数える。1回のフィッティングから伝票を分けたとき、
+ *   2枚目は opts.alreadyRefunded に1枚目の返金額を渡す。残り枠までしか引かない。
+ *
  * ⚠ 表の「DRを含む2本以上→22,000」を文字どおり実装している。
  *   そのため DR1本＋UT1本は、UT単独なら0円でも満額22,000円になる。
  *   意図どおりかは要確認（NEXT_TASKS の craft-os 項に記載）。
@@ -276,28 +295,52 @@ function utRefund(_minutes: FittingMinutes, n: number): number {
 export function computeFittingRefund(
   minutes: FittingMinutes | number | null | undefined,
   counts: ClubCounts,
+  opts: RefundOptions = {},
 ): RefundResult {
   const m = (minutes === 110 || minutes === 55 ? minutes : null) as FittingMinutes | null;
   const dr = Math.max(0, Math.trunc(num(counts.DR, 0)));
   const fw = Math.max(0, Math.trunc(num(counts.FW, 0)));
   const ut = Math.max(0, Math.trunc(num(counts.UT, 0)));
+  const used = Math.max(0, num(opts.alreadyRefunded, 0));
 
   if (!m) {
     return {
       amount: 0,
       rawAmount: 0,
+      entitled: 0,
       cap: 0,
+      alreadyRefunded: used,
+      remaining: 0,
       breakdown: ["フィッティング料のご利用が無いため返金なし"],
       capped: false,
     };
   }
 
   const cap = REFUND_CAP[m];
+  const remaining = Math.max(0, cap - used);
   const total = dr + fw + ut;
   const breakdown: string[] = [];
 
+  const settle = (raw: number): RefundResult => {
+    const entitled = Math.min(raw, cap);
+    if (entitled < raw) {
+      breakdown.push(`合計 ${raw.toLocaleString("ja-JP")}円 → 上限 ${cap.toLocaleString("ja-JP")}円で丸め`);
+    }
+    const amount = Math.min(entitled, remaining);
+    if (used > 0) {
+      breakdown.push(
+        `同じ表紙で返金済み ${used.toLocaleString("ja-JP")}円 → この伝票で使えるのは残り ${remaining.toLocaleString("ja-JP")}円`,
+      );
+    }
+    if (amount < entitled) {
+      breakdown.push(`残り枠に合わせて ${amount.toLocaleString("ja-JP")}円に調整`);
+    }
+    return { amount, rawAmount: raw, entitled, cap, alreadyRefunded: used, remaining, breakdown, capped: entitled < raw };
+  };
+
   if (total === 0) {
-    return { amount: 0, rawAmount: 0, cap, breakdown: ["ご購入が無いため返金なし"], capped: false };
+    breakdown.push("ご購入が無いため返金なし");
+    return { amount: 0, rawAmount: 0, entitled: 0, cap, alreadyRefunded: used, remaining, breakdown, capped: false };
   }
 
   // ドライバーを含むときは表の専用行が優先する
@@ -305,13 +348,13 @@ export function computeFittingRefund(
     if (m === 110) {
       if (total >= 2) {
         breakdown.push(`ドライバーを含む2本以上（計${total}本）→ 22,000円`);
-        return { amount: 22000, rawAmount: 22000, cap, breakdown, capped: false };
+        return settle(22000);
       }
       breakdown.push("ドライバー1本 → 16,500円");
-      return { amount: 16500, rawAmount: 16500, cap, breakdown, capped: false };
+      return settle(16500);
     }
     breakdown.push("ドライバーご購入 → 16,500円");
-    return { amount: 16500, rawAmount: 16500, cap, breakdown, capped: false };
+    return settle(16500);
   }
 
   const fwAmt = fwRefund(m, fw);
@@ -319,12 +362,7 @@ export function computeFittingRefund(
   if (fw > 0) breakdown.push(`FW ${fw}本 → ${fwAmt.toLocaleString("ja-JP")}円`);
   if (ut > 0) breakdown.push(`UT ${ut}本 → ${utAmt.toLocaleString("ja-JP")}円`);
 
-  const raw = fwAmt + utAmt;
-  const amount = Math.min(raw, cap);
-  if (amount < raw) {
-    breakdown.push(`合計 ${raw.toLocaleString("ja-JP")}円 → 上限 ${cap.toLocaleString("ja-JP")}円で丸め`);
-  }
-  return { amount, rawAmount: raw, cap, breakdown, capped: amount < raw };
+  return settle(fwAmt + utAmt);
 }
 
 /** 明細から DR/FW/UT の本数を数える（返金の入力）。商品行だけを数える */
@@ -414,6 +452,8 @@ export type QuoteInput = {
   prepaidAmount?: number | null;
   /** 返金を手で決めたとき。null なら自動計算 */
   refundOverride?: number | null;
+  /** 同じ表紙の、ほかの伝票で既に返金した額（上限は表紙ごとに数える） */
+  refundAlreadyUsed?: number | null;
   onDate?: string | null;
 };
 
@@ -467,7 +507,9 @@ export function priceQuote(
   });
 
   const clubCounts = countClubs(items);
-  const refund = computeFittingRefund(quote.fittingMinutes, clubCounts);
+  const refund = computeFittingRefund(quote.fittingMinutes, clubCounts, {
+    alreadyRefunded: quote.refundAlreadyUsed,
+  });
   const refundAmount = quote.refundOverride != null ? num(quote.refundOverride, 0) : refund.amount;
 
   const totals = computeTotals({
