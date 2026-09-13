@@ -12,7 +12,7 @@ function ProfitTone({ profit }: { profit: number }) {
   return <span className={`tabular-nums font-semibold ${tone}`}>{yen(profit)}</span>;
 }
 
-function SegmentCard({ seg }: { seg: SegmentMetric }) {
+function SegmentCard({ seg, mtdLabel }: { seg: SegmentMetric; mtdLabel: string }) {
   const [open, setOpen] = useState(false);
   const [openLines, setOpenLines] = useState(false);
   const hasStores = seg.stores.length > 0;
@@ -26,12 +26,40 @@ function SegmentCard({ seg }: { seg: SegmentMetric }) {
             {hasStores ? `店舗 ${seg.stores.length}` : "横断・オンライン事業"}
           </p>
         </div>
-        {seg.hasFinance ? (
-          <Badge tone={seg.profit >= 0 ? "ok" : "danger"}>{seg.profit >= 0 ? "黒字" : "赤字"}</Badge>
+        {/* #237b: 完了月に実績が無くても、当月に動いている事業は「財務未接続」ではない */}
+        {seg.hasFinance || seg.hasMtd ? (
+          (() => {
+            const p = seg.hasFinance ? seg.profit : seg.mtdProfit;
+            return <Badge tone={p >= 0 ? "ok" : "danger"}>{p >= 0 ? "黒字" : "赤字"}</Badge>;
+          })()
         ) : (
           <Badge tone="default">財務未接続</Badge>
         )}
       </div>
+
+      {/* 進行中の当月（#237b）。FRANK は9月開業で、最新の完了月（8月）には実績が無い＝
+          完了月だけを出していると「まだ何も動いていない店」に見えてしまう。 */}
+      {seg.hasMtd && (
+        <div className="mt-3 rounded-lg border border-sky-800/50 bg-sky-950/30 px-3 py-2">
+          <p className="text-[10px] text-sky-200/80">当月（{mtdLabel}・進行中）</p>
+          <div className="mt-1 grid grid-cols-3 gap-2 text-center">
+            <div className="min-w-0">
+              <p className="text-[10px] text-(--color-dim)">売上</p>
+              <p className="tabular-nums text-sm font-semibold break-all text-sky-200">{yen(seg.mtdRevenue)}</p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] text-(--color-dim)">原価+経費</p>
+              <p className="tabular-nums text-sm font-semibold break-all text-(--color-txt)">{yen(seg.mtdCogs + seg.mtdExpense)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-(--color-dim)">利益</p>
+              <p className="text-sm">
+                <ProfitTone profit={seg.mtdProfit} />
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {seg.hasFinance ? (
         <div
@@ -56,9 +84,9 @@ function SegmentCard({ seg }: { seg: SegmentMetric }) {
             </p>
           </div>
         </div>
-      ) : (
+      ) : seg.hasMtd ? null : (
         <p className="mt-3 rounded-lg bg-(--color-panel-2) px-3 py-2 text-[11px] text-(--color-dim)">
-          当月の財務入力なし。
+          最新の完了月の財務入力なし。
           <Link href="/finance" className="ml-1 text-sky-300 hover:underline">
             Money OSで入力
           </Link>
@@ -199,10 +227,10 @@ export function BusinessBreakdown({
           <span className="tabular-nums text-sm font-semibold text-sky-200">{yen(forecastTotal)}</span>
         </div>
       )}
-      <p className="mb-3 text-[11px] text-(--color-dim)">下段のPLは最新の完了月（{monthLabel}）。事業別=Money OS(fin_entries)、店舗別の会員・入退会は会員名簿（FRANKはFRANK会員台帳）、スタッフ・シフトはShift Cloudから自動集計</p>
+      <p className="mb-3 text-[11px] text-(--color-dim)">青い枠は当月（{forecastMonthLabel ?? "—"}・進行中／まだ締まっていません）、その下のPLは最新の完了月（{monthLabel}）。事業別=Money OS(fin_entries)、店舗別の会員・入退会は会員名簿（FRANKはFRANK会員台帳）、スタッフ・シフトはShift Cloudから自動集計</p>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {segments.map((seg) => (
-          <SegmentCard key={seg.code} seg={seg} />
+          <SegmentCard key={seg.code} seg={seg} mtdLabel={forecastMonthLabel ?? "当月"} />
         ))}
       </div>
     </div>

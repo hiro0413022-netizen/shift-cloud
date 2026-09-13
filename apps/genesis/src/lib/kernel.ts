@@ -360,7 +360,13 @@ export type SegmentMetric = {
   cogs: number;
   expense: number;
   profit: number;
-  hasFinance: boolean; // 当月に財務入力があるか
+  hasFinance: boolean; // 最新の完了月に財務入力があるか
+  /** 進行中の当月の実績（#237b）。予測(source='forecast')は含めない */
+  mtdRevenue: number;
+  mtdCogs: number;
+  mtdExpense: number;
+  mtdProfit: number;
+  hasMtd: boolean;
   stores: StoreMetric[];
   /** 収支のカテゴリ別内訳（#83: カードタップでざっくり見える用） */
   lines: SegmentLine[];
@@ -464,7 +470,7 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
     .is("deleted_at", null);
   const forecastTotal = (fcRows ?? []).reduce((s, r) => s + (Number((r as { amount: number | string }).amount) || 0), 0);
 
-  const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes, frankRes] = await Promise.all([
+  const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes, frankRes, mtdRes] = await Promise.all([
     admin.from("fin_segments").select("id,name,code").eq("company_id", companyId).is("deleted_at", null),
     admin.from("fin_categories").select("id,kind,name").eq("company_id", companyId).is("deleted_at", null),
     month
@@ -496,6 +502,15 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
       admin.from("frunk_members").select("store_id,status,join_date,leave_date").eq("company_id", companyId).is("deleted_at", null),
       allowed
     ),
+    // 進行中の当月の実績（#237b）。FRANK は9月開業で、最新の完了月（8月）には実績が1件も無い。
+    // 完了月だけを出していると「まだ何も動いていない店」に見えてしまうので、当月も併記する。
+    // 予測（source='forecast'）は forecastTotal 側の別枠なので、下の集計で除く。
+    admin
+      .from("fin_entries")
+      .select("segment_id,category_id,amount,source")
+      .eq("company_id", companyId)
+      .gte("target_month", monthStart())
+      .is("deleted_at", null),
   ]);
 
   const segments = (segRes.data ?? []) as { id: string; name: string; code: string }[];
@@ -635,9 +650,30 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
     }
   }
 
+  // 進行中の当月（#237b）。内訳(lines)は完了月のぶんだけ出す＝締まっていない数字を並べて混乱させない
+  const byMtd = new Map<string, { revenue: number; cogs: number; expense: number }>();
+  for (const e of (mtdRes.data ?? []) as {
+    segment_id: string;
+    category_id: string;
+    amount: number | string;
+    source: string | null;
+  }[]) {
+    if (String(e.source ?? "") === "forecast") continue; // 月会費予測は実績ではない（forecastTotalへ）
+    const kind = catKind.get(e.category_id);
+    if (!kind || !e.segment_id) continue;
+    const acc = byMtd.get(e.segment_id) ?? { revenue: 0, cogs: 0, expense: 0 };
+    const amt = Number(e.amount) || 0;
+    if (kind === "revenue") acc.revenue += amt;
+    else if (kind === "cogs") acc.cogs += amt;
+    else if (kind === "expense") acc.expense += amt;
+    byMtd.set(e.segment_id, acc);
+  }
+
   const result: SegmentMetric[] = segments.map((seg) => {
     const f = bySeg.get(seg.id) ?? { revenue: 0, cogs: 0, expense: 0 };
     const hasFinance = f.revenue !== 0 || f.cogs !== 0 || f.expense !== 0;
+    const mtd = byMtd.get(seg.id) ?? { revenue: 0, cogs: 0, expense: 0 };
+    const hasMtd = mtd.revenue !== 0 || mtd.cogs !== 0 || mtd.expense !== 0;
     const segStores = storesForSegment(seg.code, stores);
     // 事業→店舗が1:1のときのみ、当月売上を店舗へ按分（複数店は不明=null）
     const perStoreRevenue = segStores.length === 1 && hasFinance ? f.revenue : null;
@@ -649,6 +685,11 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
       expense: f.expense,
       profit: f.revenue - f.cogs - f.expense,
       hasFinance,
+      mtdRevenue: mtd.revenue,
+      mtdCogs: mtd.cogs,
+      mtdExpense: mtd.expense,
+      mtdProfit: mtd.revenue - mtd.cogs - mtd.expense,
+      hasMtd,
       stores: segStores.map((s) => storeMetric(s, perStoreRevenue)),
       lines: Array.from(linesBySeg.get(seg.id)?.values() ?? []).sort((a, b) => {
         const rank = (k: string) => (k === "revenue" ? 0 : k === "cogs" ? 1 : 2);
@@ -660,7 +701,7 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
 
   // 並び順: 配下店舗がある事業 → 財務入力がある事業 → その他
   result.sort((a, b) => {
-    const rank = (s: SegmentMetric) => (s.stores.length > 0 ? 0 : s.hasFinance ? 1 : 2);
+    const rank = (s: SegmentMetric) => (s.stores.length > 0 ? 0 : s.hasFinance || s.hasMtd ? 1 : 2);
     if (rank(a) !== rank(b)) return rank(a) - rank(b);
     return b.revenue - a.revenue;
   });
