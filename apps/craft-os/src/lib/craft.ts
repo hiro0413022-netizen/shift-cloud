@@ -311,23 +311,31 @@ export async function getProducts(actor: Actor, ids: number[]): Promise<Map<numb
   return out;
 }
 
-/** 商品マスタの検索。マスタに無いものは手入力行で入れられるので、ここは「探しやすさ」だけを見る */
+/**
+ * 商品マスタの検索。マスタに無いものは手入力行で入れられるので、ここは「探しやすさ」だけを見る。
+ *
+ * 2026-09-13 ユーザー報告「すべての区分を押しても商品一覧が出てこない」への対応。
+ * 以前はキーワードが空なら即 [] を返していたので、区分だけ選んで眺める、という使い方ができなかった。
+ * キーワードが無いときは、その区分の頭から並べて返す（棚を覗く感覚）。
+ */
+export const PRODUCT_BROWSE_LIMIT = 80;
+
 export async function searchProducts(
   actor: Actor,
   q: string,
   opts: { category?: string | null; limit?: number } = {}
 ): Promise<ProductRow[]> {
   const term = q.trim();
-  if (term.length < 1) return [];
+  const words = term.split(/[\s　]+/).filter(Boolean).slice(0, 4);
   let query = db()
     .from("gw_products")
     .select("id, item_category, manufacturer, name, spec, club_type, list_price, default_rate, unit")
     .eq("company_id", actor.companyId)
     .eq("is_active", true)
-    .limit(opts.limit ?? 30);
+    .limit(opts.limit ?? (words.length === 0 ? PRODUCT_BROWSE_LIMIT : 30));
   if (opts.category) query = query.eq("item_category", opts.category);
   // 空白区切りのすべてを含む、で絞る（「ベンタス 6S」のような引き方）
-  for (const word of term.split(/[\s　]+/).filter(Boolean).slice(0, 4)) {
+  for (const word of words) {
     query = query.or(`name.ilike.%${word}%,manufacturer.ilike.%${word}%,spec.ilike.%${word}%`);
   }
   const { data } = await query.order("manufacturer").order("name");

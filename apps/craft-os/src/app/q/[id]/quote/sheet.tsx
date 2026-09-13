@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   addFreeLine,
@@ -188,6 +188,13 @@ export function QuoteSheet({
       setSearching(false);
     }
   }
+
+  // 「＋ 商品」を開いた時点で、まず棚を見せる。
+  // キーワードを打つまで真っ白、では何が入っているのか分からない（2026-09-13 ユーザー報告）。
+  useEffect(() => {
+    if (adding === "product" && hits.length === 0 && !searching) void search();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adding]);
 
   const colCount = 9;
 
@@ -444,7 +451,12 @@ export function QuoteSheet({
             {adding === "product" && (
               <div className="rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                 <div className="flex flex-wrap gap-2">
-                  <select ref={catRef} defaultValue="" className="rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm">
+                  <select
+                    ref={catRef}
+                    defaultValue=""
+                    onChange={() => void search()}
+                    className="rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm"
+                  >
                     {CATEGORIES.map((c) => (
                       <option key={c} value={c}>
                         {c || "すべての区分"}
@@ -506,6 +518,11 @@ export function QuoteSheet({
                 {searched && hits.length === 0 && (
                   <p className="mt-2 text-xs text-(--color-dim)">
                     見つかりませんでした。マスタに無いものは「＋ 手入力」から入れてください。
+                  </p>
+                )}
+                {hits.length >= 80 && (
+                  <p className="mt-2 text-[11px] text-(--color-dim)">
+                    先頭80件だけ出しています。区分を選ぶか、商品名・メーカーを打つと絞り込めます。
                   </p>
                 )}
                 <p className="mt-2 text-[11px] text-(--color-dim)">
