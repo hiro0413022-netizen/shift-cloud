@@ -1,0 +1,91 @@
+Rufus x64 v4.15.2396 (Portable)
+Windows version: Windows 11 Home x64 (Build 26200.9168)
+Syslinux versions: 4.07/2013-07-25, 6.04/pre1
+Grub versions: 0.4.6a, 2.14
+System locale ID: 0x0411 (ja-JP)
+Will use default UI locale 0x0411
+SetLGP: Successfully set NoDriveTypeAutorun policy to 0x0000009E
+Localization set to 'ja-JP'
+Found USB 3.0 device 'BUFFALO USB Flash Disk USB Device' (0411:023A)
+1 device found
+Disk type: Removable, Disk size: 14.5 GB, Sector size: 512 bytes
+Cylinders: 1892, Tracks per cylinder: 255, Sectors per track: 63
+Partition type: GPT, NB Partitions: 1
+Disk GUID: {82018360-F3D4-4A3A-B433-A874D6C8211C}
+Max parts: 128, Start Offset: 17408, Usable = 15562930688 bytes
+Partition 1:
+  Type: Microsoft basic data
+  Name: 'Main Data Partition'
+  Detected File System: FAT32
+  ID: {B0D150D2-32CE-420A-BD86-DFFAE5B645E6}
+  Size: 14.5 GB (15561867264 bytes)
+  Start Sector: 2048, Attributes: 0x0000000000000000
+Found 5 additional UEFI revocation filters from remote SBAT
+Found 4 active Secure Boot certificate entries from remote
+Found 1 revoked Secure Boot certificate entries from remote
+Scanning image...
+ISO analysis:
+  Image is an ISO9660 image
+  Detected GRUB version: 2.12 (from '/boot/grub/i386-pc/normal.mod')
+  Detected Shim version: 15.8 (from '/EFI/BOOT/BOOTx64.EFI')
+  Detected GRUB version: 2.12 (from '/EFI/BOOT/grubx64.efi')
+  Supported GRUB filesystems: ext2, fat, hfsplus, iso9660, ntfs, gzio, xfs
+Disk image analysis:
+  Image has a Grub 2.0 Master Boot Record
+  Image is a bootable disk image
+  Size: 1.6 GB (Projected)
+UEFI bootloaders analysis:
+  • /EFI/BOOT/BOOTIA32.EFI
+  (Unsigned Bootloader)
+  • /EFI/BOOT/BOOTx64.EFI*
+  Signed by 'Microsoft Corporation UEFI CA 2011'
+  Note: This bootloader may fail Secure Boot validation on *some* systems,
+  unless you enable "Microsoft 3rd-party UEFI CA" in your 'BIOS'.
+  • /EFI/BOOT/grubx64.efi
+  Signed by 'Canonical Ltd. Secure Boot Signing (2022 v1)'
+ISO label: 'Rescuezilla'
+  Size: 1.6 GB (Projected)
+  Uses: GRUB2 (2.12)
+  Uses: EFI
+Using image: rescuezilla-2.6.2-64bit.resolute.iso (1.6 GB)
+
+Format operation started
+Requesting disk access...
+Will use 'D:' as volume mountpoint
+Opened \\.\PhysicalDrive1 for exclusive write access
+Analyzing existing boot records...
+Drive has a Zeroed Master Boot Record
+Clearing MBR/PBR/GPT structures...
+Zeroed 8 MB at the top of the drive
+Zeroed 1 MB at the end of the drive
+Initializing disk...
+Partitioning (GPT)...
+● Creating Main Data Partition (offset: 1048576, size: 14.5 GB)
+Refreshing drive layout...
+Waiting for logical drive to reappear...
+Formatting to FAT32 (using IFS)
+Using cluster size: 8192 bytes
+Quick format was selected
+Volume is in use
+[0x00000057] パラメーターが間違っています。 - Retrying...
+[0x00000057] パラメーターが間違っています。 - Retrying...
+[0x00000057] パラメーターが間違っています。 - Retrying...
+[0x00000057] パラメーターが間違っています。 - Retrying...
+Format error: The device is in use by another process. Please close any other process that may be accessing the device.
+Re-mounted volume as D: after error
+
+Found USB 3.0 device 'BUFFALO USB Flash Disk USB Device' (0411:023A)
+1 device found
+No volume information for drive 0x81
+Disk type: Removable, Disk size: 14.5 GB, Sector size: 512 bytes
+Cylinders: 1892, Tracks per cylinder: 255, Sectors per track: 63
+Partition type: GPT, NB Partitions: 1
+Disk GUID: {3D029DB0-07B2-4E75-A9AA-4D048D1B0456}
+Max parts: 128, Start Offset: 17408, Usable = 15562930688 bytes
+Partition 1:
+  Type: Microsoft basic data
+  Name: 'Main Data Partition'
+  Detected File System: (Unrecognized)
+  ID: {0785EEB3-2CA9-42A8-BC79-4D71ED9C3E34}
+  Size: 14.5 GB (15561867264 bytes)
+  Start Sector: 2048, Attributes: 0x0000000000000000

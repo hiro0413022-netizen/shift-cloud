@@ -1,0 +1,74 @@
+﻿=== WinUSB probe / 2026-09-06 19:51:44 ===
+PSVersion: 5.1.26100.9168
+Add-Type: OK
+interfaces found: 4
+   \\?\usb#vid_8087&pid_0033#5&1524d9fe&0&10#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+   \\?\usb#vid_04f2&pid_b832#01.00.00#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+   \\?\usb#vid_03c3&pid_034a#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+   \\?\usb#vid_03c3&pid_034c#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+
+VID_03C3 targets: 2
+
+############################################################
+PATH: \\?\usb#vid_03c3&pid_034a#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  Open: OK
+  device descriptor: OK
+    raw: 12 01 00 02 00 00 00 40 C3 03 4A 03 00 00 01 02 03 01
+    bcdUSB       = 0x0200
+    bDeviceClass = 0x00   bMaxPacketSize0 = 64
+    idVendor     = 0x03C3
+    idProduct    = 0x034A   <<<<<<<<
+    bcdDevice    = 0x0000
+    iManuf=1 iProd=2 iSerial=3 numConfig=1
+  config descriptor: OK
+    raw: 09 02 19 00 01 01 04 A0 FA 09 04 00 00 01 FF 00 00 05 07 05 82 02 00 04 00
+  pipes: interface #0 alt0 class=0xFF sub=0x00 proto=0x00 endpoints=1
+      ep 0x82 IN  BULK        maxPacket=1024 interval=0
+  --- Cypress EZ-USB test: bmReq=0xC0 bReq=0xA0 wValue=0xE600 len=1 (CPUCS) ---
+    *** OK -> 02   <== EZ-USB (FX2/FX3) LIKELY
+  --- 0xC0 0xA0 wValue=0x0000 len=16 (RAM head) ---
+    OK  EF 90 EF 90 EF 90 EF 90 E6 5D E6 5D E6 5D E6 5D
+  --- 0xC0 0xA2 len=32 (EEPROM read) ---
+    ERR err=31  
+  --- other vendor requests ---
+    0xA1: ERR err=31  
+    0xA5: ERR err=31  
+    0xA9: OK  A9 00
+    0xB0: OK  B0 00
+    0xB1: OK  B1 00
+    0xB2: ERR err=31  
+    0xD0: ERR err=31  
+    0xD1: ERR err=31  
+
+############################################################
+PATH: \\?\usb#vid_03c3&pid_034c#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  Open: OK
+  device descriptor: OK
+    raw: 12 01 00 02 00 00 00 40 C3 03 4C 03 00 00 01 02 03 01
+    bcdUSB       = 0x0200
+    bDeviceClass = 0x00   bMaxPacketSize0 = 64
+    idVendor     = 0x03C3
+    idProduct    = 0x034C   <<<<<<<<
+    bcdDevice    = 0x0000
+    iManuf=1 iProd=2 iSerial=3 numConfig=1
+  config descriptor: OK
+    raw: 09 02 19 00 01 01 04 A0 FA 09 04 00 00 01 FF 00 00 05 07 05 82 02 00 04 00
+  pipes: interface #0 alt0 class=0xFF sub=0x00 proto=0x00 endpoints=1
+      ep 0x82 IN  BULK        maxPacket=1024 interval=0
+  --- Cypress EZ-USB test: bmReq=0xC0 bReq=0xA0 wValue=0xE600 len=1 (CPUCS) ---
+    *** OK -> 02   <== EZ-USB (FX2/FX3) LIKELY
+  --- 0xC0 0xA0 wValue=0x0000 len=16 (RAM head) ---
+    OK  53 91 53 91 53 91 53 91 EF 90 EF 90 EF 90 EF 90
+  --- 0xC0 0xA2 len=32 (EEPROM read) ---
+    ERR err=31  
+  --- other vendor requests ---
+    0xA1: ERR err=31  
+    0xA5: ERR err=31  
+    0xA9: OK  A9 00
+    0xB0: OK  B0 00
+    0xB1: OK  B1 00
+    0xB2: ERR err=31  
+    0xD0: ERR err=31  
+    0xD1: ERR err=31  
+
+DONE

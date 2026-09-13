@@ -1,0 +1,11 @@
+[2024-04-25 11:08] Register ExceptionFilter
+[2024-04-25 11:08:32] Log Data : Log_2024_0425_110832.txt
+[2024-04-25 11:08:33] Failed Initialize
+[2024-04-25 11:08:33] Initialize Failed
+[2024-04-25 11:08] Exclude ExceptionFilter
+[2024-04-25 11:08:33] [Release]
+      [Success Shot Count] : 0
+      [Error Shot Count] : 0
+      [UndeZero Delta Time Count] : 0
+      [FPS Under Count] : 0
+[2024-04-25 11:08:33] Release : 2024-04-25 11:08

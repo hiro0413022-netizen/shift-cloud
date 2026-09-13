@@ -1,0 +1,13 @@
+[2020-07-20 09:25] Register ExceptionFilter
+[2020-07-20 09:25:09] Log Data : Log_2020_0720_092509.txt
+[2020-07-20 09:25:10] Failed Auth Data
+
+[2020-07-20 09:25:12] Failed Initialize
+[2020-07-20 09:25:12] Initialize Failed
+[2020-07-20 09:25] Exclude ExceptionFilter
+[2020-07-20 09:25:12] [Release]
+      [Success Shot Count] : 0
+      [Error Shot Count] : 0
+      [UndeZero Delta Time Count] : 0
+      [FPS Under Count] : 0
+[2020-07-20 09:25:12] Release : 2020-07-20 09:25

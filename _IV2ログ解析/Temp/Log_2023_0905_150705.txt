@@ -1,0 +1,132 @@
+[2023-09-05 15:07] Register ExceptionFilter
+[2023-09-05 15:07:05] Log Data : Log_2023_0905_150705.txt
+[2023-09-05 15:07:07] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2023-09-05 15:07:07] Load Info Data
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionGain : 100
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionGamma : 85
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionBrightness : 0
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionFlip : 3
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2023-09-05 15:07:12] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2023-09-05 15:07:12] Success Initialize
+[2023-09-05 15:07:12] ImageQueue Reset : Main Camera
+[2023-09-05 15:07:12] Initialize Success
+[2023-09-05 15:07:12] 0 -> 1
+[2023-09-05 15:07:12] IV2MSG : System - Operate
+[2023-09-05 15:07:12] HanderType : [Right] -> [Left]
+[2023-09-05 15:07:12] IV2MSG : Option - LeftHander
+[2023-09-05 15:07:12] TeeMode : [Up] -> [Up]
+[2023-09-05 15:07:12] IV2MSG : Option - TeeUp
+[2023-09-05 15:07:12] SurFaceType : [Fairway] -> [Fairway]
+[2023-09-05 15:07:12] IV2MSG : Option - FairWay
+[2023-09-05 15:07:12] HanderType : [Left] -> [Left]
+[2023-09-05 15:07:12] IV2MSG : Option - LeftHander
+[2023-09-05 15:07:12] TeeMode : [Up] -> [Up]
+[2023-09-05 15:07:12] IV2MSG : Option - TeeUp
+[2023-09-05 15:07:12] SurFaceType : [Fairway] -> [Fairway]
+[2023-09-05 15:07:12] IV2MSG : Option - FairWay
+[2023-09-05 15:07:12] HanderType : [Left] -> [Left]
+[2023-09-05 15:07:12] IV2MSG : Option - LeftHander
+[2023-09-05 15:07:12] TeeMode : [Up] -> [Up]
+[2023-09-05 15:07:12] IV2MSG : Option - TeeUp
+[2023-09-05 15:07:12] SurFaceType : [Fairway] -> [Fairway]
+[2023-09-05 15:07:12] IV2MSG : Option - FairWay
+[2023-09-05 15:07:12] Hand 1, TeeMode : 0, Surface : 0
+[2023-09-05 15:07:12] IV2MSG : System - Operate
+[2023-09-05 15:07:12] HanderType : [Left] -> [Left]
+[2023-09-05 15:07:12] IV2MSG : Option - LeftHander
+[2023-09-05 15:07:12] TeeMode : [Up] -> [Up]
+[2023-09-05 15:07:12] IV2MSG : Option - TeeUp
+[2023-09-05 15:07:12] SurFaceType : [Fairway] -> [Fairway]
+[2023-09-05 15:07:12] IV2MSG : Option - FairWay
+[2023-09-05 15:07:12] IV2MSG : System - Operate
+[2023-09-05 15:07:12] HanderType : [Left] -> [Left]
+[2023-09-05 15:07:12] IV2MSG : Option - LeftHander
+[2023-09-05 15:07:12] TeeMode : [Up] -> [Up]
+[2023-09-05 15:07:12] IV2MSG : Option - TeeUp
+[2023-09-05 15:07:12] SurFaceType : [Fairway] -> [Fairway]
+[2023-09-05 15:07:12] IV2MSG : Option - FairWay
+[2023-09-05 15:07:13] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-09-05 15:07:13] 1 -> 1
+[2023-09-05 15:07:13] ImageQueue Reset : Main Camera
+[2023-09-05 15:07:13] IRLight : Idle
+[2023-09-05 15:07:14] IRLight : Standby
+[2023-09-05 15:07:14] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-09-05 15:07:14] IRLight : On
+[2023-09-05 15:07:14] 1 -> 2
+[2023-09-05 15:07:15] IRLight : On
+[2023-09-05 15:07:15] 2 -> 1
+[2023-09-05 15:07:15] ImageQueue Reset : Main Camera
+[2023-09-05 15:07:16] IRLight : Standby
+[2023-09-05 15:07:16] IRLight : On
+[2023-09-05 15:07:17] IRLight : Standby
+[2023-09-05 15:07:18] IRLight : On
+[2023-09-05 15:07:19] IRLight : Standby
+[2023-09-05 15:07:20] IRLight : On
+[2023-09-05 15:07:20] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:07:21] IRLight : Standby
+[2023-09-05 15:07:24] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:07:27] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:07:31] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:07:34] IRLight : On
+[2023-09-05 15:07:34] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:07:35] IRLight : Standby
+[2023-09-05 15:07:36] IRLight : On
+[2023-09-05 15:07:37] IRLight : Standby
+[2023-09-05 15:07:37] IRLight : On
+[2023-09-05 15:07:38] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:07:38] IRLight : Standby
+[2023-09-05 15:07:40] IRLight : On
+[2023-09-05 15:07:41] IRLight : Standby
+[2023-09-05 15:07:41] IRLight : On
+[2023-09-05 15:07:41] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:07:42] IRLight : Standby
+[2023-09-05 15:07:45] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:07:46] IRLight : On
+[2023-09-05 15:07:47] IRLight : Standby
+[2023-09-05 15:07:48] IRLight : On
+[2023-09-05 15:07:48] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:07:49] IRLight : Standby
+[2023-09-05 15:07:50] IRLight : On
+[2023-09-05 15:07:51] IRLight : Standby
+[2023-09-05 15:07:51] IRLight : On
+[2023-09-05 15:07:52] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:07:52] IRLight : Standby
+[2023-09-05 15:07:54] IRLight : On
+[2023-09-05 15:07:55] IRLight : Standby
+[2023-09-05 15:07:55] IRLight : On
+[2023-09-05 15:07:55] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:07:56] IRLight : Standby
+[2023-09-05 15:07:58] IRLight : On
+[2023-09-05 15:07:59] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:07:59] IRLight : Standby
+[2023-09-05 15:08:00] IRLight : On
+[2023-09-05 15:08:01] IRLight : Standby
+[2023-09-05 15:08:02] IRLight : On
+[2023-09-05 15:08:02] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:08:03] IRLight : Standby
+[2023-09-05 15:08:05] IRLight : On
+[2023-09-05 15:08:06] IRLight : Standby
+[2023-09-05 15:08:06] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:08:07] IRLight : On
+[2023-09-05 15:08:08] IRLight : Standby
+[2023-09-05 15:08:09] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:08:13] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:08:16] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:08:20] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:08:21] IRLight : On
+[2023-09-05 15:08:22] IRLight : Standby
+[2023-09-05 15:08:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:08:27] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:08:30] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:08:34] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-09-05 15:08:35] IRLight : On
+[2023-09-05 15:08:36] IRLight : Standby
+[2023-09-05 15:08:37] IRLight : On
+[2023-09-05 15:08:37] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-09-05 15:08:38] IRLight : Standby

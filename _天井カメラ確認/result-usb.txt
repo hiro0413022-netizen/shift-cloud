@@ -1,0 +1,152 @@
+﻿=== USB descriptor of VID_03C3 devices / 2026-09-06 18:41:37 ===
+
+##################################################
+InstanceId : USB\VID_03C3&PID_034A\00000
+Status     : Error   Problem: CM_PROB_FAILED_INSTALL
+  HardwareIds = USB\VID_03C3&PID_034A&REV_0000 | USB\VID_03C3&PID_034A
+  CompatibleIds = USB\COMPAT_VID_03C3&Class_FF&SubClass_00&Prot_00 | USB\COMPAT_VID_03C3&Class_FF&SubClass_00 | USB\COMPAT_VID_03C3&Class_FF | USB\Class_FF&SubClass_00&Prot_00 | USB\Class_FF&SubClass_00 | USB\Class_FF
+  LocationInfo = Port_#0003.Hub_#0001
+  InstallState = 2
+  ProblemCode = 28
+  ContainerId = {6D5B99A4-4FFB-5955-9583-15BF06CDBCC4}
+  --- all properties ---
+    {3464F7A4-2444-40B1-980A-E0903CB6D912} 10 = 3
+    {80497100-8C73-48B9-AAD9-CE387E19C56E} 6 = 0
+    {83DA6326-97A6-4088-9453-A1923F573B29} 10 = USB\ROOT_HUB30\4&2f81719c&0&0
+    {83DA6326-97A6-4088-9453-A1923F573B29} 15 = True
+    {83DA6326-97A6-4088-9453-A1923F573B29} 5 = 3758096936
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 13 = 0
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 14 = 4278190080
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 15 = 2
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 16 = True
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 2 = {00000000-0000-0000-ffff-ffffffffffff}\0000\1
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 3 = 0
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 4 = 1
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 5 = 8
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 6 = 3
+    {A8B865DD-2E3D-4094-AD97-E593A70C75D6} 26 = False
+    {B5A825B8-3907-40B5-ABCA-8451E2453D5F} 3 = 1
+    DEVPKEY_Device_Address = 3
+    DEVPKEY_Device_BaseContainerId = {6D5B99A4-4FFB-5955-9583-15BF06CDBCC4}
+    DEVPKEY_Device_BiosDeviceName = \_SB.PC00.XHCI.RHUB.HS03
+    DEVPKEY_Device_BusNumber = 0
+    DEVPKEY_Device_BusTypeGuid = {9D7DEBBC-C85D-11D1-9EB4-006008C3A19A}
+    DEVPKEY_Device_Capabilities = 20
+    DEVPKEY_Device_CompatibleIds = USB\COMPAT_VID_03C3&Class_FF&SubClass_00&Prot_00 | USB\COMPAT_VID_03C3&Class_FF&SubClass_00 | USB\COMPAT_VID_03C3&Class_FF | USB\Class_FF&SubClass_00&Prot_00 | USB\Class_FF&SubClass_00 | USB\Class_FF
+    DEVPKEY_Device_ConfigFlags = 64
+    DEVPKEY_Device_ConfigurationId = 
+    DEVPKEY_Device_ContainerId = {6D5B99A4-4FFB-5955-9583-15BF06CDBCC4}
+    DEVPKEY_Device_DevNodeStatus = 25191424
+    DEVPKEY_Device_EnumeratorName = USB
+    DEVPKEY_Device_FirstInstallDate = 08/31/2026 17:57:42
+    DEVPKEY_Device_HardwareIds = USB\VID_03C3&PID_034A&REV_0000 | USB\VID_03C3&PID_034A
+    DEVPKEY_Device_HasProblem = True
+    DEVPKEY_Device_InLocalMachineContainer = False
+    DEVPKEY_Device_InstallDate = 08/31/2026 17:57:42
+    DEVPKEY_Device_InstallState = 2
+    DEVPKEY_Device_InstanceId = USB\VID_03C3&PID_034A\00000
+    DEVPKEY_Device_IsPresent = True
+    DEVPKEY_Device_IsRebootRequired = False
+    DEVPKEY_Device_LastArrivalDate = 09/06/2026 14:48:38
+    DEVPKEY_Device_LegacyBusType = 15
+    DEVPKEY_Device_LocationInfo = Port_#0003.Hub_#0001
+    DEVPKEY_Device_LocationPaths = PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(3) | ACPI(_SB_)#ACPI(PC00)#ACPI(XHCI)#ACPI(RHUB)#ACPI(HS03)
+    DEVPKEY_Device_Parent = USB\ROOT_HUB30\4&2f81719c&0&0
+    DEVPKEY_Device_PDOName = \Device\USBPDO-4
+    DEVPKEY_Device_PhysicalDeviceLocation = 1 | 0 | 0 | 0 | 8 | 0 | 3 | 0 | 1 | 4 | 128 | 1 | 0 | 0 | 0 | 0 | 255 | 255 | 255 | 255
+    DEVPKEY_Device_PowerData = 56 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 5 | 0 | 0 | 0
+    DEVPKEY_Device_ProblemCode = 28
+    DEVPKEY_Device_ProblemStatus = 3221226640
+    DEVPKEY_Device_RemovalPolicy = 3
+    DEVPKEY_Device_RemovalPolicyDefault = 3
+    DEVPKEY_Device_ReportedDeviceIdsHash = 2568635900
+    DEVPKEY_Device_SafeRemovalRequired = False
+    DEVPKEY_Device_Siblings = USB\VID_04F2&PID_B832\01.00.00 | USB\VID_8087&PID_0033\5&1524d9fe&0&10 | USB\VID_03C3&PID_034C\00000
+    DEVPKEY_Device_Stack = \Driver\ACPI | \Driver\USBHUB3
+
+##################################################
+InstanceId : USB\VID_03C3&PID_034C\00000
+Status     : Error   Problem: CM_PROB_FAILED_INSTALL
+  HardwareIds = USB\VID_03C3&PID_034C&REV_0000 | USB\VID_03C3&PID_034C
+  CompatibleIds = USB\COMPAT_VID_03C3&Class_FF&SubClass_00&Prot_00 | USB\COMPAT_VID_03C3&Class_FF&SubClass_00 | USB\COMPAT_VID_03C3&Class_FF | USB\Class_FF&SubClass_00&Prot_00 | USB\Class_FF&SubClass_00 | USB\Class_FF
+  LocationInfo = Port_#0001.Hub_#0001
+  InstallState = 2
+  ProblemCode = 28
+  ContainerId = {B00EACF6-CC2E-5465-B58F-BB12F8E956F4}
+  --- all properties ---
+    {3464F7A4-2444-40B1-980A-E0903CB6D912} 10 = 3
+    {80497100-8C73-48B9-AAD9-CE387E19C56E} 6 = 0
+    {83DA6326-97A6-4088-9453-A1923F573B29} 10 = USB\ROOT_HUB30\4&2f81719c&0&0
+    {83DA6326-97A6-4088-9453-A1923F573B29} 15 = True
+    {83DA6326-97A6-4088-9453-A1923F573B29} 5 = 3758096936
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 13 = 0
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 14 = 4278190080
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 15 = 2
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 16 = True
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 2 = {00000000-0000-0000-ffff-ffffffffffff}\0000\1
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 3 = 0
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 4 = 1
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 5 = 8
+    {8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 6 = 3
+    {A8B865DD-2E3D-4094-AD97-E593A70C75D6} 26 = False
+    {B5A825B8-3907-40B5-ABCA-8451E2453D5F} 3 = 1
+    DEVPKEY_Device_Address = 1
+    DEVPKEY_Device_BaseContainerId = {B00EACF6-CC2E-5465-B58F-BB12F8E956F4}
+    DEVPKEY_Device_BiosDeviceName = \_SB.PC00.XHCI.RHUB.HS01
+    DEVPKEY_Device_BusNumber = 0
+    DEVPKEY_Device_BusTypeGuid = {9D7DEBBC-C85D-11D1-9EB4-006008C3A19A}
+    DEVPKEY_Device_Capabilities = 20
+    DEVPKEY_Device_CompatibleIds = USB\COMPAT_VID_03C3&Class_FF&SubClass_00&Prot_00 | USB\COMPAT_VID_03C3&Class_FF&SubClass_00 | USB\COMPAT_VID_03C3&Class_FF | USB\Class_FF&SubClass_00&Prot_00 | USB\Class_FF&SubClass_00 | USB\Class_FF
+    DEVPKEY_Device_ConfigFlags = 64
+    DEVPKEY_Device_ConfigurationId = 
+    DEVPKEY_Device_ContainerId = {B00EACF6-CC2E-5465-B58F-BB12F8E956F4}
+    DEVPKEY_Device_DevNodeStatus = 25191424
+    DEVPKEY_Device_EnumeratorName = USB
+    DEVPKEY_Device_FirstInstallDate = 08/31/2026 17:57:48
+    DEVPKEY_Device_HardwareIds = USB\VID_03C3&PID_034C&REV_0000 | USB\VID_03C3&PID_034C
+    DEVPKEY_Device_HasProblem = True
+    DEVPKEY_Device_InLocalMachineContainer = False
+    DEVPKEY_Device_InstallDate = 08/31/2026 17:57:48
+    DEVPKEY_Device_InstallState = 2
+    DEVPKEY_Device_InstanceId = USB\VID_03C3&PID_034C\00000
+    DEVPKEY_Device_IsPresent = True
+    DEVPKEY_Device_IsRebootRequired = False
+    DEVPKEY_Device_LastArrivalDate = 09/06/2026 14:48:28
+    DEVPKEY_Device_LegacyBusType = 15
+    DEVPKEY_Device_LocationInfo = Port_#0001.Hub_#0001
+    DEVPKEY_Device_LocationPaths = PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(1) | ACPI(_SB_)#ACPI(PC00)#ACPI(XHCI)#ACPI(RHUB)#ACPI(HS01)
+    DEVPKEY_Device_Parent = USB\ROOT_HUB30\4&2f81719c&0&0
+    DEVPKEY_Device_PDOName = \Device\USBPDO-1
+    DEVPKEY_Device_PhysicalDeviceLocation = 1 | 0 | 0 | 0 | 8 | 0 | 3 | 0 | 1 | 4 | 128 | 0 | 0 | 0 | 0 | 0 | 255 | 255 | 255 | 255
+    DEVPKEY_Device_PowerData = 56 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 127 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 5 | 0 | 0 | 0
+    DEVPKEY_Device_ProblemCode = 28
+    DEVPKEY_Device_ProblemStatus = 3221226640
+    DEVPKEY_Device_RemovalPolicy = 3
+    DEVPKEY_Device_RemovalPolicyDefault = 3
+    DEVPKEY_Device_ReportedDeviceIdsHash = 4224174716
+    DEVPKEY_Device_SafeRemovalRequired = False
+    DEVPKEY_Device_Siblings = USB\VID_04F2&PID_B832\01.00.00 | USB\VID_8087&PID_0033\5&1524d9fe&0&10 | USB\VID_03C3&PID_034A\00000
+    DEVPKEY_Device_Stack = \Driver\ACPI | \Driver\USBHUB3
+
+### USB hub port info (Win32_PnPEntity)
+
+
+Name                   : 
+Description            : 
+Manufacturer           : 
+Service                : 
+Status                 : Error
+ConfigManagerErrorCode : CM_PROB_FAILED_INSTALL
+PNPDeviceID            : USB\VID_03C3&PID_034A\00000
+
+Name                   : 
+Description            : 
+Manufacturer           : 
+Service                : 
+Status                 : Error
+ConfigManagerErrorCode : CM_PROB_FAILED_INSTALL
+PNPDeviceID            : USB\VID_03C3&PID_034C\00000
+
+
+
+

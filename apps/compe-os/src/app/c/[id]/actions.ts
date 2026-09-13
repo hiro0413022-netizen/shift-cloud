@@ -72,6 +72,7 @@ export async function saveEntrySettings(formData: FormData): Promise<void> {
       entry_opens_on: strOrNull(formData, "entry_opens_on"),
       entry_closes_on: strOrNull(formData, "entry_closes_on"),
       entry_note: strOrNull(formData, "entry_note"),
+      entry_terms: strOrNull(formData, "entry_terms"),
     })
     .eq("id", compId);
   refresh(compId);

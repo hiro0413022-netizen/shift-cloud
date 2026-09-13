@@ -1,0 +1,15 @@
+GENESIS: cron の Money OS 転記を await + try/catch に直す（ビルドが型エラーで落ちていた）(#237)
+
+supabase-js の .rpc() が返すのは PromiseLike（クエリビルダ）で、.then() の戻りに .catch() は生えていない。
+`.then(...).catch(...)` と書いたため yozan-genesis のビルドが
+
+  Type error: Property 'catch' does not exist on type 'PromiseLike<...>'
+  ./src/app/api/cron/daily/route.ts:46:10
+
+で落ち、#237/#238 のコミットがすべて本番へ届いていなかった（member-os は READY、genesis だけ ERROR）。
+
+await して try/catch で受ける形に変更。転記が失敗しても日次レポート本体は続行する挙動は変えていない。
+クラウドでリポジトリを clone し npx tsc --noEmit を通して確認済み（エラー0）。
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S2vBXFEGCVs6S1B3XTrYGB

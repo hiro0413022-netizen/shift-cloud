@@ -76,7 +76,12 @@ export default async function EntryPage({
               先着順です。ご記入いただいた電話番号に、確定のご連絡を差し上げます。
             </p>
           )}
-          <EntryForm slug={slug} waitlistMode={remaining === 0} />
+          <EntryForm
+            slug={slug}
+            waitlistMode={remaining === 0}
+            questions={comp.entry_questions}
+            terms={comp.entry_terms}
+          />
         </section>
       )}
 

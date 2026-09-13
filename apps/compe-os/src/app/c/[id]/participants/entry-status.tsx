@@ -27,11 +27,13 @@ export function EntryStatusCell({
   participantId,
   status,
   source,
+  agreedAt,
 }: {
   compId: string;
   participantId: string;
   status: "confirmed" | "applied" | "waitlist" | "cancelled";
   source: "staff" | "web";
+  agreedAt?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -53,7 +55,11 @@ export function EntryStatusCell({
           </option>
         ))}
       </select>
-      {source === "web" && <span className="text-[10px] text-(--color-dim)">ご本人申込</span>}
+      {source === "web" && (
+        <span className="text-[10px] text-(--color-dim)">
+          ご本人申込{agreedAt ? "・同意済" : ""}
+        </span>
+      )}
     </div>
   );
 }

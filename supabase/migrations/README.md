@@ -59,3 +59,5 @@
 - ✅ `0160_fin_segment_frank_golf_rename.sql` — 適用済（2026-09-12、MCP name=fin_segment_frank_golf_rename。事業名「姫路インドアゴルフ」→「FRANK GOLF（姫路）」。codeは himeji のまま据え置き）
 - ✅ `0161_kpis_upsert_partial_index_fix.sql` — 適用済（2026-09-12、MCP name=kpis_upsert_partial_index_fix。0112の部分索引化で `on conflict (company_id, code)` が42P10になり、refresh_money_to_finance が8/22以降ずっと巻き戻っていた #237）
 - ✅ `0162_shift_cloud_kpis_upsert_fix.sql` — 適用済（2026-09-12、MCP name=shift_cloud_kpis_upsert_partial_index_fix。在籍スタッフ数・総労働時間のKPIも同じ理由で止まっていた #237）
+
+- ✅ `0168_compe_entry_terms.sql` — 適用済（2026-09-13、MCP name=compe_entry_terms。募集ページの同意事項 entry_terms / 追加設問 entry_questions / 同意時刻 agreed_at #237c）

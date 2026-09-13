@@ -1,0 +1,50 @@
+﻿=== FX2 dump / 2026-09-07 11:49:43 ===
+Add-Type: OK
+targets: 2
+
+############################################################
+PATH: \\?\usb#vid_03c3&pid_034a#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  Open: OK
+  --- string descriptors ---
+    langid table: OK  04 03 3F 00
+    using langid = 0x003F
+    string[1] = 'ZWOptical company  '   (raw 40 bytes)
+    string[2] = 'ASI034MC'   (raw 18 bytes)
+    string[3] = '00000'   (raw 12 bytes)
+    string[4] = 'HighSpeed Configuration'   (raw 48 bytes)
+    string[5] = 'Camera Interface'   (raw 34 bytes)
+    string[6] = ''   (raw 2 bytes)
+  --- dumping internal RAM 0x0000-0x3FFF via 0xA0 ---
+    chunks ok=256 ng=0
+    saved -> C:\Users\hiro0\Claude\Projects\YOZAN GENESIS\_天井カメラ確認\fx2ram_034A.bin
+  --- scratch RAM 0xE000-0xE1FF ---
+    saved -> fx2scratch_034A.bin
+  --- ASCII strings found in RAM (len>=4) ---
+    @0x04A1 i3"3"3"
+    @0x1FAB i3"3"3"
+    @0x2EDB i3"3"3"
+    @0x3867 i3"3"3"
+  --- search device-descriptor signature in RAM ---
+
+############################################################
+PATH: \\?\usb#vid_03c3&pid_034c#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+  Open: OK
+  --- string descriptors ---
+    langid table: OK  04 03 3F 00
+    using langid = 0x003F
+    string[1] = 'ZWOptical company  '   (raw 40 bytes)
+    string[2] = 'ASI034MC'   (raw 18 bytes)
+    string[3] = '00000'   (raw 12 bytes)
+    string[4] = 'HighSpeed Configuration'   (raw 48 bytes)
+    string[5] = 'Camera Interface'   (raw 34 bytes)
+    string[6] = ''   (raw 2 bytes)
+  --- dumping internal RAM 0x0000-0x3FFF via 0xA0 ---
+    chunks ok=256 ng=0
+    saved -> C:\Users\hiro0\Claude\Projects\YOZAN GENESIS\_天井カメラ確認\fx2ram_034C.bin
+  --- scratch RAM 0xE000-0xE1FF ---
+    saved -> fx2scratch_034C.bin
+  --- ASCII strings found in RAM (len>=4) ---
+    @0x1F27 i3"3"
+  --- search device-descriptor signature in RAM ---
+
+DONE

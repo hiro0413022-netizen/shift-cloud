@@ -1,0 +1,2 @@
+[2020-12-28 20:03] Register ExceptionFilter
+[2020-12-28 20:03:47] Log Data : SubLog_2020_1228_200347.txt

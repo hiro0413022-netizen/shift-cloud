@@ -1,0 +1,2933 @@
+[2024-06-16 17:53] Register ExceptionFilter
+[2024-06-16 17:53:18] Log Data : Log_2024_0616_175318.txt
+[2024-06-16 17:53:20] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2024-06-16 17:53:20] Load Info Data
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionGain : 100
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionGamma : 85
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionBrightness : 0
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionFlip : 3
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2024-06-16 17:53:25] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2024-06-16 17:53:25] Success Initialize
+[2024-06-16 17:53:25] ImageQueue Reset : Main Camera
+[2024-06-16 17:53:25] Initialize Success
+[2024-06-16 17:53:25] 0 -> 0
+[2024-06-16 17:53:25] IV2MSG : System - Stop
+[2024-06-16 17:53:25] HanderType : [Right] -> [Left]
+[2024-06-16 17:53:25] IV2MSG : Option - LeftHander
+[2024-06-16 17:53:25] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 17:53:25] IV2MSG : Option - FairWay
+[2024-06-16 17:53:25] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-16 17:53:25] HanderType : [Left] -> [Left]
+[2024-06-16 17:53:25] IV2MSG : Option - LeftHander
+[2024-06-16 17:53:25] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 17:53:25] IV2MSG : Option - FairWay
+[2024-06-16 17:53:25] HanderType : [Left] -> [Left]
+[2024-06-16 17:53:25] IV2MSG : Option - LeftHander
+[2024-06-16 17:53:25] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 17:53:25] IV2MSG : Option - FairWay
+[2024-06-16 17:53:25] 0 -> 0
+[2024-06-16 17:53:25] IV2MSG : System - Stop
+[2024-06-16 17:53:25] HanderType : [Left] -> [Left]
+[2024-06-16 17:53:25] IV2MSG : Option - LeftHander
+[2024-06-16 17:53:25] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 17:53:25] IV2MSG : Option - FairWay
+[2024-06-16 17:53:25] 0 -> 0
+[2024-06-16 17:53:25] IV2MSG : System - Stop
+[2024-06-16 17:53:25] HanderType : [Left] -> [Left]
+[2024-06-16 17:53:25] IV2MSG : Option - LeftHander
+[2024-06-16 17:53:25] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 17:53:25] IV2MSG : Option - FairWay
+[2024-06-16 17:53:26] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 17:53:26] IRLight : Idle
+[2024-06-16 17:53:27] IRLight : Standby
+[2024-06-16 17:53:27] IRLight : Off
+[2024-06-16 17:53:28] IRLight : Standby
+[2024-06-16 17:53:28] IRLight : Off
+[2024-06-16 17:53:29] IRLight : Standby
+[2024-06-16 17:53:30] IRLight : Off
+[2024-06-16 17:53:31] IRLight : Standby
+[2024-06-16 17:54:50] IRLight : Off
+[2024-06-16 17:54:51] IRLight : Standby
+[2024-06-16 17:56:10] IRLight : Off
+[2024-06-16 17:56:11] IRLight : Standby
+[2024-06-16 17:57:30] IRLight : Off
+[2024-06-16 17:57:31] IRLight : Standby
+[2024-06-16 17:58:50] IRLight : Off
+[2024-06-16 17:58:51] IRLight : Standby
+[2024-06-16 18:00:10] IRLight : Off
+[2024-06-16 18:00:11] IRLight : Standby
+[2024-06-16 18:00:38] 0 -> 1
+[2024-06-16 18:00:38] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-16 18:00:38] IRLight : On
+[2024-06-16 18:00:38] IV2MSG : System - Operate
+[2024-06-16 18:00:38] 1 -> 2
+[2024-06-16 18:00:38] HanderType : [Left] -> [Left]
+[2024-06-16 18:00:38] IV2MSG : Option - LeftHander
+[2024-06-16 18:00:38] TeeMode : [Up] -> [Up]
+[2024-06-16 18:00:38] IV2MSG : Option - TeeUp
+[2024-06-16 18:00:38] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 18:00:38] IV2MSG : Option - FairWay
+[2024-06-16 18:00:39] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 140)
+[2024-06-16 18:00:39] 2 -> 3
+[2024-06-16 18:00:39] IRLight : On
+[2024-06-16 18:00:39] ImageQueue Reset : Main Camera
+[2024-06-16 18:00:39] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-16 18:00:39] IV2MSG : State - subreadysuccess
+[2024-06-16 18:00:39] 3 -> 4
+[2024-06-16 18:00:40] IRLight : Standby
+[2024-06-16 18:01:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:01:34] Selected CameraID : 0 _ Set ROI Pos : (265, 140) -> (268, 86)
+[2024-06-16 18:01:34] 4 -> 1
+[2024-06-16 18:01:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:01:34] IRLight : Idle
+[2024-06-16 18:01:35] IRLight : Standby
+[2024-06-16 18:02:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:02:54] 1 -> 1
+[2024-06-16 18:02:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:02:54] IRLight : Idle
+[2024-06-16 18:02:55] IRLight : Standby
+[2024-06-16 18:04:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:04:14] 1 -> 1
+[2024-06-16 18:04:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:04:14] IRLight : Idle
+[2024-06-16 18:04:15] IRLight : Standby
+[2024-06-16 18:05:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:05:34] 1 -> 1
+[2024-06-16 18:05:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:05:34] IRLight : Idle
+[2024-06-16 18:05:35] IRLight : Standby
+[2024-06-16 18:06:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:06:54] 1 -> 1
+[2024-06-16 18:06:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:06:54] IRLight : Idle
+[2024-06-16 18:06:55] IRLight : Standby
+[2024-06-16 18:08:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:08:14] 1 -> 1
+[2024-06-16 18:08:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:08:14] IRLight : Idle
+[2024-06-16 18:08:15] IRLight : Standby
+[2024-06-16 18:09:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:09:34] 1 -> 1
+[2024-06-16 18:09:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:09:34] IRLight : Idle
+[2024-06-16 18:09:35] IRLight : Standby
+[2024-06-16 18:10:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:10:54] 1 -> 1
+[2024-06-16 18:10:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:10:54] IRLight : Idle
+[2024-06-16 18:10:55] IRLight : Standby
+[2024-06-16 18:12:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:12:14] 1 -> 1
+[2024-06-16 18:12:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:12:14] IRLight : Idle
+[2024-06-16 18:12:15] IRLight : Standby
+[2024-06-16 18:13:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:13:34] 1 -> 1
+[2024-06-16 18:13:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:13:34] IRLight : Idle
+[2024-06-16 18:13:35] IRLight : Standby
+[2024-06-16 18:14:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:14:54] 1 -> 1
+[2024-06-16 18:14:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:14:54] IRLight : Idle
+[2024-06-16 18:14:55] IRLight : Standby
+[2024-06-16 18:16:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:16:14] 1 -> 1
+[2024-06-16 18:16:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:16:14] IRLight : Idle
+[2024-06-16 18:16:15] IRLight : Standby
+[2024-06-16 18:17:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:17:34] 1 -> 1
+[2024-06-16 18:17:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:17:34] IRLight : Idle
+[2024-06-16 18:17:35] IRLight : Standby
+[2024-06-16 18:18:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:18:54] 1 -> 1
+[2024-06-16 18:18:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:18:54] IRLight : Idle
+[2024-06-16 18:18:55] IRLight : Standby
+[2024-06-16 18:20:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:20:14] 1 -> 1
+[2024-06-16 18:20:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:20:14] IRLight : Idle
+[2024-06-16 18:20:15] IRLight : Standby
+[2024-06-16 18:21:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:21:34] 1 -> 1
+[2024-06-16 18:21:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:21:34] IRLight : Idle
+[2024-06-16 18:21:35] IRLight : Standby
+[2024-06-16 18:22:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:22:54] 1 -> 1
+[2024-06-16 18:22:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:22:54] IRLight : Idle
+[2024-06-16 18:22:55] IRLight : Standby
+[2024-06-16 18:24:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:24:14] 1 -> 1
+[2024-06-16 18:24:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:24:14] IRLight : Idle
+[2024-06-16 18:24:15] IRLight : Standby
+[2024-06-16 18:25:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:25:34] 1 -> 1
+[2024-06-16 18:25:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:25:34] IRLight : Idle
+[2024-06-16 18:25:35] IRLight : Standby
+[2024-06-16 18:26:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:26:54] 1 -> 1
+[2024-06-16 18:26:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:26:54] IRLight : Idle
+[2024-06-16 18:26:55] IRLight : Standby
+[2024-06-16 18:28:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:28:14] 1 -> 1
+[2024-06-16 18:28:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:28:14] IRLight : Idle
+[2024-06-16 18:28:15] IRLight : Standby
+[2024-06-16 18:29:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:29:34] 1 -> 1
+[2024-06-16 18:29:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:29:34] IRLight : Idle
+[2024-06-16 18:29:35] IRLight : Standby
+[2024-06-16 18:30:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:30:54] 1 -> 1
+[2024-06-16 18:30:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:30:54] IRLight : Idle
+[2024-06-16 18:30:55] IRLight : Standby
+[2024-06-16 18:32:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:32:14] 1 -> 1
+[2024-06-16 18:32:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:32:14] IRLight : Idle
+[2024-06-16 18:32:15] IRLight : Standby
+[2024-06-16 18:33:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:33:34] 1 -> 1
+[2024-06-16 18:33:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:33:34] IRLight : Idle
+[2024-06-16 18:33:35] IRLight : Standby
+[2024-06-16 18:34:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:34:54] 1 -> 1
+[2024-06-16 18:34:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:34:54] IRLight : Idle
+[2024-06-16 18:34:55] IRLight : Standby
+[2024-06-16 18:36:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:36:14] 1 -> 1
+[2024-06-16 18:36:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:36:14] IRLight : Idle
+[2024-06-16 18:36:15] IRLight : Standby
+[2024-06-16 18:37:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:37:34] 1 -> 1
+[2024-06-16 18:37:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:37:34] IRLight : Idle
+[2024-06-16 18:37:35] IRLight : Standby
+[2024-06-16 18:38:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:38:54] 1 -> 1
+[2024-06-16 18:38:54] ImageQueue Reset : Main Camera
+[2024-06-16 18:38:54] IRLight : Idle
+[2024-06-16 18:38:55] IRLight : Standby
+[2024-06-16 18:40:14] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:40:14] 1 -> 1
+[2024-06-16 18:40:14] ImageQueue Reset : Main Camera
+[2024-06-16 18:40:14] IRLight : Idle
+[2024-06-16 18:40:15] IRLight : Standby
+[2024-06-16 18:41:34] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:41:34] 1 -> 1
+[2024-06-16 18:41:34] ImageQueue Reset : Main Camera
+[2024-06-16 18:41:34] IRLight : Idle
+[2024-06-16 18:41:35] IRLight : Standby
+[2024-06-16 18:41:55] HanderType : [Left] -> [Left]
+[2024-06-16 18:41:55] IV2MSG : Option - LeftHander
+[2024-06-16 18:41:55] TeeMode : [Up] -> [Up]
+[2024-06-16 18:41:55] IV2MSG : Option - TeeUp
+[2024-06-16 18:41:55] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 18:41:55] IV2MSG : Option - FairWay
+[2024-06-16 18:42:51] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-16 18:42:51] IRLight : On
+[2024-06-16 18:42:51] 1 -> 2
+[2024-06-16 18:42:52] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 140)
+[2024-06-16 18:42:52] 2 -> 3
+[2024-06-16 18:42:52] IRLight : On
+[2024-06-16 18:42:52] ImageQueue Reset : Main Camera
+[2024-06-16 18:42:52] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-16 18:42:52] IV2MSG : State - subreadysuccess
+[2024-06-16 18:42:52] 3 -> 4
+[2024-06-16 18:42:53] IRLight : Standby
+[2024-06-16 18:43:02] IRLight : On
+[2024-06-16 18:43:03] IRLight : Standby
+[2024-06-16 18:43:35] IRLight : On
+[2024-06-16 18:43:35] 4 -> 6
+[2024-06-16 18:43:35] Failed SaveImageSize : 20
+[2024-06-16 18:43:35] Selected CameraID : 0 _ Set ROI Pos : (266, 140) -> (268, 86)
+[2024-06-16 18:43:35] 6 -> 1
+[2024-06-16 18:43:35] ImageQueue Reset : Main Camera
+[2024-06-16 18:43:35] 1 -> 2
+[2024-06-16 18:43:36] IRLight : Standby
+[2024-06-16 18:43:36] 2 -> 1
+[2024-06-16 18:43:36] ImageQueue Reset : Main Camera
+[2024-06-16 18:43:36] 1 -> 2
+[2024-06-16 18:43:36] IRLight : On
+[2024-06-16 18:43:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 140)
+[2024-06-16 18:43:36] 2 -> 3
+[2024-06-16 18:43:36] IRLight : On
+[2024-06-16 18:43:36] ImageQueue Reset : Main Camera
+[2024-06-16 18:43:36] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-16 18:43:36] IV2MSG : State - subreadysuccess
+[2024-06-16 18:43:36] 3 -> 4
+[2024-06-16 18:43:37] IRLight : Standby
+[2024-06-16 18:43:38] IRLight : On
+[2024-06-16 18:43:39] IRLight : Standby
+[2024-06-16 18:43:39] IRLight : On
+[2024-06-16 18:43:40] IRLight : Standby
+[2024-06-16 18:43:41] IRLight : On
+[2024-06-16 18:43:42] IRLight : Standby
+[2024-06-16 18:43:42] IRLight : On
+[2024-06-16 18:43:43] IRLight : Standby
+[2024-06-16 18:43:48] IRLight : On
+[2024-06-16 18:43:49] IRLight : Standby
+[2024-06-16 18:43:50] IRLight : On
+[2024-06-16 18:43:51] IRLight : Standby
+[2024-06-16 18:44:45] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:44:45] Selected CameraID : 0 _ Set ROI Pos : (266, 140) -> (268, 86)
+[2024-06-16 18:44:45] 4 -> 1
+[2024-06-16 18:44:45] ImageQueue Reset : Main Camera
+[2024-06-16 18:44:45] IRLight : Idle
+[2024-06-16 18:44:46] IRLight : Standby
+[2024-06-16 18:44:56] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-16 18:44:56] IRLight : On
+[2024-06-16 18:44:56] 1 -> 2
+[2024-06-16 18:44:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 140)
+[2024-06-16 18:44:57] 2 -> 3
+[2024-06-16 18:44:57] IRLight : On
+[2024-06-16 18:44:57] ImageQueue Reset : Main Camera
+[2024-06-16 18:44:57] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-16 18:44:57] IV2MSG : State - subreadysuccess
+[2024-06-16 18:44:57] 3 -> 4
+[2024-06-16 18:44:58] IRLight : Standby
+[2024-06-16 18:45:52] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:45:52] Selected CameraID : 0 _ Set ROI Pos : (266, 140) -> (268, 86)
+[2024-06-16 18:45:52] 4 -> 1
+[2024-06-16 18:45:52] ImageQueue Reset : Main Camera
+[2024-06-16 18:45:52] IRLight : Idle
+[2024-06-16 18:45:53] IRLight : Standby
+[2024-06-16 18:47:12] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:47:12] 1 -> 1
+[2024-06-16 18:47:12] ImageQueue Reset : Main Camera
+[2024-06-16 18:47:12] IRLight : Idle
+[2024-06-16 18:47:13] IRLight : Standby
+[2024-06-16 18:48:32] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:48:32] 1 -> 1
+[2024-06-16 18:48:32] ImageQueue Reset : Main Camera
+[2024-06-16 18:48:32] IRLight : Idle
+[2024-06-16 18:48:33] IRLight : Standby
+[2024-06-16 18:49:52] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:49:52] 1 -> 1
+[2024-06-16 18:49:52] ImageQueue Reset : Main Camera
+[2024-06-16 18:49:52] IRLight : Idle
+[2024-06-16 18:49:53] IRLight : Standby
+[2024-06-16 18:51:12] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:51:12] 1 -> 1
+[2024-06-16 18:51:12] ImageQueue Reset : Main Camera
+[2024-06-16 18:51:12] IRLight : Idle
+[2024-06-16 18:51:13] IRLight : Standby
+[2024-06-16 18:52:32] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:52:32] 1 -> 1
+[2024-06-16 18:52:32] ImageQueue Reset : Main Camera
+[2024-06-16 18:52:32] IRLight : Idle
+[2024-06-16 18:52:33] IRLight : Standby
+[2024-06-16 18:53:52] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:53:52] 1 -> 1
+[2024-06-16 18:53:52] ImageQueue Reset : Main Camera
+[2024-06-16 18:53:52] IRLight : Idle
+[2024-06-16 18:53:53] IRLight : Standby
+[2024-06-16 18:55:12] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:55:12] 1 -> 1
+[2024-06-16 18:55:12] ImageQueue Reset : Main Camera
+[2024-06-16 18:55:12] IRLight : Idle
+[2024-06-16 18:55:13] IRLight : Standby
+[2024-06-16 18:56:32] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:56:32] 1 -> 1
+[2024-06-16 18:56:32] ImageQueue Reset : Main Camera
+[2024-06-16 18:56:32] IRLight : Idle
+[2024-06-16 18:56:33] IRLight : Standby
+[2024-06-16 18:57:52] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-16 18:57:52] 1 -> 1
+[2024-06-16 18:57:52] ImageQueue Reset : Main Camera
+[2024-06-16 18:57:52] IRLight : Idle
+[2024-06-16 18:57:53] IRLight : Standby
+[2024-06-16 18:58:07] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-16 18:58:07] IRLight : On
+[2024-06-16 18:58:07] 1 -> 2
+[2024-06-16 18:58:07] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 140)
+[2024-06-16 18:58:07] 2 -> 3
+[2024-06-16 18:58:07] IRLight : On
+[2024-06-16 18:58:07] ImageQueue Reset : Main Camera
+[2024-06-16 18:58:07] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-16 18:58:07] IV2MSG : State - subreadysuccess
+[2024-06-16 18:58:08] 3 -> 4
+[2024-06-16 18:58:08] IRLight : Standby
+[2024-06-16 18:58:11] IV2MSG : System - Operate
+[2024-06-16 18:58:11] HanderType : [Left] -> [Left]
+[2024-06-16 18:58:11] IV2MSG : Option - LeftHander
+[2024-06-16 18:58:11] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-16 18:58:11] IV2MSG : Option - FairWay
+[2024-06-16 18:58:11] 4 -> 0
+[2024-06-16 18:58:11] IV2MSG : System - Stop
+[2024-06-16 18:58:11] IRLight : Off
+[2024-06-16 18:58:12] 0 -> 0
+[2024-06-16 18:58:12] IRLight : Off
+[2024-06-16 18:58:12] IV2MSG : System - Stop
+[2024-06-16 18:58:13] IRLight : Standby
+[2024-06-16 18:59:32] IRLight : Off
+[2024-06-16 18:59:33] IRLight : Standby
+[2024-06-16 19:00:52] IRLight : Off
+[2024-06-16 19:00:53] IRLight : Standby
+[2024-06-16 19:02:12] IRLight : Off
+[2024-06-16 19:02:13] IRLight : Standby
+[2024-06-16 19:03:32] IRLight : Off
+[2024-06-16 19:03:33] IRLight : Standby
+[2024-06-16 19:04:52] IRLight : Off
+[2024-06-16 19:04:53] IRLight : Standby
+[2024-06-16 19:06:12] IRLight : Off
+[2024-06-16 19:06:13] IRLight : Standby
+[2024-06-16 19:07:32] IRLight : Off
+[2024-06-16 19:07:33] IRLight : Standby
+[2024-06-16 19:08:52] IRLight : Off
+[2024-06-16 19:08:53] IRLight : Standby
+[2024-06-16 19:10:12] IRLight : Off
+[2024-06-16 19:10:13] IRLight : Standby
+[2024-06-16 19:11:32] IRLight : Off
+[2024-06-16 19:11:33] IRLight : Standby
+[2024-06-16 19:12:52] IRLight : Off
+[2024-06-16 19:12:53] IRLight : Standby
+[2024-06-16 19:14:12] IRLight : Off
+[2024-06-16 19:14:13] IRLight : Standby
+[2024-06-16 19:15:32] IRLight : Off
+[2024-06-16 19:15:33] IRLight : Standby
+[2024-06-16 19:16:52] IRLight : Off
+[2024-06-16 19:16:53] IRLight : Standby
+[2024-06-16 19:18:12] IRLight : Off
+[2024-06-16 19:18:13] IRLight : Standby
+[2024-06-16 19:19:32] IRLight : Off
+[2024-06-16 19:19:33] IRLight : Standby
+[2024-06-16 19:20:52] IRLight : Off
+[2024-06-16 19:20:53] IRLight : Standby
+[2024-06-16 19:22:12] IRLight : Off
+[2024-06-16 19:22:13] IRLight : Standby
+[2024-06-16 19:23:32] IRLight : Off
+[2024-06-16 19:23:33] IRLight : Standby
+[2024-06-16 19:24:52] IRLight : Off
+[2024-06-16 19:24:53] IRLight : Standby
+[2024-06-16 19:26:12] IRLight : Off
+[2024-06-16 19:26:13] IRLight : Standby
+[2024-06-16 19:27:32] IRLight : Off
+[2024-06-16 19:27:33] IRLight : Standby
+[2024-06-16 19:28:52] IRLight : Off
+[2024-06-16 19:28:53] IRLight : Standby
+[2024-06-16 19:30:12] IRLight : Off
+[2024-06-16 19:30:13] IRLight : Standby
+[2024-06-16 19:31:32] IRLight : Off
+[2024-06-16 19:31:33] IRLight : Standby
+[2024-06-16 19:32:52] IRLight : Off
+[2024-06-16 19:32:53] IRLight : Standby
+[2024-06-16 19:34:12] IRLight : Off
+[2024-06-16 19:34:13] IRLight : Standby
+[2024-06-16 19:35:32] IRLight : Off
+[2024-06-16 19:35:33] IRLight : Standby
+[2024-06-16 19:36:52] IRLight : Off
+[2024-06-16 19:36:53] IRLight : Standby
+[2024-06-16 19:38:12] IRLight : Off
+[2024-06-16 19:38:13] IRLight : Standby
+[2024-06-16 19:39:32] IRLight : Off
+[2024-06-16 19:39:33] IRLight : Standby
+[2024-06-16 19:40:52] IRLight : Off
+[2024-06-16 19:40:53] IRLight : Standby
+[2024-06-16 19:42:12] IRLight : Off
+[2024-06-16 19:42:13] IRLight : Standby
+[2024-06-16 19:43:32] IRLight : Off
+[2024-06-16 19:43:33] IRLight : Standby
+[2024-06-16 19:44:52] IRLight : Off
+[2024-06-16 19:44:53] IRLight : Standby
+[2024-06-16 19:46:12] IRLight : Off
+[2024-06-16 19:46:13] IRLight : Standby
+[2024-06-16 19:47:32] IRLight : Off
+[2024-06-16 19:47:33] IRLight : Standby
+[2024-06-16 19:48:52] IRLight : Off
+[2024-06-16 19:48:53] IRLight : Standby
+[2024-06-16 19:50:12] IRLight : Off
+[2024-06-16 19:50:13] IRLight : Standby
+[2024-06-16 19:51:32] IRLight : Off
+[2024-06-16 19:51:33] IRLight : Standby
+[2024-06-16 19:52:52] IRLight : Off
+[2024-06-16 19:52:53] IRLight : Standby
+[2024-06-16 19:54:12] IRLight : Off
+[2024-06-16 19:54:13] IRLight : Standby
+[2024-06-16 19:55:32] IRLight : Off
+[2024-06-16 19:55:33] IRLight : Standby
+[2024-06-16 19:56:52] IRLight : Off
+[2024-06-16 19:56:53] IRLight : Standby
+[2024-06-16 19:58:12] IRLight : Off
+[2024-06-16 19:58:13] IRLight : Standby
+[2024-06-16 19:59:32] IRLight : Off
+[2024-06-16 19:59:33] IRLight : Standby
+[2024-06-16 20:00:52] IRLight : Off
+[2024-06-16 20:00:53] IRLight : Standby
+[2024-06-16 20:02:12] IRLight : Off
+[2024-06-16 20:02:13] IRLight : Standby
+[2024-06-16 20:03:32] IRLight : Off
+[2024-06-16 20:03:33] IRLight : Standby
+[2024-06-16 20:04:52] IRLight : Off
+[2024-06-16 20:04:53] IRLight : Standby
+[2024-06-16 20:06:12] IRLight : Off
+[2024-06-16 20:06:13] IRLight : Standby
+[2024-06-16 20:07:32] IRLight : Off
+[2024-06-16 20:07:33] IRLight : Standby
+[2024-06-16 20:08:52] IRLight : Off
+[2024-06-16 20:08:53] IRLight : Standby
+[2024-06-16 20:10:12] IRLight : Off
+[2024-06-16 20:10:13] IRLight : Standby
+[2024-06-16 20:11:32] IRLight : Off
+[2024-06-16 20:11:33] IRLight : Standby
+[2024-06-16 20:12:52] IRLight : Off
+[2024-06-16 20:12:53] IRLight : Standby
+[2024-06-16 20:14:12] IRLight : Off
+[2024-06-16 20:14:13] IRLight : Standby
+[2024-06-16 20:15:32] IRLight : Off
+[2024-06-16 20:15:33] IRLight : Standby
+[2024-06-16 20:16:52] IRLight : Off
+[2024-06-16 20:16:53] IRLight : Standby
+[2024-06-16 20:18:12] IRLight : Off
+[2024-06-16 20:18:13] IRLight : Standby
+[2024-06-16 20:19:32] IRLight : Off
+[2024-06-16 20:19:33] IRLight : Standby
+[2024-06-16 20:20:52] IRLight : Off
+[2024-06-16 20:20:53] IRLight : Standby
+[2024-06-16 20:22:12] IRLight : Off
+[2024-06-16 20:22:13] IRLight : Standby
+[2024-06-16 20:23:32] IRLight : Off
+[2024-06-16 20:23:33] IRLight : Standby
+[2024-06-16 20:24:52] IRLight : Off
+[2024-06-16 20:24:53] IRLight : Standby
+[2024-06-16 20:26:12] IRLight : Off
+[2024-06-16 20:26:13] IRLight : Standby
+[2024-06-16 20:27:32] IRLight : Off
+[2024-06-16 20:27:33] IRLight : Standby
+[2024-06-16 20:28:52] IRLight : Off
+[2024-06-16 20:28:53] IRLight : Standby
+[2024-06-16 20:30:12] IRLight : Off
+[2024-06-16 20:30:13] IRLight : Standby
+[2024-06-16 20:31:32] IRLight : Off
+[2024-06-16 20:31:33] IRLight : Standby
+[2024-06-16 20:32:52] IRLight : Off
+[2024-06-16 20:32:53] IRLight : Standby
+[2024-06-16 20:34:12] IRLight : Off
+[2024-06-16 20:34:13] IRLight : Standby
+[2024-06-16 20:35:32] IRLight : Off
+[2024-06-16 20:35:33] IRLight : Standby
+[2024-06-16 20:36:52] IRLight : Off
+[2024-06-16 20:36:53] IRLight : Standby
+[2024-06-16 20:38:12] IRLight : Off
+[2024-06-16 20:38:13] IRLight : Standby
+[2024-06-16 20:39:32] IRLight : Off
+[2024-06-16 20:39:33] IRLight : Standby
+[2024-06-16 20:40:52] IRLight : Off
+[2024-06-16 20:40:53] IRLight : Standby
+[2024-06-16 20:42:12] IRLight : Off
+[2024-06-16 20:42:13] IRLight : Standby
+[2024-06-16 20:43:32] IRLight : Off
+[2024-06-16 20:43:33] IRLight : Standby
+[2024-06-16 20:44:52] IRLight : Off
+[2024-06-16 20:44:53] IRLight : Standby
+[2024-06-16 20:46:12] IRLight : Off
+[2024-06-16 20:46:13] IRLight : Standby
+[2024-06-16 20:47:32] IRLight : Off
+[2024-06-16 20:47:33] IRLight : Standby
+[2024-06-16 20:48:52] IRLight : Off
+[2024-06-16 20:48:53] IRLight : Standby
+[2024-06-16 20:50:12] IRLight : Off
+[2024-06-16 20:50:13] IRLight : Standby
+[2024-06-16 20:51:32] IRLight : Off
+[2024-06-16 20:51:33] IRLight : Standby
+[2024-06-16 20:52:52] IRLight : Off
+[2024-06-16 20:52:53] IRLight : Standby
+[2024-06-16 20:54:12] IRLight : Off
+[2024-06-16 20:54:13] IRLight : Standby
+[2024-06-16 20:55:32] IRLight : Off
+[2024-06-16 20:55:33] IRLight : Standby
+[2024-06-16 20:56:52] IRLight : Off
+[2024-06-16 20:56:53] IRLight : Standby
+[2024-06-16 20:58:12] IRLight : Off
+[2024-06-16 20:58:13] IRLight : Standby
+[2024-06-16 20:59:32] IRLight : Off
+[2024-06-16 20:59:33] IRLight : Standby
+[2024-06-16 21:00:52] IRLight : Off
+[2024-06-16 21:00:53] IRLight : Standby
+[2024-06-16 21:02:12] IRLight : Off
+[2024-06-16 21:02:13] IRLight : Standby
+[2024-06-16 21:03:32] IRLight : Off
+[2024-06-16 21:03:33] IRLight : Standby
+[2024-06-16 21:04:52] IRLight : Off
+[2024-06-16 21:04:53] IRLight : Standby
+[2024-06-16 21:06:12] IRLight : Off
+[2024-06-16 21:06:13] IRLight : Standby
+[2024-06-16 21:07:32] IRLight : Off
+[2024-06-16 21:07:33] IRLight : Standby
+[2024-06-16 21:08:52] IRLight : Off
+[2024-06-16 21:08:53] IRLight : Standby
+[2024-06-16 21:10:12] IRLight : Off
+[2024-06-16 21:10:13] IRLight : Standby
+[2024-06-16 21:11:32] IRLight : Off
+[2024-06-16 21:11:33] IRLight : Standby
+[2024-06-16 21:12:52] IRLight : Off
+[2024-06-16 21:12:53] IRLight : Standby
+[2024-06-16 21:14:12] IRLight : Off
+[2024-06-16 21:14:13] IRLight : Standby
+[2024-06-16 21:15:32] IRLight : Off
+[2024-06-16 21:15:33] IRLight : Standby
+[2024-06-16 21:16:52] IRLight : Off
+[2024-06-16 21:16:53] IRLight : Standby
+[2024-06-16 21:18:12] IRLight : Off
+[2024-06-16 21:18:13] IRLight : Standby
+[2024-06-16 21:19:32] IRLight : Off
+[2024-06-16 21:19:33] IRLight : Standby
+[2024-06-16 21:20:52] IRLight : Off
+[2024-06-16 21:20:53] IRLight : Standby
+[2024-06-16 21:22:12] IRLight : Off
+[2024-06-16 21:22:13] IRLight : Standby
+[2024-06-16 21:23:32] IRLight : Off
+[2024-06-16 21:23:33] IRLight : Standby
+[2024-06-16 21:24:52] IRLight : Off
+[2024-06-16 21:24:53] IRLight : Standby
+[2024-06-16 21:26:12] IRLight : Off
+[2024-06-16 21:26:13] IRLight : Standby
+[2024-06-16 21:27:32] IRLight : Off
+[2024-06-16 21:27:33] IRLight : Standby
+[2024-06-16 21:28:52] IRLight : Off
+[2024-06-16 21:28:53] IRLight : Standby
+[2024-06-16 21:30:12] IRLight : Off
+[2024-06-16 21:30:13] IRLight : Standby
+[2024-06-16 21:31:32] IRLight : Off
+[2024-06-16 21:31:33] IRLight : Standby
+[2024-06-16 21:32:52] IRLight : Off
+[2024-06-16 21:32:53] IRLight : Standby
+[2024-06-16 21:34:12] IRLight : Off
+[2024-06-16 21:34:13] IRLight : Standby
+[2024-06-16 21:35:32] IRLight : Off
+[2024-06-16 21:35:33] IRLight : Standby
+[2024-06-16 21:36:52] IRLight : Off
+[2024-06-16 21:36:53] IRLight : Standby
+[2024-06-16 21:38:12] IRLight : Off
+[2024-06-16 21:38:13] IRLight : Standby
+[2024-06-16 21:39:32] IRLight : Off
+[2024-06-16 21:39:33] IRLight : Standby
+[2024-06-16 21:40:52] IRLight : Off
+[2024-06-16 21:40:53] IRLight : Standby
+[2024-06-16 21:42:12] IRLight : Off
+[2024-06-16 21:42:13] IRLight : Standby
+[2024-06-16 21:43:32] IRLight : Off
+[2024-06-16 21:43:33] IRLight : Standby
+[2024-06-16 21:44:52] IRLight : Off
+[2024-06-16 21:44:53] IRLight : Standby
+[2024-06-16 21:46:12] IRLight : Off
+[2024-06-16 21:46:13] IRLight : Standby
+[2024-06-16 21:47:32] IRLight : Off
+[2024-06-16 21:47:33] IRLight : Standby
+[2024-06-16 21:48:52] IRLight : Off
+[2024-06-16 21:48:53] IRLight : Standby
+[2024-06-16 21:50:12] IRLight : Off
+[2024-06-16 21:50:13] IRLight : Standby
+[2024-06-16 21:51:32] IRLight : Off
+[2024-06-16 21:51:33] IRLight : Standby
+[2024-06-16 21:52:52] IRLight : Off
+[2024-06-16 21:52:53] IRLight : Standby
+[2024-06-16 21:54:12] IRLight : Off
+[2024-06-16 21:54:13] IRLight : Standby
+[2024-06-16 21:55:32] IRLight : Off
+[2024-06-16 21:55:33] IRLight : Standby
+[2024-06-16 21:56:52] IRLight : Off
+[2024-06-16 21:56:53] IRLight : Standby
+[2024-06-16 21:58:12] IRLight : Off
+[2024-06-16 21:58:13] IRLight : Standby
+[2024-06-16 21:59:32] IRLight : Off
+[2024-06-16 21:59:33] IRLight : Standby
+[2024-06-16 22:00:52] IRLight : Off
+[2024-06-16 22:00:53] IRLight : Standby
+[2024-06-16 22:02:12] IRLight : Off
+[2024-06-16 22:02:13] IRLight : Standby
+[2024-06-16 22:03:32] IRLight : Off
+[2024-06-16 22:03:33] IRLight : Standby
+[2024-06-16 22:04:53] IRLight : Off
+[2024-06-16 22:04:54] IRLight : Standby
+[2024-06-16 22:06:13] IRLight : Off
+[2024-06-16 22:06:14] IRLight : Standby
+[2024-06-16 22:07:33] IRLight : Off
+[2024-06-16 22:07:34] IRLight : Standby
+[2024-06-16 22:08:53] IRLight : Off
+[2024-06-16 22:08:54] IRLight : Standby
+[2024-06-16 22:10:13] IRLight : Off
+[2024-06-16 22:10:14] IRLight : Standby
+[2024-06-16 22:11:33] IRLight : Off
+[2024-06-16 22:11:34] IRLight : Standby
+[2024-06-16 22:12:53] IRLight : Off
+[2024-06-16 22:12:54] IRLight : Standby
+[2024-06-16 22:14:13] IRLight : Off
+[2024-06-16 22:14:14] IRLight : Standby
+[2024-06-16 22:15:33] IRLight : Off
+[2024-06-16 22:15:34] IRLight : Standby
+[2024-06-16 22:16:53] IRLight : Off
+[2024-06-16 22:16:54] IRLight : Standby
+[2024-06-16 22:18:13] IRLight : Off
+[2024-06-16 22:18:14] IRLight : Standby
+[2024-06-16 22:19:33] IRLight : Off
+[2024-06-16 22:19:34] IRLight : Standby
+[2024-06-16 22:20:53] IRLight : Off
+[2024-06-16 22:20:54] IRLight : Standby
+[2024-06-16 22:22:13] IRLight : Off
+[2024-06-16 22:22:14] IRLight : Standby
+[2024-06-16 22:23:33] IRLight : Off
+[2024-06-16 22:23:34] IRLight : Standby
+[2024-06-16 22:24:53] IRLight : Off
+[2024-06-16 22:24:54] IRLight : Standby
+[2024-06-16 22:26:13] IRLight : Off
+[2024-06-16 22:26:14] IRLight : Standby
+[2024-06-16 22:27:33] IRLight : Off
+[2024-06-16 22:27:34] IRLight : Standby
+[2024-06-16 22:28:53] IRLight : Off
+[2024-06-16 22:28:54] IRLight : Standby
+[2024-06-16 22:30:13] IRLight : Off
+[2024-06-16 22:30:14] IRLight : Standby
+[2024-06-16 22:31:33] IRLight : Off
+[2024-06-16 22:31:34] IRLight : Standby
+[2024-06-16 22:32:53] IRLight : Off
+[2024-06-16 22:32:54] IRLight : Standby
+[2024-06-16 22:34:13] IRLight : Off
+[2024-06-16 22:34:14] IRLight : Standby
+[2024-06-16 22:35:33] IRLight : Off
+[2024-06-16 22:35:34] IRLight : Standby
+[2024-06-16 22:36:53] IRLight : Off
+[2024-06-16 22:36:54] IRLight : Standby
+[2024-06-16 22:38:13] IRLight : Off
+[2024-06-16 22:38:14] IRLight : Standby
+[2024-06-16 22:39:33] IRLight : Off
+[2024-06-16 22:39:34] IRLight : Standby
+[2024-06-16 22:40:53] IRLight : Off
+[2024-06-16 22:40:54] IRLight : Standby
+[2024-06-16 22:42:13] IRLight : Off
+[2024-06-16 22:42:14] IRLight : Standby
+[2024-06-16 22:43:33] IRLight : Off
+[2024-06-16 22:43:34] IRLight : Standby
+[2024-06-16 22:44:53] IRLight : Off
+[2024-06-16 22:44:54] IRLight : Standby
+[2024-06-16 22:46:13] IRLight : Off
+[2024-06-16 22:46:14] IRLight : Standby
+[2024-06-16 22:47:33] IRLight : Off
+[2024-06-16 22:47:34] IRLight : Standby
+[2024-06-16 22:48:53] IRLight : Off
+[2024-06-16 22:48:54] IRLight : Standby
+[2024-06-16 22:50:13] IRLight : Off
+[2024-06-16 22:50:14] IRLight : Standby
+[2024-06-16 22:51:33] IRLight : Off
+[2024-06-16 22:51:34] IRLight : Standby
+[2024-06-16 22:52:53] IRLight : Off
+[2024-06-16 22:52:54] IRLight : Standby
+[2024-06-16 22:54:13] IRLight : Off
+[2024-06-16 22:54:14] IRLight : Standby
+[2024-06-16 22:55:33] IRLight : Off
+[2024-06-16 22:55:34] IRLight : Standby
+[2024-06-16 22:56:53] IRLight : Off
+[2024-06-16 22:56:54] IRLight : Standby
+[2024-06-16 22:58:13] IRLight : Off
+[2024-06-16 22:58:14] IRLight : Standby
+[2024-06-16 22:59:33] IRLight : Off
+[2024-06-16 22:59:34] IRLight : Standby
+[2024-06-16 23:00:53] IRLight : Off
+[2024-06-16 23:00:54] IRLight : Standby
+[2024-06-16 23:02:13] IRLight : Off
+[2024-06-16 23:02:14] IRLight : Standby
+[2024-06-16 23:03:33] IRLight : Off
+[2024-06-16 23:03:34] IRLight : Standby
+[2024-06-16 23:04:53] IRLight : Off
+[2024-06-16 23:04:54] IRLight : Standby
+[2024-06-16 23:06:13] IRLight : Off
+[2024-06-16 23:06:14] IRLight : Standby
+[2024-06-16 23:07:33] IRLight : Off
+[2024-06-16 23:07:34] IRLight : Standby
+[2024-06-16 23:08:53] IRLight : Off
+[2024-06-16 23:08:54] IRLight : Standby
+[2024-06-16 23:10:13] IRLight : Off
+[2024-06-16 23:10:14] IRLight : Standby
+[2024-06-16 23:11:33] IRLight : Off
+[2024-06-16 23:11:34] IRLight : Standby
+[2024-06-16 23:12:53] IRLight : Off
+[2024-06-16 23:12:54] IRLight : Standby
+[2024-06-16 23:14:13] IRLight : Off
+[2024-06-16 23:14:14] IRLight : Standby
+[2024-06-16 23:15:33] IRLight : Off
+[2024-06-16 23:15:34] IRLight : Standby
+[2024-06-16 23:16:53] IRLight : Off
+[2024-06-16 23:16:54] IRLight : Standby
+[2024-06-16 23:18:13] IRLight : Off
+[2024-06-16 23:18:14] IRLight : Standby
+[2024-06-16 23:19:33] IRLight : Off
+[2024-06-16 23:19:34] IRLight : Standby
+[2024-06-16 23:20:53] IRLight : Off
+[2024-06-16 23:20:54] IRLight : Standby
+[2024-06-16 23:22:13] IRLight : Off
+[2024-06-16 23:22:14] IRLight : Standby
+[2024-06-16 23:23:33] IRLight : Off
+[2024-06-16 23:23:34] IRLight : Standby
+[2024-06-16 23:24:53] IRLight : Off
+[2024-06-16 23:24:54] IRLight : Standby
+[2024-06-16 23:26:13] IRLight : Off
+[2024-06-16 23:26:14] IRLight : Standby
+[2024-06-16 23:27:33] IRLight : Off
+[2024-06-16 23:27:34] IRLight : Standby
+[2024-06-16 23:28:53] IRLight : Off
+[2024-06-16 23:28:54] IRLight : Standby
+[2024-06-16 23:30:13] IRLight : Off
+[2024-06-16 23:30:14] IRLight : Standby
+[2024-06-16 23:31:33] IRLight : Off
+[2024-06-16 23:31:34] IRLight : Standby
+[2024-06-16 23:32:53] IRLight : Off
+[2024-06-16 23:32:54] IRLight : Standby
+[2024-06-16 23:34:13] IRLight : Off
+[2024-06-16 23:34:14] IRLight : Standby
+[2024-06-16 23:35:33] IRLight : Off
+[2024-06-16 23:35:34] IRLight : Standby
+[2024-06-16 23:36:53] IRLight : Off
+[2024-06-16 23:36:54] IRLight : Standby
+[2024-06-16 23:38:13] IRLight : Off
+[2024-06-16 23:38:14] IRLight : Standby
+[2024-06-16 23:39:33] IRLight : Off
+[2024-06-16 23:39:34] IRLight : Standby
+[2024-06-16 23:40:53] IRLight : Off
+[2024-06-16 23:40:54] IRLight : Standby
+[2024-06-16 23:42:13] IRLight : Off
+[2024-06-16 23:42:14] IRLight : Standby
+[2024-06-16 23:43:33] IRLight : Off
+[2024-06-16 23:43:34] IRLight : Standby
+[2024-06-16 23:44:53] IRLight : Off
+[2024-06-16 23:44:54] IRLight : Standby
+[2024-06-16 23:46:13] IRLight : Off
+[2024-06-16 23:46:14] IRLight : Standby
+[2024-06-16 23:47:33] IRLight : Off
+[2024-06-16 23:47:34] IRLight : Standby
+[2024-06-16 23:48:53] IRLight : Off
+[2024-06-16 23:48:54] IRLight : Standby
+[2024-06-16 23:50:13] IRLight : Off
+[2024-06-16 23:50:14] IRLight : Standby
+[2024-06-16 23:51:33] IRLight : Off
+[2024-06-16 23:51:34] IRLight : Standby
+[2024-06-16 23:52:53] IRLight : Off
+[2024-06-16 23:52:54] IRLight : Standby
+[2024-06-16 23:54:13] IRLight : Off
+[2024-06-16 23:54:14] IRLight : Standby
+[2024-06-16 23:55:33] IRLight : Off
+[2024-06-16 23:55:34] IRLight : Standby
+[2024-06-16 23:56:53] IRLight : Off
+[2024-06-16 23:56:54] IRLight : Standby
+[2024-06-16 23:58:13] IRLight : Off
+[2024-06-16 23:58:14] IRLight : Standby
+[2024-06-16 23:59:33] IRLight : Off
+[2024-06-16 23:59:34] IRLight : Standby
+[2024-06-17 00:00:53] IRLight : Off
+[2024-06-17 00:00:54] IRLight : Standby
+[2024-06-17 00:02:13] IRLight : Off
+[2024-06-17 00:02:14] IRLight : Standby
+[2024-06-17 00:03:33] IRLight : Off
+[2024-06-17 00:03:34] IRLight : Standby
+[2024-06-17 00:04:53] IRLight : Off
+[2024-06-17 00:04:54] IRLight : Standby
+[2024-06-17 00:06:13] IRLight : Off
+[2024-06-17 00:06:14] IRLight : Standby
+[2024-06-17 00:07:33] IRLight : Off
+[2024-06-17 00:07:34] IRLight : Standby
+[2024-06-17 00:08:53] IRLight : Off
+[2024-06-17 00:08:54] IRLight : Standby
+[2024-06-17 00:10:13] IRLight : Off
+[2024-06-17 00:10:14] IRLight : Standby
+[2024-06-17 00:11:33] IRLight : Off
+[2024-06-17 00:11:34] IRLight : Standby
+[2024-06-17 00:12:53] IRLight : Off
+[2024-06-17 00:12:54] IRLight : Standby
+[2024-06-17 00:14:13] IRLight : Off
+[2024-06-17 00:14:14] IRLight : Standby
+[2024-06-17 00:15:33] IRLight : Off
+[2024-06-17 00:15:34] IRLight : Standby
+[2024-06-17 00:16:53] IRLight : Off
+[2024-06-17 00:16:54] IRLight : Standby
+[2024-06-17 00:18:13] IRLight : Off
+[2024-06-17 00:18:14] IRLight : Standby
+[2024-06-17 00:19:33] IRLight : Off
+[2024-06-17 00:19:34] IRLight : Standby
+[2024-06-17 00:20:53] IRLight : Off
+[2024-06-17 00:20:54] IRLight : Standby
+[2024-06-17 00:22:13] IRLight : Off
+[2024-06-17 00:22:14] IRLight : Standby
+[2024-06-17 00:23:33] IRLight : Off
+[2024-06-17 00:23:34] IRLight : Standby
+[2024-06-17 00:24:53] IRLight : Off
+[2024-06-17 00:24:54] IRLight : Standby
+[2024-06-17 00:26:13] IRLight : Off
+[2024-06-17 00:26:14] IRLight : Standby
+[2024-06-17 00:27:33] IRLight : Off
+[2024-06-17 00:27:34] IRLight : Standby
+[2024-06-17 00:28:53] IRLight : Off
+[2024-06-17 00:28:54] IRLight : Standby
+[2024-06-17 00:30:13] IRLight : Off
+[2024-06-17 00:30:14] IRLight : Standby
+[2024-06-17 00:31:33] IRLight : Off
+[2024-06-17 00:31:34] IRLight : Standby
+[2024-06-17 00:32:53] IRLight : Off
+[2024-06-17 00:32:54] IRLight : Standby
+[2024-06-17 00:34:13] IRLight : Off
+[2024-06-17 00:34:14] IRLight : Standby
+[2024-06-17 00:35:33] IRLight : Off
+[2024-06-17 00:35:34] IRLight : Standby
+[2024-06-17 00:36:53] IRLight : Off
+[2024-06-17 00:36:54] IRLight : Standby
+[2024-06-17 00:38:13] IRLight : Off
+[2024-06-17 00:38:14] IRLight : Standby
+[2024-06-17 00:39:33] IRLight : Off
+[2024-06-17 00:39:34] IRLight : Standby
+[2024-06-17 00:40:53] IRLight : Off
+[2024-06-17 00:40:54] IRLight : Standby
+[2024-06-17 00:42:13] IRLight : Off
+[2024-06-17 00:42:14] IRLight : Standby
+[2024-06-17 00:43:33] IRLight : Off
+[2024-06-17 00:43:34] IRLight : Standby
+[2024-06-17 00:44:53] IRLight : Off
+[2024-06-17 00:44:54] IRLight : Standby
+[2024-06-17 00:46:13] IRLight : Off
+[2024-06-17 00:46:14] IRLight : Standby
+[2024-06-17 00:47:33] IRLight : Off
+[2024-06-17 00:47:34] IRLight : Standby
+[2024-06-17 00:48:53] IRLight : Off
+[2024-06-17 00:48:54] IRLight : Standby
+[2024-06-17 00:50:13] IRLight : Off
+[2024-06-17 00:50:14] IRLight : Standby
+[2024-06-17 00:51:33] IRLight : Off
+[2024-06-17 00:51:34] IRLight : Standby
+[2024-06-17 00:52:53] IRLight : Off
+[2024-06-17 00:52:54] IRLight : Standby
+[2024-06-17 00:54:13] IRLight : Off
+[2024-06-17 00:54:14] IRLight : Standby
+[2024-06-17 00:55:33] IRLight : Off
+[2024-06-17 00:55:34] IRLight : Standby
+[2024-06-17 00:56:53] IRLight : Off
+[2024-06-17 00:56:54] IRLight : Standby
+[2024-06-17 00:58:13] IRLight : Off
+[2024-06-17 00:58:14] IRLight : Standby
+[2024-06-17 00:59:33] IRLight : Off
+[2024-06-17 00:59:34] IRLight : Standby
+[2024-06-17 01:00:53] IRLight : Off
+[2024-06-17 01:00:54] IRLight : Standby
+[2024-06-17 01:02:13] IRLight : Off
+[2024-06-17 01:02:14] IRLight : Standby
+[2024-06-17 01:03:33] IRLight : Off
+[2024-06-17 01:03:34] IRLight : Standby
+[2024-06-17 01:04:53] IRLight : Off
+[2024-06-17 01:04:54] IRLight : Standby
+[2024-06-17 01:06:13] IRLight : Off
+[2024-06-17 01:06:14] IRLight : Standby
+[2024-06-17 01:07:33] IRLight : Off
+[2024-06-17 01:07:34] IRLight : Standby
+[2024-06-17 01:08:53] IRLight : Off
+[2024-06-17 01:08:54] IRLight : Standby
+[2024-06-17 01:10:13] IRLight : Off
+[2024-06-17 01:10:14] IRLight : Standby
+[2024-06-17 01:11:33] IRLight : Off
+[2024-06-17 01:11:34] IRLight : Standby
+[2024-06-17 01:12:53] IRLight : Off
+[2024-06-17 01:12:54] IRLight : Standby
+[2024-06-17 01:14:13] IRLight : Off
+[2024-06-17 01:14:14] IRLight : Standby
+[2024-06-17 01:15:33] IRLight : Off
+[2024-06-17 01:15:34] IRLight : Standby
+[2024-06-17 01:16:53] IRLight : Off
+[2024-06-17 01:16:54] IRLight : Standby
+[2024-06-17 01:18:13] IRLight : Off
+[2024-06-17 01:18:14] IRLight : Standby
+[2024-06-17 01:19:33] IRLight : Off
+[2024-06-17 01:19:34] IRLight : Standby
+[2024-06-17 01:20:53] IRLight : Off
+[2024-06-17 01:20:54] IRLight : Standby
+[2024-06-17 01:22:13] IRLight : Off
+[2024-06-17 01:22:14] IRLight : Standby
+[2024-06-17 01:23:33] IRLight : Off
+[2024-06-17 01:23:34] IRLight : Standby
+[2024-06-17 01:24:53] IRLight : Off
+[2024-06-17 01:24:54] IRLight : Standby
+[2024-06-17 01:26:13] IRLight : Off
+[2024-06-17 01:26:14] IRLight : Standby
+[2024-06-17 01:27:34] IRLight : Off
+[2024-06-17 01:27:35] IRLight : Standby
+[2024-06-17 01:28:53] IRLight : Off
+[2024-06-17 01:28:55] IRLight : Standby
+[2024-06-17 01:30:14] IRLight : Off
+[2024-06-17 01:30:15] IRLight : Standby
+[2024-06-17 01:31:34] IRLight : Off
+[2024-06-17 01:31:35] IRLight : Standby
+[2024-06-17 01:32:54] IRLight : Off
+[2024-06-17 01:32:55] IRLight : Standby
+[2024-06-17 01:34:14] IRLight : Off
+[2024-06-17 01:34:15] IRLight : Standby
+[2024-06-17 01:35:34] IRLight : Off
+[2024-06-17 01:35:35] IRLight : Standby
+[2024-06-17 01:36:54] IRLight : Off
+[2024-06-17 01:36:55] IRLight : Standby
+[2024-06-17 01:38:14] IRLight : Off
+[2024-06-17 01:38:15] IRLight : Standby
+[2024-06-17 01:39:34] IRLight : Off
+[2024-06-17 01:39:35] IRLight : Standby
+[2024-06-17 01:40:54] IRLight : Off
+[2024-06-17 01:40:55] IRLight : Standby
+[2024-06-17 01:42:14] IRLight : Off
+[2024-06-17 01:42:15] IRLight : Standby
+[2024-06-17 01:43:34] IRLight : Off
+[2024-06-17 01:43:35] IRLight : Standby
+[2024-06-17 01:44:54] IRLight : Off
+[2024-06-17 01:44:55] IRLight : Standby
+[2024-06-17 01:46:14] IRLight : Off
+[2024-06-17 01:46:15] IRLight : Standby
+[2024-06-17 01:47:34] IRLight : Off
+[2024-06-17 01:47:35] IRLight : Standby
+[2024-06-17 01:48:54] IRLight : Off
+[2024-06-17 01:48:55] IRLight : Standby
+[2024-06-17 01:50:14] IRLight : Off
+[2024-06-17 01:50:15] IRLight : Standby
+[2024-06-17 01:51:34] IRLight : Off
+[2024-06-17 01:51:35] IRLight : Standby
+[2024-06-17 01:52:54] IRLight : Off
+[2024-06-17 01:52:55] IRLight : Standby
+[2024-06-17 01:54:14] IRLight : Off
+[2024-06-17 01:54:15] IRLight : Standby
+[2024-06-17 01:55:34] IRLight : Off
+[2024-06-17 01:55:35] IRLight : Standby
+[2024-06-17 01:56:54] IRLight : Off
+[2024-06-17 01:56:55] IRLight : Standby
+[2024-06-17 01:58:14] IRLight : Off
+[2024-06-17 01:58:15] IRLight : Standby
+[2024-06-17 01:59:34] IRLight : Off
+[2024-06-17 01:59:35] IRLight : Standby
+[2024-06-17 02:00:54] IRLight : Off
+[2024-06-17 02:00:55] IRLight : Standby
+[2024-06-17 02:02:14] IRLight : Off
+[2024-06-17 02:02:15] IRLight : Standby
+[2024-06-17 02:03:34] IRLight : Off
+[2024-06-17 02:03:35] IRLight : Standby
+[2024-06-17 02:04:54] IRLight : Off
+[2024-06-17 02:04:55] IRLight : Standby
+[2024-06-17 02:06:14] IRLight : Off
+[2024-06-17 02:06:15] IRLight : Standby
+[2024-06-17 02:07:34] IRLight : Off
+[2024-06-17 02:07:35] IRLight : Standby
+[2024-06-17 02:08:54] IRLight : Off
+[2024-06-17 02:08:55] IRLight : Standby
+[2024-06-17 02:10:14] IRLight : Off
+[2024-06-17 02:10:15] IRLight : Standby
+[2024-06-17 02:11:34] IRLight : Off
+[2024-06-17 02:11:35] IRLight : Standby
+[2024-06-17 02:12:54] IRLight : Off
+[2024-06-17 02:12:55] IRLight : Standby
+[2024-06-17 02:14:14] IRLight : Off
+[2024-06-17 02:14:15] IRLight : Standby
+[2024-06-17 02:15:34] IRLight : Off
+[2024-06-17 02:15:35] IRLight : Standby
+[2024-06-17 02:16:54] IRLight : Off
+[2024-06-17 02:16:55] IRLight : Standby
+[2024-06-17 02:18:14] IRLight : Off
+[2024-06-17 02:18:15] IRLight : Standby
+[2024-06-17 02:19:34] IRLight : Off
+[2024-06-17 02:19:35] IRLight : Standby
+[2024-06-17 02:20:54] IRLight : Off
+[2024-06-17 02:20:55] IRLight : Standby
+[2024-06-17 02:22:14] IRLight : Off
+[2024-06-17 02:22:15] IRLight : Standby
+[2024-06-17 02:23:34] IRLight : Off
+[2024-06-17 02:23:35] IRLight : Standby
+[2024-06-17 02:24:54] IRLight : Off
+[2024-06-17 02:24:55] IRLight : Standby
+[2024-06-17 02:26:14] IRLight : Off
+[2024-06-17 02:26:15] IRLight : Standby
+[2024-06-17 02:27:34] IRLight : Off
+[2024-06-17 02:27:35] IRLight : Standby
+[2024-06-17 02:28:54] IRLight : Off
+[2024-06-17 02:28:55] IRLight : Standby
+[2024-06-17 02:30:14] IRLight : Off
+[2024-06-17 02:30:15] IRLight : Standby
+[2024-06-17 02:31:34] IRLight : Off
+[2024-06-17 02:31:35] IRLight : Standby
+[2024-06-17 02:32:54] IRLight : Off
+[2024-06-17 02:32:55] IRLight : Standby
+[2024-06-17 02:34:14] IRLight : Off
+[2024-06-17 02:34:15] IRLight : Standby
+[2024-06-17 02:35:34] IRLight : Off
+[2024-06-17 02:35:35] IRLight : Standby
+[2024-06-17 02:36:54] IRLight : Off
+[2024-06-17 02:36:55] IRLight : Standby
+[2024-06-17 02:38:14] IRLight : Off
+[2024-06-17 02:38:15] IRLight : Standby
+[2024-06-17 02:39:34] IRLight : Off
+[2024-06-17 02:39:35] IRLight : Standby
+[2024-06-17 02:40:54] IRLight : Off
+[2024-06-17 02:40:55] IRLight : Standby
+[2024-06-17 02:42:14] IRLight : Off
+[2024-06-17 02:42:15] IRLight : Standby
+[2024-06-17 02:43:34] IRLight : Off
+[2024-06-17 02:43:35] IRLight : Standby
+[2024-06-17 02:44:54] IRLight : Off
+[2024-06-17 02:44:55] IRLight : Standby
+[2024-06-17 02:46:14] IRLight : Off
+[2024-06-17 02:46:15] IRLight : Standby
+[2024-06-17 02:47:34] IRLight : Off
+[2024-06-17 02:47:35] IRLight : Standby
+[2024-06-17 02:48:54] IRLight : Off
+[2024-06-17 02:48:55] IRLight : Standby
+[2024-06-17 02:50:14] IRLight : Off
+[2024-06-17 02:50:15] IRLight : Standby
+[2024-06-17 02:51:34] IRLight : Off
+[2024-06-17 02:51:35] IRLight : Standby
+[2024-06-17 02:52:54] IRLight : Off
+[2024-06-17 02:52:55] IRLight : Standby
+[2024-06-17 02:54:14] IRLight : Off
+[2024-06-17 02:54:15] IRLight : Standby
+[2024-06-17 02:55:34] IRLight : Off
+[2024-06-17 02:55:35] IRLight : Standby
+[2024-06-17 02:56:54] IRLight : Off
+[2024-06-17 02:56:55] IRLight : Standby
+[2024-06-17 02:58:14] IRLight : Off
+[2024-06-17 02:58:15] IRLight : Standby
+[2024-06-17 02:59:34] IRLight : Off
+[2024-06-17 02:59:35] IRLight : Standby
+[2024-06-17 03:00:54] IRLight : Off
+[2024-06-17 03:00:55] IRLight : Standby
+[2024-06-17 03:02:14] IRLight : Off
+[2024-06-17 03:02:15] IRLight : Standby
+[2024-06-17 03:03:34] IRLight : Off
+[2024-06-17 03:03:35] IRLight : Standby
+[2024-06-17 03:04:54] IRLight : Off
+[2024-06-17 03:04:55] IRLight : Standby
+[2024-06-17 03:06:14] IRLight : Off
+[2024-06-17 03:06:15] IRLight : Standby
+[2024-06-17 03:07:34] IRLight : Off
+[2024-06-17 03:07:35] IRLight : Standby
+[2024-06-17 03:08:54] IRLight : Off
+[2024-06-17 03:08:55] IRLight : Standby
+[2024-06-17 03:10:14] IRLight : Off
+[2024-06-17 03:10:15] IRLight : Standby
+[2024-06-17 03:11:34] IRLight : Off
+[2024-06-17 03:11:35] IRLight : Standby
+[2024-06-17 03:12:54] IRLight : Off
+[2024-06-17 03:12:55] IRLight : Standby
+[2024-06-17 03:14:14] IRLight : Off
+[2024-06-17 03:14:15] IRLight : Standby
+[2024-06-17 03:15:34] IRLight : Off
+[2024-06-17 03:15:35] IRLight : Standby
+[2024-06-17 03:16:54] IRLight : Off
+[2024-06-17 03:16:55] IRLight : Standby
+[2024-06-17 03:18:14] IRLight : Off
+[2024-06-17 03:18:15] IRLight : Standby
+[2024-06-17 03:19:34] IRLight : Off
+[2024-06-17 03:19:35] IRLight : Standby
+[2024-06-17 03:20:54] IRLight : Off
+[2024-06-17 03:20:55] IRLight : Standby
+[2024-06-17 03:22:14] IRLight : Off
+[2024-06-17 03:22:15] IRLight : Standby
+[2024-06-17 03:23:34] IRLight : Off
+[2024-06-17 03:23:35] IRLight : Standby
+[2024-06-17 03:24:54] IRLight : Off
+[2024-06-17 03:24:55] IRLight : Standby
+[2024-06-17 03:26:14] IRLight : Off
+[2024-06-17 03:26:15] IRLight : Standby
+[2024-06-17 03:27:34] IRLight : Off
+[2024-06-17 03:27:35] IRLight : Standby
+[2024-06-17 03:28:54] IRLight : Off
+[2024-06-17 03:28:55] IRLight : Standby
+[2024-06-17 03:30:14] IRLight : Off
+[2024-06-17 03:30:15] IRLight : Standby
+[2024-06-17 03:31:34] IRLight : Off
+[2024-06-17 03:31:35] IRLight : Standby
+[2024-06-17 03:32:54] IRLight : Off
+[2024-06-17 03:32:55] IRLight : Standby
+[2024-06-17 03:34:14] IRLight : Off
+[2024-06-17 03:34:15] IRLight : Standby
+[2024-06-17 03:35:34] IRLight : Off
+[2024-06-17 03:35:35] IRLight : Standby
+[2024-06-17 03:36:54] IRLight : Off
+[2024-06-17 03:36:55] IRLight : Standby
+[2024-06-17 03:38:14] IRLight : Off
+[2024-06-17 03:38:15] IRLight : Standby
+[2024-06-17 03:39:34] IRLight : Off
+[2024-06-17 03:39:35] IRLight : Standby
+[2024-06-17 03:40:54] IRLight : Off
+[2024-06-17 03:40:55] IRLight : Standby
+[2024-06-17 03:42:14] IRLight : Off
+[2024-06-17 03:42:15] IRLight : Standby
+[2024-06-17 03:43:34] IRLight : Off
+[2024-06-17 03:43:35] IRLight : Standby
+[2024-06-17 03:44:54] IRLight : Off
+[2024-06-17 03:44:55] IRLight : Standby
+[2024-06-17 03:46:14] IRLight : Off
+[2024-06-17 03:46:15] IRLight : Standby
+[2024-06-17 03:47:34] IRLight : Off
+[2024-06-17 03:47:35] IRLight : Standby
+[2024-06-17 03:48:54] IRLight : Off
+[2024-06-17 03:48:55] IRLight : Standby
+[2024-06-17 03:50:14] IRLight : Off
+[2024-06-17 03:50:15] IRLight : Standby
+[2024-06-17 03:51:34] IRLight : Off
+[2024-06-17 03:51:35] IRLight : Standby
+[2024-06-17 03:52:54] IRLight : Off
+[2024-06-17 03:52:55] IRLight : Standby
+[2024-06-17 03:54:14] IRLight : Off
+[2024-06-17 03:54:15] IRLight : Standby
+[2024-06-17 03:55:34] IRLight : Off
+[2024-06-17 03:55:35] IRLight : Standby
+[2024-06-17 03:56:54] IRLight : Off
+[2024-06-17 03:56:55] IRLight : Standby
+[2024-06-17 03:58:14] IRLight : Off
+[2024-06-17 03:58:15] IRLight : Standby
+[2024-06-17 03:59:34] IRLight : Off
+[2024-06-17 03:59:35] IRLight : Standby
+[2024-06-17 04:00:54] IRLight : Off
+[2024-06-17 04:00:55] IRLight : Standby
+[2024-06-17 04:02:14] IRLight : Off
+[2024-06-17 04:02:15] IRLight : Standby
+[2024-06-17 04:03:34] IRLight : Off
+[2024-06-17 04:03:35] IRLight : Standby
+[2024-06-17 04:04:54] IRLight : Off
+[2024-06-17 04:04:55] IRLight : Standby
+[2024-06-17 04:06:14] IRLight : Off
+[2024-06-17 04:06:15] IRLight : Standby
+[2024-06-17 04:07:34] IRLight : Off
+[2024-06-17 04:07:35] IRLight : Standby
+[2024-06-17 04:08:54] IRLight : Off
+[2024-06-17 04:08:55] IRLight : Standby
+[2024-06-17 04:10:14] IRLight : Off
+[2024-06-17 04:10:15] IRLight : Standby
+[2024-06-17 04:11:34] IRLight : Off
+[2024-06-17 04:11:35] IRLight : Standby
+[2024-06-17 04:12:54] IRLight : Off
+[2024-06-17 04:12:55] IRLight : Standby
+[2024-06-17 04:14:14] IRLight : Off
+[2024-06-17 04:14:15] IRLight : Standby
+[2024-06-17 04:15:34] IRLight : Off
+[2024-06-17 04:15:35] IRLight : Standby
+[2024-06-17 04:16:54] IRLight : Off
+[2024-06-17 04:16:55] IRLight : Standby
+[2024-06-17 04:18:14] IRLight : Off
+[2024-06-17 04:18:15] IRLight : Standby
+[2024-06-17 04:19:34] IRLight : Off
+[2024-06-17 04:19:35] IRLight : Standby
+[2024-06-17 04:20:54] IRLight : Off
+[2024-06-17 04:20:55] IRLight : Standby
+[2024-06-17 04:22:14] IRLight : Off
+[2024-06-17 04:22:15] IRLight : Standby
+[2024-06-17 04:23:34] IRLight : Off
+[2024-06-17 04:23:35] IRLight : Standby
+[2024-06-17 04:24:54] IRLight : Off
+[2024-06-17 04:24:55] IRLight : Standby
+[2024-06-17 04:26:14] IRLight : Off
+[2024-06-17 04:26:15] IRLight : Standby
+[2024-06-17 04:27:34] IRLight : Off
+[2024-06-17 04:27:35] IRLight : Standby
+[2024-06-17 04:28:54] IRLight : Off
+[2024-06-17 04:28:55] IRLight : Standby
+[2024-06-17 04:30:14] IRLight : Off
+[2024-06-17 04:30:15] IRLight : Standby
+[2024-06-17 04:31:34] IRLight : Off
+[2024-06-17 04:31:35] IRLight : Standby
+[2024-06-17 04:32:54] IRLight : Off
+[2024-06-17 04:32:55] IRLight : Standby
+[2024-06-17 04:34:14] IRLight : Off
+[2024-06-17 04:34:15] IRLight : Standby
+[2024-06-17 04:35:34] IRLight : Off
+[2024-06-17 04:35:35] IRLight : Standby
+[2024-06-17 04:36:54] IRLight : Off
+[2024-06-17 04:36:55] IRLight : Standby
+[2024-06-17 04:38:14] IRLight : Off
+[2024-06-17 04:38:15] IRLight : Standby
+[2024-06-17 04:39:34] IRLight : Off
+[2024-06-17 04:39:35] IRLight : Standby
+[2024-06-17 04:40:54] IRLight : Off
+[2024-06-17 04:40:55] IRLight : Standby
+[2024-06-17 04:42:14] IRLight : Off
+[2024-06-17 04:42:15] IRLight : Standby
+[2024-06-17 04:43:34] IRLight : Off
+[2024-06-17 04:43:35] IRLight : Standby
+[2024-06-17 04:44:54] IRLight : Off
+[2024-06-17 04:44:55] IRLight : Standby
+[2024-06-17 04:46:14] IRLight : Off
+[2024-06-17 04:46:15] IRLight : Standby
+[2024-06-17 04:47:34] IRLight : Off
+[2024-06-17 04:47:35] IRLight : Standby
+[2024-06-17 04:48:54] IRLight : Off
+[2024-06-17 04:48:55] IRLight : Standby
+[2024-06-17 04:50:14] IRLight : Off
+[2024-06-17 04:50:15] IRLight : Standby
+[2024-06-17 04:51:34] IRLight : Off
+[2024-06-17 04:51:35] IRLight : Standby
+[2024-06-17 04:52:55] IRLight : Off
+[2024-06-17 04:52:56] IRLight : Standby
+[2024-06-17 04:54:15] IRLight : Off
+[2024-06-17 04:54:16] IRLight : Standby
+[2024-06-17 04:55:35] IRLight : Off
+[2024-06-17 04:55:36] IRLight : Standby
+[2024-06-17 04:56:55] IRLight : Off
+[2024-06-17 04:56:56] IRLight : Standby
+[2024-06-17 04:58:15] IRLight : Off
+[2024-06-17 04:58:16] IRLight : Standby
+[2024-06-17 04:59:35] IRLight : Off
+[2024-06-17 04:59:36] IRLight : Standby
+[2024-06-17 05:00:55] IRLight : Off
+[2024-06-17 05:00:56] IRLight : Standby
+[2024-06-17 05:02:15] IRLight : Off
+[2024-06-17 05:02:16] IRLight : Standby
+[2024-06-17 05:03:35] IRLight : Off
+[2024-06-17 05:03:36] IRLight : Standby
+[2024-06-17 05:04:55] IRLight : Off
+[2024-06-17 05:04:56] IRLight : Standby
+[2024-06-17 05:06:15] IRLight : Off
+[2024-06-17 05:06:16] IRLight : Standby
+[2024-06-17 05:07:35] IRLight : Off
+[2024-06-17 05:07:36] IRLight : Standby
+[2024-06-17 05:08:55] IRLight : Off
+[2024-06-17 05:08:56] IRLight : Standby
+[2024-06-17 05:10:15] IRLight : Off
+[2024-06-17 05:10:16] IRLight : Standby
+[2024-06-17 05:11:35] IRLight : Off
+[2024-06-17 05:11:36] IRLight : Standby
+[2024-06-17 05:12:55] IRLight : Off
+[2024-06-17 05:12:56] IRLight : Standby
+[2024-06-17 05:14:15] IRLight : Off
+[2024-06-17 05:14:16] IRLight : Standby
+[2024-06-17 05:15:35] IRLight : Off
+[2024-06-17 05:15:36] IRLight : Standby
+[2024-06-17 05:16:55] IRLight : Off
+[2024-06-17 05:16:56] IRLight : Standby
+[2024-06-17 05:18:15] IRLight : Off
+[2024-06-17 05:18:16] IRLight : Standby
+[2024-06-17 05:19:35] IRLight : Off
+[2024-06-17 05:19:36] IRLight : Standby
+[2024-06-17 05:20:55] IRLight : Off
+[2024-06-17 05:20:56] IRLight : Standby
+[2024-06-17 05:22:15] IRLight : Off
+[2024-06-17 05:22:16] IRLight : Standby
+[2024-06-17 05:23:35] IRLight : Off
+[2024-06-17 05:23:36] IRLight : Standby
+[2024-06-17 05:24:55] IRLight : Off
+[2024-06-17 05:24:56] IRLight : Standby
+[2024-06-17 05:26:15] IRLight : Off
+[2024-06-17 05:26:16] IRLight : Standby
+[2024-06-17 05:27:35] IRLight : Off
+[2024-06-17 05:27:36] IRLight : Standby
+[2024-06-17 05:28:55] IRLight : Off
+[2024-06-17 05:28:56] IRLight : Standby
+[2024-06-17 05:30:15] IRLight : Off
+[2024-06-17 05:30:16] IRLight : Standby
+[2024-06-17 05:31:35] IRLight : Off
+[2024-06-17 05:31:36] IRLight : Standby
+[2024-06-17 05:32:55] IRLight : Off
+[2024-06-17 05:32:56] IRLight : Standby
+[2024-06-17 05:34:15] IRLight : Off
+[2024-06-17 05:34:16] IRLight : Standby
+[2024-06-17 05:35:35] IRLight : Off
+[2024-06-17 05:35:36] IRLight : Standby
+[2024-06-17 05:36:55] IRLight : Off
+[2024-06-17 05:36:56] IRLight : Standby
+[2024-06-17 05:37:47] 0 -> 1
+[2024-06-17 05:37:47] IV2MSG : System - Operate
+[2024-06-17 05:37:47] IRLight : On
+[2024-06-17 05:37:47] HanderType : [Left] -> [Left]
+[2024-06-17 05:37:47] IV2MSG : Option - LeftHander
+[2024-06-17 05:37:47] TeeMode : [Up] -> [Up]
+[2024-06-17 05:37:47] IV2MSG : Option - TeeUp
+[2024-06-17 05:37:47] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:37:47] IV2MSG : Option - FairWay
+[2024-06-17 05:37:48] IRLight : Standby
+[2024-06-17 05:37:50] Selected CameraID : 0 _ Set ROI Pos : (266, 140) -> (268, 86)
+[2024-06-17 05:37:54] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:37:57] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:01] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:04] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:08] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:11] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:15] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:18] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:18] HanderType : [Left] -> [Left]
+[2024-06-17 05:38:18] IV2MSG : Option - LeftHander
+[2024-06-17 05:38:18] TeeMode : [Up] -> [Up]
+[2024-06-17 05:38:18] IV2MSG : Option - TeeUp
+[2024-06-17 05:38:18] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:38:18] IV2MSG : Option - FairWay
+[2024-06-17 05:38:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:25] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:29] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:32] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:39] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:39] HanderType : [Left] -> [Left]
+[2024-06-17 05:38:39] IV2MSG : Option - LeftHander
+[2024-06-17 05:38:39] TeeMode : [Up] -> [Up]
+[2024-06-17 05:38:39] IV2MSG : Option - TeeUp
+[2024-06-17 05:38:39] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:38:39] IV2MSG : Option - Rough
+[2024-06-17 05:38:39] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:38:39] 1 -> 1
+[2024-06-17 05:38:39] ImageQueue Reset : Main Camera
+[2024-06-17 05:38:39] IRLight : On
+[2024-06-17 05:38:40] IRLight : Standby
+[2024-06-17 05:38:43] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:46] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:50] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:38:50] HanderType : [Left] -> [Left]
+[2024-06-17 05:38:50] IV2MSG : Option - LeftHander
+[2024-06-17 05:38:50] TeeMode : [Up] -> [Up]
+[2024-06-17 05:38:50] IV2MSG : Option - TeeUp
+[2024-06-17 05:38:50] SurFaceType : [Rough] -> [Rough]
+[2024-06-17 05:38:50] IV2MSG : Option - Rough
+[2024-06-17 05:38:53] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:38:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:00] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:03] HanderType : [Left] -> [Left]
+[2024-06-17 05:39:03] IV2MSG : Option - LeftHander
+[2024-06-17 05:39:03] TeeMode : [Up] -> [Up]
+[2024-06-17 05:39:03] IV2MSG : Option - TeeUp
+[2024-06-17 05:39:03] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:39:03] IV2MSG : Option - FairWay
+[2024-06-17 05:39:03] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:39:03] 1 -> 1
+[2024-06-17 05:39:03] ImageQueue Reset : Main Camera
+[2024-06-17 05:39:03] IRLight : On
+[2024-06-17 05:39:04] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:04] IRLight : Standby
+[2024-06-17 05:39:07] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:11] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:14] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:18] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:21] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:22] HanderType : [Left] -> [Left]
+[2024-06-17 05:39:22] IV2MSG : Option - LeftHander
+[2024-06-17 05:39:22] TeeMode : [Up] -> [Up]
+[2024-06-17 05:39:22] IV2MSG : Option - TeeUp
+[2024-06-17 05:39:22] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:39:22] IV2MSG : Option - FairWay
+[2024-06-17 05:39:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:28] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:30] HanderType : [Left] -> [Left]
+[2024-06-17 05:39:30] IV2MSG : Option - LeftHander
+[2024-06-17 05:39:30] TeeMode : [Up] -> [Up]
+[2024-06-17 05:39:30] IV2MSG : Option - TeeUp
+[2024-06-17 05:39:30] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:39:30] IV2MSG : Option - Rough
+[2024-06-17 05:39:30] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:39:30] 1 -> 1
+[2024-06-17 05:39:30] ImageQueue Reset : Main Camera
+[2024-06-17 05:39:30] IRLight : On
+[2024-06-17 05:39:31] IRLight : Standby
+[2024-06-17 05:39:32] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:35] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:39] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:42] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:42] HanderType : [Left] -> [Left]
+[2024-06-17 05:39:42] IV2MSG : Option - LeftHander
+[2024-06-17 05:39:42] TeeMode : [Up] -> [Up]
+[2024-06-17 05:39:42] IV2MSG : Option - TeeUp
+[2024-06-17 05:39:42] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:39:42] IV2MSG : Option - FairWay
+[2024-06-17 05:39:42] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:39:42] 1 -> 1
+[2024-06-17 05:39:42] ImageQueue Reset : Main Camera
+[2024-06-17 05:39:42] IRLight : On
+[2024-06-17 05:39:43] IRLight : Standby
+[2024-06-17 05:39:46] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:49] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:39:53] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:39:53] HanderType : [Left] -> [Left]
+[2024-06-17 05:39:53] IV2MSG : Option - LeftHander
+[2024-06-17 05:39:53] TeeMode : [Up] -> [Up]
+[2024-06-17 05:39:53] IV2MSG : Option - TeeUp
+[2024-06-17 05:39:53] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:39:53] IV2MSG : Option - FairWay
+[2024-06-17 05:39:56] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:40:00] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:40:03] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:40:04] HanderType : [Left] -> [Left]
+[2024-06-17 05:40:04] IV2MSG : Option - LeftHander
+[2024-06-17 05:40:04] TeeMode : [Up] -> [Up]
+[2024-06-17 05:40:04] IV2MSG : Option - TeeUp
+[2024-06-17 05:40:04] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:40:04] IV2MSG : Option - FairWay
+[2024-06-17 05:40:07] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:40:10] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:40:14] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:40:17] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:40:21] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:40:23] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:40:23] 1 -> 1
+[2024-06-17 05:40:23] ImageQueue Reset : Main Camera
+[2024-06-17 05:40:23] IRLight : Idle
+[2024-06-17 05:40:24] IRLight : Standby
+[2024-06-17 05:40:42] HanderType : [Left] -> [Left]
+[2024-06-17 05:40:42] IV2MSG : Option - LeftHander
+[2024-06-17 05:40:42] TeeMode : [Up] -> [Up]
+[2024-06-17 05:40:42] IV2MSG : Option - TeeUp
+[2024-06-17 05:40:42] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:40:42] IV2MSG : Option - FairWay
+[2024-06-17 05:40:52] HanderType : [Left] -> [Left]
+[2024-06-17 05:40:52] IV2MSG : Option - LeftHander
+[2024-06-17 05:40:52] TeeMode : [Up] -> [Up]
+[2024-06-17 05:40:52] IV2MSG : Option - TeeUp
+[2024-06-17 05:40:52] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:40:52] IV2MSG : Option - FairWay
+[2024-06-17 05:41:03] HanderType : [Left] -> [Left]
+[2024-06-17 05:41:03] IV2MSG : Option - LeftHander
+[2024-06-17 05:41:03] TeeMode : [Up] -> [Up]
+[2024-06-17 05:41:03] IV2MSG : Option - TeeUp
+[2024-06-17 05:41:03] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:41:03] IV2MSG : Option - FairWay
+[2024-06-17 05:41:37] HanderType : [Left] -> [Left]
+[2024-06-17 05:41:37] IV2MSG : Option - LeftHander
+[2024-06-17 05:41:37] TeeMode : [Up] -> [Up]
+[2024-06-17 05:41:37] IV2MSG : Option - TeeUp
+[2024-06-17 05:41:37] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:41:37] IV2MSG : Option - FairWay
+[2024-06-17 05:41:43] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:41:43] 1 -> 1
+[2024-06-17 05:41:43] ImageQueue Reset : Main Camera
+[2024-06-17 05:41:43] IRLight : Idle
+[2024-06-17 05:41:44] IRLight : Standby
+[2024-06-17 05:42:01] HanderType : [Left] -> [Left]
+[2024-06-17 05:42:01] IV2MSG : Option - LeftHander
+[2024-06-17 05:42:01] TeeMode : [Up] -> [Up]
+[2024-06-17 05:42:01] IV2MSG : Option - TeeUp
+[2024-06-17 05:42:01] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:42:01] IV2MSG : Option - Rough
+[2024-06-17 05:42:01] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:42:01] 1 -> 1
+[2024-06-17 05:42:01] ImageQueue Reset : Main Camera
+[2024-06-17 05:42:01] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-17 05:42:01] IRLight : On
+[2024-06-17 05:42:02] IRLight : Standby
+[2024-06-17 05:42:03] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:06] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:42:10] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:13] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:42:14] HanderType : [Left] -> [Left]
+[2024-06-17 05:42:14] IV2MSG : Option - LeftHander
+[2024-06-17 05:42:14] TeeMode : [Up] -> [Up]
+[2024-06-17 05:42:14] IV2MSG : Option - TeeUp
+[2024-06-17 05:42:14] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:42:14] IV2MSG : Option - FairWay
+[2024-06-17 05:42:14] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:42:14] 1 -> 1
+[2024-06-17 05:42:14] ImageQueue Reset : Main Camera
+[2024-06-17 05:42:14] IRLight : On
+[2024-06-17 05:42:15] IRLight : Standby
+[2024-06-17 05:42:17] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:20] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:42:24] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:27] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:42:31] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:34] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:42:38] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:40] HanderType : [Left] -> [Left]
+[2024-06-17 05:42:40] IV2MSG : Option - LeftHander
+[2024-06-17 05:42:40] TeeMode : [Up] -> [Up]
+[2024-06-17 05:42:40] IV2MSG : Option - TeeUp
+[2024-06-17 05:42:40] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:42:40] IV2MSG : Option - FairWay
+[2024-06-17 05:42:41] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:42:45] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:48] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:42:52] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:42:54] HanderType : [Left] -> [Left]
+[2024-06-17 05:42:54] IV2MSG : Option - LeftHander
+[2024-06-17 05:42:54] TeeMode : [Up] -> [Up]
+[2024-06-17 05:42:54] IV2MSG : Option - TeeUp
+[2024-06-17 05:42:54] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:42:54] IV2MSG : Option - FairWay
+[2024-06-17 05:42:54] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:42:54] 1 -> 1
+[2024-06-17 05:42:54] ImageQueue Reset : Main Camera
+[2024-06-17 05:42:54] IRLight : Idle
+[2024-06-17 05:42:55] IRLight : Standby
+[2024-06-17 05:43:07] HanderType : [Left] -> [Left]
+[2024-06-17 05:43:07] IV2MSG : Option - LeftHander
+[2024-06-17 05:43:07] TeeMode : [Up] -> [Up]
+[2024-06-17 05:43:07] IV2MSG : Option - TeeUp
+[2024-06-17 05:43:07] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:43:07] IV2MSG : Option - FairWay
+[2024-06-17 05:43:22] HanderType : [Left] -> [Left]
+[2024-06-17 05:43:22] IV2MSG : Option - LeftHander
+[2024-06-17 05:43:22] TeeMode : [Up] -> [Up]
+[2024-06-17 05:43:22] IV2MSG : Option - TeeUp
+[2024-06-17 05:43:22] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:43:22] IV2MSG : Option - FairWay
+[2024-06-17 05:43:42] HanderType : [Left] -> [Left]
+[2024-06-17 05:43:42] IV2MSG : Option - LeftHander
+[2024-06-17 05:43:42] TeeMode : [Up] -> [Up]
+[2024-06-17 05:43:42] IV2MSG : Option - TeeUp
+[2024-06-17 05:43:42] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:43:42] IV2MSG : Option - FairWay
+[2024-06-17 05:43:58] HanderType : [Left] -> [Left]
+[2024-06-17 05:43:58] IV2MSG : Option - LeftHander
+[2024-06-17 05:43:58] TeeMode : [Up] -> [Up]
+[2024-06-17 05:43:58] IV2MSG : Option - TeeUp
+[2024-06-17 05:43:58] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:43:58] IV2MSG : Option - FairWay
+[2024-06-17 05:44:08] HanderType : [Left] -> [Left]
+[2024-06-17 05:44:08] IV2MSG : Option - LeftHander
+[2024-06-17 05:44:08] TeeMode : [Up] -> [Up]
+[2024-06-17 05:44:08] IV2MSG : Option - TeeUp
+[2024-06-17 05:44:08] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:44:08] IV2MSG : Option - Rough
+[2024-06-17 05:44:08] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:44:08] 1 -> 1
+[2024-06-17 05:44:08] ImageQueue Reset : Main Camera
+[2024-06-17 05:44:08] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-17 05:44:08] IRLight : On
+[2024-06-17 05:44:09] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:44:09] IRLight : Standby
+[2024-06-17 05:44:12] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:44:16] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:44:18] HanderType : [Left] -> [Left]
+[2024-06-17 05:44:18] IV2MSG : Option - LeftHander
+[2024-06-17 05:44:18] TeeMode : [Up] -> [Up]
+[2024-06-17 05:44:18] IV2MSG : Option - TeeUp
+[2024-06-17 05:44:18] SurFaceType : [Rough] -> [Rough]
+[2024-06-17 05:44:18] IV2MSG : Option - Rough
+[2024-06-17 05:44:19] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:44:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:44:26] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:44:30] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:44:33] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:44:37] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:44:40] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:44:44] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:44:47] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:44:48] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:44:48] 1 -> 1
+[2024-06-17 05:44:48] ImageQueue Reset : Main Camera
+[2024-06-17 05:44:48] IRLight : Idle
+[2024-06-17 05:44:49] IRLight : Standby
+[2024-06-17 05:45:16] HanderType : [Left] -> [Left]
+[2024-06-17 05:45:16] IV2MSG : Option - LeftHander
+[2024-06-17 05:45:16] TeeMode : [Up] -> [Up]
+[2024-06-17 05:45:16] IV2MSG : Option - TeeUp
+[2024-06-17 05:45:16] SurFaceType : [Rough] -> [Rough]
+[2024-06-17 05:45:16] IV2MSG : Option - Rough
+[2024-06-17 05:45:39] HanderType : [Left] -> [Left]
+[2024-06-17 05:45:39] IV2MSG : Option - LeftHander
+[2024-06-17 05:45:39] TeeMode : [Up] -> [Up]
+[2024-06-17 05:45:39] IV2MSG : Option - TeeUp
+[2024-06-17 05:45:39] SurFaceType : [Rough] -> [Rough]
+[2024-06-17 05:45:39] IV2MSG : Option - Rough
+[2024-06-17 05:46:06] HanderType : [Left] -> [Left]
+[2024-06-17 05:46:06] IV2MSG : Option - LeftHander
+[2024-06-17 05:46:06] TeeMode : [Up] -> [Up]
+[2024-06-17 05:46:06] IV2MSG : Option - TeeUp
+[2024-06-17 05:46:06] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:46:06] IV2MSG : Option - FairWay
+[2024-06-17 05:46:06] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:46:06] 1 -> 1
+[2024-06-17 05:46:06] ImageQueue Reset : Main Camera
+[2024-06-17 05:46:06] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-17 05:46:06] IRLight : On
+[2024-06-17 05:46:07] IRLight : Standby
+[2024-06-17 05:46:08] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:46:12] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:46:15] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:46:19] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:46:20] HanderType : [Left] -> [Left]
+[2024-06-17 05:46:20] IV2MSG : Option - LeftHander
+[2024-06-17 05:46:20] TeeMode : [Up] -> [Up]
+[2024-06-17 05:46:20] IV2MSG : Option - TeeUp
+[2024-06-17 05:46:20] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:46:20] IV2MSG : Option - Rough
+[2024-06-17 05:46:20] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:46:20] 1 -> 1
+[2024-06-17 05:46:20] ImageQueue Reset : Main Camera
+[2024-06-17 05:46:20] IRLight : On
+[2024-06-17 05:46:21] IRLight : Standby
+[2024-06-17 05:46:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:46:26] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:46:29] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:46:32] HanderType : [Left] -> [Left]
+[2024-06-17 05:46:32] IV2MSG : Option - LeftHander
+[2024-06-17 05:46:32] TeeMode : [Up] -> [Up]
+[2024-06-17 05:46:32] IV2MSG : Option - TeeUp
+[2024-06-17 05:46:32] SurFaceType : [Rough] -> [Rough]
+[2024-06-17 05:46:32] IV2MSG : Option - Rough
+[2024-06-17 05:46:33] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:46:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:46:40] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:46:43] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:46:44] HanderType : [Left] -> [Left]
+[2024-06-17 05:46:44] IV2MSG : Option - LeftHander
+[2024-06-17 05:46:44] TeeMode : [Up] -> [Up]
+[2024-06-17 05:46:44] IV2MSG : Option - TeeUp
+[2024-06-17 05:46:44] SurFaceType : [Rough] -> [Rough]
+[2024-06-17 05:46:44] IV2MSG : Option - Rough
+[2024-06-17 05:46:47] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:46:50] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:46:54] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:46:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:47:00] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:47:00] 1 -> 1
+[2024-06-17 05:47:00] ImageQueue Reset : Main Camera
+[2024-06-17 05:47:00] IRLight : Idle
+[2024-06-17 05:47:00] HanderType : [Left] -> [Left]
+[2024-06-17 05:47:00] IV2MSG : Option - LeftHander
+[2024-06-17 05:47:00] TeeMode : [Up] -> [Up]
+[2024-06-17 05:47:00] IV2MSG : Option - TeeUp
+[2024-06-17 05:47:00] SurFaceType : [Rough] -> [Rough]
+[2024-06-17 05:47:00] IV2MSG : Option - Rough
+[2024-06-17 05:47:01] IRLight : Standby
+[2024-06-17 05:47:11] HanderType : [Left] -> [Left]
+[2024-06-17 05:47:11] IV2MSG : Option - LeftHander
+[2024-06-17 05:47:11] TeeMode : [Up] -> [Up]
+[2024-06-17 05:47:11] IV2MSG : Option - TeeUp
+[2024-06-17 05:47:11] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:47:11] IV2MSG : Option - FairWay
+[2024-06-17 05:47:11] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:47:11] 1 -> 1
+[2024-06-17 05:47:11] ImageQueue Reset : Main Camera
+[2024-06-17 05:47:11] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-17 05:47:11] IRLight : On
+[2024-06-17 05:47:12] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:47:12] IRLight : Standby
+[2024-06-17 05:47:15] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:47:19] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:47:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:47:26] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:47:27] HanderType : [Left] -> [Left]
+[2024-06-17 05:47:27] IV2MSG : Option - LeftHander
+[2024-06-17 05:47:27] TeeMode : [Up] -> [Up]
+[2024-06-17 05:47:27] IV2MSG : Option - TeeUp
+[2024-06-17 05:47:27] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:47:27] IV2MSG : Option - FairWay
+[2024-06-17 05:47:29] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:47:33] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:47:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:47:40] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:47:43] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:47:47] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:47:47] HanderType : [Left] -> [Left]
+[2024-06-17 05:47:47] IV2MSG : Option - LeftHander
+[2024-06-17 05:47:47] TeeMode : [Up] -> [Up]
+[2024-06-17 05:47:47] IV2MSG : Option - TeeUp
+[2024-06-17 05:47:47] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:47:47] IV2MSG : Option - FairWay
+[2024-06-17 05:47:50] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:47:51] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:47:51] 1 -> 1
+[2024-06-17 05:47:51] ImageQueue Reset : Main Camera
+[2024-06-17 05:47:51] IRLight : Idle
+[2024-06-17 05:47:52] IRLight : Standby
+[2024-06-17 05:47:55] HanderType : [Left] -> [Left]
+[2024-06-17 05:47:55] IV2MSG : Option - LeftHander
+[2024-06-17 05:47:55] TeeMode : [Up] -> [Up]
+[2024-06-17 05:47:55] IV2MSG : Option - TeeUp
+[2024-06-17 05:47:55] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:47:55] IV2MSG : Option - Rough
+[2024-06-17 05:47:55] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:47:55] 1 -> 1
+[2024-06-17 05:47:55] ImageQueue Reset : Main Camera
+[2024-06-17 05:47:55] Selected Camera ID : 0 _ OptionExpose : 595
+[2024-06-17 05:47:55] IRLight : On
+[2024-06-17 05:47:56] IRLight : Standby
+[2024-06-17 05:47:57] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:01] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:04] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:05] HanderType : [Left] -> [Left]
+[2024-06-17 05:48:05] IV2MSG : Option - LeftHander
+[2024-06-17 05:48:05] TeeMode : [Up] -> [Up]
+[2024-06-17 05:48:05] IV2MSG : Option - TeeUp
+[2024-06-17 05:48:05] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:48:05] IV2MSG : Option - FairWay
+[2024-06-17 05:48:05] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:48:05] 1 -> 1
+[2024-06-17 05:48:05] ImageQueue Reset : Main Camera
+[2024-06-17 05:48:05] IRLight : On
+[2024-06-17 05:48:06] IRLight : Standby
+[2024-06-17 05:48:08] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:11] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:15] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:16] HanderType : [Left] -> [Left]
+[2024-06-17 05:48:16] IV2MSG : Option - LeftHander
+[2024-06-17 05:48:16] TeeMode : [Up] -> [Up]
+[2024-06-17 05:48:16] IV2MSG : Option - TeeUp
+[2024-06-17 05:48:16] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:48:16] IV2MSG : Option - FairWay
+[2024-06-17 05:48:18] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:25] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:26] HanderType : [Left] -> [Left]
+[2024-06-17 05:48:26] IV2MSG : Option - LeftHander
+[2024-06-17 05:48:26] TeeMode : [Up] -> [Up]
+[2024-06-17 05:48:26] IV2MSG : Option - TeeUp
+[2024-06-17 05:48:26] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:48:26] IV2MSG : Option - Rough
+[2024-06-17 05:48:26] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:48:26] 1 -> 1
+[2024-06-17 05:48:26] ImageQueue Reset : Main Camera
+[2024-06-17 05:48:26] IRLight : On
+[2024-06-17 05:48:27] IRLight : Standby
+[2024-06-17 05:48:29] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:32] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:36] HanderType : [Left] -> [Left]
+[2024-06-17 05:48:36] IV2MSG : Option - LeftHander
+[2024-06-17 05:48:36] TeeMode : [Up] -> [Up]
+[2024-06-17 05:48:36] IV2MSG : Option - TeeUp
+[2024-06-17 05:48:36] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:48:36] IV2MSG : Option - FairWay
+[2024-06-17 05:48:36] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:48:36] 1 -> 1
+[2024-06-17 05:48:36] ImageQueue Reset : Main Camera
+[2024-06-17 05:48:36] IRLight : On
+[2024-06-17 05:48:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:37] IRLight : Standby
+[2024-06-17 05:48:39] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:43] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:46] HanderType : [Left] -> [Left]
+[2024-06-17 05:48:46] IV2MSG : Option - LeftHander
+[2024-06-17 05:48:46] TeeMode : [Up] -> [Up]
+[2024-06-17 05:48:46] IV2MSG : Option - TeeUp
+[2024-06-17 05:48:46] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:48:46] IV2MSG : Option - Rough
+[2024-06-17 05:48:46] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:48:46] 1 -> 1
+[2024-06-17 05:48:46] ImageQueue Reset : Main Camera
+[2024-06-17 05:48:46] IRLight : On
+[2024-06-17 05:48:46] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:47] IRLight : Standby
+[2024-06-17 05:48:50] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:48:53] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:48:56] HanderType : [Left] -> [Left]
+[2024-06-17 05:48:56] IV2MSG : Option - LeftHander
+[2024-06-17 05:48:56] TeeMode : [Up] -> [Up]
+[2024-06-17 05:48:56] IV2MSG : Option - TeeUp
+[2024-06-17 05:48:56] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:48:56] IV2MSG : Option - FairWay
+[2024-06-17 05:48:56] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:48:56] 1 -> 1
+[2024-06-17 05:48:56] ImageQueue Reset : Main Camera
+[2024-06-17 05:48:56] IRLight : On
+[2024-06-17 05:48:57] IRLight : Standby
+[2024-06-17 05:48:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:00] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:04] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:07] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:11] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:14] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:16] HanderType : [Left] -> [Left]
+[2024-06-17 05:49:16] IV2MSG : Option - LeftHander
+[2024-06-17 05:49:16] TeeMode : [Up] -> [Up]
+[2024-06-17 05:49:16] IV2MSG : Option - TeeUp
+[2024-06-17 05:49:16] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:49:16] IV2MSG : Option - FairWay
+[2024-06-17 05:49:18] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:21] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:28] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:29] HanderType : [Left] -> [Left]
+[2024-06-17 05:49:29] IV2MSG : Option - LeftHander
+[2024-06-17 05:49:29] TeeMode : [Up] -> [Up]
+[2024-06-17 05:49:29] IV2MSG : Option - TeeUp
+[2024-06-17 05:49:29] SurFaceType : [Fairway] -> [Rough]
+[2024-06-17 05:49:29] IV2MSG : Option - Rough
+[2024-06-17 05:49:29] Hand 1, TeeMode : 0, Surface : 1
+[2024-06-17 05:49:29] 1 -> 1
+[2024-06-17 05:49:29] ImageQueue Reset : Main Camera
+[2024-06-17 05:49:29] IRLight : On
+[2024-06-17 05:49:30] IRLight : Standby
+[2024-06-17 05:49:32] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:35] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:39] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:41] HanderType : [Left] -> [Left]
+[2024-06-17 05:49:41] IV2MSG : Option - LeftHander
+[2024-06-17 05:49:41] TeeMode : [Up] -> [Up]
+[2024-06-17 05:49:41] IV2MSG : Option - TeeUp
+[2024-06-17 05:49:41] SurFaceType : [Rough] -> [Fairway]
+[2024-06-17 05:49:41] IV2MSG : Option - FairWay
+[2024-06-17 05:49:41] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 05:49:41] 1 -> 1
+[2024-06-17 05:49:41] ImageQueue Reset : Main Camera
+[2024-06-17 05:49:41] IRLight : On
+[2024-06-17 05:49:42] IRLight : Standby
+[2024-06-17 05:49:42] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:46] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:49] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:49:52] HanderType : [Left] -> [Left]
+[2024-06-17 05:49:52] IV2MSG : Option - LeftHander
+[2024-06-17 05:49:52] TeeMode : [Up] -> [Up]
+[2024-06-17 05:49:52] IV2MSG : Option - TeeUp
+[2024-06-17 05:49:52] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:49:52] IV2MSG : Option - FairWay
+[2024-06-17 05:49:53] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:49:56] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:50:00] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:50:03] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:50:06] HanderType : [Left] -> [Left]
+[2024-06-17 05:50:06] IV2MSG : Option - LeftHander
+[2024-06-17 05:50:06] TeeMode : [Up] -> [Up]
+[2024-06-17 05:50:06] IV2MSG : Option - TeeUp
+[2024-06-17 05:50:06] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:50:06] IV2MSG : Option - FairWay
+[2024-06-17 05:50:07] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:50:10] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:50:14] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 05:50:17] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 05:50:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:50:21] 1 -> 1
+[2024-06-17 05:50:21] ImageQueue Reset : Main Camera
+[2024-06-17 05:50:21] IRLight : Idle
+[2024-06-17 05:50:22] IRLight : Standby
+[2024-06-17 05:50:30] HanderType : [Left] -> [Left]
+[2024-06-17 05:50:30] IV2MSG : Option - LeftHander
+[2024-06-17 05:50:30] TeeMode : [Up] -> [Up]
+[2024-06-17 05:50:30] IV2MSG : Option - TeeUp
+[2024-06-17 05:50:30] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:50:30] IV2MSG : Option - FairWay
+[2024-06-17 05:51:11] HanderType : [Left] -> [Left]
+[2024-06-17 05:51:11] IV2MSG : Option - LeftHander
+[2024-06-17 05:51:11] TeeMode : [Up] -> [Up]
+[2024-06-17 05:51:11] IV2MSG : Option - TeeUp
+[2024-06-17 05:51:11] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:51:11] IV2MSG : Option - FairWay
+[2024-06-17 05:51:37] HanderType : [Left] -> [Left]
+[2024-06-17 05:51:37] IV2MSG : Option - LeftHander
+[2024-06-17 05:51:37] TeeMode : [Up] -> [Up]
+[2024-06-17 05:51:37] IV2MSG : Option - TeeUp
+[2024-06-17 05:51:37] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:51:37] IV2MSG : Option - FairWay
+[2024-06-17 05:51:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:51:41] 1 -> 1
+[2024-06-17 05:51:41] ImageQueue Reset : Main Camera
+[2024-06-17 05:51:41] IRLight : Idle
+[2024-06-17 05:51:42] IRLight : Standby
+[2024-06-17 05:51:53] HanderType : [Left] -> [Left]
+[2024-06-17 05:51:53] IV2MSG : Option - LeftHander
+[2024-06-17 05:51:53] TeeMode : [Up] -> [Up]
+[2024-06-17 05:51:53] IV2MSG : Option - TeeUp
+[2024-06-17 05:51:53] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:51:53] IV2MSG : Option - FairWay
+[2024-06-17 05:52:09] HanderType : [Left] -> [Left]
+[2024-06-17 05:52:09] IV2MSG : Option - LeftHander
+[2024-06-17 05:52:09] TeeMode : [Up] -> [Up]
+[2024-06-17 05:52:09] IV2MSG : Option - TeeUp
+[2024-06-17 05:52:09] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:52:09] IV2MSG : Option - FairWay
+[2024-06-17 05:52:27] HanderType : [Left] -> [Left]
+[2024-06-17 05:52:27] IV2MSG : Option - LeftHander
+[2024-06-17 05:52:27] TeeMode : [Up] -> [Up]
+[2024-06-17 05:52:27] IV2MSG : Option - TeeUp
+[2024-06-17 05:52:27] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:52:27] IV2MSG : Option - FairWay
+[2024-06-17 05:52:51] HanderType : [Left] -> [Left]
+[2024-06-17 05:52:51] IV2MSG : Option - LeftHander
+[2024-06-17 05:52:51] TeeMode : [Up] -> [Up]
+[2024-06-17 05:52:51] IV2MSG : Option - TeeUp
+[2024-06-17 05:52:51] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:52:51] IV2MSG : Option - FairWay
+[2024-06-17 05:53:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:53:01] 1 -> 1
+[2024-06-17 05:53:01] ImageQueue Reset : Main Camera
+[2024-06-17 05:53:01] IRLight : Idle
+[2024-06-17 05:53:02] IRLight : Standby
+[2024-06-17 05:53:10] HanderType : [Left] -> [Left]
+[2024-06-17 05:53:10] IV2MSG : Option - LeftHander
+[2024-06-17 05:53:10] TeeMode : [Up] -> [Up]
+[2024-06-17 05:53:10] IV2MSG : Option - TeeUp
+[2024-06-17 05:53:10] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:53:10] IV2MSG : Option - FairWay
+[2024-06-17 05:53:24] HanderType : [Left] -> [Left]
+[2024-06-17 05:53:24] IV2MSG : Option - LeftHander
+[2024-06-17 05:53:24] TeeMode : [Up] -> [Up]
+[2024-06-17 05:53:24] IV2MSG : Option - TeeUp
+[2024-06-17 05:53:24] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:53:24] IV2MSG : Option - FairWay
+[2024-06-17 05:53:37] HanderType : [Left] -> [Left]
+[2024-06-17 05:53:37] IV2MSG : Option - LeftHander
+[2024-06-17 05:53:37] TeeMode : [Up] -> [Up]
+[2024-06-17 05:53:37] IV2MSG : Option - TeeUp
+[2024-06-17 05:53:37] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:53:37] IV2MSG : Option - FairWay
+[2024-06-17 05:53:55] HanderType : [Left] -> [Left]
+[2024-06-17 05:53:55] IV2MSG : Option - LeftHander
+[2024-06-17 05:53:55] TeeMode : [Up] -> [Up]
+[2024-06-17 05:53:55] IV2MSG : Option - TeeUp
+[2024-06-17 05:53:55] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:53:55] IV2MSG : Option - FairWay
+[2024-06-17 05:54:11] HanderType : [Left] -> [Left]
+[2024-06-17 05:54:11] IV2MSG : Option - LeftHander
+[2024-06-17 05:54:11] TeeMode : [Up] -> [Up]
+[2024-06-17 05:54:11] IV2MSG : Option - TeeUp
+[2024-06-17 05:54:11] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:54:11] IV2MSG : Option - FairWay
+[2024-06-17 05:54:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:54:21] 1 -> 1
+[2024-06-17 05:54:21] ImageQueue Reset : Main Camera
+[2024-06-17 05:54:21] IRLight : Idle
+[2024-06-17 05:54:22] IRLight : Standby
+[2024-06-17 05:54:30] HanderType : [Left] -> [Left]
+[2024-06-17 05:54:30] IV2MSG : Option - LeftHander
+[2024-06-17 05:54:30] TeeMode : [Up] -> [Up]
+[2024-06-17 05:54:30] IV2MSG : Option - TeeUp
+[2024-06-17 05:54:30] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:54:30] IV2MSG : Option - FairWay
+[2024-06-17 05:54:49] HanderType : [Left] -> [Left]
+[2024-06-17 05:54:49] IV2MSG : Option - LeftHander
+[2024-06-17 05:54:49] TeeMode : [Up] -> [Up]
+[2024-06-17 05:54:49] IV2MSG : Option - TeeUp
+[2024-06-17 05:54:49] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:54:49] IV2MSG : Option - FairWay
+[2024-06-17 05:55:09] HanderType : [Left] -> [Left]
+[2024-06-17 05:55:09] IV2MSG : Option - LeftHander
+[2024-06-17 05:55:09] TeeMode : [Up] -> [Up]
+[2024-06-17 05:55:09] IV2MSG : Option - TeeUp
+[2024-06-17 05:55:09] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:55:09] IV2MSG : Option - FairWay
+[2024-06-17 05:55:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:55:41] 1 -> 1
+[2024-06-17 05:55:41] ImageQueue Reset : Main Camera
+[2024-06-17 05:55:41] IRLight : Idle
+[2024-06-17 05:55:42] IRLight : Standby
+[2024-06-17 05:56:09] HanderType : [Left] -> [Left]
+[2024-06-17 05:56:09] IV2MSG : Option - LeftHander
+[2024-06-17 05:56:09] TeeMode : [Up] -> [Up]
+[2024-06-17 05:56:09] IV2MSG : Option - TeeUp
+[2024-06-17 05:56:09] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:56:09] IV2MSG : Option - FairWay
+[2024-06-17 05:56:32] HanderType : [Left] -> [Left]
+[2024-06-17 05:56:32] IV2MSG : Option - LeftHander
+[2024-06-17 05:56:32] TeeMode : [Up] -> [Up]
+[2024-06-17 05:56:32] IV2MSG : Option - TeeUp
+[2024-06-17 05:56:32] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:56:32] IV2MSG : Option - FairWay
+[2024-06-17 05:56:58] HanderType : [Left] -> [Left]
+[2024-06-17 05:56:58] IV2MSG : Option - LeftHander
+[2024-06-17 05:56:58] TeeMode : [Up] -> [Up]
+[2024-06-17 05:56:58] IV2MSG : Option - TeeUp
+[2024-06-17 05:56:58] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:56:58] IV2MSG : Option - FairWay
+[2024-06-17 05:57:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:57:01] 1 -> 1
+[2024-06-17 05:57:01] ImageQueue Reset : Main Camera
+[2024-06-17 05:57:01] IRLight : Idle
+[2024-06-17 05:57:02] IRLight : Standby
+[2024-06-17 05:57:25] HanderType : [Left] -> [Left]
+[2024-06-17 05:57:25] IV2MSG : Option - LeftHander
+[2024-06-17 05:57:25] TeeMode : [Up] -> [Up]
+[2024-06-17 05:57:25] IV2MSG : Option - TeeUp
+[2024-06-17 05:57:25] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:57:25] IV2MSG : Option - FairWay
+[2024-06-17 05:57:52] HanderType : [Left] -> [Left]
+[2024-06-17 05:57:52] IV2MSG : Option - LeftHander
+[2024-06-17 05:57:52] TeeMode : [Up] -> [Up]
+[2024-06-17 05:57:52] IV2MSG : Option - TeeUp
+[2024-06-17 05:57:52] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:57:52] IV2MSG : Option - FairWay
+[2024-06-17 05:58:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:58:21] 1 -> 1
+[2024-06-17 05:58:21] ImageQueue Reset : Main Camera
+[2024-06-17 05:58:21] IRLight : Idle
+[2024-06-17 05:58:22] IRLight : Standby
+[2024-06-17 05:58:23] HanderType : [Left] -> [Left]
+[2024-06-17 05:58:23] IV2MSG : Option - LeftHander
+[2024-06-17 05:58:23] TeeMode : [Up] -> [Up]
+[2024-06-17 05:58:23] IV2MSG : Option - TeeUp
+[2024-06-17 05:58:23] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:58:23] IV2MSG : Option - FairWay
+[2024-06-17 05:58:53] HanderType : [Left] -> [Left]
+[2024-06-17 05:58:53] IV2MSG : Option - LeftHander
+[2024-06-17 05:58:53] TeeMode : [Up] -> [Up]
+[2024-06-17 05:58:53] IV2MSG : Option - TeeUp
+[2024-06-17 05:58:53] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:58:53] IV2MSG : Option - FairWay
+[2024-06-17 05:59:26] HanderType : [Left] -> [Left]
+[2024-06-17 05:59:26] IV2MSG : Option - LeftHander
+[2024-06-17 05:59:26] TeeMode : [Up] -> [Up]
+[2024-06-17 05:59:26] IV2MSG : Option - TeeUp
+[2024-06-17 05:59:26] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 05:59:26] IV2MSG : Option - FairWay
+[2024-06-17 05:59:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 05:59:41] 1 -> 1
+[2024-06-17 05:59:41] ImageQueue Reset : Main Camera
+[2024-06-17 05:59:41] IRLight : Idle
+[2024-06-17 05:59:42] IRLight : Standby
+[2024-06-17 06:00:00] HanderType : [Left] -> [Left]
+[2024-06-17 06:00:00] IV2MSG : Option - LeftHander
+[2024-06-17 06:00:00] TeeMode : [Up] -> [Up]
+[2024-06-17 06:00:00] IV2MSG : Option - TeeUp
+[2024-06-17 06:00:00] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:00:00] IV2MSG : Option - FairWay
+[2024-06-17 06:00:28] HanderType : [Left] -> [Left]
+[2024-06-17 06:00:28] IV2MSG : Option - LeftHander
+[2024-06-17 06:00:28] TeeMode : [Up] -> [Up]
+[2024-06-17 06:00:28] IV2MSG : Option - TeeUp
+[2024-06-17 06:00:28] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:00:28] IV2MSG : Option - FairWay
+[2024-06-17 06:00:52] HanderType : [Left] -> [Left]
+[2024-06-17 06:00:52] IV2MSG : Option - LeftHander
+[2024-06-17 06:00:52] TeeMode : [Up] -> [Up]
+[2024-06-17 06:00:52] IV2MSG : Option - TeeUp
+[2024-06-17 06:00:52] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:00:52] IV2MSG : Option - FairWay
+[2024-06-17 06:01:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:01:01] 1 -> 1
+[2024-06-17 06:01:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:01:01] IRLight : Idle
+[2024-06-17 06:01:02] IRLight : Standby
+[2024-06-17 06:01:20] HanderType : [Left] -> [Left]
+[2024-06-17 06:01:20] IV2MSG : Option - LeftHander
+[2024-06-17 06:01:20] TeeMode : [Up] -> [Up]
+[2024-06-17 06:01:20] IV2MSG : Option - TeeUp
+[2024-06-17 06:01:20] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:01:20] IV2MSG : Option - FairWay
+[2024-06-17 06:01:48] HanderType : [Left] -> [Left]
+[2024-06-17 06:01:48] IV2MSG : Option - LeftHander
+[2024-06-17 06:01:48] TeeMode : [Up] -> [Up]
+[2024-06-17 06:01:48] IV2MSG : Option - TeeUp
+[2024-06-17 06:01:48] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:01:48] IV2MSG : Option - FairWay
+[2024-06-17 06:02:18] HanderType : [Left] -> [Left]
+[2024-06-17 06:02:18] IV2MSG : Option - LeftHander
+[2024-06-17 06:02:18] TeeMode : [Up] -> [Up]
+[2024-06-17 06:02:18] IV2MSG : Option - TeeUp
+[2024-06-17 06:02:18] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:02:18] IV2MSG : Option - FairWay
+[2024-06-17 06:02:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:02:21] 1 -> 1
+[2024-06-17 06:02:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:02:21] IRLight : Idle
+[2024-06-17 06:02:22] IRLight : Standby
+[2024-06-17 06:02:45] HanderType : [Left] -> [Left]
+[2024-06-17 06:02:45] IV2MSG : Option - LeftHander
+[2024-06-17 06:02:45] TeeMode : [Up] -> [Up]
+[2024-06-17 06:02:45] IV2MSG : Option - TeeUp
+[2024-06-17 06:02:45] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:02:45] IV2MSG : Option - FairWay
+[2024-06-17 06:03:13] HanderType : [Left] -> [Left]
+[2024-06-17 06:03:13] IV2MSG : Option - LeftHander
+[2024-06-17 06:03:13] TeeMode : [Up] -> [Up]
+[2024-06-17 06:03:13] IV2MSG : Option - TeeUp
+[2024-06-17 06:03:13] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:03:13] IV2MSG : Option - FairWay
+[2024-06-17 06:03:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:03:41] 1 -> 1
+[2024-06-17 06:03:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:03:41] IRLight : Idle
+[2024-06-17 06:03:42] IRLight : Standby
+[2024-06-17 06:03:46] HanderType : [Left] -> [Left]
+[2024-06-17 06:03:46] IV2MSG : Option - LeftHander
+[2024-06-17 06:03:46] TeeMode : [Up] -> [Up]
+[2024-06-17 06:03:46] IV2MSG : Option - TeeUp
+[2024-06-17 06:03:46] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:03:46] IV2MSG : Option - FairWay
+[2024-06-17 06:04:20] HanderType : [Left] -> [Left]
+[2024-06-17 06:04:20] IV2MSG : Option - LeftHander
+[2024-06-17 06:04:20] TeeMode : [Up] -> [Up]
+[2024-06-17 06:04:20] IV2MSG : Option - TeeUp
+[2024-06-17 06:04:20] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:04:20] IV2MSG : Option - FairWay
+[2024-06-17 06:04:51] HanderType : [Left] -> [Left]
+[2024-06-17 06:04:51] IV2MSG : Option - LeftHander
+[2024-06-17 06:04:51] TeeMode : [Up] -> [Up]
+[2024-06-17 06:04:51] IV2MSG : Option - TeeUp
+[2024-06-17 06:04:51] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:04:51] IV2MSG : Option - FairWay
+[2024-06-17 06:05:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:05:01] 1 -> 1
+[2024-06-17 06:05:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:05:01] IRLight : Idle
+[2024-06-17 06:05:02] IRLight : Standby
+[2024-06-17 06:05:18] HanderType : [Left] -> [Left]
+[2024-06-17 06:05:18] IV2MSG : Option - LeftHander
+[2024-06-17 06:05:18] TeeMode : [Up] -> [Up]
+[2024-06-17 06:05:18] IV2MSG : Option - TeeUp
+[2024-06-17 06:05:18] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:05:18] IV2MSG : Option - FairWay
+[2024-06-17 06:05:44] HanderType : [Left] -> [Left]
+[2024-06-17 06:05:44] IV2MSG : Option - LeftHander
+[2024-06-17 06:05:44] TeeMode : [Up] -> [Up]
+[2024-06-17 06:05:44] IV2MSG : Option - TeeUp
+[2024-06-17 06:05:44] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:05:44] IV2MSG : Option - FairWay
+[2024-06-17 06:06:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:06:21] 1 -> 1
+[2024-06-17 06:06:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:06:21] IRLight : Idle
+[2024-06-17 06:06:22] IRLight : Standby
+[2024-06-17 06:06:24] HanderType : [Left] -> [Left]
+[2024-06-17 06:06:24] IV2MSG : Option - LeftHander
+[2024-06-17 06:06:24] TeeMode : [Up] -> [Up]
+[2024-06-17 06:06:24] IV2MSG : Option - TeeUp
+[2024-06-17 06:06:24] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:06:24] IV2MSG : Option - FairWay
+[2024-06-17 06:06:55] HanderType : [Left] -> [Left]
+[2024-06-17 06:06:55] IV2MSG : Option - LeftHander
+[2024-06-17 06:06:55] TeeMode : [Up] -> [Up]
+[2024-06-17 06:06:55] IV2MSG : Option - TeeUp
+[2024-06-17 06:06:55] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:06:55] IV2MSG : Option - FairWay
+[2024-06-17 06:07:25] HanderType : [Left] -> [Left]
+[2024-06-17 06:07:25] IV2MSG : Option - LeftHander
+[2024-06-17 06:07:25] TeeMode : [Up] -> [Up]
+[2024-06-17 06:07:25] IV2MSG : Option - TeeUp
+[2024-06-17 06:07:25] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:07:25] IV2MSG : Option - FairWay
+[2024-06-17 06:07:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:07:41] 1 -> 1
+[2024-06-17 06:07:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:07:41] IRLight : Idle
+[2024-06-17 06:07:42] IRLight : Standby
+[2024-06-17 06:07:46] HanderType : [Left] -> [Left]
+[2024-06-17 06:07:46] IV2MSG : Option - LeftHander
+[2024-06-17 06:07:46] TeeMode : [Up] -> [Up]
+[2024-06-17 06:07:46] IV2MSG : Option - TeeUp
+[2024-06-17 06:07:46] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:07:46] IV2MSG : Option - FairWay
+[2024-06-17 06:08:07] HanderType : [Left] -> [Left]
+[2024-06-17 06:08:07] IV2MSG : Option - LeftHander
+[2024-06-17 06:08:07] TeeMode : [Up] -> [Up]
+[2024-06-17 06:08:07] IV2MSG : Option - TeeUp
+[2024-06-17 06:08:07] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:08:07] IV2MSG : Option - FairWay
+[2024-06-17 06:09:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:09:01] 1 -> 1
+[2024-06-17 06:09:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:09:01] IRLight : Idle
+[2024-06-17 06:09:02] IRLight : Standby
+[2024-06-17 06:10:02] HanderType : [Left] -> [Left]
+[2024-06-17 06:10:02] IV2MSG : Option - LeftHander
+[2024-06-17 06:10:02] TeeMode : [Up] -> [Up]
+[2024-06-17 06:10:02] IV2MSG : Option - TeeUp
+[2024-06-17 06:10:02] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:10:02] IV2MSG : Option - FairWay
+[2024-06-17 06:10:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:10:21] 1 -> 1
+[2024-06-17 06:10:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:10:21] IRLight : Idle
+[2024-06-17 06:10:22] IRLight : Standby
+[2024-06-17 06:10:34] HanderType : [Left] -> [Left]
+[2024-06-17 06:10:34] IV2MSG : Option - LeftHander
+[2024-06-17 06:10:34] TeeMode : [Up] -> [Up]
+[2024-06-17 06:10:34] IV2MSG : Option - TeeUp
+[2024-06-17 06:10:34] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:10:34] IV2MSG : Option - FairWay
+[2024-06-17 06:11:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:11:41] 1 -> 1
+[2024-06-17 06:11:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:11:41] IRLight : Idle
+[2024-06-17 06:11:42] IRLight : Standby
+[2024-06-17 06:11:43] HanderType : [Left] -> [Left]
+[2024-06-17 06:11:43] IV2MSG : Option - LeftHander
+[2024-06-17 06:11:43] TeeMode : [Up] -> [Up]
+[2024-06-17 06:11:43] IV2MSG : Option - TeeUp
+[2024-06-17 06:11:43] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:11:43] IV2MSG : Option - FairWay
+[2024-06-17 06:12:10] HanderType : [Left] -> [Left]
+[2024-06-17 06:12:10] IV2MSG : Option - LeftHander
+[2024-06-17 06:12:10] TeeMode : [Up] -> [Up]
+[2024-06-17 06:12:10] IV2MSG : Option - TeeUp
+[2024-06-17 06:12:10] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:12:10] IV2MSG : Option - FairWay
+[2024-06-17 06:12:44] HanderType : [Left] -> [Left]
+[2024-06-17 06:12:44] IV2MSG : Option - LeftHander
+[2024-06-17 06:12:44] TeeMode : [Up] -> [Up]
+[2024-06-17 06:12:44] IV2MSG : Option - TeeUp
+[2024-06-17 06:12:44] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:12:44] IV2MSG : Option - FairWay
+[2024-06-17 06:13:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:13:01] 1 -> 1
+[2024-06-17 06:13:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:13:01] IRLight : Idle
+[2024-06-17 06:13:02] IRLight : Standby
+[2024-06-17 06:13:07] HanderType : [Left] -> [Left]
+[2024-06-17 06:13:07] IV2MSG : Option - LeftHander
+[2024-06-17 06:13:07] TeeMode : [Up] -> [Up]
+[2024-06-17 06:13:07] IV2MSG : Option - TeeUp
+[2024-06-17 06:13:07] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:13:07] IV2MSG : Option - FairWay
+[2024-06-17 06:14:08] HanderType : [Left] -> [Left]
+[2024-06-17 06:14:08] IV2MSG : Option - LeftHander
+[2024-06-17 06:14:08] TeeMode : [Up] -> [Up]
+[2024-06-17 06:14:08] IV2MSG : Option - TeeUp
+[2024-06-17 06:14:08] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:14:08] IV2MSG : Option - FairWay
+[2024-06-17 06:14:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:14:21] 1 -> 1
+[2024-06-17 06:14:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:14:21] IRLight : Idle
+[2024-06-17 06:14:22] IRLight : Standby
+[2024-06-17 06:14:43] HanderType : [Left] -> [Left]
+[2024-06-17 06:14:43] IV2MSG : Option - LeftHander
+[2024-06-17 06:14:43] TeeMode : [Up] -> [Up]
+[2024-06-17 06:14:43] IV2MSG : Option - TeeUp
+[2024-06-17 06:14:43] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:14:43] IV2MSG : Option - FairWay
+[2024-06-17 06:15:06] HanderType : [Left] -> [Left]
+[2024-06-17 06:15:06] IV2MSG : Option - LeftHander
+[2024-06-17 06:15:06] TeeMode : [Up] -> [Up]
+[2024-06-17 06:15:06] IV2MSG : Option - TeeUp
+[2024-06-17 06:15:06] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:15:06] IV2MSG : Option - FairWay
+[2024-06-17 06:15:30] HanderType : [Left] -> [Left]
+[2024-06-17 06:15:30] IV2MSG : Option - LeftHander
+[2024-06-17 06:15:30] TeeMode : [Up] -> [Up]
+[2024-06-17 06:15:30] IV2MSG : Option - TeeUp
+[2024-06-17 06:15:30] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:15:30] IV2MSG : Option - FairWay
+[2024-06-17 06:15:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:15:41] 1 -> 1
+[2024-06-17 06:15:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:15:41] IRLight : Idle
+[2024-06-17 06:15:42] IRLight : Standby
+[2024-06-17 06:15:55] HanderType : [Left] -> [Left]
+[2024-06-17 06:15:55] IV2MSG : Option - LeftHander
+[2024-06-17 06:15:55] TeeMode : [Up] -> [Up]
+[2024-06-17 06:15:55] IV2MSG : Option - TeeUp
+[2024-06-17 06:15:55] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 06:15:55] IV2MSG : Option - FairWay
+[2024-06-17 06:17:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:17:01] 1 -> 1
+[2024-06-17 06:17:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:17:01] IRLight : Idle
+[2024-06-17 06:17:02] IRLight : Standby
+[2024-06-17 06:18:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:18:21] 1 -> 1
+[2024-06-17 06:18:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:18:21] IRLight : Idle
+[2024-06-17 06:18:22] IRLight : Standby
+[2024-06-17 06:19:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:19:41] 1 -> 1
+[2024-06-17 06:19:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:19:41] IRLight : Idle
+[2024-06-17 06:19:42] IRLight : Standby
+[2024-06-17 06:21:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:21:01] 1 -> 1
+[2024-06-17 06:21:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:21:01] IRLight : Idle
+[2024-06-17 06:21:02] IRLight : Standby
+[2024-06-17 06:22:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:22:21] 1 -> 1
+[2024-06-17 06:22:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:22:21] IRLight : Idle
+[2024-06-17 06:22:22] IRLight : Standby
+[2024-06-17 06:23:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:23:41] 1 -> 1
+[2024-06-17 06:23:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:23:41] IRLight : Idle
+[2024-06-17 06:23:42] IRLight : Standby
+[2024-06-17 06:25:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:25:01] 1 -> 1
+[2024-06-17 06:25:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:25:01] IRLight : Idle
+[2024-06-17 06:25:02] IRLight : Standby
+[2024-06-17 06:26:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:26:21] 1 -> 1
+[2024-06-17 06:26:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:26:21] IRLight : Idle
+[2024-06-17 06:26:22] IRLight : Standby
+[2024-06-17 06:27:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:27:41] 1 -> 1
+[2024-06-17 06:27:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:27:41] IRLight : Idle
+[2024-06-17 06:27:42] IRLight : Standby
+[2024-06-17 06:29:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:29:01] 1 -> 1
+[2024-06-17 06:29:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:29:01] IRLight : Idle
+[2024-06-17 06:29:02] IRLight : Standby
+[2024-06-17 06:30:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:30:21] 1 -> 1
+[2024-06-17 06:30:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:30:21] IRLight : Idle
+[2024-06-17 06:30:22] IRLight : Standby
+[2024-06-17 06:31:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:31:41] 1 -> 1
+[2024-06-17 06:31:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:31:41] IRLight : Idle
+[2024-06-17 06:31:42] IRLight : Standby
+[2024-06-17 06:33:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:33:01] 1 -> 1
+[2024-06-17 06:33:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:33:01] IRLight : Idle
+[2024-06-17 06:33:02] IRLight : Standby
+[2024-06-17 06:34:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:34:21] 1 -> 1
+[2024-06-17 06:34:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:34:21] IRLight : Idle
+[2024-06-17 06:34:22] IRLight : Standby
+[2024-06-17 06:35:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:35:41] 1 -> 1
+[2024-06-17 06:35:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:35:41] IRLight : Idle
+[2024-06-17 06:35:42] IRLight : Standby
+[2024-06-17 06:37:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:37:01] 1 -> 1
+[2024-06-17 06:37:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:37:01] IRLight : Idle
+[2024-06-17 06:37:02] IRLight : Standby
+[2024-06-17 06:38:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:38:21] 1 -> 1
+[2024-06-17 06:38:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:38:21] IRLight : Idle
+[2024-06-17 06:38:22] IRLight : Standby
+[2024-06-17 06:39:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:39:41] 1 -> 1
+[2024-06-17 06:39:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:39:41] IRLight : Idle
+[2024-06-17 06:39:42] IRLight : Standby
+[2024-06-17 06:41:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:41:01] 1 -> 1
+[2024-06-17 06:41:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:41:01] IRLight : Idle
+[2024-06-17 06:41:02] IRLight : Standby
+[2024-06-17 06:42:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:42:21] 1 -> 1
+[2024-06-17 06:42:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:42:21] IRLight : Idle
+[2024-06-17 06:42:22] IRLight : Standby
+[2024-06-17 06:43:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:43:41] 1 -> 1
+[2024-06-17 06:43:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:43:41] IRLight : Idle
+[2024-06-17 06:43:42] IRLight : Standby
+[2024-06-17 06:45:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:45:01] 1 -> 1
+[2024-06-17 06:45:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:45:01] IRLight : Idle
+[2024-06-17 06:45:02] IRLight : Standby
+[2024-06-17 06:46:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:46:21] 1 -> 1
+[2024-06-17 06:46:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:46:21] IRLight : Idle
+[2024-06-17 06:46:22] IRLight : Standby
+[2024-06-17 06:47:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:47:41] 1 -> 1
+[2024-06-17 06:47:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:47:41] IRLight : Idle
+[2024-06-17 06:47:42] IRLight : Standby
+[2024-06-17 06:49:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:49:01] 1 -> 1
+[2024-06-17 06:49:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:49:01] IRLight : Idle
+[2024-06-17 06:49:02] IRLight : Standby
+[2024-06-17 06:50:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:50:21] 1 -> 1
+[2024-06-17 06:50:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:50:21] IRLight : Idle
+[2024-06-17 06:50:22] IRLight : Standby
+[2024-06-17 06:51:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:51:41] 1 -> 1
+[2024-06-17 06:51:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:51:41] IRLight : Idle
+[2024-06-17 06:51:42] IRLight : Standby
+[2024-06-17 06:53:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:53:01] 1 -> 1
+[2024-06-17 06:53:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:53:01] IRLight : Idle
+[2024-06-17 06:53:02] IRLight : Standby
+[2024-06-17 06:54:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:54:21] 1 -> 1
+[2024-06-17 06:54:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:54:21] IRLight : Idle
+[2024-06-17 06:54:22] IRLight : Standby
+[2024-06-17 06:55:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:55:41] 1 -> 1
+[2024-06-17 06:55:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:55:41] IRLight : Idle
+[2024-06-17 06:55:42] IRLight : Standby
+[2024-06-17 06:57:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:57:01] 1 -> 1
+[2024-06-17 06:57:01] ImageQueue Reset : Main Camera
+[2024-06-17 06:57:01] IRLight : Idle
+[2024-06-17 06:57:02] IRLight : Standby
+[2024-06-17 06:58:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:58:21] 1 -> 1
+[2024-06-17 06:58:21] ImageQueue Reset : Main Camera
+[2024-06-17 06:58:21] IRLight : Idle
+[2024-06-17 06:58:22] IRLight : Standby
+[2024-06-17 06:59:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 06:59:41] 1 -> 1
+[2024-06-17 06:59:41] ImageQueue Reset : Main Camera
+[2024-06-17 06:59:41] IRLight : Idle
+[2024-06-17 06:59:42] IRLight : Standby
+[2024-06-17 07:01:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:01:01] 1 -> 1
+[2024-06-17 07:01:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:01:01] IRLight : Idle
+[2024-06-17 07:01:02] IRLight : Standby
+[2024-06-17 07:02:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:02:21] 1 -> 1
+[2024-06-17 07:02:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:02:21] IRLight : Idle
+[2024-06-17 07:02:22] IRLight : Standby
+[2024-06-17 07:03:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:03:41] 1 -> 1
+[2024-06-17 07:03:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:03:41] IRLight : Idle
+[2024-06-17 07:03:42] IRLight : Standby
+[2024-06-17 07:05:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:05:01] 1 -> 1
+[2024-06-17 07:05:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:05:01] IRLight : Idle
+[2024-06-17 07:05:02] IRLight : Standby
+[2024-06-17 07:06:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:06:21] 1 -> 1
+[2024-06-17 07:06:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:06:21] IRLight : Idle
+[2024-06-17 07:06:22] IRLight : Standby
+[2024-06-17 07:07:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:07:41] 1 -> 1
+[2024-06-17 07:07:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:07:41] IRLight : Idle
+[2024-06-17 07:07:42] IRLight : Standby
+[2024-06-17 07:09:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:09:01] 1 -> 1
+[2024-06-17 07:09:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:09:01] IRLight : Idle
+[2024-06-17 07:09:02] IRLight : Standby
+[2024-06-17 07:10:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:10:21] 1 -> 1
+[2024-06-17 07:10:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:10:21] IRLight : Idle
+[2024-06-17 07:10:22] IRLight : Standby
+[2024-06-17 07:11:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:11:41] 1 -> 1
+[2024-06-17 07:11:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:11:41] IRLight : Idle
+[2024-06-17 07:11:42] IRLight : Standby
+[2024-06-17 07:13:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:13:01] 1 -> 1
+[2024-06-17 07:13:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:13:01] IRLight : Idle
+[2024-06-17 07:13:02] IRLight : Standby
+[2024-06-17 07:14:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:14:21] 1 -> 1
+[2024-06-17 07:14:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:14:21] IRLight : Idle
+[2024-06-17 07:14:22] IRLight : Standby
+[2024-06-17 07:15:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:15:41] 1 -> 1
+[2024-06-17 07:15:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:15:41] IRLight : Idle
+[2024-06-17 07:15:42] IRLight : Standby
+[2024-06-17 07:17:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:17:01] 1 -> 1
+[2024-06-17 07:17:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:17:01] IRLight : Idle
+[2024-06-17 07:17:02] IRLight : Standby
+[2024-06-17 07:18:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:18:21] 1 -> 1
+[2024-06-17 07:18:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:18:21] IRLight : Idle
+[2024-06-17 07:18:22] IRLight : Standby
+[2024-06-17 07:19:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:19:41] 1 -> 1
+[2024-06-17 07:19:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:19:41] IRLight : Idle
+[2024-06-17 07:19:42] IRLight : Standby
+[2024-06-17 07:21:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:21:01] 1 -> 1
+[2024-06-17 07:21:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:21:01] IRLight : Idle
+[2024-06-17 07:21:02] IRLight : Standby
+[2024-06-17 07:22:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:22:21] 1 -> 1
+[2024-06-17 07:22:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:22:21] IRLight : Idle
+[2024-06-17 07:22:22] IRLight : Standby
+[2024-06-17 07:23:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:23:41] 1 -> 1
+[2024-06-17 07:23:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:23:41] IRLight : Idle
+[2024-06-17 07:23:42] IRLight : Standby
+[2024-06-17 07:25:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:25:01] 1 -> 1
+[2024-06-17 07:25:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:25:01] IRLight : Idle
+[2024-06-17 07:25:02] IRLight : Standby
+[2024-06-17 07:26:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:26:21] 1 -> 1
+[2024-06-17 07:26:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:26:21] IRLight : Idle
+[2024-06-17 07:26:22] IRLight : Standby
+[2024-06-17 07:27:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:27:41] 1 -> 1
+[2024-06-17 07:27:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:27:41] IRLight : Idle
+[2024-06-17 07:27:42] IRLight : Standby
+[2024-06-17 07:29:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:29:01] 1 -> 1
+[2024-06-17 07:29:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:29:01] IRLight : Idle
+[2024-06-17 07:29:02] IRLight : Standby
+[2024-06-17 07:30:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:30:21] 1 -> 1
+[2024-06-17 07:30:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:30:21] IRLight : Idle
+[2024-06-17 07:30:22] IRLight : Standby
+[2024-06-17 07:31:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:31:41] 1 -> 1
+[2024-06-17 07:31:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:31:41] IRLight : Idle
+[2024-06-17 07:31:42] IRLight : Standby
+[2024-06-17 07:33:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:33:01] 1 -> 1
+[2024-06-17 07:33:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:33:01] IRLight : Idle
+[2024-06-17 07:33:02] IRLight : Standby
+[2024-06-17 07:34:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:34:21] 1 -> 1
+[2024-06-17 07:34:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:34:21] IRLight : Idle
+[2024-06-17 07:34:22] IRLight : Standby
+[2024-06-17 07:35:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:35:41] 1 -> 1
+[2024-06-17 07:35:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:35:41] IRLight : Idle
+[2024-06-17 07:35:42] IRLight : Standby
+[2024-06-17 07:37:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:37:01] 1 -> 1
+[2024-06-17 07:37:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:37:01] IRLight : Idle
+[2024-06-17 07:37:02] IRLight : Standby
+[2024-06-17 07:38:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:38:21] 1 -> 1
+[2024-06-17 07:38:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:38:21] IRLight : Idle
+[2024-06-17 07:38:22] IRLight : Standby
+[2024-06-17 07:39:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:39:41] 1 -> 1
+[2024-06-17 07:39:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:39:41] IRLight : Idle
+[2024-06-17 07:39:42] IRLight : Standby
+[2024-06-17 07:41:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:41:01] 1 -> 1
+[2024-06-17 07:41:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:41:01] IRLight : Idle
+[2024-06-17 07:41:02] IRLight : Standby
+[2024-06-17 07:42:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:42:21] 1 -> 1
+[2024-06-17 07:42:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:42:21] IRLight : Idle
+[2024-06-17 07:42:22] IRLight : Standby
+[2024-06-17 07:43:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:43:41] 1 -> 1
+[2024-06-17 07:43:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:43:41] IRLight : Idle
+[2024-06-17 07:43:42] IRLight : Standby
+[2024-06-17 07:45:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:45:01] 1 -> 1
+[2024-06-17 07:45:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:45:01] IRLight : Idle
+[2024-06-17 07:45:02] IRLight : Standby
+[2024-06-17 07:46:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:46:21] 1 -> 1
+[2024-06-17 07:46:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:46:21] IRLight : Idle
+[2024-06-17 07:46:22] IRLight : Standby
+[2024-06-17 07:47:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:47:41] 1 -> 1
+[2024-06-17 07:47:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:47:41] IRLight : Idle
+[2024-06-17 07:47:42] IRLight : Standby
+[2024-06-17 07:49:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:49:01] 1 -> 1
+[2024-06-17 07:49:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:49:01] IRLight : Idle
+[2024-06-17 07:49:02] IRLight : Standby
+[2024-06-17 07:50:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:50:21] 1 -> 1
+[2024-06-17 07:50:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:50:21] IRLight : Idle
+[2024-06-17 07:50:22] IRLight : Standby
+[2024-06-17 07:51:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:51:41] 1 -> 1
+[2024-06-17 07:51:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:51:41] IRLight : Idle
+[2024-06-17 07:51:42] IRLight : Standby
+[2024-06-17 07:53:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:53:01] 1 -> 1
+[2024-06-17 07:53:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:53:01] IRLight : Idle
+[2024-06-17 07:53:02] IRLight : Standby
+[2024-06-17 07:54:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:54:21] 1 -> 1
+[2024-06-17 07:54:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:54:21] IRLight : Idle
+[2024-06-17 07:54:22] IRLight : Standby
+[2024-06-17 07:55:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:55:41] 1 -> 1
+[2024-06-17 07:55:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:55:41] IRLight : Idle
+[2024-06-17 07:55:42] IRLight : Standby
+[2024-06-17 07:57:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:57:01] 1 -> 1
+[2024-06-17 07:57:01] ImageQueue Reset : Main Camera
+[2024-06-17 07:57:01] IRLight : Idle
+[2024-06-17 07:57:02] IRLight : Standby
+[2024-06-17 07:58:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:58:21] 1 -> 1
+[2024-06-17 07:58:21] ImageQueue Reset : Main Camera
+[2024-06-17 07:58:21] IRLight : Idle
+[2024-06-17 07:58:22] IRLight : Standby
+[2024-06-17 07:59:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 07:59:41] 1 -> 1
+[2024-06-17 07:59:41] ImageQueue Reset : Main Camera
+[2024-06-17 07:59:41] IRLight : Idle
+[2024-06-17 07:59:42] IRLight : Standby
+[2024-06-17 08:01:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:01:01] 1 -> 1
+[2024-06-17 08:01:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:01:01] IRLight : Idle
+[2024-06-17 08:01:02] IRLight : Standby
+[2024-06-17 08:02:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:02:21] 1 -> 1
+[2024-06-17 08:02:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:02:21] IRLight : Idle
+[2024-06-17 08:02:22] IRLight : Standby
+[2024-06-17 08:03:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:03:41] 1 -> 1
+[2024-06-17 08:03:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:03:41] IRLight : Idle
+[2024-06-17 08:03:42] IRLight : Standby
+[2024-06-17 08:05:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:05:01] 1 -> 1
+[2024-06-17 08:05:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:05:01] IRLight : Idle
+[2024-06-17 08:05:02] IRLight : Standby
+[2024-06-17 08:06:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:06:21] 1 -> 1
+[2024-06-17 08:06:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:06:21] IRLight : Idle
+[2024-06-17 08:06:22] IRLight : Standby
+[2024-06-17 08:07:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:07:41] 1 -> 1
+[2024-06-17 08:07:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:07:41] IRLight : Idle
+[2024-06-17 08:07:42] IRLight : Standby
+[2024-06-17 08:09:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:09:01] 1 -> 1
+[2024-06-17 08:09:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:09:01] IRLight : Idle
+[2024-06-17 08:09:02] IRLight : Standby
+[2024-06-17 08:10:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:10:21] 1 -> 1
+[2024-06-17 08:10:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:10:21] IRLight : Idle
+[2024-06-17 08:10:22] IRLight : Standby
+[2024-06-17 08:11:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:11:41] 1 -> 1
+[2024-06-17 08:11:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:11:41] IRLight : Idle
+[2024-06-17 08:11:42] IRLight : Standby
+[2024-06-17 08:13:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:13:01] 1 -> 1
+[2024-06-17 08:13:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:13:01] IRLight : Idle
+[2024-06-17 08:13:02] IRLight : Standby
+[2024-06-17 08:14:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:14:21] 1 -> 1
+[2024-06-17 08:14:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:14:21] IRLight : Idle
+[2024-06-17 08:14:22] IRLight : Standby
+[2024-06-17 08:15:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:15:41] 1 -> 1
+[2024-06-17 08:15:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:15:41] IRLight : Idle
+[2024-06-17 08:15:42] IRLight : Standby
+[2024-06-17 08:17:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:17:01] 1 -> 1
+[2024-06-17 08:17:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:17:01] IRLight : Idle
+[2024-06-17 08:17:02] IRLight : Standby
+[2024-06-17 08:18:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:18:21] 1 -> 1
+[2024-06-17 08:18:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:18:21] IRLight : Idle
+[2024-06-17 08:18:22] IRLight : Standby
+[2024-06-17 08:19:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:19:41] 1 -> 1
+[2024-06-17 08:19:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:19:41] IRLight : Idle
+[2024-06-17 08:19:42] IRLight : Standby
+[2024-06-17 08:21:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:21:01] 1 -> 1
+[2024-06-17 08:21:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:21:01] IRLight : Idle
+[2024-06-17 08:21:02] IRLight : Standby
+[2024-06-17 08:22:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:22:21] 1 -> 1
+[2024-06-17 08:22:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:22:21] IRLight : Idle
+[2024-06-17 08:22:22] IRLight : Standby
+[2024-06-17 08:23:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:23:41] 1 -> 1
+[2024-06-17 08:23:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:23:41] IRLight : Idle
+[2024-06-17 08:23:42] IRLight : Standby
+[2024-06-17 08:25:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:25:01] 1 -> 1
+[2024-06-17 08:25:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:25:01] IRLight : Idle
+[2024-06-17 08:25:02] IRLight : Standby
+[2024-06-17 08:26:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:26:21] 1 -> 1
+[2024-06-17 08:26:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:26:21] IRLight : Idle
+[2024-06-17 08:26:22] IRLight : Standby
+[2024-06-17 08:27:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:27:41] 1 -> 1
+[2024-06-17 08:27:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:27:41] IRLight : Idle
+[2024-06-17 08:27:42] IRLight : Standby
+[2024-06-17 08:29:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:29:01] 1 -> 1
+[2024-06-17 08:29:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:29:01] IRLight : Idle
+[2024-06-17 08:29:02] IRLight : Standby
+[2024-06-17 08:30:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:30:21] 1 -> 1
+[2024-06-17 08:30:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:30:21] IRLight : Idle
+[2024-06-17 08:30:22] IRLight : Standby
+[2024-06-17 08:31:41] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:31:41] 1 -> 1
+[2024-06-17 08:31:41] ImageQueue Reset : Main Camera
+[2024-06-17 08:31:41] IRLight : Idle
+[2024-06-17 08:31:42] IRLight : Standby
+[2024-06-17 08:33:01] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:33:01] 1 -> 1
+[2024-06-17 08:33:01] ImageQueue Reset : Main Camera
+[2024-06-17 08:33:01] IRLight : Idle
+[2024-06-17 08:33:02] IRLight : Standby
+[2024-06-17 08:34:21] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:34:21] 1 -> 1
+[2024-06-17 08:34:21] ImageQueue Reset : Main Camera
+[2024-06-17 08:34:21] IRLight : Idle
+[2024-06-17 08:34:22] IRLight : Standby
+[2024-06-17 08:35:42] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:35:42] 1 -> 1
+[2024-06-17 08:35:42] ImageQueue Reset : Main Camera
+[2024-06-17 08:35:42] IRLight : Idle
+[2024-06-17 08:35:43] IRLight : Standby
+[2024-06-17 08:37:02] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:37:02] 1 -> 1
+[2024-06-17 08:37:02] ImageQueue Reset : Main Camera
+[2024-06-17 08:37:02] IRLight : Idle
+[2024-06-17 08:37:03] IRLight : Standby
+[2024-06-17 08:38:22] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:38:22] 1 -> 1
+[2024-06-17 08:38:22] ImageQueue Reset : Main Camera
+[2024-06-17 08:38:22] IRLight : Idle
+[2024-06-17 08:38:23] IRLight : Standby
+[2024-06-17 08:39:42] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:39:42] 1 -> 1
+[2024-06-17 08:39:42] ImageQueue Reset : Main Camera
+[2024-06-17 08:39:42] IRLight : Idle
+[2024-06-17 08:39:43] IRLight : Standby
+[2024-06-17 08:41:02] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:41:02] 1 -> 1
+[2024-06-17 08:41:02] ImageQueue Reset : Main Camera
+[2024-06-17 08:41:02] IRLight : Idle
+[2024-06-17 08:41:03] IRLight : Standby
+[2024-06-17 08:42:22] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:42:22] 1 -> 1
+[2024-06-17 08:42:22] ImageQueue Reset : Main Camera
+[2024-06-17 08:42:22] IRLight : Idle
+[2024-06-17 08:42:23] IRLight : Standby
+[2024-06-17 08:43:42] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:43:42] 1 -> 1
+[2024-06-17 08:43:42] ImageQueue Reset : Main Camera
+[2024-06-17 08:43:42] IRLight : Idle
+[2024-06-17 08:43:43] IRLight : Standby
+[2024-06-17 08:45:02] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:45:02] 1 -> 1
+[2024-06-17 08:45:02] ImageQueue Reset : Main Camera
+[2024-06-17 08:45:02] IRLight : Idle
+[2024-06-17 08:45:03] IRLight : Standby
+[2024-06-17 08:46:22] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:46:22] 1 -> 1
+[2024-06-17 08:46:22] ImageQueue Reset : Main Camera
+[2024-06-17 08:46:22] IRLight : Idle
+[2024-06-17 08:46:23] IRLight : Standby
+[2024-06-17 08:47:42] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:47:42] 1 -> 1
+[2024-06-17 08:47:42] ImageQueue Reset : Main Camera
+[2024-06-17 08:47:42] IRLight : Idle
+[2024-06-17 08:47:43] IRLight : Standby
+[2024-06-17 08:49:02] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:49:02] 1 -> 1
+[2024-06-17 08:49:02] ImageQueue Reset : Main Camera
+[2024-06-17 08:49:02] IRLight : Idle
+[2024-06-17 08:49:03] IRLight : Standby
+[2024-06-17 08:50:22] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:50:22] 1 -> 1
+[2024-06-17 08:50:22] ImageQueue Reset : Main Camera
+[2024-06-17 08:50:22] IRLight : Idle
+[2024-06-17 08:50:23] IRLight : Standby
+[2024-06-17 08:51:42] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:51:42] 1 -> 1
+[2024-06-17 08:51:42] ImageQueue Reset : Main Camera
+[2024-06-17 08:51:42] IRLight : Idle
+[2024-06-17 08:51:43] IRLight : Standby
+[2024-06-17 08:53:02] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:53:02] 1 -> 1
+[2024-06-17 08:53:02] ImageQueue Reset : Main Camera
+[2024-06-17 08:53:02] IRLight : Idle
+[2024-06-17 08:53:03] IRLight : Standby
+[2024-06-17 08:54:22] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:54:22] 1 -> 1
+[2024-06-17 08:54:22] ImageQueue Reset : Main Camera
+[2024-06-17 08:54:22] IRLight : Idle
+[2024-06-17 08:54:23] IRLight : Standby
+[2024-06-17 08:55:42] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:55:42] 1 -> 1
+[2024-06-17 08:55:42] ImageQueue Reset : Main Camera
+[2024-06-17 08:55:42] IRLight : Idle
+[2024-06-17 08:55:43] IRLight : Standby
+[2024-06-17 08:57:02] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:57:02] 1 -> 1
+[2024-06-17 08:57:02] ImageQueue Reset : Main Camera
+[2024-06-17 08:57:02] IRLight : Idle
+[2024-06-17 08:57:03] IRLight : Standby
+[2024-06-17 08:58:22] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:58:22] 1 -> 1
+[2024-06-17 08:58:22] ImageQueue Reset : Main Camera
+[2024-06-17 08:58:22] IRLight : Idle
+[2024-06-17 08:58:23] IRLight : Standby
+[2024-06-17 08:59:42] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 08:59:42] 1 -> 1
+[2024-06-17 08:59:42] ImageQueue Reset : Main Camera
+[2024-06-17 08:59:42] IRLight : Idle
+[2024-06-17 08:59:43] IRLight : Standby
+[2024-06-17 09:01:02] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 09:01:02] 1 -> 1
+[2024-06-17 09:01:02] ImageQueue Reset : Main Camera
+[2024-06-17 09:01:02] IRLight : Idle
+[2024-06-17 09:01:03] IRLight : Standby
+[2024-06-17 09:02:22] Selected Camera ID : 0 _ OptionExpose : 2261
+[2024-06-17 09:02:22] 1 -> 1
+[2024-06-17 09:02:22] ImageQueue Reset : Main Camera
+[2024-06-17 09:02:22] IRLight : Idle
+[2024-06-17 09:02:23] IRLight : Standby
+[2024-06-17 09:03:01] IV2MSG : System - Operate
+[2024-06-17 09:03:01] HanderType : [Left] -> [Left]
+[2024-06-17 09:03:01] IV2MSG : Option - LeftHander
+[2024-06-17 09:03:01] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 09:03:01] IV2MSG : Option - FairWay
+[2024-06-17 09:03:01] 1 -> 0
+[2024-06-17 09:03:01] IRLight : Off
+[2024-06-17 09:03:01] IV2MSG : System - Stop
+[2024-06-17 09:03:02] 0 -> 0
+[2024-06-17 09:03:02] IV2MSG : System - Stop
+[2024-06-17 09:03:02] IRLight : Standby
+[2024-06-17 09:03:02] IRLight : Off
+[2024-06-17 09:03:03] IRLight : Standby

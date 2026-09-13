@@ -1,0 +1,2447 @@
+[2024-06-17 13:57] Register ExceptionFilter
+[2024-06-17 13:57:08] Log Data : Log_2024_0617_135708.txt
+[2024-06-17 13:57:10] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2024-06-17 13:57:10] Load Info Data
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionGain : 100
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionExpose : 596
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionGamma : 85
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionBrightness : 0
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionFlip : 3
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2024-06-17 13:57:15] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2024-06-17 13:57:15] Success Initialize
+[2024-06-17 13:57:15] ImageQueue Reset : Main Camera
+[2024-06-17 13:57:15] Initialize Success
+[2024-06-17 13:57:15] 0 -> 1
+[2024-06-17 13:57:15] IV2MSG : System - Operate
+[2024-06-17 13:57:15] HanderType : [Right] -> [Left]
+[2024-06-17 13:57:15] IV2MSG : Option - LeftHander
+[2024-06-17 13:57:15] TeeMode : [Up] -> [Up]
+[2024-06-17 13:57:15] IV2MSG : Option - TeeUp
+[2024-06-17 13:57:15] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 13:57:15] IV2MSG : Option - FairWay
+[2024-06-17 13:57:15] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 13:57:15] HanderType : [Left] -> [Left]
+[2024-06-17 13:57:15] IV2MSG : Option - LeftHander
+[2024-06-17 13:57:15] TeeMode : [Up] -> [Up]
+[2024-06-17 13:57:15] IV2MSG : Option - TeeUp
+[2024-06-17 13:57:15] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 13:57:15] IV2MSG : Option - FairWay
+[2024-06-17 13:57:15] HanderType : [Left] -> [Left]
+[2024-06-17 13:57:15] IV2MSG : Option - LeftHander
+[2024-06-17 13:57:15] TeeMode : [Up] -> [Up]
+[2024-06-17 13:57:15] IV2MSG : Option - TeeUp
+[2024-06-17 13:57:15] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 13:57:15] IV2MSG : Option - FairWay
+[2024-06-17 13:57:15] IV2MSG : System - Operate
+[2024-06-17 13:57:15] HanderType : [Left] -> [Left]
+[2024-06-17 13:57:15] IV2MSG : Option - LeftHander
+[2024-06-17 13:57:15] TeeMode : [Up] -> [Up]
+[2024-06-17 13:57:15] IV2MSG : Option - TeeUp
+[2024-06-17 13:57:15] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 13:57:15] IV2MSG : Option - FairWay
+[2024-06-17 13:57:15] IV2MSG : System - Operate
+[2024-06-17 13:57:15] HanderType : [Left] -> [Left]
+[2024-06-17 13:57:15] IV2MSG : Option - LeftHander
+[2024-06-17 13:57:15] TeeMode : [Up] -> [Up]
+[2024-06-17 13:57:15] IV2MSG : Option - TeeUp
+[2024-06-17 13:57:15] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 13:57:15] IV2MSG : Option - FairWay
+[2024-06-17 13:57:16] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 13:57:16] 1 -> 1
+[2024-06-17 13:57:16] ImageQueue Reset : Main Camera
+[2024-06-17 13:57:16] IRLight : Idle
+[2024-06-17 13:57:17] IRLight : Standby
+[2024-06-17 13:57:17] Selected Camera ID : 0 _ OptionExpose : 596
+[2024-06-17 13:57:17] IRLight : On
+[2024-06-17 13:57:17] 1 -> 2
+[2024-06-17 13:57:18] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 140)
+[2024-06-17 13:57:18] 2 -> 3
+[2024-06-17 13:57:18] IRLight : On
+[2024-06-17 13:57:18] ImageQueue Reset : Main Camera
+[2024-06-17 13:57:18] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 13:57:18] IV2MSG : State - subreadysuccess
+[2024-06-17 13:57:18] 3 -> 4
+[2024-06-17 13:57:19] IRLight : Standby
+[2024-06-17 13:57:19] IRLight : On
+[2024-06-17 13:57:20] IRLight : Standby
+[2024-06-17 13:58:13] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 13:58:13] Selected CameraID : 0 _ Set ROI Pos : (265, 140) -> (268, 86)
+[2024-06-17 13:58:13] 4 -> 1
+[2024-06-17 13:58:13] ImageQueue Reset : Main Camera
+[2024-06-17 13:58:13] IRLight : Idle
+[2024-06-17 13:58:14] IRLight : Standby
+[2024-06-17 13:59:33] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 13:59:33] 1 -> 1
+[2024-06-17 13:59:33] ImageQueue Reset : Main Camera
+[2024-06-17 13:59:33] IRLight : Idle
+[2024-06-17 13:59:34] IRLight : Standby
+[2024-06-17 14:00:53] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:00:53] 1 -> 1
+[2024-06-17 14:00:53] ImageQueue Reset : Main Camera
+[2024-06-17 14:00:53] IRLight : Idle
+[2024-06-17 14:00:54] IRLight : Standby
+[2024-06-17 14:02:13] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:02:13] 1 -> 1
+[2024-06-17 14:02:13] ImageQueue Reset : Main Camera
+[2024-06-17 14:02:13] IRLight : Idle
+[2024-06-17 14:02:14] IRLight : Standby
+[2024-06-17 14:02:54] Selected Camera ID : 0 _ OptionExpose : 596
+[2024-06-17 14:02:54] IRLight : On
+[2024-06-17 14:02:54] 1 -> 2
+[2024-06-17 14:02:55] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 140)
+[2024-06-17 14:02:55] 2 -> 3
+[2024-06-17 14:02:55] IRLight : On
+[2024-06-17 14:02:55] ImageQueue Reset : Main Camera
+[2024-06-17 14:02:55] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 14:02:55] IV2MSG : State - subreadysuccess
+[2024-06-17 14:02:55] 3 -> 4
+[2024-06-17 14:02:56] IRLight : Standby
+[2024-06-17 14:03:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:03:50] Selected CameraID : 0 _ Set ROI Pos : (265, 140) -> (268, 86)
+[2024-06-17 14:03:50] 4 -> 1
+[2024-06-17 14:03:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:03:50] IRLight : Idle
+[2024-06-17 14:03:51] IRLight : Standby
+[2024-06-17 14:05:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:05:10] 1 -> 1
+[2024-06-17 14:05:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:05:10] IRLight : Idle
+[2024-06-17 14:05:11] IRLight : Standby
+[2024-06-17 14:06:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:06:30] 1 -> 1
+[2024-06-17 14:06:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:06:30] IRLight : Idle
+[2024-06-17 14:06:31] IRLight : Standby
+[2024-06-17 14:07:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:07:50] 1 -> 1
+[2024-06-17 14:07:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:07:50] IRLight : Idle
+[2024-06-17 14:07:51] IRLight : Standby
+[2024-06-17 14:09:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:09:10] 1 -> 1
+[2024-06-17 14:09:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:09:10] IRLight : Idle
+[2024-06-17 14:09:11] IRLight : Standby
+[2024-06-17 14:10:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:10:30] 1 -> 1
+[2024-06-17 14:10:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:10:30] IRLight : Idle
+[2024-06-17 14:10:31] IRLight : Standby
+[2024-06-17 14:11:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:11:50] 1 -> 1
+[2024-06-17 14:11:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:11:50] IRLight : Idle
+[2024-06-17 14:11:51] IRLight : Standby
+[2024-06-17 14:13:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:13:10] 1 -> 1
+[2024-06-17 14:13:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:13:10] IRLight : Idle
+[2024-06-17 14:13:11] IRLight : Standby
+[2024-06-17 14:14:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:14:30] 1 -> 1
+[2024-06-17 14:14:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:14:30] IRLight : Idle
+[2024-06-17 14:14:31] IRLight : Standby
+[2024-06-17 14:15:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:15:50] 1 -> 1
+[2024-06-17 14:15:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:15:50] IRLight : Idle
+[2024-06-17 14:15:51] IRLight : Standby
+[2024-06-17 14:17:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:17:10] 1 -> 1
+[2024-06-17 14:17:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:17:10] IRLight : Idle
+[2024-06-17 14:17:11] IRLight : Standby
+[2024-06-17 14:18:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:18:30] 1 -> 1
+[2024-06-17 14:18:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:18:30] IRLight : Idle
+[2024-06-17 14:18:31] IRLight : Standby
+[2024-06-17 14:19:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:19:50] 1 -> 1
+[2024-06-17 14:19:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:19:50] IRLight : Idle
+[2024-06-17 14:19:51] IRLight : Standby
+[2024-06-17 14:21:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:21:10] 1 -> 1
+[2024-06-17 14:21:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:21:10] IRLight : Idle
+[2024-06-17 14:21:11] IRLight : Standby
+[2024-06-17 14:22:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:22:30] 1 -> 1
+[2024-06-17 14:22:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:22:30] IRLight : Idle
+[2024-06-17 14:22:31] IRLight : Standby
+[2024-06-17 14:23:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:23:50] 1 -> 1
+[2024-06-17 14:23:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:23:50] IRLight : Idle
+[2024-06-17 14:23:51] IRLight : Standby
+[2024-06-17 14:25:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:25:10] 1 -> 1
+[2024-06-17 14:25:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:25:10] IRLight : Idle
+[2024-06-17 14:25:11] IRLight : Standby
+[2024-06-17 14:26:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:26:30] 1 -> 1
+[2024-06-17 14:26:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:26:30] IRLight : Idle
+[2024-06-17 14:26:31] IRLight : Standby
+[2024-06-17 14:27:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:27:50] 1 -> 1
+[2024-06-17 14:27:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:27:50] IRLight : Idle
+[2024-06-17 14:27:51] IRLight : Standby
+[2024-06-17 14:29:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:29:10] 1 -> 1
+[2024-06-17 14:29:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:29:10] IRLight : Idle
+[2024-06-17 14:29:11] IRLight : Standby
+[2024-06-17 14:30:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:30:30] 1 -> 1
+[2024-06-17 14:30:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:30:30] IRLight : Idle
+[2024-06-17 14:30:31] IRLight : Standby
+[2024-06-17 14:31:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:31:50] 1 -> 1
+[2024-06-17 14:31:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:31:50] IRLight : Idle
+[2024-06-17 14:31:51] IRLight : Standby
+[2024-06-17 14:33:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:33:10] 1 -> 1
+[2024-06-17 14:33:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:33:10] IRLight : Idle
+[2024-06-17 14:33:11] IRLight : Standby
+[2024-06-17 14:34:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:34:30] 1 -> 1
+[2024-06-17 14:34:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:34:30] IRLight : Idle
+[2024-06-17 14:34:31] IRLight : Standby
+[2024-06-17 14:35:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:35:50] 1 -> 1
+[2024-06-17 14:35:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:35:50] IRLight : Idle
+[2024-06-17 14:35:51] IRLight : Standby
+[2024-06-17 14:37:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:37:10] 1 -> 1
+[2024-06-17 14:37:10] ImageQueue Reset : Main Camera
+[2024-06-17 14:37:10] IRLight : Idle
+[2024-06-17 14:37:11] IRLight : Standby
+[2024-06-17 14:38:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:38:30] 1 -> 1
+[2024-06-17 14:38:30] ImageQueue Reset : Main Camera
+[2024-06-17 14:38:30] IRLight : Idle
+[2024-06-17 14:38:31] IRLight : Standby
+[2024-06-17 14:39:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2024-06-17 14:39:50] 1 -> 1
+[2024-06-17 14:39:50] ImageQueue Reset : Main Camera
+[2024-06-17 14:39:50] IRLight : Idle
+[2024-06-17 14:39:51] IRLight : Standby
+[2024-06-17 14:40:10] Selected Camera ID : 0 _ OptionExpose : 596
+[2024-06-17 14:40:10] IRLight : On
+[2024-06-17 14:40:10] 1 -> 2
+[2024-06-17 14:40:11] IRLight : Standby
+[2024-06-17 14:40:11] 2 -> 1
+[2024-06-17 14:40:11] ImageQueue Reset : Main Camera
+[2024-06-17 14:40:11] 1 -> 2
+[2024-06-17 14:40:11] IRLight : On
+[2024-06-17 14:40:12] 2 -> 1
+[2024-06-17 14:40:12] ImageQueue Reset : Main Camera
+[2024-06-17 14:40:12] 1 -> 2
+[2024-06-17 14:40:12] IRLight : Standby
+[2024-06-17 14:40:13] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 140)
+[2024-06-17 14:40:13] 2 -> 3
+[2024-06-17 14:40:13] IRLight : On
+[2024-06-17 14:40:13] ImageQueue Reset : Main Camera
+[2024-06-17 14:40:13] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 14:40:13] IV2MSG : State - subreadysuccess
+[2024-06-17 14:40:13] 3 -> 4
+[2024-06-17 14:40:14] IRLight : Standby
+[2024-06-17 14:40:14] IRLight : On
+[2024-06-17 14:40:15] IRLight : Standby
+[2024-06-17 14:40:16] IRLight : On
+[2024-06-17 14:40:17] IRLight : Standby
+[2024-06-17 14:40:20] 4 -> 0
+[2024-06-17 14:40:20] IV2MSG : System - Stop
+[2024-06-17 14:40:20] 4 -> 0
+[2024-06-17 14:40:20] IV2MSG : System - Stop
+[2024-06-17 14:40:20] IRLight : Off
+[2024-06-17 14:40:21] IRLight : Standby
+[2024-06-17 14:40:22] IRLight : Off
+[2024-06-17 14:40:23] IRLight : Standby
+[2024-06-17 14:40:31] 0 -> 1
+[2024-06-17 14:40:31] IRLight : On
+[2024-06-17 14:40:31] IV2MSG : System - Operate
+[2024-06-17 14:40:31] HanderType : [Left] -> [Left]
+[2024-06-17 14:40:31] IV2MSG : Option - LeftHander
+[2024-06-17 14:40:31] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 14:40:31] IV2MSG : Option - FairWay
+[2024-06-17 14:40:31] 0 -> 0
+[2024-06-17 14:40:31] IV2MSG : System - Stop
+[2024-06-17 14:40:32] 0 -> 0
+[2024-06-17 14:40:32] IV2MSG : System - Stop
+[2024-06-17 14:40:32] IRLight : Standby
+[2024-06-17 14:40:33] IRLight : Off
+[2024-06-17 14:40:34] IRLight : Standby
+[2024-06-17 14:40:34] IRLight : Off
+[2024-06-17 14:40:35] IRLight : Standby
+[2024-06-17 14:41:54] IRLight : Off
+[2024-06-17 14:41:55] IRLight : Standby
+[2024-06-17 14:43:14] IRLight : Off
+[2024-06-17 14:43:15] IRLight : Standby
+[2024-06-17 14:44:34] IRLight : Off
+[2024-06-17 14:44:35] IRLight : Standby
+[2024-06-17 14:45:54] IRLight : Off
+[2024-06-17 14:45:55] IRLight : Standby
+[2024-06-17 14:47:14] IRLight : Off
+[2024-06-17 14:47:15] IRLight : Standby
+[2024-06-17 14:48:34] IRLight : Off
+[2024-06-17 14:48:35] IRLight : Standby
+[2024-06-17 14:49:54] IRLight : Off
+[2024-06-17 14:49:55] IRLight : Standby
+[2024-06-17 14:51:14] IRLight : Off
+[2024-06-17 14:51:15] IRLight : Standby
+[2024-06-17 14:52:34] IRLight : Off
+[2024-06-17 14:52:35] IRLight : Standby
+[2024-06-17 14:53:54] IRLight : Off
+[2024-06-17 14:53:55] IRLight : Standby
+[2024-06-17 14:55:14] IRLight : Off
+[2024-06-17 14:55:15] IRLight : Standby
+[2024-06-17 14:56:34] IRLight : Off
+[2024-06-17 14:56:35] IRLight : Standby
+[2024-06-17 14:57:54] IRLight : Off
+[2024-06-17 14:57:55] IRLight : Standby
+[2024-06-17 14:59:14] IRLight : Off
+[2024-06-17 14:59:15] IRLight : Standby
+[2024-06-17 15:00:34] IRLight : Off
+[2024-06-17 15:00:35] IRLight : Standby
+[2024-06-17 15:01:54] IRLight : Off
+[2024-06-17 15:01:55] IRLight : Standby
+[2024-06-17 15:03:14] IRLight : Off
+[2024-06-17 15:03:15] IRLight : Standby
+[2024-06-17 15:04:34] IRLight : Off
+[2024-06-17 15:04:35] IRLight : Standby
+[2024-06-17 15:05:54] IRLight : Off
+[2024-06-17 15:05:55] IRLight : Standby
+[2024-06-17 15:07:14] IRLight : Off
+[2024-06-17 15:07:15] IRLight : Standby
+[2024-06-17 15:08:34] IRLight : Off
+[2024-06-17 15:08:35] IRLight : Standby
+[2024-06-17 15:09:54] IRLight : Off
+[2024-06-17 15:09:55] IRLight : Standby
+[2024-06-17 15:11:14] IRLight : Off
+[2024-06-17 15:11:15] IRLight : Standby
+[2024-06-17 15:12:34] IRLight : Off
+[2024-06-17 15:12:35] IRLight : Standby
+[2024-06-17 15:13:54] IRLight : Off
+[2024-06-17 15:13:55] IRLight : Standby
+[2024-06-17 15:15:14] IRLight : Off
+[2024-06-17 15:15:15] IRLight : Standby
+[2024-06-17 15:16:34] IRLight : Off
+[2024-06-17 15:16:35] IRLight : Standby
+[2024-06-17 15:17:54] IRLight : Off
+[2024-06-17 15:17:55] IRLight : Standby
+[2024-06-17 15:19:14] IRLight : Off
+[2024-06-17 15:19:15] IRLight : Standby
+[2024-06-17 15:20:34] IRLight : Off
+[2024-06-17 15:20:35] IRLight : Standby
+[2024-06-17 15:21:54] IRLight : Off
+[2024-06-17 15:21:55] IRLight : Standby
+[2024-06-17 15:23:14] IRLight : Off
+[2024-06-17 15:23:15] IRLight : Standby
+[2024-06-17 15:24:34] IRLight : Off
+[2024-06-17 15:24:35] IRLight : Standby
+[2024-06-17 15:25:54] IRLight : Off
+[2024-06-17 15:25:55] IRLight : Standby
+[2024-06-17 15:27:14] IRLight : Off
+[2024-06-17 15:27:15] IRLight : Standby
+[2024-06-17 15:28:34] IRLight : Off
+[2024-06-17 15:28:35] IRLight : Standby
+[2024-06-17 15:29:54] IRLight : Off
+[2024-06-17 15:29:55] IRLight : Standby
+[2024-06-17 15:31:14] IRLight : Off
+[2024-06-17 15:31:15] IRLight : Standby
+[2024-06-17 15:32:34] IRLight : Off
+[2024-06-17 15:32:35] IRLight : Standby
+[2024-06-17 15:33:54] IRLight : Off
+[2024-06-17 15:33:55] IRLight : Standby
+[2024-06-17 15:35:14] IRLight : Off
+[2024-06-17 15:35:15] IRLight : Standby
+[2024-06-17 15:36:34] IRLight : Off
+[2024-06-17 15:36:35] IRLight : Standby
+[2024-06-17 15:37:54] IRLight : Off
+[2024-06-17 15:37:55] IRLight : Standby
+[2024-06-17 15:39:14] IRLight : Off
+[2024-06-17 15:39:15] IRLight : Standby
+[2024-06-17 15:40:34] IRLight : Off
+[2024-06-17 15:40:35] IRLight : Standby
+[2024-06-17 15:41:54] IRLight : Off
+[2024-06-17 15:41:55] IRLight : Standby
+[2024-06-17 15:43:14] IRLight : Off
+[2024-06-17 15:43:15] IRLight : Standby
+[2024-06-17 15:44:34] IRLight : Off
+[2024-06-17 15:44:35] IRLight : Standby
+[2024-06-17 15:45:54] IRLight : Off
+[2024-06-17 15:45:55] IRLight : Standby
+[2024-06-17 15:47:14] IRLight : Off
+[2024-06-17 15:47:15] IRLight : Standby
+[2024-06-17 15:48:34] IRLight : Off
+[2024-06-17 15:48:35] IRLight : Standby
+[2024-06-17 15:49:54] IRLight : Off
+[2024-06-17 15:49:55] IRLight : Standby
+[2024-06-17 15:51:14] IRLight : Off
+[2024-06-17 15:51:15] IRLight : Standby
+[2024-06-17 15:52:34] IRLight : Off
+[2024-06-17 15:52:35] IRLight : Standby
+[2024-06-17 15:53:54] IRLight : Off
+[2024-06-17 15:53:55] IRLight : Standby
+[2024-06-17 15:55:14] IRLight : Off
+[2024-06-17 15:55:15] IRLight : Standby
+[2024-06-17 15:56:34] IRLight : Off
+[2024-06-17 15:56:35] IRLight : Standby
+[2024-06-17 15:57:54] IRLight : Off
+[2024-06-17 15:57:55] IRLight : Standby
+[2024-06-17 15:59:10] 0 -> 1
+[2024-06-17 15:59:10] IRLight : On
+[2024-06-17 15:59:10] IV2MSG : System - Operate
+[2024-06-17 15:59:10] 1 -> 2
+[2024-06-17 15:59:10] Selected CameraID : 0 _ Set ROI Pos : (266, 140) -> (268, 86)
+[2024-06-17 15:59:10] HanderType : [Left] -> [Left]
+[2024-06-17 15:59:10] IV2MSG : Option - LeftHander
+[2024-06-17 15:59:10] TeeMode : [Up] -> [Up]
+[2024-06-17 15:59:10] IV2MSG : Option - TeeUp
+[2024-06-17 15:59:10] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 15:59:10] IV2MSG : Option - FairWay
+[2024-06-17 15:59:11] IRLight : Standby
+[2024-06-17 15:59:11] 2 -> 1
+[2024-06-17 15:59:11] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:11] 1 -> 2
+[2024-06-17 15:59:11] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2024-06-17 15:59:11] 2 -> 3
+[2024-06-17 15:59:11] IRLight : On
+[2024-06-17 15:59:11] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:11] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 15:59:11] IV2MSG : State - subreadysuccess
+[2024-06-17 15:59:11] 3 -> 4
+[2024-06-17 15:59:12] IRLight : Standby
+[2024-06-17 15:59:13] IRLight : On
+[2024-06-17 15:59:14] IRLight : Standby
+[2024-06-17 15:59:29] IRLight : On
+[2024-06-17 15:59:29] 4 -> 6
+[2024-06-17 15:59:29] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2024-06-17 15:59:29] 6 -> 1
+[2024-06-17 15:59:29] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:29] 1 -> 2
+[2024-06-17 15:59:30] IRLight : Standby
+[2024-06-17 15:59:30] 2 -> 1
+[2024-06-17 15:59:30] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:30] 1 -> 2
+[2024-06-17 15:59:30] IRLight : On
+[2024-06-17 15:59:31] 2 -> 1
+[2024-06-17 15:59:31] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:31] 1 -> 2
+[2024-06-17 15:59:31] IRLight : Standby
+[2024-06-17 15:59:32] 2 -> 1
+[2024-06-17 15:59:32] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:33] 1 -> 2
+[2024-06-17 15:59:34] IRLight : On
+[2024-06-17 15:59:34] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2024-06-17 15:59:34] 2 -> 3
+[2024-06-17 15:59:34] IRLight : On
+[2024-06-17 15:59:34] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:34] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 15:59:34] IV2MSG : State - subreadysuccess
+[2024-06-17 15:59:34] 3 -> 4
+[2024-06-17 15:59:34] 4 -> 6
+[2024-06-17 15:59:34] Failed SaveImageSize : 20
+[2024-06-17 15:59:34] 6 -> 4
+[2024-06-17 15:59:34] 4 -> 6
+[2024-06-17 15:59:34] Failed SaveImageSize : 20
+[2024-06-17 15:59:34] 6 -> 4
+[2024-06-17 15:59:34] 4 -> 6
+[2024-06-17 15:59:34] Failed SaveImageSize : 20
+[2024-06-17 15:59:34] 6 -> 4
+[2024-06-17 15:59:34] 4 -> 6
+[2024-06-17 15:59:34] Failed SaveImageSize : 20
+[2024-06-17 15:59:34] 6 -> 4
+[2024-06-17 15:59:34] 4 -> 6
+[2024-06-17 15:59:34] Failed SaveImageSize : 20
+[2024-06-17 15:59:34] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2024-06-17 15:59:34] 6 -> 1
+[2024-06-17 15:59:34] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:34] 1 -> 2
+[2024-06-17 15:59:35] IRLight : Standby
+[2024-06-17 15:59:35] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (263, 141)
+[2024-06-17 15:59:35] 2 -> 3
+[2024-06-17 15:59:35] IRLight : On
+[2024-06-17 15:59:35] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:35] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 15:59:35] IV2MSG : State - subreadysuccess
+[2024-06-17 15:59:35] 3 -> 4
+[2024-06-17 15:59:35] 4 -> 6
+[2024-06-17 15:59:35] Failed SaveImageSize : 20
+[2024-06-17 15:59:35] Selected CameraID : 0 _ Set ROI Pos : (263, 141) -> (268, 86)
+[2024-06-17 15:59:35] 6 -> 1
+[2024-06-17 15:59:35] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:35] 1 -> 2
+[2024-06-17 15:59:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 15:59:36] 2 -> 3
+[2024-06-17 15:59:36] IRLight : On
+[2024-06-17 15:59:36] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:36] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 15:59:36] IV2MSG : State - subreadysuccess
+[2024-06-17 15:59:36] 3 -> 4
+[2024-06-17 15:59:37] HanderType : [Left] -> [Left]
+[2024-06-17 15:59:37] IV2MSG : Option - LeftHander
+[2024-06-17 15:59:37] TeeMode : [Up] -> [Down]
+[2024-06-17 15:59:37] IV2MSG : Option - TeeDown
+[2024-06-17 15:59:37] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 15:59:37] IV2MSG : Option - FairWay
+[2024-06-17 15:59:37] Hand 1, TeeMode : 1, Surface : 0
+[2024-06-17 15:59:37] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 15:59:37] 4 -> 1
+[2024-06-17 15:59:37] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:37] IRLight : On
+[2024-06-17 15:59:37] 1 -> 2
+[2024-06-17 15:59:37] 2 -> 1
+[2024-06-17 15:59:37] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:37] 1 -> 2
+[2024-06-17 15:59:38] IRLight : Standby
+[2024-06-17 15:59:38] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2024-06-17 15:59:38] 2 -> 3
+[2024-06-17 15:59:38] IRLight : On
+[2024-06-17 15:59:38] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:38] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 15:59:38] IV2MSG : State - subreadysuccess
+[2024-06-17 15:59:38] 3 -> 4
+[2024-06-17 15:59:38] 4 -> 6
+[2024-06-17 15:59:38] Failed SaveImageSize : 35
+[2024-06-17 15:59:38] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2024-06-17 15:59:38] 6 -> 1
+[2024-06-17 15:59:38] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:38] 1 -> 2
+[2024-06-17 15:59:39] 2 -> 1
+[2024-06-17 15:59:39] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:39] 1 -> 2
+[2024-06-17 15:59:39] IRLight : Standby
+[2024-06-17 15:59:39] IRLight : On
+[2024-06-17 15:59:39] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (227, 141)
+[2024-06-17 15:59:39] 2 -> 3
+[2024-06-17 15:59:39] IRLight : On
+[2024-06-17 15:59:39] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:39] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 15:59:39] IV2MSG : State - subreadysuccess
+[2024-06-17 15:59:39] 3 -> 4
+[2024-06-17 15:59:40] IRLight : Standby
+[2024-06-17 15:59:40] 4 -> 6
+[2024-06-17 15:59:41] Failed SaveImageSize : 35
+[2024-06-17 15:59:41] Selected CameraID : 0 _ Set ROI Pos : (227, 141) -> (268, 86)
+[2024-06-17 15:59:41] 6 -> 1
+[2024-06-17 15:59:41] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:41] IRLight : On
+[2024-06-17 15:59:41] 1 -> 2
+[2024-06-17 15:59:41] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (227, 141)
+[2024-06-17 15:59:41] 2 -> 3
+[2024-06-17 15:59:41] IRLight : On
+[2024-06-17 15:59:41] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:41] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 15:59:41] IV2MSG : State - subreadysuccess
+[2024-06-17 15:59:41] 3 -> 4
+[2024-06-17 15:59:42] IRLight : Standby
+[2024-06-17 15:59:44] IRLight : On
+[2024-06-17 15:59:45] 4 -> 6
+[2024-06-17 15:59:45] Failed SaveImageSize : 35
+[2024-06-17 15:59:45] 6 -> 4
+[2024-06-17 15:59:45] IRLight : Standby
+[2024-06-17 15:59:45] 4 -> 6
+[2024-06-17 15:59:45] Failed SaveImageSize : 35
+[2024-06-17 15:59:45] 6 -> 4
+[2024-06-17 15:59:45] IRLight : On
+[2024-06-17 15:59:46] 4 -> 6
+[2024-06-17 15:59:46] Failed SaveImageSize : 35
+[2024-06-17 15:59:46] 6 -> 4
+[2024-06-17 15:59:46] IRLight : Standby
+[2024-06-17 15:59:47] 4 -> 6
+[2024-06-17 15:59:47] Failed SaveImageSize : 35
+[2024-06-17 15:59:47] 6 -> 4
+[2024-06-17 15:59:50] IRLight : On
+[2024-06-17 15:59:50] 4 -> 6
+[2024-06-17 15:59:50] Failed SaveImageSize : 35
+[2024-06-17 15:59:50] 6 -> 4
+[2024-06-17 15:59:51] IRLight : Standby
+[2024-06-17 15:59:51] IRLight : On
+[2024-06-17 15:59:52] IRLight : Standby
+[2024-06-17 15:59:55] IRLight : On
+[2024-06-17 15:59:56] IRLight : Standby
+[2024-06-17 15:59:56] 4 -> 6
+[2024-06-17 15:59:56] 6 -> 8
+[2024-06-17 15:59:56] 8 -> 9
+[2024-06-17 15:59:56] Img : 
+[2024-06-17 15:59:56] Img : 
+[2024-06-17 15:59:56] Img : 
+[2024-06-17 15:59:56] Success : PeekMessage(0.000013)
+[2024-06-17 15:59:56] i
+
+[2024-06-17 15:59:56] o
+
+[2024-06-17 15:59:56] [Result Data] TunningData(OriginalData) _ Speed : 47.67(48.49)   Direction : -7.88(-7.88)    LaunchAngle : 17.88(16.82)
+ ClubDirection : -5.29(-5.29)    SideSpin : -114.99(0.00)   BackSpin : 3700.73(0.00)
+[2024-06-17 15:59:56] IRLight : Off
+[2024-06-17 15:59:56] Shot : [Auto]01240617_155956(101)
+[2024-06-17 15:59:56] Selected CameraID : 0 _ Set ROI Pos : (227, 141) -> (268, 86)
+[2024-06-17 15:59:56] 9 -> 1
+[2024-06-17 15:59:56] ImageQueue Reset : Main Camera
+[2024-06-17 15:59:57] IRLight : Standby
+[2024-06-17 15:59:59] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:00:00] IRLight : On
+[2024-06-17 16:00:01] IRLight : Standby
+[2024-06-17 16:00:03] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:00:04] IRLight : On
+[2024-06-17 16:00:05] 1 -> 2
+[2024-06-17 16:00:05] IRLight : Standby
+[2024-06-17 16:00:05] 2 -> 1
+[2024-06-17 16:00:05] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:06] 1 -> 2
+[2024-06-17 16:00:06] IRLight : On
+[2024-06-17 16:00:06] 2 -> 1
+[2024-06-17 16:00:06] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:06] 1 -> 2
+[2024-06-17 16:00:07] IRLight : Standby
+[2024-06-17 16:00:07] IRLight : On
+[2024-06-17 16:00:07] 2 -> 1
+[2024-06-17 16:00:07] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:07] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:00:08] IRLight : Standby
+[2024-06-17 16:00:10] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:00:14] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:00:15] IRLight : On
+[2024-06-17 16:00:15] 1 -> 2
+[2024-06-17 16:00:15] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:00:16] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (201, 144)
+[2024-06-17 16:00:16] 2 -> 3
+[2024-06-17 16:00:16] IRLight : On
+[2024-06-17 16:00:16] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:16] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:00:16] IV2MSG : State - subreadysuccess
+[2024-06-17 16:00:16] 3 -> 4
+[2024-06-17 16:00:16] 4 -> 6
+[2024-06-17 16:00:16] 6 -> 8
+[2024-06-17 16:00:16] 8 -> 9
+[2024-06-17 16:00:16] ErrorShot : Error/[Shot]01240617_160016(101)
+[2024-06-17 16:00:16] Selected CameraID : 0 _ Set ROI Pos : (201, 144) -> (268, 86)
+[2024-06-17 16:00:16] 9 -> 1
+[2024-06-17 16:00:16] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:16] IV2MSG : State - SubSuccess
+[2024-06-17 16:00:17] IRLight : Standby
+[2024-06-17 16:00:20] IV2MSG : System - Operate
+[2024-06-17 16:00:20] HanderType : [Left] -> [Left]
+[2024-06-17 16:00:20] IV2MSG : Option - LeftHander
+[2024-06-17 16:00:20] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:00:20] IV2MSG : Option - FairWay
+[2024-06-17 16:00:20] 1 -> 0
+[2024-06-17 16:00:20] IV2MSG : System - Stop
+[2024-06-17 16:00:20] IRLight : Off
+[2024-06-17 16:00:20] 0 -> 0
+[2024-06-17 16:00:20] IRLight : Off
+[2024-06-17 16:00:20] IV2MSG : System - Stop
+[2024-06-17 16:00:21] IRLight : Standby
+[2024-06-17 16:00:27] 0 -> 1
+[2024-06-17 16:00:27] IV2MSG : System - Operate
+[2024-06-17 16:00:27] IRLight : On
+[2024-06-17 16:00:27] HanderType : [Left] -> [Left]
+[2024-06-17 16:00:27] IV2MSG : Option - LeftHander
+[2024-06-17 16:00:27] TeeMode : [Down] -> [Up]
+[2024-06-17 16:00:27] IV2MSG : Option - TeeUp
+[2024-06-17 16:00:27] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:00:27] IV2MSG : Option - FairWay
+[2024-06-17 16:00:27] Hand 1, TeeMode : 0, Surface : 0
+[2024-06-17 16:00:27] 1 -> 1
+[2024-06-17 16:00:27] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:27] IRLight : On
+[2024-06-17 16:00:27] 1 -> 2
+[2024-06-17 16:00:27] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:00:27] 2 -> 3
+[2024-06-17 16:00:27] IRLight : On
+[2024-06-17 16:00:27] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:27] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:00:27] IV2MSG : State - subreadysuccess
+[2024-06-17 16:00:27] 3 -> 4
+[2024-06-17 16:00:28] 4 -> 7
+[2024-06-17 16:00:28] Failed SaveImageSize : 20
+[2024-06-17 16:00:28] 7 -> 4
+[2024-06-17 16:00:28] 4 -> 6
+[2024-06-17 16:00:28] Failed SaveImageSize : 20
+[2024-06-17 16:00:28] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:00:28] 6 -> 1
+[2024-06-17 16:00:28] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:28] 1 -> 2
+[2024-06-17 16:00:28] IRLight : Standby
+[2024-06-17 16:00:29] IRLight : On
+[2024-06-17 16:00:29] IRLight : On
+[2024-06-17 16:00:29] 2 -> 1
+[2024-06-17 16:00:29] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:30] IRLight : Standby
+[2024-06-17 16:00:31] IRLight : On
+[2024-06-17 16:00:32] IRLight : Standby
+[2024-06-17 16:00:32] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:00:34] IRLight : On
+[2024-06-17 16:00:34] HanderType : [Left] -> [Left]
+[2024-06-17 16:00:34] IV2MSG : Option - LeftHander
+[2024-06-17 16:00:34] TeeMode : [Up] -> [Down]
+[2024-06-17 16:00:34] IV2MSG : Option - TeeDown
+[2024-06-17 16:00:34] Hand 1, TeeMode : 1, Surface : 0
+[2024-06-17 16:00:34] 1 -> 1
+[2024-06-17 16:00:34] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:34] IRLight : On
+[2024-06-17 16:00:34] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:00:34] IV2MSG : Option - FairWay
+[2024-06-17 16:00:34] 1 -> 2
+[2024-06-17 16:00:34] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:00:35] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (225, 140)
+[2024-06-17 16:00:35] 2 -> 3
+[2024-06-17 16:00:35] IRLight : On
+[2024-06-17 16:00:35] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:35] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:00:35] IV2MSG : State - subreadysuccess
+[2024-06-17 16:00:35] 3 -> 4
+[2024-06-17 16:00:36] IRLight : Standby
+[2024-06-17 16:00:36] 4 -> 6
+[2024-06-17 16:00:36] Failed SaveImageSize : 35
+[2024-06-17 16:00:36] Selected CameraID : 0 _ Set ROI Pos : (225, 140) -> (268, 86)
+[2024-06-17 16:00:36] 6 -> 1
+[2024-06-17 16:00:36] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:36] 1 -> 2
+[2024-06-17 16:00:36] IRLight : On
+[2024-06-17 16:00:37] 2 -> 1
+[2024-06-17 16:00:37] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:37] 1 -> 2
+[2024-06-17 16:00:37] IRLight : Standby
+[2024-06-17 16:00:37] IRLight : On
+[2024-06-17 16:00:38] 2 -> 1
+[2024-06-17 16:00:38] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:38] 1 -> 2
+[2024-06-17 16:00:38] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (230, 137)
+[2024-06-17 16:00:38] 2 -> 3
+[2024-06-17 16:00:38] IRLight : On
+[2024-06-17 16:00:38] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:38] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:00:38] IV2MSG : State - subreadysuccess
+[2024-06-17 16:00:38] 3 -> 4
+[2024-06-17 16:00:39] IRLight : Standby
+[2024-06-17 16:00:39] IRLight : On
+[2024-06-17 16:00:40] IRLight : Standby
+[2024-06-17 16:00:41] IRLight : On
+[2024-06-17 16:00:42] IRLight : Standby
+[2024-06-17 16:00:43] IRLight : On
+[2024-06-17 16:00:44] IRLight : Standby
+[2024-06-17 16:00:46] IRLight : On
+[2024-06-17 16:00:47] IRLight : Standby
+[2024-06-17 16:00:48] 4 -> 6
+[2024-06-17 16:00:48] 6 -> 8
+[2024-06-17 16:00:48] 8 -> 9
+[2024-06-17 16:00:48] Img : 
+[2024-06-17 16:00:48] Img : 
+[2024-06-17 16:00:48] Img : 
+[2024-06-17 16:00:48] Success : PeekMessage(0.000007)
+[2024-06-17 16:00:48] i
+
+[2024-06-17 16:00:48] o
+
+[2024-06-17 16:00:48] [Result Data] TunningData(OriginalData) _ Speed : 53.61(55.30)   Direction : -8.40(-8.40)    LaunchAngle : 18.48(17.45)
+ ClubDirection : -6.71(-6.71)    SideSpin : -54.53(0.00)   BackSpin : 3825.04(0.00)
+[2024-06-17 16:00:48] IRLight : Off
+[2024-06-17 16:00:48] Shot : [Auto]01240617_160048(101)
+[2024-06-17 16:00:48] Selected CameraID : 0 _ Set ROI Pos : (230, 137) -> (268, 86)
+[2024-06-17 16:00:48] 9 -> 1
+[2024-06-17 16:00:48] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:49] IRLight : Standby
+[2024-06-17 16:00:50] HanderType : [Left] -> [Left]
+[2024-06-17 16:00:50] IV2MSG : Option - LeftHander
+[2024-06-17 16:00:50] TeeMode : [Down] -> [Down]
+[2024-06-17 16:00:50] IV2MSG : Option - TeeDown
+[2024-06-17 16:00:50] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:00:50] IV2MSG : Option - FairWay
+[2024-06-17 16:00:52] IRLight : On
+[2024-06-17 16:00:52] 1 -> 2
+[2024-06-17 16:00:53] 2 -> 1
+[2024-06-17 16:00:53] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:53] 1 -> 2
+[2024-06-17 16:00:53] IRLight : Standby
+[2024-06-17 16:00:53] IRLight : On
+[2024-06-17 16:00:53] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 138)
+[2024-06-17 16:00:53] 2 -> 3
+[2024-06-17 16:00:53] IRLight : On
+[2024-06-17 16:00:53] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:53] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:00:53] IV2MSG : State - subreadysuccess
+[2024-06-17 16:00:53] 3 -> 4
+[2024-06-17 16:00:54] IRLight : Standby
+[2024-06-17 16:00:56] IRLight : On
+[2024-06-17 16:00:56] 4 -> 7
+[2024-06-17 16:00:57] Failed SaveImageSize : 35
+[2024-06-17 16:00:57] Selected CameraID : 0 _ Set ROI Pos : (226, 138) -> (268, 86)
+[2024-06-17 16:00:57] 7 -> 1
+[2024-06-17 16:00:57] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:57] 1 -> 2
+[2024-06-17 16:00:57] IRLight : Standby
+[2024-06-17 16:00:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 138)
+[2024-06-17 16:00:57] 2 -> 3
+[2024-06-17 16:00:57] IRLight : On
+[2024-06-17 16:00:57] ImageQueue Reset : Main Camera
+[2024-06-17 16:00:57] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:00:57] IV2MSG : State - subreadysuccess
+[2024-06-17 16:00:57] 3 -> 4
+[2024-06-17 16:00:58] IRLight : Standby
+[2024-06-17 16:00:58] IRLight : On
+[2024-06-17 16:00:59] IRLight : Standby
+[2024-06-17 16:01:06] IRLight : On
+[2024-06-17 16:01:07] IRLight : Standby
+[2024-06-17 16:01:07] 4 -> 6
+[2024-06-17 16:01:07] 6 -> 8
+[2024-06-17 16:01:07] 8 -> 9
+[2024-06-17 16:01:08] Img : 
+[2024-06-17 16:01:08] Img : 
+[2024-06-17 16:01:08] Img : 
+[2024-06-17 16:01:08] Success : PeekMessage(0.003472)
+[2024-06-17 16:01:08] i
+
+[2024-06-17 16:01:08] o
+
+[2024-06-17 16:01:08] [Result Data] TunningData(OriginalData) _ Speed : 47.56(48.37)   Direction : -7.76(-7.76)    LaunchAngle : 18.07(17.02)
+ ClubDirection : -6.71(-6.71)    SideSpin : -18.65(0.00)   BackSpin : 3747.71(0.00)
+[2024-06-17 16:01:08] IRLight : Off
+[2024-06-17 16:01:08] Shot : [Auto]01240617_160108(101)
+[2024-06-17 16:01:08] Selected CameraID : 0 _ Set ROI Pos : (226, 138) -> (268, 86)
+[2024-06-17 16:01:08] 9 -> 1
+[2024-06-17 16:01:08] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:09] IRLight : Standby
+[2024-06-17 16:01:10] HanderType : [Left] -> [Left]
+[2024-06-17 16:01:10] IV2MSG : Option - LeftHander
+[2024-06-17 16:01:10] TeeMode : [Down] -> [Down]
+[2024-06-17 16:01:10] IV2MSG : Option - TeeDown
+[2024-06-17 16:01:10] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:01:10] IV2MSG : Option - FairWay
+[2024-06-17 16:01:11] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:01:12] IRLight : On
+[2024-06-17 16:01:12] 1 -> 2
+[2024-06-17 16:01:12] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:01:12] IRLight : On
+[2024-06-17 16:01:13] 2 -> 1
+[2024-06-17 16:01:13] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:13] 1 -> 2
+[2024-06-17 16:01:13] IRLight : Standby
+[2024-06-17 16:01:13] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (225, 140)
+[2024-06-17 16:01:13] 2 -> 3
+[2024-06-17 16:01:13] IRLight : On
+[2024-06-17 16:01:13] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:13] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:01:13] IV2MSG : State - subreadysuccess
+[2024-06-17 16:01:13] 3 -> 4
+[2024-06-17 16:01:14] 4 -> 7
+[2024-06-17 16:01:14] Failed SaveImageSize : 35
+[2024-06-17 16:01:14] Selected CameraID : 0 _ Set ROI Pos : (225, 140) -> (268, 86)
+[2024-06-17 16:01:14] 7 -> 1
+[2024-06-17 16:01:14] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:14] 1 -> 2
+[2024-06-17 16:01:14] IRLight : Standby
+[2024-06-17 16:01:15] IRLight : On
+[2024-06-17 16:01:15] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (225, 138)
+[2024-06-17 16:01:15] 2 -> 3
+[2024-06-17 16:01:15] IRLight : On
+[2024-06-17 16:01:15] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:15] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:01:15] IV2MSG : State - subreadysuccess
+[2024-06-17 16:01:15] 3 -> 4
+[2024-06-17 16:01:15] 4 -> 6
+[2024-06-17 16:01:15] Failed SaveImageSize : 35
+[2024-06-17 16:01:15] 6 -> 4
+[2024-06-17 16:01:16] IRLight : Standby
+[2024-06-17 16:01:16] IRLight : On
+[2024-06-17 16:01:17] IRLight : On
+[2024-06-17 16:01:18] IRLight : Standby
+[2024-06-17 16:01:23] IRLight : On
+[2024-06-17 16:01:24] IRLight : Standby
+[2024-06-17 16:01:25] 4 -> 6
+[2024-06-17 16:01:25] 6 -> 8
+[2024-06-17 16:01:25] 8 -> 9
+[2024-06-17 16:01:25] Img : 
+[2024-06-17 16:01:25] Img : 
+[2024-06-17 16:01:25] Img : 
+[2024-06-17 16:01:25] Success : PeekMessage(0.000512)
+[2024-06-17 16:01:25] i
+
+[2024-06-17 16:01:25] o
+
+[2024-06-17 16:01:25] [Result Data] TunningData(OriginalData) _ Speed : 51.89(53.31)   Direction : -7.51(-7.51)    LaunchAngle : 17.63(16.56)
+ ClubDirection : -6.46(-6.46)    SideSpin : -20.79(0.00)   BackSpin : 3672.11(0.00)
+[2024-06-17 16:01:25] IRLight : Off
+[2024-06-17 16:01:25] Shot : [Auto]01240617_160125(101)
+[2024-06-17 16:01:25] Selected CameraID : 0 _ Set ROI Pos : (225, 138) -> (268, 86)
+[2024-06-17 16:01:25] 9 -> 1
+[2024-06-17 16:01:25] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:26] IRLight : Standby
+[2024-06-17 16:01:27] HanderType : [Left] -> [Left]
+[2024-06-17 16:01:27] IV2MSG : Option - LeftHander
+[2024-06-17 16:01:27] TeeMode : [Down] -> [Down]
+[2024-06-17 16:01:27] IV2MSG : Option - TeeDown
+[2024-06-17 16:01:27] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:01:27] IV2MSG : Option - FairWay
+[2024-06-17 16:01:29] IRLight : On
+[2024-06-17 16:01:29] 1 -> 2
+[2024-06-17 16:01:30] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:01:30] 2 -> 3
+[2024-06-17 16:01:30] IRLight : On
+[2024-06-17 16:01:30] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:30] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:01:30] IV2MSG : State - subreadysuccess
+[2024-06-17 16:01:30] 3 -> 4
+[2024-06-17 16:01:31] IRLight : Standby
+[2024-06-17 16:01:31] 4 -> 6
+[2024-06-17 16:01:31] Failed SaveImageSize : 35
+[2024-06-17 16:01:31] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:01:31] 6 -> 1
+[2024-06-17 16:01:31] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:31] 1 -> 2
+[2024-06-17 16:01:31] IRLight : On
+[2024-06-17 16:01:31] IRLight : On
+[2024-06-17 16:01:32] 2 -> 1
+[2024-06-17 16:01:32] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:32] 1 -> 2
+[2024-06-17 16:01:32] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (220, 138)
+[2024-06-17 16:01:32] 2 -> 3
+[2024-06-17 16:01:32] IRLight : On
+[2024-06-17 16:01:32] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:32] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:01:32] IV2MSG : State - subreadysuccess
+[2024-06-17 16:01:32] 3 -> 4
+[2024-06-17 16:01:33] IRLight : Standby
+[2024-06-17 16:01:33] IRLight : On
+[2024-06-17 16:01:34] IRLight : Standby
+[2024-06-17 16:01:35] IRLight : On
+[2024-06-17 16:01:36] IRLight : Standby
+[2024-06-17 16:01:40] IRLight : On
+[2024-06-17 16:01:41] IRLight : Standby
+[2024-06-17 16:01:41] 4 -> 6
+[2024-06-17 16:01:41] 6 -> 8
+[2024-06-17 16:01:41] 8 -> 9
+[2024-06-17 16:01:41] Img : 
+[2024-06-17 16:01:41] Img : 
+[2024-06-17 16:01:41] Img : 
+[2024-06-17 16:01:41] Success : PeekMessage(0.000006)
+[2024-06-17 16:01:41] i
+
+[2024-06-17 16:01:41] o
+
+[2024-06-17 16:01:41] [Result Data] TunningData(OriginalData) _ Speed : 52.81(54.37)   Direction : -6.94(-6.94)    LaunchAngle : 17.25(16.16)
+ ClubDirection : -7.28(-7.28)    SideSpin : 2.24(0.00)   BackSpin : 3654.23(0.00)
+[2024-06-17 16:01:41] IRLight : Off
+[2024-06-17 16:01:41] Shot : [Auto]01240617_160141(101)
+[2024-06-17 16:01:41] Selected CameraID : 0 _ Set ROI Pos : (220, 138) -> (268, 86)
+[2024-06-17 16:01:41] 9 -> 1
+[2024-06-17 16:01:41] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:42] IRLight : Standby
+[2024-06-17 16:01:43] HanderType : [Left] -> [Left]
+[2024-06-17 16:01:43] IV2MSG : Option - LeftHander
+[2024-06-17 16:01:43] TeeMode : [Down] -> [Down]
+[2024-06-17 16:01:43] IV2MSG : Option - TeeDown
+[2024-06-17 16:01:43] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:01:43] IV2MSG : Option - FairWay
+[2024-06-17 16:01:45] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:01:45] IRLight : On
+[2024-06-17 16:01:45] 1 -> 2
+[2024-06-17 16:01:45] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:01:46] IRLight : Standby
+[2024-06-17 16:01:46] 2 -> 1
+[2024-06-17 16:01:46] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:46] 1 -> 2
+[2024-06-17 16:01:47] IRLight : On
+[2024-06-17 16:01:48] IRLight : Standby
+[2024-06-17 16:01:48] 2 -> 1
+[2024-06-17 16:01:48] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:48] 1 -> 2
+[2024-06-17 16:01:48] IRLight : On
+[2024-06-17 16:01:48] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (214, 140)
+[2024-06-17 16:01:48] 2 -> 3
+[2024-06-17 16:01:48] IRLight : On
+[2024-06-17 16:01:48] ImageQueue Reset : Main Camera
+[2024-06-17 16:01:48] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:01:48] IV2MSG : State - subreadysuccess
+[2024-06-17 16:01:48] 3 -> 4
+[2024-06-17 16:01:49] IRLight : Standby
+[2024-06-17 16:01:50] IRLight : On
+[2024-06-17 16:01:51] IRLight : Standby
+[2024-06-17 16:01:52] IRLight : On
+[2024-06-17 16:01:53] IRLight : Standby
+[2024-06-17 16:01:59] IRLight : On
+[2024-06-17 16:02:00] IRLight : Standby
+[2024-06-17 16:02:00] 4 -> 6
+[2024-06-17 16:02:00] 6 -> 8
+[2024-06-17 16:02:00] 8 -> 9
+[2024-06-17 16:02:01] Img : 
+[2024-06-17 16:02:01] Img : 
+[2024-06-17 16:02:01] Img : 
+[2024-06-17 16:02:01] Success : PeekMessage(0.000007)
+[2024-06-17 16:02:01] i
+
+[2024-06-17 16:02:01] o
+
+[2024-06-17 16:02:01] [Result Data] TunningData(OriginalData) _ Speed : 47.07(47.82)   Direction : -6.37(-6.37)    LaunchAngle : 14.20(12.95)
+ ClubDirection : -5.71(-5.71)    SideSpin : -7.72(0.00)   BackSpin : 3164.00(0.00)
+[2024-06-17 16:02:01] IRLight : Off
+[2024-06-17 16:02:01] Shot : [Auto]01240617_160201(101)
+[2024-06-17 16:02:01] Selected CameraID : 0 _ Set ROI Pos : (214, 140) -> (268, 86)
+[2024-06-17 16:02:01] 9 -> 1
+[2024-06-17 16:02:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:02] IRLight : Standby
+[2024-06-17 16:02:03] HanderType : [Left] -> [Left]
+[2024-06-17 16:02:03] IV2MSG : Option - LeftHander
+[2024-06-17 16:02:03] TeeMode : [Down] -> [Down]
+[2024-06-17 16:02:03] IV2MSG : Option - TeeDown
+[2024-06-17 16:02:03] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:02:03] IV2MSG : Option - FairWay
+[2024-06-17 16:02:05] IRLight : On
+[2024-06-17 16:02:05] 1 -> 2
+[2024-06-17 16:02:05] IRLight : On
+[2024-06-17 16:02:06] 2 -> 1
+[2024-06-17 16:02:06] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:06] 1 -> 2
+[2024-06-17 16:02:06] IRLight : Standby
+[2024-06-17 16:02:06] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:02:06] 2 -> 3
+[2024-06-17 16:02:06] IRLight : On
+[2024-06-17 16:02:06] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:06] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:02:06] IV2MSG : State - subreadysuccess
+[2024-06-17 16:02:06] 3 -> 4
+[2024-06-17 16:02:06] 4 -> 6
+[2024-06-17 16:02:06] Failed SaveImageSize : 35
+[2024-06-17 16:02:06] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:02:07] 6 -> 1
+[2024-06-17 16:02:07] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:07] 1 -> 2
+[2024-06-17 16:02:07] IRLight : Standby
+[2024-06-17 16:02:07] 2 -> 1
+[2024-06-17 16:02:07] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:07] 1 -> 2
+[2024-06-17 16:02:07] IRLight : On
+[2024-06-17 16:02:08] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (216, 140)
+[2024-06-17 16:02:08] 2 -> 3
+[2024-06-17 16:02:08] IRLight : On
+[2024-06-17 16:02:08] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:08] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:02:08] IV2MSG : State - subreadysuccess
+[2024-06-17 16:02:08] 3 -> 4
+[2024-06-17 16:02:09] IRLight : Standby
+[2024-06-17 16:02:09] IRLight : On
+[2024-06-17 16:02:09] IRLight : On
+[2024-06-17 16:02:10] IRLight : Standby
+[2024-06-17 16:02:11] IRLight : On
+[2024-06-17 16:02:12] IRLight : Standby
+[2024-06-17 16:02:17] IRLight : On
+[2024-06-17 16:02:18] IRLight : Standby
+[2024-06-17 16:02:19] 4 -> 6
+[2024-06-17 16:02:19] 6 -> 8
+[2024-06-17 16:02:19] 8 -> 9
+[2024-06-17 16:02:19] Img : 
+[2024-06-17 16:02:19] Img : 
+[2024-06-17 16:02:19] Img : 
+[2024-06-17 16:02:19] Success : PeekMessage(0.000007)
+[2024-06-17 16:02:19] i
+
+[2024-06-17 16:02:19] o
+
+[2024-06-17 16:02:19] [Result Data] TunningData(OriginalData) _ Speed : 53.21(54.83)   Direction : -8.70(-8.70)    LaunchAngle : 18.35(17.32)
+ ClubDirection : -12.81(-12.81)    SideSpin : 250.54(0.00)   BackSpin : 3778.64(0.00)
+[2024-06-17 16:02:19] IRLight : Off
+[2024-06-17 16:02:19] Shot : [Auto]01240617_160219(101)
+[2024-06-17 16:02:19] Selected CameraID : 0 _ Set ROI Pos : (216, 140) -> (268, 86)
+[2024-06-17 16:02:19] 9 -> 1
+[2024-06-17 16:02:19] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:20] IRLight : Standby
+[2024-06-17 16:02:21] HanderType : [Left] -> [Left]
+[2024-06-17 16:02:21] IV2MSG : Option - LeftHander
+[2024-06-17 16:02:21] TeeMode : [Down] -> [Down]
+[2024-06-17 16:02:21] IV2MSG : Option - TeeDown
+[2024-06-17 16:02:21] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:02:21] IV2MSG : Option - FairWay
+[2024-06-17 16:02:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:02:23] IRLight : On
+[2024-06-17 16:02:23] 1 -> 2
+[2024-06-17 16:02:23] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:02:23] IRLight : On
+[2024-06-17 16:02:24] 2 -> 1
+[2024-06-17 16:02:24] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:24] IRLight : Standby
+[2024-06-17 16:02:24] 1 -> 2
+[2024-06-17 16:02:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 140)
+[2024-06-17 16:02:25] 2 -> 3
+[2024-06-17 16:02:25] IRLight : On
+[2024-06-17 16:02:25] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:25] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:02:25] IV2MSG : State - subreadysuccess
+[2024-06-17 16:02:25] 3 -> 4
+[2024-06-17 16:02:26] IRLight : Standby
+[2024-06-17 16:02:26] IRLight : On
+[2024-06-17 16:02:26] IRLight : On
+[2024-06-17 16:02:27] IRLight : Standby
+[2024-06-17 16:02:28] IRLight : On
+[2024-06-17 16:02:29] IRLight : Standby
+[2024-06-17 16:02:34] IRLight : On
+[2024-06-17 16:02:35] IRLight : Standby
+[2024-06-17 16:02:36] 4 -> 6
+[2024-06-17 16:02:36] 6 -> 8
+[2024-06-17 16:02:36] 8 -> 9
+[2024-06-17 16:02:36] Img : 
+[2024-06-17 16:02:36] Img : 
+[2024-06-17 16:02:36] Img : 
+[2024-06-17 16:02:36] Success : PeekMessage(0.000008)
+[2024-06-17 16:02:36] i
+
+[2024-06-17 16:02:36] o
+
+[2024-06-17 16:02:36] [Result Data] TunningData(OriginalData) _ Speed : 43.31(43.63)   Direction : -11.82(-11.82)    LaunchAngle : 16.16(15.01)
+ ClubDirection : -11.71(-11.71)    SideSpin : -0.18(0.00)   BackSpin : 3504.44(0.00)
+[2024-06-17 16:02:36] IRLight : Off
+[2024-06-17 16:02:36] Shot : [Auto]01240617_160236(101)
+[2024-06-17 16:02:36] Selected CameraID : 0 _ Set ROI Pos : (226, 140) -> (268, 86)
+[2024-06-17 16:02:36] 9 -> 1
+[2024-06-17 16:02:36] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:37] IRLight : Standby
+[2024-06-17 16:02:38] HanderType : [Left] -> [Left]
+[2024-06-17 16:02:38] IV2MSG : Option - LeftHander
+[2024-06-17 16:02:38] TeeMode : [Down] -> [Down]
+[2024-06-17 16:02:38] IV2MSG : Option - TeeDown
+[2024-06-17 16:02:38] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:02:38] IV2MSG : Option - FairWay
+[2024-06-17 16:02:40] IRLight : On
+[2024-06-17 16:02:40] 1 -> 2
+[2024-06-17 16:02:41] IRLight : Standby
+[2024-06-17 16:02:41] 2 -> 1
+[2024-06-17 16:02:41] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:41] 1 -> 2
+[2024-06-17 16:02:41] IRLight : On
+[2024-06-17 16:02:42] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 138)
+[2024-06-17 16:02:42] 2 -> 3
+[2024-06-17 16:02:42] IRLight : On
+[2024-06-17 16:02:42] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:42] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:02:42] IV2MSG : State - subreadysuccess
+[2024-06-17 16:02:42] 3 -> 4
+[2024-06-17 16:02:42] 4 -> 7
+[2024-06-17 16:02:42] Failed SaveImageSize : 35
+[2024-06-17 16:02:42] Selected CameraID : 0 _ Set ROI Pos : (226, 138) -> (268, 86)
+[2024-06-17 16:02:42] 7 -> 1
+[2024-06-17 16:02:42] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:42] 1 -> 2
+[2024-06-17 16:02:43] IRLight : Standby
+[2024-06-17 16:02:43] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 138)
+[2024-06-17 16:02:43] 2 -> 3
+[2024-06-17 16:02:43] IRLight : On
+[2024-06-17 16:02:43] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:43] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:02:43] IV2MSG : State - subreadysuccess
+[2024-06-17 16:02:43] 3 -> 4
+[2024-06-17 16:02:44] IRLight : Standby
+[2024-06-17 16:02:44] IRLight : On
+[2024-06-17 16:02:45] IRLight : Standby
+[2024-06-17 16:02:49] IRLight : On
+[2024-06-17 16:02:50] IRLight : Standby
+[2024-06-17 16:02:51] 4 -> 6
+[2024-06-17 16:02:51] Selected CameraID : 0 _ Set ROI Pos : (226, 138) -> (268, 86)
+[2024-06-17 16:02:51] 6 -> 1
+[2024-06-17 16:02:51] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:51] IRLight : On
+[2024-06-17 16:02:52] IRLight : Standby
+[2024-06-17 16:02:54] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:02:57] IRLight : On
+[2024-06-17 16:02:58] 1 -> 2
+[2024-06-17 16:02:58] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:02:58] IRLight : Standby
+[2024-06-17 16:02:58] IRLight : On
+[2024-06-17 16:02:58] 2 -> 1
+[2024-06-17 16:02:58] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:58] 1 -> 2
+[2024-06-17 16:02:59] IRLight : Standby
+[2024-06-17 16:02:59] 2 -> 1
+[2024-06-17 16:02:59] ImageQueue Reset : Main Camera
+[2024-06-17 16:02:59] 1 -> 2
+[2024-06-17 16:03:00] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 132)
+[2024-06-17 16:03:00] 2 -> 3
+[2024-06-17 16:03:00] IRLight : On
+[2024-06-17 16:03:00] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:00] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:03:00] IV2MSG : State - subreadysuccess
+[2024-06-17 16:03:00] 3 -> 4
+[2024-06-17 16:03:00] 4 -> 6
+[2024-06-17 16:03:01] Failed SaveImageSize : 35
+[2024-06-17 16:03:01] Selected CameraID : 0 _ Set ROI Pos : (266, 132) -> (268, 86)
+[2024-06-17 16:03:01] 6 -> 1
+[2024-06-17 16:03:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:01] 1 -> 2
+[2024-06-17 16:03:01] IRLight : Standby
+[2024-06-17 16:03:01] IRLight : On
+[2024-06-17 16:03:01] 2 -> 1
+[2024-06-17 16:03:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:01] 1 -> 2
+[2024-06-17 16:03:02] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (230, 140)
+[2024-06-17 16:03:02] 2 -> 3
+[2024-06-17 16:03:02] IRLight : On
+[2024-06-17 16:03:02] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:02] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:03:02] IV2MSG : State - subreadysuccess
+[2024-06-17 16:03:02] 3 -> 4
+[2024-06-17 16:03:03] IRLight : Standby
+[2024-06-17 16:03:03] IRLight : On
+[2024-06-17 16:03:04] IRLight : Standby
+[2024-06-17 16:03:04] IRLight : On
+[2024-06-17 16:03:05] IRLight : Standby
+[2024-06-17 16:03:09] IRLight : On
+[2024-06-17 16:03:10] IRLight : Standby
+[2024-06-17 16:03:11] 4 -> 6
+[2024-06-17 16:03:11] Selected CameraID : 0 _ Set ROI Pos : (230, 140) -> (268, 86)
+[2024-06-17 16:03:11] 6 -> 1
+[2024-06-17 16:03:11] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:11] IRLight : On
+[2024-06-17 16:03:12] IRLight : Standby
+[2024-06-17 16:03:14] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:03:17] IRLight : On
+[2024-06-17 16:03:18] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:03:18] IRLight : Standby
+[2024-06-17 16:03:18] 1 -> 2
+[2024-06-17 16:03:18] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:03:18] 2 -> 3
+[2024-06-17 16:03:18] IRLight : On
+[2024-06-17 16:03:18] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:18] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:03:18] IV2MSG : State - subreadysuccess
+[2024-06-17 16:03:18] 3 -> 4
+[2024-06-17 16:03:19] 4 -> 6
+[2024-06-17 16:03:19] Failed SaveImageSize : 35
+[2024-06-17 16:03:19] 6 -> 4
+[2024-06-17 16:03:20] IRLight : Standby
+[2024-06-17 16:03:20] 4 -> 6
+[2024-06-17 16:03:20] Failed SaveImageSize : 35
+[2024-06-17 16:03:20] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:03:20] 6 -> 1
+[2024-06-17 16:03:20] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:20] 1 -> 2
+[2024-06-17 16:03:20] IRLight : On
+[2024-06-17 16:03:21] IRLight : On
+[2024-06-17 16:03:21] 2 -> 1
+[2024-06-17 16:03:21] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:21] 1 -> 2
+[2024-06-17 16:03:21] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (227, 140)
+[2024-06-17 16:03:21] 2 -> 3
+[2024-06-17 16:03:21] IRLight : On
+[2024-06-17 16:03:21] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:21] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:03:21] IV2MSG : State - subreadysuccess
+[2024-06-17 16:03:21] 3 -> 4
+[2024-06-17 16:03:22] IRLight : Standby
+[2024-06-17 16:03:28] IRLight : On
+[2024-06-17 16:03:29] IRLight : Standby
+[2024-06-17 16:03:29] IRLight : On
+[2024-06-17 16:03:30] IRLight : Standby
+[2024-06-17 16:03:35] IRLight : On
+[2024-06-17 16:03:36] IRLight : Standby
+[2024-06-17 16:03:37] 4 -> 6
+[2024-06-17 16:03:37] 6 -> 8
+[2024-06-17 16:03:37] 8 -> 9
+[2024-06-17 16:03:37] Img : 
+[2024-06-17 16:03:37] Img : 
+[2024-06-17 16:03:37] Img : 
+[2024-06-17 16:03:37] Success : PeekMessage(0.000007)
+[2024-06-17 16:03:37] i
+
+[2024-06-17 16:03:37] o
+
+[2024-06-17 16:03:37] [Result Data] TunningData(OriginalData) _ Speed : 50.95(52.23)   Direction : -1.50(-1.50)    LaunchAngle : 14.65(13.42)
+ ClubDirection : -6.46(-6.46)    SideSpin : 311.72(0.00)   BackSpin : 3273.15(0.00)
+[2024-06-17 16:03:37] IRLight : Off
+[2024-06-17 16:03:37] Shot : [Auto]01240617_160337(101)
+[2024-06-17 16:03:37] Selected CameraID : 0 _ Set ROI Pos : (227, 140) -> (268, 86)
+[2024-06-17 16:03:37] 9 -> 1
+[2024-06-17 16:03:37] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:38] IRLight : Standby
+[2024-06-17 16:03:39] HanderType : [Left] -> [Left]
+[2024-06-17 16:03:39] IV2MSG : Option - LeftHander
+[2024-06-17 16:03:39] TeeMode : [Down] -> [Down]
+[2024-06-17 16:03:39] IV2MSG : Option - TeeDown
+[2024-06-17 16:03:39] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:03:39] IV2MSG : Option - FairWay
+[2024-06-17 16:03:40] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:03:41] IRLight : On
+[2024-06-17 16:03:41] 1 -> 2
+[2024-06-17 16:03:41] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:03:42] IRLight : Standby
+[2024-06-17 16:03:42] IRLight : On
+[2024-06-17 16:03:42] 2 -> 1
+[2024-06-17 16:03:42] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:42] 1 -> 2
+[2024-06-17 16:03:43] IRLight : On
+[2024-06-17 16:03:43] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:03:43] 2 -> 3
+[2024-06-17 16:03:43] IRLight : On
+[2024-06-17 16:03:43] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:43] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:03:43] IV2MSG : State - subreadysuccess
+[2024-06-17 16:03:43] 3 -> 4
+[2024-06-17 16:03:43] 4 -> 6
+[2024-06-17 16:03:43] Failed SaveImageSize : 35
+[2024-06-17 16:03:43] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:03:43] 6 -> 1
+[2024-06-17 16:03:43] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:43] 1 -> 2
+[2024-06-17 16:03:44] IRLight : Standby
+[2024-06-17 16:03:44] 2 -> 1
+[2024-06-17 16:03:44] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:44] 1 -> 2
+[2024-06-17 16:03:44] IRLight : On
+[2024-06-17 16:03:44] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 140)
+[2024-06-17 16:03:44] 2 -> 3
+[2024-06-17 16:03:44] IRLight : On
+[2024-06-17 16:03:44] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:44] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:03:44] IV2MSG : State - subreadysuccess
+[2024-06-17 16:03:45] 3 -> 4
+[2024-06-17 16:03:45] IRLight : Standby
+[2024-06-17 16:03:46] IRLight : On
+[2024-06-17 16:03:47] IRLight : Standby
+[2024-06-17 16:03:47] IRLight : On
+[2024-06-17 16:03:48] IRLight : Standby
+[2024-06-17 16:03:51] IRLight : On
+[2024-06-17 16:03:52] IRLight : Standby
+[2024-06-17 16:03:53] 4 -> 6
+[2024-06-17 16:03:53] 6 -> 8
+[2024-06-17 16:03:53] 8 -> 9
+[2024-06-17 16:03:53] Img : 
+[2024-06-17 16:03:53] Img : 
+[2024-06-17 16:03:53] Img : 
+[2024-06-17 16:03:53] Success : PeekMessage(0.000010)
+[2024-06-17 16:03:53] i
+
+[2024-06-17 16:03:53] o
+
+[2024-06-17 16:03:53] [Result Data] TunningData(OriginalData) _ Speed : 51.92(53.34)   Direction : -5.52(-5.52)    LaunchAngle : 16.33(15.19)
+ ClubDirection : -14.04(-14.04)    SideSpin : 515.66(0.00)   BackSpin : 3427.28(0.00)
+[2024-06-17 16:03:53] IRLight : Off
+[2024-06-17 16:03:53] Shot : [Auto]01240617_160353(101)
+[2024-06-17 16:03:53] Selected CameraID : 0 _ Set ROI Pos : (226, 140) -> (268, 86)
+[2024-06-17 16:03:53] 9 -> 1
+[2024-06-17 16:03:53] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:54] IRLight : Standby
+[2024-06-17 16:03:55] HanderType : [Left] -> [Left]
+[2024-06-17 16:03:55] IV2MSG : Option - LeftHander
+[2024-06-17 16:03:55] TeeMode : [Down] -> [Down]
+[2024-06-17 16:03:55] IV2MSG : Option - TeeDown
+[2024-06-17 16:03:55] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:03:55] IV2MSG : Option - FairWay
+[2024-06-17 16:03:57] IRLight : On
+[2024-06-17 16:03:57] 1 -> 2
+[2024-06-17 16:03:58] IRLight : Standby
+[2024-06-17 16:03:58] 2 -> 1
+[2024-06-17 16:03:58] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:58] 1 -> 2
+[2024-06-17 16:03:58] IRLight : On
+[2024-06-17 16:03:58] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:03:58] 2 -> 3
+[2024-06-17 16:03:58] IRLight : On
+[2024-06-17 16:03:58] ImageQueue Reset : Main Camera
+[2024-06-17 16:03:58] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:03:58] IV2MSG : State - subreadysuccess
+[2024-06-17 16:03:58] 3 -> 4
+[2024-06-17 16:03:59] IRLight : Standby
+[2024-06-17 16:04:00] IRLight : On
+[2024-06-17 16:04:00] IRLight : On
+[2024-06-17 16:04:01] 4 -> 6
+[2024-06-17 16:04:01] Failed SaveImageSize : 35
+[2024-06-17 16:04:01] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:04:01] 6 -> 1
+[2024-06-17 16:04:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:01] 1 -> 2
+[2024-06-17 16:04:01] IRLight : Standby
+[2024-06-17 16:04:01] 2 -> 1
+[2024-06-17 16:04:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:01] 1 -> 2
+[2024-06-17 16:04:02] IRLight : On
+[2024-06-17 16:04:02] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (221, 139)
+[2024-06-17 16:04:02] 2 -> 3
+[2024-06-17 16:04:02] IRLight : On
+[2024-06-17 16:04:02] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:02] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:04:02] IV2MSG : State - subreadysuccess
+[2024-06-17 16:04:02] 3 -> 4
+[2024-06-17 16:04:03] IRLight : Standby
+[2024-06-17 16:04:04] IRLight : On
+[2024-06-17 16:04:05] IRLight : Standby
+[2024-06-17 16:04:05] IRLight : On
+[2024-06-17 16:04:06] IRLight : Standby
+[2024-06-17 16:04:14] IRLight : On
+[2024-06-17 16:04:15] IRLight : Standby
+[2024-06-17 16:04:15] 4 -> 6
+[2024-06-17 16:04:15] Selected CameraID : 0 _ Set ROI Pos : (221, 139) -> (268, 86)
+[2024-06-17 16:04:15] 6 -> 1
+[2024-06-17 16:04:15] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:15] IRLight : On
+[2024-06-17 16:04:16] IRLight : Standby
+[2024-06-17 16:04:17] IRLight : On
+[2024-06-17 16:04:18] IRLight : Standby
+[2024-06-17 16:04:19] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:04:20] IRLight : On
+[2024-06-17 16:04:21] 1 -> 2
+[2024-06-17 16:04:21] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:04:21] IRLight : Standby
+[2024-06-17 16:04:21] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:04:21] 2 -> 3
+[2024-06-17 16:04:21] IRLight : On
+[2024-06-17 16:04:21] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:21] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:04:21] IV2MSG : State - subreadysuccess
+[2024-06-17 16:04:21] 3 -> 4
+[2024-06-17 16:04:22] IRLight : Standby
+[2024-06-17 16:04:23] 4 -> 6
+[2024-06-17 16:04:23] Failed SaveImageSize : 35
+[2024-06-17 16:04:23] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:04:23] 6 -> 1
+[2024-06-17 16:04:23] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:23] 1 -> 2
+[2024-06-17 16:04:23] IRLight : On
+[2024-06-17 16:04:23] IRLight : On
+[2024-06-17 16:04:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2024-06-17 16:04:23] 2 -> 3
+[2024-06-17 16:04:23] IRLight : On
+[2024-06-17 16:04:23] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:23] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:04:23] IV2MSG : State - subreadysuccess
+[2024-06-17 16:04:23] 3 -> 4
+[2024-06-17 16:04:23] 4 -> 6
+[2024-06-17 16:04:23] Failed SaveImageSize : 35
+[2024-06-17 16:04:23] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2024-06-17 16:04:23] 6 -> 1
+[2024-06-17 16:04:23] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:23] 1 -> 2
+[2024-06-17 16:04:24] 2 -> 1
+[2024-06-17 16:04:24] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:24] 1 -> 2
+[2024-06-17 16:04:24] IRLight : Standby
+[2024-06-17 16:04:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (225, 138)
+[2024-06-17 16:04:25] 2 -> 3
+[2024-06-17 16:04:25] IRLight : On
+[2024-06-17 16:04:25] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:25] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:04:25] IV2MSG : State - subreadysuccess
+[2024-06-17 16:04:25] 3 -> 4
+[2024-06-17 16:04:26] IRLight : Standby
+[2024-06-17 16:04:26] IRLight : On
+[2024-06-17 16:04:27] 4 -> 7
+[2024-06-17 16:04:27] SaveImageSize : 26 -> 26
+[2024-06-17 16:04:27] 7 -> 8
+[2024-06-17 16:04:27] 8 -> 4
+[2024-06-17 16:04:27] IRLight : Standby
+[2024-06-17 16:04:27] IRLight : On
+[2024-06-17 16:04:28] IRLight : Standby
+[2024-06-17 16:04:28] 4 -> 6
+[2024-06-17 16:04:28] Failed SaveImageSize : 35
+[2024-06-17 16:04:28] 6 -> 4
+[2024-06-17 16:04:29] IRLight : On
+[2024-06-17 16:04:30] IRLight : Standby
+[2024-06-17 16:04:35] IRLight : On
+[2024-06-17 16:04:36] IRLight : Standby
+[2024-06-17 16:04:37] 4 -> 6
+[2024-06-17 16:04:37] 6 -> 8
+[2024-06-17 16:04:37] 8 -> 9
+[2024-06-17 16:04:37] Img : 
+[2024-06-17 16:04:37] Img : 
+[2024-06-17 16:04:37] Img : 
+[2024-06-17 16:04:37] Success : PeekMessage(0.001767)
+[2024-06-17 16:04:37] i
+
+[2024-06-17 16:04:37] o
+
+[2024-06-17 16:04:37] [Result Data] TunningData(OriginalData) _ Speed : 51.01(52.30)   Direction : -4.55(-4.55)    LaunchAngle : 15.17(13.97)
+ ClubDirection : -18.00(-18.00)    SideSpin : 643.12(0.00)   BackSpin : 3201.69(0.00)
+[2024-06-17 16:04:37] IRLight : Off
+[2024-06-17 16:04:37] Shot : [Auto]01240617_160437(101)
+[2024-06-17 16:04:37] Selected CameraID : 0 _ Set ROI Pos : (225, 138) -> (268, 86)
+[2024-06-17 16:04:37] 9 -> 1
+[2024-06-17 16:04:37] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:38] IRLight : Standby
+[2024-06-17 16:04:39] HanderType : [Left] -> [Left]
+[2024-06-17 16:04:39] IV2MSG : Option - LeftHander
+[2024-06-17 16:04:39] TeeMode : [Down] -> [Down]
+[2024-06-17 16:04:39] IV2MSG : Option - TeeDown
+[2024-06-17 16:04:39] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:04:39] IV2MSG : Option - FairWay
+[2024-06-17 16:04:41] IRLight : On
+[2024-06-17 16:04:41] 1 -> 2
+[2024-06-17 16:04:42] IRLight : Standby
+[2024-06-17 16:04:42] 2 -> 1
+[2024-06-17 16:04:42] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:42] 1 -> 2
+[2024-06-17 16:04:42] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2024-06-17 16:04:42] 2 -> 3
+[2024-06-17 16:04:42] IRLight : On
+[2024-06-17 16:04:42] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:42] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:04:42] IV2MSG : State - subreadysuccess
+[2024-06-17 16:04:42] 3 -> 4
+[2024-06-17 16:04:43] IRLight : Standby
+[2024-06-17 16:04:44] IRLight : On
+[2024-06-17 16:04:44] IRLight : On
+[2024-06-17 16:04:44] 4 -> 6
+[2024-06-17 16:04:44] Failed SaveImageSize : 35
+[2024-06-17 16:04:44] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2024-06-17 16:04:44] 6 -> 1
+[2024-06-17 16:04:44] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:44] 1 -> 2
+[2024-06-17 16:04:45] IRLight : Standby
+[2024-06-17 16:04:45] 2 -> 1
+[2024-06-17 16:04:45] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:45] 1 -> 2
+[2024-06-17 16:04:45] IRLight : On
+[2024-06-17 16:04:45] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (231, 137)
+[2024-06-17 16:04:46] 2 -> 3
+[2024-06-17 16:04:46] IRLight : On
+[2024-06-17 16:04:46] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:46] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:04:46] IV2MSG : State - subreadysuccess
+[2024-06-17 16:04:46] 3 -> 4
+[2024-06-17 16:04:47] IRLight : Standby
+[2024-06-17 16:04:47] IRLight : On
+[2024-06-17 16:04:48] IRLight : Standby
+[2024-06-17 16:04:54] IRLight : On
+[2024-06-17 16:04:55] IRLight : Standby
+[2024-06-17 16:04:56] 4 -> 6
+[2024-06-17 16:04:56] Selected CameraID : 0 _ Set ROI Pos : (231, 137) -> (268, 86)
+[2024-06-17 16:04:56] 6 -> 1
+[2024-06-17 16:04:56] ImageQueue Reset : Main Camera
+[2024-06-17 16:04:56] IRLight : On
+[2024-06-17 16:04:57] IRLight : Standby
+[2024-06-17 16:04:59] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:05:03] IRLight : On
+[2024-06-17 16:05:03] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:05:04] IRLight : Standby
+[2024-06-17 16:05:04] 1 -> 2
+[2024-06-17 16:05:05] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:05:05] 2 -> 3
+[2024-06-17 16:05:05] IRLight : On
+[2024-06-17 16:05:05] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:05] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:05:05] IV2MSG : State - subreadysuccess
+[2024-06-17 16:05:05] 3 -> 4
+[2024-06-17 16:05:06] IRLight : Standby
+[2024-06-17 16:05:06] 4 -> 6
+[2024-06-17 16:05:06] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:05:06] 6 -> 1
+[2024-06-17 16:05:06] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:06] 1 -> 2
+[2024-06-17 16:05:06] IRLight : On
+[2024-06-17 16:05:06] IRLight : On
+[2024-06-17 16:05:07] 2 -> 1
+[2024-06-17 16:05:07] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:07] 1 -> 2
+[2024-06-17 16:05:08] IRLight : Standby
+[2024-06-17 16:05:08] 2 -> 1
+[2024-06-17 16:05:08] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:08] 1 -> 2
+[2024-06-17 16:05:08] IRLight : On
+[2024-06-17 16:05:08] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 139)
+[2024-06-17 16:05:08] 2 -> 3
+[2024-06-17 16:05:08] IRLight : On
+[2024-06-17 16:05:08] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:08] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:05:08] IV2MSG : State - subreadysuccess
+[2024-06-17 16:05:08] 3 -> 4
+[2024-06-17 16:05:09] IRLight : Standby
+[2024-06-17 16:05:10] IRLight : On
+[2024-06-17 16:05:11] IRLight : Standby
+[2024-06-17 16:05:12] IRLight : On
+[2024-06-17 16:05:13] IRLight : Standby
+[2024-06-17 16:05:13] IRLight : On
+[2024-06-17 16:05:14] IRLight : Standby
+[2024-06-17 16:05:17] IRLight : On
+[2024-06-17 16:05:18] IRLight : Standby
+[2024-06-17 16:05:19] 4 -> 6
+[2024-06-17 16:05:19] Selected CameraID : 0 _ Set ROI Pos : (226, 139) -> (268, 86)
+[2024-06-17 16:05:19] 6 -> 1
+[2024-06-17 16:05:19] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:19] IRLight : On
+[2024-06-17 16:05:20] IRLight : Standby
+[2024-06-17 16:05:22] IRLight : On
+[2024-06-17 16:05:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:05:23] IRLight : Standby
+[2024-06-17 16:05:26] IRLight : On
+[2024-06-17 16:05:26] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:05:27] IRLight : Standby
+[2024-06-17 16:05:27] 1 -> 2
+[2024-06-17 16:05:28] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:05:28] 2 -> 3
+[2024-06-17 16:05:28] IRLight : On
+[2024-06-17 16:05:28] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:28] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:05:28] IV2MSG : State - subreadysuccess
+[2024-06-17 16:05:28] 3 -> 4
+[2024-06-17 16:05:29] IRLight : Standby
+[2024-06-17 16:05:29] 4 -> 6
+[2024-06-17 16:05:29] Failed SaveImageSize : 35
+[2024-06-17 16:05:29] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:05:29] 6 -> 1
+[2024-06-17 16:05:29] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:29] 1 -> 2
+[2024-06-17 16:05:29] IRLight : On
+[2024-06-17 16:05:30] IRLight : On
+[2024-06-17 16:05:30] 2 -> 1
+[2024-06-17 16:05:30] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:30] 1 -> 2
+[2024-06-17 16:05:30] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (216, 142)
+[2024-06-17 16:05:30] 2 -> 3
+[2024-06-17 16:05:30] IRLight : On
+[2024-06-17 16:05:30] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:30] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:05:30] IV2MSG : State - subreadysuccess
+[2024-06-17 16:05:30] 3 -> 4
+[2024-06-17 16:05:31] 4 -> 6
+[2024-06-17 16:05:31] Selected CameraID : 0 _ Set ROI Pos : (216, 142) -> (268, 86)
+[2024-06-17 16:05:31] 6 -> 1
+[2024-06-17 16:05:31] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:31] 1 -> 2
+[2024-06-17 16:05:31] 2 -> 1
+[2024-06-17 16:05:31] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:31] 1 -> 2
+[2024-06-17 16:05:31] IRLight : Standby
+[2024-06-17 16:05:32] IRLight : On
+[2024-06-17 16:05:32] 2 -> 1
+[2024-06-17 16:05:32] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:33] IRLight : Standby
+[2024-06-17 16:05:33] IRLight : On
+[2024-06-17 16:05:34] 1 -> 2
+[2024-06-17 16:05:34] IRLight : Standby
+[2024-06-17 16:05:34] IRLight : On
+[2024-06-17 16:05:35] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (216, 142)
+[2024-06-17 16:05:35] 2 -> 3
+[2024-06-17 16:05:35] IRLight : On
+[2024-06-17 16:05:35] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:35] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:05:35] IV2MSG : State - subreadysuccess
+[2024-06-17 16:05:35] 3 -> 4
+[2024-06-17 16:05:35] 4 -> 6
+[2024-06-17 16:05:35] Selected CameraID : 0 _ Set ROI Pos : (216, 142) -> (268, 86)
+[2024-06-17 16:05:35] 6 -> 1
+[2024-06-17 16:05:35] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:35] 1 -> 2
+[2024-06-17 16:05:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (227, 136)
+[2024-06-17 16:05:36] 2 -> 3
+[2024-06-17 16:05:36] IRLight : On
+[2024-06-17 16:05:36] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:36] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:05:36] IV2MSG : State - subreadysuccess
+[2024-06-17 16:05:36] 3 -> 4
+[2024-06-17 16:05:37] IRLight : Standby
+[2024-06-17 16:05:42] IRLight : On
+[2024-06-17 16:05:43] IRLight : Standby
+[2024-06-17 16:05:43] IRLight : On
+[2024-06-17 16:05:44] IRLight : Standby
+[2024-06-17 16:05:49] IRLight : On
+[2024-06-17 16:05:50] IRLight : Standby
+[2024-06-17 16:05:50] 4 -> 6
+[2024-06-17 16:05:50] Selected CameraID : 0 _ Set ROI Pos : (227, 136) -> (268, 86)
+[2024-06-17 16:05:50] 6 -> 1
+[2024-06-17 16:05:50] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:50] IRLight : On
+[2024-06-17 16:05:51] IRLight : Standby
+[2024-06-17 16:05:54] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:05:57] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:05:58] IRLight : On
+[2024-06-17 16:05:59] 1 -> 2
+[2024-06-17 16:05:59] IRLight : Standby
+[2024-06-17 16:05:59] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:05:59] 2 -> 3
+[2024-06-17 16:05:59] IRLight : On
+[2024-06-17 16:05:59] ImageQueue Reset : Main Camera
+[2024-06-17 16:05:59] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:05:59] IV2MSG : State - subreadysuccess
+[2024-06-17 16:05:59] 3 -> 4
+[2024-06-17 16:06:00] IRLight : Standby
+[2024-06-17 16:06:00] 4 -> 6
+[2024-06-17 16:06:00] Failed SaveImageSize : 35
+[2024-06-17 16:06:00] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:06:00] 6 -> 1
+[2024-06-17 16:06:00] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:00] 1 -> 2
+[2024-06-17 16:06:00] IRLight : On
+[2024-06-17 16:06:01] IRLight : On
+[2024-06-17 16:06:01] 2 -> 1
+[2024-06-17 16:06:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:01] 1 -> 2
+[2024-06-17 16:06:02] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (231, 139)
+[2024-06-17 16:06:02] 2 -> 3
+[2024-06-17 16:06:02] IRLight : On
+[2024-06-17 16:06:02] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:02] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:06:02] IV2MSG : State - subreadysuccess
+[2024-06-17 16:06:02] 3 -> 4
+[2024-06-17 16:06:03] IRLight : Standby
+[2024-06-17 16:06:03] IRLight : On
+[2024-06-17 16:06:04] IRLight : Standby
+[2024-06-17 16:06:05] IRLight : On
+[2024-06-17 16:06:06] IRLight : Standby
+[2024-06-17 16:06:06] IRLight : On
+[2024-06-17 16:06:07] IRLight : Standby
+[2024-06-17 16:06:08] IRLight : On
+[2024-06-17 16:06:09] IRLight : Standby
+[2024-06-17 16:06:13] IRLight : On
+[2024-06-17 16:06:14] IRLight : Standby
+[2024-06-17 16:06:14] 4 -> 6
+[2024-06-17 16:06:14] 6 -> 8
+[2024-06-17 16:06:14] 8 -> 9
+[2024-06-17 16:06:14] Img : 
+[2024-06-17 16:06:14] Img : 
+[2024-06-17 16:06:14] Img : 
+[2024-06-17 16:06:14] Success : PeekMessage(0.000006)
+[2024-06-17 16:06:14] i
+
+[2024-06-17 16:06:14] o
+
+[2024-06-17 16:06:14] [Result Data] TunningData(OriginalData) _ Speed : 54.11(55.89)   Direction : -6.64(-6.64)    LaunchAngle : 16.39(15.26)
+ ClubDirection : -8.59(-8.59)    SideSpin : 78.08(0.00)   BackSpin : 3588.77(0.00)
+[2024-06-17 16:06:14] IRLight : Off
+[2024-06-17 16:06:14] Shot : [Auto]01240617_160614(101)
+[2024-06-17 16:06:14] Selected CameraID : 0 _ Set ROI Pos : (231, 139) -> (268, 86)
+[2024-06-17 16:06:14] 9 -> 1
+[2024-06-17 16:06:14] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:15] IRLight : Standby
+[2024-06-17 16:06:17] HanderType : [Left] -> [Left]
+[2024-06-17 16:06:17] IV2MSG : Option - LeftHander
+[2024-06-17 16:06:17] TeeMode : [Down] -> [Down]
+[2024-06-17 16:06:17] IV2MSG : Option - TeeDown
+[2024-06-17 16:06:17] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:06:17] IV2MSG : Option - FairWay
+[2024-06-17 16:06:18] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:06:18] IRLight : On
+[2024-06-17 16:06:18] 1 -> 2
+[2024-06-17 16:06:18] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:06:19] IRLight : Standby
+[2024-06-17 16:06:19] 2 -> 1
+[2024-06-17 16:06:19] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:19] 1 -> 2
+[2024-06-17 16:06:20] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:06:20] 2 -> 3
+[2024-06-17 16:06:20] IRLight : On
+[2024-06-17 16:06:20] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:20] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:06:20] IV2MSG : State - subreadysuccess
+[2024-06-17 16:06:20] 3 -> 4
+[2024-06-17 16:06:21] IRLight : Standby
+[2024-06-17 16:06:21] IRLight : On
+[2024-06-17 16:06:22] IRLight : On
+[2024-06-17 16:06:22] 4 -> 6
+[2024-06-17 16:06:22] Failed SaveImageSize : 35
+[2024-06-17 16:06:22] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:06:22] 6 -> 1
+[2024-06-17 16:06:22] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:22] 1 -> 2
+[2024-06-17 16:06:23] 2 -> 1
+[2024-06-17 16:06:23] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:23] 1 -> 2
+[2024-06-17 16:06:23] IRLight : Standby
+[2024-06-17 16:06:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (224, 140)
+[2024-06-17 16:06:23] 2 -> 3
+[2024-06-17 16:06:23] IRLight : On
+[2024-06-17 16:06:23] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:23] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:06:23] IV2MSG : State - subreadysuccess
+[2024-06-17 16:06:23] 3 -> 4
+[2024-06-17 16:06:24] IRLight : Standby
+[2024-06-17 16:06:24] IRLight : On
+[2024-06-17 16:06:25] IRLight : On
+[2024-06-17 16:06:26] IRLight : Standby
+[2024-06-17 16:06:32] IRLight : On
+[2024-06-17 16:06:33] IRLight : Standby
+[2024-06-17 16:06:34] 4 -> 6
+[2024-06-17 16:06:34] 6 -> 8
+[2024-06-17 16:06:34] 8 -> 9
+[2024-06-17 16:06:34] Img : 
+[2024-06-17 16:06:34] Img : 
+[2024-06-17 16:06:34] Img : 
+[2024-06-17 16:06:34] Success : PeekMessage(0.000007)
+[2024-06-17 16:06:34] i
+
+[2024-06-17 16:06:34] o
+
+[2024-06-17 16:06:34] [Result Data] TunningData(OriginalData) _ Speed : 51.01(52.29)   Direction : -6.37(-6.37)    LaunchAngle : 16.66(15.53)
+ ClubDirection : -5.91(-5.91)    SideSpin : -4.04(0.00)   BackSpin : 3529.26(0.00)
+[2024-06-17 16:06:34] IRLight : Off
+[2024-06-17 16:06:34] Shot : [Auto]01240617_160634(101)
+[2024-06-17 16:06:34] Selected CameraID : 0 _ Set ROI Pos : (224, 140) -> (268, 86)
+[2024-06-17 16:06:34] 9 -> 1
+[2024-06-17 16:06:34] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:35] IRLight : Standby
+[2024-06-17 16:06:36] HanderType : [Left] -> [Left]
+[2024-06-17 16:06:36] IV2MSG : Option - LeftHander
+[2024-06-17 16:06:36] TeeMode : [Down] -> [Down]
+[2024-06-17 16:06:36] IV2MSG : Option - TeeDown
+[2024-06-17 16:06:36] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:06:36] IV2MSG : Option - FairWay
+[2024-06-17 16:06:38] IRLight : On
+[2024-06-17 16:06:38] 1 -> 2
+[2024-06-17 16:06:39] IRLight : Standby
+[2024-06-17 16:06:39] 2 -> 1
+[2024-06-17 16:06:39] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:39] 1 -> 2
+[2024-06-17 16:06:39] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:06:39] 2 -> 3
+[2024-06-17 16:06:39] IRLight : On
+[2024-06-17 16:06:39] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:39] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:06:39] IV2MSG : State - subreadysuccess
+[2024-06-17 16:06:39] 3 -> 4
+[2024-06-17 16:06:40] IRLight : Standby
+[2024-06-17 16:06:41] IRLight : On
+[2024-06-17 16:06:41] IRLight : On
+[2024-06-17 16:06:41] 4 -> 7
+[2024-06-17 16:06:41] Failed SaveImageSize : 35
+[2024-06-17 16:06:41] 7 -> 4
+[2024-06-17 16:06:42] 4 -> 6
+[2024-06-17 16:06:42] Failed SaveImageSize : 35
+[2024-06-17 16:06:42] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:06:42] 6 -> 1
+[2024-06-17 16:06:42] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:42] 1 -> 2
+[2024-06-17 16:06:42] IRLight : Standby
+[2024-06-17 16:06:43] 2 -> 1
+[2024-06-17 16:06:43] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:43] 1 -> 2
+[2024-06-17 16:06:43] IRLight : On
+[2024-06-17 16:06:43] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (226, 137)
+[2024-06-17 16:06:43] 2 -> 3
+[2024-06-17 16:06:43] IRLight : On
+[2024-06-17 16:06:43] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:43] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:06:43] IV2MSG : State - subreadysuccess
+[2024-06-17 16:06:43] 3 -> 4
+[2024-06-17 16:06:44] IRLight : Standby
+[2024-06-17 16:06:46] IRLight : On
+[2024-06-17 16:06:47] IRLight : Standby
+[2024-06-17 16:06:47] IRLight : On
+[2024-06-17 16:06:48] IRLight : Standby
+[2024-06-17 16:06:49] IRLight : On
+[2024-06-17 16:06:50] IRLight : Standby
+[2024-06-17 16:06:55] IRLight : On
+[2024-06-17 16:06:56] IRLight : Standby
+[2024-06-17 16:06:56] 4 -> 6
+[2024-06-17 16:06:56] 6 -> 8
+[2024-06-17 16:06:56] 8 -> 9
+[2024-06-17 16:06:56] Img : 
+[2024-06-17 16:06:56] Img : 
+[2024-06-17 16:06:56] Img : 
+[2024-06-17 16:06:56] Success : PeekMessage(0.000008)
+[2024-06-17 16:06:56] i
+
+[2024-06-17 16:06:56] o
+
+[2024-06-17 16:06:56] [Result Data] TunningData(OriginalData) _ Speed : 49.19(50.22)   Direction : -5.25(-5.25)    LaunchAngle : 18.40(17.37)
+ ClubDirection : -5.05(-5.05)    SideSpin : -0.70(0.00)   BackSpin : 3740.04(0.00)
+[2024-06-17 16:06:56] IRLight : Off
+[2024-06-17 16:06:56] Shot : [Auto]01240617_160656(101)
+[2024-06-17 16:06:56] Selected CameraID : 0 _ Set ROI Pos : (226, 137) -> (268, 86)
+[2024-06-17 16:06:56] 9 -> 1
+[2024-06-17 16:06:56] ImageQueue Reset : Main Camera
+[2024-06-17 16:06:57] IRLight : Standby
+[2024-06-17 16:06:59] HanderType : [Left] -> [Left]
+[2024-06-17 16:06:59] IV2MSG : Option - LeftHander
+[2024-06-17 16:06:59] TeeMode : [Down] -> [Down]
+[2024-06-17 16:06:59] IV2MSG : Option - TeeDown
+[2024-06-17 16:06:59] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:06:59] IV2MSG : Option - FairWay
+[2024-06-17 16:07:00] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:07:00] IRLight : On
+[2024-06-17 16:07:00] 1 -> 2
+[2024-06-17 16:07:00] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:07:01] IRLight : Standby
+[2024-06-17 16:07:01] 2 -> 1
+[2024-06-17 16:07:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:01] 1 -> 2
+[2024-06-17 16:07:02] IRLight : On
+[2024-06-17 16:07:02] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (225, 136)
+[2024-06-17 16:07:02] 2 -> 3
+[2024-06-17 16:07:02] IRLight : On
+[2024-06-17 16:07:02] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:02] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:07:02] IV2MSG : State - subreadysuccess
+[2024-06-17 16:07:02] 3 -> 4
+[2024-06-17 16:07:03] IRLight : Standby
+[2024-06-17 16:07:05] IRLight : On
+[2024-06-17 16:07:06] IRLight : Standby
+[2024-06-17 16:07:08] IRLight : On
+[2024-06-17 16:07:09] IRLight : Standby
+[2024-06-17 16:07:14] IRLight : On
+[2024-06-17 16:07:15] IRLight : Standby
+[2024-06-17 16:07:15] 4 -> 6
+[2024-06-17 16:07:15] Selected CameraID : 0 _ Set ROI Pos : (225, 136) -> (268, 86)
+[2024-06-17 16:07:15] 6 -> 1
+[2024-06-17 16:07:15] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:15] IRLight : On
+[2024-06-17 16:07:16] IRLight : Standby
+[2024-06-17 16:07:20] IRLight : On
+[2024-06-17 16:07:21] IRLight : Standby
+[2024-06-17 16:07:21] 1 -> 2
+[2024-06-17 16:07:21] IRLight : On
+[2024-06-17 16:07:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:07:22] 2 -> 3
+[2024-06-17 16:07:22] IRLight : On
+[2024-06-17 16:07:22] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:22] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:07:22] IV2MSG : State - subreadysuccess
+[2024-06-17 16:07:22] 3 -> 4
+[2024-06-17 16:07:23] IRLight : Standby
+[2024-06-17 16:07:23] 4 -> 6
+[2024-06-17 16:07:23] Failed SaveImageSize : 35
+[2024-06-17 16:07:23] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:07:23] 6 -> 1
+[2024-06-17 16:07:23] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:23] 1 -> 2
+[2024-06-17 16:07:23] IRLight : On
+[2024-06-17 16:07:24] 2 -> 1
+[2024-06-17 16:07:24] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:24] 1 -> 2
+[2024-06-17 16:07:24] IRLight : Standby
+[2024-06-17 16:07:24] IRLight : On
+[2024-06-17 16:07:24] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (223, 141)
+[2024-06-17 16:07:25] 2 -> 3
+[2024-06-17 16:07:25] IRLight : On
+[2024-06-17 16:07:25] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:25] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:07:25] IV2MSG : State - subreadysuccess
+[2024-06-17 16:07:25] 3 -> 4
+[2024-06-17 16:07:25] IRLight : Standby
+[2024-06-17 16:07:26] IRLight : On
+[2024-06-17 16:07:27] IRLight : Standby
+[2024-06-17 16:07:27] IRLight : On
+[2024-06-17 16:07:28] IRLight : Standby
+[2024-06-17 16:07:33] IRLight : On
+[2024-06-17 16:07:34] IRLight : Standby
+[2024-06-17 16:07:34] 4 -> 6
+[2024-06-17 16:07:34] 6 -> 8
+[2024-06-17 16:07:34] 8 -> 9
+[2024-06-17 16:07:34] Img : 
+[2024-06-17 16:07:34] Img : 
+[2024-06-17 16:07:34] Img : 
+[2024-06-17 16:07:34] Success : PeekMessage(0.000009)
+[2024-06-17 16:07:34] i
+
+[2024-06-17 16:07:34] o
+
+[2024-06-17 16:07:34] [Result Data] TunningData(OriginalData) _ Speed : 50.65(51.88)   Direction : -5.39(-5.39)    LaunchAngle : 17.13(16.03)
+ ClubDirection : -11.83(-11.83)    SideSpin : 373.41(0.00)   BackSpin : 3528.85(0.00)
+[2024-06-17 16:07:34] IRLight : Off
+[2024-06-17 16:07:34] Shot : [Auto]01240617_160734(101)
+[2024-06-17 16:07:34] Selected CameraID : 0 _ Set ROI Pos : (223, 141) -> (268, 86)
+[2024-06-17 16:07:34] 9 -> 1
+[2024-06-17 16:07:34] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:35] IRLight : Standby
+[2024-06-17 16:07:36] HanderType : [Left] -> [Left]
+[2024-06-17 16:07:36] IV2MSG : Option - LeftHander
+[2024-06-17 16:07:36] TeeMode : [Down] -> [Down]
+[2024-06-17 16:07:36] IV2MSG : Option - TeeDown
+[2024-06-17 16:07:36] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:07:36] IV2MSG : Option - FairWay
+[2024-06-17 16:07:38] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:07:38] IRLight : On
+[2024-06-17 16:07:38] 1 -> 2
+[2024-06-17 16:07:38] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:07:39] IRLight : Standby
+[2024-06-17 16:07:40] 2 -> 1
+[2024-06-17 16:07:40] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:40] 1 -> 2
+[2024-06-17 16:07:40] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:07:40] 2 -> 3
+[2024-06-17 16:07:40] IRLight : On
+[2024-06-17 16:07:40] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:40] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:07:40] IV2MSG : State - subreadysuccess
+[2024-06-17 16:07:40] 3 -> 4
+[2024-06-17 16:07:41] IRLight : Standby
+[2024-06-17 16:07:41] IRLight : On
+[2024-06-17 16:07:42] IRLight : Standby
+[2024-06-17 16:07:43] IRLight : On
+[2024-06-17 16:07:44] 4 -> 6
+[2024-06-17 16:07:44] Failed SaveImageSize : 35
+[2024-06-17 16:07:44] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:07:44] 6 -> 1
+[2024-06-17 16:07:44] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:44] 1 -> 2
+[2024-06-17 16:07:44] IRLight : Standby
+[2024-06-17 16:07:45] 2 -> 1
+[2024-06-17 16:07:45] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:45] 1 -> 2
+[2024-06-17 16:07:45] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (210, 137)
+[2024-06-17 16:07:45] 2 -> 3
+[2024-06-17 16:07:45] IRLight : On
+[2024-06-17 16:07:45] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:45] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:07:45] IV2MSG : State - subreadysuccess
+[2024-06-17 16:07:45] 3 -> 4
+[2024-06-17 16:07:46] IRLight : Standby
+[2024-06-17 16:07:46] IRLight : On
+[2024-06-17 16:07:47] IRLight : On
+[2024-06-17 16:07:48] IRLight : Standby
+[2024-06-17 16:07:49] IRLight : On
+[2024-06-17 16:07:50] IRLight : Standby
+[2024-06-17 16:07:52] IRLight : On
+[2024-06-17 16:07:53] IRLight : Standby
+[2024-06-17 16:07:54] 4 -> 6
+[2024-06-17 16:07:54] 6 -> 8
+[2024-06-17 16:07:54] 8 -> 9
+[2024-06-17 16:07:54] Img : 
+[2024-06-17 16:07:54] Img : 
+[2024-06-17 16:07:54] Img : 
+[2024-06-17 16:07:54] Success : PeekMessage(0.000004)
+[2024-06-17 16:07:54] i
+
+[2024-06-17 16:07:54] o
+
+[2024-06-17 16:07:54] [Result Data] TunningData(OriginalData) _ Speed : 53.64(55.34)   Direction : -6.16(-6.16)    LaunchAngle : 16.89(15.77)
+ ClubDirection : -5.95(-5.95)    SideSpin : -0.89(0.00)   BackSpin : 3635.85(0.00)
+[2024-06-17 16:07:54] IRLight : Off
+[2024-06-17 16:07:54] Shot : [Auto]01240617_160754(101)
+[2024-06-17 16:07:54] Selected CameraID : 0 _ Set ROI Pos : (210, 137) -> (268, 86)
+[2024-06-17 16:07:54] 9 -> 1
+[2024-06-17 16:07:54] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:55] IRLight : Standby
+[2024-06-17 16:07:56] HanderType : [Left] -> [Left]
+[2024-06-17 16:07:56] IV2MSG : Option - LeftHander
+[2024-06-17 16:07:56] TeeMode : [Down] -> [Down]
+[2024-06-17 16:07:56] IV2MSG : Option - TeeDown
+[2024-06-17 16:07:56] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:07:56] IV2MSG : Option - FairWay
+[2024-06-17 16:07:58] IRLight : On
+[2024-06-17 16:07:58] 1 -> 2
+[2024-06-17 16:07:58] IRLight : On
+[2024-06-17 16:07:59] IRLight : Standby
+[2024-06-17 16:07:59] 2 -> 1
+[2024-06-17 16:07:59] ImageQueue Reset : Main Camera
+[2024-06-17 16:07:59] 1 -> 2
+[2024-06-17 16:08:00] IRLight : On
+[2024-06-17 16:08:00] 2 -> 1
+[2024-06-17 16:08:00] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:00] 1 -> 2
+[2024-06-17 16:08:01] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (224, 141)
+[2024-06-17 16:08:01] 2 -> 3
+[2024-06-17 16:08:01] IRLight : On
+[2024-06-17 16:08:01] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:01] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:08:01] IV2MSG : State - subreadysuccess
+[2024-06-17 16:08:01] 3 -> 4
+[2024-06-17 16:08:02] IRLight : Standby
+[2024-06-17 16:08:02] IRLight : On
+[2024-06-17 16:08:03] IRLight : Standby
+[2024-06-17 16:08:04] IRLight : On
+[2024-06-17 16:08:05] IRLight : Standby
+[2024-06-17 16:08:08] IRLight : On
+[2024-06-17 16:08:09] IRLight : Standby
+[2024-06-17 16:08:10] 4 -> 6
+[2024-06-17 16:08:10] Selected CameraID : 0 _ Set ROI Pos : (224, 141) -> (268, 86)
+[2024-06-17 16:08:10] 6 -> 1
+[2024-06-17 16:08:10] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:10] IRLight : On
+[2024-06-17 16:08:11] IRLight : Standby
+[2024-06-17 16:08:13] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:08:17] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:08:18] IRLight : On
+[2024-06-17 16:08:18] 1 -> 2
+[2024-06-17 16:08:19] IRLight : Standby
+[2024-06-17 16:08:19] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:08:19] 2 -> 3
+[2024-06-17 16:08:19] IRLight : On
+[2024-06-17 16:08:19] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:19] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:08:19] IV2MSG : State - subreadysuccess
+[2024-06-17 16:08:19] 3 -> 4
+[2024-06-17 16:08:20] IRLight : Standby
+[2024-06-17 16:08:20] 4 -> 6
+[2024-06-17 16:08:20] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:08:21] 6 -> 1
+[2024-06-17 16:08:21] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:21] 1 -> 2
+[2024-06-17 16:08:21] IRLight : On
+[2024-06-17 16:08:21] 2 -> 1
+[2024-06-17 16:08:21] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:21] 1 -> 2
+[2024-06-17 16:08:21] IRLight : On
+[2024-06-17 16:08:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:08:22] 2 -> 3
+[2024-06-17 16:08:22] IRLight : On
+[2024-06-17 16:08:22] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:22] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:08:22] IV2MSG : State - subreadysuccess
+[2024-06-17 16:08:22] 3 -> 4
+[2024-06-17 16:08:22] 4 -> 6
+[2024-06-17 16:08:22] 6 -> 4
+[2024-06-17 16:08:22] 4 -> 6
+[2024-06-17 16:08:22] Failed SaveImageSize : 35
+[2024-06-17 16:08:22] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:08:22] 6 -> 1
+[2024-06-17 16:08:22] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:22] 1 -> 2
+[2024-06-17 16:08:23] IRLight : Standby
+[2024-06-17 16:08:23] 2 -> 1
+[2024-06-17 16:08:23] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:23] 1 -> 2
+[2024-06-17 16:08:23] IRLight : On
+[2024-06-17 16:08:24] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (219, 137)
+[2024-06-17 16:08:24] 2 -> 3
+[2024-06-17 16:08:24] IRLight : On
+[2024-06-17 16:08:24] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:24] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:08:24] IV2MSG : State - subreadysuccess
+[2024-06-17 16:08:24] 3 -> 4
+[2024-06-17 16:08:25] IRLight : Standby
+[2024-06-17 16:08:28] IRLight : On
+[2024-06-17 16:08:28] 4 -> 6
+[2024-06-17 16:08:28] Failed SaveImageSize : 35
+[2024-06-17 16:08:28] 6 -> 4
+[2024-06-17 16:08:29] IRLight : Standby
+[2024-06-17 16:08:30] IRLight : On
+[2024-06-17 16:08:31] IRLight : Standby
+[2024-06-17 16:08:31] IRLight : On
+[2024-06-17 16:08:32] IRLight : Standby
+[2024-06-17 16:08:37] IRLight : On
+[2024-06-17 16:08:38] IRLight : Standby
+[2024-06-17 16:08:39] 4 -> 6
+[2024-06-17 16:08:39] 6 -> 8
+[2024-06-17 16:08:39] 8 -> 9
+[2024-06-17 16:08:39] Img : 
+[2024-06-17 16:08:39] Img : 
+[2024-06-17 16:08:39] Img : 
+[2024-06-17 16:08:39] Success : PeekMessage(0.005476)
+[2024-06-17 16:08:39] i
+
+[2024-06-17 16:08:39] o
+
+[2024-06-17 16:08:39] [Result Data] TunningData(OriginalData) _ Speed : 46.53(47.21)   Direction : -1.37(-1.37)    LaunchAngle : 16.32(15.18)
+ ClubDirection : -5.44(-5.44)    SideSpin : 221.12(0.00)   BackSpin : 3425.70(0.00)
+[2024-06-17 16:08:39] IRLight : Off
+[2024-06-17 16:08:39] Shot : [Auto]01240617_160839(101)
+[2024-06-17 16:08:39] Selected CameraID : 0 _ Set ROI Pos : (219, 137) -> (268, 86)
+[2024-06-17 16:08:39] 9 -> 1
+[2024-06-17 16:08:39] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:40] IRLight : Standby
+[2024-06-17 16:08:41] HanderType : [Left] -> [Left]
+[2024-06-17 16:08:41] IV2MSG : Option - LeftHander
+[2024-06-17 16:08:41] TeeMode : [Down] -> [Down]
+[2024-06-17 16:08:41] IV2MSG : Option - TeeDown
+[2024-06-17 16:08:41] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:08:41] IV2MSG : Option - FairWay
+[2024-06-17 16:08:42] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:08:43] IRLight : On
+[2024-06-17 16:08:43] 1 -> 2
+[2024-06-17 16:08:43] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:08:44] IRLight : Standby
+[2024-06-17 16:08:44] 2 -> 1
+[2024-06-17 16:08:44] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:44] 1 -> 2
+[2024-06-17 16:08:44] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2024-06-17 16:08:44] 2 -> 3
+[2024-06-17 16:08:44] IRLight : On
+[2024-06-17 16:08:44] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:44] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:08:44] IV2MSG : State - subreadysuccess
+[2024-06-17 16:08:44] 3 -> 4
+[2024-06-17 16:08:45] 4 -> 7
+[2024-06-17 16:08:45] Failed SaveImageSize : 35
+[2024-06-17 16:08:45] 7 -> 4
+[2024-06-17 16:08:45] 4 -> 6
+[2024-06-17 16:08:45] Failed SaveImageSize : 35
+[2024-06-17 16:08:45] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2024-06-17 16:08:45] 6 -> 1
+[2024-06-17 16:08:45] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:45] 1 -> 2
+[2024-06-17 16:08:46] IRLight : Standby
+[2024-06-17 16:08:46] IRLight : On
+[2024-06-17 16:08:46] 2 -> 1
+[2024-06-17 16:08:46] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:46] 1 -> 2
+[2024-06-17 16:08:46] IRLight : On
+[2024-06-17 16:08:46] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (219, 139)
+[2024-06-17 16:08:46] 2 -> 3
+[2024-06-17 16:08:46] IRLight : On
+[2024-06-17 16:08:46] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:46] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:08:46] IV2MSG : State - subreadysuccess
+[2024-06-17 16:08:46] 3 -> 4
+[2024-06-17 16:08:47] IRLight : Standby
+[2024-06-17 16:08:48] IRLight : On
+[2024-06-17 16:08:49] IRLight : Standby
+[2024-06-17 16:08:49] IRLight : On
+[2024-06-17 16:08:50] IRLight : Standby
+[2024-06-17 16:08:56] IRLight : On
+[2024-06-17 16:08:57] IRLight : Standby
+[2024-06-17 16:08:57] 4 -> 6
+[2024-06-17 16:08:57] 6 -> 8
+[2024-06-17 16:08:57] 8 -> 9
+[2024-06-17 16:08:57] Img : 
+[2024-06-17 16:08:57] Img : 
+[2024-06-17 16:08:57] Img : 
+[2024-06-17 16:08:57] Success : PeekMessage(0.000007)
+[2024-06-17 16:08:57] i
+
+[2024-06-17 16:08:57] o
+
+[2024-06-17 16:08:57] [Result Data] TunningData(OriginalData) _ Speed : 52.61(54.14)   Direction : -5.57(-5.57)    LaunchAngle : 17.15(16.06)
+ ClubDirection : -7.44(-7.44)    SideSpin : 67.60(0.00)   BackSpin : 3635.14(0.00)
+[2024-06-17 16:08:57] IRLight : Off
+[2024-06-17 16:08:57] Shot : [Auto]01240617_160857(101)
+[2024-06-17 16:08:57] Selected CameraID : 0 _ Set ROI Pos : (219, 139) -> (268, 86)
+[2024-06-17 16:08:57] 9 -> 1
+[2024-06-17 16:08:57] ImageQueue Reset : Main Camera
+[2024-06-17 16:08:58] IRLight : Standby
+[2024-06-17 16:09:00] HanderType : [Left] -> [Left]
+[2024-06-17 16:09:00] IV2MSG : Option - LeftHander
+[2024-06-17 16:09:00] TeeMode : [Down] -> [Down]
+[2024-06-17 16:09:00] IV2MSG : Option - TeeDown
+[2024-06-17 16:09:00] SurFaceType : [Fairway] -> [Fairway]
+[2024-06-17 16:09:00] IV2MSG : Option - FairWay
+[2024-06-17 16:09:01] IRLight : On
+[2024-06-17 16:09:01] 1 -> 2
+[2024-06-17 16:09:02] IRLight : Standby
+[2024-06-17 16:09:03] 2 -> 1
+[2024-06-17 16:09:03] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:03] 1 -> 2
+[2024-06-17 16:09:03] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2024-06-17 16:09:03] 2 -> 3
+[2024-06-17 16:09:03] IRLight : On
+[2024-06-17 16:09:03] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:03] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:09:03] IV2MSG : State - subreadysuccess
+[2024-06-17 16:09:03] 3 -> 4
+[2024-06-17 16:09:04] IRLight : Standby
+[2024-06-17 16:09:04] IRLight : On
+[2024-06-17 16:09:05] IRLight : Standby
+[2024-06-17 16:09:05] IRLight : On
+[2024-06-17 16:09:06] 4 -> 6
+[2024-06-17 16:09:06] Failed SaveImageSize : 35
+[2024-06-17 16:09:06] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2024-06-17 16:09:06] 6 -> 1
+[2024-06-17 16:09:06] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:06] 1 -> 2
+[2024-06-17 16:09:06] IRLight : Standby
+[2024-06-17 16:09:07] 2 -> 1
+[2024-06-17 16:09:07] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:07] 1 -> 2
+[2024-06-17 16:09:07] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (218, 139)
+[2024-06-17 16:09:07] 2 -> 3
+[2024-06-17 16:09:07] IRLight : On
+[2024-06-17 16:09:07] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:07] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:09:07] IV2MSG : State - subreadysuccess
+[2024-06-17 16:09:07] 3 -> 4
+[2024-06-17 16:09:08] IRLight : Standby
+[2024-06-17 16:09:08] IRLight : On
+[2024-06-17 16:09:09] IRLight : Standby
+[2024-06-17 16:09:11] IRLight : On
+[2024-06-17 16:09:11] 4 -> 6
+[2024-06-17 16:09:11] Failed SaveImageSize : 35
+[2024-06-17 16:09:11] 6 -> 4
+[2024-06-17 16:09:12] IRLight : Standby
+[2024-06-17 16:09:13] IRLight : On
+[2024-06-17 16:09:14] IRLight : Standby
+[2024-06-17 16:09:15] IRLight : On
+[2024-06-17 16:09:16] IRLight : Standby
+[2024-06-17 16:09:20] IRLight : On
+[2024-06-17 16:09:21] IRLight : Standby
+[2024-06-17 16:09:22] 4 -> 6
+[2024-06-17 16:09:22] 6 -> 8
+[2024-06-17 16:09:22] 8 -> 9
+[2024-06-17 16:09:22] Img : 
+[2024-06-17 16:09:22] Img : 
+[2024-06-17 16:09:22] Img : 
+[2024-06-17 16:09:22] Success : PeekMessage(0.001945)
+[2024-06-17 16:09:22] i
+
+[2024-06-17 16:09:22] o
+
+[2024-06-17 16:09:22] [Result Data] TunningData(OriginalData) _ Speed : 54.21(56.01)   Direction : -1.95(-1.95)    LaunchAngle : 15.42(14.23)
+ ClubDirection : -3.37(-3.37)    SideSpin : 42.68(0.00)   BackSpin : 3476.85(0.00)
+[2024-06-17 16:09:22] IRLight : Off
+[2024-06-17 16:09:22] Shot : [Auto]01240617_160922(101)
+[2024-06-17 16:09:22] Selected CameraID : 0 _ Set ROI Pos : (218, 139) -> (268, 86)
+[2024-06-17 16:09:22] 9 -> 1
+[2024-06-17 16:09:22] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:23] IRLight : Standby
+[2024-06-17 16:09:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:09:26] IRLight : On
+[2024-06-17 16:09:27] IRLight : Standby
+[2024-06-17 16:09:29] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:09:29] IRLight : On
+[2024-06-17 16:09:30] 1 -> 2
+[2024-06-17 16:09:30] IRLight : Standby
+[2024-06-17 16:09:31] 2 -> 1
+[2024-06-17 16:09:31] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:31] 1 -> 2
+[2024-06-17 16:09:31] IRLight : On
+[2024-06-17 16:09:31] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2024-06-17 16:09:31] 2 -> 3
+[2024-06-17 16:09:31] IRLight : On
+[2024-06-17 16:09:31] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:31] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:09:31] IV2MSG : State - subreadysuccess
+[2024-06-17 16:09:31] 3 -> 4
+[2024-06-17 16:09:32] IRLight : Standby
+[2024-06-17 16:09:32] 4 -> 6
+[2024-06-17 16:09:32] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2024-06-17 16:09:32] 6 -> 1
+[2024-06-17 16:09:32] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:32] 1 -> 2
+[2024-06-17 16:09:32] IRLight : On
+[2024-06-17 16:09:33] 2 -> 1
+[2024-06-17 16:09:33] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:33] 1 -> 2
+[2024-06-17 16:09:33] IRLight : Standby
+[2024-06-17 16:09:34] IRLight : On
+[2024-06-17 16:09:34] 2 -> 1
+[2024-06-17 16:09:34] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:34] 1 -> 2
+[2024-06-17 16:09:35] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (220, 135)
+[2024-06-17 16:09:35] 2 -> 3
+[2024-06-17 16:09:35] IRLight : On
+[2024-06-17 16:09:35] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:35] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:09:35] IV2MSG : State - subreadysuccess
+[2024-06-17 16:09:35] 3 -> 4
+[2024-06-17 16:09:36] IRLight : Standby
+[2024-06-17 16:09:36] IRLight : On
+[2024-06-17 16:09:36] 4 -> 6
+[2024-06-17 16:09:36] Failed SaveImageSize : 35
+[2024-06-17 16:09:36] Selected CameraID : 0 _ Set ROI Pos : (220, 135) -> (268, 86)
+[2024-06-17 16:09:36] 6 -> 1
+[2024-06-17 16:09:36] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:36] 1 -> 2
+[2024-06-17 16:09:37] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (220, 135)
+[2024-06-17 16:09:37] 2 -> 3
+[2024-06-17 16:09:37] IRLight : On
+[2024-06-17 16:09:37] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:37] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:09:37] IV2MSG : State - subreadysuccess
+[2024-06-17 16:09:37] 3 -> 4
+[2024-06-17 16:09:38] IRLight : Standby
+[2024-06-17 16:09:38] IRLight : On
+[2024-06-17 16:09:39] IRLight : Standby
+[2024-06-17 16:09:45] IRLight : On
+[2024-06-17 16:09:46] IRLight : Standby
+[2024-06-17 16:09:47] 4 -> 6
+[2024-06-17 16:09:47] 6 -> 8
+[2024-06-17 16:09:47] 8 -> 9
+[2024-06-17 16:09:47] Img : 
+[2024-06-17 16:09:47] Img : 
+[2024-06-17 16:09:47] Img : 
+[2024-06-17 16:09:47] Success : PeekMessage(0.002097)
+[2024-06-17 16:09:47] i
+
+[2024-06-17 16:09:47] o
+
+[2024-06-17 16:09:47] [Result Data] TunningData(OriginalData) _ Speed : 51.56(52.93)   Direction : -4.65(-4.65)    LaunchAngle : 16.22(15.08)
+ ClubDirection : -7.82(-7.82)    SideSpin : 193.40(0.00)   BackSpin : 3481.40(0.00)
+[2024-06-17 16:09:47] IRLight : Off
+[2024-06-17 16:09:47] Shot : [Auto]01240617_160947(101)
+[2024-06-17 16:09:47] Selected CameraID : 0 _ Set ROI Pos : (220, 135) -> (268, 86)
+[2024-06-17 16:09:47] 9 -> 1
+[2024-06-17 16:09:47] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:48] IRLight : Standby
+[2024-06-17 16:09:50] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:09:51] IRLight : On
+[2024-06-17 16:09:52] IRLight : Standby
+[2024-06-17 16:09:54] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:09:55] IRLight : On
+[2024-06-17 16:09:56] IRLight : Standby
+[2024-06-17 16:09:56] 1 -> 2
+[2024-06-17 16:09:57] IRLight : On
+[2024-06-17 16:09:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 132)
+[2024-06-17 16:09:57] 2 -> 3
+[2024-06-17 16:09:57] IRLight : On
+[2024-06-17 16:09:57] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:57] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:09:57] IV2MSG : State - subreadysuccess
+[2024-06-17 16:09:57] 3 -> 4
+[2024-06-17 16:09:58] IRLight : Standby
+[2024-06-17 16:09:58] 4 -> 6
+[2024-06-17 16:09:58] Failed SaveImageSize : 35
+[2024-06-17 16:09:58] Selected CameraID : 0 _ Set ROI Pos : (266, 132) -> (268, 86)
+[2024-06-17 16:09:58] 6 -> 1
+[2024-06-17 16:09:58] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:58] 1 -> 2
+[2024-06-17 16:09:58] IRLight : On
+[2024-06-17 16:09:59] 2 -> 1
+[2024-06-17 16:09:59] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:59] 1 -> 2
+[2024-06-17 16:09:59] IRLight : Standby
+[2024-06-17 16:09:59] 2 -> 1
+[2024-06-17 16:09:59] ImageQueue Reset : Main Camera
+[2024-06-17 16:09:59] 1 -> 2
+[2024-06-17 16:10:00] IRLight : On
+[2024-06-17 16:10:00] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (229, 141)
+[2024-06-17 16:10:00] 2 -> 3
+[2024-06-17 16:10:00] IRLight : On
+[2024-06-17 16:10:00] ImageQueue Reset : Main Camera
+[2024-06-17 16:10:00] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:10:00] IV2MSG : State - subreadysuccess
+[2024-06-17 16:10:00] 3 -> 4
+[2024-06-17 16:10:01] IRLight : Standby
+[2024-06-17 16:10:04] IRLight : On
+[2024-06-17 16:10:04] 4 -> 6
+[2024-06-17 16:10:04] Failed SaveImageSize : 35
+[2024-06-17 16:10:04] Selected CameraID : 0 _ Set ROI Pos : (229, 141) -> (268, 86)
+[2024-06-17 16:10:04] 6 -> 1
+[2024-06-17 16:10:04] ImageQueue Reset : Main Camera
+[2024-06-17 16:10:04] 1 -> 2
+[2024-06-17 16:10:05] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (229, 141)
+[2024-06-17 16:10:05] 2 -> 3
+[2024-06-17 16:10:05] IRLight : On
+[2024-06-17 16:10:05] ImageQueue Reset : Main Camera
+[2024-06-17 16:10:05] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2024-06-17 16:10:05] IV2MSG : State - subreadysuccess
+[2024-06-17 16:10:05] 3 -> 4
+[2024-06-17 16:10:06] IRLight : Standby
+[2024-06-17 16:10:07] IRLight : On
+[2024-06-17 16:10:08] IRLight : Standby
+[2024-06-17 16:10:08] IRLight : On
+[2024-06-17 16:10:09] IRLight : Standby
+[2024-06-17 16:10:14] IRLight : On
+[2024-06-17 16:10:15] IRLight : Standby
+[2024-06-17 16:10:16] 4 -> 6
+[2024-06-17 16:10:16] Selected CameraID : 0 _ Set ROI Pos : (229, 141) -> (268, 86)
+[2024-06-17 16:10:16] 6 -> 1
+[2024-06-17 16:10:16] ImageQueue Reset : Main Camera
+[2024-06-17 16:10:16] IRLight : On
+[2024-06-17 16:10:17] IRLight : Standby
+[2024-06-17 16:10:19] IRLight : On
+[2024-06-17 16:10:19] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:10:20] IRLight : Standby
+[2024-06-17 16:10:20] 1 -> 2
+[2024-06-17 16:10:20] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:10:21] IRLight : On
+[2024-06-17 16:10:21] 2 -> 1
+[2024-06-17 16:10:21] ImageQueue Reset : Main Camera
+[2024-06-17 16:10:21] 1 -> 2
+[2024-06-17 16:10:22] IRLight : Standby
+[2024-06-17 16:10:22] 2 -> 1
+[2024-06-17 16:10:22] ImageQueue Reset : Main Camera
+[2024-06-17 16:10:22] IRLight : On
+[2024-06-17 16:10:23] IRLight : Standby
+[2024-06-17 16:10:25] IRLight : On
+[2024-06-17 16:10:26] IRLight : Standby
+[2024-06-17 16:10:26] IRLight : On
+[2024-06-17 16:10:26] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2024-06-17 16:10:27] IRLight : Standby
+[2024-06-17 16:10:28] IRLight : On
+[2024-06-17 16:10:29] 1 -> 2
+[2024-06-17 16:10:29] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2024-06-17 16:10:29] IRLight : Standby
+[2024-06-17 16:10:29] 2 -> 1
+[2024-06-17 16:10:29] ImageQueue Reset : Main Camera
+[2024-06-17 16:10:30] IRLight : On
+[2024-06-17 16:10:31] IRLight : Standby

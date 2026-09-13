@@ -1,0 +1,919 @@
+[2021-11-20 23:17] Register ExceptionFilter
+[2021-11-20 23:17:45] Log Data : Log_2021_1120_231745.txt
+[2021-11-20 23:17:47] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2021-11-20 23:17:47] Load Info Data
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionGain : 100
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionGamma : 85
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionBrightness : 0
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionFlip : 3
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2021-11-20 23:17:52] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2021-11-20 23:17:52] Success Initialize
+[2021-11-20 23:17:52] ImageQueue Reset : Main Camera
+[2021-11-20 23:17:52] Initialize Success
+[2021-11-20 23:17:52] HanderType : [Right] -> [Right]
+[2021-11-20 23:17:52] IV2MSG : Option - RightHander
+[2021-11-20 23:17:52] TeeMode : [Up] -> [Up]
+[2021-11-20 23:17:52] IV2MSG : Option - TeeUp
+[2021-11-20 23:17:52] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:17:52] IV2MSG : Option - FairWay
+[2021-11-20 23:17:52] HanderType : [Right] -> [Right]
+[2021-11-20 23:17:52] IV2MSG : Option - RightHander
+[2021-11-20 23:17:52] TeeMode : [Up] -> [Up]
+[2021-11-20 23:17:52] IV2MSG : Option - TeeUp
+[2021-11-20 23:17:52] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:17:52] IV2MSG : Option - FairWay
+[2021-11-20 23:17:53] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:17:53] IRLight : Idle
+[2021-11-20 23:17:54] IRLight : Standby
+[2021-11-20 23:19:13] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:19:13] IRLight : Idle
+[2021-11-20 23:19:14] IRLight : Standby
+[2021-11-20 23:20:33] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:20:33] IRLight : Idle
+[2021-11-20 23:20:34] IRLight : Standby
+[2021-11-20 23:20:58] 0 -> 1
+[2021-11-20 23:20:58] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:20:58] IRLight : On
+[2021-11-20 23:20:58] IV2MSG : System - Operate
+[2021-11-20 23:20:58] HanderType : [Right] -> [Left]
+[2021-11-20 23:20:58] IV2MSG : Option - LeftHander
+[2021-11-20 23:20:58] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:20:58] IV2MSG : Option - FairWay
+[2021-11-20 23:20:58] 0 -> 0
+[2021-11-20 23:20:58] IV2MSG : System - Stop
+[2021-11-20 23:20:58] Hand 1, TeeMode : 0, Surface : 0
+[2021-11-20 23:20:59] IRLight : Standby
+[2021-11-20 23:21:00] IRLight : Off
+[2021-11-20 23:21:01] IRLight : Standby
+[2021-11-20 23:21:12] 0 -> 0
+[2021-11-20 23:21:12] IRLight : Off
+[2021-11-20 23:21:12] IV2MSG : System - Stop
+[2021-11-20 23:21:13] IRLight : Standby
+[2021-11-20 23:22:31] 0 -> 1
+[2021-11-20 23:22:31] IV2MSG : System - Operate
+[2021-11-20 23:22:31] IRLight : On
+[2021-11-20 23:22:31] 1 -> 2
+[2021-11-20 23:22:31] HanderType : [Left] -> [Left]
+[2021-11-20 23:22:31] IV2MSG : Option - LeftHander
+[2021-11-20 23:22:31] TeeMode : [Up] -> [Up]
+[2021-11-20 23:22:31] IV2MSG : Option - TeeUp
+[2021-11-20 23:22:31] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:22:31] IV2MSG : Option - FairWay
+[2021-11-20 23:22:31] HanderType : [Left] -> [Left]
+[2021-11-20 23:22:31] IV2MSG : Option - LeftHander
+[2021-11-20 23:22:31] TeeMode : [Up] -> [Up]
+[2021-11-20 23:22:31] IV2MSG : Option - TeeUp
+[2021-11-20 23:22:31] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:22:31] IV2MSG : Option - FairWay
+[2021-11-20 23:22:31] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (264, 139)
+[2021-11-20 23:22:31] 2 -> 3
+[2021-11-20 23:22:31] IRLight : On
+[2021-11-20 23:22:31] ImageQueue Reset : Main Camera
+[2021-11-20 23:22:31] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:22:31] IV2MSG : State - subreadysuccess
+[2021-11-20 23:22:31] 3 -> 4
+[2021-11-20 23:22:32] IRLight : Standby
+[2021-11-20 23:23:26] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:23:26] Selected CameraID : 0 _ Set ROI Pos : (264, 139) -> (268, 86)
+[2021-11-20 23:23:26] 4 -> 1
+[2021-11-20 23:23:26] ImageQueue Reset : Main Camera
+[2021-11-20 23:23:26] IRLight : Idle
+[2021-11-20 23:23:27] IRLight : Standby
+[2021-11-20 23:24:46] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:24:46] 1 -> 1
+[2021-11-20 23:24:46] ImageQueue Reset : Main Camera
+[2021-11-20 23:24:46] IRLight : Idle
+[2021-11-20 23:24:47] IRLight : Standby
+[2021-11-20 23:26:06] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:26:06] 1 -> 1
+[2021-11-20 23:26:06] ImageQueue Reset : Main Camera
+[2021-11-20 23:26:06] IRLight : Idle
+[2021-11-20 23:26:07] IRLight : Standby
+[2021-11-20 23:27:26] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:27:26] 1 -> 1
+[2021-11-20 23:27:26] ImageQueue Reset : Main Camera
+[2021-11-20 23:27:26] IRLight : Idle
+[2021-11-20 23:27:27] IRLight : Standby
+[2021-11-20 23:28:04] HanderType : [Left] -> [Left]
+[2021-11-20 23:28:04] IV2MSG : Option - LeftHander
+[2021-11-20 23:28:04] TeeMode : [Up] -> [Up]
+[2021-11-20 23:28:04] IV2MSG : Option - TeeUp
+[2021-11-20 23:28:04] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:28:04] IV2MSG : Option - FairWay
+[2021-11-20 23:28:44] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:28:44] IRLight : On
+[2021-11-20 23:28:44] 1 -> 2
+[2021-11-20 23:28:45] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:28:45] 2 -> 3
+[2021-11-20 23:28:45] IRLight : On
+[2021-11-20 23:28:45] ImageQueue Reset : Main Camera
+[2021-11-20 23:28:45] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:28:45] IV2MSG : State - subreadysuccess
+[2021-11-20 23:28:45] 3 -> 4
+[2021-11-20 23:28:46] IRLight : Standby
+[2021-11-20 23:28:55] HanderType : [Left] -> [Left]
+[2021-11-20 23:28:55] IV2MSG : Option - LeftHander
+[2021-11-20 23:28:55] TeeMode : [Up] -> [Up]
+[2021-11-20 23:28:55] IV2MSG : Option - TeeUp
+[2021-11-20 23:28:55] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:28:55] IV2MSG : Option - FairWay
+[2021-11-20 23:29:12] IRLight : On
+[2021-11-20 23:29:12] 4 -> 7
+[2021-11-20 23:29:12] SaveImageSize : 24 -> 24
+[2021-11-20 23:29:12] 7 -> 8
+[2021-11-20 23:29:12] 8 -> 4
+[2021-11-20 23:29:12] 4 -> 6
+[2021-11-20 23:29:13] 6 -> 4
+[2021-11-20 23:29:13] IRLight : Standby
+[2021-11-20 23:29:20] IRLight : On
+[2021-11-20 23:29:21] IRLight : Standby
+[2021-11-20 23:29:28] IRLight : On
+[2021-11-20 23:29:29] IRLight : Standby
+[2021-11-20 23:29:31] IRLight : On
+[2021-11-20 23:29:31] 4 -> 7
+[2021-11-20 23:29:31] SaveImageSize : 22 -> 22
+[2021-11-20 23:29:31] 7 -> 8
+[2021-11-20 23:29:31] 8 -> 4
+[2021-11-20 23:29:32] IRLight : Standby
+[2021-11-20 23:29:43] IRLight : On
+[2021-11-20 23:29:44] 4 -> 6
+[2021-11-20 23:29:44] 6 -> 4
+[2021-11-20 23:29:44] IRLight : Standby
+[2021-11-20 23:29:54] IRLight : On
+[2021-11-20 23:29:54] 4 -> 7
+[2021-11-20 23:29:54] SaveImageSize : 19 -> 19
+[2021-11-20 23:29:54] 7 -> 8
+[2021-11-20 23:29:54] 8 -> 4
+[2021-11-20 23:29:55] IRLight : Standby
+[2021-11-20 23:30:10] IRLight : On
+[2021-11-20 23:30:11] IRLight : Standby
+[2021-11-20 23:30:11] IRLight : On
+[2021-11-20 23:30:11] 4 -> 7
+[2021-11-20 23:30:11] SaveImageSize : 19 -> 19
+[2021-11-20 23:30:11] 7 -> 8
+[2021-11-20 23:30:12] 8 -> 4
+[2021-11-20 23:30:13] IRLight : Standby
+[2021-11-20 23:30:13] 4 -> 6
+[2021-11-20 23:30:13] 6 -> 4
+[2021-11-20 23:30:13] IRLight : On
+[2021-11-20 23:30:14] IRLight : Standby
+[2021-11-20 23:30:17] IRLight : On
+[2021-11-20 23:30:18] IRLight : Standby
+[2021-11-20 23:30:34] IRLight : On
+[2021-11-20 23:30:35] IRLight : Standby
+[2021-11-20 23:30:40] IRLight : On
+[2021-11-20 23:30:41] IRLight : Standby
+[2021-11-20 23:30:54] IRLight : On
+[2021-11-20 23:30:55] IRLight : Standby
+[2021-11-20 23:31:49] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:31:49] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:31:49] 4 -> 1
+[2021-11-20 23:31:49] ImageQueue Reset : Main Camera
+[2021-11-20 23:31:49] IRLight : Idle
+[2021-11-20 23:31:50] IRLight : Standby
+[2021-11-20 23:32:24] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:32:24] IRLight : On
+[2021-11-20 23:32:24] 1 -> 2
+[2021-11-20 23:32:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:32:25] 2 -> 3
+[2021-11-20 23:32:25] IRLight : On
+[2021-11-20 23:32:25] ImageQueue Reset : Main Camera
+[2021-11-20 23:32:25] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:32:25] IV2MSG : State - subreadysuccess
+[2021-11-20 23:32:25] 3 -> 4
+[2021-11-20 23:32:26] IRLight : Standby
+[2021-11-20 23:32:28] IRLight : On
+[2021-11-20 23:32:29] IRLight : Standby
+[2021-11-20 23:33:23] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:33:23] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:33:23] 4 -> 1
+[2021-11-20 23:33:23] ImageQueue Reset : Main Camera
+[2021-11-20 23:33:23] IRLight : Idle
+[2021-11-20 23:33:24] IRLight : Standby
+[2021-11-20 23:33:36] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:33:36] IRLight : On
+[2021-11-20 23:33:36] 1 -> 2
+[2021-11-20 23:33:37] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:33:37] 2 -> 3
+[2021-11-20 23:33:37] IRLight : On
+[2021-11-20 23:33:37] ImageQueue Reset : Main Camera
+[2021-11-20 23:33:37] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:33:37] IV2MSG : State - subreadysuccess
+[2021-11-20 23:33:37] 3 -> 4
+[2021-11-20 23:33:38] IRLight : Standby
+[2021-11-20 23:33:39] IRLight : On
+[2021-11-20 23:33:40] IRLight : Standby
+[2021-11-20 23:34:34] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:34:34] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:34:34] 4 -> 1
+[2021-11-20 23:34:34] ImageQueue Reset : Main Camera
+[2021-11-20 23:34:34] IRLight : Idle
+[2021-11-20 23:34:35] IRLight : Standby
+[2021-11-20 23:35:54] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:35:54] 1 -> 1
+[2021-11-20 23:35:54] ImageQueue Reset : Main Camera
+[2021-11-20 23:35:54] IRLight : Idle
+[2021-11-20 23:35:55] IRLight : Standby
+[2021-11-20 23:36:39] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:36:39] IRLight : On
+[2021-11-20 23:36:39] 1 -> 2
+[2021-11-20 23:36:40] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:36:40] 2 -> 3
+[2021-11-20 23:36:40] IRLight : On
+[2021-11-20 23:36:40] ImageQueue Reset : Main Camera
+[2021-11-20 23:36:40] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:36:40] IV2MSG : State - subreadysuccess
+[2021-11-20 23:36:40] 3 -> 4
+[2021-11-20 23:36:41] IRLight : Standby
+[2021-11-20 23:37:35] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:37:35] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:37:35] 4 -> 1
+[2021-11-20 23:37:35] ImageQueue Reset : Main Camera
+[2021-11-20 23:37:35] IRLight : Idle
+[2021-11-20 23:37:36] IRLight : Standby
+[2021-11-20 23:38:02] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:38:02] IRLight : On
+[2021-11-20 23:38:02] 1 -> 2
+[2021-11-20 23:38:03] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:38:03] 2 -> 3
+[2021-11-20 23:38:03] IRLight : On
+[2021-11-20 23:38:03] ImageQueue Reset : Main Camera
+[2021-11-20 23:38:03] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:38:03] IV2MSG : State - subreadysuccess
+[2021-11-20 23:38:03] 3 -> 4
+[2021-11-20 23:38:04] IRLight : Standby
+[2021-11-20 23:38:43] HanderType : [Left] -> [Left]
+[2021-11-20 23:38:43] IV2MSG : Option - LeftHander
+[2021-11-20 23:38:43] TeeMode : [Up] -> [Down]
+[2021-11-20 23:38:43] IV2MSG : Option - TeeDown
+[2021-11-20 23:38:43] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:38:43] IV2MSG : Option - FairWay
+[2021-11-20 23:38:43] Hand 1, TeeMode : 1, Surface : 0
+[2021-11-20 23:38:43] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:38:43] 4 -> 1
+[2021-11-20 23:38:43] ImageQueue Reset : Main Camera
+[2021-11-20 23:38:43] IRLight : On
+[2021-11-20 23:38:43] 1 -> 2
+[2021-11-20 23:38:44] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:38:44] 2 -> 3
+[2021-11-20 23:38:44] IRLight : On
+[2021-11-20 23:38:44] ImageQueue Reset : Main Camera
+[2021-11-20 23:38:44] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:38:44] IV2MSG : State - subreadysuccess
+[2021-11-20 23:38:44] 3 -> 4
+[2021-11-20 23:38:45] IRLight : Standby
+[2021-11-20 23:39:39] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:39:39] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:39:39] 4 -> 1
+[2021-11-20 23:39:39] ImageQueue Reset : Main Camera
+[2021-11-20 23:39:39] IRLight : Idle
+[2021-11-20 23:39:40] IRLight : Standby
+[2021-11-20 23:40:59] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:40:59] 1 -> 1
+[2021-11-20 23:40:59] ImageQueue Reset : Main Camera
+[2021-11-20 23:40:59] IRLight : Idle
+[2021-11-20 23:41:00] IRLight : Standby
+[2021-11-20 23:41:20] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:41:20] IRLight : On
+[2021-11-20 23:41:20] 1 -> 2
+[2021-11-20 23:41:21] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:41:21] 2 -> 3
+[2021-11-20 23:41:21] IRLight : On
+[2021-11-20 23:41:21] ImageQueue Reset : Main Camera
+[2021-11-20 23:41:21] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:41:21] IV2MSG : State - subreadysuccess
+[2021-11-20 23:41:21] 3 -> 4
+[2021-11-20 23:41:22] IRLight : Standby
+[2021-11-20 23:41:25] IRLight : On
+[2021-11-20 23:41:26] IRLight : Standby
+[2021-11-20 23:42:07] IRLight : On
+[2021-11-20 23:42:08] IRLight : Standby
+[2021-11-20 23:42:19] IRLight : On
+[2021-11-20 23:42:20] IRLight : Standby
+[2021-11-20 23:42:23] IRLight : On
+[2021-11-20 23:42:23] 4 -> 7
+[2021-11-20 23:42:23] SaveImageSize : 22 -> 22
+[2021-11-20 23:42:23] 7 -> 8
+[2021-11-20 23:42:23] 8 -> 4
+[2021-11-20 23:42:24] IRLight : Standby
+[2021-11-20 23:43:18] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:43:18] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:43:18] 4 -> 1
+[2021-11-20 23:43:18] ImageQueue Reset : Main Camera
+[2021-11-20 23:43:18] IRLight : Idle
+[2021-11-20 23:43:19] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:43:19] IRLight : On
+[2021-11-20 23:43:19] 1 -> 2
+[2021-11-20 23:43:19] 2 -> 1
+[2021-11-20 23:43:19] ImageQueue Reset : Main Camera
+[2021-11-20 23:43:20] IRLight : Standby
+[2021-11-20 23:43:26] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2021-11-20 23:43:29] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2021-11-20 23:43:33] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2021-11-20 23:43:36] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2021-11-20 23:43:40] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2021-11-20 23:43:43] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2021-11-20 23:43:44] IRLight : On
+[2021-11-20 23:43:44] 1 -> 2
+[2021-11-20 23:43:45] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:43:45] 2 -> 3
+[2021-11-20 23:43:45] IRLight : On
+[2021-11-20 23:43:45] ImageQueue Reset : Main Camera
+[2021-11-20 23:43:45] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:43:45] IV2MSG : State - subreadysuccess
+[2021-11-20 23:43:45] 3 -> 4
+[2021-11-20 23:43:46] IRLight : Standby
+[2021-11-20 23:43:58] IRLight : On
+[2021-11-20 23:43:59] IRLight : Standby
+[2021-11-20 23:44:01] IRLight : On
+[2021-11-20 23:44:02] IRLight : Standby
+[2021-11-20 23:44:08] IRLight : On
+[2021-11-20 23:44:09] IRLight : Standby
+[2021-11-20 23:44:13] IRLight : On
+[2021-11-20 23:44:13] 4 -> 7
+[2021-11-20 23:44:13] SaveImageSize : 31 -> 31
+[2021-11-20 23:44:13] 7 -> 8
+[2021-11-20 23:44:13] 8 -> 4
+[2021-11-20 23:44:14] IRLight : Standby
+[2021-11-20 23:44:26] IRLight : On
+[2021-11-20 23:44:27] IRLight : Standby
+[2021-11-20 23:44:43] IRLight : On
+[2021-11-20 23:44:44] IRLight : Standby
+[2021-11-20 23:44:46] IRLight : On
+[2021-11-20 23:44:46] 4 -> 6
+[2021-11-20 23:44:46] 6 -> 4
+[2021-11-20 23:44:47] IRLight : Standby
+[2021-11-20 23:44:53] IRLight : On
+[2021-11-20 23:44:54] IRLight : Standby
+[2021-11-20 23:45:36] IRLight : On
+[2021-11-20 23:45:37] IRLight : Standby
+[2021-11-20 23:46:02] HanderType : [Left] -> [Left]
+[2021-11-20 23:46:02] IV2MSG : Option - LeftHander
+[2021-11-20 23:46:02] TeeMode : [Down] -> [Down]
+[2021-11-20 23:46:02] IV2MSG : Option - TeeDown
+[2021-11-20 23:46:02] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:46:02] IV2MSG : Option - FairWay
+[2021-11-20 23:46:31] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:46:31] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:46:31] 4 -> 1
+[2021-11-20 23:46:31] ImageQueue Reset : Main Camera
+[2021-11-20 23:46:31] IRLight : Idle
+[2021-11-20 23:46:32] IRLight : Standby
+[2021-11-20 23:46:53] HanderType : [Left] -> [Left]
+[2021-11-20 23:46:53] IV2MSG : Option - LeftHander
+[2021-11-20 23:46:53] TeeMode : [Down] -> [Down]
+[2021-11-20 23:46:53] IV2MSG : Option - TeeDown
+[2021-11-20 23:46:53] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:46:53] IV2MSG : Option - FairWay
+[2021-11-20 23:47:37] HanderType : [Left] -> [Left]
+[2021-11-20 23:47:37] IV2MSG : Option - LeftHander
+[2021-11-20 23:47:37] TeeMode : [Down] -> [Down]
+[2021-11-20 23:47:37] IV2MSG : Option - TeeDown
+[2021-11-20 23:47:37] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:47:37] IV2MSG : Option - FairWay
+[2021-11-20 23:47:51] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:47:51] 1 -> 1
+[2021-11-20 23:47:51] ImageQueue Reset : Main Camera
+[2021-11-20 23:47:51] IRLight : Idle
+[2021-11-20 23:47:52] IRLight : Standby
+[2021-11-20 23:49:11] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:49:11] 1 -> 1
+[2021-11-20 23:49:11] ImageQueue Reset : Main Camera
+[2021-11-20 23:49:11] IRLight : Idle
+[2021-11-20 23:49:12] IRLight : Standby
+[2021-11-20 23:50:06] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:50:06] IRLight : On
+[2021-11-20 23:50:06] 1 -> 2
+[2021-11-20 23:50:06] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:50:06] 2 -> 3
+[2021-11-20 23:50:06] IRLight : On
+[2021-11-20 23:50:06] ImageQueue Reset : Main Camera
+[2021-11-20 23:50:06] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:50:06] IV2MSG : State - subreadysuccess
+[2021-11-20 23:50:06] 3 -> 4
+[2021-11-20 23:50:07] IRLight : Standby
+[2021-11-20 23:51:01] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:51:01] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:51:01] 4 -> 1
+[2021-11-20 23:51:01] ImageQueue Reset : Main Camera
+[2021-11-20 23:51:01] IRLight : Idle
+[2021-11-20 23:51:02] IRLight : Standby
+[2021-11-20 23:52:21] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:52:21] 1 -> 1
+[2021-11-20 23:52:21] ImageQueue Reset : Main Camera
+[2021-11-20 23:52:21] IRLight : Idle
+[2021-11-20 23:52:22] IRLight : Standby
+[2021-11-20 23:53:41] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:53:41] 1 -> 1
+[2021-11-20 23:53:41] ImageQueue Reset : Main Camera
+[2021-11-20 23:53:41] IRLight : Idle
+[2021-11-20 23:53:42] IRLight : Standby
+[2021-11-20 23:53:51] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:53:51] IRLight : On
+[2021-11-20 23:53:51] 1 -> 2
+[2021-11-20 23:53:52] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:53:52] 2 -> 3
+[2021-11-20 23:53:52] IRLight : On
+[2021-11-20 23:53:52] ImageQueue Reset : Main Camera
+[2021-11-20 23:53:52] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:53:52] IV2MSG : State - subreadysuccess
+[2021-11-20 23:53:52] 3 -> 4
+[2021-11-20 23:53:53] IRLight : Standby
+[2021-11-20 23:54:03] HanderType : [Left] -> [Left]
+[2021-11-20 23:54:03] IV2MSG : Option - LeftHander
+[2021-11-20 23:54:03] TeeMode : [Down] -> [Up]
+[2021-11-20 23:54:03] IV2MSG : Option - TeeUp
+[2021-11-20 23:54:03] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:54:03] IV2MSG : Option - FairWay
+[2021-11-20 23:54:03] Hand 1, TeeMode : 0, Surface : 0
+[2021-11-20 23:54:03] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:54:03] 4 -> 1
+[2021-11-20 23:54:03] ImageQueue Reset : Main Camera
+[2021-11-20 23:54:03] IRLight : On
+[2021-11-20 23:54:03] 1 -> 2
+[2021-11-20 23:54:04] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:54:04] 2 -> 3
+[2021-11-20 23:54:04] IRLight : On
+[2021-11-20 23:54:04] ImageQueue Reset : Main Camera
+[2021-11-20 23:54:04] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:54:04] IV2MSG : State - subreadysuccess
+[2021-11-20 23:54:04] 3 -> 4
+[2021-11-20 23:54:05] IRLight : Standby
+[2021-11-20 23:54:24] HanderType : [Left] -> [Left]
+[2021-11-20 23:54:24] IV2MSG : Option - LeftHander
+[2021-11-20 23:54:24] TeeMode : [Up] -> [Up]
+[2021-11-20 23:54:24] IV2MSG : Option - TeeUp
+[2021-11-20 23:54:24] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:54:24] IV2MSG : Option - FairWay
+[2021-11-20 23:54:49] HanderType : [Left] -> [Left]
+[2021-11-20 23:54:49] IV2MSG : Option - LeftHander
+[2021-11-20 23:54:49] TeeMode : [Up] -> [Up]
+[2021-11-20 23:54:49] IV2MSG : Option - TeeUp
+[2021-11-20 23:54:49] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:54:49] IV2MSG : Option - FairWay
+[2021-11-20 23:54:59] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:54:59] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:54:59] 4 -> 1
+[2021-11-20 23:54:59] ImageQueue Reset : Main Camera
+[2021-11-20 23:54:59] IRLight : Idle
+[2021-11-20 23:55:00] IRLight : Standby
+[2021-11-20 23:55:17] HanderType : [Left] -> [Left]
+[2021-11-20 23:55:17] IV2MSG : Option - LeftHander
+[2021-11-20 23:55:17] TeeMode : [Up] -> [Up]
+[2021-11-20 23:55:17] IV2MSG : Option - TeeUp
+[2021-11-20 23:55:17] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:55:17] IV2MSG : Option - FairWay
+[2021-11-20 23:55:48] HanderType : [Left] -> [Left]
+[2021-11-20 23:55:48] IV2MSG : Option - LeftHander
+[2021-11-20 23:55:48] TeeMode : [Up] -> [Up]
+[2021-11-20 23:55:48] IV2MSG : Option - TeeUp
+[2021-11-20 23:55:48] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:55:48] IV2MSG : Option - FairWay
+[2021-11-20 23:56:19] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:56:19] 1 -> 1
+[2021-11-20 23:56:19] ImageQueue Reset : Main Camera
+[2021-11-20 23:56:19] IRLight : Idle
+[2021-11-20 23:56:20] IRLight : Standby
+[2021-11-20 23:56:35] HanderType : [Left] -> [Left]
+[2021-11-20 23:56:35] IV2MSG : Option - LeftHander
+[2021-11-20 23:56:35] TeeMode : [Up] -> [Down]
+[2021-11-20 23:56:35] IV2MSG : Option - TeeDown
+[2021-11-20 23:56:35] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:56:35] IV2MSG : Option - FairWay
+[2021-11-20 23:56:35] Hand 1, TeeMode : 1, Surface : 0
+[2021-11-20 23:56:35] 1 -> 1
+[2021-11-20 23:56:35] ImageQueue Reset : Main Camera
+[2021-11-20 23:56:35] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:56:35] IRLight : On
+[2021-11-20 23:56:35] 1 -> 2
+[2021-11-20 23:56:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:56:36] 2 -> 3
+[2021-11-20 23:56:36] IRLight : On
+[2021-11-20 23:56:36] ImageQueue Reset : Main Camera
+[2021-11-20 23:56:36] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:56:36] IV2MSG : State - subreadysuccess
+[2021-11-20 23:56:36] 3 -> 4
+[2021-11-20 23:56:37] IRLight : Standby
+[2021-11-20 23:56:37] IRLight : On
+[2021-11-20 23:56:38] IRLight : Standby
+[2021-11-20 23:57:31] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:57:31] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:57:31] 4 -> 1
+[2021-11-20 23:57:31] ImageQueue Reset : Main Camera
+[2021-11-20 23:57:31] IRLight : Idle
+[2021-11-20 23:57:32] IRLight : Standby
+[2021-11-20 23:57:35] HanderType : [Left] -> [Left]
+[2021-11-20 23:57:35] IV2MSG : Option - LeftHander
+[2021-11-20 23:57:35] TeeMode : [Down] -> [Down]
+[2021-11-20 23:57:35] IV2MSG : Option - TeeDown
+[2021-11-20 23:57:35] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:57:35] IV2MSG : Option - FairWay
+[2021-11-20 23:57:37] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-20 23:57:37] IRLight : On
+[2021-11-20 23:57:37] 1 -> 2
+[2021-11-20 23:57:37] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2021-11-20 23:57:37] 2 -> 3
+[2021-11-20 23:57:37] IRLight : On
+[2021-11-20 23:57:37] ImageQueue Reset : Main Camera
+[2021-11-20 23:57:37] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-20 23:57:37] IV2MSG : State - subreadysuccess
+[2021-11-20 23:57:37] 3 -> 4
+[2021-11-20 23:57:38] IRLight : Standby
+[2021-11-20 23:58:07] HanderType : [Left] -> [Left]
+[2021-11-20 23:58:07] IV2MSG : Option - LeftHander
+[2021-11-20 23:58:07] TeeMode : [Down] -> [Down]
+[2021-11-20 23:58:07] IV2MSG : Option - TeeDown
+[2021-11-20 23:58:07] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:58:07] IV2MSG : Option - FairWay
+[2021-11-20 23:58:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:58:32] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2021-11-20 23:58:32] 4 -> 1
+[2021-11-20 23:58:32] ImageQueue Reset : Main Camera
+[2021-11-20 23:58:32] IRLight : Idle
+[2021-11-20 23:58:33] IRLight : Standby
+[2021-11-20 23:59:29] HanderType : [Left] -> [Left]
+[2021-11-20 23:59:29] IV2MSG : Option - LeftHander
+[2021-11-20 23:59:29] TeeMode : [Down] -> [Down]
+[2021-11-20 23:59:29] IV2MSG : Option - TeeDown
+[2021-11-20 23:59:29] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:59:29] IV2MSG : Option - FairWay
+[2021-11-20 23:59:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-20 23:59:52] 1 -> 1
+[2021-11-20 23:59:52] ImageQueue Reset : Main Camera
+[2021-11-20 23:59:52] IRLight : Idle
+[2021-11-20 23:59:53] IRLight : Standby
+[2021-11-20 23:59:55] HanderType : [Left] -> [Left]
+[2021-11-20 23:59:55] IV2MSG : Option - LeftHander
+[2021-11-20 23:59:55] TeeMode : [Down] -> [Down]
+[2021-11-20 23:59:55] IV2MSG : Option - TeeDown
+[2021-11-20 23:59:55] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-20 23:59:55] IV2MSG : Option - FairWay
+[2021-11-21 00:00:18] HanderType : [Left] -> [Left]
+[2021-11-21 00:00:18] IV2MSG : Option - LeftHander
+[2021-11-21 00:00:18] TeeMode : [Down] -> [Down]
+[2021-11-21 00:00:18] IV2MSG : Option - TeeDown
+[2021-11-21 00:00:18] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:00:18] IV2MSG : Option - FairWay
+[2021-11-21 00:01:10] HanderType : [Left] -> [Left]
+[2021-11-21 00:01:10] IV2MSG : Option - LeftHander
+[2021-11-21 00:01:10] TeeMode : [Down] -> [Down]
+[2021-11-21 00:01:10] IV2MSG : Option - TeeDown
+[2021-11-21 00:01:10] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:01:10] IV2MSG : Option - FairWay
+[2021-11-21 00:01:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:01:12] 1 -> 1
+[2021-11-21 00:01:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:01:12] IRLight : Idle
+[2021-11-21 00:01:13] IRLight : Standby
+[2021-11-21 00:01:37] HanderType : [Left] -> [Left]
+[2021-11-21 00:01:37] IV2MSG : Option - LeftHander
+[2021-11-21 00:01:37] TeeMode : [Down] -> [Down]
+[2021-11-21 00:01:37] IV2MSG : Option - TeeDown
+[2021-11-21 00:01:37] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:01:37] IV2MSG : Option - FairWay
+[2021-11-21 00:01:59] HanderType : [Left] -> [Left]
+[2021-11-21 00:01:59] IV2MSG : Option - LeftHander
+[2021-11-21 00:01:59] TeeMode : [Down] -> [Down]
+[2021-11-21 00:01:59] IV2MSG : Option - TeeDown
+[2021-11-21 00:01:59] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:01:59] IV2MSG : Option - FairWay
+[2021-11-21 00:02:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:02:32] 1 -> 1
+[2021-11-21 00:02:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:02:32] IRLight : Idle
+[2021-11-21 00:02:33] IRLight : Standby
+[2021-11-21 00:03:29] HanderType : [Left] -> [Left]
+[2021-11-21 00:03:29] IV2MSG : Option - LeftHander
+[2021-11-21 00:03:29] TeeMode : [Down] -> [Down]
+[2021-11-21 00:03:29] IV2MSG : Option - TeeDown
+[2021-11-21 00:03:29] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:03:29] IV2MSG : Option - FairWay
+[2021-11-21 00:03:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:03:52] 1 -> 1
+[2021-11-21 00:03:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:03:52] IRLight : Idle
+[2021-11-21 00:03:53] IRLight : Standby
+[2021-11-21 00:04:46] HanderType : [Left] -> [Left]
+[2021-11-21 00:04:46] IV2MSG : Option - LeftHander
+[2021-11-21 00:04:46] TeeMode : [Down] -> [Down]
+[2021-11-21 00:04:46] IV2MSG : Option - TeeDown
+[2021-11-21 00:04:46] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:04:46] IV2MSG : Option - FairWay
+[2021-11-21 00:04:59] HanderType : [Left] -> [Left]
+[2021-11-21 00:04:59] IV2MSG : Option - LeftHander
+[2021-11-21 00:04:59] TeeMode : [Down] -> [Down]
+[2021-11-21 00:04:59] IV2MSG : Option - TeeDown
+[2021-11-21 00:04:59] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:04:59] IV2MSG : Option - FairWay
+[2021-11-21 00:05:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:05:12] 1 -> 1
+[2021-11-21 00:05:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:05:12] IRLight : Idle
+[2021-11-21 00:05:13] IRLight : Standby
+[2021-11-21 00:05:13] HanderType : [Left] -> [Left]
+[2021-11-21 00:05:13] IV2MSG : Option - LeftHander
+[2021-11-21 00:05:13] TeeMode : [Down] -> [Down]
+[2021-11-21 00:05:13] IV2MSG : Option - TeeDown
+[2021-11-21 00:05:13] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:05:13] IV2MSG : Option - FairWay
+[2021-11-21 00:06:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:06:32] 1 -> 1
+[2021-11-21 00:06:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:06:32] IRLight : Idle
+[2021-11-21 00:06:33] IRLight : Standby
+[2021-11-21 00:07:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:07:52] 1 -> 1
+[2021-11-21 00:07:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:07:52] IRLight : Idle
+[2021-11-21 00:07:53] IRLight : Standby
+[2021-11-21 00:07:56] HanderType : [Left] -> [Left]
+[2021-11-21 00:07:56] IV2MSG : Option - LeftHander
+[2021-11-21 00:07:56] TeeMode : [Down] -> [Down]
+[2021-11-21 00:07:56] IV2MSG : Option - TeeDown
+[2021-11-21 00:07:56] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:07:56] IV2MSG : Option - FairWay
+[2021-11-21 00:08:08] HanderType : [Left] -> [Left]
+[2021-11-21 00:08:08] IV2MSG : Option - LeftHander
+[2021-11-21 00:08:08] TeeMode : [Down] -> [Down]
+[2021-11-21 00:08:08] IV2MSG : Option - TeeDown
+[2021-11-21 00:08:08] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:08:08] IV2MSG : Option - FairWay
+[2021-11-21 00:09:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:09:12] 1 -> 1
+[2021-11-21 00:09:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:09:12] IRLight : Idle
+[2021-11-21 00:09:13] HanderType : [Left] -> [Left]
+[2021-11-21 00:09:13] IV2MSG : Option - LeftHander
+[2021-11-21 00:09:13] TeeMode : [Down] -> [Down]
+[2021-11-21 00:09:13] IV2MSG : Option - TeeDown
+[2021-11-21 00:09:13] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:09:13] IV2MSG : Option - FairWay
+[2021-11-21 00:09:13] IRLight : Standby
+[2021-11-21 00:09:22] HanderType : [Left] -> [Left]
+[2021-11-21 00:09:22] IV2MSG : Option - LeftHander
+[2021-11-21 00:09:22] TeeMode : [Down] -> [Down]
+[2021-11-21 00:09:22] IV2MSG : Option - TeeDown
+[2021-11-21 00:09:22] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:09:22] IV2MSG : Option - FairWay
+[2021-11-21 00:09:33] HanderType : [Left] -> [Left]
+[2021-11-21 00:09:33] IV2MSG : Option - LeftHander
+[2021-11-21 00:09:33] TeeMode : [Down] -> [Down]
+[2021-11-21 00:09:33] IV2MSG : Option - TeeDown
+[2021-11-21 00:09:33] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:09:33] IV2MSG : Option - FairWay
+[2021-11-21 00:10:06] HanderType : [Left] -> [Left]
+[2021-11-21 00:10:06] IV2MSG : Option - LeftHander
+[2021-11-21 00:10:06] TeeMode : [Down] -> [Down]
+[2021-11-21 00:10:06] IV2MSG : Option - TeeDown
+[2021-11-21 00:10:06] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:10:06] IV2MSG : Option - FairWay
+[2021-11-21 00:10:08] HanderType : [Left] -> [Left]
+[2021-11-21 00:10:08] IV2MSG : Option - LeftHander
+[2021-11-21 00:10:08] TeeMode : [Down] -> [Down]
+[2021-11-21 00:10:08] IV2MSG : Option - TeeDown
+[2021-11-21 00:10:08] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:10:08] IV2MSG : Option - FairWay
+[2021-11-21 00:10:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:10:32] 1 -> 1
+[2021-11-21 00:10:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:10:32] IRLight : Idle
+[2021-11-21 00:10:33] IRLight : Standby
+[2021-11-21 00:10:56] HanderType : [Left] -> [Left]
+[2021-11-21 00:10:56] IV2MSG : Option - LeftHander
+[2021-11-21 00:10:56] TeeMode : [Down] -> [Down]
+[2021-11-21 00:10:56] IV2MSG : Option - TeeDown
+[2021-11-21 00:10:56] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:10:56] IV2MSG : Option - FairWay
+[2021-11-21 00:11:07] HanderType : [Left] -> [Left]
+[2021-11-21 00:11:07] IV2MSG : Option - LeftHander
+[2021-11-21 00:11:07] TeeMode : [Down] -> [Down]
+[2021-11-21 00:11:07] IV2MSG : Option - TeeDown
+[2021-11-21 00:11:07] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:11:07] IV2MSG : Option - FairWay
+[2021-11-21 00:11:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:11:52] 1 -> 1
+[2021-11-21 00:11:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:11:52] IRLight : Idle
+[2021-11-21 00:11:53] IRLight : Standby
+[2021-11-21 00:11:57] HanderType : [Left] -> [Left]
+[2021-11-21 00:11:57] IV2MSG : Option - LeftHander
+[2021-11-21 00:11:57] TeeMode : [Down] -> [Down]
+[2021-11-21 00:11:57] IV2MSG : Option - TeeDown
+[2021-11-21 00:11:57] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:11:57] IV2MSG : Option - FairWay
+[2021-11-21 00:12:08] HanderType : [Left] -> [Left]
+[2021-11-21 00:12:08] IV2MSG : Option - LeftHander
+[2021-11-21 00:12:08] TeeMode : [Down] -> [Down]
+[2021-11-21 00:12:08] IV2MSG : Option - TeeDown
+[2021-11-21 00:12:08] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:12:08] IV2MSG : Option - FairWay
+[2021-11-21 00:12:19] HanderType : [Left] -> [Left]
+[2021-11-21 00:12:19] IV2MSG : Option - LeftHander
+[2021-11-21 00:12:19] TeeMode : [Down] -> [Down]
+[2021-11-21 00:12:19] IV2MSG : Option - TeeDown
+[2021-11-21 00:12:19] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:12:19] IV2MSG : Option - FairWay
+[2021-11-21 00:12:49] HanderType : [Left] -> [Left]
+[2021-11-21 00:12:49] IV2MSG : Option - LeftHander
+[2021-11-21 00:12:49] TeeMode : [Down] -> [Down]
+[2021-11-21 00:12:49] IV2MSG : Option - TeeDown
+[2021-11-21 00:12:49] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:12:49] IV2MSG : Option - FairWay
+[2021-11-21 00:13:00] HanderType : [Left] -> [Left]
+[2021-11-21 00:13:00] IV2MSG : Option - LeftHander
+[2021-11-21 00:13:00] TeeMode : [Down] -> [Down]
+[2021-11-21 00:13:00] IV2MSG : Option - TeeDown
+[2021-11-21 00:13:00] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:13:00] IV2MSG : Option - FairWay
+[2021-11-21 00:13:10] HanderType : [Left] -> [Left]
+[2021-11-21 00:13:10] IV2MSG : Option - LeftHander
+[2021-11-21 00:13:10] TeeMode : [Down] -> [Down]
+[2021-11-21 00:13:10] IV2MSG : Option - TeeDown
+[2021-11-21 00:13:10] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:13:10] IV2MSG : Option - FairWay
+[2021-11-21 00:13:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:13:12] 1 -> 1
+[2021-11-21 00:13:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:13:12] IRLight : Idle
+[2021-11-21 00:13:13] IRLight : Standby
+[2021-11-21 00:14:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:14:32] 1 -> 1
+[2021-11-21 00:14:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:14:32] IRLight : Idle
+[2021-11-21 00:14:33] IRLight : Standby
+[2021-11-21 00:15:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:15:52] 1 -> 1
+[2021-11-21 00:15:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:15:52] IRLight : Idle
+[2021-11-21 00:15:53] IRLight : Standby
+[2021-11-21 00:17:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:17:12] 1 -> 1
+[2021-11-21 00:17:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:17:12] IRLight : Idle
+[2021-11-21 00:17:13] IRLight : Standby
+[2021-11-21 00:18:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:18:32] 1 -> 1
+[2021-11-21 00:18:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:18:32] IRLight : Idle
+[2021-11-21 00:18:33] IRLight : Standby
+[2021-11-21 00:19:36] HanderType : [Left] -> [Left]
+[2021-11-21 00:19:36] IV2MSG : Option - LeftHander
+[2021-11-21 00:19:36] TeeMode : [Down] -> [Down]
+[2021-11-21 00:19:36] IV2MSG : Option - TeeDown
+[2021-11-21 00:19:36] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:19:36] IV2MSG : Option - FairWay
+[2021-11-21 00:19:37] HanderType : [Left] -> [Left]
+[2021-11-21 00:19:37] IV2MSG : Option - LeftHander
+[2021-11-21 00:19:37] TeeMode : [Down] -> [Down]
+[2021-11-21 00:19:37] IV2MSG : Option - TeeDown
+[2021-11-21 00:19:37] SurFaceType : [Fairway] -> [Fairway]
+[2021-11-21 00:19:37] IV2MSG : Option - FairWay
+[2021-11-21 00:19:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:19:52] 1 -> 1
+[2021-11-21 00:19:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:19:52] IRLight : Idle
+[2021-11-21 00:19:53] IRLight : Standby
+[2021-11-21 00:21:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:21:12] 1 -> 1
+[2021-11-21 00:21:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:21:12] IRLight : Idle
+[2021-11-21 00:21:13] IRLight : Standby
+[2021-11-21 00:22:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:22:32] 1 -> 1
+[2021-11-21 00:22:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:22:32] IRLight : Idle
+[2021-11-21 00:22:33] IRLight : Standby
+[2021-11-21 00:23:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:23:52] 1 -> 1
+[2021-11-21 00:23:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:23:52] IRLight : Idle
+[2021-11-21 00:23:53] IRLight : Standby
+[2021-11-21 00:25:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:25:12] 1 -> 1
+[2021-11-21 00:25:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:25:12] IRLight : Idle
+[2021-11-21 00:25:13] IRLight : Standby
+[2021-11-21 00:26:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:26:32] 1 -> 1
+[2021-11-21 00:26:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:26:32] IRLight : Idle
+[2021-11-21 00:26:33] IRLight : Standby
+[2021-11-21 00:27:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:27:52] 1 -> 1
+[2021-11-21 00:27:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:27:52] IRLight : Idle
+[2021-11-21 00:27:53] IRLight : Standby
+[2021-11-21 00:29:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:29:12] 1 -> 1
+[2021-11-21 00:29:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:29:12] IRLight : Idle
+[2021-11-21 00:29:13] IRLight : Standby
+[2021-11-21 00:30:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:30:32] 1 -> 1
+[2021-11-21 00:30:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:30:32] IRLight : Idle
+[2021-11-21 00:30:33] IRLight : Standby
+[2021-11-21 00:31:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:31:52] 1 -> 1
+[2021-11-21 00:31:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:31:52] IRLight : Idle
+[2021-11-21 00:31:53] IRLight : Standby
+[2021-11-21 00:33:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:33:12] 1 -> 1
+[2021-11-21 00:33:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:33:12] IRLight : Idle
+[2021-11-21 00:33:13] IRLight : Standby
+[2021-11-21 00:34:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:34:32] 1 -> 1
+[2021-11-21 00:34:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:34:32] IRLight : Idle
+[2021-11-21 00:34:33] IRLight : Standby
+[2021-11-21 00:35:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:35:52] 1 -> 1
+[2021-11-21 00:35:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:35:52] IRLight : Idle
+[2021-11-21 00:35:53] IRLight : Standby
+[2021-11-21 00:37:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:37:12] 1 -> 1
+[2021-11-21 00:37:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:37:12] IRLight : Idle
+[2021-11-21 00:37:13] IRLight : Standby
+[2021-11-21 00:38:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:38:32] 1 -> 1
+[2021-11-21 00:38:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:38:32] IRLight : Idle
+[2021-11-21 00:38:33] IRLight : Standby
+[2021-11-21 00:39:52] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:39:52] 1 -> 1
+[2021-11-21 00:39:52] ImageQueue Reset : Main Camera
+[2021-11-21 00:39:52] IRLight : Idle
+[2021-11-21 00:39:53] IRLight : Standby
+[2021-11-21 00:41:12] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:41:12] 1 -> 1
+[2021-11-21 00:41:12] ImageQueue Reset : Main Camera
+[2021-11-21 00:41:12] IRLight : Idle
+[2021-11-21 00:41:13] IRLight : Standby
+[2021-11-21 00:42:32] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:42:32] 1 -> 1
+[2021-11-21 00:42:32] ImageQueue Reset : Main Camera
+[2021-11-21 00:42:32] IRLight : Idle
+[2021-11-21 00:42:33] IRLight : Standby
+[2021-11-21 00:43:50] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-21 00:43:50] IRLight : On
+[2021-11-21 00:43:50] 1 -> 2
+[2021-11-21 00:43:51] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 138)
+[2021-11-21 00:43:51] 2 -> 3
+[2021-11-21 00:43:51] IRLight : On
+[2021-11-21 00:43:51] ImageQueue Reset : Main Camera
+[2021-11-21 00:43:51] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-21 00:43:51] IV2MSG : State - subreadysuccess
+[2021-11-21 00:43:51] 3 -> 4
+[2021-11-21 00:43:52] IRLight : Standby
+[2021-11-21 00:43:54] IRLight : On
+[2021-11-21 00:43:55] IRLight : Standby
+[2021-11-21 00:44:49] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:44:49] Selected CameraID : 0 _ Set ROI Pos : (265, 138) -> (268, 86)
+[2021-11-21 00:44:49] 4 -> 1
+[2021-11-21 00:44:49] ImageQueue Reset : Main Camera
+[2021-11-21 00:44:49] IRLight : Idle
+[2021-11-21 00:44:50] IRLight : Standby
+[2021-11-21 00:45:15] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-21 00:45:15] IRLight : On
+[2021-11-21 00:45:15] 1 -> 2
+[2021-11-21 00:45:16] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 138)
+[2021-11-21 00:45:16] 2 -> 3
+[2021-11-21 00:45:16] IRLight : On
+[2021-11-21 00:45:16] ImageQueue Reset : Main Camera
+[2021-11-21 00:45:16] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-21 00:45:16] IV2MSG : State - subreadysuccess
+[2021-11-21 00:45:16] 3 -> 4
+[2021-11-21 00:45:17] IRLight : Standby
+[2021-11-21 00:46:11] Selected Camera ID : 0 _ OptionExpose : 1637
+[2021-11-21 00:46:11] Selected CameraID : 0 _ Set ROI Pos : (265, 138) -> (268, 86)
+[2021-11-21 00:46:11] 4 -> 1
+[2021-11-21 00:46:11] ImageQueue Reset : Main Camera
+[2021-11-21 00:46:11] IRLight : Idle
+[2021-11-21 00:46:12] IRLight : Standby
+[2021-11-21 00:47:04] Selected Camera ID : 0 _ OptionExpose : 431
+[2021-11-21 00:47:04] IRLight : On
+[2021-11-21 00:47:04] 1 -> 2
+[2021-11-21 00:47:05] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 138)
+[2021-11-21 00:47:05] 2 -> 3
+[2021-11-21 00:47:05] IRLight : On
+[2021-11-21 00:47:05] ImageQueue Reset : Main Camera
+[2021-11-21 00:47:05] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2021-11-21 00:47:05] IV2MSG : State - subreadysuccess
+[2021-11-21 00:47:05] 3 -> 4
+[2021-11-21 00:47:06] IRLight : Standby
+[2021-11-21 00:47:06] 4 -> 6
+[2021-11-21 00:47:07] Selected CameraID : 0 _ Set ROI Pos : (265, 138) -> (268, 86)
+[2021-11-21 00:47:07] 6 -> 1
+[2021-11-21 00:47:07] ImageQueue Reset : Main Camera
+[2021-11-21 00:47:07] IRLight : On
+[2021-11-21 00:47:08] IRLight : Standby

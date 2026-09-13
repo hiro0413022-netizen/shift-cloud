@@ -1,0 +1,240 @@
+﻿=== collected: 2026-09-06 14:16:25 ===
+
+### [1] Camera / Image / Media class devices
+
+Status  Class  FriendlyName                                          InstanceId                                                                                                 
+------  -----  ------------                                          ----------                                                                                                 
+OK      MEDIA  Microsoft Streaming Service Proxy                     SW\{96E080C7-143C-11D1-B40F-00A0C9223196}\{3C0D501A-140B-11D1-B40F-00A0C9223196}                           
+OK      Image  GX6500 series _744616A7008A                           SWD\DAFWSDPROVIDER\URN:UUID:00000000-0000-1000-8000-00114800145C/HTTP://SCHEMAS.CANON.COM/SCANNER          
+Unknown MEDIA  HD Audio Driver for Display Audio                     INTELAUDIO\SGPC_FUNC_01&VEN_8086&DEV_281F&SUBSYS_80860101&REV_1000\5&72A11E5&0&0201                        
+OK      MEDIA  Intel® Smart Sound Technology for Bluetooth® LE Audio INTELAUDIO\CTLR_DEV_51CA&LINKTYPE_03&DEVTYPE_03&VEN_8086&DEV_AE33&SUBSYS_14601462&REV_0001\5&72A11E5&0&0301
+Unknown MEDIA  HD Audio Driver for Display Audio                     HDAUDIO\SUBFUNC_01&VEN_8086&DEV_281F&NID_0001&SUBSYS_00000000&REV_1000\6&26221779&1&0002&00000015          
+OK      MEDIA  Realtek(R) Audio                                      INTELAUDIO\FUNC_01&VEN_10EC&DEV_0257&SUBSYS_14621460&REV_1000\5&72A11E5&0&0001                             
+OK      MEDIA  Bluetooth® オーディオ向けインテル® スマート・サウンド・テクノロジー              INTELAUDIO\CTLR_DEV_51CA&LINKTYPE_03&DEVTYPE_00&VEN_8086&DEV_AE30&SUBSYS_14601462&REV_0001\5&72A11E5&0&0000
+OK      MEDIA  USB オーディオ向けインテル® スマート・サウンド・テクノロジー                     INTELAUDIO\CTLR_DEV_51CA&LINKTYPE_06&DEVTYPE_06&VEN_8086&DEV_AE50&SUBSYS_14601462&REV_0001\0603            
+Unknown Camera HD USB Camera                                         USB\VID_05A3&PID_8830&MI_00\6&27D2624D&0&0000                                                              
+Unknown MEDIA  Microsoft Streaming Quality Manager Proxy             SW\{DDF4358E-BB2C-11D0-A42F-00A0C9223196}\{97EBAACB-95BD-11D0-A3EA-00A0C9223196}                           
+OK      MEDIA  Bose QC Ultra 2 Earbuds                               BTHENUM\{0000110B-0000-1000-8000-00805F9B34FB}_VID&0001009E_PID&4062\7&25A01BB8&1&E458BCE4FB36_C00000000   
+Unknown MEDIA  Microsoft Streaming Clock Proxy                       SW\{97EBAACC-95BD-11D0-A3EA-00A0C9223196}\{53172480-4791-11D0-A5D6-28DB04C10000}                           
+OK      Camera HD Webcam                                             USB\VID_04F2&PID_B832&MI_00\6&1EBF7F&1&0000                                                                
+
+
+
+### [2] Devices with a problem (unknown / driver missing)
+
+Status  Class          FriendlyName                                          InstanceId                                                                                                                                        Problem
+------  -----          ------------                                          ----------                                                                                                                                        -------
+Unknown Volume         Volume                                                STORAGE\VOLUME\{F28EE771-A12D-11F1-A12C-289529BE068F}#0000000B46500000                                                                    CM_PROB_PHANTOM
+Unknown WPD            H:\                                                   SWD\WPDBUSENUM\{F28EE773-A12D-11F1-A12C-289529BE068F}#0000000006500000                                                                    CM_PROB_PHANTOM
+Unknown AudioEndpoint  TOSHIBA-TV (HD Audio Driver for Display Audio)        SWD\MMDEVAPI\{0.0.0.00000000}.{6E1DF4AD-8ECB-423D-A507-05F82ADD83C0}                                                                      CM_PROB_PHANTOM
+Error                                                                        USB\VID_03C3&PID_034A\00000                                                                                                        CM_PROB_FAILED_INSTALL
+Unknown Keyboard       HID Keyboard Device                                   HID\VID_3367&PID_1903&MI_01&COL03\7&22867CB2&0&0002                                                                                       CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_3367&PID_1903&MI_02\6&1F19647&0&0002                                                                                              CM_PROB_PHANTOM
+Unknown WPD            システムで予約済み                                             SWD\WPDBUSENUM\{F28EE771-A12D-11F1-A12C-289529BE068F}#0000000000100000                                                                    CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_3367&PID_1903&MI_01\6&1F19647&0&0001                                                                                              CM_PROB_PHANTOM
+Unknown HIDClass       HID-compliant device                                  HID\VID_046D&PID_C542&COL02\6&2FE19548&1&0001                                                                                             CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_3367&PID_1903&MI_00\6&1F19647&0&0000                                                                                              CM_PROB_PHANTOM
+Unknown SCSIAdapter    USB Attached SCSI (UAS) Mass Storage Device           USB\VID_174C&PID_55AA\MSFT30AAAABBBB000C                                                                                                  CM_PROB_PHANTOM
+Unknown Volume         Volume                                                STORAGE\VOLUME\{F28EE773-A12D-11F1-A12C-289529BE068F}#0000000006500000                                                                    CM_PROB_PHANTOM
+Unknown CDROM          Microsoft Virtual DVD-ROM                             SCSI\CDROM&VEN_MSFT&PROD_VIRTUAL_DVD-ROM\2&1F4ADFFE&0&000004                                                                              CM_PROB_PHANTOM
+Unknown Monitor        Generic Monitor (A271D)                               DISPLAY\IOD444E\4&1D059D7F&0&UID4145                                                                                                      CM_PROB_PHANTOM
+Unknown MEDIA          HD Audio Driver for Display Audio                     INTELAUDIO\SGPC_FUNC_01&VEN_8086&DEV_281F&SUBSYS_80860101&REV_1000\5&72A11E5&0&0201                                                       CM_PROB_PHANTOM
+Unknown WPD            D:\                                                   SWD\WPDBUSENUM\{765E6D97-A44E-11F1-A130-289529BE068F}#0000000000100000                                                                    CM_PROB_PHANTOM
+Unknown Volume         Volume                                                STORAGE\VOLUME\{F28EE771-A12D-11F1-A12C-289529BE068F}#0000000000100000                                                                    CM_PROB_PHANTOM
+Unknown Mouse          HID-compliant mouse                                   HID\VID_3367&PID_1903&MI_01&COL04\7&22867CB2&0&0003                                                                                       CM_PROB_PHANTOM
+Unknown WPD            D:\                                                   SWD\WPDBUSENUM\_??_USBSTOR#DISK&VEN_BUFFALO&PROD_USB_FLASH_DISK&REV_1.00#070841BA23AEDB45&0#{53F56307-B6BF-11D0-94F2-00A0C91EFB8B}        CM_PROB_PHANTOM
+Unknown HIDClass       HID-compliant vendor-defined device                   HID\VID_3367&PID_1903&MI_02\7&35B698F0&0&0000                                                                                             CM_PROB_PHANTOM
+Unknown VolumeSnapshot Generic volume shadow copy                            STORAGE\VOLUMESNAPSHOT\HARDDISKVOLUMESNAPSHOT2                                                                                            CM_PROB_PHANTOM
+Unknown VolumeSnapshot Generic volume shadow copy                            STORAGE\VOLUMESNAPSHOT\HARDDISKVOLUMESNAPSHOT4                                                                                            CM_PROB_PHANTOM
+Unknown VolumeSnapshot Generic volume shadow copy                            STORAGE\VOLUMESNAPSHOT\HARDDISKVOLUMESNAPSHOT5                                                                                            CM_PROB_PHANTOM
+Unknown VolumeSnapshot Generic volume shadow copy                            STORAGE\VOLUMESNAPSHOT\HARDDISKVOLUMESNAPSHOT6                                                                                            CM_PROB_PHANTOM
+Unknown USB            USB Mass Storage Device                               USB\VID_174C&PID_55AA\AAAABBBB000C                                                                                                        CM_PROB_PHANTOM
+Unknown MEDIA          HD Audio Driver for Display Audio                     HDAUDIO\SUBFUNC_01&VEN_8086&DEV_281F&NID_0001&SUBSYS_00000000&REV_1000\6&26221779&1&0002&00000015                                         CM_PROB_PHANTOM
+Unknown SoftwareDevice 55HX900_Series                                        SWD\DAFUPNPPROVIDER\UUID:4D454930-0100-1000-8001-B46C47951A87                                                                             CM_PROB_PHANTOM
+Unknown Mouse          HID-compliant mouse                                   HID\VID_30FA&PID_0300\6&7B20930&0&0000                                                                                                    CM_PROB_PHANTOM
+Unknown WPD            I:\                                                   SWD\WPDBUSENUM\{F28EE773-A12D-11F1-A12C-289529BE068F}#0000000B46500000                                                                    CM_PROB_PHANTOM
+Unknown Volume         Volume                                                STORAGE\VOLUME\{765E6D97-A44E-11F1-A130-289529BE068F}#0000000000100000                                                                    CM_PROB_PHANTOM
+Unknown WPD            E:\                                                   SWD\WPDBUSENUM\{F28EE771-A12D-11F1-A12C-289529BE068F}#0000000006500000                                                                    CM_PROB_PHANTOM
+Unknown USB            USB Composite Device                                  USB\VID_05A3&PID_8830\SN0179                                                                                                              CM_PROB_PHANTOM
+Unknown Mouse          HID-compliant mouse                                   HID\VID_046D&PID_C542&COL01\6&1D27E4A3&1&0000                                                                                             CM_PROB_PHANTOM
+Unknown SoftwareDevice 55HX900_Series                                        SWD\DAFUPNPPROVIDER\UUID:4D454930-0000-1000-8001-B46C47951A87                                                                             CM_PROB_PHANTOM
+Unknown Volume         Volume                                                STORAGE\VOLUME\_??_USBSTOR#DISK&VEN_BUFFALO&PROD_USB_FLASH_DISK&REV_1.00#070841BA23AEDB45&0#{53F56307-B6BF-11D0-94F2-00A0C91EFB8B}        CM_PROB_PHANTOM
+Unknown WPD            D:\                                                   SWD\WPDBUSENUM\_??_USBSTOR#DISK&VEN_SSD&PROD_THINKPLUS&REV_0#AAAABBBB000C&0#{53F56307-B6BF-11D0-94F2-00A0C91EFB8B}                        CM_PROB_PHANTOM
+Unknown Camera         HD USB Camera                                         USB\VID_05A3&PID_8830&MI_00\6&27D2624D&0&0000                                                                                             CM_PROB_PHANTOM
+Unknown AudioEndpoint  MEL-TV(FHD) (HD Audio Driver for Display Audio)       SWD\MMDEVAPI\{0.0.0.00000000}.{B5A7A85B-61FA-49FE-9A89-C974217E1CA0}                                                                      CM_PROB_PHANTOM
+Unknown Volume         Volume                                                STORAGE\VOLUME\{F28EE773-A12D-11F1-A12C-289529BE068F}#0000000B46500000                                                                    CM_PROB_PHANTOM
+Unknown Volume         Volume                                                STORAGE\VOLUME\{F28EE771-A12D-11F1-A12C-289529BE068F}#0000000006500000                                                                    CM_PROB_PHANTOM
+Unknown DiskDrive      SSD ThinkPlus USB Device                              USBSTOR\DISK&VEN_SSD&PROD_THINKPLUS&REV_0\AAAABBBB000C&0                                                                                  CM_PROB_PHANTOM
+Unknown DiskDrive      SSD ThinkPlus SCSI Disk Device                        SCSI\DISK&VEN_SSD&PROD_THINKPLUS\6&1B2E2D62&0&000000                                                                                      CM_PROB_PHANTOM
+Unknown DiskDrive      SSD ThinkPlus SCSI Disk Device                        SCSI\DISK&VEN_SSD&PROD_THINKPLUS\6&1B2E2D62&0&000001                                                                                      CM_PROB_PHANTOM
+Unknown USB            Unknown USB Device (Device Descriptor Request Failed) USB\VID_0000&PID_0002\5&1524D9FE&0&3                                                                                                      CM_PROB_PHANTOM
+Unknown WPD            G:\                                                   SWD\WPDBUSENUM\{F28EE773-A12D-11F1-A12C-289529BE068F}#0000000000100000                                                                    CM_PROB_PHANTOM
+Unknown HIDClass       HID-compliant consumer control device                 HID\VID_3367&PID_1903&MI_01&COL01\7&22867CB2&0&0000                                                                                       CM_PROB_PHANTOM
+Unknown Mouse          HID-compliant mouse                                   HID\VID_3367&PID_1903&MI_00\7&F566074&0&0000                                                                                              CM_PROB_PHANTOM
+Unknown Mouse          HID-compliant mouse                                   HID\VID_046D&PID_C542&COL01\6&19BA2C8B&0&0000                                                                                             CM_PROB_PHANTOM
+Unknown HIDClass       HID-compliant device                                  HID\VID_046D&PID_C542&COL02\6&1D27E4A3&1&0001                                                                                             CM_PROB_PHANTOM
+Unknown USB            USB Composite Device                                  USB\VID_3367&PID_1903\0000000000000000                                                                                                    CM_PROB_PHANTOM
+Unknown MEDIA          Microsoft Streaming Quality Manager Proxy             SW\{DDF4358E-BB2C-11D0-A42F-00A0C9223196}\{97EBAACB-95BD-11D0-A3EA-00A0C9223196}                                                          CM_PROB_PHANTOM
+Unknown                                                                      USB\VID_03C3&PID_034C\00000                                                                                                               CM_PROB_PHANTOM
+Unknown Keyboard       HID Keyboard Device                                   HID\VID_26F1&PID_8801\6&3723DBB&0&0000                                                                                                    CM_PROB_PHANTOM
+Unknown Volume         Volume                                                STORAGE\VOLUME\{F28EE773-A12D-11F1-A12C-289529BE068F}#0000000000100000                                                                    CM_PROB_PHANTOM
+Unknown MTD            Realtek PCIE CardReader                               PCI\VEN_10EC&DEV_522A&SUBSYS_522A10EC&REV_01\00000001004CE00000                                                                           CM_PROB_PHANTOM
+Unknown WPD            ボリューム                                                 SWD\WPDBUSENUM\{F28EE771-A12D-11F1-A12C-289529BE068F}#0000000B46500000                                                                    CM_PROB_PHANTOM
+Unknown Monitor        Generic Monitor (TOSHIBA-TV)                          DISPLAY\TSB023A\4&1D059D7F&0&UID4145                                                                                                      CM_PROB_PHANTOM
+Unknown HIDClass       HID-compliant system controller                       HID\VID_3367&PID_1903&MI_01&COL02\7&22867CB2&0&0001                                                                                       CM_PROB_PHANTOM
+Unknown USB            Generic USB Hub                                       USB\VID_1A40&PID_0101\5&1524D9FE&0&3                                                                                                      CM_PROB_PHANTOM
+Unknown USB            Generic USB Hub                                       USB\VID_1A40&PID_0101\5&1524D9FE&0&4                                                                                                      CM_PROB_PHANTOM
+Unknown HIDClass       HID-compliant device                                  HID\VID_046D&PID_C542&COL02\6&19BA2C8B&0&0001                                                                                             CM_PROB_PHANTOM
+Unknown USB            USB Mass Storage Device                               USB\VID_0411&PID_023A\070841BA23AEDB45                                                                                                    CM_PROB_PHANTOM
+Unknown Monitor        Generic Monitor (MEL-TV(FHD))                         DISPLAY\MEL332F\4&1D059D7F&0&UID4145                                                                                                      CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_30FA&PID_0300\5&1524D9FE&0&3                                                                                                      CM_PROB_PHANTOM
+Unknown MEDIA          Microsoft Streaming Clock Proxy                       SW\{97EBAACC-95BD-11D0-A3EA-00A0C9223196}\{53172480-4791-11D0-A5D6-28DB04C10000}                                                          CM_PROB_PHANTOM
+Unknown Mouse          HID-compliant mouse                                   HID\VID_046D&PID_C542&COL01\6&2FE19548&1&0000                                                                                             CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_26F1&PID_8801\1234567890ABCD                                                                                                      CM_PROB_PHANTOM
+Unknown DiskDrive      BUFFALO USB Flash Disk USB Device                     USBSTOR\DISK&VEN_BUFFALO&PROD_USB_FLASH_DISK&REV_1.00\070841BA23AEDB45&0                                                                  CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_046D&PID_C542\5&1524D9FE&0&1                                                                                                      CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_046D&PID_C542\5&1524D9FE&0&3                                                                                                      CM_PROB_PHANTOM
+Unknown HIDClass       USB Input Device                                      USB\VID_046D&PID_C542\5&1524D9FE&0&4                                                                                                      CM_PROB_PHANTOM
+Unknown AudioEndpoint  A271D (HD Audio Driver for Display Audio)             SWD\MMDEVAPI\{0.0.0.00000000}.{8A787AD0-DFFA-4A73-BB6B-8C6661810FDB}                                                                      CM_PROB_PHANTOM
+
+
+
+### [3] All USB devices (VID/PID)
+
+Status  Class       FriendlyName                                          InstanceId                                   
+------  -----       ------------                                          ----------                                   
+Unknown                                                                   USB\VID_03C3&PID_034C\00000                  
+Error                                                                     USB\VID_03C3&PID_034A\00000                  
+OK      Bluetooth   Intel(R) Wireless Bluetooth(R)                        USB\VID_8087&PID_0033\5&1524D9FE&0&10        
+Unknown Camera      HD USB Camera                                         USB\VID_05A3&PID_8830&MI_00\6&27D2624D&0&0000
+OK      Camera      HD Webcam                                             USB\VID_04F2&PID_B832&MI_00\6&1EBF7F&1&0000  
+Unknown HIDClass    USB Input Device                                      USB\VID_3367&PID_1903&MI_00\6&1F19647&0&0000 
+Unknown HIDClass    USB Input Device                                      USB\VID_26F1&PID_8801\1234567890ABCD         
+Unknown HIDClass    USB Input Device                                      USB\VID_30FA&PID_0300\5&1524D9FE&0&3         
+Unknown HIDClass    USB Input Device                                      USB\VID_3367&PID_1903&MI_01\6&1F19647&0&0001 
+Unknown HIDClass    USB Input Device                                      USB\VID_046D&PID_C542\5&1524D9FE&0&1         
+Unknown HIDClass    USB Input Device                                      USB\VID_3367&PID_1903&MI_02\6&1F19647&0&0002 
+Unknown HIDClass    USB Input Device                                      USB\VID_046D&PID_C542\5&1524D9FE&0&3         
+Unknown HIDClass    USB Input Device                                      USB\VID_046D&PID_C542\5&1524D9FE&0&4         
+Unknown SCSIAdapter USB Attached SCSI (UAS) Mass Storage Device           USB\VID_174C&PID_55AA\MSFT30AAAABBBB000C     
+Unknown USB         Generic USB Hub                                       USB\VID_1A40&PID_0101\5&1524D9FE&0&3         
+Unknown USB         Generic USB Hub                                       USB\VID_1A40&PID_0101\5&1524D9FE&0&4         
+Unknown USB         Unknown USB Device (Device Descriptor Request Failed) USB\VID_0000&PID_0002\5&1524D9FE&0&3         
+Unknown USB         USB Composite Device                                  USB\VID_05A3&PID_8830\SN0179                 
+Unknown USB         USB Composite Device                                  USB\VID_3367&PID_1903\0000000000000000       
+OK      USB         USB Composite Device                                  USB\VID_04F2&PID_B832\01.00.00               
+Unknown USB         USB Mass Storage Device                               USB\VID_0411&PID_023A\070841BA23AEDB45       
+Unknown USB         USB Mass Storage Device                               USB\VID_174C&PID_55AA\AAAABBBB000C           
+OK      USB         USB Root Hub (USB 3.0)                                USB\ROOT_HUB30\4&2F81719C&0&0                
+OK      USBDevice   APP Mode                                              USB\VID_04F2&PID_B832&MI_02\6&1EBF7F&1&0002  
+
+
+
+### [4] Driver info for camera-ish devices
+
+DeviceName                                            DeviceClass DriverProviderName          DriverVersion   DriverDate         InfName                         
+----------                                            ----------- ------------------          -------------   ----------         -------                         
+WSD スキャン デバイス                                         IMAGE       Microsoft                   10.0.26100.8115 2006/06/21 9:00:00 wsdscdrv.inf                    
+Microsoft Streaming Service Proxy                     MEDIA       Microsoft                   10.0.26100.1    2006/06/21 9:00:00 ksfilter.inf                    
+Intel® Smart Sound Technology for Bluetooth® LE Audio MEDIA       Intel(R) Corporation        10.29.0.11192   2024/07/18 9:00:00 oem7.inf                        
+Bluetooth® オーディオ向けインテル® スマート・サウンド・テクノロジー              MEDIA       Intel(R) Corporation        10.29.0.10981   2024/05/22 9:00:00 oem24.inf                       
+USB オーディオ向けインテル® スマート・サウンド・テクノロジー                     MEDIA       Intel(R) Corporation        10.29.0.10981   2024/05/22 9:00:00 oem20.inf                       
+Realtek High Definition Audio                         MEDIA       Realtek Semiconductor Corp. 6.0.9679.1      2024/05/07 9:00:00 oem28.inf                       
+Microsoft Bluetooth A2dp Source                       MEDIA       Microsoft                   10.0.26100.1    2024/03/31 9:00:00 microsoft_bluetooth_a2dp_src.inf
+USB Video Device                                      CAMERA      Microsoft                   10.0.26100.8972 2006/06/21 9:00:00 usbvideo.inf                    
+USB Composite Device                                  USB         Microsoft                   10.0.26100.8972 2006/06/21 9:00:00 usb.inf                         
+USB Root Hub (USB 3.0)                                USB         Microsoft                   10.0.26100.8972 2026/07/22 9:00:00 usbhub3.inf                     
+USB xHCI Compliant Host Controller                    USB         Microsoft                   10.0.26100.8972 2026/07/22 9:00:00 usbxhci.inf                     
+
+
+
+### [5] ZWO / ASI related files on this PC (quick scan)
+C:\Program Files\Git\mingw64\lib\tcl8.6\tzdata\Asia
+C:\Program Files\Git\mingw64\share\zoneinfo\Asia
+C:\Program Files\Git\mingw64\share\zoneinfo\posix\Asia
+C:\Program Files\Git\mingw64\share\zoneinfo\right\Asia
+C:\Program Files\Git\usr\lib\terminfo\78\xterm-basic
+C:\Program Files\Git\usr\share\perl5\core_perl\Test2\Tools\Basic.pm
+C:\Program Files\Git\usr\share\perl5\core_perl\unicore\SpecialCasing.txt
+C:\Program Files\Git\usr\share\perl5\vendor_perl\LWP\Authen\Basic.pm
+C:\Program Files\Git\usr\share\terminfo\78\xterm-basic
+C:\Program Files\Git\usr\share\vim\vim92\autoload\freebasic.vim
+C:\Program Files\Git\usr\share\vim\vim92\ftplugin\basic.vim
+C:\Program Files\Git\usr\share\vim\vim92\ftplugin\freebasic.vim
+C:\Program Files\Git\usr\share\vim\vim92\ftplugin\rasi.vim
+C:\Program Files\Git\usr\share\vim\vim92\indent\basic.vim
+C:\Program Files\Git\usr\share\vim\vim92\indent\freebasic.vim
+C:\Program Files\Git\usr\share\vim\vim92\syntax\basic.vim
+C:\Program Files\Git\usr\share\vim\vim92\syntax\freebasic.vim
+C:\Program Files\Git\usr\share\vim\vim92\syntax\ibasic.vim
+C:\Program Files\Git\usr\share\vim\vim92\syntax\rasi.vim
+C:\Program Files\Microsoft Office\root\Licenses16\O365AppsBasicR_Grace-ppd.xrm-ms
+C:\Program Files\Microsoft Office\root\Licenses16\O365AppsBasicR_Grace-ul-oob.xrm-ms
+C:\Program Files\Microsoft Office\root\Licenses16\O365AppsBasicR_Subscription-pl.xrm-ms
+C:\Program Files\Microsoft Office\root\Licenses16\O365AppsBasicR_Subscription-ppd.xrm-ms
+C:\Program Files\Microsoft Office\root\Licenses16\O365AppsBasicR_Subscription-ul-oob.xrm-ms
+C:\Program Files\Microsoft Office\root\Office16\1041\QuickStyles\basicelegant.dotx
+C:\Program Files\Microsoft Office\root\Office16\1041\QuickStyles\basicsimple.dotx
+C:\Program Files\Microsoft Office\root\Office16\1041\QuickStyles\basicstylish.dotx
+C:\Program Files\Microsoft Office\root\Office16\1041\LyncBasic_Eula.txt
+C:\Program Files\Microsoft Office\root\Office16\1041\SkypeForBusinessBasic2019_eula.txt
+C:\Program Files\Microsoft Office\root\Office16\1041\SkypeForBusinessBasic2021_eula.txt
+C:\Program Files\Microsoft Office\root\Office16\Bibliography\Style\APASixthEditionOfficeOnline.xsl
+C:\Program Files\Microsoft OneDrive\26.153.0809.0004\tzdata\asia
+C:\Program Files\Microsoft OneDrive\26.153.0809.0004\tzdata\australasia
+C:\Program Files\nodejs\node_modules\npm\node_modules\jsonparse\samplejson\basic.json
+C:\Program Files\nodejs\node_modules\npm\node_modules\jsonparse\samplejson\basic2.json
+C:\Program Files\nodejs\node_modules\npm\node_modules\qrcode-terminal\example\basic.js
+C:\Program Files\nodejs\node_modules\npm\node_modules\qrcode-terminal\example\basic.png
+C:\Program Files (x86)\MSI\MSI Center S\MSI_True_Color\ui\common\css\pdi_basic.css
+C:\Program Files (x86)\MSI\MSI Center S\MSI_True_Color\ui\common\css\pdi_basic.css.map
+C:\Program Files (x86)\MSI\MSI Center S\MSI_True_Color\ui\common\css\pdi_basic.scss
+C:\Program Files (x86)\ZWO Design
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\driver\x64\asicamusb3.cat
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\driver\x64\ASICAMUSB3.inf
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\driver\x64\ASICAMUSB3.sys
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\driver\x86\asicamusb3.cat
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\driver\x86\ASICAMUSB3.inf
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\driver\x86\ASICAMUSB3.sys
+C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\ZWO_USB_Cameras_driver.url
+C:\Users\hiro0\AppData\Local\LINE\bin\26.1.0.3865\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\26.1.0.3865\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\26.1.0.3865\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\26.1.0.3865\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\current\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\current\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\current\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\current\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\old\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\old\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\old\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\old\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\shared\108\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\shared\108\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\shared\108\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\bin\shared\108\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.910\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.910\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.910\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.910\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.911\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.911\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.911\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineCall\1.0.0.911\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.652\plugins\QtQuick\Controls\Basic
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.652\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.652\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.652\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.652\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.654\plugins\QtQuick\Controls\Basic
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.654\plugins\qtquickcontrols2basicstyleimplplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.654\plugins\qtquickcontrols2basicstyleplugin.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.654\Qt6QuickControls2Basic.dll
+C:\Users\hiro0\AppData\Local\LINE\Data\plugin\LineMediaPlayer\1.2.0.654\Qt6QuickControls2BasicStyleImpl.dll
+C:\Users\hiro0\AppData\Local\Microsoft\Edge\User Data\Default\IndexedDB\https_www.zwoastro.com_0.indexeddb.leveldb
+C:\Users\hiro0\AppData\Local\OpenAI\Codex\runtimes\cua_node\2c6075088d3180ec\bin\node_modules\npm\node_modules\jsonparse\samplejson\basic.json
+C:\Users\hiro0\AppData\Local\OpenAI\Codex\runtimes\cua_node\2c6075088d3180ec\bin\node_modules\npm\node_modules\jsonparse\samplejson\basic2.json
+C:\Users\hiro0\AppData\Local\OpenAI\Codex\runtimes\cua_node\2c6075088d3180ec\bin\node_modules\npm\node_modules\qrcode-terminal\example\basic.js
+C:\Users\hiro0\AppData\Local\OpenAI\Codex\runtimes\cua_node\2c6075088d3180ec\bin\node_modules\npm\node_modules\qrcode-terminal\example\basic.png
+C:\Users\hiro0\AppData\Local\Programs\Genspark Claw\resources\node\node_modules\npm\node_modules\jsonparse\samplejson\basic.json

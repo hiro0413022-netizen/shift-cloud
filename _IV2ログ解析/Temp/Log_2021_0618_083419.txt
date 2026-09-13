@@ -1,0 +1,909 @@
+[2021-06-18 08:34] Register ExceptionFilter
+[2021-06-18 08:34:19] Log Data : Log_2021_0618_083419.txt
+[2021-06-18 08:34:21] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2021-06-18 08:34:21] Load Info Data
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionGain : 100
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionExpose : 430
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionGamma : 85
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionBrightness : 0
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionFlip : 3
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2021-06-18 08:34:26] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2021-06-18 08:34:26] Success Initialize
+[2021-06-18 08:34:26] ImageQueue Reset : Main Camera
+[2021-06-18 08:34:26] Initialize Success
+[2021-06-18 08:34:26] HanderType : [Right] -> [Right]
+[2021-06-18 08:34:26] IV2MSG : Option - RightHander
+[2021-06-18 08:34:26] TeeMode : [Up] -> [Up]
+[2021-06-18 08:34:26] IV2MSG : Option - TeeUp
+[2021-06-18 08:34:26] SurFaceType : [Fairway] -> [Fairway]
+[2021-06-18 08:34:26] IV2MSG : Option - FairWay
+[2021-06-18 08:34:26] HanderType : [Right] -> [Right]
+[2021-06-18 08:34:26] IV2MSG : Option - RightHander
+[2021-06-18 08:34:26] TeeMode : [Up] -> [Up]
+[2021-06-18 08:34:26] IV2MSG : Option - TeeUp
+[2021-06-18 08:34:26] SurFaceType : [Fairway] -> [Fairway]
+[2021-06-18 08:34:26] IV2MSG : Option - FairWay
+[2021-06-18 08:34:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:34:27] IRLight : Idle
+[2021-06-18 08:34:28] IRLight : Standby
+[2021-06-18 08:35:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:35:47] IRLight : Idle
+[2021-06-18 08:35:48] IRLight : Standby
+[2021-06-18 08:37:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:37:07] IRLight : Idle
+[2021-06-18 08:37:08] IRLight : Standby
+[2021-06-18 08:38:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:38:27] IRLight : Idle
+[2021-06-18 08:38:28] IRLight : Standby
+[2021-06-18 08:39:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:39:47] IRLight : Idle
+[2021-06-18 08:39:48] IRLight : Standby
+[2021-06-18 08:41:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:41:07] IRLight : Idle
+[2021-06-18 08:41:08] IRLight : Standby
+[2021-06-18 08:42:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:42:27] IRLight : Idle
+[2021-06-18 08:42:28] IRLight : Standby
+[2021-06-18 08:43:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:43:47] IRLight : Idle
+[2021-06-18 08:43:48] IRLight : Standby
+[2021-06-18 08:45:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:45:07] IRLight : Idle
+[2021-06-18 08:45:08] IRLight : Standby
+[2021-06-18 08:46:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:46:27] IRLight : Idle
+[2021-06-18 08:46:28] IRLight : Standby
+[2021-06-18 08:47:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:47:47] IRLight : Idle
+[2021-06-18 08:47:48] IRLight : Standby
+[2021-06-18 08:49:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:49:07] IRLight : Idle
+[2021-06-18 08:49:08] IRLight : Standby
+[2021-06-18 08:50:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:50:27] IRLight : Idle
+[2021-06-18 08:50:28] IRLight : Standby
+[2021-06-18 08:51:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:51:47] IRLight : Idle
+[2021-06-18 08:51:48] IRLight : Standby
+[2021-06-18 08:53:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:53:07] IRLight : Idle
+[2021-06-18 08:53:08] IRLight : Standby
+[2021-06-18 08:54:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:54:27] IRLight : Idle
+[2021-06-18 08:54:28] IRLight : Standby
+[2021-06-18 08:55:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:55:47] IRLight : Idle
+[2021-06-18 08:55:48] IRLight : Standby
+[2021-06-18 08:57:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:57:07] IRLight : Idle
+[2021-06-18 08:57:08] IRLight : Standby
+[2021-06-18 08:58:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:58:27] IRLight : Idle
+[2021-06-18 08:58:28] IRLight : Standby
+[2021-06-18 08:59:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 08:59:47] IRLight : Idle
+[2021-06-18 08:59:48] IRLight : Standby
+[2021-06-18 09:01:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:01:07] IRLight : Idle
+[2021-06-18 09:01:08] IRLight : Standby
+[2021-06-18 09:02:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:02:27] IRLight : Idle
+[2021-06-18 09:02:28] IRLight : Standby
+[2021-06-18 09:03:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:03:47] IRLight : Idle
+[2021-06-18 09:03:48] IRLight : Standby
+[2021-06-18 09:05:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:05:07] IRLight : Idle
+[2021-06-18 09:05:08] IRLight : Standby
+[2021-06-18 09:06:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:06:27] IRLight : Idle
+[2021-06-18 09:06:28] IRLight : Standby
+[2021-06-18 09:07:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:07:47] IRLight : Idle
+[2021-06-18 09:07:48] IRLight : Standby
+[2021-06-18 09:09:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:09:07] IRLight : Idle
+[2021-06-18 09:09:08] IRLight : Standby
+[2021-06-18 09:10:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:10:27] IRLight : Idle
+[2021-06-18 09:10:28] IRLight : Standby
+[2021-06-18 09:11:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:11:47] IRLight : Idle
+[2021-06-18 09:11:48] IRLight : Standby
+[2021-06-18 09:13:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:13:07] IRLight : Idle
+[2021-06-18 09:13:08] IRLight : Standby
+[2021-06-18 09:14:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:14:27] IRLight : Idle
+[2021-06-18 09:14:28] IRLight : Standby
+[2021-06-18 09:15:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:15:47] IRLight : Idle
+[2021-06-18 09:15:48] IRLight : Standby
+[2021-06-18 09:17:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:17:07] IRLight : Idle
+[2021-06-18 09:17:08] IRLight : Standby
+[2021-06-18 09:18:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:18:27] IRLight : Idle
+[2021-06-18 09:18:28] IRLight : Standby
+[2021-06-18 09:19:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:19:47] IRLight : Idle
+[2021-06-18 09:19:48] IRLight : Standby
+[2021-06-18 09:21:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:21:07] IRLight : Idle
+[2021-06-18 09:21:08] IRLight : Standby
+[2021-06-18 09:22:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:22:27] IRLight : Idle
+[2021-06-18 09:22:28] IRLight : Standby
+[2021-06-18 09:23:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:23:47] IRLight : Idle
+[2021-06-18 09:23:48] IRLight : Standby
+[2021-06-18 09:25:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:25:07] IRLight : Idle
+[2021-06-18 09:25:08] IRLight : Standby
+[2021-06-18 09:26:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:26:27] IRLight : Idle
+[2021-06-18 09:26:28] IRLight : Standby
+[2021-06-18 09:27:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:27:47] IRLight : Idle
+[2021-06-18 09:27:48] IRLight : Standby
+[2021-06-18 09:29:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:29:07] IRLight : Idle
+[2021-06-18 09:29:08] IRLight : Standby
+[2021-06-18 09:30:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:30:27] IRLight : Idle
+[2021-06-18 09:30:28] IRLight : Standby
+[2021-06-18 09:31:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:31:47] IRLight : Idle
+[2021-06-18 09:31:48] IRLight : Standby
+[2021-06-18 09:33:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:33:07] IRLight : Idle
+[2021-06-18 09:33:08] IRLight : Standby
+[2021-06-18 09:34:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:34:27] IRLight : Idle
+[2021-06-18 09:34:28] IRLight : Standby
+[2021-06-18 09:35:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:35:47] IRLight : Idle
+[2021-06-18 09:35:48] IRLight : Standby
+[2021-06-18 09:37:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:37:07] IRLight : Idle
+[2021-06-18 09:37:08] IRLight : Standby
+[2021-06-18 09:38:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:38:27] IRLight : Idle
+[2021-06-18 09:38:28] IRLight : Standby
+[2021-06-18 09:39:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:39:47] IRLight : Idle
+[2021-06-18 09:39:48] IRLight : Standby
+[2021-06-18 09:41:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:41:07] IRLight : Idle
+[2021-06-18 09:41:08] IRLight : Standby
+[2021-06-18 09:42:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:42:27] IRLight : Idle
+[2021-06-18 09:42:28] IRLight : Standby
+[2021-06-18 09:43:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:43:47] IRLight : Idle
+[2021-06-18 09:43:48] IRLight : Standby
+[2021-06-18 09:45:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:45:07] IRLight : Idle
+[2021-06-18 09:45:08] IRLight : Standby
+[2021-06-18 09:46:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:46:27] IRLight : Idle
+[2021-06-18 09:46:28] IRLight : Standby
+[2021-06-18 09:47:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:47:47] IRLight : Idle
+[2021-06-18 09:47:48] IRLight : Standby
+[2021-06-18 09:49:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:49:07] IRLight : Idle
+[2021-06-18 09:49:08] IRLight : Standby
+[2021-06-18 09:50:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:50:27] IRLight : Idle
+[2021-06-18 09:50:28] IRLight : Standby
+[2021-06-18 09:51:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:51:47] IRLight : Idle
+[2021-06-18 09:51:48] IRLight : Standby
+[2021-06-18 09:53:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:53:07] IRLight : Idle
+[2021-06-18 09:53:08] IRLight : Standby
+[2021-06-18 09:54:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:54:27] IRLight : Idle
+[2021-06-18 09:54:28] IRLight : Standby
+[2021-06-18 09:55:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:55:47] IRLight : Idle
+[2021-06-18 09:55:48] IRLight : Standby
+[2021-06-18 09:57:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:57:07] IRLight : Idle
+[2021-06-18 09:57:08] IRLight : Standby
+[2021-06-18 09:58:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:58:27] IRLight : Idle
+[2021-06-18 09:58:28] IRLight : Standby
+[2021-06-18 09:59:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 09:59:47] IRLight : Idle
+[2021-06-18 09:59:48] IRLight : Standby
+[2021-06-18 10:01:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:01:07] IRLight : Idle
+[2021-06-18 10:01:08] IRLight : Standby
+[2021-06-18 10:02:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:02:27] IRLight : Idle
+[2021-06-18 10:02:28] IRLight : Standby
+[2021-06-18 10:03:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:03:47] IRLight : Idle
+[2021-06-18 10:03:48] IRLight : Standby
+[2021-06-18 10:05:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:05:07] IRLight : Idle
+[2021-06-18 10:05:08] IRLight : Standby
+[2021-06-18 10:06:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:06:27] IRLight : Idle
+[2021-06-18 10:06:28] IRLight : Standby
+[2021-06-18 10:07:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:07:47] IRLight : Idle
+[2021-06-18 10:07:48] IRLight : Standby
+[2021-06-18 10:09:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:09:07] IRLight : Idle
+[2021-06-18 10:09:08] IRLight : Standby
+[2021-06-18 10:10:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:10:27] IRLight : Idle
+[2021-06-18 10:10:28] IRLight : Standby
+[2021-06-18 10:11:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:11:47] IRLight : Idle
+[2021-06-18 10:11:48] IRLight : Standby
+[2021-06-18 10:13:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:13:07] IRLight : Idle
+[2021-06-18 10:13:08] IRLight : Standby
+[2021-06-18 10:14:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:14:27] IRLight : Idle
+[2021-06-18 10:14:28] IRLight : Standby
+[2021-06-18 10:15:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:15:47] IRLight : Idle
+[2021-06-18 10:15:48] IRLight : Standby
+[2021-06-18 10:17:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:17:07] IRLight : Idle
+[2021-06-18 10:17:08] IRLight : Standby
+[2021-06-18 10:18:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:18:27] IRLight : Idle
+[2021-06-18 10:18:28] IRLight : Standby
+[2021-06-18 10:19:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:19:47] IRLight : Idle
+[2021-06-18 10:19:48] IRLight : Standby
+[2021-06-18 10:21:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:21:07] IRLight : Idle
+[2021-06-18 10:21:08] IRLight : Standby
+[2021-06-18 10:22:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:22:27] IRLight : Idle
+[2021-06-18 10:22:28] IRLight : Standby
+[2021-06-18 10:23:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:23:47] IRLight : Idle
+[2021-06-18 10:23:48] IRLight : Standby
+[2021-06-18 10:25:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:25:07] IRLight : Idle
+[2021-06-18 10:25:08] IRLight : Standby
+[2021-06-18 10:26:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:26:27] IRLight : Idle
+[2021-06-18 10:26:28] IRLight : Standby
+[2021-06-18 10:27:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:27:47] IRLight : Idle
+[2021-06-18 10:27:48] IRLight : Standby
+[2021-06-18 10:29:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:29:07] IRLight : Idle
+[2021-06-18 10:29:08] IRLight : Standby
+[2021-06-18 10:30:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:30:27] IRLight : Idle
+[2021-06-18 10:30:28] IRLight : Standby
+[2021-06-18 10:31:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:31:47] IRLight : Idle
+[2021-06-18 10:31:48] IRLight : Standby
+[2021-06-18 10:33:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:33:07] IRLight : Idle
+[2021-06-18 10:33:08] IRLight : Standby
+[2021-06-18 10:34:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:34:27] IRLight : Idle
+[2021-06-18 10:34:28] IRLight : Standby
+[2021-06-18 10:35:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:35:47] IRLight : Idle
+[2021-06-18 10:35:48] IRLight : Standby
+[2021-06-18 10:37:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:37:07] IRLight : Idle
+[2021-06-18 10:37:08] IRLight : Standby
+[2021-06-18 10:38:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:38:27] IRLight : Idle
+[2021-06-18 10:38:28] IRLight : Standby
+[2021-06-18 10:39:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:39:47] IRLight : Idle
+[2021-06-18 10:39:48] IRLight : Standby
+[2021-06-18 10:41:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:41:07] IRLight : Idle
+[2021-06-18 10:41:08] IRLight : Standby
+[2021-06-18 10:42:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:42:27] IRLight : Idle
+[2021-06-18 10:42:28] IRLight : Standby
+[2021-06-18 10:43:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:43:47] IRLight : Idle
+[2021-06-18 10:43:48] IRLight : Standby
+[2021-06-18 10:45:07] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:45:07] IRLight : Idle
+[2021-06-18 10:45:08] IRLight : Standby
+[2021-06-18 10:46:27] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:46:27] IRLight : Idle
+[2021-06-18 10:46:28] IRLight : Standby
+[2021-06-18 10:47:47] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:47:47] IRLight : Idle
+[2021-06-18 10:47:49] IRLight : Standby
+[2021-06-18 10:49:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:49:08] IRLight : Idle
+[2021-06-18 10:49:09] IRLight : Standby
+[2021-06-18 10:50:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:50:28] IRLight : Idle
+[2021-06-18 10:50:29] IRLight : Standby
+[2021-06-18 10:51:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:51:48] IRLight : Idle
+[2021-06-18 10:51:49] IRLight : Standby
+[2021-06-18 10:53:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:53:08] IRLight : Idle
+[2021-06-18 10:53:09] IRLight : Standby
+[2021-06-18 10:54:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:54:28] IRLight : Idle
+[2021-06-18 10:54:29] IRLight : Standby
+[2021-06-18 10:55:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:55:48] IRLight : Idle
+[2021-06-18 10:55:49] IRLight : Standby
+[2021-06-18 10:57:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:57:08] IRLight : Idle
+[2021-06-18 10:57:09] IRLight : Standby
+[2021-06-18 10:58:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:58:28] IRLight : Idle
+[2021-06-18 10:58:29] IRLight : Standby
+[2021-06-18 10:59:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 10:59:48] IRLight : Idle
+[2021-06-18 10:59:49] IRLight : Standby
+[2021-06-18 11:01:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:01:08] IRLight : Idle
+[2021-06-18 11:01:09] IRLight : Standby
+[2021-06-18 11:02:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:02:28] IRLight : Idle
+[2021-06-18 11:02:29] IRLight : Standby
+[2021-06-18 11:03:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:03:48] IRLight : Idle
+[2021-06-18 11:03:49] IRLight : Standby
+[2021-06-18 11:05:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:05:08] IRLight : Idle
+[2021-06-18 11:05:09] IRLight : Standby
+[2021-06-18 11:06:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:06:28] IRLight : Idle
+[2021-06-18 11:06:29] IRLight : Standby
+[2021-06-18 11:07:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:07:48] IRLight : Idle
+[2021-06-18 11:07:49] IRLight : Standby
+[2021-06-18 11:09:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:09:08] IRLight : Idle
+[2021-06-18 11:09:09] IRLight : Standby
+[2021-06-18 11:10:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:10:28] IRLight : Idle
+[2021-06-18 11:10:29] IRLight : Standby
+[2021-06-18 11:11:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:11:48] IRLight : Idle
+[2021-06-18 11:11:49] IRLight : Standby
+[2021-06-18 11:13:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:13:08] IRLight : Idle
+[2021-06-18 11:13:09] IRLight : Standby
+[2021-06-18 11:14:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:14:28] IRLight : Idle
+[2021-06-18 11:14:29] IRLight : Standby
+[2021-06-18 11:15:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:15:48] IRLight : Idle
+[2021-06-18 11:15:49] IRLight : Standby
+[2021-06-18 11:17:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:17:08] IRLight : Idle
+[2021-06-18 11:17:09] IRLight : Standby
+[2021-06-18 11:18:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:18:28] IRLight : Idle
+[2021-06-18 11:18:29] IRLight : Standby
+[2021-06-18 11:19:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:19:48] IRLight : Idle
+[2021-06-18 11:19:49] IRLight : Standby
+[2021-06-18 11:21:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:21:08] IRLight : Idle
+[2021-06-18 11:21:09] IRLight : Standby
+[2021-06-18 11:22:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:22:28] IRLight : Idle
+[2021-06-18 11:22:29] IRLight : Standby
+[2021-06-18 11:23:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:23:48] IRLight : Idle
+[2021-06-18 11:23:49] IRLight : Standby
+[2021-06-18 11:25:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:25:08] IRLight : Idle
+[2021-06-18 11:25:09] IRLight : Standby
+[2021-06-18 11:26:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:26:28] IRLight : Idle
+[2021-06-18 11:26:29] IRLight : Standby
+[2021-06-18 11:27:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:27:48] IRLight : Idle
+[2021-06-18 11:27:49] IRLight : Standby
+[2021-06-18 11:29:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:29:08] IRLight : Idle
+[2021-06-18 11:29:09] IRLight : Standby
+[2021-06-18 11:30:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:30:28] IRLight : Idle
+[2021-06-18 11:30:29] IRLight : Standby
+[2021-06-18 11:31:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:31:48] IRLight : Idle
+[2021-06-18 11:31:49] IRLight : Standby
+[2021-06-18 11:33:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:33:08] IRLight : Idle
+[2021-06-18 11:33:09] IRLight : Standby
+[2021-06-18 11:34:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:34:28] IRLight : Idle
+[2021-06-18 11:34:29] IRLight : Standby
+[2021-06-18 11:35:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:35:48] IRLight : Idle
+[2021-06-18 11:35:49] IRLight : Standby
+[2021-06-18 11:37:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:37:08] IRLight : Idle
+[2021-06-18 11:37:09] IRLight : Standby
+[2021-06-18 11:38:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:38:28] IRLight : Idle
+[2021-06-18 11:38:29] IRLight : Standby
+[2021-06-18 11:39:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:39:48] IRLight : Idle
+[2021-06-18 11:39:49] IRLight : Standby
+[2021-06-18 11:41:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:41:08] IRLight : Idle
+[2021-06-18 11:41:09] IRLight : Standby
+[2021-06-18 11:42:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:42:28] IRLight : Idle
+[2021-06-18 11:42:29] IRLight : Standby
+[2021-06-18 11:43:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:43:48] IRLight : Idle
+[2021-06-18 11:43:49] IRLight : Standby
+[2021-06-18 11:45:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:45:08] IRLight : Idle
+[2021-06-18 11:45:09] IRLight : Standby
+[2021-06-18 11:46:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:46:28] IRLight : Idle
+[2021-06-18 11:46:29] IRLight : Standby
+[2021-06-18 11:47:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:47:48] IRLight : Idle
+[2021-06-18 11:47:49] IRLight : Standby
+[2021-06-18 11:49:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:49:08] IRLight : Idle
+[2021-06-18 11:49:09] IRLight : Standby
+[2021-06-18 11:50:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:50:28] IRLight : Idle
+[2021-06-18 11:50:29] IRLight : Standby
+[2021-06-18 11:51:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:51:48] IRLight : Idle
+[2021-06-18 11:51:49] IRLight : Standby
+[2021-06-18 11:53:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:53:08] IRLight : Idle
+[2021-06-18 11:53:09] IRLight : Standby
+[2021-06-18 11:54:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:54:28] IRLight : Idle
+[2021-06-18 11:54:29] IRLight : Standby
+[2021-06-18 11:55:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:55:48] IRLight : Idle
+[2021-06-18 11:55:49] IRLight : Standby
+[2021-06-18 11:57:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:57:08] IRLight : Idle
+[2021-06-18 11:57:09] IRLight : Standby
+[2021-06-18 11:58:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:58:28] IRLight : Idle
+[2021-06-18 11:58:29] IRLight : Standby
+[2021-06-18 11:59:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 11:59:48] IRLight : Idle
+[2021-06-18 11:59:49] IRLight : Standby
+[2021-06-18 12:01:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:01:08] IRLight : Idle
+[2021-06-18 12:01:09] IRLight : Standby
+[2021-06-18 12:02:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:02:28] IRLight : Idle
+[2021-06-18 12:02:29] IRLight : Standby
+[2021-06-18 12:03:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:03:48] IRLight : Idle
+[2021-06-18 12:03:49] IRLight : Standby
+[2021-06-18 12:05:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:05:08] IRLight : Idle
+[2021-06-18 12:05:09] IRLight : Standby
+[2021-06-18 12:06:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:06:28] IRLight : Idle
+[2021-06-18 12:06:29] IRLight : Standby
+[2021-06-18 12:07:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:07:48] IRLight : Idle
+[2021-06-18 12:07:49] IRLight : Standby
+[2021-06-18 12:09:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:09:08] IRLight : Idle
+[2021-06-18 12:09:09] IRLight : Standby
+[2021-06-18 12:10:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:10:28] IRLight : Idle
+[2021-06-18 12:10:29] IRLight : Standby
+[2021-06-18 12:11:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:11:48] IRLight : Idle
+[2021-06-18 12:11:49] IRLight : Standby
+[2021-06-18 12:13:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:13:08] IRLight : Idle
+[2021-06-18 12:13:09] IRLight : Standby
+[2021-06-18 12:14:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:14:28] IRLight : Idle
+[2021-06-18 12:14:29] IRLight : Standby
+[2021-06-18 12:15:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:15:48] IRLight : Idle
+[2021-06-18 12:15:49] IRLight : Standby
+[2021-06-18 12:17:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:17:08] IRLight : Idle
+[2021-06-18 12:17:09] IRLight : Standby
+[2021-06-18 12:18:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:18:28] IRLight : Idle
+[2021-06-18 12:18:29] IRLight : Standby
+[2021-06-18 12:19:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:19:48] IRLight : Idle
+[2021-06-18 12:19:49] IRLight : Standby
+[2021-06-18 12:21:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:21:08] IRLight : Idle
+[2021-06-18 12:21:09] IRLight : Standby
+[2021-06-18 12:22:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:22:28] IRLight : Idle
+[2021-06-18 12:22:29] IRLight : Standby
+[2021-06-18 12:23:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:23:48] IRLight : Idle
+[2021-06-18 12:23:49] IRLight : Standby
+[2021-06-18 12:25:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:25:08] IRLight : Idle
+[2021-06-18 12:25:09] IRLight : Standby
+[2021-06-18 12:26:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:26:28] IRLight : Idle
+[2021-06-18 12:26:29] IRLight : Standby
+[2021-06-18 12:27:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:27:48] IRLight : Idle
+[2021-06-18 12:27:49] IRLight : Standby
+[2021-06-18 12:29:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:29:08] IRLight : Idle
+[2021-06-18 12:29:09] IRLight : Standby
+[2021-06-18 12:30:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:30:28] IRLight : Idle
+[2021-06-18 12:30:29] IRLight : Standby
+[2021-06-18 12:31:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:31:48] IRLight : Idle
+[2021-06-18 12:31:49] IRLight : Standby
+[2021-06-18 12:33:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:33:08] IRLight : Idle
+[2021-06-18 12:33:09] IRLight : Standby
+[2021-06-18 12:34:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:34:28] IRLight : Idle
+[2021-06-18 12:34:29] IRLight : Standby
+[2021-06-18 12:35:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:35:48] IRLight : Idle
+[2021-06-18 12:35:49] IRLight : Standby
+[2021-06-18 12:37:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:37:08] IRLight : Idle
+[2021-06-18 12:37:09] IRLight : Standby
+[2021-06-18 12:38:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:38:28] IRLight : Idle
+[2021-06-18 12:38:29] IRLight : Standby
+[2021-06-18 12:39:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:39:48] IRLight : Idle
+[2021-06-18 12:39:49] IRLight : Standby
+[2021-06-18 12:41:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:41:08] IRLight : Idle
+[2021-06-18 12:41:09] IRLight : Standby
+[2021-06-18 12:42:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:42:28] IRLight : Idle
+[2021-06-18 12:42:29] IRLight : Standby
+[2021-06-18 12:43:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:43:48] IRLight : Idle
+[2021-06-18 12:43:49] IRLight : Standby
+[2021-06-18 12:45:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:45:08] IRLight : Idle
+[2021-06-18 12:45:09] IRLight : Standby
+[2021-06-18 12:46:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:46:28] IRLight : Idle
+[2021-06-18 12:46:29] IRLight : Standby
+[2021-06-18 12:47:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:47:48] IRLight : Idle
+[2021-06-18 12:47:49] IRLight : Standby
+[2021-06-18 12:49:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:49:08] IRLight : Idle
+[2021-06-18 12:49:09] IRLight : Standby
+[2021-06-18 12:50:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:50:28] IRLight : Idle
+[2021-06-18 12:50:29] IRLight : Standby
+[2021-06-18 12:51:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:51:48] IRLight : Idle
+[2021-06-18 12:51:49] IRLight : Standby
+[2021-06-18 12:53:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:53:08] IRLight : Idle
+[2021-06-18 12:53:09] IRLight : Standby
+[2021-06-18 12:54:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:54:28] IRLight : Idle
+[2021-06-18 12:54:29] IRLight : Standby
+[2021-06-18 12:55:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:55:48] IRLight : Idle
+[2021-06-18 12:55:49] IRLight : Standby
+[2021-06-18 12:57:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:57:08] IRLight : Idle
+[2021-06-18 12:57:09] IRLight : Standby
+[2021-06-18 12:58:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:58:28] IRLight : Idle
+[2021-06-18 12:58:29] IRLight : Standby
+[2021-06-18 12:59:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 12:59:48] IRLight : Idle
+[2021-06-18 12:59:49] IRLight : Standby
+[2021-06-18 13:01:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:01:08] IRLight : Idle
+[2021-06-18 13:01:09] IRLight : Standby
+[2021-06-18 13:02:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:02:28] IRLight : Idle
+[2021-06-18 13:02:29] IRLight : Standby
+[2021-06-18 13:03:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:03:48] IRLight : Idle
+[2021-06-18 13:03:49] IRLight : Standby
+[2021-06-18 13:05:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:05:08] IRLight : Idle
+[2021-06-18 13:05:09] IRLight : Standby
+[2021-06-18 13:06:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:06:28] IRLight : Idle
+[2021-06-18 13:06:29] IRLight : Standby
+[2021-06-18 13:07:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:07:48] IRLight : Idle
+[2021-06-18 13:07:49] IRLight : Standby
+[2021-06-18 13:09:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:09:08] IRLight : Idle
+[2021-06-18 13:09:09] IRLight : Standby
+[2021-06-18 13:10:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:10:28] IRLight : Idle
+[2021-06-18 13:10:29] IRLight : Standby
+[2021-06-18 13:11:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:11:48] IRLight : Idle
+[2021-06-18 13:11:49] IRLight : Standby
+[2021-06-18 13:13:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:13:08] IRLight : Idle
+[2021-06-18 13:13:09] IRLight : Standby
+[2021-06-18 13:14:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:14:28] IRLight : Idle
+[2021-06-18 13:14:29] IRLight : Standby
+[2021-06-18 13:15:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:15:48] IRLight : Idle
+[2021-06-18 13:15:49] IRLight : Standby
+[2021-06-18 13:17:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:17:08] IRLight : Idle
+[2021-06-18 13:17:09] IRLight : Standby
+[2021-06-18 13:18:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:18:28] IRLight : Idle
+[2021-06-18 13:18:29] IRLight : Standby
+[2021-06-18 13:19:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:19:48] IRLight : Idle
+[2021-06-18 13:19:49] IRLight : Standby
+[2021-06-18 13:21:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:21:08] IRLight : Idle
+[2021-06-18 13:21:09] IRLight : Standby
+[2021-06-18 13:22:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:22:28] IRLight : Idle
+[2021-06-18 13:22:29] IRLight : Standby
+[2021-06-18 13:23:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:23:48] IRLight : Idle
+[2021-06-18 13:23:49] IRLight : Standby
+[2021-06-18 13:25:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:25:08] IRLight : Idle
+[2021-06-18 13:25:09] IRLight : Standby
+[2021-06-18 13:26:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:26:28] IRLight : Idle
+[2021-06-18 13:26:29] IRLight : Standby
+[2021-06-18 13:27:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:27:48] IRLight : Idle
+[2021-06-18 13:27:49] IRLight : Standby
+[2021-06-18 13:29:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:29:08] IRLight : Idle
+[2021-06-18 13:29:09] IRLight : Standby
+[2021-06-18 13:30:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:30:28] IRLight : Idle
+[2021-06-18 13:30:29] IRLight : Standby
+[2021-06-18 13:31:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:31:48] IRLight : Idle
+[2021-06-18 13:31:49] IRLight : Standby
+[2021-06-18 13:33:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:33:08] IRLight : Idle
+[2021-06-18 13:33:09] IRLight : Standby
+[2021-06-18 13:34:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:34:28] IRLight : Idle
+[2021-06-18 13:34:29] IRLight : Standby
+[2021-06-18 13:35:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:35:48] IRLight : Idle
+[2021-06-18 13:35:49] IRLight : Standby
+[2021-06-18 13:37:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:37:08] IRLight : Idle
+[2021-06-18 13:37:09] IRLight : Standby
+[2021-06-18 13:38:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:38:28] IRLight : Idle
+[2021-06-18 13:38:29] IRLight : Standby
+[2021-06-18 13:39:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:39:48] IRLight : Idle
+[2021-06-18 13:39:49] IRLight : Standby
+[2021-06-18 13:41:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:41:08] IRLight : Idle
+[2021-06-18 13:41:09] IRLight : Standby
+[2021-06-18 13:42:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:42:28] IRLight : Idle
+[2021-06-18 13:42:29] IRLight : Standby
+[2021-06-18 13:43:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:43:48] IRLight : Idle
+[2021-06-18 13:43:49] IRLight : Standby
+[2021-06-18 13:45:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:45:08] IRLight : Idle
+[2021-06-18 13:45:09] IRLight : Standby
+[2021-06-18 13:46:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:46:28] IRLight : Idle
+[2021-06-18 13:46:29] IRLight : Standby
+[2021-06-18 13:47:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:47:48] IRLight : Idle
+[2021-06-18 13:47:49] IRLight : Standby
+[2021-06-18 13:49:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:49:08] IRLight : Idle
+[2021-06-18 13:49:09] IRLight : Standby
+[2021-06-18 13:50:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:50:28] IRLight : Idle
+[2021-06-18 13:50:29] IRLight : Standby
+[2021-06-18 13:51:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:51:48] IRLight : Idle
+[2021-06-18 13:51:49] IRLight : Standby
+[2021-06-18 13:53:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:53:08] IRLight : Idle
+[2021-06-18 13:53:09] IRLight : Standby
+[2021-06-18 13:54:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:54:28] IRLight : Idle
+[2021-06-18 13:54:29] IRLight : Standby
+[2021-06-18 13:55:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:55:48] IRLight : Idle
+[2021-06-18 13:55:49] IRLight : Standby
+[2021-06-18 13:57:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:57:08] IRLight : Idle
+[2021-06-18 13:57:09] IRLight : Standby
+[2021-06-18 13:58:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:58:28] IRLight : Idle
+[2021-06-18 13:58:29] IRLight : Standby
+[2021-06-18 13:59:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 13:59:48] IRLight : Idle
+[2021-06-18 13:59:49] IRLight : Standby
+[2021-06-18 14:01:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:01:08] IRLight : Idle
+[2021-06-18 14:01:09] IRLight : Standby
+[2021-06-18 14:02:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:02:28] IRLight : Idle
+[2021-06-18 14:02:29] IRLight : Standby
+[2021-06-18 14:03:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:03:48] IRLight : Idle
+[2021-06-18 14:03:49] IRLight : Standby
+[2021-06-18 14:05:08] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:05:08] IRLight : Idle
+[2021-06-18 14:05:09] IRLight : Standby
+[2021-06-18 14:06:28] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:06:28] IRLight : Idle
+[2021-06-18 14:06:29] IRLight : Standby
+[2021-06-18 14:07:48] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:07:48] IRLight : Idle
+[2021-06-18 14:07:49] IRLight : Standby
+[2021-06-18 14:09:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:09:09] IRLight : Idle
+[2021-06-18 14:09:10] IRLight : Standby
+[2021-06-18 14:10:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:10:29] IRLight : Idle
+[2021-06-18 14:10:30] IRLight : Standby
+[2021-06-18 14:11:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:11:49] IRLight : Idle
+[2021-06-18 14:11:50] IRLight : Standby
+[2021-06-18 14:13:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:13:09] IRLight : Idle
+[2021-06-18 14:13:10] IRLight : Standby
+[2021-06-18 14:14:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:14:29] IRLight : Idle
+[2021-06-18 14:14:30] IRLight : Standby
+[2021-06-18 14:15:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:15:49] IRLight : Idle
+[2021-06-18 14:15:50] IRLight : Standby
+[2021-06-18 14:17:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:17:09] IRLight : Idle
+[2021-06-18 14:17:10] IRLight : Standby
+[2021-06-18 14:18:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:18:29] IRLight : Idle
+[2021-06-18 14:18:30] IRLight : Standby
+[2021-06-18 14:19:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:19:49] IRLight : Idle
+[2021-06-18 14:19:50] IRLight : Standby
+[2021-06-18 14:21:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:21:09] IRLight : Idle
+[2021-06-18 14:21:10] IRLight : Standby
+[2021-06-18 14:22:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:22:29] IRLight : Idle
+[2021-06-18 14:22:30] IRLight : Standby
+[2021-06-18 14:23:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:23:49] IRLight : Idle
+[2021-06-18 14:23:50] IRLight : Standby
+[2021-06-18 14:25:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:25:09] IRLight : Idle
+[2021-06-18 14:25:10] IRLight : Standby
+[2021-06-18 14:26:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:26:29] IRLight : Idle
+[2021-06-18 14:26:30] IRLight : Standby
+[2021-06-18 14:27:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:27:49] IRLight : Idle
+[2021-06-18 14:27:50] IRLight : Standby
+[2021-06-18 14:29:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:29:09] IRLight : Idle
+[2021-06-18 14:29:10] IRLight : Standby
+[2021-06-18 14:30:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:30:29] IRLight : Idle
+[2021-06-18 14:30:30] IRLight : Standby
+[2021-06-18 14:31:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:31:49] IRLight : Idle
+[2021-06-18 14:31:50] IRLight : Standby
+[2021-06-18 14:33:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:33:09] IRLight : Idle
+[2021-06-18 14:33:10] IRLight : Standby
+[2021-06-18 14:34:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:34:29] IRLight : Idle
+[2021-06-18 14:34:30] IRLight : Standby
+[2021-06-18 14:35:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:35:49] IRLight : Idle
+[2021-06-18 14:35:50] IRLight : Standby
+[2021-06-18 14:37:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:37:09] IRLight : Idle
+[2021-06-18 14:37:10] IRLight : Standby
+[2021-06-18 14:38:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:38:29] IRLight : Idle
+[2021-06-18 14:38:30] IRLight : Standby
+[2021-06-18 14:39:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:39:49] IRLight : Idle
+[2021-06-18 14:39:50] IRLight : Standby
+[2021-06-18 14:41:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:41:09] IRLight : Idle
+[2021-06-18 14:41:10] IRLight : Standby
+[2021-06-18 14:42:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:42:29] IRLight : Idle
+[2021-06-18 14:42:30] IRLight : Standby
+[2021-06-18 14:43:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:43:49] IRLight : Idle
+[2021-06-18 14:43:50] IRLight : Standby
+[2021-06-18 14:45:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:45:09] IRLight : Idle
+[2021-06-18 14:45:10] IRLight : Standby
+[2021-06-18 14:46:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:46:29] IRLight : Idle
+[2021-06-18 14:46:30] IRLight : Standby
+[2021-06-18 14:47:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:47:49] IRLight : Idle
+[2021-06-18 14:47:50] IRLight : Standby
+[2021-06-18 14:49:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:49:09] IRLight : Idle
+[2021-06-18 14:49:10] IRLight : Standby
+[2021-06-18 14:50:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:50:29] IRLight : Idle
+[2021-06-18 14:50:30] IRLight : Standby
+[2021-06-18 14:51:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:51:49] IRLight : Idle
+[2021-06-18 14:51:50] IRLight : Standby
+[2021-06-18 14:53:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:53:09] IRLight : Idle
+[2021-06-18 14:53:10] IRLight : Standby
+[2021-06-18 14:54:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:54:29] IRLight : Idle
+[2021-06-18 14:54:30] IRLight : Standby
+[2021-06-18 14:55:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:55:49] IRLight : Idle
+[2021-06-18 14:55:50] IRLight : Standby
+[2021-06-18 14:57:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:57:09] IRLight : Idle
+[2021-06-18 14:57:10] IRLight : Standby
+[2021-06-18 14:58:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:58:29] IRLight : Idle
+[2021-06-18 14:58:30] IRLight : Standby
+[2021-06-18 14:59:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 14:59:49] IRLight : Idle
+[2021-06-18 14:59:50] IRLight : Standby
+[2021-06-18 15:01:09] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 15:01:09] IRLight : Idle
+[2021-06-18 15:01:10] IRLight : Standby
+[2021-06-18 15:02:29] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 15:02:29] IRLight : Idle
+[2021-06-18 15:02:30] IRLight : Standby
+[2021-06-18 15:03:49] Selected Camera ID : 0 _ OptionExpose : 1634
+[2021-06-18 15:03:49] IRLight : Idle
+[2021-06-18 15:03:50] IRLight : Standby

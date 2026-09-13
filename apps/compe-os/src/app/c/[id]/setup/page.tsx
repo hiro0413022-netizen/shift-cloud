@@ -133,6 +133,36 @@ export default async function SetupPage({ params }: { params: Promise<{ id: stri
           <L label="募集ページに出す案内（任意）">
             <textarea name="entry_note" rows={3} defaultValue={comp.entry_note ?? ""} className={inputCls} />
           </L>
+          <L label="ご参加にあたってのお願い（同意事項）">
+            <textarea
+              name="entry_terms"
+              rows={6}
+              defaultValue={comp.entry_terms ?? ""}
+              placeholder="・申し込み後のキャンセルについては…"
+              className={inputCls}
+            />
+          </L>
+          <p className="-mt-2 text-xs text-(--color-dim)">
+            ここに文章を入れると、募集ページの最後に表示され、
+            <strong>「上記の注意事項を確認し、同意のうえ申し込みます。」のチェックが必須</strong>になります。
+            空欄にするとチェック欄は出ません。同意した日時は参加者ごとに記録されます。
+          </p>
+          {comp.entry_questions.length > 0 && (
+            <div className="rounded-lg bg-(--color-panel-2) p-3 text-xs text-(--color-dim)">
+              <p className="mb-1 font-semibold text-(--color-txt)">募集ページの追加設問</p>
+              <ul className="space-y-0.5">
+                {comp.entry_questions.map((q) => (
+                  <li key={q.id}>
+                    ・{q.label}
+                    {q.required ? "（必須）" : ""}： {q.options.join(" / ")}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1">
+                回答は参加者の受付表に列として並びます。設問を変えたいときはお知らせください。
+              </p>
+            </div>
+          )}
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="entry_open" value="1" defaultChecked={comp.entry_open} />
             募集を受け付ける（チェックを外すと「受付を行っておりません」と表示されます）

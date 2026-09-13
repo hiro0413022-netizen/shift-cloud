@@ -1,0 +1,2381 @@
+TAP version 13
+# (node:15) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/bank-csv.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:15) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/money-golfwing/src/lib/import/bankCsv.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/money-golfwing/package.json.
+# Subtest: parseCsv: 引用符内のカンマ・改行・二重引用符
+ok 1 - parseCsv: 引用符内のカンマ・改行・二重引用符
+  ---
+  duration_ms: 0.802994
+  type: 'test'
+  ...
+# Subtest: parseDate: YYYY/MM/DD と 和文年月日
+ok 2 - parseDate: YYYY/MM/DD と 和文年月日
+  ---
+  duration_ms: 0.399941
+  type: 'test'
+  ...
+# Subtest: toNumber: 空・カンマ・全角
+ok 3 - toNumber: 空・カンマ・全角
+  ---
+  duration_ms: 0.139852
+  type: 'test'
+  ...
+# Subtest: parseBankCsv(AMEX型): 支払=正 → amount負・同一明細は出現順dedup
+ok 4 - parseBankCsv(AMEX型): 支払=正 → amount負・同一明細は出現順dedup
+  ---
+  duration_ms: 0.274186
+  type: 'test'
+  ...
+# Subtest: parseBankCsv(口座型): 入金-出金・残高でdedup
+ok 5 - parseBankCsv(口座型): 入金-出金・残高でdedup
+  ---
+  duration_ms: 0.175433
+  type: 'test'
+  ...
+# Subtest: parseBankCsv: 不正な日付行はエラーに積んでスキップ
+ok 6 - parseBankCsv: 不正な日付行はエラーに積んでスキップ
+  ---
+  duration_ms: 0.149273
+  type: 'test'
+  ...
+# (node:22) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/bay-timeline.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:22) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/member-os/src/lib/bay-timeline-pure.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/member-os/package.json.
+# (node:22) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/core/src/frank-booking.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/core/package.json.
+# Subtest: 55分の体験は開始コマ1つに置かれ、高さ2コマぶんになる（30分表示）
+ok 7 - 55分の体験は開始コマ1つに置かれ、高さ2コマぶんになる（30分表示）
+  ---
+  duration_ms: 0.838984
+  type: 'test'
+  ...
+# Subtest: ちょうど30分の予約は1コマ、2時間の予約は4コマ
+ok 8 - ちょうど30分の予約は1コマ、2時間の予約は4コマ
+  ---
+  duration_ms: 4.000807
+  type: 'test'
+  ...
+# Subtest: 半端な開始時刻はコマの先頭に寄せる（10:15開始が11:00に見えない）
+ok 9 - 半端な開始時刻はコマの先頭に寄せる（10:15開始が11:00に見えない）
+  ---
+  duration_ms: 0.127113
+  type: 'test'
+  ...
+# Subtest: 表示粒度を60分にしても崩れない（1件は1コマぶん）
+ok 10 - 表示粒度を60分にしても崩れない（1件は1コマぶん）
+  ---
+  duration_ms: 0.151562
+  type: 'test'
+  ...
+# Subtest: 営業時間より前から始まる予約は、表に入る分だけ描いて cutTop を立てる
+ok 11 - 営業時間より前から始まる予約は、表に入る分だけ描いて cutTop を立てる
+  ---
+  duration_ms: 0.156518
+  type: 'test'
+  ...
+# Subtest: 閉店をまたぐ予約は最後のコマまでで止まり cutBottom を立てる
+ok 12 - 閉店をまたぐ予約は最後のコマまでで止まり cutBottom を立てる
+  ---
+  duration_ms: 0.112461
+  type: 'test'
+  ...
+# Subtest: 営業時間の完全に外にある予約は unplaced に回す（黙って消さない）
+ok 13 - 営業時間の完全に外にある予約は unplaced に回す（黙って消さない）
+  ---
+  duration_ms: 0.139126
+  type: 'test'
+  ...
+# Subtest: 定休日（枠ゼロ）でも予約が残っていれば unplaced で見える
+ok 14 - 定休日（枠ゼロ）でも予約が残っていれば unplaced で見える
+  ---
+  duration_ms: 0.094355
+  type: 'test'
+  ...
+# Subtest: キャンセル済みは載せない（空き枠に戻す）
+ok 15 - キャンセル済みは載せない（空き枠に戻す）
+  ---
+  duration_ms: 0.190641
+  type: 'test'
+  ...
+# Subtest: 打席指定なしのレッスン枠は表に置かず unplaced（no_bay）へ
+ok 16 - 打席指定なしのレッスン枠は表に置かず unplaced（no_bay）へ
+  ---
+  duration_ms: 0.241208
+  type: 'test'
+  ...
+# Subtest: 打席が決まっているレッスン枠は普通に並ぶ
+ok 17 - 打席が決まっているレッスン枠は普通に並ぶ
+  ---
+  duration_ms: 0.121284
+  type: 'test'
+  ...
+# Subtest: 同じ打席・同じ時間の二重予約は、先の1件を表に出して後の1件を conflict で見せる
+ok 18 - 同じ打席・同じ時間の二重予約は、先の1件を表に出して後の1件を conflict で見せる
+  ---
+  duration_ms: 0.088954
+  type: 'test'
+  ...
+# Subtest: 打席が違えば同じ時間でも並ぶ
+ok 19 - 打席が違えば同じ時間でも並ぶ
+  ---
+  duration_ms: 0.718308
+  type: 'test'
+  ...
+# Subtest: 台帳に無い打席（休止した打席の古い予約）は表に紛れ込ませない
+ok 20 - 台帳に無い打席（休止した打席の古い予約）は表に紛れ込ませない
+  ---
+  duration_ms: 0.114725
+  type: 'test'
+  ...
+# Subtest: 誰の予約かは 会員名→体験申込名→ゲスト名 の順（最後は「ご予約」）
+ok 21 - 誰の予約かは 会員名→体験申込名→ゲスト名 の順（最後は「ご予約」）
+  ---
+  duration_ms: 0.341165
+  type: 'test'
+  ...
+# Subtest: 重要説明事項があると alert が立つ（空白だけなら立てない）
+ok 22 - 重要説明事項があると alert が立つ（空白だけなら立てない）
+  ---
+  duration_ms: 0.062813
+  type: 'test'
+  ...
+# Subtest: 種別は4つとも色が定義されていて、会員と都度が同じ色になっていない
+ok 23 - 種別は4つとも色が定義されていて、会員と都度が同じ色になっていない
+  ---
+  duration_ms: 0.38381
+  type: 'test'
+  ...
+# Subtest: 週の時間軸は全日の和集合（平日10-22と土日9-20が混ざっても抜けない）
+ok 24 - 週の時間軸は全日の和集合（平日10-22と土日9-20が混ざっても抜けない）
+  ---
+  duration_ms: 0.100581
+  type: 'test'
+  ...
+# Subtest: 週表示はコマに重なっている予定を全部拾う（打席は合算）
+ok 25 - 週表示はコマに重なっている予定を全部拾う（打席は合算）
+  ---
+  duration_ms: 0.127526
+  type: 'test'
+  ...
+# Subtest: 月グリッドは常に6週×7日で、先頭は日曜
+ok 26 - 月グリッドは常に6週×7日で、先頭は日曜
+  ---
+  duration_ms: 0.364314
+  type: 'test'
+  ...
+# Subtest: 2月・年またぎでも日付がズレない
+ok 27 - 2月・年またぎでも日付がズレない
+  ---
+  duration_ms: 0.089158
+  type: 'test'
+  ...
+# Subtest: 月の範囲は「1日以上・翌月1日未満」（末日を取りこぼさない）
+ok 28 - 月の範囲は「1日以上・翌月1日未満」（末日を取りこぼさない）
+  ---
+  duration_ms: 0.066057
+  type: 'test'
+  ...
+# Subtest: 週のはじまりは日曜。日曜そのものはその日から
+ok 29 - 週のはじまりは日曜。日曜そのものはその日から
+  ---
+  duration_ms: 0.058234
+  type: 'test'
+  ...
+# [billing] webhook failed: Error: boom
+#     at Object.onEvent (file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/billing-package.test.ts:75:25)
+#     at file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/billing/src/stripe.ts:160:18
+#     at async TestContext.<anonymous> (file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/billing-package.test.ts:93:17)
+#     at async Test.run (node:internal/test_runner/test:1054:7)
+#     at async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+# (node:29) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/billing-package.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:29) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/billing/src/stripe.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/billing/package.json.
+# Subtest: 署名検証: 正しい署名は通る
+ok 30 - 署名検証: 正しい署名は通る
+  ---
+  duration_ms: 1.276782
+  type: 'test'
+  ...
+# Subtest: 署名検証: 改ざん・鍵違い・ヘッダ無し・5分超過は弾く
+ok 31 - 署名検証: 改ざん・鍵違い・ヘッダ無し・5分超過は弾く
+  ---
+  duration_ms: 0.227238
+  type: 'test'
+  ...
+# Subtest: Checkoutパラメータ: FRANK月会費と同じ形になる（jpy・月次・ja・metadata二重付与）
+ok 32 - Checkoutパラメータ: FRANK月会費と同じ形になる（jpy・月次・ja・metadata二重付与）
+  ---
+  duration_ms: 2.102649
+  type: 'test'
+  ...
+# Subtest: 鍵の検査: sk_のみ有効・未設定はnull（店頭案内フォールバック用）
+ok 33 - 鍵の検査: sk_のみ有効・未設定はnull（店頭案内フォールバック用）
+  ---
+  duration_ms: 0.154747
+  type: 'test'
+  ...
+# Subtest: Webhookハンドラ: secret未設定503・署名不正400・成功200・handler失敗500(再送)
+ok 34 - Webhookハンドラ: secret未設定503・署名不正400・成功200・handler失敗500(再送)
+  ---
+  duration_ms: 22.170549
+  type: 'test'
+  ...
+# (node:37) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/caddy-invoice.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:37) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/caddy-os/src/lib/invoice.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/caddy-os/package.json.
+# Subtest: 実物再現: 2026年6月 加古川ゴルフ倶楽部 = 小計96,000 / 税9,600 / 合計105,600
+ok 35 - 実物再現: 2026年6月 加古川ゴルフ倶楽部 = 小計96,000 / 税9,600 / 合計105,600
+  ---
+  duration_ms: 1.721848
+  type: 'test'
+  ...
+# Subtest: 売上0の派遣（研修・自社負担）は請求対象外
+ok 36 - 売上0の派遣（研修・自社負担）は請求対象外
+  ---
+  duration_ms: 0.249353
+  type: 'test'
+  ...
+# Subtest: 同じ日でも単価が違えば別明細（スポット単価4,000など）
+ok 37 - 同じ日でも単価が違えば別明細（スポット単価4,000など）
+  ---
+  duration_ms: 0.175759
+  type: 'test'
+  ...
+# Subtest: 締切日: 西宮高原は「２０日締め」（全角）→ その月の20日
+ok 38 - 締切日: 西宮高原は「２０日締め」（全角）→ その月の20日
+  ---
+  duration_ms: 0.120984
+  type: 'test'
+  ...
+# Subtest: 締切日: 「月末」「空欄」は実在する月末日（2月は28日・うるう年は29日）
+ok 39 - 締切日: 「月末」「空欄」は実在する月末日（2月は28日・うるう年は29日）
+  ---
+  duration_ms: 0.137049
+  type: 'test'
+  ...
+# Subtest: 請求期間: 20日締めは前月21日〜当月20日（西宮高原の実運用 / migration 0089）
+ok 40 - 請求期間: 20日締めは前月21日〜当月20日（西宮高原の実運用 / migration 0089）
+  ---
+  duration_ms: 0.537175
+  type: 'test'
+  ...
+# Subtest: 請求期間: 月末締め・空欄は暦月どおり
+ok 41 - 請求期間: 月末締め・空欄は暦月どおり
+  ---
+  duration_ms: 0.163682
+  type: 'test'
+  ...
+# Subtest: 請求期間: 前月に存在しない開始日は前月末に丸める（30日締め×3月）
+ok 42 - 請求期間: 前月に存在しない開始日は前月末に丸める（30日締め×3月）
+  ---
+  duration_ms: 0.870808
+  type: 'test'
+  ...
+# Subtest: 消費税は小計に対して10%・端数はfloor（DECISIONS \#4のinteger円）
+ok 43 - 消費税は小計に対して10%・端数はfloor（DECISIONS \#4のinteger円）
+  ---
+  duration_ms: 0.318212
+  type: 'test'
+  ...
+# Subtest: 明細ラベルは実物と同じ表記（0埋めしない）
+ok 44 - 明細ラベルは実物と同じ表記（0埋めしない）
+  ---
+  duration_ms: 0.21678
+  type: 'test'
+  ...
+# Subtest: 請求番号は 対象月 + 取引先コード
+ok 45 - 請求番号は 対象月 + 取引先コード
+  ---
+  duration_ms: 0.116836
+  type: 'test'
+  ...
+# Subtest: 支払請求書は委託料＋交通費＋手当を合算し、消費税を足さない（免税）
+ok 46 - 支払請求書は委託料＋交通費＋手当を合算し、消費税を足さない（免税）
+  ---
+  duration_ms: 0.139349
+  type: 'test'
+  ...
+# Subtest: ゴルフウィング勤務（時給）も支払請求書に合算される
+ok 47 - ゴルフウィング勤務（時給）も支払請求書に合算される
+  ---
+  duration_ms: 0.169618
+  type: 'test'
+  ...
+# Subtest: 支払請求番号は 対象月 + P + 委託先コード
+ok 48 - 支払請求番号は 対象月 + P + 委託先コード
+  ---
+  duration_ms: 0.070488
+  type: 'test'
+  ...
+# (node:44) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/caddy-ledger.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 委託先の派遣: 委託料+交通費+特別手当が原価になる
+ok 49 - 委託先の派遣: 委託料+交通費+特別手当が原価になる
+  ---
+  duration_ms: 0.537429
+  type: 'test'
+  ...
+# Subtest: 社員の派遣: 原価は0（人件費は給与側で計上する）
+ok 50 - 社員の派遣: 原価は0（人件費は給与側で計上する）
+  ---
+  duration_ms: 0.104081
+  type: 'test'
+  ...
+# Subtest: 社員の交通費は外注費に入らない（Excel運用の二重計上を構造で防ぐ）
+ok 51 - 社員の交通費は外注費に入らない（Excel運用の二重計上を構造で防ぐ）
+  ---
+  duration_ms: 0.093813
+  type: 'test'
+  ...
+# Subtest: 2026年6月の実データを再現: 売上661,000 / 外注費321,000 / 粗利340,000
+ok 52 - 2026年6月の実データを再現: 売上661,000 / 外注費321,000 / 粗利340,000
+  ---
+  duration_ms: 0.103767
+  type: 'test'
+  ...
+# Subtest: 粗利は「売上−外注費」であり、自社人件費（林さん27万）は含まない
+ok 53 - 粗利は「売上−外注費」であり、自社人件費（林さん27万）は含まない
+  ---
+  duration_ms: 0.075517
+  type: 'test'
+  ...
+# Subtest: 研修など売上0の派遣は人工数に数えないが、原価は計上される
+ok 54 - 研修など売上0の派遣は人工数に数えないが、原価は計上される
+  ---
+  duration_ms: 0.091908
+  type: 'test'
+  ...
+# (node:51) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/categorize.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:51) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/money-golfwing/src/lib/import/categorize.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/money-golfwing/package.json.
+# Subtest: proposeCategory: 代表パターン
+ok 55 - proposeCategory: 代表パターン
+  ---
+  duration_ms: 0.73046
+  type: 'test'
+  ...
+# Subtest: proposeCategory: 振込の個人/法人判定（誤ると人件費KPIが歪む）
+ok 56 - proposeCategory: 振込の個人/法人判定（誤ると人件費KPIが歪む）
+  ---
+  duration_ms: 0.155289
+  type: 'test'
+  ...
+# Subtest: proposeCategory: 不明は other_expense（勝手にlabor等へ倒さない）
+ok 57 - proposeCategory: 不明は other_expense（勝手にlabor等へ倒さない）
+  ---
+  duration_ms: 0.15908
+  type: 'test'
+  ...
+# Subtest: isCardSettlement: カード引落は経費二重計上防止でignore初期値
+ok 58 - isCardSettlement: カード引落は経費二重計上防止でignore初期値
+  ---
+  duration_ms: 0.198321
+  type: 'test'
+  ...
+# (node:58) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/content-publish-due.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:58) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/content/src/due.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/content/package.json.
+# Subtest: 承認待ち × X投稿済み ＝ もう用事なし（枠を占領させない）
+ok 59 - 承認待ち × X投稿済み ＝ もう用事なし（枠を占領させない）
+  ---
+  duration_ms: 0.552481
+  type: 'test'
+  ...
+# Subtest: 承認待ち × X未投稿 ＝ 投稿する
+ok 60 - 承認待ち × X未投稿 ＝ 投稿する
+  ---
+  duration_ms: 0.097581
+  type: 'test'
+  ...
+# Subtest: 承認済み（scheduled）は常に対象＝この場でposted/failedに確定するので溜まらない
+ok 61 - 承認済み（scheduled）は常に対象＝この場でposted/failedに確定するので溜まらない
+  ---
+  duration_ms: 0.102106
+  type: 'test'
+  ...
+# Subtest: x_auto=off なら承認待ちは一切拾わない（Instagramは承認が要る）
+ok 62 - x_auto=off なら承認待ちは一切拾わない（Instagramは承認が要る）
+  ---
+  duration_ms: 0.063298
+  type: 'test'
+  ...
+# Subtest: 連投は途中まででも残作業あり／全部投げ終われば用事なし
+ok 63 - 連投は途中まででも残作業あり／全部投げ終われば用事なし
+  ---
+  duration_ms: 0.117581
+  type: 'test'
+  ...
+# Subtest: 止まったままの連投（stall上限）は枠を返す＝後続の投稿を止めない
+ok 64 - 止まったままの連投（stall上限）は枠を返す＝後続の投稿を止めない
+  ---
+  duration_ms: 0.077229
+  type: 'test'
+  ...
+# (node:65) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/core-jst.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:65) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/core/src/jst.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/core/package.json.
+# (node:65) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/genesis/src/lib/jst.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/genesis/package.json.
+# (node:65) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/inventory-os/src/lib/jst.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/inventory-os/package.json.
+# Subtest: core版はgenesis/inventory-osのコピーと同一挙動（ドリフト検知）
+ok 65 - core版はgenesis/inventory-osのコピーと同一挙動（ドリフト検知）
+  ---
+  duration_ms: 13.167108
+  type: 'test'
+  ...
+# (node:72) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/cron-package.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:72) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/cron/src/server.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/cron/package.json.
+# Subtest: 認可: secret未設定は全部401（Vercel環境変数の設定漏れが黙って素通りしない）
+ok 66 - 認可: secret未設定は全部401（Vercel環境変数の設定漏れが黙って素通りしない）
+  ---
+  duration_ms: 14.126249
+  type: 'test'
+  ...
+# Subtest: 認可: ヘッダ無し・値違いは401、正しいBearerはnull(通過)
+ok 67 - 認可: ヘッダ無し・値違いは401、正しいBearerはnull(通過)
+  ---
+  duration_ms: 0.595053
+  type: 'test'
+  ...
+# Subtest: ハンドラ: 会社ごとに実行し、1社の失敗は他社を巻き込まない（genesis dailyと同方針）
+ok 68 - ハンドラ: 会社ごとに実行し、1社の失敗は他社を巻き込まない（genesis dailyと同方針）
+  ---
+  duration_ms: 1.263165
+  type: 'test'
+  ...
+# Subtest: ハンドラ: 認可NGならlistCompaniesすら呼ばれない
+ok 69 - ハンドラ: 認可NGならlistCompaniesすら呼ばれない
+  ---
+  duration_ms: 0.255682
+  type: 'test'
+  ...
+# (node:80) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/frank-billing-member.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:80) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/member-os/src/lib/frank-billing-pure.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/member-os/package.json.
+# (node:80) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/genesis/src/lib/frank-pos-pure.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/genesis/package.json.
+# Subtest: クーポン: 6種のみ有効・大文字/空白は吸収・無効はnull
+ok 70 - クーポン: 6種のみ有効・大文字/空白は吸収・無効はnull
+  ---
+  duration_ms: 0.549986
+  type: 'test'
+  ...
+# Subtest: プラン変更の週割: レギュラー→マスター（差額6,600円税込→1,650円/週）
+ok 71 - プラン変更の週割: レギュラー→マスター（差額6,600円税込→1,650円/週）
+  ---
+  duration_ms: 0.163825
+  type: 'test'
+  ...
+# Subtest: プラン変更の週割: ダウングレードは請求0円（返金しない）
+ok 72 - プラン変更の週割: ダウングレードは請求0円（返金しない）
+  ---
+  duration_ms: 0.06192
+  type: 'test'
+  ...
+# Subtest: 入会金: 税込11,000円・noteの接頭辞で入会金の入金と判定する
+ok 73 - 入会金: 税込11,000円・noteの接頭辞で入会金の入金と判定する
+  ---
+  duration_ms: 0.068618
+  type: 'test'
+  ...
+# Subtest: キャンペーン判定: 2026-12-31まで適用・2027-01-01から対象外
+ok 74 - キャンペーン判定: 2026-12-31まで適用・2027-01-01から対象外
+  ---
+  duration_ms: 0.064775
+  type: 'test'
+  ...
+# Subtest: 入会見積: キャンペーン中は入会金0・入会月0・2か月分前取り
+ok 75 - 入会見積: キャンペーン中は入会金0・入会月0・2か月分前取り
+  ---
+  duration_ms: 0.082044
+  type: 'test'
+  ...
+# Subtest: 入会見積: キャンペーン後は入会金5,500円を請求（前取り2か月は継続）
+ok 76 - 入会見積: キャンペーン後は入会金5,500円を請求（前取り2か月は継続）
+  ---
+  duration_ms: 0.070834
+  type: 'test'
+  ...
+# Subtest: 見積と決済額が一致する（キャンペーン中/後・全プラン）
+ok 77 - 見積と決済額が一致する（キャンペーン中/後・全プラン）
+  ---
+  duration_ms: 0.336253
+  type: 'test'
+  ...
+# Subtest: クーポン適用は入会金0＝決済額も前取り分のみ
+ok 78 - クーポン適用は入会金0＝決済額も前取り分のみ
+  ---
+  duration_ms: 0.253672
+  type: 'test'
+  ...
+# (node:87) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/frank-booking-open.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:87) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/core/src/frank-booking.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/core/package.json.
+# Subtest: オープン日より前は営業時間なし（＝予約不可）
+ok 79 - オープン日より前は営業時間なし（＝予約不可）
+  ---
+  duration_ms: 0.655831
+  type: 'test'
+  ...
+# Subtest: オープン初日(9/2 水)は 10:00〜22:00（平日closeに合わせる）
+ok 80 - オープン初日(9/2 水)は 10:00〜22:00（平日closeに合わせる）
+  ---
+  duration_ms: 0.468698
+  type: 'test'
+  ...
+# Subtest: オープン翌日以降は通常の営業時間（9/5 土は 9:00〜20:00）
+ok 81 - オープン翌日以降は通常の営業時間（9/5 土は 9:00〜20:00）
+  ---
+  duration_ms: 0.086534
+  type: 'test'
+  ...
+# Subtest: 火曜定休は変わらず休み（9/8）
+ok 82 - 火曜定休は変わらず休み（9/8）
+  ---
+  duration_ms: 0.060392
+  type: 'test'
+  ...
+# Subtest: 枠は閉業時間を超えない（22:00閉店→最終枠は21:30開始）
+ok 83 - 枠は閉業時間を超えない（22:00閉店→最終枠は21:30開始）
+  ---
+  duration_ms: 0.149233
+  type: 'test'
+  ...
+# Subtest: オープン前でも『9/2から14日分』は先行予約できる範囲になる
+ok 84 - オープン前でも『9/2から14日分』は先行予約できる範囲になる
+  ---
+  duration_ms: 0.276344
+  type: 'test'
+  ...
+# Subtest: 特別営業日: オープン前でもその日だけ営業時間が出る（他の日は出ない）
+ok 85 - 特別営業日: オープン前でもその日だけ営業時間が出る（他の日は出ない）
+  ---
+  duration_ms: 0.195044
+  type: 'test'
+  ...
+# Subtest: 特別営業日: 定休曜日・臨時休業の指定より優先する
+ok 86 - 特別営業日: 定休曜日・臨時休業の指定より優先する
+  ---
+  duration_ms: 0.163886
+  type: 'test'
+  ...
+# Subtest: 特別営業日: 予約可能範囲がその日まで前倒しされる（オープン日以降の範囲は狭まらない）
+ok 87 - 特別営業日: 予約可能範囲がその日まで前倒しされる（オープン日以降の範囲は狭まらない）
+  ---
+  duration_ms: 0.237979
+  type: 'test'
+  ...
+# Subtest: open_timeが営業openより遅い日だけ開始が繰り下がる（他日は影響なし）
+ok 88 - open_timeが営業openより遅い日だけ開始が繰り下がる（他日は影響なし）
+  ---
+  duration_ms: 0.225035
+  type: 'test'
+  ...
+# (node:94) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/frank-pos.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:94) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/genesis/src/lib/frank-pos-pure.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/genesis/package.json.
+# Subtest: Square署名: 正しい署名は通る
+ok 89 - Square署名: 正しい署名は通る
+  ---
+  duration_ms: 0.872725
+  type: 'test'
+  ...
+# Subtest: Square署名: 本文改ざん・鍵違い・URL違い・ヘッダ無しは弾く
+ok 90 - Square署名: 本文改ざん・鍵違い・URL違い・ヘッダ無しは弾く
+  ---
+  duration_ms: 0.157089
+  type: 'test'
+  ...
+# Subtest: 税込→税抜: Money OS(floor)・Stripe月会費(round)の両方の作り方と往復一致する
+ok 91 - 税込→税抜: Money OS(floor)・Stripe月会費(round)の両方の作り方と往復一致する
+  ---
+  duration_ms: 0.126605
+  type: 'test'
+  ...
+# Subtest: sold_on はJSTの日付（UTC夕方の決済が前日にならない）
+ok 92 - sold_on はJSTの日付（UTC夕方の決済が前日にならない）
+  ---
+  duration_ms: 0.213837
+  type: 'test'
+  ...
+# Subtest: 支払いマッピング: COMPLETEDのみ・現金ラベル・金額の税抜化
+ok 93 - 支払いマッピング: COMPLETEDのみ・現金ラベル・金額の税抜化
+  ---
+  duration_ms: 0.220568
+  type: 'test'
+  ...
+# Subtest: 支払い方法ラベル: source_typeを日本語へ（不明はSquare）
+ok 94 - 支払い方法ラベル: source_typeを日本語へ（不明はSquare）
+  ---
+  duration_ms: 0.062901
+  type: 'test'
+  ...
+# Subtest: 返金マッピング: マイナスの売上行（category=返金）になる
+ok 95 - 返金マッピング: マイナスの売上行（category=返金）になる
+  ---
+  duration_ms: 0.096014
+  type: 'test'
+  ...
+# Subtest: 月会費の税込額: round(税抜×1.1)＝exTaxと往復一致（全5プラン）
+ok 96 - 月会費の税込額: round(税抜×1.1)＝exTaxと往復一致（全5プラン）
+  ---
+  duration_ms: 0.066743
+  type: 'test'
+  ...
+# Subtest: 電話番号→E.164: 0始まりは+81へ・変換できなければnull（省略）
+ok 97 - 電話番号→E.164: 0始まりは+81へ・変換できなければnull（省略）
+  ---
+  duration_ms: 0.234699
+  type: 'test'
+  ...
+# Subtest: 月会費の振り分け: 注文ID一致=初回・顧客ID一致は金額がプラン税込月額のときだけ継続
+ok 98 - 月会費の振り分け: 注文ID一致=初回・顧客ID一致は金額がプラン税込月額のときだけ継続
+  ---
+  duration_ms: 0.212027
+  type: 'test'
+  ...
+# Subtest: メール一致フォールバック(\#137): pending×checkout×見積どおりの金額のときだけ初回入金と判定
+ok 99 - メール一致フォールバック(\#137): pending×checkout×見積どおりの金額のときだけ初回入金と判定
+  ---
+  duration_ms: 0.112542
+  type: 'test'
+  ...
+# Subtest: 体験確認メール: キャンセルURL・日時・打席が入る
+ok 100 - 体験確認メール: キャンセルURL・日時・打席が入る
+  ---
+  duration_ms: 0.153706
+  type: 'test'
+  ...
+# Subtest: 前日リマインダー: キャンセルURLは体験のみ（会員予約には出さない）
+ok 101 - 前日リマインダー: キャンセルURLは体験のみ（会員予約には出さない）
+  ---
+  duration_ms: 0.096339
+  type: 'test'
+  ...
+# (node:101) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/genesis-score.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 警告ゼロなら満点のまま（減点は起きない）
+ok 102 - 警告ゼロなら満点のまま（減点は起きない）
+  ---
+  duration_ms: 0.947455
+  type: 'test'
+  ...
+# Subtest: weightの無い判断項目は減点しない（承認待ち等は既存ロジックが担当）
+ok 103 - weightの無い判断項目は減点しない（承認待ち等は既存ロジックが担当）
+  ---
+  duration_ms: 0.185095
+  type: 'test'
+  ...
+# Subtest: 2026-07-11の実データ再現: 整合性2件＋目標未設定5件で満点にならない
+ok 104 - 2026-07-11の実データ再現: 整合性2件＋目標未設定5件で満点にならない
+  ---
+  duration_ms: 0.330167
+  type: 'test'
+  ...
+# Subtest: 同じラベルはまとめて集計される（説明可能性）
+ok 105 - 同じラベルはまとめて集計される（説明可能性）
+  ---
+  duration_ms: 0.231221
+  type: 'test'
+  ...
+# Subtest: スコアは0未満にならない
+ok 106 - スコアは0未満にならない
+  ---
+  duration_ms: 0.210805
+  type: 'test'
+  ...
+# Subtest: 既存の減点（ブロッカー等）に上乗せされる
+ok 107 - 既存の減点（ブロッカー等）に上乗せされる
+  ---
+  duration_ms: 0.093204
+  type: 'test'
+  ...
+# (node:108) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/import-package.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:108) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/import/src/csv.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/import/package.json.
+# (node:108) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/money-golfwing/src/lib/import/bankCsv.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/money-golfwing/package.json.
+# Subtest: 切り出し元(bankCsv)とパース結果が一致する（挙動ドリフトの検知）
+ok 108 - 切り出し元(bankCsv)とパース結果が一致する（挙動ドリフトの検知）
+  ---
+  duration_ms: 1.914448
+  type: 'test'
+  ...
+# Subtest: toCsv: エスケープ・CRLF・既定でBOM付き（Excelの文字化け対策）
+ok 109 - toCsv: エスケープ・CRLF・既定でBOM付き（Excelの文字化け対策）
+  ---
+  duration_ms: 0.416439
+  type: 'test'
+  ...
+# Subtest: csvEscape: null/undefinedは空文字
+ok 110 - csvEscape: null/undefinedは空文字
+  ---
+  duration_ms: 0.132957
+  type: 'test'
+  ...
+# Subtest: decode: cp932系ラベルの吸収とShift_JIS復号
+ok 111 - decode: cp932系ラベルの吸収とShift_JIS復号
+  ---
+  duration_ms: 3.757918
+  type: 'test'
+  ...
+# Subtest: makeDedupKey: bankCsvの規約どおり | 区切り・null/undefinedは空
+ok 112 - makeDedupKey: bankCsvの規約どおり | 区切り・null/undefinedは空
+  ---
+  duration_ms: 1.492249
+  type: 'test'
+  ...
+# Subtest: tableToRecords: 前置き行スキップ・空行スキップ・列名で引ける
+ok 113 - tableToRecords: 前置き行スキップ・空行スキップ・列名で引ける
+  ---
+  duration_ms: 0.415875
+  type: 'test'
+  ...
+# (node:115) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/incidents.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:115) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/core/src/incidents.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/core/package.json.
+# Subtest: 未知のカテゴリでも必ずどれかに入る（報告が消えない）
+ok 114 - 未知のカテゴリでも必ずどれかに入る（報告が消えない）
+  ---
+  duration_ms: 0.672457
+  type: 'test'
+  ...
+# Subtest: 別名は正規のキーへ寄る
+ok 115 - 別名は正規のキーへ寄る
+  ---
+  duration_ms: 0.099297
+  type: 'test'
+  ...
+# Subtest: 未知カテゴリは other に落ちる（ラベルも必ず返る）
+ok 116 - 未知カテゴリは other に落ちる（ラベルも必ず返る）
+  ---
+  duration_ms: 0.123363
+  type: 'test'
+  ...
+# Subtest: 重大度: 不正値は mid に落ちる（high を勝手に作らない）
+ok 117 - 重大度: 不正値は mid に落ちる（high を勝手に作らない）
+  ---
+  duration_ms: 0.091425
+  type: 'test'
+  ...
+# Subtest: カテゴリ別集計は多い順
+ok 118 - カテゴリ別集計は多い順
+  ---
+  duration_ms: 0.122874
+  type: 'test'
+  ...
+# Subtest: 2件以上を繰り返しとみなす
+ok 119 - 2件以上を繰り返しとみなす
+  ---
+  duration_ms: 0.128867
+  type: 'test'
+  ...
+# Subtest: ルールベース分析: AIが無くても繰り返しには必ず対策が出る
+ok 120 - ルールベース分析: AIが無くても繰り返しには必ず対策が出る
+  ---
+  duration_ms: 0.274015
+  type: 'test'
+  ...
+# Subtest: ルールベース分析: 1件しかなければ対策は作らない（ノイズを出さない）
+ok 121 - ルールベース分析: 1件しかなければ対策は作らない（ノイズを出さない）
+  ---
+  duration_ms: 0.075934
+  type: 'test'
+  ...
+# (node:122) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/inventory-calc.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:122) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/inventory-os/src/lib/inventory-calc.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/inventory-os/package.json.
+# Subtest: 出庫種別は数量を負にする（画面ではマイナスを打たせない）
+ok 122 - 出庫種別は数量を負にする（画面ではマイナスを打たせない）
+  ---
+  duration_ms: 0.712168
+  type: 'test'
+  ...
+# Subtest: 符号は種別だけで決まる — 負値を入れても入庫は入庫のまま
+ok 123 - 符号は種別だけで決まる — 負値を入れても入庫は入庫のまま
+  ---
+  duration_ms: 0.126835
+  type: 'test'
+  ...
+# Subtest: 小数・文字化けした数量は切り捨てる
+ok 124 - 小数・文字化けした数量は切り捨てる
+  ---
+  duration_ms: 0.152838
+  type: 'test'
+  ...
+# Subtest: 出庫種別の一覧に adjust を含めない（棚卸調整は差の符号をそのまま持つ）
+ok 125 - 出庫種別の一覧に adjust を含めない（棚卸調整は差の符号をそのまま持つ）
+  ---
+  duration_ms: 0.120234
+  type: 'test'
+  ...
+# Subtest: 理論在庫＝直近の確定棚卸＋その後の入出庫
+ok 126 - 理論在庫＝直近の確定棚卸＋その後の入出庫
+  ---
+  duration_ms: 0.117432
+  type: 'test'
+  ...
+# Subtest: 適正在庫は未設定なら判定しない
+ok 127 - 適正在庫は未設定なら判定しない
+  ---
+  duration_ms: 0.072224
+  type: 'test'
+  ...
+# Subtest: 売上原価は三分法。期首が無い月は計算しない
+ok 128 - 売上原価は三分法。期首が無い月は計算しない
+  ---
+  duration_ms: 0.106453
+  type: 'test'
+  ...
+# Subtest: 保管場所グルーピングは品番数の多い順、未設定は最後
+ok 129 - 保管場所グルーピングは品番数の多い順、未設定は最後
+  ---
+  duration_ms: 0.483676
+  type: 'test'
+  ...
+# Subtest: 保管場所が全部未設定でも落ちない
+ok 130 - 保管場所が全部未設定でも落ちない
+  ---
+  duration_ms: 0.186089
+  type: 'test'
+  ...
+# (node:129) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/jst-dates.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:129) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/genesis/src/lib/jst.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/genesis/package.json.
+# Subtest: jstDateJa: 6:00 JSTのcronでJSTの今日を返す（前日にならない）
+ok 131 - jstDateJa: 6:00 JSTのcronでJSTの今日を返す（前日にならない）
+  ---
+  duration_ms: 11.923178
+  type: 'test'
+  ...
+# Subtest: jstYmd: DB date列・dedupeキー用にJSTのYYYY-MM-DDを返す
+ok 132 - jstYmd: DB date列・dedupeキー用にJSTのYYYY-MM-DDを返す
+  ---
+  duration_ms: 0.83298
+  type: 'test'
+  ...
+# Subtest: jstMonthStart: 毎月1日 6:00 JST（前月末日UTC）でも当月初を返す
+ok 133 - jstMonthStart: 毎月1日 6:00 JST（前月末日UTC）でも当月初を返す
+  ---
+  duration_ms: 0.515139
+  type: 'test'
+  ...
+# (node:136) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/labor-summary.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:136) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/shift-cloud/src/lib/labor-summary.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/shift-cloud/package.json.
+# Subtest: 総労働時間は15分丸め後（生の合計ではない）
+ok 134 - 総労働時間は15分丸め後（生の合計ではない）
+  ---
+  duration_ms: 1.17527
+  type: 'test'
+  ...
+# Subtest: 人件費は月給・交通費込みで給与計算と一致する
+ok 135 - 人件費は月給・交通費込みで給与計算と一致する
+  ---
+  duration_ms: 0.318965
+  type: 'test'
+  ...
+# Subtest: 月給者は実働0でも人件費に含まれる（時給0円で消えない）
+ok 136 - 月給者は実働0でも人件費に含まれる（時給0円で消えない）
+  ---
+  duration_ms: 0.135958
+  type: 'test'
+  ...
+# Subtest: summarizeLabor の合計は calcMonthlyPayroll と完全一致（二重実装の検知）
+ok 137 - summarizeLabor の合計は calcMonthlyPayroll と完全一致（二重実装の検知）
+  ---
+  duration_ms: 0.167995
+  type: 'test'
+  ...
+# Subtest: 店舗別按分の合計は総額と一致する（端数が消えない/増えない）
+ok 138 - 店舗別按分の合計は総額と一致する（端数が消えない/増えない）
+  ---
+  duration_ms: 0.167926
+  type: 'test'
+  ...
+# Subtest: 休憩を二重控除していない（work_minutes は控除後の値をそのまま使う）
+ok 139 - 休憩を二重控除していない（work_minutes は控除後の値をそのまま使う）
+  ---
+  duration_ms: 0.083468
+  type: 'test'
+  ...
+# (node:143) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/lesson-allowance.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:143) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/shift-cloud/src/lib/lesson-allowance.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/shift-cloud/package.json.
+# Subtest: 単価は2,000円で、件数×単価が手当額
+ok 140 - 単価は2,000円で、件数×単価が手当額
+  ---
+  duration_ms: 0.495625
+  type: 'test'
+  ...
+# Subtest: 返金で件数がマイナスになっても手当はマイナスにならない
+ok 141 - 返金で件数がマイナスになっても手当はマイナスにならない
+  ---
+  duration_ms: 0.088118
+  type: 'test'
+  ...
+# Subtest: 2026-06: 給与に入る手当が明細どおり（井殿1 / 卜部1 / 榎本1 = 各2,000円）
+ok 142 - 2026-06: 給与に入る手当が明細どおり（井殿1 / 卜部1 / 榎本1 = 各2,000円）
+  ---
+  duration_ms: 0.499583
+  type: 'test'
+  ...
+# Subtest: 2026-06: 安東さんは業務委託枠（50,000円）で、給与には入らない
+ok 143 - 2026-06: 安東さんは業務委託枠（50,000円）で、給与には入らない
+  ---
+  duration_ms: 0.098403
+  type: 'test'
+  ...
+# Subtest: 2026-06: 古川さん（月給）は件数があっても対象外に振り分けられる
+ok 144 - 2026-06: 古川さん（月給）は件数があっても対象外に振り分けられる
+  ---
+  duration_ms: 0.128681
+  type: 'test'
+  ...
+# Subtest: 担当プロがスタッフに紐付いていない売上は unlinked（取り込まない）
+ok 145 - 担当プロがスタッフに紐付いていない売上は unlinked（取り込まない）
+  ---
+  duration_ms: 0.102837
+  type: 'test'
+  ...
+# Subtest: 同じ人が複数の表記で出たら1行に束ねる（卜部＋春馬）
+ok 146 - 同じ人が複数の表記で出たら1行に束ねる（卜部＋春馬）
+  ---
+  duration_ms: 0.084047
+  type: 'test'
+  ...
+# (node:150) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/line-contact.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:150) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/genesis/src/lib/line-contact-pure.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/genesis/package.json.
+# Subtest: matchesContactHint: 表示名にヒントのどれかが含まれればリンク（大文字小文字無視）
+ok 147 - matchesContactHint: 表示名にヒントのどれかが含まれればリンク（大文字小文字無視）
+  ---
+  duration_ms: 0.519224
+  type: 'test'
+  ...
+# Subtest: matchesContactHint: 空・null・空ヒントは絶対にリンクしない（誤リンク防止）
+ok 148 - matchesContactHint: 空・null・空ヒントは絶対にリンクしない（誤リンク防止）
+  ---
+  duration_ms: 0.086685
+  type: 'test'
+  ...
+# Subtest: contactFromName: 正式名 > 表示名 > null の順（空白だけは無いものとして扱う）
+ok 149 - contactFromName: 正式名 > 表示名 > null の順（空白だけは無いものとして扱う）
+  ---
+  duration_ms: 0.090855
+  type: 'test'
+  ...
+# (node:157) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/members.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:157) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/core/src/members.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/core/package.json.
+# Subtest: スタッフは顧客会員から除外される
+ok 150 - スタッフは顧客会員から除外される
+  ---
+  duration_ms: 0.738494
+  type: 'test'
+  ...
+# Subtest: 本会員: 在籍・当月入会・当月退会
+ok 151 - 本会員: 在籍・当月入会・当月退会
+  ---
+  duration_ms: 0.103061
+  type: 'test'
+  ...
+# Subtest: トライアル会員: 在籍・入会に数えず、退会は別カウント
+ok 152 - トライアル会員: 在籍・入会に数えず、退会は別カウント
+  ---
+  duration_ms: 0.069424
+  type: 'test'
+  ...
+# Subtest: 半開区間 [月初, 翌月初): 翌月1日は含まない
+ok 153 - 半開区間 [月初, 翌月初): 翌月1日は含まない
+  ---
+  duration_ms: 0.075927
+  type: 'test'
+  ...
+# Subtest: 分類述語とプレースホルダ
+ok 154 - 分類述語とプレースホルダ
+  ---
+  duration_ms: 0.100784
+  type: 'test'
+  ...
+# (node:164) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/membership-forecast-sql.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 単価表（税抜）がDECISIONS \#31と一致
+ok 155 - 単価表（税抜）がDECISIONS \#31と一致
+  ---
+  duration_ms: 0.825136
+  type: 'test'
+  ...
+# Subtest: 課金対象ルール: 実績優先・退会月末まで課金・休会除外・0円種別
+ok 156 - 課金対象ルール: 実績優先・退会月末まで課金・休会除外・0円種別
+  ---
+  duration_ms: 0.150541
+  type: 'test'
+  ...
+# (node:171) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/money-util.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:171) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/money-golfwing/src/lib/money-util.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/money-golfwing/package.json.
+# Subtest: toNum: カンマ・全角・空白を除去して数値化
+ok 157 - toNum: カンマ・全角・空白を除去して数値化
+  ---
+  duration_ms: 0.67854
+  type: 'test'
+  ...
+# Subtest: monthRange: 月初〜翌月初（12月は年跨ぎ）
+ok 158 - monthRange: 月初〜翌月初（12月は年跨ぎ）
+  ---
+  duration_ms: 0.889687
+  type: 'test'
+  ...
+# (node:178) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/outreach.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:178) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/outreach/src/policy.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/outreach/package.json.
+# (node:178) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/prospect/src/audit.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/prospect/package.json.
+# Subtest: 条件が揃っていれば送信できる
+ok 159 - 条件が揃っていれば送信できる
+  ---
+  duration_ms: 0.906622
+  type: 'test'
+  ...
+# Subtest: サイトで公表されていないアドレスには送らない（特定電子メール法3条1項3号）
+ok 160 - サイトで公表されていないアドレスには送らない（特定電子メール法3条1項3号）
+  ---
+  duration_ms: 0.174428
+  type: 'test'
+  ...
+# Subtest: 「営業お断り」の表示がある先には送らない
+ok 161 - 「営業お断り」の表示がある先には送らない
+  ---
+  duration_ms: 0.076051
+  type: 'test'
+  ...
+# Subtest: 配信停止・バウンス済みのアドレスとドメインには送らない
+ok 162 - 配信停止・バウンス済みのアドレスとドメインには送らない
+  ---
+  duration_ms: 0.080915
+  type: 'test'
+  ...
+# Subtest: 同じ先に2通目は送らない
+ok 163 - 同じ先に2通目は送らない
+  ---
+  duration_ms: 0.164343
+  type: 'test'
+  ...
+# Subtest: デモが無い先には送らない（見せるものが無いメールはただの売り込み）
+ok 164 - デモが無い先には送らない（見せるものが無いメールはただの売り込み）
+  ---
+  duration_ms: 0.075551
+  type: 'test'
+  ...
+# Subtest: 送信OFF・自動停止中は何があっても送らない
+ok 165 - 送信OFF・自動停止中は何があっても送らない
+  ---
+  duration_ms: 0.110982
+  type: 'test'
+  ...
+# Subtest: 1日の上限に達したら止まる
+ok 166 - 1日の上限に達したら止まる
+  ---
+  duration_ms: 0.068934
+  type: 'test'
+  ...
+# Subtest: スコアが低い先は送らない
+ok 167 - スコアが低い先は送らない
+  ---
+  duration_ms: 0.191987
+  type: 'test'
+  ...
+# Subtest: メールアドレスの正規化（不正な文字列は通さない）
+ok 168 - メールアドレスの正規化（不正な文字列は通さない）
+  ---
+  duration_ms: 0.258695
+  type: 'test'
+  ...
+# Subtest: ウォームアップは初日10通から1日10通ずつ増え、上限で頭打ちになる
+ok 169 - ウォームアップは初日10通から1日10通ずつ増え、上限で頭打ちになる
+  ---
+  duration_ms: 0.188149
+  type: 'test'
+  ...
+# Subtest: 迷惑メール報告2件で自動停止する
+ok 170 - 迷惑メール報告2件で自動停止する
+  ---
+  duration_ms: 0.092459
+  type: 'test'
+  ...
+# Subtest: 宛先不明が8%を超えたら自動停止する（母数が少ないうちは止めない）
+ok 171 - 宛先不明が8%を超えたら自動停止する（母数が少ないうちは止めない）
+  ---
+  duration_ms: 0.051396
+  type: 'test'
+  ...
+# Subtest: 業種一致を優先し、無ければ既定を使う。無効な文面は選ばれない
+ok 172 - 業種一致を優先し、無ければ既定を使う。無効な文面は選ばれない
+  ---
+  duration_ms: 0.081973
+  type: 'test'
+  ...
+# Subtest: 未知の差込キーは空にする（{{foo}} が先方に見えるのを防ぐ）
+ok 173 - 未知の差込キーは空にする（{{foo}} が先方に見えるのを防ぐ）
+  ---
+  duration_ms: 0.097009
+  type: 'test'
+  ...
+# Subtest: 法定表示（会社名・代表者・住所・配信停止URL）が必ず本文に入る
+ok 174 - 法定表示（会社名・代表者・住所・配信停止URL）が必ず本文に入る
+  ---
+  duration_ms: 0.447504
+  type: 'test'
+  ...
+# Subtest: 改善余地は2つまでしか載せない（ダメ出しの手紙にしない）
+ok 175 - 改善余地は2つまでしか載せない（ダメ出しの手紙にしない）
+  ---
+  duration_ms: 0.154842
+  type: 'test'
+  ...
+# Subtest: 既定テンプレートに未置換の差込やMarkdown装飾が残っていない
+ok 176 - 既定テンプレートに未置換の差込やMarkdown装飾が残っていない
+  ---
+  duration_ms: 0.125664
+  type: 'test'
+  ...
+# Subtest: Resendのイベントを状態に読み替える。未知のイベントは無視する
+ok 177 - Resendのイベントを状態に読み替える。未知のイベントは無視する
+  ---
+  duration_ms: 0.104866
+  type: 'test'
+  ...
+# Subtest: Webhookは順不同で届くので状態を後戻りさせない
+ok 178 - Webhookは順不同で届くので状態を後戻りさせない
+  ---
+  duration_ms: 0.052496
+  type: 'test'
+  ...
+# Subtest: 先方サイトから公表アドレスを拾う。同一ドメインを優先し、ダミーは除外する
+ok 179 - 先方サイトから公表アドレスを拾う。同一ドメインを優先し、ダミーは除外する
+  ---
+  duration_ms: 0.943941
+  type: 'test'
+  ...
+# Subtest: アドレスが無いページからは何も返さない（推測でアドレスを作らない）
+ok 180 - アドレスが無いページからは何も返さない（推測でアドレスを作らない）
+  ---
+  duration_ms: 1.249708
+  type: 'test'
+  ...
+# (node:185) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/payroll-allowances.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:185) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/shift-cloud/src/lib/payroll-calc.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/shift-cloud/package.json.
+# Subtest: 井殿さん 2026年6月度: 時給2,500×94.75h + 交通費720×13日 + パーソナル1件2,000 = 248,235円
+ok 181 - 井殿さん 2026年6月度: 時給2,500×94.75h + 交通費720×13日 + パーソナル1件2,000 = 248,235円
+  ---
+  duration_ms: 1.553464
+  type: 'test'
+  ...
+# Subtest: 福原さん 2026年6月度: 手当なし = 247,100円
+ok 182 - 福原さん 2026年6月度: 手当なし = 247,100円
+  ---
+  duration_ms: 0.331481
+  type: 'test'
+  ...
+# Subtest: 榎本さん 2026年6月度: 4日勤務＋パーソナル1件 = 69,785円
+ok 183 - 榎本さん 2026年6月度: 4日勤務＋パーソナル1件 = 69,785円
+  ---
+  duration_ms: 0.242189
+  type: 'test'
+  ...
+# Subtest: 林さん 2026年6月度: 月給270,000＋交通費実費4,680 = 274,680円（実労働時間は金額に影響しない）
+ok 184 - 林さん 2026年6月度: 月給270,000＋交通費実費4,680 = 274,680円（実労働時間は金額に影響しない）
+  ---
+  duration_ms: 0.356624
+  type: 'test'
+  ...
+# Subtest: 役員（勤怠0日）でも月給は満額支給される: 古川さん 80,000円
+ok 185 - 役員（勤怠0日）でも月給は満額支給される: 古川さん 80,000円
+  ---
+  duration_ms: 0.368757
+  type: 'test'
+  ...
+# Subtest: 安東さん型: パーソナル25件＋ラウンドレッスン1件の手当が合算される
+ok 186 - 安東さん型: パーソナル25件＋ラウンドレッスン1件の手当が合算される
+  ---
+  duration_ms: 1.194952
+  type: 'test'
+  ...
+# Subtest: sumAllowances: commute_actual だけは交通費側に分離される
+ok 187 - sumAllowances: commute_actual だけは交通費側に分離される
+  ---
+  duration_ms: 0.536114
+  type: 'test'
+  ...
+# Subtest: 後方互換: opts無しの呼び出しは従来と同じ（手当0・時給計算）
+ok 188 - 後方互換: opts無しの呼び出しは従来と同じ（手当0・時給計算）
+  ---
+  duration_ms: 0.106424
+  type: 'test'
+  ...
+# (node:192) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/payroll-calc.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:192) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/shift-cloud/src/lib/payroll-calc.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/shift-cloud/package.json.
+# Subtest: calcOvertimeMinutes: 退勤を15分切り下げてから残業判定（DECISIONS \#60）
+ok 189 - calcOvertimeMinutes: 退勤を15分切り下げてから残業判定（DECISIONS \#60）
+  ---
+  duration_ms: 0.752684
+  type: 'test'
+  ...
+# Subtest: autoBreakMinutes: 労基法の段階式（6h超=45分, 8h超=60分）
+ok 190 - autoBreakMinutes: 労基法の段階式（6h超=45分, 8h超=60分）
+  ---
+  duration_ms: 0.153584
+  type: 'test'
+  ...
+# Subtest: monthRange: 実在する月末日を返す（AUDIT D-1: 旧-31固定バグの回帰防止）
+ok 191 - monthRange: 実在する月末日を返す（AUDIT D-1: 旧-31固定バグの回帰防止）
+  ---
+  duration_ms: 0.793453
+  type: 'test'
+  ...
+# Subtest: roundDailyWork: floor丸め・0は丸めなし（DECISIONS \#9）
+ok 192 - roundDailyWork: floor丸め・0は丸めなし（DECISIONS \#9）
+  ---
+  duration_ms: 1.299468
+  type: 'test'
+  ...
+# Subtest: aggregateAttendance: 日次丸め後に合算・出勤日数はwork>0のみ
+ok 193 - aggregateAttendance: 日次丸め後に合算・出勤日数はwork>0のみ
+  ---
+  duration_ms: 0.33132
+  type: 'test'
+  ...
+# Subtest: calcPayrollAmounts: 基本・残業1.25倍・交通費/日、floor円（DECISIONS \#4）
+ok 194 - calcPayrollAmounts: 基本・残業1.25倍・交通費/日、floor円（DECISIONS \#4）
+  ---
+  duration_ms: 0.156567
+  type: 'test'
+  ...
+# Subtest: calcPayrollAmounts: 分単位の端数はfloor（切り捨て）
+ok 195 - calcPayrollAmounts: 分単位の端数はfloor（切り捨て）
+  ---
+  duration_ms: 0.128949
+  type: 'test'
+  ...
+# Subtest: calcPayrollAmounts: 丸めで実働<残業になっても通常分は負にならない（AUDIT D-2）
+ok 196 - calcPayrollAmounts: 丸めで実働<残業になっても通常分は負にならない（AUDIT D-2）
+  ---
+  duration_ms: 0.164817
+  type: 'test'
+  ...
+# Subtest: wageOnDate: その日に有効な賃金（月中の変更日を境に切替）
+ok 197 - wageOnDate: その日に有効な賃金（月中の変更日を境に切替）
+  ---
+  duration_ms: 0.405099
+  type: 'test'
+  ...
+# Subtest: wageOnDate: 賃金開始日より前の勤務日は最古の賃金へフォールバック（0円事故防止）
+ok 198 - wageOnDate: 賃金開始日より前の勤務日は最古の賃金へフォールバック（0円事故防止）
+  ---
+  duration_ms: 0.282756
+  type: 'test'
+  ...
+# Subtest: wageOnDate: 同じ日に2回変更した場合は後から保存した行を使う（2026-07-27の反映されない事故）
+ok 199 - wageOnDate: 同じ日に2回変更した場合は後から保存した行を使う（2026-07-27の反映されない事故）
+  ---
+  duration_ms: 0.13873
+  type: 'test'
+  ...
+# Subtest: calcMonthlyPayroll: 月中の時給変更を日付で按分（変更前後で別レート計算）
+ok 200 - calcMonthlyPayroll: 月中の時給変更を日付で按分（変更前後で別レート計算）
+  ---
+  duration_ms: 0.376514
+  type: 'test'
+  ...
+# Subtest: calcMonthlyPayroll: 単一時給のスタッフは従来計算（calcPayrollAmounts）と完全一致
+ok 201 - calcMonthlyPayroll: 単一時給のスタッフは従来計算（calcPayrollAmounts）と完全一致
+  ---
+  duration_ms: 0.099138
+  type: 'test'
+  ...
+# Subtest: calcMonthlyPayroll: 賃金未登録スタッフは0円（実働は記録される）
+ok 202 - calcMonthlyPayroll: 賃金未登録スタッフは0円（実働は記録される）
+  ---
+  duration_ms: 0.068861
+  type: 'test'
+  ...
+# (node:199) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/payslip-sheet.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:199) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/shift-cloud/src/lib/payslip-sheet.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/shift-cloud/package.json.
+# Subtest: 日付昇順・打刻なし行・未来と休みの除外
+ok 203 - 日付昇順・打刻なし行・未来と休みの除外
+  ---
+  duration_ms: 11.661868
+  type: 'test'
+  ...
+# Subtest: JST表示・シフト・休憩・備考
+ok 204 - JST表示・シフト・休憩・備考
+  ---
+  duration_ms: 0.414444
+  type: 'test'
+  ...
+# Subtest: 合計は丸め前の生分数＋打刻なし件数
+ok 205 - 合計は丸め前の生分数＋打刻なし件数
+  ---
+  duration_ms: 0.425975
+  type: 'test'
+  ...
+# (node:206) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/prospect.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:206) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/prospect/src/audit.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/prospect/package.json.
+# Subtest: 最新の西暦を拾う（未来の年は無視する）
+ok 206 - 最新の西暦を拾う（未来の年は無視する）
+  ---
+  duration_ms: 0.983826
+  type: 'test'
+  ...
+# Subtest: stripTags は script/style を落として本文だけ残す
+ok 207 - stripTags は script/style を落として本文だけ残す
+  ---
+  duration_ms: 0.55538
+  type: 'test'
+  ...
+# Subtest: スマホ未対応・SSL無し・更新が古い先ほどスコアが高い
+ok 208 - スマホ未対応・SSL無し・更新が古い先ほどスコアが高い
+  ---
+  duration_ms: 2.782579
+  type: 'test'
+  ...
+# Subtest: 改善余地が無いサイトのスコアは低く、致命的に古いサイトは高い
+ok 209 - 改善余地が無いサイトのスコアは低く、致命的に古いサイトは高い
+  ---
+  duration_ms: 0.343389
+  type: 'test'
+  ...
+# Subtest: PageSpeedのスコアが speed 項目に反映される
+ok 210 - PageSpeedのスコアが speed 項目に反映される
+  ---
+  duration_ms: 0.489967
+  type: 'test'
+  ...
+# Subtest: 「営業お断り」表示を検出する（②outreach の送信除外に使う）
+ok 211 - 「営業お断り」表示を検出する（②outreach の送信除外に使う）
+  ---
+  duration_ms: 0.218261
+  type: 'test'
+  ...
+# Subtest: サーバーエラーの先はスコアを下げる
+ok 212 - サーバーエラーの先はスコアを下げる
+  ---
+  duration_ms: 0.301535
+  type: 'test'
+  ...
+# Subtest: 取得できなかった先は0点にせず中位に置く（消さずに人が見る）
+ok 213 - 取得できなかった先は0点にせず中位に置く（消さずに人が見る）
+  ---
+  duration_ms: 0.518531
+  type: 'test'
+  ...
+# Subtest: 屋号の表記ゆれを正規化する
+ok 214 - 屋号の表記ゆれを正規化する
+  ---
+  duration_ms: 26.694174
+  type: 'test'
+  ...
+# Subtest: 電話番号は書式が違っても同じ鍵になる
+ok 215 - 電話番号は書式が違っても同じ鍵になる
+  ---
+  duration_ms: 0.393801
+  type: 'test'
+  ...
+# Subtest: サイトURLは www・末尾スラッシュ・スキームの差を吸収する
+ok 216 - サイトURLは www・末尾スラッシュ・スキームの差を吸収する
+  ---
+  duration_ms: 0.255395
+  type: 'test'
+  ...
+# Subtest: 電話かサイトが一致すれば屋号が違っても同一先とみなす
+ok 217 - 電話かサイトが一致すれば屋号が違っても同一先とみなす
+  ---
+  duration_ms: 0.124029
+  type: 'test'
+  ...
+# Subtest: 屋号だけの一致は同じ市のときに限る（同名の医院は全国にある）
+ok 218 - 屋号だけの一致は同じ市のときに限る（同名の医院は全国にある）
+  ---
+  duration_ms: 0.074528
+  type: 'test'
+  ...
+# Subtest: robots.txt の Disallow を守り、Allow の方が長ければ通す
+ok 219 - robots.txt の Disallow を守り、Allow の方が長ければ通す
+  ---
+  duration_ms: 0.305324
+  type: 'test'
+  ...
+# Subtest: 自分宛のグループがあればワイルドカードより優先する
+ok 220 - 自分宛のグループがあればワイルドカードより優先する
+  ---
+  duration_ms: 0.142815
+  type: 'test'
+  ...
+# Subtest: robots.txt が無い場合は制限なしとして扱う
+ok 221 - robots.txt が無い場合は制限なしとして扱う
+  ---
+  duration_ms: 0.049834
+  type: 'test'
+  ...
+# Subtest: 一覧ページから詳細ページのリンクを絶対URLで拾う
+ok 222 - 一覧ページから詳細ページのリンクを絶対URLで拾う
+  ---
+  duration_ms: 0.325065
+  type: 'test'
+  ...
+# Subtest: パターン未指定なら同一ホストのリンクだけ拾う
+ok 223 - パターン未指定なら同一ホストのリンクだけ拾う
+  ---
+  duration_ms: 0.127126
+  type: 'test'
+  ...
+# Subtest: 詳細ページから屋号・電話・住所・自院サイトを拾う
+ok 224 - 詳細ページから屋号・電話・住所・自院サイトを拾う
+  ---
+  duration_ms: 0.974285
+  type: 'test'
+  ...
+# Subtest: 屋号が取れないページは name が空になり、営業先にしない目印になる
+ok 225 - 屋号が取れないページは name が空になり、営業先にしない目印になる
+  ---
+  duration_ms: 0.398811
+  type: 'test'
+  ...
+# Subtest: Placesの住所から市区町村を切り出す
+ok 226 - Placesの住所から市区町村を切り出す
+  ---
+  duration_ms: 0.08657
+  type: 'test'
+  ...
+# Subtest: 名簿ページの診療科名から業種を寄せる（拾えなければ巡回元の設定に戻す）
+ok 227 - 名簿ページの診療科名から業種を寄せる（拾えなければ巡回元の設定に戻す）
+  ---
+  duration_ms: 0.231542
+  type: 'test'
+  ...
+# Subtest: User-Agent はASCIIだけ（日本語を入れると全リクエストが落ちる）
+ok 228 - User-Agent はASCIIだけ（日本語を入れると全リクエストが落ちる）
+  ---
+  duration_ms: 12.552847
+  type: 'test'
+  ...
+# Subtest: 一覧ページの行から屋号・住所・電話を拾う（詳細ページの見出しに頼らない）
+ok 229 - 一覧ページの行から屋号・住所・電話を拾う（詳細ページの見出しに頼らない）
+  ---
+  duration_ms: 0.945147
+  type: 'test'
+  ...
+# Subtest: 行の診療科名から業種を寄せる（名簿は科が混在するため）
+ok 230 - 行の診療科名から業種を寄せる（名簿は科が混在するため）
+  ---
+  duration_ms: 0.211873
+  type: 'test'
+  ...
+# Subtest: 屋号が全件同じなら「抽出が壊れている」と判定する
+ok 231 - 屋号が全件同じなら「抽出が壊れている」と判定する
+  ---
+  duration_ms: 0.185364
+  type: 'test'
+  ...
+# Subtest: ホームページが無い先は最優先（95点）＝HP制作営業の本命
+ok 232 - ホームページが無い先は最優先（95点）＝HP制作営業の本命
+  ---
+  duration_ms: 0.226453
+  type: 'test'
+  ...
+# Subtest: 「サイトが無い」と「サイトを取得できなかった」を区別する
+ok 233 - 「サイトが無い」と「サイトを取得できなかった」を区別する
+  ---
+  duration_ms: 0.065563
+  type: 'test'
+  ...
+# Subtest: 探していない先を「ホームページが無い」と断定しない
+ok 234 - 探していない先を「ホームページが無い」と断定しない
+  ---
+  duration_ms: 0.056555
+  type: 'test'
+  ...
+# Subtest: 採点していいのは has か none の先だけ（unknown は保留）
+ok 235 - 採点していいのは has か none の先だけ（unknown は保留）
+  ---
+  duration_ms: 0.057122
+  type: 'test'
+  ...
+# Subtest: AIが書いた屋号が元ページに無ければ落とす（創作を営業先にしない）
+ok 236 - AIが書いた屋号が元ページに無ければ落とす（創作を営業先にしない）
+  ---
+  duration_ms: 0.092943
+  type: 'test'
+  ...
+# Subtest: AIに渡す前にHTMLを削る（費用は入力の長さに比例するため）
+ok 237 - AIに渡す前にHTMLを削る（費用は入力の長さに比例するため）
+  ---
+  duration_ms: 0.20269
+  type: 'test'
+  ...
+# Subtest: AIの出力がコードブロックで囲まれていてもJSONを読む
+ok 238 - AIの出力がコードブロックで囲まれていてもJSONを読む
+  ---
+  duration_ms: 0.199417
+  type: 'test'
+  ...
+# (node:214) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/settlement.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:214) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/money-golfwing/src/lib/settlement.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/money-golfwing/package.json.
+# Subtest: 金額と支払先が両方一致する出金を最優先で返す
+ok 239 - 金額と支払先が両方一致する出金を最優先で返す
+  ---
+  duration_ms: 1.825774
+  type: 'test'
+  ...
+# Subtest: 入金（プラス）は候補にしない
+ok 240 - 入金（プラス）は候補にしない
+  ---
+  duration_ms: 0.275055
+  type: 'test'
+  ...
+# Subtest: 支払日が発生から離れすぎている出金は除外（翌々月末は拾い、半年後は拾わない）
+ok 241 - 支払日が発生から離れすぎている出金は除外（翌々月末は拾い、半年後は拾わない）
+  ---
+  duration_ms: 0.253991
+  type: 'test'
+  ...
+# Subtest: 前払い（発生より前の出金）も1か月までは候補になる
+ok 242 - 前払い（発生より前の出金）も1か月までは候補になる
+  ---
+  duration_ms: 0.324534
+  type: 'test'
+  ...
+# Subtest: 金額も支払先も一致しないものは候補にしない
+ok 243 - 金額も支払先も一致しないものは候補にしない
+  ---
+  duration_ms: 0.208094
+  type: 'test'
+  ...
+# Subtest: 摘要の空白は無視して支払先を照合する
+ok 244 - 摘要の空白は無視して支払先を照合する
+  ---
+  duration_ms: 0.219294
+  type: 'test'
+  ...
+# Subtest: 支払先が1文字なら誤検知を避けて照合しない
+ok 245 - 支払先が1文字なら誤検知を避けて照合しない
+  ---
+  duration_ms: 0.300426
+  type: 'test'
+  ...
+# Subtest: 同点なら発生日に近い出金を先に返す
+ok 246 - 同点なら発生日に近い出金を先に返す
+  ---
+  duration_ms: 0.194228
+  type: 'test'
+  ...
+# Subtest: すでに他の経費で使われている出金は候補から外す（1つの出金を二重に消込まない）
+ok 247 - すでに他の経費で使われている出金は候補から外す（1つの出金を二重に消込まない）
+  ---
+  duration_ms: 0.419994
+  type: 'test'
+  ...
+# (node:221) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/shift-scope.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:221) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/shift-cloud/src/lib/shift-scope.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/shift-cloud/package.json.
+# Subtest: 店舗別テンプレは他店舗に出さない
+ok 248 - 店舗別テンプレは他店舗に出さない
+  ---
+  duration_ms: 1.036582
+  type: 'test'
+  ...
+# Subtest: scope未設定（旧データ）は全店共通あつかい
+ok 249 - scope未設定（旧データ）は全店共通あつかい
+  ---
+  duration_ms: 0.196296
+  type: 'test'
+  ...
+# Subtest: 店舗が選ばれていないときは店舗別テンプレを出さない
+ok 250 - 店舗が選ばれていないときは店舗別テンプレを出さない
+  ---
+  duration_ms: 0.093471
+  type: 'test'
+  ...
+# Subtest: 複数店舗に所属するスタッフは両方のテンプレが見える
+ok 251 - 複数店舗に所属するスタッフは両方のテンプレが見える
+  ---
+  duration_ms: 0.132403
+  type: 'test'
+  ...
+# Subtest: 休み希望の期間は1日ずつ引ける
+ok 252 - 休み希望の期間は1日ずつ引ける
+  ---
+  duration_ms: 0.65273
+  type: 'test'
+  ...
+# Subtest: 同じ日に申請中と承認済みが重なったら承認済みが勝つ
+ok 253 - 同じ日に申請中と承認済みが重なったら承認済みが勝つ
+  ---
+  duration_ms: 0.153725
+  type: 'test'
+  ...
+# Subtest: 却下・取り下げは表示に出さない
+ok 254 - 却下・取り下げは表示に出さない
+  ---
+  duration_ms: 0.119956
+  type: 'test'
+  ...
+# Subtest: 月をまたぐ日付計算がずれない
+ok 255 - 月をまたぐ日付計算がずれない
+  ---
+  duration_ms: 0.095372
+  type: 'test'
+  ...
+# Subtest: 入力チェック
+ok 256 - 入力チェック
+  ---
+  duration_ms: 1.380956
+  type: 'test'
+  ...
+# (node:228) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/shift-span.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:228) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/shift-cloud/src/lib/shift-span.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/shift-cloud/package.json.
+# Subtest: パラメータ無しは翌月・1ヶ月（今までの既定）
+ok 257 - パラメータ無しは翌月・1ヶ月（今までの既定）
+  ---
+  duration_ms: 2.064493
+  type: 'test'
+  ...
+# Subtest: 旧URLの ?ym= はそのまま効く
+ok 258 - 旧URLの ?ym= はそのまま効く
+  ---
+  duration_ms: 0.609972
+  type: 'test'
+  ...
+# Subtest: ?d= は ?ym= より優先
+ok 259 - ?d= は ?ym= より優先
+  ---
+  duration_ms: 1.505062
+  type: 'test'
+  ...
+# Subtest: 日: 前後は1日ずつ動き、月末は翌月1日へ
+ok 260 - 日: 前後は1日ずつ動き、月末は翌月1日へ
+  ---
+  duration_ms: 0.168701
+  type: 'test'
+  ...
+# Subtest: 週: 開始は月曜。水曜を渡してもその週の月曜〜日曜
+ok 261 - 週: 開始は月曜。水曜を渡してもその週の月曜〜日曜
+  ---
+  duration_ms: 0.261304
+  type: 'test'
+  ...
+# Subtest: 週: 月曜を渡したらその日が開始（1週間ずれない）
+ok 262 - 週: 月曜を渡したらその日が開始（1週間ずれない）
+  ---
+  duration_ms: 0.275453
+  type: 'test'
+  ...
+# Subtest: 週: 日曜は「その週」＝直前の月曜から
+ok 263 - 週: 日曜は「その週」＝直前の月曜から
+  ---
+  duration_ms: 0.304112
+  type: 'test'
+  ...
+# Subtest: 週: 月をまたいでも7日ちょうど
+ok 264 - 週: 月をまたいでも7日ちょうど
+  ---
+  duration_ms: 0.337812
+  type: 'test'
+  ...
+# Subtest: 週: →/← は7日ずつ
+ok 265 - 週: →/← は7日ずつ
+  ---
+  duration_ms: 0.442028
+  type: 'test'
+  ...
+# Subtest: 半月: 15日までは前半（1〜15）
+ok 266 - 半月: 15日までは前半（1〜15）
+  ---
+  duration_ms: 0.982627
+  type: 'test'
+  ...
+# Subtest: 半月: 16日からは後半（16〜末日）
+ok 267 - 半月: 16日からは後半（16〜末日）
+  ---
+  duration_ms: 0.276743
+  type: 'test'
+  ...
+# Subtest: 半月: 30日の月は後半が16〜30
+ok 268 - 半月: 30日の月は後半が16〜30
+  ---
+  duration_ms: 0.129082
+  type: 'test'
+  ...
+# Subtest: 半月: 前半←は前月の後半、後半→は翌月の前半
+ok 269 - 半月: 前半←は前月の後半、後半→は翌月の前半
+  ---
+  duration_ms: 0.123502
+  type: 'test'
+  ...
+# Subtest: 月: 末日は月ごとに正しい（うるう年の2月＝29日）
+ok 270 - 月: 末日は月ごとに正しい（うるう年の2月＝29日）
+  ---
+  duration_ms: 0.259423
+  type: 'test'
+  ...
+# Subtest: 月: うるう年2月の後半は16〜29
+ok 271 - 月: うるう年2月の後半は16〜29
+  ---
+  duration_ms: 0.102476
+  type: 'test'
+  ...
+# Subtest: 月: ←→ は年をまたぐ
+ok 272 - 月: ←→ は年をまたぐ
+  ---
+  duration_ms: 0.08701
+  type: 'test'
+  ...
+# Subtest: days は start〜end の連続で、端を含む
+ok 273 - days は start〜end の連続で、端を含む
+  ---
+  duration_ms: 0.090771
+  type: 'test'
+  ...
+# Subtest: おかしなURLパラメータは既定に落ちる（落ちない・例外を投げない）
+ok 274 - おかしなURLパラメータは既定に落ちる（落ちない・例外を投げない）
+  ---
+  duration_ms: 0.124039
+  type: 'test'
+  ...
+# Subtest: monthsCovered は同月なら1件、またぐと両方
+ok 275 - monthsCovered は同月なら1件、またぐと両方
+  ---
+  duration_ms: 0.064677
+  type: 'test'
+  ...
+# Subtest: 印刷リンク: 半月/月はrange、日/週はcustomで開始終了を渡す
+ok 276 - 印刷リンク: 半月/月はrange、日/週はcustomで開始終了を渡す
+  ---
+  duration_ms: 0.125847
+  type: 'test'
+  ...
+# Subtest: 画面リンクは span と基準日を必ず持つ（期間が勝手に月へ戻らない）
+ok 277 - 画面リンクは span と基準日を必ず持つ（期間が勝手に月へ戻らない）
+  ---
+  duration_ms: 0.082086
+  type: 'test'
+  ...
+# (node:235) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/swing-cortex-search.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:235) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/swing-cortex/src/lib/jp-search.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/swing-cortex/package.json.
+# Subtest: normalize: カタカナ・漢字・記号のゆれを同じ形に寄せる
+ok 278 - normalize: カタカナ・漢字・記号のゆれを同じ形に寄せる
+  ---
+  duration_ms: 0.90076
+  type: 'test'
+  ...
+# Subtest: stem: 活用語尾を落として語幹に寄せる
+ok 279 - stem: 活用語尾を落として語幹に寄せる
+  ---
+  duration_ms: 0.928814
+  type: 'test'
+  ...
+# Subtest: similarity: 活用・送り仮名違いは高スコア、無関係は0
+ok 280 - similarity: 活用・送り仮名違いは高スコア、無関係は0
+  ---
+  duration_ms: 0.397209
+  type: 'test'
+  ...
+# Subtest: あいまい検索: 伸びあがり系はどの言い方でも同じ症状に着地する
+ok 281 - あいまい検索: 伸びあがり系はどの言い方でも同じ症状に着地する
+  ---
+  duration_ms: 14.418445
+  type: 'test'
+  ...
+# Subtest: あいまい検索: 話し言葉・活用形でも当たる
+ok 282 - あいまい検索: 話し言葉・活用形でも当たる
+  ---
+  duration_ms: 10.851284
+  type: 'test'
+  ...
+# Subtest: あいまい検索: 症状名そのもの・部分入力でも当たる
+ok 283 - あいまい検索: 症状名そのもの・部分入力でも当たる
+  ---
+  duration_ms: 6.366624
+  type: 'test'
+  ...
+# Subtest: あいまい検索: 無関係な語で誤爆しない
+ok 284 - あいまい検索: 無関係な語で誤爆しない
+  ---
+  duration_ms: 1.178549
+  type: 'test'
+  ...
+# Subtest: あいまい検索: 名詞形/動詞形どちらでも当たる
+ok 285 - あいまい検索: 名詞形/動詞形どちらでも当たる
+  ---
+  duration_ms: 3.472184
+  type: 'test'
+  ...
+# (node:242) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/table-filter.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:242) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/money-golfwing/src/lib/table-filter.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/money-golfwing/package.json.
+# Subtest: 全角と大文字小文字の差を吸収する
+ok 286 - 全角と大文字小文字の差を吸収する
+  ---
+  duration_ms: 1.147973
+  type: 'test'
+  ...
+# Subtest: キーワードは全角入力でも引ける
+ok 287 - キーワードは全角入力でも引ける
+  ---
+  duration_ms: 0.251889
+  type: 'test'
+  ...
+# Subtest: スペース区切りはAND、-付きは除外
+ok 288 - スペース区切りはAND、-付きは除外
+  ---
+  duration_ms: 0.102926
+  type: 'test'
+  ...
+# Subtest: 空の検索語は全件通す（うっかり空振りで0件にしない）
+ok 289 - 空の検索語は全件通す（うっかり空振りで0件にしない）
+  ---
+  duration_ms: 0.076033
+  type: 'test'
+  ...
+# Subtest: 数値の列も検索対象にできる
+ok 290 - 数値の列も検索対象にできる
+  ---
+  duration_ms: 0.121919
+  type: 'test'
+  ...
+# Subtest: 商品別の集計は金額の大きい順
+ok 291 - 商品別の集計は金額の大きい順
+  ---
+  duration_ms: 0.495039
+  type: 'test'
+  ...
+# Subtest: 担当が空欄の行も（未設定）として集計に残す
+ok 292 - 担当が空欄の行も（未設定）として集計に残す
+  ---
+  duration_ms: 68.615758
+  type: 'test'
+  ...
+# Subtest: プルダウンの候補は件数の多い順・空欄は出さない
+ok 293 - プルダウンの候補は件数の多い順・空欄は出さない
+  ---
+  duration_ms: 0.412777
+  type: 'test'
+  ...
+# Subtest: 期間プリセット（toは翌日/翌月1日＝そのままgte/ltで使える）
+ok 294 - 期間プリセット（toは翌日/翌月1日＝そのままgte/ltで使える）
+  ---
+  duration_ms: 0.994527
+  type: 'test'
+  ...
+# Subtest: 任意期間は終了日も含む
+ok 295 - 任意期間は終了日も含む
+  ---
+  duration_ms: 0.714935
+  type: 'test'
+  ...
+# Subtest: 開始と終了を逆に入れてもエラーにしない
+ok 296 - 開始と終了を逆に入れてもエラーにしない
+  ---
+  duration_ms: 2.310024
+  type: 'test'
+  ...
+# Subtest: 月送り・日送り
+ok 297 - 月送り・日送り
+  ---
+  duration_ms: 0.177766
+  type: 'test'
+  ...
+# (node:249) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/track.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:249) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/track/src/beacon.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/track/package.json.
+# Subtest: ビーコンは </body> の直前に入る
+ok 298 - ビーコンは </body> の直前に入る
+  ---
+  duration_ms: 1.114414
+  type: 'test'
+  ...
+# Subtest: 二重注入はしない（二重カウントの防止）
+ok 299 - 二重注入はしない（二重カウントの防止）
+  ---
+  duration_ms: 0.182588
+  type: 'test'
+  ...
+# Subtest: </body> が無いHTMLでも末尾に入る（計測が消えない）
+ok 300 - </body> が無いHTMLでも末尾に入る（計測が消えない）
+  ---
+  duration_ms: 0.154897
+  type: 'test'
+  ...
+# Subtest: 空HTMLはそのまま返す
+ok 301 - 空HTMLはそのまま返す
+  ---
+  duration_ms: 0.082908
+  type: 'test'
+  ...
+# Subtest: トークンはJSONとして埋め込まれる（引用符でスクリプトを壊さない）
+ok 302 - トークンはJSONとして埋め込まれる（引用符でスクリプトを壊さない）
+  ---
+  duration_ms: 0.096167
+  type: 'test'
+  ...
+# Subtest: 社内プレビューのフラグがスニペットに乗る
+ok 303 - 社内プレビューのフラグがスニペットに乗る
+  ---
+  duration_ms: 0.147307
+  type: 'test'
+  ...
+# Subtest: ハートビート間隔は5秒未満にできない（過剰POSTの防止）
+ok 304 - ハートビート間隔は5秒未満にできない（過剰POSTの防止）
+  ---
+  duration_ms: 0.088852
+  type: 'test'
+  ...
+# Subtest: 滞在時間の表示
+ok 305 - 滞在時間の表示
+  ---
+  duration_ms: 0.154317
+  type: 'test'
+  ...
+# (node:256) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/vault-categories.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:256) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/genesis/src/lib/vault-categories.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/genesis/package.json.
+# Subtest: 入力の全件が必ずどこかのグループに入る（1件も消えない）
+ok 306 - 入力の全件が必ずどこかのグループに入る（1件も消えない）
+  ---
+  duration_ms: 0.558542
+  type: 'test'
+  ...
+# Subtest: 過去の表記ゆれを正しいカテゴリに寄せる
+ok 307 - 過去の表記ゆれを正しいカテゴリに寄せる
+  ---
+  duration_ms: 0.189606
+  type: 'test'
+  ...
+# Subtest: 未知のカテゴリは other に落とす（例外を投げたり捨てたりしない）
+ok 308 - 未知のカテゴリは other に落とす（例外を投げたり捨てたりしない）
+  ---
+  duration_ms: 0.087743
+  type: 'test'
+  ...
+# Subtest: 正規のキーはそのまま通す
+ok 309 - 正規のキーはそのまま通す
+  ---
+  duration_ms: 0.08036
+  type: 'test'
+  ...
+# Subtest: 表示順は定義順（サイト/アプリが先頭・その他が末尾）
+ok 310 - 表示順は定義順（サイト/アプリが先頭・その他が末尾）
+  ---
+  duration_ms: 0.548377
+  type: 'test'
+  ...
+# Subtest: グループには画面に出すラベルが付く
+ok 311 - グループには画面に出すラベルが付く
+  ---
+  duration_ms: 0.121689
+  type: 'test'
+  ...
+# (node:263) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/visitor-search.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:263) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/apps/member-os/src/lib/visitor-search-pure.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/apps/member-os/package.json.
+# Subtest: 電話番号が同じなら表記が違っても同一人物にまとめる
+ok 312 - 電話番号が同じなら表記が違っても同一人物にまとめる
+  ---
+  duration_ms: 1.505042
+  type: 'test'
+  ...
+# Subtest: 同姓同名でも生年月日も電話も違えば別人のまま
+ok 313 - 同姓同名でも生年月日も電話も違えば別人のまま
+  ---
+  duration_ms: 4.503083
+  type: 'test'
+  ...
+# Subtest: 氏名だけ一致（生年月日なし）ではくっつけない
+ok 314 - 氏名だけ一致（生年月日なし）ではくっつけない
+  ---
+  duration_ms: 0.289378
+  type: 'test'
+  ...
+# Subtest: 氏名＋生年月日が一致すれば会員名簿と受付台帳がつながる
+ok 315 - 氏名＋生年月日が一致すれば会員名簿と受付台帳がつながる
+  ---
+  duration_ms: 0.221367
+  type: 'test'
+  ...
+# Subtest: カナがひらがな／カタカナで揺れても生年月日が同じならまとまる
+ok 316 - カナがひらがな／カタカナで揺れても生年月日が同じならまとまる
+  ---
+  duration_ms: 0.250966
+  type: 'test'
+  ...
+# Subtest: 3件が電話・メール・生年月日の別々の鍵で数珠つなぎになっても1人になる
+ok 317 - 3件が電話・メール・生年月日の別々の鍵で数珠つなぎになっても1人になる
+  ---
+  duration_ms: 0.14176
+  type: 'test'
+  ...
+# Subtest: 来店履歴は複数ソースを日付の新しい順に1本化する
+ok 318 - 来店履歴は複数ソースを日付の新しい順に1本化する
+  ---
+  duration_ms: 0.992267
+  type: 'test'
+  ...
+# Subtest: 来店回数が多い人・最近来た人が上に並ぶ
+ok 319 - 来店回数が多い人・最近来た人が上に並ぶ
+  ---
+  duration_ms: 0.22796
+  type: 'test'
+  ...
+# Subtest: 連絡先が無い側があっても、ある側の情報が代表値になる
+ok 320 - 連絡先が無い側があっても、ある側の情報が代表値になる
+  ---
+  duration_ms: 0.254945
+  type: 'test'
+  ...
+# Subtest: 短い番号（下4桁など）は名寄せの鍵にしない＝別人を混ぜない
+ok 321 - 短い番号（下4桁など）は名寄せの鍵にしない＝別人を混ぜない
+  ---
+  duration_ms: 0.249011
+  type: 'test'
+  ...
+# Subtest: digits はハイフン・全角・空白を落とす
+ok 322 - digits はハイフン・全角・空白を落とす
+  ---
+  duration_ms: 0.096757
+  type: 'test'
+  ...
+# Subtest: 空の結果でも落ちない
+ok 323 - 空の結果でも落ちない
+  ---
+  duration_ms: 0.074756
+  type: 'test'
+  ...
+# (node:270) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/x-metrics.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:270) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/content/src/x.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/content/package.json.
+# Subtest: fetchOwnTweetMetrics: 自分のタイムラインを1回だけ叩く（IDごとに引くと5倍課金される）
+ok 324 - fetchOwnTweetMetrics: 自分のタイムラインを1回だけ叩く（IDごとに引くと5倍課金される）
+  ---
+  duration_ms: 71.514516
+  type: 'test'
+  ...
+# Subtest: fetchOwnTweetMetrics: public_metrics をID→反応数の表に変換する
+ok 325 - fetchOwnTweetMetrics: public_metrics をID→反応数の表に変換する
+  ---
+  duration_ms: 1.537108
+  type: 'test'
+  ...
+# Subtest: sumMetrics: 連投は全体を合計し、表示回数は取れたぶんだけ足す
+ok 326 - sumMetrics: 連投は全体を合計し、表示回数は取れたぶんだけ足す
+  ---
+  duration_ms: 0.151002
+  type: 'test'
+  ...
+# Subtest: sumMetrics: 1本も取れなければ表示回数はnullのまま（0と誤解させない）
+ok 327 - sumMetrics: 1本も取れなければ表示回数はnullのまま（0と誤解させない）
+  ---
+  duration_ms: 0.081059
+  type: 'test'
+  ...
+# Subtest: buildOAuthHeader: クエリは署名に使うがAuthorizationヘッダには載せない
+ok 328 - buildOAuthHeader: クエリは署名に使うがAuthorizationヘッダには載せない
+  ---
+  duration_ms: 0.868468
+  type: 'test'
+  ...
+# Subtest: 連投の返信数は、自分の連結ぶん(本数-1)を引いて外部からの返信にする
+ok 329 - 連投の返信数は、自分の連結ぶん(本数-1)を引いて外部からの返信にする
+  ---
+  duration_ms: 0.267733
+  type: 'test'
+  ...
+# (node:281) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/x-post.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:281) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/content/src/x.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/content/package.json.
+# Subtest: buildOAuthHeader: 公式ドキュメントの既知ベクタと署名が一致する
+ok 330 - buildOAuthHeader: 公式ドキュメントの既知ベクタと署名が一致する
+  ---
+  duration_ms: 5.986118
+  type: 'test'
+  ...
+# Subtest: buildOAuthHeader: 必須のoauthパラメータが揃い、値はパーセントエンコードされる
+ok 331 - buildOAuthHeader: 必須のoauthパラメータが揃い、値はパーセントエンコードされる
+  ---
+  duration_ms: 1.285707
+  type: 'test'
+  ...
+# Subtest: buildOAuthHeader: nonceは毎回変わる（リプレイ拒否されないため）
+ok 332 - buildOAuthHeader: nonceは毎回変わる（リプレイ拒否されないため）
+  ---
+  duration_ms: 1.854015
+  type: 'test'
+  ...
+# Subtest: weightedLength: 半角=1・全角=2
+ok 333 - weightedLength: 半角=1・全角=2
+  ---
+  duration_ms: 0.309959
+  type: 'test'
+  ...
+# Subtest: buildTweetText: 長文でも上限内に収まり、URLとタグが残る
+ok 334 - buildTweetText: 長文でも上限内に収まり、URLとタグが残る
+  ---
+  duration_ms: 0.796008
+  type: 'test'
+  ...
+# Subtest: buildTweetText: 短文はそのまま（余計な加工をしない）
+ok 335 - buildTweetText: 短文はそのまま（余計な加工をしない）
+  ---
+  duration_ms: 0.225316
+  type: 'test'
+  ...
+# Subtest: buildTweetText: URL無し・タグ無しでも上限を守る
+ok 336 - buildTweetText: URL無し・タグ無しでも上限を守る
+  ---
+  duration_ms: 0.479718
+  type: 'test'
+  ...
+# Subtest: buildTweetText: 本文が空でもURLだけは残る（投稿を落とさない）
+ok 337 - buildTweetText: 本文が空でもURLだけは残る（投稿を落とさない）
+  ---
+  duration_ms: 0.289744
+  type: 'test'
+  ...
+# Subtest: buildTweetText: 文の途中でぶつ切りにせず文末で切る
+ok 338 - buildTweetText: 文の途中でぶつ切りにせず文末で切る
+  ---
+  duration_ms: 0.574541
+  type: 'test'
+  ...
+# Subtest: buildTweetText: 文末が早い位置にしか無いときは字数で切って…を付ける
+ok 339 - buildTweetText: 文末が早い位置にしか無いときは字数で切って…を付ける
+  ---
+  duration_ms: 0.487438
+  type: 'test'
+  ...
+# Subtest: buildTweetText: IG向けCTA「プロフィールのリンク」はX向けに言い換える
+ok 340 - buildTweetText: IG向けCTA「プロフィールのリンク」はX向けに言い換える
+  ---
+  duration_ms: 0.267957
+  type: 'test'
+  ...
+# Subtest: buildTweetText: URLが無いとき（Xにリンクを載せない運用）は言い換えない
+ok 341 - buildTweetText: URLが無いとき（Xにリンクを載せない運用）は言い換えない
+  ---
+  duration_ms: 0.105308
+  type: 'test'
+  ...
+# (node:292) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/tests/x-thread.test.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:292) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN%20GENESIS/packages/content/src/x.ts is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to /sessions/rcw-01cceu8a5pjv8fg9q1nwql8k/mnt/YOZAN GENESIS/packages/content/package.json.
+# Subtest: publishThread: 2本目以降は直前のツイートへの返信として繋がる
+ok 342 - publishThread: 2本目以降は直前のツイートへの返信として繋がる
+  ---
+  duration_ms: 2415.499098
+  type: 'test'
+  ...
+# Subtest: publishThread: 途中で失敗しても、投稿できたぶんのIDは返る（＝再開点になる）
+ok 343 - publishThread: 途中で失敗しても、投稿できたぶんのIDは返る（＝再開点になる）
+  ---
+  duration_ms: 2410.366611
+  type: 'test'
+  ...
+# Subtest: publishThread: 再開時は投稿済みのぶんを飛ばし、末尾を親にして続きだけ出す
+ok 344 - publishThread: 再開時は投稿済みのぶんを飛ばし、末尾を親にして続きだけ出す
+  ---
+  duration_ms: 1208.673767
+  type: 'test'
+  ...
+# Subtest: publishThread: 全部投稿済みならAPIを一度も叩かない（cronが何度回っても増えない）
+ok 345 - publishThread: 全部投稿済みならAPIを一度も叩かない（cronが何度回っても増えない）
+  ---
+  duration_ms: 0.628507
+  type: 'test'
+  ...
+# Subtest: publishThread: 1tickの本数に上限があり、残りは未完了として返る
+ok 346 - publishThread: 1tickの本数に上限があり、残りは未完了として返る
+  ---
+  duration_ms: 1206.23598
+  type: 'test'
+  ...
+# Subtest: normalizeThreadParts: 空要素は捨て、上限超過は落とさず末尾を削る
+ok 347 - normalizeThreadParts: 空要素は捨て、上限超過は落とさず末尾を削る
+  ---
+  duration_ms: 0.885329
+  type: 'test'
+  ...
+1..347
+# tests 347
+# suites 0
+# pass 347
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 15158.0199
+EXIT:0

@@ -1,0 +1,13 @@
+[2024-05-01 12:14] Register ExceptionFilter
+[2024-05-01 12:14:56] Log Data : Log_2024_0501_121456.txt
+[2024-05-01 12:14:57] Failed Auth Data
+
+[2024-05-01 12:14:59] Failed Initialize
+[2024-05-01 12:14:59] Initialize Failed
+[2024-05-01 12:14] Exclude ExceptionFilter
+[2024-05-01 12:14:59] [Release]
+      [Success Shot Count] : 0
+      [Error Shot Count] : 0
+      [UndeZero Delta Time Count] : 0
+      [FPS Under Count] : 0
+[2024-05-01 12:14:59] Release : 2024-05-01 12:14

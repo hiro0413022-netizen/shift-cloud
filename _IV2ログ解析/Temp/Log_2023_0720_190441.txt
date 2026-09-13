@@ -1,0 +1,248 @@
+[2023-07-20 19:04] Register ExceptionFilter
+[2023-07-20 19:04:41] Log Data : Log_2023_0720_190441.txt
+[2023-07-20 19:04:43] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2023-07-20 19:04:43] Load Info Data
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionGain : 100
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionGamma : 85
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionBrightness : 0
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionFlip : 3
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2023-07-20 19:04:48] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2023-07-20 19:04:49] Success Initialize
+[2023-07-20 19:04:49] ImageQueue Reset : Main Camera
+[2023-07-20 19:04:49] Initialize Success
+[2023-07-20 19:04:49] HanderType : [Right] -> [Right]
+[2023-07-20 19:04:49] IV2MSG : Option - RightHander
+[2023-07-20 19:04:49] TeeMode : [Up] -> [Up]
+[2023-07-20 19:04:49] IV2MSG : Option - TeeUp
+[2023-07-20 19:04:49] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:04:49] IV2MSG : Option - FairWay
+[2023-07-20 19:04:49] HanderType : [Right] -> [Right]
+[2023-07-20 19:04:49] IV2MSG : Option - RightHander
+[2023-07-20 19:04:49] TeeMode : [Up] -> [Up]
+[2023-07-20 19:04:49] IV2MSG : Option - TeeUp
+[2023-07-20 19:04:49] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:04:49] IV2MSG : Option - FairWay
+[2023-07-20 19:04:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:04:50] IRLight : Idle
+[2023-07-20 19:04:51] IRLight : Standby
+[2023-07-20 19:06:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:06:10] IRLight : Idle
+[2023-07-20 19:06:11] IRLight : Standby
+[2023-07-20 19:07:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:07:30] IRLight : Idle
+[2023-07-20 19:07:31] IRLight : Standby
+[2023-07-20 19:08:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:08:50] IRLight : Idle
+[2023-07-20 19:08:51] IRLight : Standby
+[2023-07-20 19:10:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:10:10] IRLight : Idle
+[2023-07-20 19:10:11] IRLight : Standby
+[2023-07-20 19:11:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:11:30] IRLight : Idle
+[2023-07-20 19:11:31] IRLight : Standby
+[2023-07-20 19:12:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:12:50] IRLight : Idle
+[2023-07-20 19:12:51] IRLight : Standby
+[2023-07-20 19:14:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:14:10] IRLight : Idle
+[2023-07-20 19:14:11] IRLight : Standby
+[2023-07-20 19:15:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:15:30] IRLight : Idle
+[2023-07-20 19:15:31] IRLight : Standby
+[2023-07-20 19:16:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:16:50] IRLight : Idle
+[2023-07-20 19:16:51] IRLight : Standby
+[2023-07-20 19:18:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:18:10] IRLight : Idle
+[2023-07-20 19:18:11] IRLight : Standby
+[2023-07-20 19:19:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:19:30] IRLight : Idle
+[2023-07-20 19:19:31] IRLight : Standby
+[2023-07-20 19:20:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:20:50] IRLight : Idle
+[2023-07-20 19:20:51] IRLight : Standby
+[2023-07-20 19:22:10] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:22:10] IRLight : Idle
+[2023-07-20 19:22:11] IRLight : Standby
+[2023-07-20 19:23:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:23:30] IRLight : Idle
+[2023-07-20 19:23:31] IRLight : Standby
+[2023-07-20 19:24:44] 0 -> 1
+[2023-07-20 19:24:44] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-07-20 19:24:44] IRLight : On
+[2023-07-20 19:24:44] IV2MSG : System - Operate
+[2023-07-20 19:24:44] HanderType : [Right] -> [Left]
+[2023-07-20 19:24:44] IV2MSG : Option - LeftHander
+[2023-07-20 19:24:44] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:24:44] IV2MSG : Option - FairWay
+[2023-07-20 19:24:44] 0 -> 0
+[2023-07-20 19:24:44] IV2MSG : System - Stop
+[2023-07-20 19:24:44] Hand 1, TeeMode : 0, Surface : 0
+[2023-07-20 19:24:45] IRLight : Standby
+[2023-07-20 19:24:46] IRLight : Off
+[2023-07-20 19:24:47] IRLight : Standby
+[2023-07-20 19:24:47] 0 -> 0
+[2023-07-20 19:24:47] IRLight : Off
+[2023-07-20 19:24:47] IV2MSG : System - Stop
+[2023-07-20 19:24:48] IRLight : Standby
+[2023-07-20 19:25:50] 0 -> 1
+[2023-07-20 19:25:50] IV2MSG : System - Operate
+[2023-07-20 19:25:50] IRLight : On
+[2023-07-20 19:25:50] HanderType : [Left] -> [Left]
+[2023-07-20 19:25:50] IV2MSG : Option - LeftHander
+[2023-07-20 19:25:50] TeeMode : [Up] -> [Putter]
+[2023-07-20 19:25:50] IV2MSG : Option - TeePutter
+[2023-07-20 19:25:50] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:25:50] IV2MSG : Option - FairWay
+[2023-07-20 19:25:50] Hand 1, TeeMode : 2, Surface : 0
+[2023-07-20 19:25:50] 1 -> 1
+[2023-07-20 19:25:50] ImageQueue Reset : Main Camera
+[2023-07-20 19:25:50] IRLight : On
+[2023-07-20 19:25:50] HanderType : [Left] -> [Left]
+[2023-07-20 19:25:50] IV2MSG : Option - LeftHander
+[2023-07-20 19:25:50] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:25:50] IV2MSG : Option - TeePutter
+[2023-07-20 19:25:50] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:25:50] IV2MSG : Option - FairWay
+[2023-07-20 19:25:51] IRLight : Standby
+[2023-07-20 19:25:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:26:00] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:26:04] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:26:05] HanderType : [Left] -> [Left]
+[2023-07-20 19:26:05] IV2MSG : Option - LeftHander
+[2023-07-20 19:26:05] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:26:05] IV2MSG : Option - TeePutter
+[2023-07-20 19:26:05] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:26:05] IV2MSG : Option - FairWay
+[2023-07-20 19:26:07] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:26:11] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:26:14] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:26:18] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:26:19] HanderType : [Left] -> [Left]
+[2023-07-20 19:26:19] IV2MSG : Option - LeftHander
+[2023-07-20 19:26:19] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:26:19] IV2MSG : Option - TeePutter
+[2023-07-20 19:26:19] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:26:19] IV2MSG : Option - FairWay
+[2023-07-20 19:26:21] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:26:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:26:28] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:26:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:26:30] 1 -> 1
+[2023-07-20 19:26:30] ImageQueue Reset : Main Camera
+[2023-07-20 19:26:30] IRLight : Idle
+[2023-07-20 19:26:31] HanderType : [Left] -> [Left]
+[2023-07-20 19:26:31] IV2MSG : Option - LeftHander
+[2023-07-20 19:26:31] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:26:31] IV2MSG : Option - TeePutter
+[2023-07-20 19:26:31] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:26:31] IV2MSG : Option - FairWay
+[2023-07-20 19:26:31] IRLight : Standby
+[2023-07-20 19:26:44] HanderType : [Left] -> [Left]
+[2023-07-20 19:26:44] IV2MSG : Option - LeftHander
+[2023-07-20 19:26:44] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:26:44] IV2MSG : Option - TeePutter
+[2023-07-20 19:26:44] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:26:44] IV2MSG : Option - FairWay
+[2023-07-20 19:26:48] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-07-20 19:26:48] IRLight : On
+[2023-07-20 19:26:49] IRLight : Standby
+[2023-07-20 19:26:49] IRLight : On
+[2023-07-20 19:26:49] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:26:50] IRLight : Standby
+[2023-07-20 19:26:53] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:26:56] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:27:00] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:27:03] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:27:04] HanderType : [Left] -> [Left]
+[2023-07-20 19:27:04] IV2MSG : Option - LeftHander
+[2023-07-20 19:27:04] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:27:04] IV2MSG : Option - TeePutter
+[2023-07-20 19:27:04] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:27:04] IV2MSG : Option - FairWay
+[2023-07-20 19:27:07] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:27:10] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:27:14] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:27:17] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:27:21] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:27:24] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:27:25] HanderType : [Left] -> [Left]
+[2023-07-20 19:27:25] IV2MSG : Option - LeftHander
+[2023-07-20 19:27:25] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:27:25] IV2MSG : Option - TeePutter
+[2023-07-20 19:27:25] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:27:25] IV2MSG : Option - FairWay
+[2023-07-20 19:27:28] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-07-20 19:27:30] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:27:30] 1 -> 1
+[2023-07-20 19:27:30] ImageQueue Reset : Main Camera
+[2023-07-20 19:27:30] IRLight : Idle
+[2023-07-20 19:27:31] IRLight : Standby
+[2023-07-20 19:27:38] HanderType : [Left] -> [Left]
+[2023-07-20 19:27:38] IV2MSG : Option - LeftHander
+[2023-07-20 19:27:38] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:27:38] IV2MSG : Option - TeePutter
+[2023-07-20 19:27:38] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:27:38] IV2MSG : Option - FairWay
+[2023-07-20 19:28:22] HanderType : [Left] -> [Left]
+[2023-07-20 19:28:22] IV2MSG : Option - LeftHander
+[2023-07-20 19:28:22] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:28:22] IV2MSG : Option - TeePutter
+[2023-07-20 19:28:22] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:28:22] IV2MSG : Option - FairWay
+[2023-07-20 19:28:32] HanderType : [Left] -> [Left]
+[2023-07-20 19:28:32] IV2MSG : Option - LeftHander
+[2023-07-20 19:28:32] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:28:32] IV2MSG : Option - TeePutter
+[2023-07-20 19:28:32] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:28:32] IV2MSG : Option - FairWay
+[2023-07-20 19:28:41] HanderType : [Left] -> [Left]
+[2023-07-20 19:28:41] IV2MSG : Option - LeftHander
+[2023-07-20 19:28:41] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:28:41] IV2MSG : Option - TeePutter
+[2023-07-20 19:28:41] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:28:41] IV2MSG : Option - FairWay
+[2023-07-20 19:28:50] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-07-20 19:28:50] 1 -> 1
+[2023-07-20 19:28:50] ImageQueue Reset : Main Camera
+[2023-07-20 19:28:50] IRLight : Idle
+[2023-07-20 19:28:51] IRLight : Standby
+[2023-07-20 19:28:57] HanderType : [Left] -> [Left]
+[2023-07-20 19:28:57] IV2MSG : Option - LeftHander
+[2023-07-20 19:28:57] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:28:57] IV2MSG : Option - TeePutter
+[2023-07-20 19:28:57] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:28:57] IV2MSG : Option - FairWay
+[2023-07-20 19:29:08] HanderType : [Left] -> [Left]
+[2023-07-20 19:29:08] IV2MSG : Option - LeftHander
+[2023-07-20 19:29:08] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:29:08] IV2MSG : Option - TeePutter
+[2023-07-20 19:29:08] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:29:08] IV2MSG : Option - FairWay
+[2023-07-20 19:29:17] HanderType : [Left] -> [Left]
+[2023-07-20 19:29:17] IV2MSG : Option - LeftHander
+[2023-07-20 19:29:17] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:29:17] IV2MSG : Option - TeePutter
+[2023-07-20 19:29:17] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:29:17] IV2MSG : Option - FairWay
+[2023-07-20 19:29:27] HanderType : [Left] -> [Left]
+[2023-07-20 19:29:27] IV2MSG : Option - LeftHander
+[2023-07-20 19:29:27] TeeMode : [Putter] -> [Putter]
+[2023-07-20 19:29:27] IV2MSG : Option - TeePutter
+[2023-07-20 19:29:27] SurFaceType : [Fairway] -> [Fairway]
+[2023-07-20 19:29:27] IV2MSG : Option - FairWay
+[2023-07-20 19:29:35] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-07-20 19:29:35] IRLight : On
+[2023-07-20 19:29:35] 1 -> 2
+[2023-07-20 19:29:36] IRLight : Standby
+[2023-07-20 19:29:36] 2 -> 1
+[2023-07-20 19:29:36] ImageQueue Reset : Main Camera
+[2023-07-20 19:29:36] IRLight : On
+[2023-07-20 19:29:37] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-07-20 19:29:37] IRLight : Standby

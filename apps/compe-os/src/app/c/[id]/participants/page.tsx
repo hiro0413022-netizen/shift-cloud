@@ -121,7 +121,7 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
                       {p.email ? <div>{p.email}</div> : null}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <EntryStatusCell compId={id} participantId={p.id} status={p.entry_status} source={p.source} />
+                      <EntryStatusCell compId={id} participantId={p.id} status={p.entry_status} source={p.source} agreedAt={p.agreed_at} />
                     </td>
                     <td className="px-3 py-2 text-center">
                       {p.paid ? <Badge tone="ok">徴収済</Badge> : <Badge tone="danger">未徴収</Badge>}

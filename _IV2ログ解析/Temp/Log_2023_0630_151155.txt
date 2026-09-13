@@ -1,0 +1,983 @@
+[2023-06-30 15:11] Register ExceptionFilter
+[2023-06-30 15:11:55] Log Data : Log_2023_0630_151155.txt
+[2023-06-30 15:11:57] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2023-06-30 15:11:57] Load Info Data
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionGain : 100
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionGamma : 85
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionBrightness : 0
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionFlip : 3
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2023-06-30 15:12:02] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2023-06-30 15:12:02] Success Initialize
+[2023-06-30 15:12:02] ImageQueue Reset : Main Camera
+[2023-06-30 15:12:02] Initialize Success
+[2023-06-30 15:12:02] 0 -> 0
+[2023-06-30 15:12:02] IV2MSG : System - Stop
+[2023-06-30 15:12:02] HanderType : [Right] -> [Left]
+[2023-06-30 15:12:02] IV2MSG : Option - LeftHander
+[2023-06-30 15:12:02] SurFaceType : [Fairway] -> [Fairway]
+[2023-06-30 15:12:02] IV2MSG : Option - FairWay
+[2023-06-30 15:12:02] Hand 1, TeeMode : 0, Surface : 0
+[2023-06-30 15:12:02] HanderType : [Left] -> [Left]
+[2023-06-30 15:12:02] IV2MSG : Option - LeftHander
+[2023-06-30 15:12:02] SurFaceType : [Fairway] -> [Fairway]
+[2023-06-30 15:12:02] IV2MSG : Option - FairWay
+[2023-06-30 15:12:02] HanderType : [Left] -> [Left]
+[2023-06-30 15:12:02] IV2MSG : Option - LeftHander
+[2023-06-30 15:12:02] SurFaceType : [Fairway] -> [Fairway]
+[2023-06-30 15:12:02] IV2MSG : Option - FairWay
+[2023-06-30 15:12:02] 0 -> 0
+[2023-06-30 15:12:02] IV2MSG : System - Stop
+[2023-06-30 15:12:02] HanderType : [Left] -> [Left]
+[2023-06-30 15:12:02] IV2MSG : Option - LeftHander
+[2023-06-30 15:12:02] SurFaceType : [Fairway] -> [Fairway]
+[2023-06-30 15:12:02] IV2MSG : Option - FairWay
+[2023-06-30 15:12:02] 0 -> 0
+[2023-06-30 15:12:02] IV2MSG : System - Stop
+[2023-06-30 15:12:02] HanderType : [Left] -> [Left]
+[2023-06-30 15:12:02] IV2MSG : Option - LeftHander
+[2023-06-30 15:12:02] SurFaceType : [Fairway] -> [Fairway]
+[2023-06-30 15:12:02] IV2MSG : Option - FairWay
+[2023-06-30 15:12:03] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-06-30 15:12:03] IRLight : Idle
+[2023-06-30 15:12:04] IRLight : Standby
+[2023-06-30 15:12:05] IRLight : Off
+[2023-06-30 15:12:06] IRLight : Standby
+[2023-06-30 15:12:06] IRLight : Off
+[2023-06-30 15:12:07] IRLight : Standby
+[2023-06-30 15:12:07] IRLight : Off
+[2023-06-30 15:12:08] IRLight : Standby
+[2023-06-30 15:13:27] IRLight : Off
+[2023-06-30 15:13:28] IRLight : Standby
+[2023-06-30 15:14:47] IRLight : Off
+[2023-06-30 15:14:48] IRLight : Standby
+[2023-06-30 15:16:07] IRLight : Off
+[2023-06-30 15:16:08] IRLight : Standby
+[2023-06-30 15:17:27] IRLight : Off
+[2023-06-30 15:17:28] IRLight : Standby
+[2023-06-30 15:18:47] IRLight : Off
+[2023-06-30 15:18:48] IRLight : Standby
+[2023-06-30 15:19:25] 0 -> 1
+[2023-06-30 15:19:25] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-06-30 15:19:25] IRLight : On
+[2023-06-30 15:19:25] IV2MSG : System - Operate
+[2023-06-30 15:19:25] HanderType : [Left] -> [Left]
+[2023-06-30 15:19:25] IV2MSG : Option - LeftHander
+[2023-06-30 15:19:25] SurFaceType : [Fairway] -> [Fairway]
+[2023-06-30 15:19:25] IV2MSG : Option - FairWay
+[2023-06-30 15:19:25] 0 -> 0
+[2023-06-30 15:19:25] IV2MSG : System - Stop
+[2023-06-30 15:19:26] IRLight : Standby
+[2023-06-30 15:19:26] 0 -> 0
+[2023-06-30 15:19:26] IV2MSG : System - Stop
+[2023-06-30 15:19:26] IRLight : Off
+[2023-06-30 15:19:27] IRLight : Standby
+[2023-06-30 15:19:27] IRLight : Off
+[2023-06-30 15:19:28] IRLight : Standby
+[2023-06-30 15:19:35] 0 -> 1
+[2023-06-30 15:19:35] IRLight : On
+[2023-06-30 15:19:35] IV2MSG : System - Operate
+[2023-06-30 15:19:35] 1 -> 2
+[2023-06-30 15:19:35] HanderType : [Left] -> [Left]
+[2023-06-30 15:19:35] IV2MSG : Option - LeftHander
+[2023-06-30 15:19:35] TeeMode : [Up] -> [Up]
+[2023-06-30 15:19:35] IV2MSG : Option - TeeUp
+[2023-06-30 15:19:35] SurFaceType : [Fairway] -> [Fairway]
+[2023-06-30 15:19:35] IV2MSG : Option - FairWay
+[2023-06-30 15:19:35] 2 -> 1
+[2023-06-30 15:19:35] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:36] IRLight : Standby
+[2023-06-30 15:19:37] IRLight : On
+[2023-06-30 15:19:38] IRLight : Standby
+[2023-06-30 15:19:39] IRLight : On
+[2023-06-30 15:19:39] 1 -> 2
+[2023-06-30 15:19:40] IRLight : Standby
+[2023-06-30 15:19:40] 2 -> 1
+[2023-06-30 15:19:40] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:40] IRLight : On
+[2023-06-30 15:19:41] IRLight : Standby
+[2023-06-30 15:19:42] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:19:43] IRLight : On
+[2023-06-30 15:19:44] 1 -> 2
+[2023-06-30 15:19:44] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:19:44] IRLight : Standby
+[2023-06-30 15:19:45] 2 -> 1
+[2023-06-30 15:19:45] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:45] IRLight : On
+[2023-06-30 15:19:46] IRLight : Standby
+[2023-06-30 15:19:47] IRLight : On
+[2023-06-30 15:19:48] IRLight : Standby
+[2023-06-30 15:19:49] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:19:49] IRLight : On
+[2023-06-30 15:19:50] IRLight : Standby
+[2023-06-30 15:19:51] IRLight : On
+[2023-06-30 15:19:52] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:19:52] IRLight : Standby
+[2023-06-30 15:19:53] IRLight : On
+[2023-06-30 15:19:54] 1 -> 2
+[2023-06-30 15:19:54] IRLight : Standby
+[2023-06-30 15:19:54] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:19:54] 2 -> 3
+[2023-06-30 15:19:54] IRLight : On
+[2023-06-30 15:19:54] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:54] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:19:54] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:19:54] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:19:54] 2 -> 1
+[2023-06-30 15:19:54] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:54] IV2MSG : State - UnReady
+[2023-06-30 15:19:54] 1 -> 2
+[2023-06-30 15:19:55] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:19:55] 2 -> 3
+[2023-06-30 15:19:55] IRLight : On
+[2023-06-30 15:19:55] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:55] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:19:55] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:19:55] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:19:55] 2 -> 1
+[2023-06-30 15:19:55] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:55] IV2MSG : State - UnReady
+[2023-06-30 15:19:55] 1 -> 2
+[2023-06-30 15:19:56] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:19:56] 2 -> 3
+[2023-06-30 15:19:56] IRLight : On
+[2023-06-30 15:19:56] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:56] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:19:56] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:19:56] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:19:56] 2 -> 1
+[2023-06-30 15:19:56] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:56] IV2MSG : State - UnReady
+[2023-06-30 15:19:56] 1 -> 2
+[2023-06-30 15:19:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:19:57] 2 -> 3
+[2023-06-30 15:19:57] IRLight : On
+[2023-06-30 15:19:57] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:57] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:19:57] IV2MSG : State - subreadysuccess
+[2023-06-30 15:19:57] 3 -> 4
+[2023-06-30 15:19:57] 4 -> 6
+[2023-06-30 15:19:57] Failed SaveImageSize : 20
+[2023-06-30 15:19:57] 6 -> 4
+[2023-06-30 15:19:57] 4 -> 7
+[2023-06-30 15:19:57] Failed SaveImageSize : 20
+[2023-06-30 15:19:57] 7 -> 4
+[2023-06-30 15:19:57] 4 -> 6
+[2023-06-30 15:19:57] Failed SaveImageSize : 20
+[2023-06-30 15:19:57] 6 -> 4
+[2023-06-30 15:19:57] 4 -> 6
+[2023-06-30 15:19:57] Failed SaveImageSize : 20
+[2023-06-30 15:19:57] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:19:57] 6 -> 1
+[2023-06-30 15:19:57] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:57] 1 -> 2
+[2023-06-30 15:19:58] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:19:58] 2 -> 3
+[2023-06-30 15:19:58] IRLight : On
+[2023-06-30 15:19:58] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:58] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:19:58] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:19:58] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:19:58] 2 -> 1
+[2023-06-30 15:19:58] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:58] IV2MSG : State - UnReady
+[2023-06-30 15:19:58] 1 -> 2
+[2023-06-30 15:19:58] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:19:58] 2 -> 3
+[2023-06-30 15:19:58] IRLight : On
+[2023-06-30 15:19:58] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:58] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:19:58] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:19:58] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:19:58] 2 -> 1
+[2023-06-30 15:19:58] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:58] IV2MSG : State - UnReady
+[2023-06-30 15:19:58] 1 -> 2
+[2023-06-30 15:19:59] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (252, 145)
+[2023-06-30 15:19:59] 2 -> 3
+[2023-06-30 15:19:59] IRLight : On
+[2023-06-30 15:19:59] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:59] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:19:59] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:19:59] Selected CameraID : 0 _ Set ROI Pos : (252, 145) -> (268, 86)
+[2023-06-30 15:19:59] 2 -> 1
+[2023-06-30 15:19:59] ImageQueue Reset : Main Camera
+[2023-06-30 15:19:59] IV2MSG : State - UnReady
+[2023-06-30 15:19:59] 1 -> 2
+[2023-06-30 15:20:00] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (252, 145)
+[2023-06-30 15:20:00] 2 -> 3
+[2023-06-30 15:20:00] IRLight : On
+[2023-06-30 15:20:00] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:00] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:20:00] IV2MSG : State - subreadysuccess
+[2023-06-30 15:20:00] 3 -> 4
+[2023-06-30 15:20:00] 4 -> 6
+[2023-06-30 15:20:00] Failed SaveImageSize : 20
+[2023-06-30 15:20:00] 6 -> 4
+[2023-06-30 15:20:00] 4 -> 6
+[2023-06-30 15:20:00] Failed SaveImageSize : 20
+[2023-06-30 15:20:00] 6 -> 4
+[2023-06-30 15:20:00] 4 -> 6
+[2023-06-30 15:20:00] Failed SaveImageSize : 20
+[2023-06-30 15:20:00] 6 -> 4
+[2023-06-30 15:20:00] 4 -> 6
+[2023-06-30 15:20:00] Failed SaveImageSize : 20
+[2023-06-30 15:20:00] 6 -> 4
+[2023-06-30 15:20:00] 4 -> 6
+[2023-06-30 15:20:00] Failed SaveImageSize : 20
+[2023-06-30 15:20:00] Selected CameraID : 0 _ Set ROI Pos : (252, 145) -> (268, 86)
+[2023-06-30 15:20:00] 6 -> 1
+[2023-06-30 15:20:00] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:00] 1 -> 2
+[2023-06-30 15:20:01] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:20:01] 2 -> 3
+[2023-06-30 15:20:01] IRLight : On
+[2023-06-30 15:20:01] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:01] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:01] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:01] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:20:01] 2 -> 1
+[2023-06-30 15:20:01] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:01] IV2MSG : State - UnReady
+[2023-06-30 15:20:01] 1 -> 2
+[2023-06-30 15:20:02] IRLight : Standby
+[2023-06-30 15:20:02] 2 -> 1
+[2023-06-30 15:20:02] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:02] 1 -> 2
+[2023-06-30 15:20:02] IRLight : On
+[2023-06-30 15:20:03] 2 -> 1
+[2023-06-30 15:20:03] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:03] IRLight : Standby
+[2023-06-30 15:20:03] IRLight : On
+[2023-06-30 15:20:04] IRLight : Standby
+[2023-06-30 15:20:04] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:20:05] IRLight : On
+[2023-06-30 15:20:06] IRLight : Standby
+[2023-06-30 15:20:07] IRLight : On
+[2023-06-30 15:20:08] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:20:08] IRLight : Standby
+[2023-06-30 15:20:09] IRLight : On
+[2023-06-30 15:20:10] IRLight : Standby
+[2023-06-30 15:20:10] 1 -> 2
+[2023-06-30 15:20:11] IRLight : On
+[2023-06-30 15:20:11] 2 -> 1
+[2023-06-30 15:20:11] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:11] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:20:12] IRLight : Standby
+[2023-06-30 15:20:13] IRLight : On
+[2023-06-30 15:20:14] IRLight : Standby
+[2023-06-30 15:20:14] IRLight : On
+[2023-06-30 15:20:15] 1 -> 2
+[2023-06-30 15:20:15] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:20:15] IRLight : Standby
+[2023-06-30 15:20:16] 2 -> 1
+[2023-06-30 15:20:16] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:16] 1 -> 2
+[2023-06-30 15:20:17] IRLight : On
+[2023-06-30 15:20:17] 2 -> 1
+[2023-06-30 15:20:17] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:17] 1 -> 2
+[2023-06-30 15:20:18] IRLight : Standby
+[2023-06-30 15:20:18] IRLight : On
+[2023-06-30 15:20:19] 2 -> 1
+[2023-06-30 15:20:19] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:19] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:20:19] 1 -> 2
+[2023-06-30 15:20:19] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:20:19] IRLight : Standby
+[2023-06-30 15:20:20] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:20:20] 2 -> 3
+[2023-06-30 15:20:20] IRLight : On
+[2023-06-30 15:20:20] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:20] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:20] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:20] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:20:20] 2 -> 1
+[2023-06-30 15:20:20] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:20] IV2MSG : State - UnReady
+[2023-06-30 15:20:20] 1 -> 2
+[2023-06-30 15:20:21] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (251, 145)
+[2023-06-30 15:20:21] 2 -> 3
+[2023-06-30 15:20:21] IRLight : On
+[2023-06-30 15:20:21] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:21] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:21] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:21] Selected CameraID : 0 _ Set ROI Pos : (251, 145) -> (268, 86)
+[2023-06-30 15:20:21] 2 -> 1
+[2023-06-30 15:20:21] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:21] IV2MSG : State - UnReady
+[2023-06-30 15:20:21] 1 -> 2
+[2023-06-30 15:20:22] IRLight : Standby
+[2023-06-30 15:20:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (249, 145)
+[2023-06-30 15:20:22] 2 -> 3
+[2023-06-30 15:20:22] IRLight : On
+[2023-06-30 15:20:22] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:22] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:22] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:22] Selected CameraID : 0 _ Set ROI Pos : (249, 145) -> (268, 86)
+[2023-06-30 15:20:22] 2 -> 1
+[2023-06-30 15:20:22] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:22] IV2MSG : State - UnReady
+[2023-06-30 15:20:22] 1 -> 2
+[2023-06-30 15:20:22] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (249, 145)
+[2023-06-30 15:20:22] 2 -> 3
+[2023-06-30 15:20:22] IRLight : On
+[2023-06-30 15:20:22] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:22] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:22] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:22] Selected CameraID : 0 _ Set ROI Pos : (249, 145) -> (268, 86)
+[2023-06-30 15:20:22] 2 -> 1
+[2023-06-30 15:20:22] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:22] IV2MSG : State - UnReady
+[2023-06-30 15:20:22] 1 -> 2
+[2023-06-30 15:20:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (248, 145)
+[2023-06-30 15:20:23] 2 -> 3
+[2023-06-30 15:20:23] IRLight : On
+[2023-06-30 15:20:23] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:23] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:23] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:23] Selected CameraID : 0 _ Set ROI Pos : (248, 145) -> (268, 86)
+[2023-06-30 15:20:23] 2 -> 1
+[2023-06-30 15:20:23] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:23] IV2MSG : State - UnReady
+[2023-06-30 15:20:23] 1 -> 2
+[2023-06-30 15:20:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (249, 145)
+[2023-06-30 15:20:23] 2 -> 3
+[2023-06-30 15:20:23] IRLight : On
+[2023-06-30 15:20:23] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:23] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:20:23] IV2MSG : State - subreadysuccess
+[2023-06-30 15:20:23] 3 -> 4
+[2023-06-30 15:20:24] 4 -> 6
+[2023-06-30 15:20:24] Failed SaveImageSize : 20
+[2023-06-30 15:20:24] 6 -> 4
+[2023-06-30 15:20:24] 4 -> 6
+[2023-06-30 15:20:24] Failed SaveImageSize : 20
+[2023-06-30 15:20:24] Selected CameraID : 0 _ Set ROI Pos : (249, 145) -> (268, 86)
+[2023-06-30 15:20:24] 6 -> 1
+[2023-06-30 15:20:24] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:24] 1 -> 2
+[2023-06-30 15:20:24] IRLight : Standby
+[2023-06-30 15:20:25] IRLight : On
+[2023-06-30 15:20:25] 2 -> 1
+[2023-06-30 15:20:25] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:25] 1 -> 2
+[2023-06-30 15:20:25] IRLight : On
+[2023-06-30 15:20:26] 2 -> 1
+[2023-06-30 15:20:26] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:26] 1 -> 2
+[2023-06-30 15:20:26] IRLight : Standby
+[2023-06-30 15:20:27] 2 -> 1
+[2023-06-30 15:20:27] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:27] IRLight : On
+[2023-06-30 15:20:28] IRLight : Standby
+[2023-06-30 15:20:30] IRLight : On
+[2023-06-30 15:20:31] IRLight : Standby
+[2023-06-30 15:20:31] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:20:32] IRLight : On
+[2023-06-30 15:20:33] IRLight : Standby
+[2023-06-30 15:20:33] 1 -> 2
+[2023-06-30 15:20:33] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:20:34] IRLight : On
+[2023-06-30 15:20:34] 2 -> 1
+[2023-06-30 15:20:34] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:34] 1 -> 2
+[2023-06-30 15:20:35] IRLight : Standby
+[2023-06-30 15:20:35] 2 -> 1
+[2023-06-30 15:20:35] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:35] 1 -> 2
+[2023-06-30 15:20:36] 2 -> 1
+[2023-06-30 15:20:36] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:36] 1 -> 2
+[2023-06-30 15:20:37] IRLight : On
+[2023-06-30 15:20:38] 2 -> 1
+[2023-06-30 15:20:38] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:38] IRLight : Standby
+[2023-06-30 15:20:38] 1 -> 2
+[2023-06-30 15:20:38] IRLight : On
+[2023-06-30 15:20:39] 2 -> 1
+[2023-06-30 15:20:39] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:39] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:20:39] 1 -> 2
+[2023-06-30 15:20:39] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:20:39] IRLight : Standby
+[2023-06-30 15:20:39] 2 -> 1
+[2023-06-30 15:20:39] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:39] 1 -> 2
+[2023-06-30 15:20:40] IRLight : On
+[2023-06-30 15:20:40] 2 -> 1
+[2023-06-30 15:20:40] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:40] 1 -> 2
+[2023-06-30 15:20:41] IRLight : Standby
+[2023-06-30 15:20:42] 2 -> 1
+[2023-06-30 15:20:42] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:42] 1 -> 2
+[2023-06-30 15:20:42] 2 -> 1
+[2023-06-30 15:20:42] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:42] 1 -> 2
+[2023-06-30 15:20:43] IRLight : On
+[2023-06-30 15:20:44] 2 -> 1
+[2023-06-30 15:20:44] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:44] 1 -> 2
+[2023-06-30 15:20:44] IRLight : Standby
+[2023-06-30 15:20:44] IRLight : On
+[2023-06-30 15:20:45] 2 -> 1
+[2023-06-30 15:20:45] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:45] 1 -> 2
+[2023-06-30 15:20:45] IRLight : Standby
+[2023-06-30 15:20:46] 2 -> 1
+[2023-06-30 15:20:46] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:46] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:20:46] 1 -> 2
+[2023-06-30 15:20:46] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:20:47] 2 -> 1
+[2023-06-30 15:20:47] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:47] 1 -> 2
+[2023-06-30 15:20:48] 2 -> 1
+[2023-06-30 15:20:48] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:48] 1 -> 2
+[2023-06-30 15:20:49] 2 -> 1
+[2023-06-30 15:20:49] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:49] 1 -> 2
+[2023-06-30 15:20:50] 2 -> 1
+[2023-06-30 15:20:50] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:50] 1 -> 2
+[2023-06-30 15:20:50] IRLight : On
+[2023-06-30 15:20:51] 2 -> 1
+[2023-06-30 15:20:51] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:51] 1 -> 2
+[2023-06-30 15:20:51] IRLight : Standby
+[2023-06-30 15:20:52] 2 -> 1
+[2023-06-30 15:20:52] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:52] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:20:52] 1 -> 2
+[2023-06-30 15:20:52] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:20:53] 2 -> 1
+[2023-06-30 15:20:53] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:53] IRLight : On
+[2023-06-30 15:20:54] 1 -> 2
+[2023-06-30 15:20:54] IRLight : Standby
+[2023-06-30 15:20:54] 2 -> 1
+[2023-06-30 15:20:54] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:55] IRLight : On
+[2023-06-30 15:20:55] 1 -> 2
+[2023-06-30 15:20:56] 2 -> 1
+[2023-06-30 15:20:56] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:56] 1 -> 2
+[2023-06-30 15:20:56] IRLight : Standby
+[2023-06-30 15:20:56] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (249, 145)
+[2023-06-30 15:20:56] 2 -> 3
+[2023-06-30 15:20:56] IRLight : On
+[2023-06-30 15:20:56] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:56] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:56] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:56] Selected CameraID : 0 _ Set ROI Pos : (249, 145) -> (268, 86)
+[2023-06-30 15:20:56] 2 -> 1
+[2023-06-30 15:20:56] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:56] IV2MSG : State - UnReady
+[2023-06-30 15:20:56] 1 -> 2
+[2023-06-30 15:20:57] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (249, 145)
+[2023-06-30 15:20:57] 2 -> 3
+[2023-06-30 15:20:57] IRLight : On
+[2023-06-30 15:20:57] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:57] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:20:57] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:20:57] Selected CameraID : 0 _ Set ROI Pos : (249, 145) -> (268, 86)
+[2023-06-30 15:20:57] 2 -> 1
+[2023-06-30 15:20:57] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:57] IV2MSG : State - UnReady
+[2023-06-30 15:20:57] 1 -> 2
+[2023-06-30 15:20:57] 2 -> 1
+[2023-06-30 15:20:57] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:58] 1 -> 2
+[2023-06-30 15:20:58] IRLight : Standby
+[2023-06-30 15:20:58] IRLight : On
+[2023-06-30 15:20:58] 2 -> 1
+[2023-06-30 15:20:58] ImageQueue Reset : Main Camera
+[2023-06-30 15:20:59] IRLight : On
+[2023-06-30 15:21:00] IRLight : Standby
+[2023-06-30 15:21:00] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:21:04] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:21:07] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:21:11] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:21:14] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:21:18] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:21:18] IRLight : On
+[2023-06-30 15:21:19] IRLight : Standby
+[2023-06-30 15:21:20] 1 -> 2
+[2023-06-30 15:21:20] IRLight : On
+[2023-06-30 15:21:20] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2023-06-30 15:21:20] 2 -> 3
+[2023-06-30 15:21:20] IRLight : On
+[2023-06-30 15:21:20] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:20] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:20] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:20] 3 -> 4
+[2023-06-30 15:21:21] IRLight : Standby
+[2023-06-30 15:21:22] IRLight : On
+[2023-06-30 15:21:23] IRLight : Standby
+[2023-06-30 15:21:23] 4 -> 6
+[2023-06-30 15:21:23] Failed SaveImageSize : 20
+[2023-06-30 15:21:23] 6 -> 4
+[2023-06-30 15:21:23] 4 -> 6
+[2023-06-30 15:21:23] Failed SaveImageSize : 20
+[2023-06-30 15:21:23] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2023-06-30 15:21:23] 6 -> 1
+[2023-06-30 15:21:23] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:23] 1 -> 2
+[2023-06-30 15:21:23] IRLight : On
+[2023-06-30 15:21:24] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2023-06-30 15:21:24] 2 -> 3
+[2023-06-30 15:21:24] IRLight : On
+[2023-06-30 15:21:24] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:24] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:24] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:24] 3 -> 4
+[2023-06-30 15:21:25] IRLight : Standby
+[2023-06-30 15:21:25] IRLight : On
+[2023-06-30 15:21:25] 4 -> 7
+[2023-06-30 15:21:25] SaveImageSize : 18 -> 18
+[2023-06-30 15:21:25] 7 -> 8
+[2023-06-30 15:21:25] 8 -> 9
+[2023-06-30 15:21:25] ErrorShot : Error/[Shot]01230630_152125(001)
+[2023-06-30 15:21:25] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2023-06-30 15:21:25] 9 -> 1
+[2023-06-30 15:21:25] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:25] IV2MSG : State - SubSuccess
+[2023-06-30 15:21:25] 1 -> 2
+[2023-06-30 15:21:26] 2 -> 1
+[2023-06-30 15:21:26] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:26] IRLight : Standby
+[2023-06-30 15:21:26] 1 -> 2
+[2023-06-30 15:21:26] IRLight : On
+[2023-06-30 15:21:27] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2023-06-30 15:21:27] 2 -> 3
+[2023-06-30 15:21:27] IRLight : On
+[2023-06-30 15:21:27] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:27] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:27] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:27] 3 -> 4
+[2023-06-30 15:21:28] IRLight : Standby
+[2023-06-30 15:21:28] IRLight : On
+[2023-06-30 15:21:28] 4 -> 6
+[2023-06-30 15:21:28] Failed SaveImageSize : 20
+[2023-06-30 15:21:28] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2023-06-30 15:21:28] 6 -> 1
+[2023-06-30 15:21:28] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:28] 1 -> 2
+[2023-06-30 15:21:29] IRLight : Standby
+[2023-06-30 15:21:29] 2 -> 1
+[2023-06-30 15:21:29] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:30] IRLight : On
+[2023-06-30 15:21:31] IRLight : Standby
+[2023-06-30 15:21:31] 1 -> 2
+[2023-06-30 15:21:31] IRLight : On
+[2023-06-30 15:21:31] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2023-06-30 15:21:31] 2 -> 3
+[2023-06-30 15:21:31] IRLight : On
+[2023-06-30 15:21:31] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:31] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:31] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:31] 3 -> 4
+[2023-06-30 15:21:32] IRLight : Standby
+[2023-06-30 15:21:33] IRLight : On
+[2023-06-30 15:21:33] 4 -> 6
+[2023-06-30 15:21:33] Failed SaveImageSize : 20
+[2023-06-30 15:21:33] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2023-06-30 15:21:33] 6 -> 1
+[2023-06-30 15:21:33] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:33] 1 -> 2
+[2023-06-30 15:21:34] IRLight : Standby
+[2023-06-30 15:21:34] 2 -> 1
+[2023-06-30 15:21:34] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:35] IRLight : On
+[2023-06-30 15:21:36] IRLight : Standby
+[2023-06-30 15:21:36] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:21:38] IRLight : On
+[2023-06-30 15:21:39] 1 -> 2
+[2023-06-30 15:21:39] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:21:39] IRLight : Standby
+[2023-06-30 15:21:40] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2023-06-30 15:21:40] 2 -> 3
+[2023-06-30 15:21:40] IRLight : On
+[2023-06-30 15:21:40] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:40] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:40] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:40] 3 -> 4
+[2023-06-30 15:21:41] IRLight : Standby
+[2023-06-30 15:21:41] IRLight : On
+[2023-06-30 15:21:41] 4 -> 6
+[2023-06-30 15:21:41] Failed SaveImageSize : 20
+[2023-06-30 15:21:41] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2023-06-30 15:21:41] 6 -> 1
+[2023-06-30 15:21:41] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:41] 1 -> 2
+[2023-06-30 15:21:41] IRLight : On
+[2023-06-30 15:21:41] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2023-06-30 15:21:41] 2 -> 3
+[2023-06-30 15:21:41] IRLight : On
+[2023-06-30 15:21:41] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:41] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:41] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:42] 3 -> 4
+[2023-06-30 15:21:42] IRLight : Standby
+[2023-06-30 15:21:43] IRLight : On
+[2023-06-30 15:21:43] 4 -> 6
+[2023-06-30 15:21:43] Failed SaveImageSize : 20
+[2023-06-30 15:21:43] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2023-06-30 15:21:43] 6 -> 1
+[2023-06-30 15:21:43] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:43] 1 -> 2
+[2023-06-30 15:21:44] 2 -> 1
+[2023-06-30 15:21:44] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:44] IRLight : Standby
+[2023-06-30 15:21:44] IRLight : On
+[2023-06-30 15:21:45] 1 -> 2
+[2023-06-30 15:21:45] IRLight : Standby
+[2023-06-30 15:21:46] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2023-06-30 15:21:46] 2 -> 3
+[2023-06-30 15:21:46] IRLight : On
+[2023-06-30 15:21:46] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:46] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:46] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:46] 3 -> 4
+[2023-06-30 15:21:47] IRLight : Standby
+[2023-06-30 15:21:47] IRLight : On
+[2023-06-30 15:21:47] 4 -> 6
+[2023-06-30 15:21:47] Failed SaveImageSize : 20
+[2023-06-30 15:21:47] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2023-06-30 15:21:47] 6 -> 1
+[2023-06-30 15:21:47] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:47] 1 -> 2
+[2023-06-30 15:21:47] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 141)
+[2023-06-30 15:21:47] 2 -> 3
+[2023-06-30 15:21:47] IRLight : On
+[2023-06-30 15:21:47] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:47] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:21:47] IV2MSG : State - subreadysuccess
+[2023-06-30 15:21:48] 3 -> 4
+[2023-06-30 15:21:48] IRLight : Standby
+[2023-06-30 15:21:49] IRLight : On
+[2023-06-30 15:21:50] IRLight : Standby
+[2023-06-30 15:21:55] IRLight : On
+[2023-06-30 15:21:56] 4 -> 6
+[2023-06-30 15:21:56] Failed SaveImageSize : 20
+[2023-06-30 15:21:56] Selected CameraID : 0 _ Set ROI Pos : (265, 141) -> (268, 86)
+[2023-06-30 15:21:56] 6 -> 1
+[2023-06-30 15:21:56] ImageQueue Reset : Main Camera
+[2023-06-30 15:21:56] 1 -> 2
+[2023-06-30 15:21:56] IRLight : Standby
+[2023-06-30 15:21:56] 2 -> 1
+[2023-06-30 15:21:56] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:03] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:06] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:09] IRLight : On
+[2023-06-30 15:22:10] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:10] IRLight : Standby
+[2023-06-30 15:22:11] IRLight : On
+[2023-06-30 15:22:12] 1 -> 2
+[2023-06-30 15:22:12] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:12] IRLight : Standby
+[2023-06-30 15:22:13] 2 -> 1
+[2023-06-30 15:22:13] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:13] IRLight : On
+[2023-06-30 15:22:14] IRLight : Standby
+[2023-06-30 15:22:15] IRLight : On
+[2023-06-30 15:22:16] IRLight : Standby
+[2023-06-30 15:22:17] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:17] 1 -> 2
+[2023-06-30 15:22:17] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:17] IRLight : On
+[2023-06-30 15:22:18] 2 -> 1
+[2023-06-30 15:22:18] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:18] IRLight : Standby
+[2023-06-30 15:22:18] 1 -> 2
+[2023-06-30 15:22:19] IRLight : On
+[2023-06-30 15:22:19] 2 -> 1
+[2023-06-30 15:22:19] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:20] IRLight : Standby
+[2023-06-30 15:22:20] 1 -> 2
+[2023-06-30 15:22:20] IRLight : On
+[2023-06-30 15:22:21] 2 -> 1
+[2023-06-30 15:22:21] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:21] IRLight : Standby
+[2023-06-30 15:22:23] IRLight : On
+[2023-06-30 15:22:24] IRLight : Standby
+[2023-06-30 15:22:24] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:24] 1 -> 2
+[2023-06-30 15:22:24] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:25] IRLight : On
+[2023-06-30 15:22:25] 2 -> 1
+[2023-06-30 15:22:25] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:26] IRLight : Standby
+[2023-06-30 15:22:26] IRLight : On
+[2023-06-30 15:22:27] 1 -> 2
+[2023-06-30 15:22:27] IRLight : Standby
+[2023-06-30 15:22:27] 2 -> 1
+[2023-06-30 15:22:27] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:28] IRLight : On
+[2023-06-30 15:22:29] 1 -> 2
+[2023-06-30 15:22:29] 2 -> 1
+[2023-06-30 15:22:29] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:29] IRLight : Standby
+[2023-06-30 15:22:30] IRLight : On
+[2023-06-30 15:22:31] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:31] IRLight : Standby
+[2023-06-30 15:22:32] IRLight : On
+[2023-06-30 15:22:32] 1 -> 2
+[2023-06-30 15:22:32] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:33] IRLight : Standby
+[2023-06-30 15:22:33] 2 -> 1
+[2023-06-30 15:22:33] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:34] IRLight : On
+[2023-06-30 15:22:35] IRLight : Standby
+[2023-06-30 15:22:36] IRLight : On
+[2023-06-30 15:22:37] IRLight : Standby
+[2023-06-30 15:22:38] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:38] 1 -> 2
+[2023-06-30 15:22:38] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:38] IRLight : On
+[2023-06-30 15:22:39] 2 -> 1
+[2023-06-30 15:22:39] ImageQueue Reset : Main Camera
+[2023-06-30 15:22:39] IRLight : Standby
+[2023-06-30 15:22:40] IRLight : On
+[2023-06-30 15:22:41] IRLight : Standby
+[2023-06-30 15:22:45] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:48] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:52] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:22:55] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:22:59] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:23:02] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:23:06] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:23:09] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:23:13] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:23:16] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:23:20] Selected Camera ID : 0 _ OptionExpose : 2264
+[2023-06-30 15:23:20] 1 -> 1
+[2023-06-30 15:23:20] ImageQueue Reset : Main Camera
+[2023-06-30 15:23:20] IRLight : Idle
+[2023-06-30 15:23:21] IRLight : Standby
+[2023-06-30 15:24:02] Selected Camera ID : 0 _ OptionExpose : 596
+[2023-06-30 15:24:02] IRLight : On
+[2023-06-30 15:24:02] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:24:02] 1 -> 2
+[2023-06-30 15:24:02] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:24:03] IRLight : Standby
+[2023-06-30 15:24:03] 2 -> 1
+[2023-06-30 15:24:03] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:04] IRLight : On
+[2023-06-30 15:24:05] IRLight : Standby
+[2023-06-30 15:24:06] IRLight : On
+[2023-06-30 15:24:07] IRLight : Standby
+[2023-06-30 15:24:08] IRLight : On
+[2023-06-30 15:24:09] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:24:09] IRLight : Standby
+[2023-06-30 15:24:10] IRLight : On
+[2023-06-30 15:24:11] IRLight : Standby
+[2023-06-30 15:24:12] IRLight : On
+[2023-06-30 15:24:12] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:24:13] IRLight : Standby
+[2023-06-30 15:24:14] IRLight : On
+[2023-06-30 15:24:15] IRLight : Standby
+[2023-06-30 15:24:15] IRLight : On
+[2023-06-30 15:24:16] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:24:16] IRLight : Standby
+[2023-06-30 15:24:18] IRLight : On
+[2023-06-30 15:24:19] IRLight : Standby
+[2023-06-30 15:24:19] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:24:20] 1 -> 2
+[2023-06-30 15:24:20] IRLight : On
+[2023-06-30 15:24:21] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2023-06-30 15:24:21] 2 -> 3
+[2023-06-30 15:24:21] IRLight : On
+[2023-06-30 15:24:21] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:21] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:24:21] IV2MSG : State - subreadysuccess
+[2023-06-30 15:24:21] 3 -> 4
+[2023-06-30 15:24:22] IRLight : Standby
+[2023-06-30 15:24:24] 4 -> 6
+[2023-06-30 15:24:24] Failed SaveImageSize : 20
+[2023-06-30 15:24:24] 6 -> 4
+[2023-06-30 15:24:24] 4 -> 6
+[2023-06-30 15:24:24] Failed SaveImageSize : 20
+[2023-06-30 15:24:24] 6 -> 4
+[2023-06-30 15:24:24] 4 -> 6
+[2023-06-30 15:24:24] Failed SaveImageSize : 20
+[2023-06-30 15:24:24] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2023-06-30 15:24:24] 6 -> 1
+[2023-06-30 15:24:24] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:24] 1 -> 2
+[2023-06-30 15:24:24] IRLight : On
+[2023-06-30 15:24:24] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 139)
+[2023-06-30 15:24:24] 2 -> 3
+[2023-06-30 15:24:24] IRLight : On
+[2023-06-30 15:24:24] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:24] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:24:24] IV2MSG : State - subreadysuccess
+[2023-06-30 15:24:24] 3 -> 4
+[2023-06-30 15:24:25] 4 -> 6
+[2023-06-30 15:24:25] Failed SaveImageSize : 20
+[2023-06-30 15:24:25] 6 -> 4
+[2023-06-30 15:24:25] 4 -> 6
+[2023-06-30 15:24:25] Failed SaveImageSize : 20
+[2023-06-30 15:24:25] Selected CameraID : 0 _ Set ROI Pos : (265, 139) -> (268, 86)
+[2023-06-30 15:24:25] 6 -> 1
+[2023-06-30 15:24:25] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:25] 1 -> 2
+[2023-06-30 15:24:25] IRLight : Standby
+[2023-06-30 15:24:25] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 143)
+[2023-06-30 15:24:25] 2 -> 3
+[2023-06-30 15:24:25] IRLight : On
+[2023-06-30 15:24:25] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:25] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:24:25] IV2MSG : State - subreadysuccess
+[2023-06-30 15:24:25] 3 -> 4
+[2023-06-30 15:24:26] 4 -> 6
+[2023-06-30 15:24:26] 6 -> 8
+[2023-06-30 15:24:26] 8 -> 9
+[2023-06-30 15:24:26] Img : 
+[2023-06-30 15:24:26] Img : 
+[2023-06-30 15:24:26] Img : 
+[2023-06-30 15:24:26] Success : PeekMessage(0.000010)
+[2023-06-30 15:24:26] FALED SUBCAMERA DATA
+[2023-06-30 15:24:26] ErrorShot : Error/[Shot]01230630_152426(001)
+[2023-06-30 15:24:26] Selected CameraID : 0 _ Set ROI Pos : (265, 143) -> (268, 86)
+[2023-06-30 15:24:26] 9 -> 1
+[2023-06-30 15:24:26] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:26] 1 -> 2
+[2023-06-30 15:24:26] IRLight : Standby
+[2023-06-30 15:24:27] 2 -> 1
+[2023-06-30 15:24:27] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:27] IRLight : On
+[2023-06-30 15:24:27] 1 -> 2
+[2023-06-30 15:24:28] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 133)
+[2023-06-30 15:24:28] 2 -> 3
+[2023-06-30 15:24:28] IRLight : On
+[2023-06-30 15:24:28] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:28] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:24:28] IV2MSG : State - subreadysuccess
+[2023-06-30 15:24:28] 3 -> 4
+[2023-06-30 15:24:29] IRLight : Standby
+[2023-06-30 15:24:29] IRLight : On
+[2023-06-30 15:24:29] 4 -> 6
+[2023-06-30 15:24:29] 6 -> 8
+[2023-06-30 15:24:29] 8 -> 9
+[2023-06-30 15:24:29] ErrorShot : Error/[Shot]01230630_152429(001)
+[2023-06-30 15:24:29] Selected CameraID : 0 _ Set ROI Pos : (266, 133) -> (268, 86)
+[2023-06-30 15:24:29] 9 -> 1
+[2023-06-30 15:24:29] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:29] IV2MSG : State - SubSuccess
+[2023-06-30 15:24:29] 1 -> 2
+[2023-06-30 15:24:30] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (265, 143)
+[2023-06-30 15:24:30] 2 -> 3
+[2023-06-30 15:24:30] IRLight : On
+[2023-06-30 15:24:30] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:30] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2023-06-30 15:24:30] IV2MSG : State - subreadysuccess
+[2023-06-30 15:24:30] 3 -> 4
+[2023-06-30 15:24:31] IRLight : Standby
+[2023-06-30 15:24:31] IRLight : On
+[2023-06-30 15:24:31] 4 -> 6
+[2023-06-30 15:24:31] Failed SaveImageSize : 20
+[2023-06-30 15:24:31] Selected CameraID : 0 _ Set ROI Pos : (265, 143) -> (268, 86)
+[2023-06-30 15:24:31] 6 -> 1
+[2023-06-30 15:24:31] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:31] 1 -> 2
+[2023-06-30 15:24:32] 2 -> 1
+[2023-06-30 15:24:32] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:32] IRLight : Standby
+[2023-06-30 15:24:33] IRLight : On
+[2023-06-30 15:24:34] IRLight : Standby
+[2023-06-30 15:24:34] 1 -> 2
+[2023-06-30 15:24:34] IRLight : On
+[2023-06-30 15:24:34] 2 -> 1
+[2023-06-30 15:24:34] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:35] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:24:35] IRLight : Standby
+[2023-06-30 15:24:38] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:24:42] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:24:45] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:24:49] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:24:52] IRLight : On
+[2023-06-30 15:24:52] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:24:53] 1 -> 2
+[2023-06-30 15:24:53] IRLight : Standby
+[2023-06-30 15:24:54] 2 -> 1
+[2023-06-30 15:24:54] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:54] IRLight : On
+[2023-06-30 15:24:55] IRLight : Standby
+[2023-06-30 15:24:56] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:24:56] 1 -> 2
+[2023-06-30 15:24:56] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:24:57] IRLight : On
+[2023-06-30 15:24:57] 2 -> 1
+[2023-06-30 15:24:57] ImageQueue Reset : Main Camera
+[2023-06-30 15:24:58] IRLight : Standby
+[2023-06-30 15:24:58] IRLight : On
+[2023-06-30 15:24:59] IRLight : Standby
+[2023-06-30 15:25:03] IRLight : On
+[2023-06-30 15:25:03] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:25:04] IRLight : Standby
+[2023-06-30 15:25:06] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:25:08] IRLight : On
+[2023-06-30 15:25:09] IRLight : Standby
+[2023-06-30 15:25:10] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:25:13] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:25:14] IRLight : On
+[2023-06-30 15:25:14] 1 -> 2
+[2023-06-30 15:25:15] IRLight : Standby
+[2023-06-30 15:25:16] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (267, 156)
+[2023-06-30 15:25:16] 2 -> 3
+[2023-06-30 15:25:16] IRLight : On
+[2023-06-30 15:25:16] ImageQueue Reset : Main Camera
+[2023-06-30 15:25:16] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:25:16] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:25:16] Selected CameraID : 0 _ Set ROI Pos : (267, 156) -> (268, 86)
+[2023-06-30 15:25:16] 2 -> 1
+[2023-06-30 15:25:16] ImageQueue Reset : Main Camera
+[2023-06-30 15:25:16] IV2MSG : State - UnReady
+[2023-06-30 15:25:16] 1 -> 2
+[2023-06-30 15:25:16] 2 -> 1
+[2023-06-30 15:25:16] ImageQueue Reset : Main Camera
+[2023-06-30 15:25:17] IRLight : Standby
+[2023-06-30 15:25:17] IRLight : On
+[2023-06-30 15:25:17] IRLight : On
+[2023-06-30 15:25:18] IRLight : Standby
+[2023-06-30 15:25:19] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:25:21] IRLight : On
+[2023-06-30 15:25:22] 1 -> 2
+[2023-06-30 15:25:22] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:25:22] IRLight : Standby
+[2023-06-30 15:25:23] IRLight : On
+[2023-06-30 15:25:23] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 154)
+[2023-06-30 15:25:23] 2 -> 3
+[2023-06-30 15:25:23] IRLight : On
+[2023-06-30 15:25:23] ImageQueue Reset : Main Camera
+[2023-06-30 15:25:23] IV2MSG : Error - CannotFind SubBall1
+[2023-06-30 15:25:23] IV2MSG : Error - CannotFind SubBall3
+[2023-06-30 15:25:23] Selected CameraID : 0 _ Set ROI Pos : (266, 154) -> (268, 86)
+[2023-06-30 15:25:23] 2 -> 1
+[2023-06-30 15:25:23] ImageQueue Reset : Main Camera
+[2023-06-30 15:25:23] IV2MSG : State - UnReady
+[2023-06-30 15:25:23] 1 -> 2
+[2023-06-30 15:25:24] 2 -> 1
+[2023-06-30 15:25:24] ImageQueue Reset : Main Camera
+[2023-06-30 15:25:24] IRLight : Standby
+[2023-06-30 15:25:24] IRLight : On
+[2023-06-30 15:25:24] 1 -> 2
+[2023-06-30 15:25:25] IRLight : Standby
+[2023-06-30 15:25:25] 2 -> 1
+[2023-06-30 15:25:25] ImageQueue Reset : Main Camera
+[2023-06-30 15:25:26] IRLight : On
+[2023-06-30 15:25:27] IRLight : Standby
+[2023-06-30 15:25:30] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:25:31] IRLight : On
+[2023-06-30 15:25:32] IRLight : Standby
+[2023-06-30 15:25:33] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)
+[2023-06-30 15:25:37] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (269, 87)
+[2023-06-30 15:25:40] Selected CameraID : 0 _ Set ROI Pos : (269, 87) -> (268, 86)

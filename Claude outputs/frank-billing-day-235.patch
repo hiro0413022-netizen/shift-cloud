@@ -1,0 +1,3274 @@
+diff --git a/apps/genesis/src/app/api/cron/execute/route.ts b/apps/genesis/src/app/api/cron/execute/route.ts
+index cf36f25..45db8af 100755
+--- a/apps/genesis/src/app/api/cron/execute/route.ts
++++ b/apps/genesis/src/app/api/cron/execute/route.ts
+@@ -4,6 +4,7 @@ import { runDueActions } from "@/lib/ai-execution";
+ import { publishDueContent } from "@/lib/content-loop";
+ import { listOperatingCompanyIds } from "@/lib/operating-companies";
+ import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cron";
++import { runBillingDaySweep } from "@/lib/frank-billing-day";
+ 
+ export const dynamic = "force-dynamic";
+ export const maxDuration = 60;
+@@ -43,5 +44,8 @@ export async function GET(req: NextRequest) {
+      【退店】の押し忘れで来店中が残り続けていた。お客様のスマホ側は同じ規則で
+      すでに閉じているので、DBを画面に合わせる。 */
+   const frankCheckout = await runFrankAutoCheckout().catch((e) => ({ error: String(e) }));
+-  return NextResponse.json({ ok: true, results, frankVisited, frankCheckout });
++  /* FRANK: 入会したのに「毎月10日に翌月分」に作り直せていない方を拾い直す（#235）。
++     入会の Webhook が応答後に走らせる作り直しの取りこぼし用。1回2名まで */
++  const frankBillingDay = await runBillingDaySweep(2).catch((e) => ({ error: String(e) }));
++  return NextResponse.json({ ok: true, results, frankVisited, frankCheckout, frankBillingDay });
+ }
+diff --git a/apps/genesis/src/app/api/public/frank/admin/billing-day/route.ts b/apps/genesis/src/app/api/public/frank/admin/billing-day/route.ts
+new file mode 100644
+index 0000000..1f33871
+--- /dev/null
++++ b/apps/genesis/src/app/api/public/frank/admin/billing-day/route.ts
+@@ -0,0 +1,43 @@
++import { NextRequest, NextResponse } from "next/server";
++import { verifyAdminPayload } from "@yozan/core/admin-sign";
++import { rebaseToBillingDay } from "@/lib/frank-billing-day";
++
++export const dynamic = "force-dynamic";
++export const runtime = "nodejs";
++export const maxDuration = 60;
++
++/**
++ * 月会費を「毎月10日に翌月分」に作り直す（#235）
++ * POST {payload: JSON文字列 {member_id, usage_start?, bulk?}, exp, sig}
++ *
++ * ⚠ 会員IDだけの認可にしない。会員IDはお客様の入会完了画面のURL（?sid=）に出ているので、
++ *   ご利用開始日を後ろにずらす（＝月会費を先送りする）操作をお客様自身が叩けてしまう。
++ *   member-os からのサーバー呼び出しだけを通す（@yozan/core/admin-sign・領収書#222と同じ署名）。
++ */
++export async function POST(req: NextRequest) {
++  let body: Record<string, unknown>;
++  try {
++    body = (await req.json()) as Record<string, unknown>;
++  } catch {
++    return NextResponse.json({ ok: false, error: "bad_json" }, { status: 400 });
++  }
++  const payload = String(body.payload ?? "");
++  const exp = Number(body.exp ?? 0);
++  const sig = String(body.sig ?? "");
++  if (!verifyAdminPayload(payload, exp, sig)) {
++    return NextResponse.json({ ok: false, error: "bad_signature" }, { status: 401 });
++  }
++  let p: Record<string, unknown>;
++  try {
++    p = JSON.parse(payload) as Record<string, unknown>;
++  } catch {
++    return NextResponse.json({ ok: false, error: "bad_payload" }, { status: 400 });
++  }
++  const memberId = String(p.member_id ?? "");
++  if (!/^[0-9a-f-]{36}$/i.test(memberId)) {
++    return NextResponse.json({ ok: false, error: "bad_member_id" }, { status: 400 });
++  }
++  const usageStart = typeof p.usage_start === "string" && /^\d{4}-\d{2}-\d{2}$/.test(p.usage_start) ? p.usage_start : null;
++  const r = await rebaseToBillingDay(memberId, { source: p.bulk === true ? "bulk" : "staff", usageStart });
++  return NextResponse.json(r, { status: r.ok ? 200 : 400 });
++}
+diff --git a/apps/genesis/src/app/api/public/frank/pos/webhook/route.ts b/apps/genesis/src/app/api/public/frank/pos/webhook/route.ts
+index f3277eb..38d7d51 100644
+--- a/apps/genesis/src/app/api/public/frank/pos/webhook/route.ts
++++ b/apps/genesis/src/app/api/public/frank/pos/webhook/route.ts
+@@ -3,6 +3,8 @@ import { verifySquareSignature, handleSquareEvent, DEFAULT_WEBHOOK_URL } from "@
+ 
+ export const dynamic = "force-dynamic";
+ export const runtime = "nodejs";
++// 入会の入金で「10日払いへの作り直し」（Squareを数回呼ぶ・#235）まで行うため
++export const maxDuration = 60;
+ 
+ /**
+  * Square Webhook（FRANK GOLF 店頭POS #118 / 実行計画§3-7）
+diff --git a/apps/genesis/src/lib/frank-billing-day.ts b/apps/genesis/src/lib/frank-billing-day.ts
+new file mode 100644
+index 0000000..729e86f
+--- /dev/null
++++ b/apps/genesis/src/lib/frank-billing-day.ts
+@@ -0,0 +1,574 @@
++import "server-only";
++import { createAdmin } from "@/lib/supabase/admin";
++import { logEvent } from "@/lib/kernel";
++import { jstYmd } from "@/lib/jst";
++import {
++  BILLING_DAY,
++  addMonthsYmd,
++  calendarMonthsBetween,
++  rebaseStartDate,
++  usageStartError,
++  usageStartSchedule,
++  monthLabel,
++} from "@yozan/core/frank-billing-start";
++import { squareCancelDateForLeave } from "@yozan/core/frank-membership";
++
++/**
++ * FRANK 月会費を「毎月10日に翌月分」に作り直す（#235・2026-09-11 ユーザー決定）
++ *
++ * ── なぜサブスクを作り直すのか ──
++ * Web入会の決済リンク（サブスク付き）で作られるサブスクは「お支払いの日」が毎月の請求日になり、
++ * 決済リンク側からは請求日を指定できない。Square の ChangeBillingAnchorDate は既定で日割りせず
++ * 「すぐ満額をもう一度」請求しうる（公式docの注意書き）ので使わない。本番で使っている操作だけで組む:
++ *   ① 今のサブスクを「今の支払い済み期間の終わり」で解約（POST /cancel・#192）
++ *   ② 保存カードから、開始日＝最初の10日・請求日10日のサブスクを作る（POST /subscriptions・#233）
++ *
++ * ── お客様に二重請求しないための約束 ──
++ *   - 同時に2本走らせない: claim（5分で失効）を全経路で取る。スタッフの再実行も同じ
++ *   - 引退させるサブスクIDを先にDBへ控える（その後に届く Webhook を無視させる）
++ *   - 解約に失敗したら「何も変えていない」状態に戻す。前取り分の休止を消したのに解約できなかったら休止を戻して確認する
++ *   - 新しいサブスクの idempotency_key は「会員・旧サブスク・開始日」から決める（再送しても1本）
++ *   - Square に「生きている・引退させていない」サブスクが2本以上あったら何もしない（人が確認）
++ *   解約できたのに作成に失敗した場合は「引き落としが止まっている」（お客様は損しない）。
++ *   billing_rebase_error に残して会員カードに赤で出し、再実行で作成から続ける。
++ *
++ * ── 入会の Webhook から ──
++ *   入金で会員が active になってから動く（join_date＝入金日が決まってから。入会完了メールと同じ日付で数える）。
++ *   作り直しに失敗し、決済リンクのサブスクがまだ生きている場合は、従来の保護（価格上書きの解除＋前取り分の休止）をかける
++ *   ＝翌月に入会時の一括金額がもう一度引き落とされるのを防ぐ。
++ */
++
++const SQUARE_API = "https://connect.squareup.com/v2";
++const CLAIM_TTL_MS = 5 * 60 * 1000;
++
++function token(): string | null {
++  const t = process.env.SQUARE_ACCESS_TOKEN;
++  return t && t.trim().length > 10 ? t.trim() : null;
++}
++
++class SquareError extends Error {
++  status: number;
++  constructor(message: string, status: number) {
++    super(message);
++    this.status = status;
++  }
++}
++
++async function sq(method: string, path: string, body?: Record<string, unknown>): Promise<Record<string, unknown>> {
++  let res: Response;
++  try {
++    res = await fetch(`${SQUARE_API}${path}`, {
++      method,
++      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
++      body: body ? JSON.stringify(body) : undefined,
++      cache: "no-store",
++      signal: AbortSignal.timeout(10_000),
++    });
++  } catch (e) {
++    throw new SquareError(`network: ${String(e instanceof Error ? e.message : e)}`, 0);
++  }
++  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
++  if (!res.ok) {
++    const errs = (json.errors as Array<{ detail?: string; code?: string }> | undefined) ?? [];
++    throw new SquareError(errs.map((e) => `${e.code ?? ""} ${e.detail ?? ""}`.trim()).join("; ") || `Square ${method} ${path}`, res.status);
++  }
++  return json;
++}
++
++/** 一時的な失敗（再実行で通りうる）＝ここでは状態を変えずに止める */
++const isTransient = (e: unknown) => e instanceof SquareError && (e.status === 0 || e.status === 429 || e.status >= 500);
++const errText = (e: unknown) => String(e instanceof Error ? e.message : e).slice(0, 160);
++
++export type SquareSub = {
++  id: string;
++  status: string;
++  start_date: string | null;
++  charged_through_date: string | null;
++  canceled_date: string | null;
++  monthly_billing_anchor_date: number | null;
++  card_id: string | null;
++  created_at: string | null;
++  actions: Array<{ id: string; type: string; effective_date: string | null }>;
++};
++
++function toSub(raw: Record<string, unknown>, actionsRaw?: unknown): SquareSub {
++  const acts = ((actionsRaw ?? raw.actions ?? []) as Array<Record<string, unknown>>).map((a) => ({
++    id: String(a.id ?? ""),
++    type: String(a.type ?? "").toUpperCase(),
++    effective_date: a.effective_date ? String(a.effective_date) : null,
++  }));
++  return {
++    id: String(raw.id ?? ""),
++    status: String(raw.status ?? "").toUpperCase(),
++    start_date: raw.start_date ? String(raw.start_date) : null,
++    charged_through_date: raw.charged_through_date ? String(raw.charged_through_date) : null,
++    canceled_date: raw.canceled_date ? String(raw.canceled_date) : null,
++    monthly_billing_anchor_date: typeof raw.monthly_billing_anchor_date === "number" ? raw.monthly_billing_anchor_date : null,
++    card_id: raw.card_id ? String(raw.card_id) : null,
++    created_at: raw.created_at ? String(raw.created_at) : null,
++    actions: acts,
++  };
++}
++
++async function getSub(id: string): Promise<SquareSub> {
++  const json = await sq("GET", `/subscriptions/${encodeURIComponent(id)}?include=actions`);
++  const raw = (json.subscription ?? {}) as Record<string, unknown>;
++  return toSub(raw, json.actions ?? raw.actions);
++}
++
++async function searchSubs(customerId: string): Promise<SquareSub[]> {
++  const json = await sq("POST", "/subscriptions/search", { query: { filter: { customer_ids: [customerId] } } });
++  return ((json.subscriptions ?? []) as Array<Record<string, unknown>>).map((s) => toSub(s));
++}
++
++const isLive = (s: SquareSub) => !["CANCELED", "DEACTIVATED"].includes(s.status);
++const hasCancel = (s: SquareSub) => !!s.canceled_date || s.actions.some((a) => a.type === "CANCEL");
++
++export type RebaseResult =
++  | {
++      ok: true;
++      noop?: boolean;
++      startDate: string;
++      billedMonth: string;
++      oldSubscriptionId: string | null;
++      newSubscriptionId: string | null;
++      oldEndsOn: string | null;
++      message: string;
++    }
++  | { ok: false; error: string; detail?: string; refused?: boolean };
++
++/**
++ * 解約が「もう請求しない」形で入ったか。
++ * canceled_date が付いただけでは足りない（まだ始まっていないサブスクで、開始日より後に解約日が付くと開始日に1回請求される）。
++ */
++function cancelVerified(s: SquareSub): boolean {
++  if (s.status === "CANCELED" || s.status === "DEACTIVATED") return true;
++  if (!s.canceled_date) return false;
++  const edge = s.status === "PENDING"
++    ? s.start_date
++    : (s.charged_through_date ?? (s.start_date ? addMonthsYmd(s.start_date, 1) : null));
++  return !!edge && s.canceled_date <= edge;
++}
++
++type MemberRow = {
++  id: string;
++  company_id: string;
++  name: string | null;
++  member_no: string | null;
++  status: string;
++  join_date: string | null;
++  join_campaign: string | null;
++  billing_registered_at: string | null;
++  square_customer_id: string | null;
++  square_subscription_id: string | null;
++  square_checkout_breakdown: Record<string, unknown> | null;
++  scheduled_leave_date: string | null;
++  scheduled_suspend_start: string | null;
++  billing_rebased_at: string | null;
++  billing_rebase_error: string | null;
++  square_retired_subscription_ids: string[] | null;
++  prepay_pause_done_at: string | null;
++  frunk_plans: {
++    name: string | null;
++    monthly_price: number | null;
++    square_variation_id: string | null;
++    square_variation_nofee_id: string | null;
++  } | null;
++};
++
++const MEMBER_SELECT =
++  "id, company_id, name, member_no, status, join_date, join_campaign, billing_registered_at, square_customer_id, square_subscription_id, square_checkout_breakdown, scheduled_leave_date, scheduled_suspend_start, billing_rebased_at, billing_rebase_error, square_retired_subscription_ids, prepay_pause_done_at, frunk_plans(name, monthly_price, square_variation_id, square_variation_nofee_id)";
++
++const slash = (ymd: string) => ymd.replaceAll("-", "/");
++
++/**
++ * 1人ぶんを10日払いに作り直す。
++ * - source 'webhook': まだ作り直していない active の会員だけ（入会・カード登録の直後）
++ * - source 'staff' / 'bulk': 済んでいても今の状態から見直す（開始日が合っていれば何もしない）
++ * - usageStart: ご利用開始日の変更（#234）。成功したときだけ start_date / 継続期限 / 内訳に書く
++ */
++export async function rebaseToBillingDay(
++  memberId: string,
++  opts: { source: "webhook" | "staff" | "bulk"; usageStart?: string | null },
++): Promise<RebaseResult> {
++  if (!token() || !process.env.SQUARE_LOCATION_ID) return { ok: false, error: "square_env_missing", refused: true };
++  const locationId = String(process.env.SQUARE_LOCATION_ID);
++  const admin = createAdmin();
++  const today = jstYmd();
++
++  // ---- 同時に2本走らせない（Webhook 2本・スタッフの二度押し・一括ボタンの再押し） ----
++  const cutoff = new Date(Date.now() - CLAIM_TTL_MS).toISOString();
++  const { data: claimed } = await admin
++    .from("frunk_members")
++    .update({ billing_rebase_claimed_at: new Date().toISOString() })
++    .eq("id", memberId)
++    .or(`billing_rebase_claimed_at.is.null,billing_rebase_claimed_at.lt.${cutoff}`)
++    .select("id");
++  if (!claimed || claimed.length === 0) return { ok: false, error: "already_claimed", refused: true };
++  const release = async (patch: Record<string, unknown> = {}) => {
++    await admin
++      .from("frunk_members")
++      .update({ ...patch, billing_rebase_claimed_at: null, updated_at: new Date().toISOString() })
++      .eq("id", memberId);
++  };
++
++  // claim を取ってから読む（前の実行が書いた引退リスト・サブスクIDを必ず見る）
++  const { data } = await admin.from("frunk_members").select(MEMBER_SELECT).eq("id", memberId).is("deleted_at", null).maybeSingle();
++  const m = data as unknown as MemberRow | null;
++
++  /** 何も変えずに断る（会員カードに赤は出さない） */
++  const refuse = async (error: string, detail?: string): Promise<RebaseResult> => {
++    await release();
++    return { ok: false, error, detail, refused: true };
++  };
++  if (!m) return refuse("member_not_found");
++
++  /** Square を触ったあとの失敗。会員カードに赤で出し、イベントに残す */
++  const fail = async (error: string, detail?: string, severity: "warning" | "critical" = "warning"): Promise<RebaseResult> => {
++    await release({ billing_rebase_error: `${error}${detail ? `: ${detail}` : ""}`.slice(0, 500) });
++    await logEvent(m.company_id, {
++      event_type: "billing.rebase_failed",
++      title: `10日払いへの切り替えに失敗: ${m.name ?? ""}様（${m.member_no ?? ""}）${error}`.slice(0, 120),
++      description: detail,
++      source: "frank_billing",
++      source_type: "system",
++      severity,
++      raw_payload: { member_id: m.id, error, detail, source: opts.source },
++    });
++    return { ok: false, error, detail };
++  };
++
++  if (opts.source === "webhook" && m.billing_rebased_at) return refuse("already_rebased");
++  // 一度失敗した方は自動では再挑戦しない（Square の変更が Webhook を呼び、また失敗する、の繰り返しを防ぐ）。スタッフが再実行する
++  if (opts.source === "webhook" && m.billing_rebase_error) return refuse("needs_staff", m.billing_rebase_error);
++  // 入会日（＝入金日）が決まってから数える。入会完了メールと同じ日付になる
++  if (m.status !== "active" || !m.join_date) return refuse("not_active_yet");
++  const plan = m.frunk_plans;
++  if (!plan || Number(plan.monthly_price ?? 0) <= 0) return refuse("plan_free");
++  const variationId = plan.square_variation_nofee_id ?? plan.square_variation_id;
++  if (!variationId) return refuse("plan_no_variation");
++  if (!m.square_customer_id) return refuse("no_customer");
++  // 休会の予約がある方は、停止の予約ごと作り直すことになるので自動ではやらない
++  if (m.scheduled_suspend_start) return refuse("suspend_scheduled", `休会予約（${m.scheduled_suspend_start}〜）があります`);
++
++  // ---- 開始日（最初の10日） ----
++  const bd = (m.square_checkout_breakdown ?? {}) as Record<string, unknown>;
++  const prepaid = Number(bd.prepaidMonths ?? 0);
++  const joinYmd = String(m.join_date);
++  // ⚠ ご利用開始日は「内訳に控えたもの」だけ。#234 より前の入会は入会月無料で決済済みなので、
++  //   フォームの start_date を後から当てはめると1か月タダになる
++  let usageStartYmd = bd.usageStartYmd ? String(bd.usageStartYmd) : null;
++  if (opts.usageStart) {
++    const err = usageStartError({ applyDateYmd: joinYmd, usageStartYmd: opts.usageStart });
++    if (err) return refuse("usage_start_invalid", err);
++    usageStartYmd = opts.usageStart;
++  }
++  const registeredYmd = m.billing_registered_at ? jstYmd(new Date(m.billing_registered_at)) : null;
++  const start = rebaseStartDate({ joinDateYmd: joinYmd, usageStartYmd, prepaidMonths: prepaid, todayYmd: today, registeredYmd });
++  if (!start.ok) return refuse("past_date", `最初の引き落とし日 ${slash(start.date)} が過ぎています`);
++  const target = start.date;
++  const sch = usageStartYmd ? usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd, prepaidMonths: prepaid }) : null;
++
++  const usagePatch = (): Record<string, unknown> => {
++    if (!opts.usageStart || !sch) return {};
++    return { start_date: sch.usageStartYmd, ...(m.join_campaign ? { min_term_until: sch.minTermUntilYmd } : {}) };
++  };
++  const breakdownPatch = () => ({
++    ...bd,
++    ...(usageStartYmd ? { usageStartYmd } : {}),
++    nextBillingYmd: target,
++    billingDay: BILLING_DAY,
++  });
++
++  const markDone = async (subId: string | null, oldId: string | null, oldEnds: string | null, noop: boolean, note?: string): Promise<RebaseResult> => {
++    await release({
++      ...(subId ? { square_subscription_id: subId } : {}),
++      billing_day: BILLING_DAY,
++      billing_rebased_at: new Date().toISOString(),
++      billing_rebase_error: null,
++      prepay_pause_done_at: m.prepay_pause_done_at ?? new Date().toISOString(),
++      square_checkout_breakdown: breakdownPatch(),
++      ...usagePatch(),
++    });
++    const message = note
++      ?? (noop
++        ? `10日払いです（次回 ${slash(target)} に${monthLabel(start.billedMonthYmd)}分）`
++        : `10日払いに切り替えました。次回 ${slash(target)} に${monthLabel(start.billedMonthYmd)}分${oldEnds ? `（これまでのサブスクは ${slash(oldEnds)} で終了）` : ""}`);
++    if (!noop) {
++      await logEvent(m.company_id, {
++        event_type: "billing.rebased",
++        title: `月会費を10日払いに: ${m.name ?? ""}様（${m.member_no ?? ""}）次回 ${slash(target)}（${monthLabel(start.billedMonthYmd)}分）`.slice(0, 120),
++        source: "frank_billing",
++        source_type: "system",
++        raw_payload: { member_id: m.id, old_subscription_id: oldId, new_subscription_id: subId, start_date: target, source: opts.source },
++      });
++    }
++    return { ok: true, noop, startDate: target, billedMonth: start.billedMonthYmd, oldSubscriptionId: oldId, newSubscriptionId: subId, oldEndsOn: oldEnds, message };
++  };
++
++  const retiredBefore = (m.square_retired_subscription_ids ?? []).map(String);
++  let cancelTouched = false; // 解約（または休止の削除）に手を付けたか＝保護をかけてはいけない
++
++  /** 入会直後の Webhook で作り直せなかったとき、決済リンクのサブスクに従来の保護をかける（翌月の一括金額の再請求を防ぐ） */
++  const protectCheckoutSub = async (sub: SquareSub | null) => {
++    if (opts.source !== "webhook" || !sub || cancelTouched || sub.status !== "ACTIVE" || hasCancel(sub)) return;
++    if (sub.actions.some((a) => a.type === "PAUSE")) return;
++    const firstBilled = sch?.firstBilledMonthYmd ?? usageStartSchedule({ applyDateYmd: joinYmd, prepaidMonths: prepaid }).firstBilledMonthYmd;
++    const cycles = Math.max(0, calendarMonthsBetween(joinYmd, firstBilled) - 1);
++    try {
++      await sq("PUT", `/subscriptions/${encodeURIComponent(sub.id)}`, { subscription: { price_override_money: null } });
++      if (cycles > 0) await sq("POST", `/subscriptions/${encodeURIComponent(sub.id)}/pause`, { pause_cycle_duration: cycles });
++      await admin.from("frunk_members").update({ prepay_pause_done_at: new Date().toISOString(), square_subscription_id: sub.id }).eq("id", m.id);
++    } catch (e) {
++      await logEvent(m.company_id, {
++        event_type: "billing.prepay_setup_failed",
++        title: `⚠入会時のサブスクの保護に失敗: ${m.name ?? ""}様（${m.member_no ?? ""}）翌月の引き落としをSquareで止めてください`.slice(0, 120),
++        description: errText(e),
++        source: "frank_billing",
++        source_type: "system",
++        severity: "critical",
++      });
++    }
++  };
++
++  let current: SquareSub | null = null;
++  try {
++    // ---- Square の今の状態 ----
++    const all = await searchSubs(m.square_customer_id);
++    const retired = new Set(retiredBefore);
++    const liveMine = all
++      .filter((s) => isLive(s) && !retired.has(s.id))
++      .sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
++    if (liveMine.length > 1) {
++      const d = liveMine.map((s) => `${s.id.slice(0, 8)}:${s.status}:${s.start_date ?? ""}`).join(" / ");
++      if (opts.source === "webhook") await protectCheckoutSub(null);
++      return fail("multiple_subscriptions", `Squareに有効なサブスクが${liveMine.length}本あります（${d}）。二重引き落としにならないようSquareで確認してください`, "critical");
++    }
++    current = liveMine[0] ? await getSub(liveMine[0].id) : null;
++
++    let oldId: string | null = null;
++    let oldEnds: string | null = null;
++    let cardId: string | null = current?.card_id ?? null;
++
++    if (current) {
++      // すでに「10日払い・まだ始まっていない・開始日が合っている」
++      if (current.status === "PENDING" && current.start_date === target && !hasCancel(current)) {
++        return markDone(current.id, null, null, true);
++      }
++      if (current.status === "PAUSED") return refuse("paused", "休止中のサブスクは自動では作り直せません");
++      if (current.status === "ACTIVE" && current.monthly_billing_anchor_date === BILLING_DAY && m.billing_rebased_at) {
++        if (current.charged_through_date === target) return markDone(current.id, null, null, true);
++        return refuse("already_charging", `すでに10日払いで引き落としが始まっています（次回 ${slash(String(current.charged_through_date ?? ""))}）`);
++      }
++      if (hasCancel(current)) {
++        return refuse("cancel_scheduled", `このサブスクには解約の予約があります（${current.canceled_date ?? "予約あり"}）。退会・解約の手続きを確認してください`);
++      }
++      if (prepaid > 0 && current.status === "ACTIVE" && current.charged_through_date && target < current.charged_through_date) {
++        return refuse("overlap", `今のサブスクは ${slash(current.charged_through_date)} まで支払い済みで、新しい開始日 ${slash(target)} と重なります`);
++      }
++
++      // ---- 1. 引退させるIDを先に控える ----
++      const retiredList = Array.from(new Set([...retiredBefore, current.id]));
++      const { error: retireErr } = await admin.from("frunk_members").update({ square_retired_subscription_ids: retiredList }).eq("id", m.id);
++      if (retireErr) return refuse("db_error", String(retireErr.message ?? retireErr));
++      const unretire = async () => {
++        const { error } = await admin.from("frunk_members").update({ square_retired_subscription_ids: retiredBefore }).eq("id", m.id);
++        if (error) console.error("[frank-billing-day] unretire failed:", error);
++      };
++
++      // ---- 2. 解約 ----
++      try {
++        await sq("POST", `/subscriptions/${encodeURIComponent(current.id)}/cancel`, {});
++        cancelTouched = true;
++      } catch (e1) {
++        // 時間切れ等でも Square 側では解約が入っていることがある。読み直して、確かに入っていればそのまま進む
++        let landed = false;
++        if (isTransient(e1)) {
++          try {
++            landed = cancelVerified(await getSub(current.id));
++          } catch {
++            landed = false;
++          }
++        }
++        if (landed) {
++          cancelTouched = true;
++        } else if (isTransient(e1) || current.actions.length === 0) {
++          await unretire();
++          if (opts.source === "webhook") await protectCheckoutSub(current);
++          return fail("cancel_failed", `解約できませんでした（何も変えていません）: ${errText(e1)}`);
++        } else {
++        // 予約済みの休止などが解約を邪魔している可能性 → 消して再挑戦。だめなら休止を戻して確かめる
++        const pause = current.actions.find((a) => a.type === "PAUSE")?.effective_date ?? null;
++        const resume = current.actions.find((a) => a.type === "RESUME")?.effective_date ?? null;
++        cancelTouched = true;
++        try {
++          for (const t of ["RESUME", "PAUSE", "SWAP_PLAN", "CHANGE_BILLING_ANCHOR_DATE"]) {
++            for (const a of current.actions.filter((x) => x.type === t && x.id)) {
++              await sq("DELETE", `/subscriptions/${encodeURIComponent(current.id)}/actions/${encodeURIComponent(a.id)}`);
++            }
++          }
++          await sq("POST", `/subscriptions/${encodeURIComponent(current.id)}/cancel`, {});
++        } catch (e2) {
++          let restoredText = "休止の予約はありませんでした";
++          let severity: "warning" | "critical" = "warning";
++          if (pause && resume) {
++            const cycles = calendarMonthsBetween(pause, resume);
++            try {
++              const now = await getSub(current.id);
++              if (!now.actions.some((a) => a.type === "PAUSE") && cycles > 0) {
++                await sq("POST", `/subscriptions/${encodeURIComponent(current.id)}/pause`, { pause_cycle_duration: cycles });
++              }
++              const check = await getSub(current.id);
++              const back = check.actions.find((a) => a.type === "RESUME")?.effective_date ?? null;
++              if (back === resume) restoredText = `休止（${slash(pause)}〜${slash(resume)}）を元に戻しました`;
++              else {
++                restoredText = `⚠休止が元どおりか確認できません（再開 ${back ?? "なし"}／元 ${resume}）。${slash(pause)}の引き落としをSquareで必ず止めてください`;
++                severity = "critical";
++              }
++            } catch (e3) {
++              restoredText = `⚠休止を戻せませんでした（${errText(e3)}）。${slash(pause)}の引き落としをSquareで必ず止めてください`;
++              severity = "critical";
++            }
++          }
++          await unretire();
++          return fail("cancel_failed", `${errText(e1)} / ${errText(e2)} / ${restoredText}`, severity);
++        }
++        }
++      }
++
++      // 解約を確かめる（もう請求しない日付で解約日が付いたか）
++      const after = await getSub(current.id);
++      if (!cancelVerified(after)) {
++        await unretire();
++        return fail(
++          "cancel_unverified",
++          `解約後も請求が残る形です（status=${after.status}・解約日 ${after.canceled_date ?? "なし"}・開始 ${after.start_date ?? "-"}・支払済 ${after.charged_through_date ?? "-"}）。新しいサブスクは作っていません。Squareで確認してください`,
++          "critical",
++        );
++      }
++      for (const a of after.actions.filter((x) => ["RESUME", "SWAP_PLAN"].includes(x.type) && x.id)) {
++        try {
++          await sq("DELETE", `/subscriptions/${encodeURIComponent(after.id)}/actions/${encodeURIComponent(a.id)}`);
++        } catch {
++          /* 解約日が先に来るので害はない */
++        }
++      }
++      oldId = current.id;
++      oldEnds = after.canceled_date;
++    } else {
++      // 生きているサブスクが無い: 前回「解約はできたが作成に失敗」なら、作成から続ける。
++      // ⚠ 続けてよいのは「いちばん新しいサブスクが、自分で引退させて・確かに解約済み」のときだけ。
++      //   スタッフが止めたサブスク（引退リストに無い）が一番新しいなら、勝手に引き落としを復活させない
++      const newest = [...all].sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))[0];
++      if (!newest || !retired.has(newest.id)) {
++        return refuse(opts.source === "webhook" ? "no_subscription_yet" : "no_subscription", "Squareにこの方の有効なサブスクがありません");
++      }
++      const ours = await getSub(newest.id);
++      if (!cancelVerified(ours) || (ours.canceled_date && ours.canceled_date > target)) {
++        return fail(
++          "retired_not_canceled",
++          `引退させたサブスクがまだ請求する形です（status=${ours.status}・解約日 ${ours.canceled_date ?? "なし"}）。新しいサブスクは作っていません。Squareで確認してください`,
++          "critical",
++        );
++      }
++      oldId = ours.id;
++      oldEnds = ours.canceled_date;
++      cardId = cardId ?? ours.card_id;
++      cancelTouched = true;
++    }
++
++    // ---- 3. 新しいサブスク ----
++    const leaveCancel = m.scheduled_leave_date ? squareCancelDateForLeave(m.scheduled_leave_date) : null;
++    if (leaveCancel && leaveCancel <= target) {
++      // 最初の引き落としより前に退会する＝新しいサブスクは要らない
++      return markDone(null, oldId, oldEnds, false, `退会予定のため新しい自動引き落としは作りませんでした${oldEnds ? `（これまでのサブスクは ${slash(oldEnds)} で終了）` : ""}`);
++    }
++    if (!cardId) {
++      const cards = (await sq("GET", `/cards?customer_id=${encodeURIComponent(m.square_customer_id)}`)).cards as
++        | Array<{ id?: string; enabled?: boolean }>
++        | undefined;
++      cardId = (cards ?? []).find((c) => c.enabled !== false)?.id ?? null;
++    }
++    if (!cardId) return fail("no_card", "保存カードが見つかりません（これまでのサブスクは解約済み・引き落としは止まっています）");
++
++    let newId = "";
++    try {
++      const json = await sq("POST", "/subscriptions", {
++        // 同じ会員・同じ旧サブスク・同じ開始日なら何度送っても1本（Squareの上限45文字に収まる長さ）
++        idempotency_key: `rb10-${m.id.slice(0, 8)}-${(oldId ?? "none").slice(0, 10)}-${target}`,
++        location_id: locationId,
++        plan_variation_id: variationId,
++        customer_id: m.square_customer_id,
++        card_id: cardId,
++        start_date: target,
++        monthly_billing_anchor_date: BILLING_DAY,
++        timezone: "Asia/Tokyo",
++        ...(leaveCancel ? { canceled_date: leaveCancel } : {}),
++        source: { name: "FRANK GOLF 10日払い" },
++      });
++      const created = (json.subscription ?? {}) as Record<string, unknown>;
++      newId = String(created.id ?? "");
++      // 同じ idempotency_key の古い応答（すでに解約されたサブスク）が返ってきたら成功にしない
++      if (newId && (String(created.status ?? "").toUpperCase() === "CANCELED" || (!leaveCancel && created.canceled_date))) {
++        return fail("create_returned_canceled", `作成したはずのサブスク ${newId.slice(0, 8)} が解約済みで返りました。Squareで確認してください`, "critical");
++      }
++    } catch (e) {
++      return fail("create_failed", `新しいサブスクを作れませんでした（これまでのサブスクは解約済み・引き落としは止まっています。再実行で作成から続けます）: ${errText(e)}`);
++    }
++    if (!newId) return fail("create_failed", "サブスクIDが返りませんでした（再実行で作成から続けます）");
++    return markDone(newId, oldId, oldEnds, false);
++  } catch (e) {
++    console.error("[frank-billing-day] rebase failed:", e);
++    if (opts.source === "webhook") await protectCheckoutSub(current);
++    return fail("square_error", errText(e));
++  }
++}
++
++/**
++ * 取りこぼしの拾い直し（10分ごとの cron・#235）
++ *
++ * 入会の Webhook は応答後に作り直しを走らせるので、関数が途中で止まる・Square 側の反映が遅い等で
++ * 「入会したのに10日払いになっていない」方が残りうる。その方だけを1回あたり少人数ずつ拾う。
++ *
++ * 対象: active・カード自動課金あり・まだ作り直していない・失敗の記録なし・直近14日にカード登録
++ *       ・prepay_pause_done_at が空（＝10日払い導入後の入会。導入前の会員は店舗画面の一括ボタンで切り替える）
++ */
++export async function runBillingDaySweep(limit = 2): Promise<Record<string, unknown>> {
++  if (!token()) return { skipped: "square_env_missing" };
++  const admin = createAdmin();
++  const cutoff = new Date(Date.now() - CLAIM_TTL_MS).toISOString();
++  const since = new Date(Date.now() - 14 * 86_400_000).toISOString();
++  const { data, error } = await admin
++    .from("frunk_members")
++    .select("id")
++    .eq("status", "active")
++    .eq("billing_status", "active")
++    .not("square_customer_id", "is", null)
++    .is("billing_rebased_at", null)
++    .is("billing_rebase_error", null)
++    .is("prepay_pause_done_at", null)
++    .is("deleted_at", null)
++    .gte("billing_registered_at", since)
++    .or(`billing_rebase_claimed_at.is.null,billing_rebase_claimed_at.lt.${cutoff}`)
++    .order("billing_registered_at", { ascending: true })
++    .limit(limit);
++  if (error) return { error: error.message };
++  const results: Array<{ id: string; ok: boolean; error?: string }> = [];
++  // 何度やっても断られる理由（人が見るもの）は記録して、次から拾わない（2枠を14日間ふさがない）
++  const PERMANENT = new Set(["paused", "suspend_scheduled", "cancel_scheduled", "plan_no_variation", "plan_free", "no_customer", "past_date", "overlap", "already_charging"]);
++  for (const row of (data ?? []) as Array<{ id: string }>) {
++    try {
++      const r = await rebaseToBillingDay(String(row.id), { source: "webhook" });
++      results.push({ id: row.id, ok: r.ok, ...(r.ok ? {} : { error: r.error }) });
++      if (!r.ok && PERMANENT.has(r.error)) {
++        await admin
++          .from("frunk_members")
++          .update({ billing_rebase_error: `自動では10日払いにできません（${r.error}${r.detail ? `: ${r.detail}` : ""}）`.slice(0, 500) })
++          .eq("id", row.id);
++      }
++    } catch (e) {
++      results.push({ id: row.id, ok: false, error: errText(e) });
++    }
++  }
++  return { checked: results.length, results };
++}
+diff --git a/apps/genesis/src/lib/frank-join.ts b/apps/genesis/src/lib/frank-join.ts
+index 9581e52..32da63e 100644
+--- a/apps/genesis/src/lib/frank-join.ts
++++ b/apps/genesis/src/lib/frank-join.ts
+@@ -131,6 +131,7 @@ export type WebJoinMemberRow = {
+     monthly?: number;
+     prepaidMonths?: number;
+     campaign?: boolean;
++    usageStartYmd?: string;
+   } | null;
+   store_id: string | null;
+   plan_id: string | null;
+@@ -200,7 +201,8 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
+   // 正典 @yozan/core/frank-billing-start。Webhook が Square で止める周期数（frank-pos.ts）と同じ式・同じ日付で数える
+   const sch = usageStartSchedule({
+     applyDateYmd: today,
+-    usageStartYmd: m.start_date,
++    // 決済リンク発行時に控えたご利用開始日だけを見る（10日払いへの作り直しと同じ・#235）
++    usageStartYmd: bd?.usageStartYmd ?? null,
+     prepaidMonths: est.prepaidMonths,
+   });
+   await admin
+@@ -381,13 +383,14 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
+             `年内入会キャンペーンの適用で、入会金（5,500円税込）と${deferred ? "ご利用開始月" : "入会月"}（${m0}分）の月会費は無料です。`,
+             `本日、${m1}分・${m2}分の月会費2か月分（${(monthly * 2).toLocaleString()}円税込）を1回でお支払いいただきました。`,
+             // 前取りした月の自動課金はスキップするため、次回の請求は「前取り最終月の翌月」（#137・#234）
+-            `${m2}分より後の月会費は、毎月${Number(today.slice(8, 10))}日ごろにご登録のカードへ自動でご請求します（次回 ${sch.nextBillingYmd.replaceAll("-", "/")} 予定）。`,
++            // 毎月10日に翌月分（#235）。次回＝前取りの次の月の分
++            `${monthLabel(sch.firstBilledMonthYmd)}分からの月会費は、毎月10日に翌月分をご登録のカードへ自動でご請求します（初回 ${sch.nextBillingYmd.replaceAll("-", "/")} に${monthLabel(sch.firstBilledMonthYmd)}分）。`,
+             `※ キャンペーンでのご入会は、ご利用開始日から6か月間（${sch.minTermUntilYmd.replaceAll("-", "/")}まで）の継続をお願いしています。`,
+           ]
+         : [
+             ...(deferred ? [`ご利用開始日は ${startSlash} です。それより前の月の月会費はかかりません。`] : []),
+             `本日、入会金と${m1}分・${m2}分の月会費を1回でお支払いいただきました。`,
+-            `${m2}分より後の月会費は、毎月ご登録のカードへ自動でご請求します（次回 ${sch.nextBillingYmd.replaceAll("-", "/")} 予定）。`,
++            `${monthLabel(sch.firstBilledMonthYmd)}分からの月会費は、毎月10日に翌月分をご登録のカードへ自動でご請求します（初回 ${sch.nextBillingYmd.replaceAll("-", "/")} に${monthLabel(sch.firstBilledMonthYmd)}分）。`,
+           ]),
+       ...(attachments ? ["", "入会申込書の控え（PDF）を添付しています。"] : []),
+       "",
+diff --git a/apps/genesis/src/lib/frank-pos.ts b/apps/genesis/src/lib/frank-pos.ts
+index eb9ec0e..58b646b 100644
+--- a/apps/genesis/src/lib/frank-pos.ts
++++ b/apps/genesis/src/lib/frank-pos.ts
+@@ -1,4 +1,5 @@
+ import "server-only";
++import { after } from "next/server";
+ import { createAdmin } from "@/lib/supabase/admin";
+ import { parseOrderNote } from "@yozan/core/frank-portal";
+ import { logEvent } from "@/lib/kernel";
+@@ -15,17 +16,10 @@ import {
+   type SquarePayment,
+   type SquareRefund,
+ } from "@/lib/frank-pos-pure";
+-import {
+-  chargeCardOnFile,
+-  pauseSubscriptionCycles,
+-  clearSubscriptionPriceOverride,
+-  getSquareCustomerEmail,
+-  findSubscriptionForCustomer,
+-} from "@/lib/frank-square-billing";
++import { chargeCardOnFile, getSquareCustomerEmail } from "@/lib/frank-square-billing";
+ import { activateWebJoin } from "@/lib/frank-join";
+ import { JOIN_PREPAID_MONTHS, joinInitialTotal } from "@/lib/frank-join-pure";
+-import { jstYmd } from "@/lib/jst";
+-import { usageStartSchedule } from "@yozan/core/frank-billing-start";
++import { rebaseToBillingDay } from "@/lib/frank-billing-day";
+ 
+ export { verifySquareSignature };
+ 
+@@ -179,6 +173,9 @@ type MemberRow = {
+   join_campaign: string | null;
+   prepay_pause_done_at: string | null;
+   start_date: string | null;
++  square_subscription_id: string | null;
++  billing_rebased_at: string | null;
++  square_retired_subscription_ids: string[] | null;
+   square_checkout_breakdown: {
+     total?: number;
+     joiningFee?: number;
+@@ -190,7 +187,7 @@ type MemberRow = {
+ };
+ 
+ const MEMBER_COLS =
+-  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, start_date, square_checkout_breakdown, frunk_plans(monthly_price, joining_fee)";
++  "id, company_id, name, member_no, status, billing_status, joining_fee_waived, joining_fee_charged_at, join_campaign, prepay_pause_done_at, start_date, square_subscription_id, billing_rebased_at, square_retired_subscription_ids, square_checkout_breakdown, frunk_plans(monthly_price, joining_fee)";
+ 
+ async function memberByCheckoutOrder(admin: Admin, orderId: string | null | undefined): Promise<MemberRow | null> {
+   if (!orderId) return null;
+@@ -235,44 +232,25 @@ async function memberPendingWebJoinByEmail(admin: Admin, email: string | null):
+ }
+ 
+ /**
+- * Web入会の後始末（#131b/#137）: 価格上書きの解除＋前取り分の課金スキップ。
+- * 決済リンクの金額（入会金＋前取り月数分）を Square がサブスクの price_override_money として
+- * 引き継ぐため、(1) 上書きを消してプラン月額へ戻し、(2) 前取りした月数ぶん自動課金を止める。
+- * 前取りが無い会員（booking.htmlからのカード登録など）は対象外＝何もしない。
+- * prepay_pause_done_at で1回だけ実行。payment側・subscription側のどちらから呼んでも冪等。
++ * 入会・カード登録で作られたサブスクを「毎月10日に翌月分」に作り直す（#235）。
++ *
++ * 以前（#131b/#137/#234）はここで「価格上書きの解除＋前取り月数ぶんの休止」をしていた。
++ * 10日払いでは、決済リンクのサブスクを今の期間の終わりで解約し、保存カードから
++ * 開始日＝前取りの次の月の分の10日 のサブスクを作り直す（lib/frank-billing-day.ts）。
++ * payment 側・subscription 側のどちらから呼んでも1回しか動かない（claim）。失敗は会員カードに赤で出る。
+  */
+-async function ensurePrepaySetup(admin: Admin, member: MemberRow, subId: string, version?: number): Promise<void> {
+-  const months = Number(member.square_checkout_breakdown?.prepaidMonths ?? 0);
+-  if (member.prepay_pause_done_at || months <= 0) return;
+-  // 止める周期数 = (入金日の月→ご利用開始月の月数) + 前取り月数（#234・正典 @yozan/core/frank-billing-start）。
+-  // サブスクは入金した日から始まるので、決済リンクを作った日ではなく「いま」を基準に数える
+-  // （月末に申し込んで翌月1日に支払った方の1か月ずれを防ぐ）。ご利用開始日が空欄なら前取り月数そのまま＝従来どおり
+-  const cycles = usageStartSchedule({
+-    applyDateYmd: jstYmd(),
+-    usageStartYmd: member.start_date,
+-    prepaidMonths: months,
+-  }).pauseCycles;
+-  const cleared = await clearSubscriptionPriceOverride(subId, version);
+-  const paused = await pauseSubscriptionCycles(subId, cycles);
+-  if (cleared.ok && paused.ok) {
+-    await admin
+-      .from("frunk_members")
+-      .update({
+-        square_subscription_id: subId,
+-        prepay_pause_done_at: new Date().toISOString(),
+-        updated_at: new Date().toISOString(),
+-      })
+-      .eq("id", member.id);
+-    member.prepay_pause_done_at = new Date().toISOString();
+-  } else {
+-    await logEvent(String(member.company_id), {
+-      event_type: "billing.prepay_setup_failed",
+-      title: `入会後の継続課金の設定に失敗: ${member.name}様（${member.member_no ?? "採番前"}）${cleared.ok ? "" : "月額が初回一括の金額のままです。"}${paused.ok ? "" : "前取り分の停止ができていません。"}Squareで確認してください`.slice(0, 120),
+-      source: "frank_billing",
+-      source_type: "system",
+-      severity: "warning",
+-    });
+-  }
++function ensureBillingDay(member: MemberRow): void {
++  if (member.billing_rebased_at) return;
++  const memberId = String(member.id);
++  // Square の呼び出しが数回あるので、Webhook の応答（Squareは10秒で再送する）を待たせないよう応答後に走らせる。
++  // 取りこぼしても cron（/api/cron/execute）が拾い直す
++  after(async () => {
++    try {
++      await rebaseToBillingDay(memberId, { source: "webhook" });
++    } catch (e) {
++      console.error("[frank-pos] rebase to billing day failed:", e);
++    }
++  });
+ }
+ 
+ async function memberBySquareCustomer(admin: Admin, customerId: string | null | undefined): Promise<MemberRow | null> {
+@@ -360,13 +338,15 @@ async function tryRecordMonthlyFee(
+ 
+     // #137: subscription.created/updated のWebhookに頼らず、入金側からもサブスクの後始末を行う。
+     // （イベントの到着順は保証されず、subscription側が先に来ると顧客ID未紐付けで空振りしていた）
++    // #235: 後始末＝10日払いへの作り直し。Square側にまだサブスクが無ければ subscription 側でもう一度来る
+     if (raw.customer_id) {
+-      try {
+-        const sub = await findSubscriptionForCustomer(raw.customer_id);
+-        if (sub) await ensurePrepaySetup(admin, member, sub.id, sub.version);
+-      } catch (e) {
+-        console.error("[frank-pos] prepay setup from payment failed:", e);
++      if (String(member.billing_status) === "canceled" && member.billing_rebased_at) {
++        // 解約後のカード再登録＝新しいサブスク。作り直しをもう一度許す（同じ入金の再送では billing_status は canceled ではない）
++        // claim は触らない（走っている作り直しがあれば、その5分の失効を待つ）
++        await admin.from("frunk_members").update({ billing_rebased_at: null, billing_rebase_error: null }).eq("id", member.id);
++        member.billing_rebased_at = null;
+       }
++      ensureBillingDay(member);
+     }
+     if (String(member.billing_status) !== "active") {
+       await logEvent(String(member.company_id), {
+@@ -589,6 +569,13 @@ async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown
+     }
+   }
+   if (!member) return; // 初回決済のWebhookが先に届いて顧客IDが入ってから追従できる
++  // #235: 10日払いへの作り直しで引退させたサブスクのイベントは無視する
++  //   （無視しないと、解約日に届く CANCELED で「月会費が解約された」扱いになり、サブスクIDも古い方に戻る）
++  if ((member.square_retired_subscription_ids ?? []).map(String).includes(String(sub.id))) return;
++  if (member.billing_rebased_at && member.square_subscription_id && member.square_subscription_id !== sub.id) {
++    // 作り直した後に、別のサブスクのイベントが来た（決済リンクの古い方など）。今のサブスクを上書きしない
++    return;
++  }
+   const status = (sub.status ?? "").toUpperCase();
+   const patch: Record<string, unknown> = { square_subscription_id: sub.id, updated_at: new Date().toISOString() };
+   if (status === "CANCELED" || status === "DEACTIVATED") {
+@@ -607,11 +594,9 @@ async function handleSubscriptionEvent(admin: Admin, obj: Record<string, unknown
+   }
+   await admin.from("frunk_members").update(patch).eq("id", member.id);
+ 
+-  // Web入会の後始末（#131b/#137）: 価格上書きの解除＋前取り分のスキップ（ensurePrepaySetup・冪等）。
+-  // 前取りの無い会員（booking.htmlからのカード登録など）は breakdown が無いので何もしない。
++  // #235: 10日払いへの作り直し（payment 側と同じ関数・1回しか動かない）
+   if (["ACTIVE", "PENDING"].includes(status)) {
+-    const version = typeof (sub as { version?: number }).version === "number" ? (sub as { version?: number }).version : undefined;
+-    await ensurePrepaySetup(admin, member, sub.id, version);
++    ensureBillingDay(member);
+   }
+ }
+ 
+diff --git a/apps/genesis/src/lib/frank-square-billing.ts b/apps/genesis/src/lib/frank-square-billing.ts
+index 7ec65c1..ed8d164 100644
+--- a/apps/genesis/src/lib/frank-square-billing.ts
++++ b/apps/genesis/src/lib/frank-square-billing.ts
+@@ -5,7 +5,7 @@ import { authMember, type MemberAuth } from "@/lib/frank-booking";
+ import { monthlyFeeTaxIncluded, toE164Jp, JOIN_CHECKOUT_NOTE_PREFIX } from "@/lib/frank-pos-pure";
+ import { joinInitialTotal } from "@/lib/frank-join-pure";
+ import { jstYmd } from "@/lib/jst";
+-import { resolveBillingStartDate, usageStartSchedule } from "@yozan/core/frank-billing-start";
++import { BILLING_DAY, resolveBillingStartDate, usageStartSchedule } from "@yozan/core/frank-billing-start";
+ import { FRANK_PORTAL } from "@yozan/core/frank-links";
+ 
+ /**
+@@ -124,28 +124,6 @@ async function squarePost(token: string, path: string, body: Record<string, unkn
+   return json;
+ }
+ 
+-/**
+- * サブスクを指定周期ぶんスキップ（#131・前取り用）。
+- * 入会時に前取りした月数ぶんは自動課金を止める（止めないと二重取りになる）。
+- * cycles 経過後は自動で再開される。
+- */
+-export async function pauseSubscriptionCycles(
+-  subscriptionId: string,
+-  cycles: number,
+-): Promise<{ ok: boolean; error?: string }> {
+-  const token = accessToken();
+-  if (!token) return { ok: false, error: "square_env_missing" };
+-  try {
+-    await squarePost(token, `/subscriptions/${subscriptionId}/pause`, {
+-      pause_cycle_duration: cycles,
+-    });
+-    return { ok: true };
+-  } catch (e) {
+-    console.error("[frank-square-billing] pause cycles failed:", e);
+-    return { ok: false, error: String(e) };
+-  }
+-}
+-
+ /**
+  * Square顧客のメールアドレスを取得（#137・Web入会Webhookのフォールバック照合用）。
+  * 決済リンク（サブスク付き）の入金 payment は、リンク作成時に控えた order_id と
+@@ -170,72 +148,6 @@ export async function getSquareCustomerEmail(customerId: string): Promise<string
+   }
+ }
+ 
+-/**
+- * 顧客の生きているサブスクを1件返す（#137）。
+- * 初回入金の payment Webhook が subscription.created より先に処理を終えると、
+- * 「前取り分のスキップ」と「価格上書きの解除」を行う相手（サブスクID）がまだDBに無い。
+- * 入金側からも Square に問い合わせて後始末できるようにする。
+- */
+-export async function findSubscriptionForCustomer(
+-  customerId: string,
+-): Promise<{ id: string; status: string; version?: number } | null> {
+-  const token = accessToken();
+-  if (!token) return null;
+-  try {
+-    const json = await squarePost(token, "/subscriptions/search", {
+-      query: { filter: { customer_ids: [customerId] } },
+-    });
+-    const subs =
+-      (json.subscriptions as Array<{ id?: string; status?: string; version?: number; created_at?: string }> | undefined) ?? [];
+-    const live = subs.filter((s) => s.id && !["CANCELED", "DEACTIVATED"].includes((s.status ?? "").toUpperCase()));
+-    live.sort((a, b) => String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")));
+-    const top = live[0];
+-    if (!top?.id) return null;
+-    return {
+-      id: String(top.id),
+-      status: String(top.status ?? ""),
+-      version: typeof top.version === "number" ? top.version : undefined,
+-    };
+-  } catch (e) {
+-    console.error("[frank-square-billing] subscription search failed:", e);
+-    return null;
+-  }
+-}
+-
+-/**
+- * サブスクの価格上書きを消してプラン価格に戻す（#131b）。
+- *
+- * 入会時は「入会金＋前取り月数分」を1回でお支払いいただくため、決済リンクの金額を
+- * プラン月額と変えている。Squareはこの金額をサブスクの price_override_money として
+- * 引き継ぐ（＝放置すると毎月その金額を請求してしまう）ので、初回入金を確認したら
+- * null にしてプラン価格へ戻す。UpdateSubscription は「null を渡す＝その項目を消す」仕様。
+- */
+-export async function clearSubscriptionPriceOverride(
+-  subscriptionId: string,
+-  version?: number,
+-): Promise<{ ok: boolean; error?: string }> {
+-  const token = accessToken();
+-  if (!token) return { ok: false, error: "square_env_missing" };
+-  try {
+-    const body: Record<string, unknown> = { price_override_money: null };
+-    if (typeof version === "number") body.version = version;
+-    const res = await fetch(`${SQUARE_API}/subscriptions/${subscriptionId}`, {
+-      method: "PUT",
+-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+-      body: JSON.stringify({ subscription: body }),
+-    });
+-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+-    if (!res.ok) {
+-      const errs = (json.errors as Array<{ detail?: string; code?: string }> | undefined) ?? [];
+-      throw new Error(errs.map((e) => e.detail ?? e.code).join("; ") || `Square PUT /subscriptions (${res.status})`);
+-    }
+-    return { ok: true };
+-  } catch (e) {
+-    console.error("[frank-square-billing] clear price override failed:", e);
+-    return { ok: false, error: String(e) };
+-  }
+-}
+-
+ /**
+  * Web入会（即決済・#129）用: 会員ID直接指定で決済リンクを作る。
+  * /join-web が申込行（status='pending'）を作った直後に呼ぶ。member_no はまだ無い。
+@@ -269,8 +181,8 @@ export async function createJoinCheckoutForMember(
+   if (!variationId) return { ok: false, error: "square_env_missing" };
+ 
+   // 入会時のお支払いは「入会金＋月会費×前取り月数」の1回払い（#131b）。
+-  // 決済リンクの金額をプラン月額と変えると、Squareはそれをサブスクの price_override_money
+-  // として引き継ぐため、初回入金のWebhookで必ず null に戻す（frank-pos.ts）。
++  // 決済リンクで作られるサブスクは、入金Webhookが「10日払い」のサブスクに作り直す（#235・lib/frank-billing-day.ts）。
++  // 決済リンク側の金額（price_override）は作り直しで解約されるので、以後の請求には使われない。
+   const applyDateYmd = jstYmd();
+   const est = joinInitialTotal({
+     monthlyExTax: priceExTax,
+@@ -279,8 +191,8 @@ export async function createJoinCheckoutForMember(
+     joiningFeeWaived: !!row.joining_fee_waived,
+   });
+   const amount = est.total;
+-  // ご利用開始日（#234）。金額は変わらない（前取り月数は同じ）が、無料月と自動課金を止める周期数が変わる。
+-  // ここで控えるのは見込み。実際に止める周期数は入金Webhookの日付で数え直す（frank-pos.ts ensurePrepaySetup）
++  // ご利用開始日（#234）。金額は変わらない（前取り月数は同じ）が、無料月と最初の10日の引き落とし（#235）が変わる。
++  // ⚠ usageStartYmd は「この入会は開始月無料で決済した」という控え。10日払いへの作り直しはこれだけを見る
+   const schedule = usageStartSchedule({
+     applyDateYmd,
+     usageStartYmd: row.start_date ? String(row.start_date) : null,
+@@ -323,7 +235,6 @@ export async function createJoinCheckoutForMember(
+       applyDateYmd,
+       usageStartYmd: schedule.usageStartYmd,
+       deferredMonths: schedule.deferredMonths,
+-      pauseCycles: schedule.pauseCycles,
+       nextBillingYmd: schedule.nextBillingYmd,
+     });
+     return { ok: true, url: String(link.url) };
+@@ -458,13 +369,12 @@ export async function chargeCardOnFile(input: {
+  *
+  * やること:
+  *   1. 顧客に保存されているカードを1枚選ぶ（無ければ何もしない）
+- *   2. 前取り済みフラグを先に立てる ★
+- *   3. POST /v2/subscriptions（開始日 = 次に請求すべき日）
++ *   2. 「10日払いで作った」印を先に立てる ★
++ *   3. POST /v2/subscriptions（開始日 = 次に引き落とす10日・請求日10日）
+  *   4. 会員行にサブスクIDを控える
+  *
+- * ★ 2 が肝。frank-pos.ts の ensurePrepaySetup() は subscription.created の Webhook で
+- *   「前取り月数ぶん pause する」を実行する。前取りを一括で受領済みのこのケースで走らせると
+- *   **開始日からさらに2周期飛んで2か月ぶん取り損ねる**。Square に投げる前にフラグを立てて黙らせる。
++ * ★ 2 が肝。subscription.created の Webhook は「10日払いへの作り直し」（frank-billing-day.ts）を呼ぶ。
++ *   印が無いと、スタッフが選んだ開始日のサブスクを解約して別の日で作り直してしまう。
+  */
+ export async function startSubscriptionOnFile(
+   memberId: string,
+@@ -507,16 +417,16 @@ export async function startSubscriptionOnFile(
+   const variationId = plan.square_variation_nofee_id ?? plan.square_variation_id;
+   if (!variationId) return { ok: false, error: "plan_no_variation" };
+ 
+-  const breakdown = (row.square_checkout_breakdown ?? {}) as { prepaidMonths?: number };
+-  // 基準は入会日（請求日＝入会日と同じ日）。ご利用開始日が先の月なら、その月数ぶん後ろにずれる（#234）
++  const breakdown = (row.square_checkout_breakdown ?? {}) as { prepaidMonths?: number; usageStartYmd?: string };
++  // 既定の開始日＝前取りの次の月の分を引き落とす10日（#235）。ご利用開始月は内訳の控えだけを見る（#234）
+   const resolved = resolveBillingStartDate({
+     startDateYmd: String(row.join_date ?? row.start_date ?? jstYmd()),
+-    usageStartYmd: row.start_date ? String(row.start_date) : null,
++    usageStartYmd: breakdown.usageStartYmd ?? null,
+     prepaidMonths: Number(breakdown.prepaidMonths ?? 0),
+     todayYmd: jstYmd(),
+     requestedYmd: requestedStartYmd ?? null,
+   });
+-  if (!resolved.ok) return { ok: false, error: "past_date", suggested: resolved.suggested };
++  if (!resolved.ok) return { ok: false, error: resolved.error, suggested: resolved.suggested };
+ 
+   try {
+     // 1. 保存カード
+@@ -527,13 +437,23 @@ export async function startSubscriptionOnFile(
+     const card = (cardsJson.cards ?? []).find((c) => c.enabled !== false);
+     if (!card?.id) return { ok: false, error: "no_card" };
+ 
+-    // 2. ★ Square に投げる前にフラグを立てる（Webhook の二重スキップ止め）
+-    if (!row.prepay_pause_done_at) {
+-      await admin
+-        .from("frunk_members")
+-        .update({ prepay_pause_done_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+-        .eq("id", memberId);
+-    }
++    // 2. ★ Square に投げる前に「10日払いで作った」印を立てる（#235）
++    //    subscription.created の Webhook が先に届くと、作り直し（lib/frank-billing-day.ts）が
++    //    スタッフの選んだ開始日を無視して作り直してしまう。作成に失敗したら下で戻す
++    const claimCutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
++    const { data: claimed } = await admin
++      .from("frunk_members")
++      .update({
++        prepay_pause_done_at: row.prepay_pause_done_at ?? new Date().toISOString(),
++        billing_rebased_at: new Date().toISOString(),
++        billing_rebase_claimed_at: new Date().toISOString(),
++        updated_at: new Date().toISOString(),
++      })
++      .eq("id", memberId)
++      .or(`billing_rebase_claimed_at.is.null,billing_rebase_claimed_at.lt.${claimCutoff}`)
++      .select("id");
++    // 作り直しが走っている最中なら触らない（数分おいてもう一度）
++    if (!claimed || claimed.length === 0) return { ok: false, error: "busy" };
+ 
+     // 3. サブスク作成
+     const json = await squarePost(token, "/subscriptions", {
+@@ -543,6 +463,8 @@ export async function startSubscriptionOnFile(
+       customer_id: customerId,
+       card_id: card.id,
+       start_date: resolved.date,
++      // 毎月10日に翌月分（#235）。開始日も必ず10日（resolveBillingStartDate が10日以外を弾く）
++      monthly_billing_anchor_date: BILLING_DAY,
+       timezone: "Asia/Tokyo",
+       source: { name: "FRANK GOLF member-os" },
+     });
+@@ -555,6 +477,9 @@ export async function startSubscriptionOnFile(
+       .update({
+         square_subscription_id: sub.id,
+         billing_status: "active",
++        billing_day: BILLING_DAY,
++        billing_rebase_claimed_at: null,
++        billing_rebase_error: null,
+         updated_at: new Date().toISOString(),
+       })
+       .eq("id", memberId);
+@@ -568,6 +493,12 @@ export async function startSubscriptionOnFile(
+     };
+   } catch (e) {
+     console.error("[frank-square-billing] start subscription failed:", e);
++    // 作れなかった＝印を戻す（次に押したとき・Webhook がまた動けるように）
++    await admin
++      .from("frunk_members")
++      .update({ billing_rebased_at: null, billing_rebase_claimed_at: null })
++      .eq("id", memberId)
++      .is("square_subscription_id", null);
+     const detail = String(e instanceof Error ? e.message : e).slice(0, 160);
+     return { ok: false, error: `subscription_failed: ${detail}` };
+   }
+diff --git a/apps/member-os/src/app/(main)/frunk/[id]/page.tsx b/apps/member-os/src/app/(main)/frunk/[id]/page.tsx
+index eac34cb..48aca68 100644
+--- a/apps/member-os/src/app/(main)/frunk/[id]/page.tsx
++++ b/apps/member-os/src/app/(main)/frunk/[id]/page.tsx
+@@ -11,8 +11,14 @@ import { BirthDateInput } from "@/components/birth-date-input";
+ import { FRUNK_STATUS_LABEL, FRUNK_STATUS_TONE, FRUNK_PAYMENT_METHODS, FRUNK_PAYMENT_LABEL, yen } from "@/lib/frunk";
+ import { OCCUPATIONS, CONTACT_METHODS, GENDER_LABEL, GENDERS } from "@/lib/walkin";
+ import { jstYmd } from "@/lib/jst";
+-import { nextBillingDateAfterPrepay, usageStartSchedule, usageStartMaxYmd, monthLabel } from "@yozan/core/frank-billing-start";
+-import { getSubscriptionDetail, pendingPauseWindow } from "@/lib/frank-square";
++import {
++  nextBillingDateAfterPrepay,
++  usageStartSchedule,
++  usageStartMaxYmd,
++  monthLabel,
++  billedMonthOfChargeDate,
++} from "@yozan/core/frank-billing-start";
++import { getSubscriptionDetail, nextInvoiceDateOf } from "@/lib/frank-square";
+ import { BOOKING_STATUS_LABEL, CUSTOMER_KIND_LABEL, PAYMENT_STATUS_LABEL, outstanding } from "@yozan/core/frank-booking";
+ import {
+   leaveDateOptions,
+@@ -42,9 +48,12 @@ import {
+   useTicketManual,
+   openJoinCheckout,
+   changeUsageStart,
++  rebaseBillingDayOne,
+ } from "../actions";
+ 
+ export const dynamic = "force-dynamic";
++// 10日払いへの作り直し（#235）で Square を数回呼ぶため
++export const maxDuration = 60;
+ type Row = Record<string, unknown>;
+ 
+ /**
+@@ -240,23 +249,22 @@ export default async function FrunkMemberPage({
+ 
+   const status = String(m.status ?? "");
+ 
+-  // ご利用開始日と、無料月・前取りの月・次回の自動課金（#234）。
+-  // 式は入会画面・入会完了メール・Webhook と同じ @yozan/core/frank-billing-start。
+-  const billingBd = (m.square_checkout_breakdown ?? {}) as { prepaidMonths?: number; applyDateYmd?: string };
++  // ご利用開始日と、無料月・前取りの月・最初の10日の引き落とし（#234・#235）。
++  // 式は入会画面・入会完了メール・Genesis の作り直しと同じ @yozan/core/frank-billing-start。
++  // ⚠ ご利用開始日は「内訳に控えたもの」だけを見る（#234 より前の入会は入会月無料で決済済み）
++  const billingBd = (m.square_checkout_breakdown ?? {}) as { prepaidMonths?: number; applyDateYmd?: string; usageStartYmd?: string };
+   const prepaidMonths = Number(billingBd.prepaidMonths ?? 0);
+   const joinYmd = m.join_date ? String(m.join_date) : billingBd.applyDateYmd ? String(billingBd.applyDateYmd) : "";
+   const usageSch = joinYmd && prepaidMonths > 0
+-    ? usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd: m.start_date ? String(m.start_date) : null, prepaidMonths })
++    ? usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd: billingBd.usageStartYmd ?? null, prepaidMonths })
+     : null;
+-  // Square に実際に入っている予定も並べる（DBの計算とずれていたら画面で気づけるように）。
+-  // 前取りの休止がまだ効いている会員だけ読む＝一覧ではなくこの1枚を開いたときだけ・1回だけ
+-  const squareWindow = usageSch && m.square_subscription_id && usageSch.nextBillingYmd >= today && ["active", "pending"].includes(status)
+-    ? await getSubscriptionDetail(String(m.square_subscription_id)).then((r) =>
+-        r.ok ? { status: r.sub.status, ...pendingPauseWindow(r.sub) } : null,
+-      )
++  // Square に実際に入っている次回の引き落とし日も並べる（DBの計算とずれていたら画面で気づけるように）
++  const squareSub = m.square_subscription_id && ["active", "pending", "suspended"].includes(status)
++    ? await getSubscriptionDetail(String(m.square_subscription_id)).then((r) => (r.ok ? r.sub : null))
+     : null;
+-  const squareNext = squareWindow?.resume ?? null;
+-  const usageMismatch = !!(usageSch && squareWindow && squareWindow.status === "ACTIVE" && squareNext !== usageSch.nextBillingYmd);
++  const squareNext = squareSub ? nextInvoiceDateOf(squareSub) : null;
++  const rebased = !!m.billing_rebased_at;
++  const rebaseError = m.billing_rebase_error ? String(m.billing_rebase_error) : "";
+ 
+   const inMinTerm = m.min_term_until != null && String(m.min_term_until) > today;
+   const back = `/frunk/${id}`;
+@@ -450,6 +458,25 @@ export default async function FrunkMemberPage({
+                   {status === "suspended" ? "一時停止中（休会）" : "稼働中"}
+                 </Badge>
+                 <span className="ml-2 text-xs text-(--color-dim)">Square サブスクリプション</span>
++                {/* 毎月10日に翌月分（#235）。Square に入っている次回の引き落とし日をそのまま出す */}
++                <div className="mt-1 text-xs">
++                  {rebased ? <Badge tone="ok">10日払い</Badge> : <Badge tone="warn">10日払いに未切り替え</Badge>}
++                  <span className="ml-2 text-(--color-dim)">
++                    {squareSub
++                      ? squareNext
++                        ? `Square上の次回 ${squareNext.replaceAll("-", "/")}${Number(squareNext.slice(8, 10)) === 10 ? `（${monthLabel(billedMonthOfChargeDate(squareNext))}分）` : ""}`
++                        : `Square上の次回の引き落としなし（${squareSub.status}${squareSub.canceled_date ? `・${squareSub.canceled_date}で解約` : ""}）`
++                      : "Squareの状態を読めませんでした"}
++                  </span>
++                  {rebaseError ? <p className="mt-1 font-medium text-rose-600">⚠ 10日払いへの切り替えに失敗: {rebaseError}</p> : null}
++                  {(!rebased || rebaseError) && ["active", "pending"].includes(status) ? (
++                    <form action={rebaseBillingDayOne} className="mt-1">
++                      <input type="hidden" name="id" value={id} />
++                      <input type="hidden" name="back" value={back} />
++                      <button className={btnGhostCls}>10日払いに切り替える{rebaseError ? "（やり直す）" : ""}</button>
++                    </form>
++                  ) : null}
++                </div>
+                 {/* 退会もプラン変更もせず「引き落としだけ止めたい」ときの出口（#192）。
+                     0円プランに切り替えたのにサブスクだけ残っている、という状態を画面から潰せるようにする。 */}
+                 <form action={stopSquareBilling} className="mt-1">
+@@ -480,14 +507,14 @@ export default async function FrunkMemberPage({
+                   <form action={startSquareBilling} className="mt-2 flex flex-wrap items-center gap-2">
+                     <input type="hidden" name="id" value={id} />
+                     <input type="hidden" name="back" value={back} />
+-                    <label className="text-xs text-(--color-dim)">初回請求日</label>
++                    <label className="text-xs text-(--color-dim)">初回の引き落とし日（10日）</label>
+                     <input
+                       type="date"
+                       name="start_date"
+                       defaultValue={nextBillingDateAfterPrepay({
+-                        // 基準は入会日。ご利用開始日が先の月ならその分ずれる（#234）
++                        // 前取りの次の月の分を引き落とす10日（#235）。ご利用開始月は内訳の控えだけ（#234）
+                         startDateYmd: String(m.join_date ?? m.start_date ?? jstYmd()),
+-                        usageStartYmd: m.start_date ? String(m.start_date) : null,
++                        usageStartYmd: billingBd.usageStartYmd ?? null,
+                         prepaidMonths: Number(
+                           (m.square_checkout_breakdown as { prepaidMonths?: number } | null)?.prepaidMonths ?? 0,
+                         ),
+@@ -509,25 +536,19 @@ export default async function FrunkMemberPage({
+             {inMinTerm ? <span className="ml-2 text-amber-700">6か月継続 {String(m.min_term_until)}まで</span> : null}
+           </Info>
+           {/* ご利用開始日（#234）。先の月から使う方は、無料になるのが「ご利用開始月」。
+-              入会後に分かった場合もここで変えられる（Square の自動課金の再開日も一緒にずらす） */}
++              入会後に分かった場合もここで変えられる（まだ引き落としが始まっていなければ、10日払いのサブスクを作り直す・#235） */}
+           {usageSch ? (
+             <Info label="ご利用開始">
+               <div>
+                 <span className="font-medium">{usageSch.usageStartYmd.replaceAll("-", "/")}</span>
+                 <span className="ml-2 text-xs text-(--color-dim)">
+                   無料 {monthLabel(usageSch.freeMonthYmd)}分／前取り {usageSch.prepaidMonthYmds.map(monthLabel).join("・")}分／
+-                  次回の自動課金 {usageSch.nextBillingYmd.replaceAll("-", "/")}（予定）
++                  自動引き落とし {usageSch.nextBillingYmd.replaceAll("-", "/")} に{monthLabel(usageSch.firstBilledMonthYmd)}分から（予定）
+                 </span>
+               </div>
+-              {squareWindow ? (
+-                <div className={`mt-1 text-xs ${usageMismatch ? "font-medium text-rose-600" : "text-(--color-dim)"}`}>
+-                  Square上の予定: {squareWindow.status === "PAUSED" ? "休止中・" : ""}
+-                  {squareNext ? `次回の自動課金 ${squareNext.replaceAll("-", "/")}` : "再開日の予約なし"}
+-                  {squareNext === usageSch.nextBillingYmd
+-                    ? " ✓ 一致"
+-                    : usageMismatch
+-                      ? " ⚠ 上の予定と違います。下の【ご利用開始日を変更する】を押すとSquareを合わせます"
+-                      : " ⚠ 上の予定と違います（休止中のため本部にご相談ください）"}
++              {rebased && squareSub && squareNext && squareNext !== usageSch.nextBillingYmd && squareNext < usageSch.nextBillingYmd ? (
++                <div className="mt-1 text-xs font-medium text-rose-600">
++                  ⚠ Square上の次回（{squareNext.replaceAll("-", "/")}）が予定より早いです。【ご利用開始日を変更する】をもう一度押すと合わせます
+                 </div>
+               ) : null}
+               {["active", "pending"].includes(status) ? (
+@@ -542,12 +563,12 @@ export default async function FrunkMemberPage({
+                     defaultValue={usageSch.usageStartYmd}
+                     className={`${inputCls} w-auto`}
+                   />
+-                  <button className={usageMismatch ? btnCls : btnGhostCls}>ご利用開始日を変更する</button>
++                  <button className={btnGhostCls}>ご利用開始日を変更する</button>
+                 </form>
+               ) : null}
+               <p className="mt-1 text-xs text-(--color-dim)">
+                 無料になるのはご利用開始月です。それより前の月の月会費はかからず、入会時の前取りはその翌月・翌々月分に充てます。
+-                請求日は入会日と同じ日のままです。
++                引き落としは毎月10日に翌月分です。
+               </p>
+             </Info>
+           ) : null}
+@@ -599,8 +620,8 @@ export default async function FrunkMemberPage({
+             </div>
+ 
+             {/* 退会・休会は「いつから」を選んで受け付ける（#192・2026-09-01 ユーザー確定）
+-                退会=月末・申し出の翌月末から／休会=月初・10日までなら翌月から。
+-                受付と同時に Square の自動課金も同じ日付で止める。 */}
++                退会=月末・申し出の翌月末から／休会=月初・前々月末までの申し出（#235）。
++                受付と同時に Square の自動引き落としも止める（退会月の10日で解約／休会開始月の前月10日で停止）。 */}
+             {status !== "left" && (
+               <div className="mt-3 space-y-2 border-t border-(--color-line) pt-3">
+                 {scheduledLeave ? (
+@@ -642,7 +663,7 @@ export default async function FrunkMemberPage({
+                         </select>
+                         <button className={btnGhostCls}>休会を受け付ける</button>
+                         <span className="text-xs text-(--color-dim)">
+-                          10日までの申し出で翌月から（{monthFromLabel(suspendOpts[0])}なら {mdLabel(suspendApplyDeadline(suspendOpts[0]))}まで）
++                          休会したい月の前々月末までの申し出（{monthFromLabel(suspendOpts[0])}なら {mdLabel(suspendApplyDeadline(suspendOpts[0]))}まで）
+                         </span>
+                       </form>
+                     )}
+diff --git a/apps/member-os/src/app/(main)/frunk/actions.ts b/apps/member-os/src/app/(main)/frunk/actions.ts
+index 5a45470..0b28aa8 100644
+--- a/apps/member-os/src/app/(main)/frunk/actions.ts
++++ b/apps/member-os/src/app/(main)/frunk/actions.ts
+@@ -7,6 +7,7 @@ import { requireReceptionActor } from "@/lib/auth";
+ import { createAdmin } from "@/lib/supabase/admin";
+ import { generateToken, hashToken } from "@/lib/intake";
+ import { logAudit } from "@/lib/kernel";
++import { signAdminPayload, ADMIN_SIG_TTL_MS } from "@yozan/core/admin-sign";
+ import { FRUNK_STORE_CODE } from "@/lib/frunk";
+ import { requireStoreAccess, FRANK_STORE_ID } from "@/lib/store-scope";
+ import { buildApprovalMail, sendFrankMail } from "@/lib/frank-mail";
+@@ -17,9 +18,9 @@ import {
+   chargeCardOnFile,
+   cancelSubscription,
+   uncancelSubscription,
+-  reschedulePrepayPause,
++  clearPendingPause,
+ } from "@/lib/frank-square";
+-import { usageStartSchedule, monthLabel } from "@yozan/core/frank-billing-start";
++import { usageStartSchedule, usageStartError, monthLabel, billedMonthOfChargeDate } from "@yozan/core/frank-billing-start";
+ import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
+ import { nextMemberNo } from "@/lib/frank-member-no";
+ import { corporateSpec, corporateSeats, corporateSeatFullMessage } from "@yozan/core/frank-corporate";
+@@ -32,6 +33,9 @@ import {
+   earliestSuspendStart,
+   monthEndLabel,
+   monthFromLabel,
++  squarePauseDateForSuspend,
++  squareCancelDateForLeave,
++  resumePlan,
+ } from "@yozan/core/frank-membership";
+ import { planChangeProration } from "@/lib/frank-billing-pure";
+ import { jstYmd } from "@/lib/jst";
+@@ -362,18 +366,19 @@ export async function saveAlertNote(formData: FormData) {
+ 
+ // ---- 会員ステータス変更（休会・復帰・退会） ----
+ //
+-// 【2026-09-01 ユーザー確定・#192】退会と休会は「先の日付で受け付ける」。
++// 【2026-09-01 ユーザー確定・#192／2026-09-11 改定・#235】退会と休会は「先の日付で受け付ける」。
+ //   退会 = 月末。申込月の翌月末より前は選べない（9月末退会なら8月末までの申し出）
+-//   休会 = 月初。当月10日までの申し出で翌月から、11日以降は翌々月から
+-//   受付日の判定は @yozan/core/frank-membership に置いてある。画面もサーバーも同じ関数を通すこと。
++//   休会 = 月初。休会したい月の前々月末まで（11月から休会なら9月末まで）。毎月10日に翌月分を引き落とすため
++//   復帰 = 復帰した月は店頭で1か月分。翌月分から10日の自動引き落としに戻る
++//   受付日の判定と Square に渡す日付は @yozan/core/frank-membership。画面もサーバーも同じ関数を通すこと。
+ //
+ // 【お金】以前は退会してもSquareの自動課金が止まらず「ダッシュボードで解約してください」と
+ //   出すだけだった。見落とすと翌月も引き落とされるので、受付と同時に Square にも
+ //   同じ日付で解約/停止を予約する。cronが遅れてもお金は正しい日付で止まる。
+ //
+-//   退会 → canceled_date = 退会日（その月まで請求・翌月から停止）
+-//   休会 → pause_effective_date = 休会開始日（休会費2,200円税込は店頭徴収）
+-//   復帰 → resume（即時）
++//   退会 → canceled_date = 退会月の10日（翌月分をその日に引き落とさない）
++//   休会 → pause_effective_date = 休会開始月の前月10日（休会費2,200円税込は店頭徴収）
++//   復帰 → 次の10日から再開。10日を過ぎていたら翌月分はその場でカード請求
+ export async function setMemberStatus(formData: FormData) {
+   const actor = await requireFrankActor();
+   const admin = createAdmin();
+@@ -385,7 +390,7 @@ export async function setMemberStatus(formData: FormData) {
+ 
+   const { data: m } = await admin
+     .from("frunk_members")
+-    .select("member_no, name, status, min_term_until, square_subscription_id, billing_status")
++    .select("member_no, name, status, min_term_until, square_subscription_id, square_customer_id, billing_status, billing_day, frunk_plans(monthly_price)")
+     .eq("id", id)
+     .eq("company_id", actor.companyId)
+     .eq("store_id", FRANK_STORE_ID) // 店舗スコープ（#134）
+@@ -393,22 +398,49 @@ export async function setMemberStatus(formData: FormData) {
+   if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+   const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
+   const who = `${String(m.name ?? "")}様`;
++  // 10日払いに切り替え済みの方だけ、10日基準の日付を Square に渡す（#235）。
++  // まだの方（入会日と同じ日に請求）は従来どおり（月初で停止・月末で解約・即時再開）
++  const tenDay = Number(m.billing_day) === 10;
+ 
+-  // ---- 復帰（即時） ----
++  // ---- 復帰（#235: 復帰した月は店頭で1か月分・翌月分から10日の自動引き落とし） ----
+   if (to === "active") {
+     await admin
+       .from("frunk_members")
+       .update({ status: "active", suspend_end: now, scheduled_suspend_start: null, updated_at: new Date().toISOString() })
+       .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+-    const r = subId ? await resumeSubscription(subId) : null;
+-    await logAudit(actor, "frunk.status.active", "frunk_members", id, null, { square: r });
++    const rp = resumePlan(now);
++    const r = subId ? await resumeSubscription(subId, tenDay ? rp.resumeYmd : null) : null;
++    // 10日を過ぎての復帰は、翌月分の引き落とし日がもう過ぎている → その場でカードに請求（Webhookが月会費として記帳）
++    const monthlyTax = Math.round(Number((m.frunk_plans as { monthly_price?: number | null } | null)?.monthly_price ?? 0) * 1.1);
++    let chargeNote = "";
++    let chargeBad = false;
++    if (tenDay && subId && r?.ok && rp.chargeNowMonthYmd && monthlyTax > 0) {
++      const c = m.square_customer_id
++        ? await chargeCardOnFile({
++            customerId: String(m.square_customer_id),
++            amountTaxIncluded: monthlyTax,
++            note: `FRANK月会費 ${monthLabel(rp.chargeNowMonthYmd)}分（休会から復帰）${m.member_no ?? ""}`,
++          })
++        : { ok: false, error: "no_customer" };
++      chargeBad = !c.ok;
++      chargeNote = c.ok
++        ? `${monthLabel(rp.chargeNowMonthYmd)}分（${monthlyTax.toLocaleString()}円）は登録カードに今請求しました。`
++        : `⚠${monthLabel(rp.chargeNowMonthYmd)}分のカード請求ができませんでした。店頭でお預かりください。`;
++    }
++    await logAudit(actor, "frunk.status.active", "frunk_members", id, null, { square: r, plan: rp, charge: chargeNote });
+     revalidateMember(id);
+     if (r && !r.ok && !r.skipped) {
+       redirect(`${dest}?err=` + encodeURIComponent(
+         `${who}を復帰させましたが、Squareの課金再開に失敗しました。ダッシュボードで確認してください（${m.member_no ?? ""}）`,
+       ));
+     }
+-    redirect(`${dest}?msg=` + encodeURIComponent(`${who}を復帰させました。${subId ? "月会費の自動課金も再開します。" : ""}`));
++    const store = tenDay || !subId ? `${monthLabel(rp.storeMonthYmd)}分の月会費は店頭でお預かりください。` : "";
++    const next = subId
++      ? tenDay
++        ? `${chargeNote}自動引き落としは ${rp.resumeYmd.replaceAll("-", "/")}（${monthLabel(billedMonthOfChargeDate(rp.resumeYmd))}分）から再開します。`
++        : "月会費の自動課金も再開します（まだ10日払いに切り替えていない方です）。"
++      : "";
++    redirect(`${dest}?${chargeBad ? "err" : "msg"}=` + encodeURIComponent(`${who}を復帰させました。${store}${next}`));
+   }
+ 
+   // ---- 休会（開始月を指定して予約） ----
+@@ -416,7 +448,7 @@ export async function setMemberStatus(formData: FormData) {
+     const from = str(formData.get("suspend_start")) || earliestSuspendStart(now);
+     if (!canSuspendFrom(now, from)) {
+       redirect(`${dest}?err=` + encodeURIComponent(
+-        `その休会開始日は受け付けられません。10日までの申し出で翌月から、11日以降は翌々月からです（最短 ${monthFromLabel(earliestSuspendStart(now))}）`,
++        `その休会開始日は受け付けられません。休会したい月の前々月末までの申し出です（最短 ${monthFromLabel(earliestSuspendStart(now))}）`,
+       ));
+     }
+     await admin
+@@ -424,14 +456,16 @@ export async function setMemberStatus(formData: FormData) {
+       .update({ scheduled_suspend_start: from, scheduled_leave_date: null, updated_at: new Date().toISOString() })
+       .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+ 
+-    const r = subId ? await pauseSubscription(subId, from) : null;
++    // その月の分を引き落とす前月10日で止める（#235）
++    const pauseYmd = tenDay ? squarePauseDateForSuspend(from) : from;
++    const r = subId ? await pauseSubscription(subId, pauseYmd) : null;
+     await logAudit(actor, "frunk.status.suspend_reserve", "frunk_members", id, null, { from, square: r });
+     revalidateMember(id);
+ 
+     const tail = !subId
+       ? "（カード自動課金は未登録の会員です）"
+       : r?.ok
+-        ? `月会費の自動課金は ${monthFromLabel(from)} 停止します。`
++        ? `${monthFromLabel(from).replace("から", "")}分からの自動引き落とし（${pauseYmd.replaceAll("-", "/")}〜）を止めます。`
+         : r?.skipped
+           ? "⚠Square未接続のため、課金停止はダッシュボードで行ってください。"
+           : "⚠Squareの課金停止に失敗しました。ダッシュボードで確認してください。";
+@@ -459,14 +493,16 @@ export async function setMemberStatus(formData: FormData) {
+     .update({ scheduled_leave_date: on, scheduled_suspend_start: null, updated_at: new Date().toISOString() })
+     .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+ 
+-  const r = subId ? await cancelSubscription(subId, on) : null;
++  // 退会月の10日で解約＝翌月分を引き落とさない（#235）
++  const cancelYmd = tenDay ? squareCancelDateForLeave(on) : on;
++  const r = subId ? await cancelSubscription(subId, cancelYmd) : null;
+   await logAudit(actor, "frunk.status.leave_reserve", "frunk_members", id, null, { on, square: r });
+   revalidateMember(id);
+ 
+   const tail = !subId
+     ? "（カード自動課金は未登録の会員です）"
+     : r?.ok
+-      ? `月会費の自動課金は ${monthEndLabel(on)} で解約されます（その月までは請求されます）。`
++      ? `月会費の自動引き落としは ${cancelYmd.replaceAll("-", "/")} で解約します（${monthEndLabel(on).replace("末", "")}分まで・翌月分は引き落としません）。`
+       : r?.skipped
+         ? "⚠Square未接続のため、解約はダッシュボードで行ってください。"
+         : "⚠Squareの解約に失敗しました。ダッシュボードで解約してください。";
+@@ -625,10 +661,11 @@ export async function cancelScheduledChange(formData: FormData) {
+ 
+   const { data: m } = await admin
+     .from("frunk_members")
+-    .select("name, square_subscription_id")
++    .select("name, member_no, square_subscription_id, square_customer_id, billing_day, scheduled_suspend_start, frunk_plans(monthly_price)")
+     .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+   if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
+   const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
++  const tenDay = Number(m.billing_day) === 10;
+ 
+   await admin
+     .from("frunk_members")
+@@ -639,8 +676,26 @@ export async function cancelScheduledChange(formData: FormData) {
+     )
+     .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+ 
+-  // Square側の予約も戻す（退会=解約日を消す／休会=停止を取り消して再開）
+-  const r = subId ? (kind === "leave" ? await uncancelSubscription(subId) : await resumeSubscription(subId)) : null;
++  // Square側の予約も戻す（退会=解約日を消す／休会=停止の予約を消す・#235）
++  let r: { ok: boolean; skipped?: boolean; error?: string } | null = null;
++  if (subId && kind === "leave") r = await uncancelSubscription(subId);
++  else if (subId && kind === "suspend" && tenDay && m.scheduled_suspend_start) {
++    r = await clearPendingPause(subId, squarePauseDateForSuspend(String(m.scheduled_suspend_start)));
++    if (!r.ok && r.error === "already_paused") {
++      // 停止日（前月10日）を過ぎてから取り消した＝休会月の分は引き落とされていない → 復帰と同じ手順で戻す
++      const rp = resumePlan(today());
++      r = await resumeSubscription(subId, rp.resumeYmd);
++      const monthlyTax = Math.round(Number((m.frunk_plans as { monthly_price?: number | null } | null)?.monthly_price ?? 0) * 1.1);
++      if (r.ok && rp.chargeNowMonthYmd && monthlyTax > 0 && m.square_customer_id) {
++        const c = await chargeCardOnFile({
++          customerId: String(m.square_customer_id),
++          amountTaxIncluded: monthlyTax,
++          note: `FRANK月会費 ${monthLabel(rp.chargeNowMonthYmd)}分（休会取り消し）${m.member_no ?? ""}`,
++        });
++        if (!c.ok) r = { ok: false, error: `${monthLabel(rp.chargeNowMonthYmd)}分のカード請求に失敗（店頭でお預かりください）` };
++      }
++    }
++  } else if (subId && kind === "suspend") r = await resumeSubscription(subId);
+   await logAudit(actor, "frunk.status.schedule_cancel", "frunk_members", id, null, { kind, square: r });
+   revalidateMember(id);
+ 
+@@ -1111,25 +1166,159 @@ function startBillingError(res: { error?: string; suggested?: string }): string
+   if (e === "already_subscribed") return "すでに自動課金が登録されています。";
+   if (e === "plan_free") return "月会費0円のプラン（スタッフ・モニター）は自動課金を作りません。";
+   if (e === "plan_no_variation") return "このプランのSquare設定が未登録です。scripts/frank-square-setup.mjs を実行してください。";
++  if (e === "not_billing_day") {
++    return `月会費の引き落としは毎月10日です（翌月分）。開始日は ${String(res.suggested ?? "").replaceAll("-", "/")} のように10日を選んでください。`;
++  }
+   if (e === "past_date") {
+     return `開始日が過ぎています。${String(res.suggested ?? "").replaceAll("-", "/")} 以降でご指定ください（過ぎた分は店頭で精算してください）。`;
+   }
+   if (e === "square_env_missing") return "Square未接続のため登録できませんでした。";
+   if (e === "invalid_status") return "退会済みの会員には自動課金を作れません。";
++  if (e === "busy") return "この方の10日払いへの切り替えが動いています。数分おいてからもう一度お試しください。";
+   return `登録できませんでした（${e || "原因不明"}）。Squareダッシュボードでご確認ください。`;
+ }
+ 
++/** Genesis の「10日払いに作り直す」を呼ぶ（#235）。Square の実行は SQUARE_LOCATION_ID を持つ Genesis 側 */
++type RebaseRes = { ok?: boolean; noop?: boolean; refused?: boolean; error?: string; detail?: string; message?: string; startDate?: string };
++async function callRebase(memberId: string, body: { usage_start?: string; bulk?: boolean }, timeoutMs = 55_000): Promise<RebaseRes> {
++  // 署名つき（会員IDだけで叩けないように・@yozan/core/admin-sign）
++  const payload = JSON.stringify({ member_id: memberId, ...body });
++  const exp = Date.now() + ADMIN_SIG_TTL_MS;
++  const ctl = new AbortController();
++  const timer = setTimeout(() => ctl.abort(), timeoutMs);
++  try {
++    const r = await fetch(`${GENESIS_URL}/api/public/frank/admin/billing-day`, {
++      method: "POST",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify({ payload, exp, sig: signAdminPayload(payload, exp) }),
++      cache: "no-store",
++      signal: ctl.signal,
++    });
++    return (await r.json().catch(() => ({ ok: false, error: `HTTP ${r.status}` }))) as RebaseRes;
++  } catch (e) {
++    // 時間切れでも Genesis 側は動き続けていることがある（claim が5分残る）。画面を更新して確かめてもらう
++    return { ok: false, error: "network", detail: String(e instanceof Error ? e.message : e).slice(0, 120) };
++  } finally {
++    clearTimeout(timer);
++  }
++}
++
++/** 作り直しの失敗理由を現場の言葉に（#235） */
++function rebaseErrorText(r: RebaseRes): string {
++  const e = String(r.error ?? "");
++  const map: Record<string, string> = {
++    square_env_missing: "Square未接続のため実行できませんでした",
++    plan_free: "月会費0円のプランのため対象外です",
++    no_customer: "Squareのお客さまが紐づいていません",
++    no_subscription: "Squareにこの方の有効なサブスクがありません",
++    not_active_yet: "入会の確定前です",
++    suspend_scheduled: "休会予約があるため自動では切り替えません（休会予約を取り消してから）",
++    cancel_scheduled: "解約の予約があるため切り替えません",
++    multiple_subscriptions: "Squareに有効なサブスクが2本以上あります（二重引き落としのおそれ・Squareで確認）",
++    network: "通信が途中で切れました。数分おいて画面を更新し、状態を確かめてください",
++    bad_signature: "署名の確認に失敗しました（member-os と Genesis の設定を確認）",
++    needs_staff: "前回失敗しています",
++    db_error: "データベースの更新に失敗しました（何も変えていません）",
++    retired_not_canceled: "前回引退させたサブスクがまだ請求する形です（新しいサブスクは作っていません・Squareで確認）",
++    create_returned_canceled: "作成したサブスクが解約済みで返りました（Squareで確認）",
++    paused: "休止中のサブスクは自動では作り直せません（Squareで確認）",
++    already_charging: "すでに10日払いで引き落としが始まっているため、開始月は変えられません",
++    overlap: "今のサブスクの支払い済み期間と重なります",
++    past_date: "最初の引き落とし日が過ぎています",
++    cancel_failed: "これまでのサブスクを解約できませんでした（何も変えていません）",
++    cancel_unverified: "解約後も請求予定が残っています（新しいサブスクは作っていません）",
++    no_card: "保存カードがありません（これまでのサブスクは解約済み・引き落としは止まっています）",
++    create_failed: "新しいサブスクを作れませんでした（引き落としは止まっています）",
++    square_error: "Squareでエラーになりました",
++    usage_start_invalid: "ご利用開始日が受け付けられません",
++    invalid_status: "退会・休会中の会員は対象外です",
++    already_claimed: "処理中です。少し待ってから画面を更新してください",
++  };
++  return `${map[e] ?? e ?? "原因不明"}${r.detail ? `（${r.detail}）` : ""}`;
++}
++
+ /**
+- * ご利用開始日を変える＝無料になる月と、Square の自動課金の再開日をずらす（#234・2026-09-11）
++ * 1人ぶんを10日払いに作り直す／やり直す（会員カードのボタン・#235）
++ */
++export async function rebaseBillingDayOne(formData: FormData) {
++  const actor = await requireFrankActor();
++  const admin = createAdmin();
++  const dest = backTo(formData);
++  const id = str(formData.get("id"));
++  if (!id) return;
++  const { data: m } = await admin
++    .from("frunk_members")
++    .select("id, name")
++    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
++  if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
++  const r = await callRebase(id, {});
++  await logAudit(actor, "frunk.billing_day.rebase", "frunk_members", id, null, { result: r });
++  revalidateMember(id);
++  if (r.ok) redirect(`${dest}?msg=` + encodeURIComponent(`${String(m.name ?? "")}様: ${r.message ?? "10日払いにしました"}`));
++  redirect(`${dest}?err=` + encodeURIComponent(`${String(m.name ?? "")}様: ${rebaseErrorText(r)}`));
++}
++
++/**
++ * 今いる会員をまとめて10日払いに作り直す（/frunk のボタン・#235）
+  *
+- * 発端: 尾内様（FR0048）・大江様（FR0049）。9/11 に入会、ご利用開始は 11/2。
+- *   入会フォームの「ご利用開始日」が請求に反映されておらず、9月無料＋10月・11月前取り＋12/11 から自動課金になっていた。
+- *   ユーザー決定: 入会時の 21,560円は返金せず 12月・1月分に充当／11月無料／自動課金は 2027/2/11 から
+- *   ／請求日は入会日と同じ11日のまま／6か月継続はご利用開始日から。
++ * 1人あたり Square を5〜8回呼ぶので、時間の上限（40秒）で区切って「残り◯名」を返す。もう一度押せば続きから。
++ * 済んだ人は billing_rebased_at が立つので2回目以降は飛ばす（何度押しても二重にならない）。
++ */
++export async function rebaseBillingDayAll(formData: FormData) {
++  const actor = await requireFrankActor();
++  const admin = createAdmin();
++  const dest = backTo(formData);
++  const started = Date.now();
++  const { data: rows } = await admin
++    .from("frunk_members")
++    .select("id, name, member_no, billing_status, scheduled_leave_date, scheduled_suspend_start, billing_rebase_error, frunk_plans(monthly_price)")
++    .eq("company_id", actor.companyId)
++    .eq("store_id", FRANK_STORE_ID)
++    .in("status", ["active", "pending"])
++    .not("square_subscription_id", "is", null)
++    .is("billing_rebased_at", null)
++    .is("deleted_at", null)
++    .order("join_date");
++  // 月会費0円・解約済み・退会/休会の予約がある方は対象外（その方は会員カードで個別に）
++  const targets = (rows ?? []).filter(
++    (r) =>
++      Number((r.frunk_plans as { monthly_price?: number | null } | null)?.monthly_price ?? 0) > 0 &&
++      String(r.billing_status ?? "") !== "canceled" &&
++      !r.scheduled_leave_date &&
++      !r.scheduled_suspend_start,
++  );
++  const done: string[] = [];
++  const failed: string[] = [];
++  let skipped = 0;
++  let processed = 0;
++  for (const t of targets) {
++    // 1人10秒ほどかかることがあるので、25秒を過ぎたら次の人に手を付けない（関数の上限60秒）
++    if (Date.now() - started > 25_000) break;
++    processed++;
++    // 前回失敗して止まっている人も、Genesis 側が今の Square の状態から続きをやる
++    const r = await callRebase(String(t.id), { bulk: true }, Math.max(5_000, 55_000 - (Date.now() - started)));
++    if (r.ok) done.push(`${t.member_no ?? ""} ${r.startDate ? r.startDate.slice(5).replace("-", "/") : ""}`);
++    else if (r.error === "already_claimed") skipped++;
++    else failed.push(`${t.name ?? ""}様（${t.member_no ?? ""}）: ${rebaseErrorText(r)}`);
++  }
++  const remaining = targets.length - processed;
++  await logAudit(actor, "frunk.billing_day.rebase_all", "frunk_members", null, null, { done, failed, remaining });
++  revalidatePath("/frunk");
++  const msg =
++    `10日払いへの切り替え: ${done.length}名 完了` +
++    (remaining > 0 ? `・残り${remaining}名（もう一度押してください）` : "") +
++    (skipped > 0 ? `・処理中${skipped}名（少し待って画面を更新）` : "") +
++    (failed.length > 0 ? `・失敗${failed.length}名 → ${failed.join(" ／ ")}` : "");
++  redirect(`${dest}?${failed.length > 0 ? "err" : "msg"}=` + encodeURIComponent(msg));
++}
++
++/**
++ * ご利用開始日を変える＝無料になる月と、最初の10日の引き落としをずらす（#234→#235）
+  *
+- * 式は @yozan/core/frank-billing-start の usageStartSchedule 1か所（入会画面・入会完了メール・Webhookと同じ）。
+- * Square 側は「前取り分の休止」の周期数を組み直すだけで、サブスクの作り直しも請求日の変更もしない。
+- * ご利用開始日がDBで同じでも Square の予定がずれていれば押し直せる（お二人はまさにこの状態）。
++ * 発端: 尾内様（FR0048）・大江様（FR0049）。9/11 入会・ご利用開始 11/2。
++ *   ユーザー決定: 21,560円は返金せず12月・1月分に充当／11月無料／6か月継続はご利用開始日から。
++ * 10日払い（#235）では、まだ引き落としが始まっていない10日払いのサブスクを作り直すだけ（Genesis）。
++ * 式は @yozan/core/frank-billing-start の usageStartSchedule 1か所。
+  */
+ export async function changeUsageStart(formData: FormData) {
+   const actor = await requireFrankActor();
+@@ -1142,93 +1331,44 @@ export async function changeUsageStart(formData: FormData) {
+ 
+   const { data: m } = await admin
+     .from("frunk_members")
+-    .select("id, name, member_no, status, join_date, start_date, join_campaign, min_term_until, square_subscription_id, square_checkout_breakdown, prepay_pause_done_at")
++    .select("id, name, status, join_date, join_campaign, square_subscription_id, square_checkout_breakdown")
+     .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle();
+   if (!m) return fail("会員が見つかりません");
+   if (!["active", "pending"].includes(String(m.status))) return fail("退会・休会中の会員のご利用開始日は変更できません");
+   if (!/^\d{4}-\d{2}-\d{2}$/.test(requested)) return fail("ご利用開始日を選んでください");
+-
+   const bd = (m.square_checkout_breakdown ?? {}) as Record<string, unknown>;
+-  const prepaid = Number(bd.prepaidMonths ?? 0);
+-  // 基準日＝入会日（サブスクが始まった日＝毎月の請求日）
+   const joinYmd = String(m.join_date ?? bd.applyDateYmd ?? "");
+   if (!/^\d{4}-\d{2}-\d{2}$/.test(joinYmd)) return fail("入会日が未設定のため変更できません");
+-  if (requested < joinYmd) return fail(`ご利用開始日は入会日（${joinYmd.replaceAll("-", "/")}）以降の日付を選んでください`);
+-
+-  const campaign = !!m.join_campaign;
++  const err = usageStartError({ applyDateYmd: joinYmd, usageStartYmd: requested });
++  if (err) return fail(err.replace("本日以降", `入会日（${joinYmd.replaceAll("-", "/")}）以降`));
++  const prepaid = Number(bd.prepaidMonths ?? 0);
+   const sch = usageStartSchedule({ applyDateYmd: joinYmd, usageStartYmd: requested, prepaidMonths: prepaid });
+-  if (sch.usageStartYmd !== requested) {
+-    return fail(`ご利用開始日は ${sch.usageStartYmd.replaceAll("-", "/")} までの日付を選んでください（入会月から3か月後の月まで）`);
+-  }
+ 
+-  const subId = m.square_subscription_id ? String(m.square_subscription_id) : null;
+-  let squareLine = "自動課金（Square）は未登録のため、画面上の日付だけ変更しました。";
+-  let squareResult: unknown = null;
+-  if (subId && prepaid > 0) {
+-    if (!m.prepay_pause_done_at) {
+-      return fail("入会時の決済の処理（前取り分の休止の登録）がまだ終わっていません。数分おいてからもう一度お試しください。");
+-    }
+-    if (sch.nextBillingYmd <= today()) {
+-      return fail(`この日付だと次回の請求日（${sch.nextBillingYmd.replaceAll("-", "/")}）が過ぎてしまいます。すでに始まった月は変更できません。`);
+-    }
+-    const r = await reschedulePrepayPause(subId, {
+-      targetYmd: sch.nextBillingYmd,
+-      fallbackRestoreCycles: Number(bd.pauseCycles ?? prepaid),
+-    });
+-    squareResult = r;
+-    if (!r.ok) {
+-      await logAudit(actor, "frunk.usage_start.change_failed", "frunk_members", id, null, { requested, schedule: sch, square: r });
+-      const now = r.after?.resume ? `（Square上の次回請求は ${r.after.resume.replaceAll("-", "/")}）` : "";
+-      if (r.skipped) return fail("Square未接続のため変更できませんでした。");
+-      if (r.error === "already_paused") return fail("すでに前取り分の休止期間に入っているため、この画面では変更できません。本部にご相談ください。");
+-      if (String(r.error ?? "").startsWith("status_")) {
+-        return fail(`この会員の自動課金は開始日指定で作られている（${r.error}）ため、この画面では変更できません。本部にご相談ください。`);
+-      }
+-      return fail(
+-        `Squareの変更に失敗しました（${r.error ?? "原因不明"}）${r.restored ? "。元の予定に戻しています" : ""}${now}。Squareダッシュボードでご確認ください。`,
+-      );
+-    }
+-    const resume = r.after?.resume ?? null;
+-    if (resume && resume !== sch.nextBillingYmd) {
+-      // 予約は通ったが日付が合わない＝黙って成功にしない
+-      await logAudit(actor, "frunk.usage_start.date_mismatch", "frunk_members", id, null, { requested, schedule: sch, square: r });
+-      return fail(
+-        `Squareに休止を登録しましたが、次回請求日が ${resume.replaceAll("-", "/")} になっています（予定 ${sch.nextBillingYmd.replaceAll("-", "/")}）。Squareダッシュボードでご確認ください。`,
+-      );
+-    }
+-    squareLine = resume
+-      ? `Square上の次回の自動課金は ${resume.replaceAll("-", "/")} です（確認済み）。`
+-      : `Squareに ${r.cycles ?? 0} か月分の休止を登録しました（次回の自動課金は ${sch.nextBillingYmd.replaceAll("-", "/")} の予定・Squareで再開日をご確認ください）。`;
++  let squareLine = "";
++  if (m.square_subscription_id && prepaid > 0) {
++    // Genesis が作り直しに成功したときだけ start_date・継続期限・内訳を書き換える
++    const r = await callRebase(id, { usage_start: requested });
++    await logAudit(actor, "frunk.usage_start.change", "frunk_members", id, null, { requested, schedule: sch, result: r });
++    if (!r.ok) return fail(`ご利用開始日を変更できませんでした: ${rebaseErrorText(r)}`);
++    squareLine = `自動引き落としは ${String(r.startDate ?? sch.nextBillingYmd).replaceAll("-", "/")} に${monthLabel(sch.firstBilledMonthYmd)}分から（Square確認済み）。`;
++  } else {
++    await admin
++      .from("frunk_members")
++      .update({
++        start_date: sch.usageStartYmd,
++        ...(m.join_campaign ? { min_term_until: sch.minTermUntilYmd } : {}),
++        square_checkout_breakdown: { ...bd, usageStartYmd: sch.usageStartYmd, nextBillingYmd: sch.nextBillingYmd },
++        updated_at: new Date().toISOString(),
++      })
++      .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
++    await logAudit(actor, "frunk.usage_start.change", "frunk_members", id, null, { requested, schedule: sch });
++    squareLine = "自動引き落とし（Square）は未登録のため、画面上の日付だけ変更しました。";
+   }
+-
+-  await admin
+-    .from("frunk_members")
+-    .update({
+-      start_date: sch.usageStartYmd,
+-      ...(campaign ? { min_term_until: sch.minTermUntilYmd } : {}),
+-      square_checkout_breakdown: {
+-        ...bd,
+-        usageStartYmd: sch.usageStartYmd,
+-        deferredMonths: sch.deferredMonths,
+-        pauseCycles: sch.pauseCycles,
+-        nextBillingYmd: sch.nextBillingYmd,
+-      },
+-      updated_at: new Date().toISOString(),
+-    })
+-    .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID);
+-
+-  await logAudit(actor, "frunk.usage_start.change", "frunk_members", id, { start_date: m.start_date, min_term_until: m.min_term_until }, {
+-    start_date: sch.usageStartYmd,
+-    min_term_until: campaign ? sch.minTermUntilYmd : m.min_term_until,
+-    schedule: sch,
+-    square: squareResult,
+-  });
+   revalidateMember(id);
+-
+   const prepaidText = sch.prepaidMonthYmds.map(monthLabel).join("・");
+   redirect(`${dest}?msg=` + encodeURIComponent(
+     `${String(m.name ?? "")}様のご利用開始日を ${sch.usageStartYmd.replaceAll("-", "/")} にしました。` +
+       `${monthLabel(sch.freeMonthYmd)}分は無料${prepaidText ? `・${prepaidText}分は入会時にお支払い済み` : ""}。${squareLine}` +
+-      (campaign ? `6か月継続は ${sch.minTermUntilYmd.replaceAll("-", "/")} までです。` : ""),
++      (m.join_campaign ? `6か月継続は ${sch.minTermUntilYmd.replaceAll("-", "/")} までです。` : ""),
+   ));
+ }
+diff --git a/apps/member-os/src/app/(main)/frunk/page.tsx b/apps/member-os/src/app/(main)/frunk/page.tsx
+index e5cfcde..c8eed5a 100644
+--- a/apps/member-os/src/app/(main)/frunk/page.tsx
++++ b/apps/member-os/src/app/(main)/frunk/page.tsx
+@@ -15,11 +15,13 @@ import {
+ } from "@/lib/frunk-member-search";
+ import { jstYmd } from "@/lib/jst";
+ import { monthEndLabel, monthFromLabel } from "@yozan/core/frank-membership";
+-import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment, openJoinCheckout } from "./actions";
++import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment, openJoinCheckout, rebaseBillingDayAll } from "./actions";
+ import { joinPaymentView } from "@/lib/frunk-join-view";
+ import { memberDisplayName } from "@yozan/core/frank-corporate";
+ 
+ export const dynamic = "force-dynamic";
++// 10日払いへの一括切り替え（#235）は1人あたりSquareを数回呼ぶので、サーバーアクションの時間を延ばす
++export const maxDuration = 60;
+ type Row = Record<string, unknown>;
+ 
+ /**
+@@ -96,6 +98,14 @@ export default async function FrunkPage({
+   };
+ 
+   const pending = memberList.filter((m) => m.status === "pending");
++
++  // 月会費を「毎月10日に翌月分」に作り直していない方（#235）。月会費0円のプランは対象外
++  const notRebased = memberList.filter((m) => {
++    if (!["active", "pending"].includes(String(m.status)) || !m.square_subscription_id || m.billing_rebased_at) return false;
++    const plan = planList.find((p) => p.id === m.plan_id) as { monthly_price?: number | null } | undefined;
++    return Number(plan?.monthly_price ?? 0) > 0;
++  });
++  const rebaseErrors = memberList.filter((m) => m.billing_rebase_error && ["active", "pending"].includes(String(m.status)));
+   const counts = countByStatus(memberList as unknown as FrunkMemberLike[], [...STATUS_TABS]);
+ 
+   // ---- 探す・絞る・並べる ----
+@@ -153,6 +163,39 @@ export default async function FrunkPage({
+         </Panel>
+       )}
+ 
++      {/* 月会費を「毎月10日に翌月分」にそろえる（#235・2026-09-11 ユーザー決定）。
++          それまでのサブスクは入会日と同じ日に請求していた。済んだ方は出てこない＝何度押しても二重にならない */}
++      {(notRebased.length > 0 || rebaseErrors.length > 0) && (
++        <Panel title="月会費の引き落とし日を「毎月10日に翌月分」にそろえる" className="d1">
++          <p className="text-sm text-(--color-dim)">
++            まだ切り替えていない方が <span className="font-bold text-(--color-txt)">{notRebased.length}名</span> います。
++            それぞれ「前取りが終わった次の月の分」を、その前月10日から引き落とします（例：9月入会の方は 11/10 に12月分）。
++            今のサブスクは支払い済みの期間の終わりで解約し、同じカードで10日払いのサブスクを作り直します（二重に引き落としません）。
++          </p>
++          {notRebased.length > 0 && (
++            <p className="mt-1 text-xs text-(--color-dim)">
++              {notRebased.map((m) => `${memberDisplayName(m as never)}（${String(m.member_no ?? "")}）`).join("・")}
++            </p>
++          )}
++          {rebaseErrors.length > 0 && (
++            <ul className="mt-2 space-y-1 text-xs text-rose-600">
++              {rebaseErrors.map((m) => (
++                <li key={String(m.id)}>
++                  ⚠ <Link href={`/frunk/${String(m.id)}`} className="underline">{memberDisplayName(m as never)}（{String(m.member_no ?? "")}）</Link>: {String(m.billing_rebase_error)}
++                </li>
++              ))}
++            </ul>
++          )}
++          {notRebased.length > 0 && (
++            <form action={rebaseBillingDayAll} className="mt-3">
++              <input type="hidden" name="back" value="/frunk" />
++              <button className={btnCls}>まとめて10日払いに切り替える（{notRebased.length}名）</button>
++              <span className="ml-2 text-xs text-(--color-dim)">数名ずつ進みます。「残り◯名」と出たらもう一度押してください</span>
++            </form>
++          )}
++        </Panel>
++      )}
++
+       {/* 入会申込（承認待ち）— Web入会は承認レスで自動、ここは店頭iPad入会と救済用（#129） */}
+       {pending.length > 0 && (
+         <Panel title={`入会申込（承認待ち ${pending.length}件）`} className="d1">
+diff --git a/apps/member-os/src/app/join-web/web-join-form.tsx b/apps/member-os/src/app/join-web/web-join-form.tsx
+index 8d28049..3065ed3 100644
+--- a/apps/member-os/src/app/join-web/web-join-form.tsx
++++ b/apps/member-os/src/app/join-web/web-join-form.tsx
+@@ -264,7 +264,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
+           このあと安全な決済ページ（Square）に進み、<span className="font-medium text-(--color-txt)">入会時のお支払い（入会金＋前取りの月会費）を1回で</span>
+           お済ませいただきます。同時にカードが登録され、
+           <span className="font-medium text-(--color-txt)">決済完了と同時にご入会が確定し、会員番号を発行</span>
+-          します（入会の控えPDFをメールでお送りします）。前取り期間のあとは、毎月自動でのお支払いになります。
++          します（入会の控えPDFをメールでお送りします）。前取り期間のあとは、<span className="font-medium text-(--color-txt)">毎月10日に翌月分</span>を自動でお支払いいただきます。
+         </div>
+         <div>
+           <label className={label}>クーポンコード（お持ちの方のみ）</label>
+@@ -385,7 +385,7 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
+               {sch.deferredMonths > 0 && (
+                 <li>・ご利用開始日は<span className="font-semibold text-(--color-txt)">{slashDate(sch.usageStartYmd)}</span>です。それより前の月の月会費はかかりません。</li>
+               )}
+-              <li>・{monthLabel(sch.nextBillingYmd)}分以降の月会費は、毎月「入会日と同じ日」にご登録カードへ自動でお支払いになります（初回 {slashDate(sch.nextBillingYmd)}・{prepaidLabels.join("分・")}分は本日お支払い済みのため請求されません）。</li>
++              <li>・{monthLabel(sch.firstBilledMonthYmd)}分からの月会費は、<span className="font-semibold text-(--color-txt)">毎月10日に翌月分</span>をご登録カードへ自動でお支払いいただきます（初回は {slashDate(sch.nextBillingYmd)} に{monthLabel(sch.firstBilledMonthYmd)}分。{prepaidLabels.join("分・")}分は本日お支払い済みです）。</li>
+               <li>・キャンペーンでのご入会は、<span className="font-semibold text-(--color-txt)">ご利用開始日から{JOIN_CAMPAIGN.minMonths}か月間（{slashDate(sch.minTermUntilYmd)}まで）の継続</span>をお願いしています。</li>
+               <li>・上記の合計を、決済ページで<span className="font-semibold text-(--color-txt)">1回でお支払い</span>いただきます（分割されません）。</li>
+               <li>・決済は安全な決済ページ（Square）で行います。決済完了と同時に会員番号を発行します。</li>
+diff --git a/apps/member-os/src/app/member/settings/page.tsx b/apps/member-os/src/app/member/settings/page.tsx
+index 765e035..c918099 100644
+--- a/apps/member-os/src/app/member/settings/page.tsx
++++ b/apps/member-os/src/app/member/settings/page.tsx
+@@ -42,7 +42,7 @@ export default async function MemberSettingsPage({
+ 
+       {sp.billing === "success" && (
+         <p className="mb-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
+-          ✅ カードのご登録が完了しました。月会費は毎月自動でお支払いになります。
++          ✅ カードのご登録が完了しました。月会費は毎月10日に翌月分を自動でお支払いいただきます。
+         </p>
+       )}
+       {sp.billing === "cancel" && (
+@@ -59,7 +59,7 @@ export default async function MemberSettingsPage({
+           <h2 className="text-sm font-semibold">月会費のお支払い（クレジットカード）</h2>
+           {cardDone ? (
+             <p className="mt-1 text-xs leading-relaxed text-(--color-dim)">
+-              ご登録済みです。月会費は毎月自動でお支払いになります。
++              ご登録済みです。月会費は毎月10日に翌月分を自動でお支払いいただきます。
+               カードの変更・お支払い方法の変更は受付までお申し付けください。
+             </p>
+           ) : (
+diff --git a/apps/member-os/src/lib/frank-billing-pure.ts b/apps/member-os/src/lib/frank-billing-pure.ts
+index 7e992a4..c8d072e 100644
+--- a/apps/member-os/src/lib/frank-billing-pure.ts
++++ b/apps/member-os/src/lib/frank-billing-pure.ts
+@@ -22,7 +22,7 @@ export const taxIncl = (exTax: number) => Math.round(exTax * 1.1);
+ /* ============================ 入会キャンペーン（#131・2026-08-11 ユーザー指定） ============================
+  * - 入会金は 5,500円税込（プランの joining_fee=5,000税抜）。年内（2026-12-31申込分まで）は無料
+  * - 月会費は「入会月無料＋翌月・翌々月の2か月分をその場で前取り」
+- *   （決済リンクで1か月分＋入金確認後にカードへもう1か月分。以後は毎月入会日と同じ日に自動課金。
++ *   （決済リンクで1回払い。以後は毎月10日に翌月分を自動課金＝#235。無料月はご利用開始月＝#234。
+  *     前取り分と重ならないよう、サブスクの直近1周期はスキップする）
+  * - キャンペーン入会は6か月間の継続が条件（表示・同意記録＋退会時スタッフ警告。強制ブロックはしない）
+  */
+diff --git a/apps/member-os/src/lib/frank-mail.ts b/apps/member-os/src/lib/frank-mail.ts
+index 13d276d..a9f5d8c 100644
+--- a/apps/member-os/src/lib/frank-mail.ts
++++ b/apps/member-os/src/lib/frank-mail.ts
+@@ -211,7 +211,7 @@ export function buildApprovalMail(input: {
+           "■ 月会費のお支払い登録（クレジットカード）",
+           `${FRANK_LINKS.settings}`,
+           "会員ページにログインし、「設定・お手続き」からお手続きください。",
+-          "安全な決済ページ（Square）でカードを登録すると、月会費は毎月自動でお支払いになります。",
++          "安全な決済ページ（Square）でカードを登録すると、月会費は毎月10日に翌月分を自動でお支払いいただきます。",
+           joinFee > 0
+             ? `初回のみ、月会費に続けて入会金 ${joinFee.toLocaleString()}円（税込）を同じカードへ自動でご請求します。`
+             : "入会金はクーポン適用のため無料です。",
+diff --git a/apps/member-os/src/lib/frank-square.ts b/apps/member-os/src/lib/frank-square.ts
+index 1536dbd..4d996e3 100644
+--- a/apps/member-os/src/lib/frank-square.ts
++++ b/apps/member-os/src/lib/frank-square.ts
+@@ -1,7 +1,6 @@
+ import "server-only";
+ import { randomUUID } from "crypto";
+ import { squareOrderIdempotencyKey } from "@yozan/core/frank-portal";
+-import { calendarMonthsBetween } from "@yozan/core/frank-billing-start";
+ 
+ /**
+  * FRANK GOLF member-os → Square 操作（#124）
+@@ -44,7 +43,7 @@ async function sq(method: string, path: string, body?: Record<string, unknown>):
+  * 休会: 月会費の自動課金を止める。
+  *
+  * effectiveDate（"YYYY-MM-DD"）を渡すと **その日から** 止まる（#192）。
+- * 店のルールでは休会は必ず月初からなので、通常は "2026-10-01" のような月初が入る。
++ * 10日払い（#235）では「休会開始月の分を引き落とす前月10日」を渡す（squarePauseDateForSuspend）。
+  * 省略すると Square は「次の請求サイクルの開始日」で止める。
+  * ⚠ 未指定＝即時停止ではない。ここを取り違えると「止めたつもりで1回落ちる」事故になる。
+  */
+@@ -67,7 +66,7 @@ export async function pauseSubscription(subscriptionId: string, effectiveDate?:
+  *
+  * effectiveDate（"YYYY-MM-DD"）あり:
+  *   PUT /subscriptions/{id} で canceled_date を入れる＝**その日で解約が予約される**。
+- *   店のルールでは退会日は必ず月末なので、その月までは請求され、翌月から止まる。
++ *   10日払い（#235）では「退会月の10日」を渡す（squareCancelDateForLeave）＝翌月分をその日に引き落とさない。
+  * effectiveDate なし:
+  *   POST /subscriptions/{id}/cancel＝**現在の請求サイクルの終わり**で解約（Squareの仕様。即時ではない）。
+  */
+@@ -98,11 +97,19 @@ export async function uncancelSubscription(subscriptionId: string): Promise<Squa
+   }
+ }
+ 
+-/** 復帰: 自動課金を再開する */
+-export async function resumeSubscription(subscriptionId: string): Promise<SquareOpResult> {
++/**
++ * 復帰: 自動課金を再開する。
++ * effectiveDate（必ず10日・#235）を渡すとその日に再開＝その日に翌月分が引き落とされる。
++ * 10日に再開するので、請求日（10日）がずれない。
++ */
++export async function resumeSubscription(subscriptionId: string, effectiveDate?: string | null): Promise<SquareOpResult> {
+   if (!token()) return { ok: false, skipped: true };
+   try {
+-    await sq("POST", `/subscriptions/${subscriptionId}/resume`, {});
++    await sq(
++      "POST",
++      `/subscriptions/${subscriptionId}/resume`,
++      effectiveDate ? { resume_effective_date: effectiveDate, resume_change_timing: "IMMEDIATE" } : {},
++    );
+     return { ok: true };
+   } catch (e) {
+     console.error("[frank-square] resume failed:", e);
+@@ -191,16 +198,9 @@ export async function chargeOrderOnFile(input: {
+ }
+ 
+ /* ============================================================================
+- * ご利用開始月に合わせて「前取り分の休止」を組み直す（#234・2026-09-11）
+- *
+- * Web入会の決済でサブスクは「入会日」から始まり、Webhook が
+- * 「前取り月数ぶん（＋ご利用開始月までの月数ぶん）」の休止を Square に予約する（genesis frank-pos.ts）。
+- * 入会後に「ご利用開始は11月から」と分かった方（尾内様・大江様）は、この休止を長くすればよい。
+- * 請求日（毎月◯日）は動かさない＝サブスクを作り直さない・請求日の基準日も触らない（ユーザー決定）。
+- *
+- * Square の休止は「予約済みの PAUSE / RESUME アクション」として持たれている。
+- * 予約を上書きする API は無いので、①予約を消す ②周期数を指定して休止を予約し直す ③読み直して確かめる。
+- * ②が失敗したら元の周期数で予約し直す（消したままだと、止めるはずの月にそのまま引き落とされる）。
++ * サブスクの状態を読む（#234・#235）
++ *   会員カードに「Square上の次回の引き落とし日」をそのまま出すため。
++ *   作り直し（10日払い）は Genesis 側（SQUARE_LOCATION_ID がある）: apps/genesis/src/lib/frank-billing-day.ts
+  * ========================================================================== */
+ 
+ export type SubscriptionAction = { id: string; type: string; effective_date?: string | null };
+@@ -209,6 +209,8 @@ export type SubscriptionDetail = {
+   status: string;
+   start_date: string | null;
+   charged_through_date: string | null;
++  canceled_date: string | null;
++  monthly_billing_anchor_date: number | null;
+   actions: SubscriptionAction[];
+ };
+ 
+@@ -232,6 +234,8 @@ export async function getSubscriptionDetail(
+         status: String(raw.status ?? "").toUpperCase(),
+         start_date: raw.start_date ? String(raw.start_date) : null,
+         charged_through_date: raw.charged_through_date ? String(raw.charged_through_date) : null,
++        canceled_date: raw.canceled_date ? String(raw.canceled_date) : null,
++        monthly_billing_anchor_date: typeof raw.monthly_billing_anchor_date === "number" ? raw.monthly_billing_anchor_date : null,
+         actions,
+       },
+     };
+@@ -241,105 +245,44 @@ export async function getSubscriptionDetail(
+   }
+ }
+ 
+-/** 予約中の休止（PAUSE の日＝止まる最初の請求日／RESUME の日＝次に請求される日）。無ければ null */
+-export function pendingPauseWindow(sub: SubscriptionDetail): { pause: string | null; resume: string | null } {
+-  const pause = sub.actions.filter((a) => a.type === "PAUSE" && a.effective_date).map((a) => String(a.effective_date)).sort()[0] ?? null;
+-  const resume = sub.actions.filter((a) => a.type === "RESUME" && a.effective_date).map((a) => String(a.effective_date)).sort()[0] ?? null;
+-  return { pause, resume };
++/** Square上で次に引き落とされる日（無ければ null）。休止中は再開の予約日 */
++export function nextInvoiceDateOf(sub: SubscriptionDetail): string | null {
++  if (["CANCELED", "DEACTIVATED"].includes(sub.status)) return null;
++  const firstOf = (t: string) =>
++    sub.actions.filter((a) => a.type === t && a.effective_date).map((a) => String(a.effective_date)).sort()[0] ?? null;
++  if (sub.status === "PAUSED") return firstOf("RESUME");
++  const next = sub.status === "PENDING" ? sub.start_date : sub.charged_through_date;
++  if (!next) return null;
++  if (sub.canceled_date && sub.canceled_date <= next) return null;
++  const pause = firstOf("PAUSE");
++  if (pause && pause <= next) return firstOf("RESUME");
++  return next;
+ }
+ 
+-export type ReschedulePauseResult = {
+-  ok: boolean;
+-  skipped?: boolean;
+-  error?: string;
+-  /** 変更前の Square の予定 */
+-  before?: { pause: string | null; resume: string | null };
+-  /** 変更後に読み直した Square の予定 */
+-  after?: { pause: string | null; resume: string | null };
+-  /** 新しく予約した休止の周期数 */
+-  cycles?: number;
+-  /** ②が失敗して元の周期数で予約し直したか */
+-  restored?: boolean;
+-};
+-
+ /**
+- * 次に自動課金される日が targetYmd になるように、前取り分の休止を予約し直す。
+- *
+- * 前提（満たさなければ何もしないで理由を返す）:
+- *   - サブスクが ACTIVE（休止がまだ始まっていない）。PAUSED＝休止に入っている・PENDING＝開始日指定のサブスク（#233）は対象外
+- *   - targetYmd が「次の請求サイクルの開始日」以降
+- *
+- * fallbackRestoreCycles: Square が RESUME の予約日を返さなかったときに、元に戻す周期数（DBの控え）
++ * 休会の停止予約を消す（#235・休会予約の取り消し用）。
++ * まだ始まっていない休会を取り消すのに resume を呼ぶと Square は受け付けないことがあるので、予約そのものを消す。
++ * ⚠ 消すのは「その休会の停止日（pauseYmd）」の PAUSE と、それより後の RESUME だけ。
++ *   入会時の前取り分の休止（10日払いに切り替える前の会員）まで消すと、前取りした月に引き落とされる。
+  */
+-export async function reschedulePrepayPause(
+-  subscriptionId: string,
+-  input: { targetYmd: string; fallbackRestoreCycles: number },
+-): Promise<ReschedulePauseResult> {
++export async function clearPendingPause(subscriptionId: string, pauseYmd: string): Promise<SquareOpResult> {
+   if (!token()) return { ok: false, skipped: true };
+-  const first = await getSubscriptionDetail(subscriptionId);
+-  if (!first.ok) return { ok: false, skipped: first.skipped, error: first.error };
+-  const sub = first.sub;
+-  const before = pendingPauseWindow(sub);
+-  if (sub.status === "PAUSED") return { ok: false, before, error: "already_paused" };
+-  if (sub.status !== "ACTIVE") return { ok: false, before, error: `status_${sub.status || "unknown"}` };
+-
+-  // 次の請求サイクルの開始日。予約中の PAUSE があればその日（Square自身が決めた日）を正とする
+-  const nextCycle = before.pause ?? sub.charged_through_date;
+-  if (!nextCycle) return { ok: false, before, error: "no_next_cycle" };
+-  const cycles = calendarMonthsBetween(nextCycle, input.targetYmd);
+-  if (cycles < 0) return { ok: false, before, error: "target_before_next_cycle" };
+-
+-  const restoreCycles =
+-    before.pause && before.resume
+-      ? Math.max(0, calendarMonthsBetween(before.pause, before.resume))
+-      : before.pause
+-        ? Math.max(0, Math.trunc(input.fallbackRestoreCycles))
+-        : 0;
+-
+   try {
+-    // ① 予約を消す（RESUME を先に。PAUSE を先に消して RESUME の削除に失敗すると、変な再開予約だけが残る）
+-    const toDelete = [...sub.actions.filter((a) => a.type === "RESUME"), ...sub.actions.filter((a) => a.type === "PAUSE")];
+-    for (const a of toDelete) {
+-      if (!a.id) continue;
++    const d = await getSubscriptionDetail(subscriptionId);
++    if (!d.ok) return { ok: false, error: d.error };
++    if (d.sub.status === "PAUSED") {
++      // すでに休止に入っている＝予約を消すのではなく再開（次の10日から）
++      return { ok: false, error: "already_paused" };
++    }
++    const pauses = d.sub.actions.filter((x) => x.type === "PAUSE" && x.id && x.effective_date === pauseYmd);
++    if (pauses.length === 0) return { ok: true }; // 予約が無い（Square未反映・すでに消えている）＝何もしない
++    const resumes = d.sub.actions.filter((x) => x.type === "RESUME" && x.id && String(x.effective_date ?? "") > pauseYmd);
++    for (const a of [...resumes, ...pauses]) {
+       await sq("DELETE", `/subscriptions/${encodeURIComponent(subscriptionId)}/actions/${encodeURIComponent(a.id)}`);
+     }
++    return { ok: true };
+   } catch (e) {
+-    console.error("[frank-square] delete subscription action failed:", e);
+-    const again = await getSubscriptionDetail(subscriptionId);
+-    return {
+-      ok: false,
+-      before,
+-      after: again.ok ? pendingPauseWindow(again.sub) : undefined,
+-      error: `delete_failed: ${String(e instanceof Error ? e.message : e).slice(0, 160)}`,
+-    };
+-  }
+-
+-  let restored = false;
+-  let pauseError: string | null = null;
+-  if (cycles > 0) {
+-    try {
+-      // ② 周期数で予約（開始日を省略＝次の請求サイクルの開始日から止まり、cycles 回ぶん後に自動で再開）
+-      await sq("POST", `/subscriptions/${encodeURIComponent(subscriptionId)}/pause`, {
+-        pause_cycle_duration: cycles,
+-        pause_reason: "FRANK: ご利用開始月に合わせて前取り分の休止を組み直し（#234）",
+-      });
+-    } catch (e) {
+-      pauseError = String(e instanceof Error ? e.message : e).slice(0, 160);
+-      console.error("[frank-square] re-pause failed:", e);
+-      if (restoreCycles > 0) {
+-        try {
+-          await sq("POST", `/subscriptions/${encodeURIComponent(subscriptionId)}/pause`, { pause_cycle_duration: restoreCycles });
+-          restored = true;
+-        } catch (e2) {
+-          console.error("[frank-square] restore pause failed:", e2);
+-        }
+-      }
+-    }
++    console.error("[frank-square] clear pending pause failed:", e);
++    return { ok: false, error: String(e) };
+   }
+-
+-  // ③ 読み直して、実際に Square に入っている予定を返す（画面にそのまま出す）
+-  const again = await getSubscriptionDetail(subscriptionId);
+-  const after = again.ok ? pendingPauseWindow(again.sub) : undefined;
+-  if (pauseError) return { ok: false, before, after, cycles, restored, error: `pause_failed: ${pauseError}` };
+-  return { ok: true, before, after, cycles };
+ }
+diff --git a/apps/member-os/src/lib/frank-terms.ts b/apps/member-os/src/lib/frank-terms.ts
+index accbb5d..d3850b6 100644
+--- a/apps/member-os/src/lib/frank-terms.ts
++++ b/apps/member-os/src/lib/frank-terms.ts
+@@ -18,16 +18,16 @@ export const FRANK_TERMS_TEXT = `FRANK GOLF 会員規約
+ 会員とは、本規約に同意し、所定の入会申込を行い、当社が入会を承認した個人または法人をいいます。当社は、当施設の運営上必要と判断した場合、入会をお断りすることがあります。
+ 
+ 第2条(会員種別・会費)
+-会員種別および月会費は、料金ページに定めるとおりです(表示金額は税抜)。会費は、クレジットカードによる毎月の自動決済、口座振替、または当社が認めるその他の方法により、当月分を毎月お支払いいただきます。会費および各種料金は、経済情勢等により改定する場合があります。改定する場合は、事前に当施設内の掲示またはWebサイトでお知らせします。
++会員種別および月会費は、料金ページに定めるとおりです(表示金額は税抜)。会費は、クレジットカードによる毎月の自動決済、口座振替、または当社が認めるその他の方法により、翌月分を毎月10日にお支払いいただきます(入会時にお支払いいただく月の分を除きます)。会費および各種料金は、経済情勢等により改定する場合があります。改定する場合は、事前に当施設内の掲示またはWebサイトでお知らせします。
+ 
+ 第3条(利用方法・予約・キャンセル)
+ 会員は、会員種別ごとに定める範囲で当施設を利用できます。打席のご利用は、当社が定める予約システム(Web予約等)によりご予約ください。ご予約は、ご利用開始前まで予約ページからキャンセルいただけます。ご連絡のないキャンセル(無断キャンセル)が続く場合、当社はWeb予約のご利用を制限することがあります。
+ 
+ 第4条(休会)
+-会員は、休会を希望する月の前月末日までに当社所定の方法で申し出ることにより、翌月から休会することができます。休会中は、月会費に代えて休会費として月額1,100円(税込)をお支払いいただきます。休会期間は連続3ヶ月を上限とし、上限を超えて復会のお申し出がない場合は、翌月から通常の月会費に戻ります。復会を希望する場合は、復会を希望する月の前月末日までにお申し出ください。
++会員は、休会を希望する月の前々月末日までに当社所定の方法で申し出ることにより、その月から休会することができます(休会を希望する月の月会費は前月10日に決済するためです)。休会中は、月会費に代えて休会費として月額1,100円(税込)をお支払いいただきます。休会期間は連続3ヶ月を上限とし、上限を超えて復会のお申し出がない場合は、翌月から通常の月会費に戻ります。復会を希望する場合はお申し出ください。復会した月の月会費は店頭でお支払いいただき、翌月分から毎月10日の自動決済に戻ります(毎月10日を過ぎての復会の場合、翌月分はお申し出の時点で決済します)。
+ 
+ 第5条(退会)
+-会員は、退会を希望する月の前月末日までに当社所定の方法で申し出ることにより、希望月の末日をもって退会することができます。前月末日を過ぎてのお申し出は、翌月末日での退会となります。月会費の日割り精算は行いません。既にお支払いいただいた会費は、当社に責のある場合を除き返金いたしません。クレジットカードによる自動決済をご利用の場合、退会月の末日をもって決済を停止します。
++会員は、退会を希望する月の前月末日までに当社所定の方法で申し出ることにより、希望月の末日をもって退会することができます。前月末日を過ぎてのお申し出は、翌月末日での退会となります。月会費の日割り精算は行いません。既にお支払いいただいた会費は、当社に責のある場合を除き返金いたしません。クレジットカードによる自動決済をご利用の場合、退会月の10日に予定される翌月分の決済から停止します。
+ 
+ 第6条(会員資格の停止・除名)
+ 会員が本規約に違反した場合、会費の支払いを怠った場合、または当施設の秩序・信用を害する行為を行った場合、当社は事前の通知なく会員資格の停止または除名を行うことがあります。
+diff --git a/packages/core/src/frank-billing-start.ts b/packages/core/src/frank-billing-start.ts
+index 71d2951..617228b 100644
+--- a/packages/core/src/frank-billing-start.ts
++++ b/packages/core/src/frank-billing-start.ts
+@@ -1,21 +1,24 @@
+ /**
+- * FRANK 月会費の自動課金を「あとから」立てるときの日付（#233）
++ * FRANK 月会費の「いつ・何月分を」引き落とすか（日付の正典）
+  *
+- * 発端（2026-09-10・中尾様 FR0047）:
+- *   入会の決済でカード会社の3Dセキュア（ワンタイムパスワード）が、お客様がもう使っていない
+- *   メールアドレス宛に送られて受信できず、決済リンクを完走できなかった。
+- *   店側で Square の顧客にカードを保存し、前取り分は「一回きりの決済」で受領したため、
+- *   **入金は済んでいる・会員にもなっている・サブスクだけ無い** という状態が生まれた。
++ * ★ 2026-09-11 ユーザー決定（#235）: **毎月10日に、翌月分を引き落とす**。
++ *   例 11月10日 → 12月分。全会員同じ日（それまでは「入会日と同じ日」で人によってバラバラだった）。
+  *
+- * その状態から自動課金を立てるとき、開始日を間違えると:
+- *   早すぎる → 前取りした月をもう一度請求する（**二重取り**）
+- *   遅すぎる → その月をタダにする（**取り損ね**）
+- * どちらもそのままお金の事故になるので、日付の式はここ1か所だけに置く。
++ * ★ 入会時（キャンペーン・#131）: 無料になるのはご利用開始月（#234）、前取りはその翌月・翌々月。
++ *   自動の引き落としは「前取りが終わった次の月の分」から ＝ その前月10日。
++ *   例 9/11 入会・ご利用開始 9月 → 9月無料／10月・11月は入会時に前取り／12月分を 11/10 に
++ *   例 9/11 入会・ご利用開始 11/2 → 11月無料／12月・1月は前取り／2月分を 1/10 に
+  *
+- * 入会完了メール（apps/genesis/src/lib/frank-join.ts）がお客様に案内している
+- * 「次回 ◯月◯日」と**同じ式**であること。ずれるとメールと請求が食い違う。
++ * ここを間違えると早すぎ＝二重取り・遅すぎ＝取り損ね。日付の式はこのファイルだけに置く。
++ * 入会画面の見積り・入会完了メール・Squareのサブスク作成・スタッフの会員カードがすべてこれを通す。
+  */
+ 
++/** 毎月の引き落とし日（この日に「翌月分」を引き落とす） */
++export const BILLING_DAY = 10;
++
++const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
++const pad = (n: number) => String(n).padStart(2, "0");
++
+ /** JST日付に月を足す（毎月同日・末日は繰り下げ。例 8/31 + 1か月 = 9/30） */
+ export function addMonthsYmd(ymd: string, months: number): string {
+   const d = new Date(`${ymd}T12:00:00+09:00`);
+@@ -25,79 +28,6 @@ export function addMonthsYmd(ymd: string, months: number): string {
+   return target.toISOString().slice(0, 10);
+ }
+ 
+-/**
+- * 前取りが済んでいる会員の「次に請求すべき日」。
+- *
+- * 入会月は無料、そこから prepaidMonths か月ぶんを入会時に前取りしている。
+- * したがって次の請求は **入会日 +（前取り月数 + 1）か月**。
+- * 例: 2026-09-10 入会・前取り2か月（10月分・11月分）→ 2026-12-10
+- */
+-export function nextBillingDateAfterPrepay(i: {
+-  startDateYmd: string;
+-  prepaidMonths: number;
+-  /** ご利用開始日（#234）。入会月より先の月なら、その月数ぶん後ろにずれる。省略＝入会月から利用 */
+-  usageStartYmd?: string | null;
+-}): string {
+-  return usageStartSchedule({
+-    applyDateYmd: i.startDateYmd,
+-    usageStartYmd: i.usageStartYmd ?? null,
+-    prepaidMonths: i.prepaidMonths,
+-  }).nextBillingYmd;
+-}
+-
+-/**
+- * Square に渡してよい開始日か。
+- *
+- * Square は **過去日**の start_date を受け付けない（受け付けても即時課金になる）。
+- * 「前取りが終わった月がもう過ぎている」会員は、その月を自動で取り戻すのではなく
+- * **翌月以降を人が選ぶ**（取りこぼしは店頭で精算する）。勝手に今日課金しない。
+- */
+-export function resolveBillingStartDate(i: {
+-  startDateYmd: string;
+-  prepaidMonths: number;
+-  todayYmd: string;
+-  requestedYmd?: string | null;
+-  /** ご利用開始日（#234）。nextBillingDateAfterPrepay と同じ */
+-  usageStartYmd?: string | null;
+-}): { ok: true; date: string; adjusted: boolean } | { ok: false; error: "past_date"; suggested: string } {
+-  const wanted = i.requestedYmd && /^\d{4}-\d{2}-\d{2}$/.test(i.requestedYmd)
+-    ? i.requestedYmd
+-    : nextBillingDateAfterPrepay({
+-        startDateYmd: i.startDateYmd,
+-        prepaidMonths: i.prepaidMonths,
+-        usageStartYmd: i.usageStartYmd ?? null,
+-      });
+-  if (wanted >= i.todayYmd) return { ok: true, date: wanted, adjusted: wanted !== i.requestedYmd };
+-  // 過ぎている＝人に選び直してもらう。候補として「同じ日付の次に来る月」を返す
+-  let suggested = wanted;
+-  let guard = 0;
+-  while (suggested < i.todayYmd && guard++ < 240) suggested = addMonthsYmd(suggested, 1);
+-  return { ok: false, error: "past_date", suggested };
+-}
+-
+-/* ============================================================================
+- * ご利用開始月（#234・2026-09-11）
+- *
+- * 発端: 尾内様（FR0048）・大江様（FR0049）。9/11 に入会、ご利用開始は 11/2。
+- *   入会フォームには「ご利用開始希望日」の欄があったのに、請求はそれを見ていなかった。
+- *   → 9月（使わない月）が無料、10月・11月分を前取り、12/11 から自動課金になっていた。
+- *
+- * ユーザーの決定（2026-09-11）:
+- *   - 無料になるのは「ご利用開始月」。前取りはその翌月・翌々月
+- *   - ご利用開始月より前の月は、そもそも月会費がかからない
+- *   - 毎月の請求日は「入会日と同じ日」のまま（Squareのサブスク作成日＝請求日の基準を動かさない）
+- *   - キャンペーンの6か月継続は「ご利用開始日」から数える
+- *
+- * Square での実現: 入会時の決済でサブスクが「入会日」から始まるので、
+- *   自動課金を止める周期数を (入会月→ご利用開始月の月数) + 前取り月数 にするだけ。
+- *   例 9/11入会・11/2開始・前取り2か月 → 止める周期 2+2=4（10/11,11/11,12/11,1/11）→ 次回 2/11
+- * ========================================================================== */
+-
+-/** ご利用開始月は、入会月から数えて何か月後の月まで受け付けるか（0=今月、3=3か月後の月） */
+-export const USAGE_START_MAX_DEFER_MONTHS = 3;
+-
+-const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+-
+ /** 暦の月の差（日にちは見ない）。例 2026-09-30 → 2026-10-01 は 1 */
+ export function calendarMonthsBetween(fromYmd: string, toYmd: string): number {
+   const a = Number(fromYmd.slice(0, 4)) * 12 + Number(fromYmd.slice(5, 7));
+@@ -106,13 +36,49 @@ export function calendarMonthsBetween(fromYmd: string, toYmd: string): number {
+ }
+ 
+ /** その月の1日（"2026-11-02" → "2026-11-01"） */
+-function monthStart(ymd: string): string {
++export function monthStartYmd(ymd: string): string {
+   return `${ymd.slice(0, 7)}-01`;
+ }
+ 
++/** "2026-11-01" → "11月" */
++export function monthLabel(ymd: string): string {
++  return `${Number(ymd.slice(5, 7))}月`;
++}
++
++/** その月の分を引き落とす日 ＝ 前月10日。例 "2026-12-01"（12月分）→ "2026-11-10" */
++export function chargeDateForMonth(monthYmd: string): string {
++  const prev = addMonthsYmd(monthStartYmd(monthYmd), -1);
++  return `${prev.slice(0, 7)}-${pad(BILLING_DAY)}`;
++}
++
++/** その引き落とし日が「何月分」か ＝ 翌月の1日。例 "2026-11-10" → "2026-12-01" */
++export function billedMonthOfChargeDate(chargeYmd: string): string {
++  return addMonthsYmd(monthStartYmd(chargeYmd), 1);
++}
++
++/** ymd より後（当日は含まない）で最初に来る引き落とし日（10日） */
++export function nextChargeDateAfter(ymd: string): string {
++  const thisMonth = `${ymd.slice(0, 7)}-${pad(BILLING_DAY)}`;
++  return thisMonth > ymd ? thisMonth : addMonthsYmd(thisMonth, 1);
++}
++
++/** 引き落とし日（毎月10日）か */
++export function isChargeDate(ymd: string): boolean {
++  return YMD_RE.test(ymd) && Number(ymd.slice(8, 10)) === BILLING_DAY;
++}
++
++/* ============================================================================
++ * ご利用開始月（#234）
++ *   入会フォームの「ご利用開始日」が先の月なら、無料になるのはその月。それより前の月はかからない。
++ *   キャンペーンの6か月継続もご利用開始日から数える（ユーザー決定 2026-09-11）。
++ * ========================================================================== */
++
++/** ご利用開始月は、入会月から数えて何か月後の月まで受け付けるか（0=今月、3=3か月後の月） */
++export const USAGE_START_MAX_DEFER_MONTHS = 3;
++
+ /** ご利用開始日として選べる最終日（入会月から USAGE_START_MAX_DEFER_MONTHS か月後の月の末日） */
+ export function usageStartMaxYmd(applyDateYmd: string): string {
+-  const d = new Date(`${monthStart(applyDateYmd)}T12:00:00+09:00`);
++  const d = new Date(`${monthStartYmd(applyDateYmd)}T12:00:00+09:00`);
+   const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + USAGE_START_MAX_DEFER_MONTHS + 1, 0));
+   return last.toISOString().slice(0, 10);
+ }
+@@ -132,7 +98,7 @@ export function usageStartError(i: { applyDateYmd: string; usageStartYmd: string
+ }
+ 
+ export type UsageStartSchedule = {
+-  /** 入会日（Squareのサブスクが始まる日＝毎月の請求日の基準） */
++  /** 入会日 */
+   applyDateYmd: string;
+   /** ご利用開始日（空欄・過去日は入会日、上限を超えたら上限に丸めたもの） */
+   usageStartYmd: string;
+@@ -140,22 +106,20 @@ export type UsageStartSchedule = {
+   deferredMonths: number;
+   /** 前取り月数 */
+   prepaidMonths: number;
+-  /** Squareで自動課金を止める周期数（= deferredMonths + prepaidMonths） */
+-  pauseCycles: number;
+-  /** 最初の自動課金日（= 入会日 +（pauseCycles + 1）か月） */
+-  nextBillingYmd: string;
+   /** 無料になる月（ご利用開始月）の1日 */
+   freeMonthYmd: string;
+   /** 前取りする月の1日（前取り月数ぶん） */
+   prepaidMonthYmds: string[];
++  /** 最初に自動で引き落とす月（◯月分）の1日 */
++  firstBilledMonthYmd: string;
++  /** 最初の自動引き落とし日（= firstBilledMonth の前月10日） */
++  nextBillingYmd: string;
+   /** ご利用開始日から数えた最低継続の期限 */
+   minTermUntilYmd: string;
+ };
+ 
+ /**
+- * 入会日・ご利用開始日・前取り月数から、無料月・前取りの月・次回請求日・継続期限を決める。
+- * 見積画面（member-os）・決済リンク／Webhook・入会完了メール（genesis）・スタッフの変更操作が
+- * すべてこれを通す（ずれると「メールで案内した日」と「実際の請求」が食い違う）。
++ * 入会日・ご利用開始日・前取り月数から、無料月・前取りの月・最初の自動引き落とし日・継続期限を決める。
+  */
+ export function usageStartSchedule(i: {
+   applyDateYmd: string;
+@@ -169,23 +133,99 @@ export function usageStartSchedule(i: {
+   const max = usageStartMaxYmd(i.applyDateYmd);
+   if (usageStartYmd > max) usageStartYmd = max;
+   const deferredMonths = Math.max(0, calendarMonthsBetween(i.applyDateYmd, usageStartYmd));
+-  const pauseCycles = deferredMonths + prepaidMonths;
+-  const free = monthStart(usageStartYmd);
++  const free = monthStartYmd(usageStartYmd);
++  const firstBilled = addMonthsYmd(free, prepaidMonths + 1);
+   const minMonths = Number.isFinite(i.minMonths) ? Math.max(0, Math.trunc(i.minMonths as number)) : 6;
+   return {
+     applyDateYmd: i.applyDateYmd,
+     usageStartYmd,
+     deferredMonths,
+     prepaidMonths,
+-    pauseCycles,
+-    nextBillingYmd: addMonthsYmd(i.applyDateYmd, pauseCycles + 1),
+     freeMonthYmd: free,
+     prepaidMonthYmds: Array.from({ length: prepaidMonths }, (_, k) => addMonthsYmd(free, k + 1)),
++    firstBilledMonthYmd: firstBilled,
++    nextBillingYmd: chargeDateForMonth(firstBilled),
+     minTermUntilYmd: addMonthsYmd(usageStartYmd, minMonths),
+   };
+ }
+ 
+-/** "2026-11-01" → "11月" */
+-export function monthLabel(ymd: string): string {
+-  return `${Number(ymd.slice(5, 7))}月`;
++/**
++ * 前取りが済んでいる会員の「最初の自動引き落とし日」。usageStartSchedule の nextBillingYmd と同じ。
++ * 例: 2026-09-10 入会・前取り2か月（10月分・11月分）→ 12月分を 2026-11-10
++ */
++export function nextBillingDateAfterPrepay(i: {
++  startDateYmd: string;
++  prepaidMonths: number;
++  usageStartYmd?: string | null;
++}): string {
++  return usageStartSchedule({
++    applyDateYmd: i.startDateYmd,
++    usageStartYmd: i.usageStartYmd ?? null,
++    prepaidMonths: i.prepaidMonths,
++  }).nextBillingYmd;
++}
++
++/**
++ * 保存カードからサブスクを立てるとき（#233・#235）の開始日。
++ *
++ * - スタッフが日付を指定したら、それが 10日 であること（10日以外は請求日がずれる）
++ * - Square は過去日の start_date を受け付けない（受け付けても即時課金）。過ぎていたら
++ *   **次に来る10日を候補として返し、人に選び直してもらう**（取りこぼしは店頭で精算。勝手に今日課金しない）
++ */
++export function resolveBillingStartDate(i: {
++  startDateYmd: string;
++  prepaidMonths: number;
++  todayYmd: string;
++  requestedYmd?: string | null;
++  usageStartYmd?: string | null;
++}):
++  | { ok: true; date: string; adjusted: boolean }
++  | { ok: false; error: "past_date"; suggested: string }
++  | { ok: false; error: "not_billing_day"; suggested: string } {
++  const requested = i.requestedYmd && YMD_RE.test(i.requestedYmd) ? i.requestedYmd : null;
++  if (requested && !isChargeDate(requested)) {
++    // 候補＝指定した月の10日（過ぎていれば次の10日）
++    const tenth = `${requested.slice(0, 7)}-${pad(BILLING_DAY)}`;
++    return { ok: false, error: "not_billing_day", suggested: tenth >= i.todayYmd ? tenth : nextChargeDateAfter(i.todayYmd) };
++  }
++  const wanted = requested
++    ?? nextBillingDateAfterPrepay({
++      startDateYmd: i.startDateYmd,
++      prepaidMonths: i.prepaidMonths,
++      usageStartYmd: i.usageStartYmd ?? null,
++    });
++  if (wanted >= i.todayYmd) return { ok: true, date: wanted, adjusted: wanted !== i.requestedYmd };
++  let suggested = wanted;
++  let guard = 0;
++  while (suggested < i.todayYmd && guard++ < 240) suggested = addMonthsYmd(suggested, 1);
++  return { ok: false, error: "past_date", suggested };
++}
++
++/* ============================================================================
++ * 既存のサブスクを「10日払い」に作り直すときの開始日（#235）
++ * ========================================================================== */
++
++/**
++ * いま持っているサブスクを10日払いに作り直すとき、新しいサブスクの開始日（＝最初の引き落とし日）。
++ *
++ * - 前取りのある入会（Web入会）: usageStartSchedule の nextBillingYmd（入会日・ご利用開始日・前取り月数から）
++ * - 前取りの無いカード登録（会員ページから）: 支払った日より後で最初に来る10日
++ *   （登録時の支払いを「次の10日の前の月の分」とみなす）
++ *
++ * 過ぎた日付になる場合は ok:false（人が判断する。勝手に今日課金しない）。
++ */
++export function rebaseStartDate(i: {
++  joinDateYmd: string;
++  usageStartYmd?: string | null;
++  prepaidMonths: number;
++  todayYmd: string;
++  /** 前取りの無い会員のカード登録日（無ければ入会日） */
++  registeredYmd?: string | null;
++}): { ok: true; date: string; billedMonthYmd: string } | { ok: false; error: "past_date"; date: string } {
++  const prepaid = Number.isFinite(i.prepaidMonths) ? Math.max(0, Math.trunc(i.prepaidMonths)) : 0;
++  const date = prepaid > 0
++    ? usageStartSchedule({ applyDateYmd: i.joinDateYmd, usageStartYmd: i.usageStartYmd ?? null, prepaidMonths: prepaid }).nextBillingYmd
++    : nextChargeDateAfter(i.registeredYmd && YMD_RE.test(i.registeredYmd) ? i.registeredYmd : i.joinDateYmd);
++  if (date <= i.todayYmd) return { ok: false, error: "past_date", date };
++  return { ok: true, date, billedMonthYmd: billedMonthOfChargeDate(date) };
+ }
+diff --git a/packages/core/src/frank-membership.ts b/packages/core/src/frank-membership.ts
+index a69a959..73695bf 100644
+--- a/packages/core/src/frank-membership.ts
++++ b/packages/core/src/frank-membership.ts
+@@ -1,24 +1,26 @@
+ /**
+- * FRANK GOLF 退会・休会の受付ルール（#192・2026-09-01 ユーザー確定）
++ * FRANK GOLF 退会・休会の受付ルール（#192・2026-09-01 ユーザー確定／#235・2026-09-11 改定）
+  *
+  * ★ 店のルール（そのまま関数にしてある）
+  *   退会: 効力日は「月末」。申込月の翌月末より前は選べない。
+  *         例) 9月末で退会したいなら 8月末までに申し出る。9月に申し出たら最短は10月末。
+- *   休会: 開始は「月初」。当月10日までの申し出なら翌月から。11日以降は翌々月から。
+- *         例) 10月から休会したいなら 9月10日まで。9月11日に申し出たら最短は11月から。
++ *   休会: 開始は「月初」。**休会したい月の分が引き落とされる10日の、さらに前月末まで**に申し出る（#235）。
++ *         例) 11月から休会したいなら 9月30日まで（11月分は10月10日に引き落とすため）。
++ *         以前は「前月10日まで」だったが、10日払い（翌月分）にしたことで引き落とし当日と重なるので改めた。
++ *   復帰: 復帰した月の月会費は店頭で1か月分。翌月分からは毎月10日の自動引き落としに戻る（#235）。
+  *
+  * ★ なぜ純関数に置くか
+  *   この日付を間違えると「月会費が1か月余分に落ちる／止まりすぎる」＝そのままお金の事故になる。
+  *   画面（選択肢の生成）とサーバー（受け取った日付の検証）で必ず同じ関数を通す。
+  *   別の場所で月末計算を書き直さないこと。
+  *
+- * ★ Square との対応
+- *   退会 → サブスクの canceled_date にこの「月末」を入れる（その月までは請求され、翌月から止まる）
+- *   休会 → サブスクの pause_effective_date にこの「月初」を入れる
++ * ★ Square との対応（毎月10日に翌月分・#235）
++ *   退会 → canceled_date ＝ 退会月の10日（翌月分をその日に引き落とさない）… squareCancelDateForLeave
++ *   休会 → pause_effective_date ＝ 休会開始月の前月10日（その月の分を引き落とさない）… squarePauseDateForSuspend
++ *   復帰 → 次に来る10日から再開。10日を過ぎていたら翌月分はその場でカードに請求 … resumePlan
+  */
+ 
+-/** 休会の申し出締切（この日までなら翌月から休会できる） */
+-export const SUSPEND_APPLY_DEADLINE_DAY = 10;
++import { chargeDateForMonth, addMonthsYmd, BILLING_DAY } from "./frank-billing-start.ts";
+ 
+ /** 選択肢を何か月先まで出すか */
+ export const SCHEDULE_MONTHS_AHEAD = 12;
+@@ -88,11 +90,10 @@ export function leaveApplyDeadline(leaveDate: string): string {
+ 
+ /* ============================ 休会 ============================ */
+ 
+-/** 申込日 today に対して選べる最短の休会開始日。
+- *  10日までなら翌月1日、11日以降は翌々月1日。 */
++/** 申込日 today に対して選べる最短の休会開始日 ＝ 翌々月1日（#235）。
++ *  例) 9月中（9/1〜9/30）の申し出なら 11月から。 */
+ export function earliestSuspendStart(today: string): string {
+-  const offset = dayOf(today) <= SUSPEND_APPLY_DEADLINE_DAY ? 1 : 2;
+-  const n = addMonths(parseYm(today), offset);
++  const n = addMonths(parseYm(today), 2);
+   return `${n.y}-${pad(n.m)}-01`;
+ }
+ 
+@@ -114,10 +115,48 @@ export function canSuspendFrom(today: string, date: string): boolean {
+   return date >= earliestSuspendStart(today);
+ }
+ 
+-/** 「その月から休会するための申し出の締切」＝前月10日。画面の説明文に出す */
++/** 「その月から休会するための申し出の締切」＝前々月末（#235）。画面の説明文に出す */
+ export function suspendApplyDeadline(suspendStart: string): string {
+-  const prev = addMonths(parseYm(suspendStart), -1);
+-  return `${prev.y}-${pad(prev.m)}-${pad(SUSPEND_APPLY_DEADLINE_DAY)}`;
++  const prev = addMonths(parseYm(suspendStart), -2);
++  return `${prev.y}-${pad(prev.m)}-${pad(daysInMonth(prev.y, prev.m))}`;
++}
++
++/* ============================ Square に渡す日付（#235） ============================ */
++
++/** 休会開始月の分を引き落とさないための停止日 ＝ 休会開始月の前月10日。例 11/1から休会 → 10/10 */
++export function squarePauseDateForSuspend(suspendStart: string): string {
++  return chargeDateForMonth(suspendStart);
++}
++
++/** 退会月の翌月分を引き落とさないための解約日 ＝ 退会月の10日。例 11月末退会 → 11/10 */
++export function squareCancelDateForLeave(leaveDate: string): string {
++  return `${leaveDate.slice(0, 7)}-${pad(BILLING_DAY)}`;
++}
++
++/**
++ * 休会からの復帰（#235・ユーザー決定: 復帰した月は店頭で1か月分、翌月分から10日の自動に戻る）
++ *
++ * - 10日より前に復帰: 今月10日に Square を再開（翌月分をその日に引き落とし）
++ * - 10日ちょうど:     今日 Square を再開（翌月分が今日引き落とされる）
++ * - 11日以降:         翌月分の引き落とし日は過ぎているので **翌月分はその場でカードに請求**し、
++ *                     Square は翌月10日から再開（翌々月分から自動）
++ */
++export function resumePlan(today: string): {
++  /** 店頭でお預かりする月（復帰した月）の1日 */
++  storeMonthYmd: string;
++  /** Square の再開日（必ず10日） */
++  resumeYmd: string;
++  /** その場でカードに請求する月の1日（無ければ null） */
++  chargeNowMonthYmd: string | null;
++} {
++  const thisMonth = `${today.slice(0, 7)}-01`;
++  const tenth = `${today.slice(0, 7)}-${pad(BILLING_DAY)}`;
++  if (today <= tenth) return { storeMonthYmd: thisMonth, resumeYmd: tenth, chargeNowMonthYmd: null };
++  return {
++    storeMonthYmd: thisMonth,
++    resumeYmd: addMonthsYmd(tenth, 1),
++    chargeNowMonthYmd: addMonthsYmd(thisMonth, 1),
++  };
+ }
+ 
+ /* ============================ 表示用 ============================ */
+diff --git a/sites/frank-golf/_build.py b/sites/frank-golf/_build.py
+index b997995..0e304c6 100644
+--- a/sites/frank-golf/_build.py
++++ b/sites/frank-golf/_build.py
+@@ -1518,7 +1518,7 @@ def build_plan():
+       <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">近日公開</p></div>
+       <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee" data-tax>近日公開</p></div>
+       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
+-      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月自動でのお支払いです。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
++      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分を自動でお支払いいただきます。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
+       <div class="spec__row"><p class="spec__k">備考</p><p class="spec__v" data-frank="price.note">近日公開</p></div>
+     </div>
+     <div class="center rv" style="margin-top:40px">
+@@ -1977,7 +1977,7 @@ def build_trial():
+       <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+       <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v" data-frank="store.address">近日公開</p></div>
+       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
+-      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月自動でのお支払いです。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
++      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分を自動でお支払いいただきます。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
+     </div>
+ 
+     <div class="note-solo rv">
+@@ -2474,7 +2474,7 @@ def build_lp_campaign():
+     Web入会（即決済・会員番号即発行）へ直行させる導線。"""
+     faq = jsonld_faq([
+         ("キャンペーンの内容は？", "2026年12月31日までのご入会で、入会金5,500円（税込）が無料、さらに入会月の月会費も無料になります。"),
+-        ("支払いはどうなりますか？", "クレジットカードのみです。お申し込み時に翌月・翌々月の月会費2か月分を1回でお支払いいただき、以後は毎月自動でのお支払いになります。"),
++        ("支払いはどうなりますか？", "クレジットカードのみです。お申し込み時に翌月・翌々月の月会費2か月分を1回でお支払いいただき、以後は毎月10日に翌月分を自動でお支払いいただきます。"),
+         ("すぐに使えますか？", "はい。Web入会は決済完了と同時に会員番号が発行され、その場でWeb打席予約をご利用いただけます。"),
+         ("条件はありますか？", "キャンペーンでのご入会は6か月間の継続をお願いしています。休会・退会の規定は会員規約をご確認ください。"),
+     ])
+@@ -2506,7 +2506,7 @@ def build_lp_campaign():
+         <div class="flow__i"><p class="flow__n">特典 2</p><div><h3 class="flow__t">入会月の月会費 → <b style="color:var(--brass-2)">0円</b></h3><p class="flow__b">ご入会月の月会費は無料。お支払いは翌月分からのスタートです。</p></div></div>
+         <div class="flow__i"><p class="flow__n">おねがい</p><div><h3 class="flow__t">6か月間の継続</h3><p class="flow__b">キャンペーンでのご入会は、6か月間の継続をお願いしています（休会・退会の規定は会員規約をご覧ください）。</p></div></div>
+       </div>
+-      <p class="lead" style="font-size:13px;margin-top:14px">※ お申し込み時に、翌月・翌々月の月会費2か月分を1回でお支払いいただきます（以後は毎月自動でのお支払い）。</p>
++      <p class="lead" style="font-size:13px;margin-top:14px">※ お申し込み時に、翌月・翌々月の月会費2か月分を1回でお支払いいただきます（以後は毎月10日に翌月分を自動でお支払い）。</p>
+     </div>
+ 
+     <div class="rv" style="margin-top:56px">
+@@ -2570,7 +2570,7 @@ def build_tokushoho():
+       <div class="spec__row"><p class="spec__k">販売価格</p><p class="spec__v">各会員プランの月会費は<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に記載のとおりです（表示は税抜・別途消費税がかかります）。体験レッスンは通常3,300円（税込）、キャンペーン期間中は無料です。</p></div>
+       <div class="spec__row"><p class="spec__k">商品代金以外の必要料金</p><p class="spec__v">消費税。Webサイトのご利用にかかる通信費はお客様のご負担となります。</p></div>
+       <div class="spec__row"><p class="spec__k">支払方法</p><p class="spec__v">クレジットカード（毎月の自動決済）、口座振替、または店頭でのお支払い</p></div>
+-      <div class="spec__row"><p class="spec__k">支払時期</p><p class="spec__v">月会費は当月分を毎月お支払いいただきます。クレジットカードはご登録時および以後毎月、自動で決済されます。口座振替・店頭払いは当社所定の日にお支払いいただきます。会員ポータルからのご注文（モバイルオーダー）は、ご注文の確定時にご登録のクレジットカードで決済されます（カード未登録の場合は退店時に店頭でお支払いいただきます）。モバイルオーダーの商品代金は、会員ポータルに税込価格で表示します。</p></div>
++      <div class="spec__row"><p class="spec__k">支払時期</p><p class="spec__v">月会費は翌月分を毎月10日にお支払いいただきます。クレジットカードはご登録時および以後毎月10日に、自動で決済されます。口座振替・店頭払いは当社所定の日にお支払いいただきます。会員ポータルからのご注文（モバイルオーダー）は、ご注文の確定時にご登録のクレジットカードで決済されます（カード未登録の場合は退店時に店頭でお支払いいただきます）。モバイルオーダーの商品代金は、会員ポータルに税込価格で表示します。</p></div>
+       <div class="spec__row"><p class="spec__k">サービスの提供時期</p><p class="spec__v">入会のご承認後、ご利用開始日からご利用いただけます。打席・レッスンは予約された日時に提供します。</p></div>
+       <div class="spec__row"><p class="spec__k">返品・キャンセル</p><p class="spec__v">サービスの性質上、提供済みのサービスの返金はいたしかねます。打席のご予約は、ご利用開始前まで予約ページからキャンセルいただけます。</p></div>
+       <div class="spec__row"><p class="spec__k">退会について</p><p class="spec__v">退会を希望される月の前月末日までに、当社所定の方法でお申し出ください。月会費の日割り精算・返金はいたしません。詳細は<a href="terms.html" style="color:var(--brass-2)">会員規約</a>をご確認ください。</p></div>
+@@ -2677,17 +2677,17 @@ def build_terms():
+       <p class="legal__b">会員とは、本規約に同意し、所定の入会申込を行い、当社が入会を承認した個人または法人をいいます。当社は、当施設の運営上必要と判断した場合、入会をお断りすることがあります。</p>
+ 
+       <h2 class="legal__h">第2条（会員種別・会費）</h2>
+-      <p class="legal__b">会員種別および月会費は、<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に定めるとおりです（表示金額は税抜）。会費は、クレジットカードによる毎月の自動決済、口座振替、または当社が認めるその他の方法により、当月分を毎月お支払いいただきます。会費および各種料金は、経済情勢等により改定する場合があります。改定する場合は、事前に当施設内の掲示またはWebサイトでお知らせします。</p>
++      <p class="legal__b">会員種別および月会費は、<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に定めるとおりです（表示金額は税抜）。会費は、クレジットカードによる毎月の自動決済、口座振替、または当社が認めるその他の方法により、翌月分を毎月10日にお支払いいただきます（入会時にお支払いいただく月の分を除きます）。会費および各種料金は、経済情勢等により改定する場合があります。改定する場合は、事前に当施設内の掲示またはWebサイトでお知らせします。</p>
+ 
+       <h2 class="legal__h">第3条（利用方法・予約・キャンセル）</h2>
+       <p class="legal__b">会員は、会員種別ごとに定める範囲で当施設を利用できます。打席のご利用は、当社が定める予約システム（Web予約等）によりご予約ください。ご予約は、ご利用開始前まで予約ページからキャンセルいただけます。ご連絡のないキャンセル（無断キャンセル）が続く場合、当社はWeb予約のご利用を制限することがあります。</p>
+ 
+       <h2 class="legal__h">第4条（休会）</h2>
+       <p class="legal__b">
+-        会員は、休会を希望する月の前月末日までに当社所定の方法で申し出ることにより、翌月から休会することができます。
++        会員は、休会を希望する月の前々月末日までに当社所定の方法で申し出ることにより、その月から休会することができます（休会を希望する月の月会費は前月10日に決済するためです）。
+         休会中は、月会費に代えて休会費として月額1,100円（税込）をお支払いいただきます。休会期間は連続3ヶ月を上限とし、
+         上限を超えて復会のお申し出がない場合は、翌月から通常の月会費に戻ります。
+-        復会を希望する場合は、復会を希望する月の前月末日までにお申し出ください。
++        復会を希望する場合はお申し出ください。復会した月の月会費は店頭でお支払いいただき、翌月分から毎月10日の自動決済に戻ります（毎月10日を過ぎての復会の場合、翌月分はお申し出の時点で決済します）。
+       </p>
+ 
+       <h2 class="legal__h">第5条（退会）</h2>
+@@ -2695,7 +2695,7 @@ def build_terms():
+         会員は、退会を希望する月の前月末日までに当社所定の方法で申し出ることにより、希望月の末日をもって退会することができます。
+         前月末日を過ぎてのお申し出は、翌月末日での退会となります。月会費の日割り精算は行いません。
+         既にお支払いいただいた会費は、当社に責のある場合を除き返金いたしません。
+-        クレジットカードによる自動決済をご利用の場合、退会月の末日をもって決済を停止します。
++        クレジットカードによる自動決済をご利用の場合、退会月の10日に予定される翌月分の決済から停止します。
+       </p>
+ 
+       <h2 class="legal__h">第6条（会員資格の停止・除名）</h2>
+diff --git a/sites/frank-golf/lp-campaign.html b/sites/frank-golf/lp-campaign.html
+index 8187abc..d978f1f 100644
+--- a/sites/frank-golf/lp-campaign.html
++++ b/sites/frank-golf/lp-campaign.html
+@@ -35,7 +35,7 @@
+ <link rel="stylesheet" href="assets/style.css">
+ <script src="assets/site-data.js"></script>
+ <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"年内入会キャンペーン","item":"https://frankgolf.jp/lp-campaign.html"}]}</script>
+-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"キャンペーンの内容は？","acceptedAnswer":{"@type":"Answer","text":"2026年12月31日までのご入会で、入会金5,500円（税込）が無料、さらに入会月の月会費も無料になります。"}},{"@type":"Question","name":"支払いはどうなりますか？","acceptedAnswer":{"@type":"Answer","text":"クレジットカードのみです。お申し込み時に翌月・翌々月の月会費2か月分を1回でお支払いいただき、以後は毎月自動でのお支払いになります。"}},{"@type":"Question","name":"すぐに使えますか？","acceptedAnswer":{"@type":"Answer","text":"はい。Web入会は決済完了と同時に会員番号が発行され、その場でWeb打席予約をご利用いただけます。"}},{"@type":"Question","name":"条件はありますか？","acceptedAnswer":{"@type":"Answer","text":"キャンペーンでのご入会は6か月間の継続をお願いしています。休会・退会の規定は会員規約をご確認ください。"}}]}</script>
++<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"キャンペーンの内容は？","acceptedAnswer":{"@type":"Answer","text":"2026年12月31日までのご入会で、入会金5,500円（税込）が無料、さらに入会月の月会費も無料になります。"}},{"@type":"Question","name":"支払いはどうなりますか？","acceptedAnswer":{"@type":"Answer","text":"クレジットカードのみです。お申し込み時に翌月・翌々月の月会費2か月分を1回でお支払いいただき、以後は毎月10日に翌月分を自動でお支払いいただきます。"}},{"@type":"Question","name":"すぐに使えますか？","acceptedAnswer":{"@type":"Answer","text":"はい。Web入会は決済完了と同時に会員番号が発行され、その場でWeb打席予約をご利用いただけます。"}},{"@type":"Question","name":"条件はありますか？","acceptedAnswer":{"@type":"Answer","text":"キャンペーンでのご入会は6か月間の継続をお願いしています。休会・退会の規定は会員規約をご確認ください。"}}]}</script>
+ </head>
+ <body data-page="lp-campaign">
+ 
+@@ -109,7 +109,7 @@
+         <div class="flow__i"><p class="flow__n">特典 2</p><div><h3 class="flow__t">入会月の月会費 → <b style="color:var(--brass-2)">0円</b></h3><p class="flow__b">ご入会月の月会費は無料。お支払いは翌月分からのスタートです。</p></div></div>
+         <div class="flow__i"><p class="flow__n">おねがい</p><div><h3 class="flow__t">6か月間の継続</h3><p class="flow__b">キャンペーンでのご入会は、6か月間の継続をお願いしています（休会・退会の規定は会員規約をご覧ください）。</p></div></div>
+       </div>
+-      <p class="lead" style="font-size:13px;margin-top:14px">※ お申し込み時に、翌月・翌々月の月会費2か月分を1回でお支払いいただきます（以後は毎月自動でのお支払い）。</p>
++      <p class="lead" style="font-size:13px;margin-top:14px">※ お申し込み時に、翌月・翌々月の月会費2か月分を1回でお支払いいただきます（以後は毎月10日に翌月分を自動でお支払い）。</p>
+     </div>
+ 
+     <div class="rv" style="margin-top:56px">
+diff --git a/sites/frank-golf/plan.html b/sites/frank-golf/plan.html
+index 258a17d..a37b4b4 100644
+--- a/sites/frank-golf/plan.html
++++ b/sites/frank-golf/plan.html
+@@ -124,7 +124,7 @@
+       <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">0円（通常 3,300円 税込 → プレオープン記念で無料）</p></div>
+       <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee" data-tax>近日公開</p></div>
+       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
+-      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月自動でのお支払いです。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
++      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分を自動でお支払いいただきます。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
+       <div class="spec__row"><p class="spec__k">備考</p><p class="spec__v" data-frank="price.note">表示金額はすべて税抜です。カッコ内は税込価格（消費税10%）です。</p></div>
+     </div>
+     <div class="center rv" style="margin-top:40px">
+diff --git a/sites/frank-golf/sitemap.xml b/sites/frank-golf/sitemap.xml
+index a1773d7..d473d69 100644
+--- a/sites/frank-golf/sitemap.xml
++++ b/sites/frank-golf/sitemap.xml
+@@ -1,31 +1,31 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+-  <url><loc>https://frankgolf.jp/</loc><lastmod>2026-09-09</lastmod><priority>1.0</priority></url>
+-  <url><loc>https://frankgolf.jp/trial.html</loc><lastmod>2026-09-09</lastmod><priority>0.9</priority></url>
+-  <url><loc>https://frankgolf.jp/plan.html</loc><lastmod>2026-09-09</lastmod><priority>0.9</priority></url>
+-  <url><loc>https://frankgolf.jp/lesson.html</loc><lastmod>2026-09-09</lastmod><priority>0.9</priority></url>
+-  <url><loc>https://frankgolf.jp/access.html</loc><lastmod>2026-09-09</lastmod><priority>0.8</priority></url>
+-  <url><loc>https://frankgolf.jp/facility.html</loc><lastmod>2026-09-09</lastmod><priority>0.8</priority></url>
+-  <url><loc>https://frankgolf.jp/beginner.html</loc><lastmod>2026-09-09</lastmod><priority>0.8</priority></url>
+-  <url><loc>https://frankgolf.jp/faq.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/trial-booking.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/concept.html</loc><lastmod>2026-09-09</lastmod><priority>0.6</priority></url>
+-  <url><loc>https://frankgolf.jp/lounge.html</loc><lastmod>2026-09-09</lastmod><priority>0.6</priority></url>
+-  <url><loc>https://frankgolf.jp/community.html</loc><lastmod>2026-09-09</lastmod><priority>0.6</priority></url>
+-  <url><loc>https://frankgolf.jp/corporate.html</loc><lastmod>2026-09-09</lastmod><priority>0.6</priority></url>
+-  <url><loc>https://frankgolf.jp/lp-campaign.html</loc><lastmod>2026-09-09</lastmod><priority>0.5</priority></url>
+-  <url><loc>https://frankgolf.jp/column.html</loc><lastmod>2026-09-09</lastmod><priority>0.6</priority></url>
+-  <url><loc>https://frankgolf.jp/guide-indoor-golf-himeji.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/guide-golf-beginner-himeji.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/guide-trackman.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/himeji-golf-school-beginner.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/himeji-golf-lesson-women.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/himeji-golf-lesson-private.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/himeji-golf-bar.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/himeji-golf-range-unlimited.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/indoor-golf-cost.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/area.html</loc><lastmod>2026-09-09</lastmod><priority>0.7</priority></url>
+-  <url><loc>https://frankgolf.jp/tokushoho.html</loc><lastmod>2026-09-09</lastmod><priority>0.3</priority></url>
+-  <url><loc>https://frankgolf.jp/privacy.html</loc><lastmod>2026-09-09</lastmod><priority>0.3</priority></url>
+-  <url><loc>https://frankgolf.jp/terms.html</loc><lastmod>2026-09-09</lastmod><priority>0.3</priority></url>
++  <url><loc>https://frankgolf.jp/</loc><lastmod>2026-09-11</lastmod><priority>1.0</priority></url>
++  <url><loc>https://frankgolf.jp/trial.html</loc><lastmod>2026-09-11</lastmod><priority>0.9</priority></url>
++  <url><loc>https://frankgolf.jp/plan.html</loc><lastmod>2026-09-11</lastmod><priority>0.9</priority></url>
++  <url><loc>https://frankgolf.jp/lesson.html</loc><lastmod>2026-09-11</lastmod><priority>0.9</priority></url>
++  <url><loc>https://frankgolf.jp/access.html</loc><lastmod>2026-09-11</lastmod><priority>0.8</priority></url>
++  <url><loc>https://frankgolf.jp/facility.html</loc><lastmod>2026-09-11</lastmod><priority>0.8</priority></url>
++  <url><loc>https://frankgolf.jp/beginner.html</loc><lastmod>2026-09-11</lastmod><priority>0.8</priority></url>
++  <url><loc>https://frankgolf.jp/faq.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/trial-booking.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/concept.html</loc><lastmod>2026-09-11</lastmod><priority>0.6</priority></url>
++  <url><loc>https://frankgolf.jp/lounge.html</loc><lastmod>2026-09-11</lastmod><priority>0.6</priority></url>
++  <url><loc>https://frankgolf.jp/community.html</loc><lastmod>2026-09-11</lastmod><priority>0.6</priority></url>
++  <url><loc>https://frankgolf.jp/corporate.html</loc><lastmod>2026-09-11</lastmod><priority>0.6</priority></url>
++  <url><loc>https://frankgolf.jp/lp-campaign.html</loc><lastmod>2026-09-11</lastmod><priority>0.5</priority></url>
++  <url><loc>https://frankgolf.jp/column.html</loc><lastmod>2026-09-11</lastmod><priority>0.6</priority></url>
++  <url><loc>https://frankgolf.jp/guide-indoor-golf-himeji.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/guide-golf-beginner-himeji.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/guide-trackman.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/himeji-golf-school-beginner.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/himeji-golf-lesson-women.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/himeji-golf-lesson-private.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/himeji-golf-bar.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/himeji-golf-range-unlimited.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/indoor-golf-cost.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/area.html</loc><lastmod>2026-09-11</lastmod><priority>0.7</priority></url>
++  <url><loc>https://frankgolf.jp/tokushoho.html</loc><lastmod>2026-09-11</lastmod><priority>0.3</priority></url>
++  <url><loc>https://frankgolf.jp/privacy.html</loc><lastmod>2026-09-11</lastmod><priority>0.3</priority></url>
++  <url><loc>https://frankgolf.jp/terms.html</loc><lastmod>2026-09-11</lastmod><priority>0.3</priority></url>
+ </urlset>
+diff --git a/sites/frank-golf/terms.html b/sites/frank-golf/terms.html
+index 7245c67..b47a4d7 100644
+--- a/sites/frank-golf/terms.html
++++ b/sites/frank-golf/terms.html
+@@ -106,17 +106,17 @@
+       <p class="legal__b">会員とは、本規約に同意し、所定の入会申込を行い、当社が入会を承認した個人または法人をいいます。当社は、当施設の運営上必要と判断した場合、入会をお断りすることがあります。</p>
+ 
+       <h2 class="legal__h">第2条（会員種別・会費）</h2>
+-      <p class="legal__b">会員種別および月会費は、<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に定めるとおりです（表示金額は税抜）。会費は、クレジットカードによる毎月の自動決済、口座振替、または当社が認めるその他の方法により、当月分を毎月お支払いいただきます。会費および各種料金は、経済情勢等により改定する場合があります。改定する場合は、事前に当施設内の掲示またはWebサイトでお知らせします。</p>
++      <p class="legal__b">会員種別および月会費は、<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に定めるとおりです（表示金額は税抜）。会費は、クレジットカードによる毎月の自動決済、口座振替、または当社が認めるその他の方法により、翌月分を毎月10日にお支払いいただきます（入会時にお支払いいただく月の分を除きます）。会費および各種料金は、経済情勢等により改定する場合があります。改定する場合は、事前に当施設内の掲示またはWebサイトでお知らせします。</p>
+ 
+       <h2 class="legal__h">第3条（利用方法・予約・キャンセル）</h2>
+       <p class="legal__b">会員は、会員種別ごとに定める範囲で当施設を利用できます。打席のご利用は、当社が定める予約システム（Web予約等）によりご予約ください。ご予約は、ご利用開始前まで予約ページからキャンセルいただけます。ご連絡のないキャンセル（無断キャンセル）が続く場合、当社はWeb予約のご利用を制限することがあります。</p>
+ 
+       <h2 class="legal__h">第4条（休会）</h2>
+       <p class="legal__b">
+-        会員は、休会を希望する月の前月末日までに当社所定の方法で申し出ることにより、翌月から休会することができます。
++        会員は、休会を希望する月の前々月末日までに当社所定の方法で申し出ることにより、その月から休会することができます（休会を希望する月の月会費は前月10日に決済するためです）。
+         休会中は、月会費に代えて休会費として月額1,100円（税込）をお支払いいただきます。休会期間は連続3ヶ月を上限とし、
+         上限を超えて復会のお申し出がない場合は、翌月から通常の月会費に戻ります。
+-        復会を希望する場合は、復会を希望する月の前月末日までにお申し出ください。
++        復会を希望する場合はお申し出ください。復会した月の月会費は店頭でお支払いいただき、翌月分から毎月10日の自動決済に戻ります（毎月10日を過ぎての復会の場合、翌月分はお申し出の時点で決済します）。
+       </p>
+ 
+       <h2 class="legal__h">第5条（退会）</h2>
+@@ -124,7 +124,7 @@
+         会員は、退会を希望する月の前月末日までに当社所定の方法で申し出ることにより、希望月の末日をもって退会することができます。
+         前月末日を過ぎてのお申し出は、翌月末日での退会となります。月会費の日割り精算は行いません。
+         既にお支払いいただいた会費は、当社に責のある場合を除き返金いたしません。
+-        クレジットカードによる自動決済をご利用の場合、退会月の末日をもって決済を停止します。
++        クレジットカードによる自動決済をご利用の場合、退会月の10日に予定される翌月分の決済から停止します。
+       </p>
+ 
+       <h2 class="legal__h">第6条（会員資格の停止・除名）</h2>
+diff --git a/sites/frank-golf/tokushoho.html b/sites/frank-golf/tokushoho.html
+index f73c04e..cb48625 100644
+--- a/sites/frank-golf/tokushoho.html
++++ b/sites/frank-golf/tokushoho.html
+@@ -104,7 +104,7 @@
+       <div class="spec__row"><p class="spec__k">販売価格</p><p class="spec__v">各会員プランの月会費は<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に記載のとおりです（表示は税抜・別途消費税がかかります）。体験レッスンは通常3,300円（税込）、キャンペーン期間中は無料です。</p></div>
+       <div class="spec__row"><p class="spec__k">商品代金以外の必要料金</p><p class="spec__v">消費税。Webサイトのご利用にかかる通信費はお客様のご負担となります。</p></div>
+       <div class="spec__row"><p class="spec__k">支払方法</p><p class="spec__v">クレジットカード（毎月の自動決済）、口座振替、または店頭でのお支払い</p></div>
+-      <div class="spec__row"><p class="spec__k">支払時期</p><p class="spec__v">月会費は当月分を毎月お支払いいただきます。クレジットカードはご登録時および以後毎月、自動で決済されます。口座振替・店頭払いは当社所定の日にお支払いいただきます。会員ポータルからのご注文（モバイルオーダー）は、ご注文の確定時にご登録のクレジットカードで決済されます（カード未登録の場合は退店時に店頭でお支払いいただきます）。モバイルオーダーの商品代金は、会員ポータルに税込価格で表示します。</p></div>
++      <div class="spec__row"><p class="spec__k">支払時期</p><p class="spec__v">月会費は翌月分を毎月10日にお支払いいただきます。クレジットカードはご登録時および以後毎月10日に、自動で決済されます。口座振替・店頭払いは当社所定の日にお支払いいただきます。会員ポータルからのご注文（モバイルオーダー）は、ご注文の確定時にご登録のクレジットカードで決済されます（カード未登録の場合は退店時に店頭でお支払いいただきます）。モバイルオーダーの商品代金は、会員ポータルに税込価格で表示します。</p></div>
+       <div class="spec__row"><p class="spec__k">サービスの提供時期</p><p class="spec__v">入会のご承認後、ご利用開始日からご利用いただけます。打席・レッスンは予約された日時に提供します。</p></div>
+       <div class="spec__row"><p class="spec__k">返品・キャンセル</p><p class="spec__v">サービスの性質上、提供済みのサービスの返金はいたしかねます。打席のご予約は、ご利用開始前まで予約ページからキャンセルいただけます。</p></div>
+       <div class="spec__row"><p class="spec__k">退会について</p><p class="spec__v">退会を希望される月の前月末日までに、当社所定の方法でお申し出ください。月会費の日割り精算・返金はいたしません。詳細は<a href="terms.html" style="color:var(--brass-2)">会員規約</a>をご確認ください。</p></div>
+diff --git a/sites/frank-golf/trial.html b/sites/frank-golf/trial.html
+index c26a929..5920d4f 100644
+--- a/sites/frank-golf/trial.html
++++ b/sites/frank-golf/trial.html
+@@ -182,7 +182,7 @@
+       <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+       <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v" data-frank="store.address">兵庫県姫路市土山6-6-1</p></div>
+       <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
+-      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月自動でのお支払いです。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
++      <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">入会金（税込5,500円）無料＋入会月の月会費無料。Web入会時に翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分を自動でお支払いいただきます。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
+     </div>
+ 
+     <div class="note-solo rv">
+diff --git a/supabase/migrations/0159_frank_billing_day.sql b/supabase/migrations/0159_frank_billing_day.sql
+new file mode 100644
+index 0000000..0728337
+--- /dev/null
++++ b/supabase/migrations/0159_frank_billing_day.sql
+@@ -0,0 +1,30 @@
++-- 0159 FRANK 月会費を「毎月10日に翌月分」に（#235・2026-09-11 ユーザー決定）
++--
++-- Web入会の決済リンクで作られるサブスクは「お支払いの日」が毎月の請求日になる（人によってバラバラ）。
++-- 10日払いのサブスクに作り直した状態を会員行に控える。作り直しの実体は apps/genesis/src/lib/frank-billing-day.ts
++--
++--   billing_day                      … 10 = 10日払いに作り直し済み（null = まだ入会日と同じ日）
++--   billing_rebased_at               … 作り直しが完了した時刻
++--   billing_rebase_claimed_at        … 作り直しに着手した時刻（Webhook 2本の同時実行を1回にする鍵）
++--   billing_rebase_error             … 失敗の理由（会員カードに赤で出す・再実行で消える）
++--   square_retired_subscription_ids  … 作り直しで引退させたサブスクID（そのWebhookを無視する）
++
++alter table public.frunk_members
++  add column if not exists billing_day smallint,
++  add column if not exists billing_rebased_at timestamptz,
++  add column if not exists billing_rebase_claimed_at timestamptz,
++  add column if not exists billing_rebase_error text,
++  add column if not exists square_retired_subscription_ids jsonb not null default '[]'::jsonb;
++
++comment on column public.frunk_members.billing_day is '#235 月会費の引き落とし日。10=毎月10日に翌月分（作り直し済み）';
++comment on column public.frunk_members.square_retired_subscription_ids is '#235 10日払いへの作り直しで引退させたSquareサブスクID（Webhookを無視する）';
++
++-- 尾内様（FR0048）・大江様（FR0049）: 無料はご利用開始月（11月）・12月1月は前取り済み・継続はご利用開始日から（#234 ユーザー決定）。
++-- 決済リンクの内訳に開始日の控えが無い（#234 より前に発行）ので、ここで控える。
++update public.frunk_members
++   set square_checkout_breakdown = coalesce(square_checkout_breakdown, '{}'::jsonb) || jsonb_build_object('usageStartYmd', '2026-11-02'),
++       min_term_until = date '2027-05-02',
++       updated_at = now()
++ where member_no in ('FR0048', 'FR0049')
++   and start_date = date '2026-11-02'
++   and deleted_at is null;
+diff --git a/supabase/migrations/README.md b/supabase/migrations/README.md
+index 047b361..082924d 100755
+--- a/supabase/migrations/README.md
++++ b/supabase/migrations/README.md
+@@ -55,3 +55,4 @@
+ - ✅ `0157_compe_import_9th.sql` — 適用済（2026-09-10、第9回ゴルフウィング親睦ゴルフコンペの移行データ #232）
+ 
+ - ✅ `0158_compe_entry.sql` — 適用済（2026-09-10、MCP name=compe_entry。募集ページ用 entry_*/play_fee・参加者の entry_status #233）
++- ✅ `0159_frank_billing_day.sql` — 適用済（2026-09-11、MCP name=frank_billing_day。frunk_members に10日払いへの作り直し状態の列＋尾内様・大江様のご利用開始月の控え #235）
+diff --git a/tests/frank-billing-start.test.ts b/tests/frank-billing-start.test.ts
+index 93efb2f..e40505e 100644
+--- a/tests/frank-billing-start.test.ts
++++ b/tests/frank-billing-start.test.ts
+@@ -1,173 +1,166 @@
+ import test from "node:test";
+ import assert from "node:assert/strict";
+ import {
++  BILLING_DAY,
+   addMonthsYmd,
++  calendarMonthsBetween,
++  chargeDateForMonth,
++  billedMonthOfChargeDate,
++  nextChargeDateAfter,
++  isChargeDate,
++  monthLabel,
+   nextBillingDateAfterPrepay,
+   resolveBillingStartDate,
+   usageStartSchedule,
+   usageStartError,
+   usageStartMaxYmd,
+-  calendarMonthsBetween,
+-  monthLabel,
++  rebaseStartDate,
+ } from "../packages/core/src/frank-billing-start.ts";
+ 
+ /* ============================================================
+-   自動課金を「あとから」立てるときの開始日（#233・2026-09-10）
+-
+-   中尾様（FR0047）: 3Dセキュアのワンタイムパスワードが受け取れず決済リンクを完走できない
+-   → 店でカードを保存し、前取り分（10月分・11月分）は一回きりの決済で受領
+-   → サブスクだけを後から立てる
++   月会費の引き落とし日（#235・2026-09-11 ユーザー決定）
++     毎月10日に「翌月分」を引き落とす。全会員同じ日。
++   入会時（#131・#234）
++     無料＝ご利用開始月／前取り＝その翌月・翌々月／自動の引き落としはその次の月の分から
+ 
+-   早すぎる開始日 = 前取りした月をもう一度請求（二重取り）
+-   遅すぎる開始日 = その月をタダにする（取り損ね）
+-   どちらもそのままお金の事故なので、式をここで固定する。
++   早すぎ＝二重取り・遅すぎ＝取り損ね。式をここで固定する。
+    ============================================================ */
+ 
+-test("addMonthsYmd: 毎月同日", () => {
++test("addMonthsYmd: 毎月同日・末日の繰り下げ・年またぎ", () => {
+   assert.equal(addMonthsYmd("2026-09-10", 3), "2026-12-10");
+-  assert.equal(addMonthsYmd("2026-09-10", 0), "2026-09-10");
+-});
+-
+-test("addMonthsYmd: 末日は繰り下げる（8/31 + 1か月 = 9/30）", () => {
+   assert.equal(addMonthsYmd("2026-08-31", 1), "2026-09-30");
+   assert.equal(addMonthsYmd("2026-01-31", 1), "2026-02-28");
+-});
+-
+-test("addMonthsYmd: 年をまたぐ", () => {
+   assert.equal(addMonthsYmd("2026-11-15", 3), "2027-02-15");
++  assert.equal(addMonthsYmd("2027-01-01", -1), "2026-12-01");
+ });
+ 
+-test("中尾様の実データ: 9/10入会・前取り2か月 → 次回は12/10", () => {
+-  assert.equal(nextBillingDateAfterPrepay({ startDateYmd: "2026-09-10", prepaidMonths: 2 }), "2026-12-10");
++test("引き落とし日は10日", () => {
++  assert.equal(BILLING_DAY, 10);
++  assert.equal(isChargeDate("2026-11-10"), true);
++  assert.equal(isChargeDate("2026-11-11"), false);
+ });
+ 
+-test("前取り0か月（カード登録だけの方）なら翌月同日", () => {
+-  assert.equal(nextBillingDateAfterPrepay({ startDateYmd: "2026-09-10", prepaidMonths: 0 }), "2026-10-10");
++test("その月の分は前月10日に引き落とす／引き落とし日は翌月の分", () => {
++  assert.equal(chargeDateForMonth("2026-12-01"), "2026-11-10");
++  assert.equal(chargeDateForMonth("2026-12-25"), "2026-11-10");
++  assert.equal(chargeDateForMonth("2027-01-01"), "2026-12-10"); // 年またぎ
++  assert.equal(billedMonthOfChargeDate("2026-11-10"), "2026-12-01");
++  assert.equal(billedMonthOfChargeDate("2026-12-10"), "2027-01-01");
+ });
+ 
+-test("既定の開始日は入会完了メールが案内した日付と一致する", () => {
+-  const r = resolveBillingStartDate({
+-    startDateYmd: "2026-09-10",
+-    prepaidMonths: 2,
+-    todayYmd: "2026-09-10",
+-  });
+-  assert.equal(r.ok, true);
+-  assert.equal(r.ok && r.date, "2026-12-10");
++test("次に来る10日（当日は含まない）", () => {
++  assert.equal(nextChargeDateAfter("2026-09-05"), "2026-09-10");
++  assert.equal(nextChargeDateAfter("2026-09-10"), "2026-10-10");
++  assert.equal(nextChargeDateAfter("2026-09-11"), "2026-10-10");
++  assert.equal(nextChargeDateAfter("2026-12-31"), "2027-01-10");
+ });
+ 
+-test("スタッフが日付を指定したらそれを使う", () => {
+-  const r = resolveBillingStartDate({
+-    startDateYmd: "2026-09-10",
+-    prepaidMonths: 2,
+-    todayYmd: "2026-09-10",
+-    requestedYmd: "2027-01-01",
+-  });
+-  assert.equal(r.ok && r.date, "2027-01-01");
++test("9/11入会（開始日空欄）→ 9月無料・10月11月前取り・12月分を11/10に", () => {
++  const s = usageStartSchedule({ applyDateYmd: "2026-09-11", prepaidMonths: 2 });
++  assert.equal(monthLabel(s.freeMonthYmd), "9月");
++  assert.deepEqual(s.prepaidMonthYmds.map(monthLabel), ["10月", "11月"]);
++  assert.equal(s.firstBilledMonthYmd, "2026-12-01");
++  assert.equal(s.nextBillingYmd, "2026-11-10");
++  assert.equal(s.minTermUntilYmd, "2027-03-11");
+ });
+ 
+-test("過去日は通さない。次に来る同日を候補として返す（勝手に今日課金しない）", () => {
+-  const r = resolveBillingStartDate({
+-    startDateYmd: "2026-09-10",
+-    prepaidMonths: 2,
+-    todayYmd: "2027-02-20", // 12/10・1/10 を取りこぼしたまま気づいた
+-  });
+-  assert.equal(r.ok, false);
+-  assert.equal(!r.ok && r.error, "past_date");
+-  assert.equal(!r.ok && r.suggested, "2027-03-10");
+-});
+-
+-test("今日ちょうどの開始日は通す（境界）", () => {
+-  const r = resolveBillingStartDate({
+-    startDateYmd: "2026-09-10",
+-    prepaidMonths: 2,
+-    todayYmd: "2026-12-10",
+-  });
+-  assert.equal(r.ok && r.date, "2026-12-10");
+-});
+-
+-test("壊れた前取り月数（NaN・負）は0か月として扱う", () => {
+-  assert.equal(nextBillingDateAfterPrepay({ startDateYmd: "2026-09-10", prepaidMonths: NaN }), "2026-10-10");
+-  assert.equal(nextBillingDateAfterPrepay({ startDateYmd: "2026-09-10", prepaidMonths: -3 }), "2026-10-10");
++test("入会日が月の前半でも後半でも、次回は同じ11/10（全員同じ日）", () => {
++  for (const d of ["2026-09-01", "2026-09-10", "2026-09-11", "2026-09-30"]) {
++    assert.equal(nextBillingDateAfterPrepay({ startDateYmd: d, prepaidMonths: 2 }), "2026-11-10", d);
++  }
+ });
+ 
+-/* ============================================================
+-   ご利用開始月（#234・2026-09-11）
+-
+-   尾内様（FR0048）・大江様（FR0049）: 9/11 入会・ご利用開始 11/2
+-   ユーザー決定: 無料＝ご利用開始月（11月）／前取り＝12月・1月（本日の21,560円を充当）
+-                 請求日は入会日と同じ11日のまま／6か月継続はご利用開始日から
+-   ============================================================ */
+-
+-test("尾内様・大江様の実データ: 9/11入会・11/2開始 → 11月無料・12月1月前取り・次回 2027-02-11", () => {
++test("尾内様・大江様: 9/11入会・11/2開始 → 11月無料・12月1月前取り・2月分を1/10に・継続は5/2まで", () => {
+   const s = usageStartSchedule({ applyDateYmd: "2026-09-11", usageStartYmd: "2026-11-02", prepaidMonths: 2 });
+   assert.equal(s.deferredMonths, 2);
+-  assert.equal(s.pauseCycles, 4); // 10/11・11/11・12/11・1/11 を止める
+-  assert.equal(s.nextBillingYmd, "2027-02-11");
+   assert.equal(monthLabel(s.freeMonthYmd), "11月");
+   assert.deepEqual(s.prepaidMonthYmds.map(monthLabel), ["12月", "1月"]);
++  assert.equal(s.firstBilledMonthYmd, "2027-02-01");
++  assert.equal(s.nextBillingYmd, "2027-01-10");
+   assert.equal(s.minTermUntilYmd, "2027-05-02");
+ });
+ 
+-test("ご利用開始日が空欄・入会日と同じ・同じ月の後の日 → これまでと完全に同じ（止める周期2・次回3か月後）", () => {
+-  for (const u of [null, "", "2026-09-11", "2026-09-30"]) {
++test("中尾様（9/10入会・前取り2か月）→ 12月分を11/10に", () => {
++  assert.equal(nextBillingDateAfterPrepay({ startDateYmd: "2026-09-10", prepaidMonths: 2 }), "2026-11-10");
++});
++
++test("FR0005（8/26入会）→ 11月分を10/10に", () => {
++  assert.equal(nextBillingDateAfterPrepay({ startDateYmd: "2026-08-26", prepaidMonths: 2 }), "2026-10-10");
++});
++
++test("ご利用開始日が同じ月の後の日・過去日は入会月扱い", () => {
++  for (const u of [null, "", "2026-09-11", "2026-09-30", "2026-08-01"]) {
+     const s = usageStartSchedule({ applyDateYmd: "2026-09-11", usageStartYmd: u, prepaidMonths: 2 });
+     assert.equal(s.deferredMonths, 0, String(u));
+-    assert.equal(s.pauseCycles, 2, String(u));
+-    assert.equal(s.nextBillingYmd, "2026-12-11", String(u));
+-    assert.equal(monthLabel(s.freeMonthYmd), "9月");
++    assert.equal(s.nextBillingYmd, "2026-11-10", String(u));
+   }
+-  // 継続期限は空欄なら入会日から（これまでの addMonthsYmd(today, 6) と同じ）
+-  assert.equal(usageStartSchedule({ applyDateYmd: "2026-09-11", prepaidMonths: 2 }).minTermUntilYmd, "2027-03-11");
+-});
+-
+-test("過去日のご利用開始日は入会日に丸める（止める周期を減らさない＝二重取りしない）", () => {
+-  const s = usageStartSchedule({ applyDateYmd: "2026-09-11", usageStartYmd: "2026-08-01", prepaidMonths: 2 });
+-  assert.equal(s.usageStartYmd, "2026-09-11");
+-  assert.equal(s.pauseCycles, 2);
+ });
+ 
+-test("月末をまたぐ: 9/30入会・10/1開始は1か月ずれる", () => {
++test("月末をまたぐ: 9/30入会・10/1開始 → 10月無料・11月12月前取り・1月分を12/10に", () => {
+   assert.equal(calendarMonthsBetween("2026-09-30", "2026-10-01"), 1);
+   const s = usageStartSchedule({ applyDateYmd: "2026-09-30", usageStartYmd: "2026-10-01", prepaidMonths: 2 });
+-  assert.equal(s.pauseCycles, 3);
+-  assert.equal(s.nextBillingYmd, "2027-01-30");
++  assert.equal(s.nextBillingYmd, "2026-12-10");
+ });
+ 
+-test("年をまたぐ: 12/20入会・2/1開始", () => {
+-  const s = usageStartSchedule({ applyDateYmd: "2026-12-20", usageStartYmd: "2027-02-01", prepaidMonths: 2 });
+-  assert.equal(s.deferredMonths, 2);
+-  assert.equal(s.nextBillingYmd, "2027-05-20");
+-  assert.deepEqual(s.prepaidMonthYmds, ["2027-03-01", "2027-04-01"]);
+-});
+-
+-test("選べるのは入会月から3か月後の月の末日まで。超えた分は上限に丸める", () => {
++test("選べるご利用開始日は入会月から3か月後の月末まで。超えたら上限に丸める", () => {
+   assert.equal(usageStartMaxYmd("2026-09-11"), "2026-12-31");
+   assert.equal(usageStartMaxYmd("2026-11-30"), "2027-02-28");
+   const s = usageStartSchedule({ applyDateYmd: "2026-09-11", usageStartYmd: "2027-06-01", prepaidMonths: 2 });
+   assert.equal(s.usageStartYmd, "2026-12-31");
+-  assert.equal(s.deferredMonths, 3);
+ });
+ 
+ test("usageStartError: 空欄は通す／過去・上限超え・形式違いは文言を返す", () => {
+   assert.equal(usageStartError({ applyDateYmd: "2026-09-11", usageStartYmd: "" }), null);
+-  assert.equal(usageStartError({ applyDateYmd: "2026-09-11", usageStartYmd: null }), null);
+   assert.equal(usageStartError({ applyDateYmd: "2026-09-11", usageStartYmd: "2026-11-02" }), null);
+-  assert.equal(usageStartError({ applyDateYmd: "2026-09-11", usageStartYmd: "2026-12-31" }), null);
+   assert.match(String(usageStartError({ applyDateYmd: "2026-09-11", usageStartYmd: "2026-09-10" })), /本日以降/);
+   assert.match(String(usageStartError({ applyDateYmd: "2026-09-11", usageStartYmd: "2027-01-01" })), /2026\/12\/31/);
+   assert.match(String(usageStartError({ applyDateYmd: "2026-09-11", usageStartYmd: "11/2" })), /形式/);
+ });
+ 
+-test("#233 の自動課金の開始日もご利用開始日を見る（入会完了メールと同じ日付）", () => {
+-  assert.equal(
+-    nextBillingDateAfterPrepay({ startDateYmd: "2026-09-11", prepaidMonths: 2, usageStartYmd: "2026-11-02" }),
+-    "2027-02-11",
+-  );
+-  const r = resolveBillingStartDate({
+-    startDateYmd: "2026-09-11",
+-    prepaidMonths: 2,
+-    usageStartYmd: "2026-11-02",
+-    todayYmd: "2026-09-11",
+-  });
+-  assert.equal(r.ok && r.date, "2027-02-11");
++test("#233 保存カードから立てる: 既定は入会完了メールと同じ日", () => {
++  const r = resolveBillingStartDate({ startDateYmd: "2026-09-11", prepaidMonths: 2, usageStartYmd: "2026-11-02", todayYmd: "2026-09-11" });
++  assert.equal(r.ok && r.date, "2027-01-10");
++});
++
++test("#233 スタッフ指定は10日だけ。10日以外は候補を返す", () => {
++  const ok = resolveBillingStartDate({ startDateYmd: "2026-09-10", prepaidMonths: 2, todayYmd: "2026-09-11", requestedYmd: "2026-12-10" });
++  assert.equal(ok.ok && ok.date, "2026-12-10");
++  const ng = resolveBillingStartDate({ startDateYmd: "2026-09-10", prepaidMonths: 2, todayYmd: "2026-09-11", requestedYmd: "2026-12-05" });
++  assert.equal(ng.ok, false);
++  assert.equal(!ng.ok && ng.error, "not_billing_day");
++  assert.equal(!ng.ok && ng.suggested, "2026-12-10");
++});
++
++test("#233 過去日は通さず、次に来る10日を候補にする", () => {
++  const r = resolveBillingStartDate({ startDateYmd: "2026-09-10", prepaidMonths: 2, todayYmd: "2027-02-20" });
++  assert.equal(r.ok, false);
++  assert.equal(!r.ok && r.error, "past_date");
++  assert.equal(!r.ok && r.suggested, "2027-03-10");
++});
++
++test("既存会員の作り直し: 今いる会員（前取り2か月）の開始日", () => {
++  const today = "2026-09-11";
++  const cases: Array<[string, string | null, string]> = [
++    // FR0005: #234 より前の入会は「入会月が無料」で決済済み。フォームの開始日(9/2)は使わない＝null で渡す
++    ["2026-08-26", null, "2026-10-10"],
++    ["2026-09-02", "2026-09-04", "2026-11-10"],
++    ["2026-09-05", "2026-09-05", "2026-11-10"],
++    ["2026-09-11", "2026-11-02", "2027-01-10"], // 尾内様・大江様
++  ];
++  for (const [join, start, want] of cases) {
++    const r = rebaseStartDate({ joinDateYmd: join, usageStartYmd: start, prepaidMonths: 2, todayYmd: today });
++    assert.equal(r.ok && r.date, want, `${join} ${start}`);
++  }
++});
++
++test("既存会員の作り直し: 前取りの無いカード登録は、登録日の次の10日", () => {
++  const r = rebaseStartDate({ joinDateYmd: "2026-08-01", prepaidMonths: 0, todayYmd: "2026-09-11", registeredYmd: "2026-09-11" });
++  assert.equal(r.ok && r.date, "2026-10-10");
++  assert.equal(r.ok && r.billedMonthYmd, "2026-11-01");
++});
++
++test("既存会員の作り直し: 開始日が今日以前になるなら止める（勝手に今日課金しない）", () => {
++  const r = rebaseStartDate({ joinDateYmd: "2026-07-01", prepaidMonths: 2, todayYmd: "2026-09-11" });
++  assert.equal(r.ok, false);
++  assert.equal(!r.ok && r.date, "2026-09-10");
+ });
+diff --git a/tests/frank-membership.test.ts b/tests/frank-membership.test.ts
+index 26c4cd2..9be8a23 100644
+--- a/tests/frank-membership.test.ts
++++ b/tests/frank-membership.test.ts
+@@ -12,6 +12,9 @@ import {
+   suspendApplyDeadline,
+   monthEndLabel,
+   monthFromLabel,
++  squarePauseDateForSuspend,
++  squareCancelDateForLeave,
++  resumePlan,
+ } from "../packages/core/src/frank-membership.ts";
+ 
+ /* ============================================================
+@@ -19,8 +22,8 @@ import {
+ 
+    退会: 効力日は月末。申込月の翌月末より前は選べない。
+          「9月末退会なら8月末までの申し込み」
+-   休会: 開始は月初。当月10日までなら翌月から、11日以降は翌々月から。
+-         「10月から休会なら9月10日までは受付可能」
++   休会: 開始は月初。休会したい月の前々月末まで（#235・2026-09-11 改定。毎月10日に翌月分を引き落とすため）。
++         「11月から休会なら9月30日まで」
+ 
+    ここを間違えると月会費が1か月ぶん余分に落ちる／止まりすぎる＝そのままお金の事故になる。
+    ============================================================ */
+@@ -67,36 +70,59 @@ test("退会: 申し出の締切は退会月の前月末", () => {
+   assert.equal(leaveApplyDeadline("2027-01-31"), "2026-12-31");
+ });
+ 
+-test("休会: 10日までの申し出なら翌月から", () => {
+-  assert.equal(earliestSuspendStart("2026-09-01"), "2026-10-01");
+-  assert.equal(earliestSuspendStart("2026-09-10"), "2026-10-01"); // 締切当日はセーフ
+-  assert.ok(canSuspendFrom("2026-09-10", "2026-10-01"));
+-});
+-
+-test("休会: 11日以降の申し出は翌々月から", () => {
+-  assert.equal(earliestSuspendStart("2026-09-11"), "2026-11-01");
+-  assert.equal(earliestSuspendStart("2026-09-30"), "2026-11-01");
+-  assert.equal(canSuspendFrom("2026-09-11", "2026-10-01"), false);
+-  assert.ok(canSuspendFrom("2026-09-11", "2026-11-01"));
++test("休会: 申し出の月の翌々月から（#235）", () => {
++  assert.equal(earliestSuspendStart("2026-09-01"), "2026-11-01");
++  assert.equal(earliestSuspendStart("2026-09-10"), "2026-11-01");
++  assert.equal(earliestSuspendStart("2026-09-30"), "2026-11-01"); // 締切当日はセーフ
++  assert.equal(earliestSuspendStart("2026-10-01"), "2026-12-01");
++  assert.ok(canSuspendFrom("2026-09-30", "2026-11-01"));
++  assert.equal(canSuspendFrom("2026-09-01", "2026-10-01"), false); // 10月分は9/10に引き落とすので間に合わない
+ });
+ 
+ test("休会: 月初以外の日付は受け付けない", () => {
+-  assert.equal(canSuspendFrom("2026-09-01", "2026-10-15"), false);
+-  assert.equal(canSuspendFrom("2026-09-01", "2026-10-31"), false);
++  assert.equal(canSuspendFrom("2026-09-01", "2026-11-15"), false);
++  assert.equal(canSuspendFrom("2026-09-01", "2026-11-30"), false);
+ });
+ 
+ test("休会: 年をまたいでも崩れない", () => {
+-  assert.equal(earliestSuspendStart("2026-12-10"), "2027-01-01");
+-  assert.equal(earliestSuspendStart("2026-12-11"), "2027-02-01");
++  assert.equal(earliestSuspendStart("2026-11-30"), "2027-01-01");
++  assert.equal(earliestSuspendStart("2026-12-01"), "2027-02-01");
+ });
+ 
+ test("休会: 選択肢は最短月から並ぶ", () => {
+   assert.deepEqual(suspendStartOptions("2026-09-11", 3), ["2026-11-01", "2026-12-01", "2027-01-01"]);
+ });
+ 
+-test("休会: 申し出の締切は前月10日", () => {
+-  assert.equal(suspendApplyDeadline("2026-10-01"), "2026-09-10");
+-  assert.equal(suspendApplyDeadline("2027-01-01"), "2026-12-10");
++test("休会: 申し出の締切は前々月末", () => {
++  assert.equal(suspendApplyDeadline("2026-11-01"), "2026-09-30");
++  assert.equal(suspendApplyDeadline("2027-01-01"), "2026-11-30");
++  assert.equal(suspendApplyDeadline("2027-04-01"), "2027-02-28");
++});
++
++test("Square: 休会はその月の分を引き落とす前月10日で止める", () => {
++  assert.equal(squarePauseDateForSuspend("2026-11-01"), "2026-10-10");
++  assert.equal(squarePauseDateForSuspend("2027-01-01"), "2026-12-10");
++  // 締切（前々月末）の翌日から見ても、停止日は必ず先にある
++  assert.ok(squarePauseDateForSuspend(earliestSuspendStart("2026-09-30")) > "2026-09-30");
++});
++
++test("Square: 退会は退会月の10日で解約（翌月分を引き落とさない）", () => {
++  assert.equal(squareCancelDateForLeave("2026-11-30"), "2026-11-10");
++  assert.equal(squareCancelDateForLeave("2027-02-28"), "2027-02-10");
++  // 最短の退会日でも、解約日は申し出の日より後
++  for (const today of ["2026-09-01", "2026-09-10", "2026-09-30"]) {
++    assert.ok(squareCancelDateForLeave(earliestLeaveDate(today)) > today, today);
++  }
++});
++
++test("復帰: 10日より前なら今月10日から再開、店頭は今月分だけ", () => {
++  assert.deepEqual(resumePlan("2026-10-05"), { storeMonthYmd: "2026-10-01", resumeYmd: "2026-10-10", chargeNowMonthYmd: null });
++  assert.deepEqual(resumePlan("2026-10-10"), { storeMonthYmd: "2026-10-01", resumeYmd: "2026-10-10", chargeNowMonthYmd: null });
++});
++
++test("復帰: 11日以降は翌月分をその場でカード請求、再開は翌月10日", () => {
++  assert.deepEqual(resumePlan("2026-10-20"), { storeMonthYmd: "2026-10-01", resumeYmd: "2026-11-10", chargeNowMonthYmd: "2026-11-01" });
++  assert.deepEqual(resumePlan("2026-12-31"), { storeMonthYmd: "2026-12-01", resumeYmd: "2027-01-10", chargeNowMonthYmd: "2027-01-01" });
+ });
+ 
+ test("表示ラベル", () => {

@@ -24,6 +24,14 @@ export type SurveyQuestion = {
 
 export type SheetCol = { id: string; label: string; fixed?: boolean };
 
+/** 募集ページの追加設問（朝の練習会・懇親会など）。答えは custom_fields[id] に入る（#239） */
+export type EntryQuestion = {
+  id: string;
+  label: string;
+  options: string[];
+  required?: boolean;
+};
+
 export type Comp = {
   id: string;
   company_id: string;
@@ -58,6 +66,8 @@ export type Comp = {
   entry_opens_on: string | null;
   entry_closes_on: string | null;
   entry_note: string | null;
+  entry_terms: string | null;
+  entry_questions: EntryQuestion[];
   play_fee: number | null;
   created_at: string;
 };
@@ -81,6 +91,7 @@ export type Participant = {
   /** confirmed=参加確定 / applied=Web申込 / waitlist=キャンセル待ち / cancelled=取消（#233） */
   entry_status: "confirmed" | "applied" | "waitlist" | "cancelled";
   applied_at: string | null;
+  agreed_at: string | null;
   source: "staff" | "web";
 };
 
@@ -150,6 +161,7 @@ function normalizeComp(comp: Comp): Comp {
     tee_options: comp.tee_options?.length ? comp.tee_options : ["1番ホール", "10番ホール"],
     reception_fields: comp.reception_fields?.length ? comp.reception_fields : DEFAULT_RECEPTION_FIELDS,
     survey_questions: comp.survey_questions ?? [],
+    entry_questions: comp.entry_questions ?? [],
     sheet_cols: comp.sheet_cols ?? {},
   };
 }

@@ -1,0 +1,18 @@
+[2024-03-02 12:01] Register ExceptionFilter
+[2024-03-02 12:01:00] Log Data : Log_2024_0302_120100.txt
+[2024-03-02 12:01:02] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2024-03-02 12:01:02] Load Info Data
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionGain : 100
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionExpose : 596
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionGamma : 85
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionBrightness : 0
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionFlip : 3
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2024-03-02 12:01:07] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2024-03-02 12:01:07] Success Initialize
+[2024-03-02 12:01:07] ImageQueue Reset : Main Camera
+[2024-03-02 12:01:07] Initialize Success

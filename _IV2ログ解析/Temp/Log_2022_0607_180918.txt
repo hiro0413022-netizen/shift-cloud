@@ -1,0 +1,33 @@
+[2022-06-07 18:09] Register ExceptionFilter
+[2022-06-07 18:09:18] Log Data : Log_2022_0607_180918.txt
+[2022-06-07 18:09:20] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2022-06-07 18:09:20] Load Info Data
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionGain : 100
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionExpose : 596
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionGamma : 85
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionBrightness : 0
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionFlip : 3
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2022-06-07 18:09:25] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2022-06-07 18:09:25] Success Initialize
+[2022-06-07 18:09:25] ImageQueue Reset : Main Camera
+[2022-06-07 18:09:25] Initialize Success
+[2022-06-07 18:09:25] HanderType : [Right] -> [Right]
+[2022-06-07 18:09:25] IV2MSG : Option - RightHander
+[2022-06-07 18:09:25] TeeMode : [Up] -> [Up]
+[2022-06-07 18:09:25] IV2MSG : Option - TeeUp
+[2022-06-07 18:09:25] SurFaceType : [Fairway] -> [Fairway]
+[2022-06-07 18:09:25] IV2MSG : Option - FairWay
+[2022-06-07 18:09:25] HanderType : [Right] -> [Right]
+[2022-06-07 18:09:25] IV2MSG : Option - RightHander
+[2022-06-07 18:09:25] TeeMode : [Up] -> [Up]
+[2022-06-07 18:09:25] IV2MSG : Option - TeeUp
+[2022-06-07 18:09:25] SurFaceType : [Fairway] -> [Fairway]
+[2022-06-07 18:09:25] IV2MSG : Option - FairWay
+[2022-06-07 18:09:26] Selected Camera ID : 0 _ OptionExpose : 2264
+[2022-06-07 18:09:26] IRLight : Idle
+[2022-06-07 18:09:27] IRLight : Standby

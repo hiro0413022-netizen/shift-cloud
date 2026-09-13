@@ -1,0 +1,2 @@
+[2024-07-12 22:04] Register ExceptionFilter
+[2024-07-12 22:04:45] Log Data : SubLog_2024_0712_220445.txt

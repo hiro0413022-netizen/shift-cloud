@@ -1,0 +1,13 @@
+[2023-12-17 17:50] Register ExceptionFilter
+[2023-12-17 17:50:41] Log Data : Log_2023_1217_175041.txt
+[2023-12-17 17:50:42] Failed Auth Data
+
+[2023-12-17 17:50:44] Failed Initialize
+[2023-12-17 17:50:44] Initialize Failed
+[2023-12-17 17:50] Exclude ExceptionFilter
+[2023-12-17 17:50:44] [Release]
+      [Success Shot Count] : 0
+      [Error Shot Count] : 0
+      [UndeZero Delta Time Count] : 0
+      [FPS Under Count] : 0
+[2023-12-17 17:50:44] Release : 2023-12-17 17:50

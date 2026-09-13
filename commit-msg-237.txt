@@ -1,0 +1,29 @@
+GENESIS: Money OSの転記を毎朝のcronで回す＋当月の実績も出す＋FRANKの会員数を会員台帳から (#237)
+
+事業別パフォーマンスの数字が 2026-08-22 で止まっていた。
+
+原因:
+  0112_kpis_store_scope.sql で kpis の unique(company_id, code) を部分索引2本に置き換えたが、
+  refresh_finance_kpis / refresh_shift_cloud_kpis の upsert が `on conflict (company_id, code)` のままで
+  42P10（部分索引を推論できない）。例外が呼び出し元の refresh_money_to_finance まで巻き戻るため、
+  Money OS → fin_entries の転記が毎回まるごとロールバックしていた。
+  さらに転記自体が cron に入っておらず、Money OSの画面でボタンを押したときだけ走る作りだった。
+
+変更:
+  - 0161/0162: on conflict に `where store_id is null` を付けて部分索引を推論させる（適用済）
+  - cron/daily: 会社ループの先頭で refresh_money_to_finance を呼ぶ（CEOレポートが最新の数字を見る）
+  - kernel.ts / business-breakdown.tsx: **進行中の当月の実績を各カードに併記**。
+    FRANKは9月開業で最新の完了月（8月）に実績が1件も無く、「財務未接続」としか出なかった。
+    完了月に実績が無くても当月に動いていれば黒字/赤字のバッジを出す。
+    予測(source='forecast')は実績ではないので当月の集計から除く。
+  - kernel.ts: FRANK GOLF の 本会員数・今月入会・本会員退会 を frunk_members から集計。
+    FRANKは自前の入会フォーム→frunk_members に入るため mbr_members に1件も載らず、ずっと0だった。
+    mbr_members 側では frunk 系店舗をスキップして二重計上を防ぐ。
+  - 0160: 事業名「姫路インドアゴルフ」→「FRANK GOLF（姫路）」（適用済）
+
+データ側（適用済）:
+  - 8月のFRANKの売上5件はすべて開店前のテスト（Squareの10円決済・テスト会員の月会費/コーヒー）だったので削除扱いに
+  - 山根様（FR0051）の現金30,360円が「利用料」で入っていたのを「月会費」＋お名前に訂正
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01S2vBXFEGCVs6S1B3XTrYGB

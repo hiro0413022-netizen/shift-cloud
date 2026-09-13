@@ -1,0 +1,180 @@
+[2020-08-03 09:35] Register ExceptionFilter
+[2020-08-03 09:35:15] Log Data : Log_2020_0803_093515.txt
+[2020-08-03 09:35:17] Selected CameraID : 0 _ Set ROI Pos : (268, 136) -> (0, 0)
+[2020-08-03 09:35:17] Load Info Data
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionGain : 100
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionExpose : 885
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionGamma : 85
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionWhiteBallens_Red : 43
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionWhiteBallens_Blue : 60
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionBrightness : 0
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionBandWidth : 50
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionFlip : 3
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionAutoMaxGain : 0
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionAutoMaxExpose : 1
+[2020-08-03 09:35:22] Selected Camera ID : 0 _ OptionAutoMaxBrightness : 50
+[2020-08-03 09:35:22] Success Initialize
+[2020-08-03 09:35:22] ImageQueue Reset : Main Camera
+[2020-08-03 09:35:22] Initialize Success
+[2020-08-03 09:35:22] HanderType : [Right] -> [Right]
+[2020-08-03 09:35:22] IV2MSG : Option - RightHander
+[2020-08-03 09:35:22] TeeMode : [Up] -> [Up]
+[2020-08-03 09:35:22] IV2MSG : Option - TeeUp
+[2020-08-03 09:35:22] SurFaceType : [Fairway] -> [Fairway]
+[2020-08-03 09:35:22] IV2MSG : Option - FairWay
+[2020-08-03 09:35:22] HanderType : [Right] -> [Right]
+[2020-08-03 09:35:22] IV2MSG : Option - RightHander
+[2020-08-03 09:35:22] TeeMode : [Up] -> [Up]
+[2020-08-03 09:35:22] IV2MSG : Option - TeeUp
+[2020-08-03 09:35:22] SurFaceType : [Fairway] -> [Fairway]
+[2020-08-03 09:35:22] IV2MSG : Option - FairWay
+[2020-08-03 09:35:23] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 09:35:23] IRLight : Idle
+[2020-08-03 09:35:24] IRLight : Standby
+[2020-08-03 09:36:43] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 09:36:43] IRLight : Idle
+[2020-08-03 09:36:44] IRLight : Standby
+[2020-08-03 09:38:03] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 09:38:03] IRLight : Idle
+[2020-08-03 09:38:04] IRLight : Standby
+[2020-08-03 09:39:23] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 09:39:23] IRLight : Idle
+[2020-08-03 09:39:24] IRLight : Standby
+[2020-08-03 09:40:43] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 09:40:43] IRLight : Idle
+[2020-08-03 09:40:44] IRLight : Standby
+[2020-08-03 09:42:03] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 09:42:03] IRLight : Idle
+[2020-08-03 09:42:04] IRLight : Standby
+[2020-08-03 09:43:23] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 09:43:23] IRLight : Idle
+[2020-08-03 09:43:24] IRLight : Standby
+[2020-08-03 09:44:07] 0 -> 1
+[2020-08-03 09:44:07] Selected Camera ID : 0 _ OptionExpose : 885
+[2020-08-03 09:44:07] IRLight : On
+[2020-08-03 09:44:07] IV2MSG : System - Operate
+[2020-08-03 09:44:07] HanderType : [Right] -> [Left]
+[2020-08-03 09:44:07] IV2MSG : Option - LeftHander
+[2020-08-03 09:44:07] SurFaceType : [Fairway] -> [Fairway]
+[2020-08-03 09:44:07] IV2MSG : Option - FairWay
+[2020-08-03 09:44:07] 0 -> 0
+[2020-08-03 09:44:07] IV2MSG : System - Stop
+[2020-08-03 09:44:07] Hand 1, TeeMode : 0, Surface : 0
+[2020-08-03 09:44:07] 0 -> 0
+[2020-08-03 09:44:07] IV2MSG : System - Stop
+[2020-08-03 09:44:08] IRLight : Standby
+[2020-08-03 09:44:08] IRLight : Off
+[2020-08-03 09:44:09] IRLight : Standby
+[2020-08-03 09:44:09] IRLight : Off
+[2020-08-03 09:44:10] IRLight : Standby
+[2020-08-03 09:45:29] IRLight : Off
+[2020-08-03 09:45:30] IRLight : Standby
+[2020-08-03 09:46:49] IRLight : Off
+[2020-08-03 09:46:50] IRLight : Standby
+[2020-08-03 09:48:09] IRLight : Off
+[2020-08-03 09:48:10] IRLight : Standby
+[2020-08-03 09:49:29] IRLight : Off
+[2020-08-03 09:49:30] IRLight : Standby
+[2020-08-03 09:50:50] IRLight : Off
+[2020-08-03 09:50:51] IRLight : Standby
+[2020-08-03 09:52:10] IRLight : Off
+[2020-08-03 09:52:11] IRLight : Standby
+[2020-08-03 09:53:30] IRLight : Off
+[2020-08-03 09:53:31] IRLight : Standby
+[2020-08-03 09:54:50] IRLight : Off
+[2020-08-03 09:54:51] IRLight : Standby
+[2020-08-03 09:56:10] IRLight : Off
+[2020-08-03 09:56:11] IRLight : Standby
+[2020-08-03 09:57:30] IRLight : Off
+[2020-08-03 09:57:31] IRLight : Standby
+[2020-08-03 09:58:50] IRLight : Off
+[2020-08-03 09:58:51] IRLight : Standby
+[2020-08-03 09:59:16] 0 -> 1
+[2020-08-03 09:59:16] IRLight : On
+[2020-08-03 09:59:16] IV2MSG : System - Operate
+[2020-08-03 09:59:16] 1 -> 2
+[2020-08-03 09:59:16] HanderType : [Left] -> [Left]
+[2020-08-03 09:59:16] IV2MSG : Option - LeftHander
+[2020-08-03 09:59:16] TeeMode : [Up] -> [Up]
+[2020-08-03 09:59:16] IV2MSG : Option - TeeUp
+[2020-08-03 09:59:16] SurFaceType : [Fairway] -> [Fairway]
+[2020-08-03 09:59:16] IV2MSG : Option - FairWay
+[2020-08-03 09:59:17] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2020-08-03 09:59:17] 2 -> 3
+[2020-08-03 09:59:17] IRLight : On
+[2020-08-03 09:59:17] ImageQueue Reset : Main Camera
+[2020-08-03 09:59:17] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2020-08-03 09:59:17] IV2MSG : State - subreadysuccess
+[2020-08-03 09:59:17] 3 -> 4
+[2020-08-03 09:59:18] IRLight : Standby
+[2020-08-03 09:59:22] HanderType : [Left] -> [Left]
+[2020-08-03 09:59:22] IV2MSG : Option - LeftHander
+[2020-08-03 09:59:22] TeeMode : [Up] -> [Down]
+[2020-08-03 09:59:22] IV2MSG : Option - TeeDown
+[2020-08-03 09:59:22] SurFaceType : [Fairway] -> [Fairway]
+[2020-08-03 09:59:22] IV2MSG : Option - FairWay
+[2020-08-03 09:59:22] Hand 1, TeeMode : 1, Surface : 0
+[2020-08-03 09:59:22] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2020-08-03 09:59:22] 4 -> 1
+[2020-08-03 09:59:22] ImageQueue Reset : Main Camera
+[2020-08-03 09:59:23] IRLight : On
+[2020-08-03 09:59:23] 1 -> 2
+[2020-08-03 09:59:23] 2 -> 1
+[2020-08-03 09:59:23] ImageQueue Reset : Main Camera
+[2020-08-03 09:59:23] 1 -> 2
+[2020-08-03 09:59:23] IRLight : Standby
+[2020-08-03 09:59:24] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2020-08-03 09:59:24] 2 -> 3
+[2020-08-03 09:59:24] IRLight : On
+[2020-08-03 09:59:24] ImageQueue Reset : Main Camera
+[2020-08-03 09:59:24] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2020-08-03 09:59:24] IV2MSG : State - subreadysuccess
+[2020-08-03 09:59:24] 3 -> 4
+[2020-08-03 09:59:25] IRLight : Standby
+[2020-08-03 10:00:19] Selected Camera ID : 0 _ OptionExpose : 3918
+[2020-08-03 10:00:19] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2020-08-03 10:00:19] 4 -> 1
+[2020-08-03 10:00:19] ImageQueue Reset : Main Camera
+[2020-08-03 10:00:19] IRLight : Idle
+[2020-08-03 10:00:20] IRLight : Standby
+[2020-08-03 10:00:26] HanderType : [Left] -> [Left]
+[2020-08-03 10:00:26] IV2MSG : Option - LeftHander
+[2020-08-03 10:00:26] TeeMode : [Down] -> [Down]
+[2020-08-03 10:00:26] IV2MSG : Option - TeeDown
+[2020-08-03 10:00:26] SurFaceType : [Fairway] -> [Fairway]
+[2020-08-03 10:00:26] IV2MSG : Option - FairWay
+[2020-08-03 10:00:33] Selected Camera ID : 0 _ OptionExpose : 885
+[2020-08-03 10:00:33] IRLight : On
+[2020-08-03 10:00:33] 1 -> 2
+[2020-08-03 10:00:34] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 141)
+[2020-08-03 10:00:34] 2 -> 3
+[2020-08-03 10:00:34] IRLight : On
+[2020-08-03 10:00:34] ImageQueue Reset : Main Camera
+[2020-08-03 10:00:34] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2020-08-03 10:00:34] IV2MSG : State - subreadysuccess
+[2020-08-03 10:00:34] 3 -> 4
+[2020-08-03 10:00:35] IRLight : Standby
+[2020-08-03 10:00:47] IRLight : On
+[2020-08-03 10:00:47] 4 -> 7
+[2020-08-03 10:00:47] Failed SaveImageSize : 35
+[2020-08-03 10:00:47] Selected CameraID : 0 _ Set ROI Pos : (266, 141) -> (268, 86)
+[2020-08-03 10:00:47] 7 -> 1
+[2020-08-03 10:00:47] ImageQueue Reset : Main Camera
+[2020-08-03 10:00:47] 1 -> 2
+[2020-08-03 10:00:48] 2 -> 1
+[2020-08-03 10:00:48] ImageQueue Reset : Main Camera
+[2020-08-03 10:00:48] 1 -> 2
+[2020-08-03 10:00:48] IRLight : Standby
+[2020-08-03 10:00:49] Selected CameraID : 0 _ Set ROI Pos : (268, 86) -> (266, 142)
+[2020-08-03 10:00:49] 2 -> 3
+[2020-08-03 10:00:49] IRLight : On
+[2020-08-03 10:00:49] ImageQueue Reset : Main Camera
+[2020-08-03 10:00:49] Main: Ready, Sub : Ready || Game -> SendMessage[Ready]
+[2020-08-03 10:00:49] IV2MSG : State - subreadysuccess
+[2020-08-03 10:00:49] 3 -> 4
+[2020-08-03 10:00:49] 4 -> 6
+[2020-08-03 10:00:50] Selected CameraID : 0 _ Set ROI Pos : (266, 142) -> (268, 86)
+[2020-08-03 10:00:50] 6 -> 1
+[2020-08-03 10:00:50] ImageQueue Reset : Main Camera
+[2020-08-03 10:00:50] IRLight : Standby
+[2020-08-03 10:00:50] IRLight : On

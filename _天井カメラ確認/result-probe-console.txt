@@ -1,0 +1,10 @@
+=== WinUSB probe / 2026-09-06 19:46:52 ===
+隕九▽縺九▲縺溘ョ繝舌う繧ｹ繧､繝ｳ繧ｿ繝輔ぉ繝ｼ繧ｹ: 4 莉ｶ
+   \\?\usb#vid_03c3&pid_034a#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+   \\?\usb#vid_03c3&pid_034c#00000#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+   \\?\usb#vid_04f2&pid_b832#01.00.00#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+   \\?\usb#vid_8087&pid_0033#5&1524d9fe&0&10#{a5dcbf10-6530-11d2-901f-00c04fb951ed}
+
+VID_03C3 縺ｮ繧ゅ・: 2 莉ｶ
+
+DONE -> C:\Users\hiro0\Claude\Projects\YOZAN GENESIS\_天井カメラ確認\result-probe.txt

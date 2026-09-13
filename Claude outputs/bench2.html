@@ -1,0 +1,1642 @@
+<title>スイング計測ベンチ（ブラウザ版）</title>
+<style>
+:root{--bg:#080b0c;--panel:#0d1214;--panel2:#0a0f10;--rule:#16201f;--rule2:#22302e;
+  --ink:#e6efec;--ink2:#a8bcb6;--muted:#5d7570;--accent:#e8873a;--good:#4fbf87;--bad:#e05a4a;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:14px/1.6 system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif}
+.wrap{max-width:1900px;margin:0 auto;padding:16px 20px 40px}
+header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:20px;margin:0;letter-spacing:.02em}
+h1 b{color:var(--accent);font-weight:600}
+.sub{color:var(--muted);font-family:var(--mono);font-size:11px;letter-spacing:.1em}
+.spacer{flex:1}
+button{background:var(--panel);border:1px solid var(--rule2);color:var(--ink);
+  padding:8px 14px;border-radius:3px;cursor:pointer;font-size:13px;font-family:inherit}
+button:hover{border-color:var(--accent)}
+button.pri{background:var(--accent);border-color:var(--accent);color:#14100c;font-weight:600}
+button.on{border-color:var(--accent);color:var(--accent)}
+button:disabled{opacity:.4;cursor:default}
+#msg{color:var(--ink2);font-size:12.5px}
+.cams{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:14px}
+.cam{background:var(--panel2);border:1px solid var(--rule);border-radius:4px;overflow:hidden}
+.cam h2{margin:0;padding:9px 13px;font-size:14px;border-bottom:1px solid var(--rule);
+  display:flex;align-items:center;gap:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:0 0 auto}
+.dot.ok{background:var(--good)}.dot.ng{background:var(--bad)}
+.role{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;color:var(--muted);
+  border:1px solid var(--rule2);padding:1px 6px;border-radius:2px}
+.view{position:relative;background:#000;aspect-ratio:16/9}
+.view video,.view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.view video{object-fit:cover}
+.none{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);font-size:13px;text-align:center;padding:12px}
+/* display:flex は hidden 属性より強い。書かないと「開いています…」が出たまま残る */
+.none[hidden]{display:none}
+.stat{padding:8px 13px;font-family:var(--mono);font-size:11.5px;color:var(--ink2);
+  display:flex;flex-wrap:wrap;gap:4px 14px;border-bottom:1px solid var(--rule)}
+.stat b{color:var(--ink)}
+.mets{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:1px;
+  background:var(--rule);padding:1px}
+.met{background:var(--panel2);padding:9px 11px}
+.met .k{font-size:10.5px;color:var(--muted);margin-bottom:2px}
+.met .v{font-family:var(--mono);font-size:19px;color:var(--ink)}
+.met .v .u{font-size:10px;color:var(--muted);margin-left:2px}
+.met.empty{grid-column:1/-1;color:var(--muted);font-size:12px;background:var(--panel2)}
+.ctl{padding:8px 13px;border-top:1px solid var(--rule);background:var(--panel)}
+.ctl .k{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--muted);margin-bottom:5px}
+.ctl .k b{color:var(--accent);font-weight:500}
+.ctl .btns{display:flex;gap:5px;flex-wrap:wrap}
+.ctl button{padding:4px 9px;font-size:11.5px;font-family:var(--mono)}
+.ctl .now{font-family:var(--mono);font-size:11px;color:var(--ink2);margin-top:6px;min-height:14px}
+select{background:var(--panel);border:1px solid var(--rule2);color:var(--ink);
+  padding:5px 8px;border-radius:3px;font-size:12px;font-family:inherit;max-width:230px}
+details{margin-top:16px;background:var(--panel2);border:1px solid var(--rule);border-radius:4px}
+summary{padding:10px 15px;cursor:pointer;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--muted);list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"+ ";color:var(--accent)}
+details[open] summary::before{content:"− "}
+.body{padding:6px 15px 16px;border-top:1px solid var(--rule)}
+.hint{color:var(--muted);font-size:12px;line-height:1.75;margin:6px 0}
+.hint b{color:var(--ink2)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:6px 8px;border-bottom:1px solid var(--rule)}
+td:first-child{color:var(--muted);font-family:var(--mono);font-size:11px;width:90px}
+.ok{color:var(--good)}.ng{color:var(--bad)}.warn{color:var(--accent)}
+
+/* --- 指で押せる大きさにする。打席で立ったまま操作するため --- */
+button.big{min-height:46px;padding:11px 18px;font-size:14.5px;border-radius:5px}
+button.big.round{min-width:58px;font-family:var(--mono);font-size:17px}
+select.big{min-height:46px;padding:9px 12px;font-size:14px;max-width:340px}
+@media (pointer:coarse){
+  button{min-height:46px}
+  button.big{min-height:54px;padding:14px 20px;font-size:16px}
+  button.big.round{min-width:68px;font-size:19px}
+  input[type=range]{height:44px}
+}
+button.big:active{transform:translateY(1px)}
+
+/* --- 再生パネル --- */
+.player{margin-top:18px;background:linear-gradient(180deg,#0c1213,#0a0f10);
+  border:1px solid var(--rule2);border-radius:6px;overflow:hidden;
+  box-shadow:0 18px 48px rgba(0,0,0,.45)}
+.phead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:12px 16px;border-bottom:1px solid var(--rule);
+  background:linear-gradient(180deg,rgba(232,135,58,.10),transparent)}
+.ptitle{font-size:15px;letter-spacing:.02em}
+.stage{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));
+  gap:2px;background:var(--rule);padding:2px}
+.shot{position:relative;background:#000;aspect-ratio:16/10;overflow:hidden}
+.shot img,.shot video{width:100%;height:100%;object-fit:contain;display:block}
+/* 骨格は映像の上に重ねる。映像そのものには焼き込まない。
+   焼き込むと「素の映像」が二度と見られなくなるため。 */
+.shot canvas.ov{position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;display:block}
+.shot .badge{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);
+  padding:3px 10px;border-radius:99px;font-size:11px;
+  background:rgba(0,0,0,.6);color:var(--muted);white-space:nowrap}
+.shot .tag{position:absolute;left:0;top:0;padding:5px 10px;font-size:12px;
+  background:linear-gradient(135deg,rgba(0,0,0,.75),transparent);
+  color:var(--ink);font-weight:600;letter-spacing:.02em}
+.shot .ts{position:absolute;right:0;bottom:0;padding:4px 9px;font-family:var(--mono);
+  font-size:11.5px;color:var(--ink2);background:rgba(0,0,0,.6)}
+.shot .none2{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:var(--muted);font-size:12.5px}
+.transport{padding:12px 16px 16px;background:var(--panel)}
+.tline{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px}
+.marks{display:flex;gap:7px;flex-wrap:wrap;margin-left:6px}
+.speeds{display:flex;gap:7px;flex-wrap:wrap}
+.bar{width:100%;height:34px;-webkit-appearance:none;appearance:none;background:transparent}
+.bar::-webkit-slider-runnable-track{height:8px;border-radius:4px;
+  background:linear-gradient(90deg,var(--rule2),var(--rule2))}
+.bar::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;
+  border-radius:50%;background:var(--accent);border:3px solid #14100c;margin-top:-9px;
+  box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.bar::-moz-range-track{height:8px;border-radius:4px;background:var(--rule2)}
+.bar::-moz-range-thumb{width:26px;height:26px;border-radius:50%;
+  background:var(--accent);border:3px solid #14100c}
+.ticks{position:relative;height:20px;margin:-6px 0 8px}
+.ticks span{position:absolute;transform:translateX(-50%);font-size:10.5px;
+  color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.ticks span::before{content:"";position:absolute;left:50%;top:-7px;width:1px;height:6px;
+  background:var(--rule2)}
+.ticks span.imp{color:var(--accent)}
+/* 解析の進み具合 */
+.prog{flex:0 0 190px;height:8px;border-radius:4px;background:var(--rule2);
+  overflow:hidden;display:none}
+.prog.on{display:block}
+.prog i{display:block;height:100%;width:0;background:var(--accent);
+  transition:width .12s linear}
+.ticks span.imp::before{background:var(--accent);height:9px;top:-10px}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>スイング計測 <b>ブラウザ版</b></h1>
+  <span class="sub" id="site">BAY 1</span>
+  <span class="spacer"></span>
+  <select id="mode" title="要求の出し方で画角と明るさが変わります"></select>
+  <button id="bStart" class="pri">カメラを開始</button>
+  <button id="bRef">アドレスを基準にする</button>
+  <button id="bRefClear">基準を消す</button>
+  <button id="bSkel" class="on">骨格を隠す</button>
+  <button id="bRec" class="on" title="コマ落ちの原因を切り分けるための切り替え">録画あり</button>
+  <button id="bStop">停止</button>
+  <span id="msg"></span>
+</header>
+<p class="hint" id="modeNote" style="margin:-6px 0 12px"></p>
+
+<div class="bar" style="display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+  <button id="bArm" class="pri">スイング撮影を開始</button>
+  <span id="phase" class="sub">—</span>
+  <span id="banner" style="font-size:13px"></span>
+  <span style="flex:1"></span>
+  <span class="sub" id="recinfo">—</span>
+</div>
+<p class="hint" id="storage" style="margin:-6px 0 12px">—</p>
+
+<div class="cams" id="cams"></div>
+
+<div id="player" hidden class="player">
+  <div class="phead">
+    <b class="ptitle">スイング</b>
+    <span class="sub" id="pinfo"></span>
+    <span style="flex:1"></span>
+    <div class="prog" id="pProg"><i></i></div>
+    <button id="pAnalyze" class="big">骨格を読み込む</button>
+    <button id="pSkel" class="big" hidden>骨格を隠す</button>
+    <button id="pCompare" class="big">過去と比べる</button>
+    <button id="pSave" class="big pri">このスイングを保存</button>
+    <button id="pClose" class="big">閉じる</button>
+  </div>
+
+  <div id="pStage" class="stage"></div>
+
+  <div class="transport">
+    <div class="tline">
+      <button id="pPlay" class="big round" title="再生／一時停止">▶</button>
+      <button id="pPrev" class="big round" title="1コマ戻る">◀|</button>
+      <button id="pNext" class="big round" title="1コマ進む">|▶</button>
+      <div class="marks">
+        <button data-jump="address" class="big">アドレス</button>
+        <button data-jump="top" class="big">トップ</button>
+        <button data-jump="impact" class="big pri">インパクト</button>
+      </div>
+      <span style="flex:1"></span>
+      <button id="pLoop" class="big on" title="くり返し">くり返し</button>
+    </div>
+
+    <input type="range" id="pBar" min="0" max="1000" value="0" class="bar">
+    <div class="ticks" id="pTicks"></div>
+
+    <div class="tline">
+      <span class="sub" style="min-width:210px" id="pTime">—</span>
+      <div class="speeds" id="pSpeeds"></div>
+    </div>
+  </div>
+</div>
+
+<div id="compare" hidden class="player">
+  <div class="phead">
+    <b class="ptitle">比べる</b>
+    <select id="cmpPick" class="big"></select>
+    <span class="sub" id="cmpInfo"></span>
+    <span style="flex:1"></span>
+    <button id="cmpClose" class="big">閉じる</button>
+  </div>
+  <div id="cmpStage" class="stage"></div>
+  <p class="hint" style="padding:0 16px 14px">
+    <b>インパクトの瞬間を合わせて</b>並べています。撮影位置が違うと見た目の角度も変わるので、
+    同じ場所で撮ったもの同士で比べてください。
+  </p>
+</div>
+
+<details id="saved">
+  <summary>保存したスイング</summary>
+  <div class="body">
+    <p class="hint">
+      映像はこのパソコンの <b>recordings</b> フォルダーに残ります。外には出ません。<br>
+      保存するのは<b>スイングのところだけ</b>を切り出した動画（webm）です。
+      それでも <b>容量はすぐ埋まります。</b>いらないものは消してください。<br>
+      骨格データ（landmarks.json）は映像よりずっと軽く、将来コーチAIに渡すのはこちらです。
+      容量が苦しくなったら、映像だけ消して骨格を残す、という残し方ができます。
+    </p>
+    <div style="display:flex;gap:9px;flex-wrap:wrap;margin:10px 0">
+      <button id="svReload" class="big">一覧を更新</button>
+      <button id="svOpenFolder" class="big" title="フォルダの場所を表示">保存先を表示</button>
+    </div>
+    <table id="svList"></table>
+    <p class="hint" id="svPath"></p>
+  </div>
+</details>
+
+<details id="setup">
+  <summary>カメラの割り当て</summary>
+  <div class="body">
+    <p class="hint">
+      機器名がそのまま出ます。<b>同じ名前が3つ並ぶので、映像を見て決めてください。</b><br>
+      レンズを手で覆うと、どれがどれか分かります。選ぶと保存され、次回もこの割り当てで開きます。
+    </p>
+    <table id="assign"></table>
+    <p class="hint">
+      <b>役割で取れる指標が変わります。</b>
+      正面=肩の傾き・頭の動き／側面=前傾角・起き上がり／右斜め=回転量・Xファクター
+    </p>
+  </div>
+</details>
+
+<details id="about">
+  <summary>この画面について</summary>
+  <div class="body">
+    <p class="hint">
+      取り込みも骨格推定も<b>ブラウザの中で完結</b>しています。Python 側は設定の保存だけです。<br>
+      MediaPipe の本体とモデルは<b>このパソコンから配って</b>いるので、通信がなくても動きます。<br>
+      指標の計算式は Python 版とまったく同じものを移してあり、同じ入力で同じ数字が出ることを確認しています。
+    </p>
+    <p class="hint">
+      <b>画角と明るさは、要求の出し方で決まります。</b><br>
+      1280×720 を頼むと、1920×1200 のセンサーの<b>一部だけが切り出され</b>、広角レンズの画角が失われます。<br>
+      fps を高く頼むと、自動露出はその間隔に収まる長さまでしか露光できません
+      （120fpsなら最長1/120秒、30fpsなら1/30秒で<b>4倍明るい</b>）。<br>
+      Windows のカメラアプリが明るく広く見えるのは、1920×1200 の30fpsで開いているからです。
+    </p>
+  </div>
+</details>
+</div>
+
+<script type="module">
+import { FilesetResolver, PoseLandmarker }
+  from '/vendor/vision_bundle.mjs';
+import { compute, makeReference, quality, MIN_QUALITY, BONES, L }
+  from '/pose_metrics.js';
+import { SwingDetector, PHASE, handPoint } from '/swing_detect.js';
+import { SegmentRecorder, trimClip, loadedDuration } from '/swing_record.js';
+import { analyzeVideo, fixJumps, lerpAt, findPhases } from '/swing_analyze.js';
+
+const $=id=>document.getElementById(id);
+const ROLES=[['front','正面','front'],['side','側面','side'],['diag','右斜め','diag']];
+const STORE='gsim.bench2.assign';
+const MODE_STORE='gsim.bench2.mode';
+
+// 取り込みモード。**要求の出し方が画角と明るさを決める。**
+//
+//  ・1280x720 を頼むと、1920x1200 のセンサーの一部だけが切り出される。
+//    126°の広角レンズを買った意味がなくなるので、既定は 1920x1200 にする。
+//  ・fps を高く頼むと、自動露出はその間隔に収まる長さまでしか露光できない。
+//    120fps なら最長 1/120秒。30fps なら 1/30秒 で、4倍明るい。
+//
+// 明るさと速さは同じ制約の裏表なので、切り替えられる形にして選べるようにする。
+const MODES = [
+  {id:'wide',  label:'画角と明るさ優先', w:1920, h:1200, fps:30,
+   note:'センサー全体・最長1/30秒。Windowsのカメラアプリと同じ条件'},
+  {id:'mid',   label:'標準',            w:1920, h:1200, fps:60,
+   note:'センサー全体・最長1/60秒'},
+  {id:'full',  label:'全部入り（要:高性能PC）', w:1920, h:1200, fps:120,
+   note:'センサー全体で120fps。USB帯域を使い切るので、3台同時はMJPEG対応カメラ＋余裕のあるPCが必要'},
+  {id:'fast',  label:'速度優先',        w:1280, h:720,  fps:120,
+   note:'切り出し・最長1/120秒。暗く、画角も狭くなる'},
+];
+function curMode(){
+  const id = localStorage.getItem(MODE_STORE) || 'wide';
+  return MODES.find(m=>m.id===id) || MODES[0];
+}
+
+// 推定の回数/秒。上げても精度は変わらず、下げるとCPUが空く。
+// 体の動きを追うには30で十分（ゴルフのダウンスイングでも0.25秒あるため）。
+let POSE_HZ = 30;
+
+// 録画。**カメラの出力をそのまま動画で録る。**
+//
+// 前は骨格推定に合わせて1コマずつJPEGにしていた。つまり残るコマ数が
+// 推定の速さに縛られていて、遅い機械では毎秒8コマしか残らず再生がカクカクした。
+// 映像を残すのに推定を待つ理由はどこにもないので、切り離した。
+//
+// ・映像 … MediaRecorder が等間隔で全コマ録る（30fpsなら30コマ）
+// ・骨格 … 撮り終わったあとにコマ送りで取る（実時間の制約がないので落とさない）
+//
+// アドレスの前から残す必要があるので、一定時間ごとに録り直して2本持ち回る。
+const REC = {segmentMs:10000, bps:8_000_000, seconds:10, saveBps:6_000_000};
+const OVERLAY_MAX_W = 960;      // 骨格を描く板の横幅の上限
+// 録画を止めて回せるようにしておく。コマが落ちるとき、
+// 原因が「取り込み」か「圧縮」かは、これを切ってみれば一発で分かる。
+let RECORDING = true;
+const PHASE_LABEL = {idle:'—', address:'アドレス', backswing:'テイクバック',
+  top:'トップ', downswing:'ダウン', impact:'インパクト', follow:'フォロー'};
+
+// 推定が間に合わないときは回数を落とす。映像が固まるより、
+// 数字の更新が粗くなるほうがましである。
+function adaptPoseHz(ms){
+  const budget = 1000/POSE_HZ * 0.7;
+  if(ms > budget && POSE_HZ > 8) POSE_HZ = Math.max(8, Math.round(POSE_HZ*0.75));
+  else if(ms < budget*0.4 && POSE_HZ < 30) POSE_HZ = Math.min(30, POSE_HZ+2);
+}
+let DEVICES=[], CAMS=[], RUNNING=false, SHOW_SKEL=true, LANDMARKER_READY=false;
+let VISION=null;
+
+function loadAssign(){
+  try{ return JSON.parse(localStorage.getItem(STORE)||'{}'); }catch(e){ return {}; }
+}
+function saveAssign(a){
+  try{ localStorage.setItem(STORE, JSON.stringify(a)); }catch(e){}
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+// ---------------------------------------------------------------- 画面
+function camCard(key, label, role){
+  return `<div class="cam" id="cam-${key}">
+    <h2><span class="dot" id="dot-${key}"></span>${label}
+      <span class="role">${role.toUpperCase()}</span>
+      <span style="flex:1"></span>
+      <span class="sub" id="name-${key}">—</span></h2>
+    <div class="view">
+      <video id="v-${key}" autoplay playsinline muted></video>
+      <canvas id="c-${key}"></canvas>
+      <div class="none" id="none-${key}">「カメラを開始」を押してください</div>
+    </div>
+    <div class="stat" id="s-${key}">—</div>
+    <div class="mets" id="met-${key}"></div>
+    <div class="ctl">
+      <div class="k">シャッター速度 — <b>速いほどブレないが暗くなる</b></div>
+      <div class="btns" id="exp-${key}"></div>
+      <div class="k" style="margin-top:8px">明るさ —
+        <b>「明るさ」は黒を持ち上げるので白ボケします</b></div>
+      <div class="btns" id="brt-${key}"></div>
+      <div class="now" id="now-${key}">—</div>
+    </div>
+  </div>`;
+}
+$('cams').innerHTML = ROLES.map(([k,label,role])=>camCard(k,label,role)).join('');
+
+function renderMode(){
+  const cur=curMode();
+  $('mode').innerHTML = MODES.map(m=>
+    `<option value="${m.id}" ${m.id===cur.id?'selected':''}>`
+    +`${m.label}　${m.w}×${m.h}@${m.fps}</option>`).join('');
+  $('modeNote').textContent = cur.note;
+}
+$('mode').onchange = ()=>{
+  localStorage.setItem(MODE_STORE, $('mode').value);
+  renderMode();
+  $('msg').textContent = RUNNING
+    ? '「カメラを開始」を押し直すと切り替わります' : '';
+};
+renderMode();
+
+function renderAssign(){
+  const a=loadAssign();
+  $('assign').innerHTML = ROLES.map(([k,label])=>`<tr>
+    <td>${label}</td>
+    <td><select data-key="${k}">
+      <option value="">（選んでください）</option>
+      ${DEVICES.map((d,i)=>`<option value="${esc(d.deviceId)}"
+        ${a[k]===d.deviceId?'selected':''}>${i}: ${esc(d.label||'名前なし')}</option>`).join('')}
+    </select></td></tr>`).join('');
+  $('assign').querySelectorAll('select').forEach(sel=>{
+    sel.onchange=()=>{
+      const a2=loadAssign(); a2[sel.dataset.key]=sel.value; saveAssign(a2);
+      $('msg').textContent='割り当てを保存しました。「カメラを開始」で反映します';
+    };
+  });
+}
+
+// ---------------------------------------------------------------- 骨格推定
+async function initPose(){
+  if(VISION) return;
+  $('msg').textContent='姿勢推定を読み込んでいます…';
+  VISION = await FilesetResolver.forVisionTasks('/vendor/wasm');
+  LANDMARKER_READY = true;
+}
+
+// GPU が使えない環境では黙って落ちるのではなく、CPU に切り替えて動かし、
+// どちらで動いているかを画面に出す。遅いときに原因が分かる。
+let DELEGATE = '';
+async function makeLandmarker(){
+  const opt = d => ({
+    baseOptions:{ modelAssetPath:'/api/model', delegate:d },
+    runningMode:'VIDEO', numPoses:1,
+    minPoseDetectionConfidence:0.5, minPosePresenceConfidence:0.5,
+    minTrackingConfidence:0.5,
+  });
+  try{
+    const lm = await PoseLandmarker.createFromOptions(VISION, opt('GPU'));
+    DELEGATE = 'GPU'; return lm;
+  }catch(e){
+    const lm = await PoseLandmarker.createFromOptions(VISION, opt('CPU'));
+    DELEGATE = 'CPU'; return lm;
+  }
+}
+
+// ---------------------------------------------------------------- 1台ぶん
+class Cam {
+  constructor(key, label, role){
+    this.key=key; this.label=label; this.role=role;
+    this.video=$('v-'+key); this.canvas=$('c-'+key);
+    this.ctx=this.canvas.getContext('2d');
+    // 姿勢推定は小さい絵で十分。MediaPipe は内部でどうせ縮めるので、
+    // 1920x1200 をそのまま渡すのは転送の無駄でしかない（実測で1.7秒かかった）。
+    // 表示は元の解像度のまま、推定用にだけ縮めた絵を用意する。
+    this.small = document.createElement('canvas');
+    this.small.width = 640; this.small.height = 400;
+    this.sctx = this.small.getContext('2d', {willReadFrequently:false});
+    this.stream=null; this.track=null; this.landmarker=null;
+    this._lastPose = 0; this._warm = false;
+    // 録画は SegmentRecorder に任せる（カメラの出力をそのまま動画にする）
+    this.recorder = null;
+    this.recBright = -1;
+    // 骨格も貯める。撮影中のこれは「その場で見せる」ためのもので、
+    // 保存する骨格は撮り終わってから作り直す（コマを落とさないため）。
+    this.lmBuf = [];        // {t, lm}
+    this.det = new SwingDetector();
+    this.phase = PHASE.IDLE;
+    this.ref=null; this.lm=null; this.q=0;
+    this.fps=0; this.poseMs=0; this._n=0; this._t0=0;
+    this.stop=false;
+  }
+
+  async open(deviceId){
+    const M=curMode();
+    const t0=performance.now();
+    this.stream = await navigator.mediaDevices.getUserMedia({video:{
+      deviceId:{exact:deviceId},
+      width:{ideal:M.w}, height:{ideal:M.h}, frameRate:{ideal:M.fps}}});
+    this.openMs = performance.now()-t0;
+    this.track = this.stream.getVideoTracks()[0];
+    this.video.srcObject = this.stream;
+    await this.video.play();
+    this.caps = this.track.getCapabilities ? this.track.getCapabilities() : {};
+    this.initial = this.track.getSettings();
+    $('none-'+this.key).hidden = true;
+    $('dot-'+this.key).className = 'dot ok';
+    $('name-'+this.key).textContent = this.track.label || '';
+    this.buildControls();
+    this.landmarker = await makeLandmarker();
+    // 録画は開いた時点から回しておく。押してから録り始めると、
+    // アドレスの前が必ず抜ける（スイングの始まりがいちばん見たいところなのに）。
+    if(RECORDING){
+      this.recorder = new SegmentRecorder(this.stream,
+        {segmentMs:REC.segmentMs, bitsPerSecond:REC.bps});
+      this.recorder.start();
+    }
+    this._t0 = performance.now();
+    this.loop();
+  }
+
+  close(){
+    this.stop = true;
+    if(this.recorder){ try{ this.recorder.stop(); }catch(e){} this.recorder=null; }
+    if(this.stream) this.stream.getTracks().forEach(t=>t.stop());
+    if(this.landmarker){ try{ this.landmarker.close(); }catch(e){} }
+    this.stream=null; this.landmarker=null; this.lm=null;
+    $('dot-'+this.key).className='dot';
+    $('none-'+this.key).hidden=false;
+    $('none-'+this.key).textContent='停止しました';
+    this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+  }
+
+  loop(){
+    if(this.stop || !this.landmarker) return;
+    const v=this.video;
+    if(v.readyState >= 2){
+      // 取り込みの速さと推定の速さは別でよい。
+      // 映像は来るだけ受け取り、推定は POSE_HZ 回/秒に絞る。
+      // 姿勢は毎コマ大きく変わらないので、これで見た目も数字も足りる。
+      const t = performance.now();
+      if(t - this._lastPose >= 1000/POSE_HZ){
+        this._lastPose = t;
+        try{
+          const sw=this.small.width, sh=this.small.height;
+          this.sctx.drawImage(v, 0, 0, sw, sh);      // 縮めてから渡す
+          const res = this.landmarker.detectForVideo(this.small, t);
+          const lms = res.landmarks && res.landmarks[0];
+          this.lm = lms || null;
+          this.q = lms ? quality(lms) : 0;
+          this.poseMs = performance.now()-t;
+          if(this._warm) adaptPoseHz(this.poseMs); else this._warm = true;
+        }catch(e){ this.lm=null; }
+        this.onPose(t);
+      }
+      this._n++;
+      const el=(performance.now()-this._t0)/1000;
+      if(el>=1){ this.fps=this._n/el; this._n=0; this._t0=performance.now(); }
+      this.draw();
+    }
+    v.requestVideoFrameCallback ? v.requestVideoFrameCallback(()=>this.loop())
+                                : requestAnimationFrame(()=>this.loop());
+  }
+
+  // 骨格が1つ出るたびに、スイングの状態を進める。
+  // （映像は別系統で録れているので、ここでは触らない）
+  onPose(t){
+    if(this.lm){
+      // 小数は3桁で足りる（画面比の0.001＝1920pxで2px）。桁を落とすと保存も軽い
+      this.lmBuf.push({t, lm:this.lm.map(p=>[
+        +p.x.toFixed(4), +p.y.toFixed(4), +(p.z??0).toFixed(4),
+        +(p.visibility??1).toFixed(2)])});
+      const cut = t - REC.seconds*1000;
+      while(this.lmBuf.length && this.lmBuf[0].t < cut) this.lmBuf.shift();
+    }
+    // 録れている絵が真っ暗でないか、ときどき確かめる。
+    // 真っ暗なまま録り続けて、再生してから気づくのがいちばん困る。
+    // **人が写っていないときこそ知りたい**ので、検出の外で回す。
+    if((this._brN = (this._brN||0)+1) % 20 === 1) this.checkBright();
+    if(this.lm){
+    }
+    if(!ARMED) return;
+    const ev = this.det.push(t, this.lm);
+    this.phase = this.det.phase;
+    if(!ev) return;
+    if(this.key === TRIGGER_KEY){
+      if(ev.type === 'address') setBanner('アドレスを認識しました', 'ok');
+      // **トップまで行った時点で1本と決まる。**インパクトが取れるかは待たない。
+      if(ev.type === 'top') setBanner('トップ ／ このスイングを撮ります', 'accent');
+      if(ev.type === 'impact') setBanner('インパクト', 'accent');
+      if(ev.type === 'complete') onSwingComplete(ev);
+    }
+  }
+
+  // 推定用に縮めた絵をそのまま使って明るさを見る。
+  // 推定のために毎回描いているので、ここに追加の負担はない。
+  checkBright(){
+    try{
+      const d = this.sctx.getImageData(160, 100, 64, 64).data;
+      let sum=0; for(let i=0;i<d.length;i+=4) sum+=d[i]+d[i+1]+d[i+2];
+      this.recBright = sum/(d.length/4*3);
+    }catch(e){}
+  }
+
+  // 指定の時間範囲を含む動画を取り出す（must は必ず入れたい瞬間＝インパクト）
+  async clipVideo(t0, t1, must){
+    if(!this.recorder) return null;
+    try{ return await this.recorder.take(t0, t1, must); }catch(e){ return null; }
+  }
+  clipLm(t0, t1){ return this.lmBuf.filter(f=>f.t>=t0 && f.t<=t1); }
+
+  draw(){
+    const c=this.canvas, v=this.video;
+    // 骨格を描くだけなので、映像と同じ画素数は要らない。
+    // 1920×1200 の板を3枚、毎コマ消して描き直すのは、それだけで重い。
+    const vw=v.videoWidth||1280, vh=v.videoHeight||720;
+    const k=Math.min(1, OVERLAY_MAX_W/vw);
+    const cw=Math.round(vw*k), ch=Math.round(vh*k);
+    if(c.width!==cw || c.height!==ch){ c.width=cw; c.height=ch; }
+    const g=this.ctx;
+    g.clearRect(0,0,c.width,c.height);
+    if(!SHOW_SKEL || !this.lm) return;
+    const X=p=>p.x*c.width, Y=p=>p.y*c.height;
+    g.lineWidth=Math.max(2,c.width/400);
+    g.strokeStyle='rgba(79,191,135,.9)';
+    g.beginPath();
+    for(const [a,b] of BONES){
+      const pa=this.lm[a], pb=this.lm[b];
+      if(!pa||!pb) continue;
+      if((pa.visibility??1)<0.35 || (pb.visibility??1)<0.35) continue;
+      g.moveTo(X(pa),Y(pa)); g.lineTo(X(pb),Y(pb));
+    }
+    g.stroke();
+    g.fillStyle='rgba(232,135,58,.95)';
+    for(const n of Object.values(L)){
+      const p=this.lm[n];
+      if(!p || (p.visibility??1)<0.35) continue;
+      g.beginPath(); g.arc(X(p),Y(p),Math.max(3,c.width/260),0,Math.PI*2); g.fill();
+    }
+  }
+
+  setRef(){ this.ref = this.lm ? makeReference(this.lm) : null; return !!this.ref; }
+
+  metrics(){ return this.lm ? compute(this.role, this.lm, this.ref||{}) : []; }
+
+  // --- 調整 ---
+  buildControls(){
+    const eb=$('exp-'+this.key), bb=$('brt-'+this.key), now=$('now-'+this.key);
+    eb.innerHTML=''; bb.innerHTML='';
+    const mk=(el,label,fn,cls)=>{const b=document.createElement('button');
+      b.textContent=label; if(cls) b.className=cls; b.onclick=fn; el.appendChild(b);};
+    const caps=this.caps;
+
+    mk(eb,'自動に戻す', ()=>this.autoBack(), 'pri');
+    if(caps.exposureTime){
+      const {min,max,step}=caps.exposureTime;
+      const fit=v=>Math.min(max,Math.max(min,Math.round(v/step)*step));
+      [[500,'1/500'],[250,'1/250'],[120,'1/120'],[60,'1/60'],[30,'1/30']].forEach(([d,lb])=>{
+        const v0=fit((1/d)/100e-6);
+        if(v0<min||v0>max) return;
+        mk(eb,lb, async()=>{
+          try{ await this.track.applyConstraints({advanced:[
+                 {exposureMode:'manual', exposureTime:v0}]});
+            await new Promise(r=>setTimeout(r,300));
+            const g=this.track.getSettings();
+            const hit=g.exposureTime!==undefined && Math.abs(g.exposureTime-v0)<step*1.5;
+            const cap=g.exposureTime ? 1/(g.exposureTime*100e-6) : 0;
+            now.innerHTML=`露出 <b>${lb}秒</b> ／ <span class="${hit?'ok':'ng'}">`
+              +`${hit?`このfps上限は ${cap.toFixed(0)}`:'この設定では通りません'}</span>`;
+          }catch(e){ now.innerHTML='<span class="ng">'+esc(e.message)+'</span>'; }});
+      });
+    } else { eb.insertAdjacentHTML('beforeend',
+      '<span style="color:var(--bad);font-size:11.5px">露出は変えられません</span>'); }
+
+    if(caps.brightness){
+      const {min,max}=caps.brightness;
+      [min, Math.round((min+max)*0.45), Math.round((min+max)*0.75), max].forEach(v0=>{
+        mk(bb,String(v0), async()=>{
+          try{ await this.track.applyConstraints({advanced:[{brightness:v0}]});
+            await new Promise(r=>setTimeout(r,250));
+            now.innerHTML=`明るさ <b>${this.track.getSettings().brightness}</b>`;
+          }catch(e){ now.innerHTML='<span class="ng">'+esc(e.message)+'</span>'; }});
+      });
+    }
+    if(caps.brightness && caps.contrast){
+      mk(bb,'白ボケを直す', async()=>{
+        const b=caps.brightness, c=caps.contrast;
+        try{
+          await this.track.applyConstraints({advanced:[
+            {brightness:Math.round(b.min+(b.max-b.min)*0.45)}]});
+          await this.track.applyConstraints({advanced:[
+            {contrast:Math.round(c.min+(c.max-c.min)*0.80)}]});
+          await new Promise(r=>setTimeout(r,300));
+          const g=this.track.getSettings();
+          now.innerHTML=`明るさ <b>${g.brightness}</b> ／ コントラスト <b>${g.contrast}</b>`;
+        }catch(e){ now.innerHTML='<span class="ng">'+esc(e.message)+'</span>'; }});
+    }
+  }
+
+  // 触りすぎたときに必ず帰ってこられる場所。指示で戻らない機種は開き直す
+  async autoBack(){
+    const now=$('now-'+this.key);
+    now.textContent='戻しています…';
+    const t=[];
+    if(this.caps.exposureMode?.includes('continuous')) t.push({exposureMode:'continuous'});
+    if(this.initial.brightness!==undefined) t.push({brightness:this.initial.brightness});
+    if(this.initial.contrast!==undefined) t.push({contrast:this.initial.contrast});
+    for(const c of t){ try{ await this.track.applyConstraints({advanced:[c]}); }catch(e){} }
+    await new Promise(r=>setTimeout(r,350));
+    let g=this.track.getSettings();
+    if(g.exposureMode && g.exposureMode!=='continuous'){
+      now.textContent='戻らないので開き直しています…';
+      try{
+        const id=g.deviceId, w=g.width, h=g.height;
+        this.stream.getTracks().forEach(x=>x.stop());
+        this.stream=await navigator.mediaDevices.getUserMedia({video:{
+          deviceId:{exact:id}, width:{exact:w}, height:{exact:h},
+          frameRate:{ideal:curMode().fps}}});
+        this.track=this.stream.getVideoTracks()[0];
+        this.video.srcObject=this.stream; await this.video.play();
+        this.initial=this.track.getSettings();
+        now.innerHTML='<span class="ok">開き直して既定値に戻しました</span>';
+        return;
+      }catch(e){ now.innerHTML='<span class="ng">開き直せません</span>'; return; }
+    }
+    now.innerHTML='<span class="ok">自動露出に戻しました</span>';
+  }
+}
+
+// 実際に選ばれた圧縮方式。H.264 ならグラフィックボードが圧縮している。
+function codecName(cam){
+  if(!RECORDING) return '録画オフ';
+  const m = cam.recorder && cam.recorder.mime || '';
+  if(/avc1|h264/i.test(m)) return 'H.264';
+  if(/vp9/i.test(m)) return 'VP9(CPU)';
+  if(/vp8/i.test(m)) return 'VP8(CPU)';
+  return m || '—';
+}
+
+// ---------------------------------------------------------------- 表示更新
+function renderStats(){
+  for(const cam of CAMS){
+    if(!cam.stream) continue;
+    const st=cam.track.getSettings();
+    const qOk = cam.q>=MIN_QUALITY;
+    $('s-'+cam.key).innerHTML =
+      `<span><b>${st.width}×${st.height}</b></span>`
+     +`<span>実測 <b class="${cam.fps>=50?'ok':'warn'}">${cam.fps.toFixed(0)}</b>fps</span>`
+     +`<span>推定 <b class="${cam.poseMs<25?'ok':(cam.poseMs<60?'warn':'ng')}">${cam.poseMs.toFixed(0)}</b>ms`
+     +`<span style="color:var(--muted)"> ${DELEGATE} ${POSE_HZ}Hz</span></span>`
+     +`<span>姿勢 <b class="${qOk?'ok':'ng'}">${cam.lm?(cam.q*100).toFixed(0)+'%':'未検出'}</b></span>`
+     +`<span>${cam.ref?'<b class="ok">基準あり</b>':'基準なし'}</span>`
+     +`<span style="color:var(--muted)">${esc(codecName(cam))}</span>`;
+
+    const box=$('met-'+cam.key);
+    const ms=cam.metrics();
+    if(!ms.length){
+      const why = !cam.lm ? '人が写っていません'
+        : (cam.q<MIN_QUALITY ? '検出が不安定です（明るさを上げてください）'
+        : (cam.ref ? '—' : 'アドレスを基準にすると指標が出ます'));
+      box.innerHTML=`<div class="met empty">${why}</div>`;
+      continue;
+    }
+    box.innerHTML = ms.map(m=>`<div class="met" title="${esc(m.hint)}">
+      <div class="k">${m.label}</div>
+      <div class="v">${m.value>0&&m.key.includes('tilt')?'+':''}${m.value.toFixed(1)}<span class="u">${m.unit}</span></div>
+    </div>`).join('');
+  }
+}
+setInterval(renderStats, 250);
+setInterval(()=>{
+  const c = CAMS.find(x=>x.key===TRIGGER_KEY && x.stream);
+  $('phase').textContent = ARMED ? (PHASE_LABEL[c?.phase] || '—') : '待機';
+  const live = CAMS.filter(x=>x.stream && x.recorder);
+  const br = CAMS.filter(x=>x.stream).map(x=>x.recBright);   // 明るさは録画の有無と関係ない
+  const dark = br.length && br.every(v=>v>=0 && v<12);
+  const held = live.map(x=>x.recorder.held);
+  const mb = held.reduce((a,h)=>a+h.bytes,0)/1048576;
+  const sec = held.length ? Math.max(...held.map(h=>h.cur+h.prev)) : 0;
+  const err = live.map(x=>x.recorder.error).filter(Boolean)[0];
+  const brTxt = br.length ? ' ／ 明るさ ' + br.map(v=>v<0?'—':v.toFixed(0)).join('/') : '';
+  $('recinfo').innerHTML = !live.length ? ('録画オフ' + brTxt)
+    : err ? `<b style="color:var(--bad)">録画できません: ${esc(err)}</b>`
+    : `動画で保持 ${sec.toFixed(0)}秒 ／ ${mb.toFixed(0)}MB` + brTxt
+      + (dark ? ' <b style="color:var(--bad)">録れている絵が真っ暗です。明るさを上げてください</b>' : '');
+}, 400);
+
+// カメラが開けないときの言い方。原因は数えるほどしかないので、
+// 名前をそのまま出さずに、次にやることまで書く。
+function camHint(e){
+  const n = e && e.name || '';
+  const m = (e && e.message || '') + '';
+  if(n==='NotAllowedError')
+    return 'カメラの使用が許可されていません。アドレスバー左のカメラ印から許可してください';
+  if(n==='OverconstrainedError')
+    return 'この解像度・fpsでは開けません。上の設定を一段下げてください';
+  if(n==='NotFoundError')
+    return 'カメラが見つかりません。USBの挿し直しを試してください';
+  if(n==='NotReadableError' || /Could not start video source|in use/i.test(m))
+    return 'カメラを他が掴んでいて開けません。'
+         + '診断（check.bat）やWindowsのカメラアプリ、'
+         + 'この画面を開いた別のタブを閉じてから、もう一度「開始」を押してください';
+  return m || n || '開けませんでした';
+}
+
+// ---------------------------------------------------------------- 操作
+$('bStart').onclick = async()=>{
+  $('bStart').disabled = true;
+  try{
+    $('msg').textContent='カメラの許可を求めています…';
+    try{ await fetch('/api/cameras/release',{method:'POST'});
+         await new Promise(r=>setTimeout(r,1200)); }catch(e){}
+    // 名前を出すために一度だけ開く。ここは「掴んでいる誰か」がいると失敗する。
+    // 手放すのに少し掛かることがあるので、間を置いて数回試す。
+    // それでも駄目でも先へ進む。名前が出ないだけで、割り当てと撮影はできる。
+    let probeErr = null;
+    for(let i=0;i<3;i++){
+      try{
+        const tmp=await navigator.mediaDevices.getUserMedia({video:true});
+        tmp.getTracks().forEach(t=>t.stop());
+        probeErr = null; break;
+      }catch(e){
+        probeErr = e;
+        if(e.name==='NotAllowedError') throw e;   // 許可の話は待っても変わらない
+        await new Promise(r=>setTimeout(r,1200));
+      }
+    }
+    if(probeErr){
+      $('msg').innerHTML='<span class="ng">'+esc(camHint(probeErr))+'</span>';
+    }
+    DEVICES=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='videoinput');
+    renderAssign();
+
+    await initPose();
+
+    let a=loadAssign();
+    // 未割り当てなら、名前が同じものを上から順に当てる（あとから直せる）
+    const need=ROLES.filter(([k])=>!a[k] || !DEVICES.some(d=>d.deviceId===a[k]));
+    if(need.length){
+      const used=new Set(Object.values(a));
+      const pool=DEVICES.filter(d=>!used.has(d.deviceId));
+      need.forEach(([k],i)=>{ if(pool[i]) a[k]=pool[i].deviceId; });
+      saveAssign(a);
+      $('setup').open = true;
+    }
+
+    CAMS = ROLES.map(([k,label,role])=>new Cam(k,label,role));
+    for(const cam of CAMS){
+      const id=a[cam.key];
+      if(!id){ $('none-'+cam.key).textContent='割り当てられていません'; continue; }
+      $('none-'+cam.key).textContent='開いています…';
+      $('msg').textContent=`${cam.label} を開いています…`;
+      try{ await cam.open(id); }
+      catch(e){
+        $('dot-'+cam.key).className='dot ng';
+        $('none-'+cam.key).textContent =
+          e.name==='NotReadableError' ? '他のアプリが使用中です'
+          : e.name==='OverconstrainedError' ? 'この設定では開けません（設定を下げてください）'
+          : e.name;
+        $('msg').innerHTML='<span class="ng">'+esc(camHint(e))+'</span>';
+      }
+    }
+    RUNNING=true;
+    if(CAMS.some(c=>c.stream)) $('msg').textContent='';
+  }catch(e){
+    $('msg').innerHTML='<span class="ng">'+esc(camHint(e))+'</span>';
+  }
+  $('bStart').disabled=false;
+};
+
+// 撮影中かどうか。押すまでは検出も走らせない（意図しない保存を避ける）
+let ARMED = false;
+const TRIGGER_KEY = 'front';       // どのカメラの骨格で判定するか
+let CLIP = null;
+
+function setBanner(text, cls){
+  const el=$('banner');
+  el.textContent = text;
+  el.style.color = cls==='ok' ? 'var(--good)' : 'var(--accent)';
+  clearTimeout(setBanner._t);
+  setBanner._t = setTimeout(()=>{ el.textContent=''; }, 1800);
+}
+
+$('bArm').onclick = ()=>{
+  ARMED = !ARMED;
+  CAMS.forEach(c=>{ c.det.reset(); if(c.ref) c.det.setBase(handPoint(c.lm)); });
+  $('bArm').textContent = ARMED ? 'スイング撮影を停止' : 'スイング撮影を開始';
+  $('bArm').classList.toggle('pri', !ARMED);
+  $('banner').textContent = ARMED ? '構えてください' : '';
+  $('banner').style.color = 'var(--muted)';
+};
+
+async function onSwingComplete(ev){
+  // インパクトが見積りのときは、後ろを広めに残す。
+  // 見積りは最大で0.2秒ほどずれうるので、切り詰めるとフォローが欠ける。
+  const pre = 500, post = ev.approx ? 1500 : 900;
+  const t0 = (ev.address ?? ev.impact) - pre;
+  const t1 = ev.impact + post;
+  // インパクト後の分がまだ録れていないことがある。録れるまで待ってから切る。
+  const wait = t1 - performance.now();
+  if(wait > 0) await new Promise(r=>setTimeout(r, wait + 120));
+  setBanner('映像を切り出しています…', 'accent');
+  const cams = [];
+  for(const c of CAMS.filter(c=>c.stream)){
+    const v = await c.clipVideo(t0, t1, ev.impact);
+    if(!v) continue;
+    cams.push({key:c.key, label:c.label, role:c.role,
+               video:v, lms:c.clipLm(t0,t1), fps:Math.round(c.fps)||30});
+  }
+  CLIP = {marks:{address:ev.address, top:ev.top, impact:ev.impact},
+          approx:!!ev.approx, t0, t1, cams};
+  if(!cams.length){
+    // 区間の切り替わりを跨いだときだけ起きる。次のスイングは撮れる。
+    setBanner('映像が区切りに掛かりました。もう一度お願いします', 'accent');
+    return;
+  }
+  try{
+    const src = await fromCapture(CLIP);
+    if(src.dropped.length) setBanner(`${src.dropped.join('・')}は映像が間に合いませんでした`, 'accent');
+    openPlayer(src, true);
+  }catch(e){
+    setBanner(e.message, 'accent');
+  }
+}
+
+$('bStop').onclick = async()=>{
+  CAMS.forEach(c=>c.close()); CAMS=[]; RUNNING=false;
+  try{ await fetch('/api/cameras/resume',{method:'POST'}); }catch(e){}
+  $('msg').textContent='停止しました';
+};
+
+$('bRef').onclick = ()=>{
+  const ok=CAMS.filter(c=>c.stream && c.setRef()).length;
+  $('msg').textContent = ok ? `${ok}台で基準を記録しました` : '人が写っていません';
+};
+$('bRefClear').onclick = ()=>{
+  CAMS.forEach(c=>c.ref=null); $('msg').textContent='基準を消しました';
+};
+$('bRec').onclick = ()=>{
+  RECORDING = !RECORDING;
+  $('bRec').textContent = RECORDING ? '録画あり' : '録画オフ';
+  $('bRec').classList.toggle('on', RECORDING);
+  for(const c of CAMS){
+    if(!c.stream) continue;
+    if(RECORDING && !c.recorder){
+      c.recorder = new SegmentRecorder(c.stream,
+        {segmentMs:REC.segmentMs, bitsPerSecond:REC.bps});
+      c.recorder.start();
+    }else if(!RECORDING && c.recorder){
+      try{ c.recorder.stop(); }catch(e){}
+      c.recorder = null;
+    }
+  }
+  $('msg').textContent = RECORDING
+    ? '録画を再開しました'
+    : '録画を止めました。この状態で fps が上がるなら、詰まっているのは圧縮です';
+};
+
+$('bSkel').onclick = ()=>{
+  SHOW_SKEL=!SHOW_SKEL;
+  $('bSkel').textContent = SHOW_SKEL?'骨格を隠す':'骨格を表示';
+  $('bSkel').classList.toggle('on', SHOW_SKEL);
+  if(!SHOW_SKEL) CAMS.forEach(c=>c.ctx.clearRect(0,0,c.canvas.width,c.canvas.height));
+};
+// ------------------------------------------------------------ 再生
+//
+// ■ 何をどう直したか
+//
+// 前は骨格が1つ出るたびにJPEGを1枚ためて、それを紙芝居のように出していた。
+// つまり「再生の滑らかさ＝推定の速さ」で、遅い機械では毎秒8コマになった。
+// いまは**素の録画映像をそのまま <video> で流す**ので、カメラのコマ数がそのまま出る。
+// 骨格は映像に焼き込まず、あとから読み込んで上に重ねる。
+//
+// ■ 30fpsのカメラでも骨格を細かく取れるようにした工夫
+//
+//  1. 撮り終わってから解析するので、**1コマも落とさない**（撮影中は間引いていた）
+//  2. 重いモデル（full）を使える。実時間の締切がないため
+//  3. コマとコマの間は前後から内挿して出す（手元は0.25秒で画面の3割動く）
+//  4. 「行って戻る」飛びだけ直す。平滑化はしない（インパクトが鈍るため）
+//
+// これが効けば、高いカメラを買わなくても骨格は取れる。
+//
+// 操作は lesson-os にそろえる（コマ送り・0.1x/0.25x/0.5xスロー・比較再生）。
+
+const SPEEDS = [[0.1,'0.1x'],[0.25,'0.25x'],[0.5,'0.5x'],[1,'等速']];
+let PL = null;         // 再生中のスイング
+let CMP = null;        // 比べる相手
+let RV_URLS = [];
+function clearUrls(){ RV_URLS.forEach(u=>URL.revokeObjectURL(u)); RV_URLS=[]; }
+function keepUrl(blob){ const u=URL.createObjectURL(blob); RV_URLS.push(u); return u; }
+
+// 解析でコマ送りする刻み。
+//
+// 表示ループで測った fps をそのまま使ってはいけない。あれは「画面を描けた回数」で、
+// 推定が重い機械では 1 まで落ちる。それを刻みにすると1秒に1コマしか見なくなり、
+// スイングが数コマになってしまう（実際そうなった）。
+// 録れている中身はカメラの速さで入っているので、要求した fps を下限に置く。
+// 上は60で頭打ち。120まで刻んでも骨格の精度は上がらず、待ち時間だけ倍になる。
+function analysisFps(measured){
+  const want = curMode().fps || 30;
+  return Math.max(24, Math.min(60, Math.round(measured) > 20 ? Math.round(measured) : want));
+}
+
+function fmtRel(ms){
+  if(ms==null) return '—';
+  const s=(ms/1000);
+  return (s>=0?'+':'') + s.toFixed(3) + '秒';
+}
+
+// 動画の長さが確定するまで待つ。
+// MediaRecorder の webm は長さがヘッダに入っていないので、そのままだと
+// duration が Infinity になり、時間指定の頭出しが全部きかない（loadedDuration が直す）。
+const ready = v => loadedDuration(v);
+function seekTo(v, sec){
+  return new Promise(res=>{
+    const d=isFinite(v.duration)?v.duration:0;
+    const t=Math.max(0, Math.min(sec, Math.max(0, d-1e-3)));
+    if(Math.abs(v.currentTime-t) < 1e-3) return res();
+    const done=()=>{ v.removeEventListener('seeked',done); res(); };
+    v.addEventListener('seeked',done);
+    v.currentTime=t;
+    setTimeout(res, 1200);
+  });
+}
+
+// 撮ったスイングも保存済みのスイングも、同じ形にしてから扱う。
+// そうすれば再生も比較も1つの仕組みで済む。
+//
+//   src.cams[i].offset … その動画の 0秒 が、スイングの何ミリ秒にあたるか
+//   時刻はすべて「インパクトを0とするミリ秒」で持つ
+//
+async function fromCapture(clip){
+  const base = clip.marks.impact ?? clip.t0;
+  const cams = [], dropped = [];
+  for(const c of clip.cams){
+    const url = keepUrl(c.video.blob);
+    // **動画の中の時間と、実時刻は同じ長さになるとは限らない。**
+    // 機械が重いとコマが落ち、10秒録ったつもりが5秒ぶんしか入っていないことがある。
+    // 実測した長さを使い、**終わり**を実時刻に合わせる。
+    // （インパクトとフォローは末尾側にあるので、そこを正確にしたい）
+    const probe = document.createElement('video');
+    probe.muted=true; probe.playsInline=true; probe.preload='auto'; probe.src=url;
+    const dur = await loadedDuration(probe);
+    probe.removeAttribute('src');
+    // 長さが測れない＝中身が壊れている。実時間で代用すると、
+    // 再生も解析もできない真っ黒な枠が1つ増えるだけなので、この台は使わない。
+    if(!isFinite(dur) || dur <= 0 || c.video.blob.size < 2048){
+      dropped.push(c.label); continue;
+    }
+    const durMs = dur*1000;
+    const wall = c.video.end - c.video.start;
+    // 終わりを合わせるのが基本。ただしコマ落ちがひどいと、それでも外すことがある。
+    // **インパクト（0）が動画の中に入っていない対応づけは、必ず間違っている。**
+    // そのときは始まりを合わせ直し、それでも入らなければこの台は使わない。
+    // 黙って外れた映像を出すと「なぜか関係ないところが再生される」になる。
+    const holds = off => off <= 0 && off + durMs >= 0;
+    let offset = (c.video.end - base) - durMs;     // 動画0秒 ＝ この時刻
+    let anchor = 'end';
+    if(!holds(offset)){
+      const alt = c.video.start - base;
+      if(holds(alt)){ offset = alt; anchor = 'start'; }
+      else { dropped.push(c.label); continue; }
+    }
+    cams.push({
+      key:c.key, label:c.label, role:c.role, fps:analysisFps(c.fps),
+      videoUrl:url, blob:c.video.blob, mime:c.video.mime,
+      offset, dur:durMs, anchor,
+      drift: Math.round(wall - durMs),       // 落ちたコマの目安
+      frames: null,                          // 骨格。解析するまで無い
+      live: c.lms.map(x=>({t:x.t-base, lm:x.lm})),
+    });
+  }
+  if(!cams.length) throw new Error('録れた映像にスイングが入っていません');
+  // 動画に無いところは出せないので、実際に見られる範囲まで詰める
+  const lo = Math.max(clip.t0-base, Math.min(...cams.map(c=>c.offset)));
+  const hi = Math.min(clip.t1-base, Math.max(...cams.map(c=>c.offset+c.dur)));
+  return {
+    title:'いま撮ったスイング', name:null, saved:false, approx:!!clip.approx, dropped,
+    marks:{address:(clip.marks.address??base)-base, top:(clip.marks.top??base)-base, impact:0},
+    cams,
+    t0: Math.min(lo, -50), t1: Math.max(hi, 50),
+    raw: clip,
+  };
+}
+
+async function fromSaved(name){
+  const d = await (await fetch(`/api/swing/${encodeURIComponent(name)}/meta`)).json();
+  const m = d.meta||{};
+  const enc = encodeURIComponent(name);
+  const lmAll = (d.landmarks && d.landmarks.cams) || {};
+  const cams = [];
+
+  if(d.videos && Object.keys(d.videos).length){
+    for(const [key, v] of Object.entries(d.videos)){
+      const c = (m.cams||[]).find(x=>x.key===key) || {};
+      cams.push({
+        key, label:c.label||key, role:c.role||key, fps:v.fps||c.fps||30,
+        videoUrl:`/api/swing/${enc}/video/${encodeURIComponent(v.file)}`,
+        offset: +(v.offset ?? c.offset ?? 0),
+        frames: unpackLm(lmAll[key]),
+        live: [],
+      });
+    }
+  }else{
+    // 古い保存（静止画を並べる方式）。読めなくなると困るので残してある。
+    for(const [key,list] of Object.entries(d.cams||{})){
+      const c=(m.cams||[]).find(x=>x.key===key)||{};
+      cams.push({key, label:c.label||key, role:c.role||key, fps:30,
+        videoUrl:null, offset:0, frames:unpackLm(lmAll[key]), live:[],
+        shots:list.map(f=>({t:f.t, url:`/api/swing/${enc}/frame/${f.file}`}))});
+    }
+  }
+  const marks = m.marks || {address:null, top:null, impact:0};
+  const approx = !!m.impact_approx;
+  const span = m.span || {};
+  let t0 = span.t0, t1 = span.t1;
+  if(t0==null || t1==null){
+    const ts = cams.flatMap(c=>(c.shots||[]).map(f=>f.t))
+                   .concat(cams.flatMap(c=>(c.frames||[]).map(f=>f.t)));
+    t0 = Math.min(...ts, marks.address ?? -800, -800);
+    t1 = Math.max(...ts, 900);
+  }
+  return {title:name, name, saved:true, approx, marks, cams, t0, t1};
+}
+
+// 保存する骨格は [x,y,z,可視度] の配列。使うときは名前つきに戻す。
+function unpackLm(list){
+  if(!list || !list.length) return null;
+  return list.map(f=>({t:f.t, lm: f.lm ? f.lm.map(a=>Array.isArray(a)
+      ? {x:a[0], y:a[1], z:a[2], visibility:a[3]} : a) : null}));
+}
+function packLm(frames){
+  return (frames||[]).map(f=>({t:Math.round(f.t), lm: f.lm ? f.lm.map(p=>[
+    +p.x.toFixed(4), +p.y.toFixed(4), +(p.z??0).toFixed(4),
+    +(p.visibility??1).toFixed(2)]) : null}));
+}
+
+// ---------------------------------------------------------------- 画面を組む
+//
+// 枠は1回だけ作り、あとは中身だけ差し替える。
+// 毎コマ組み直すと動画が読み込み直しになって、そのたび止まる。
+function buildStage(el, sources){
+  el._shots = [];
+  const html = sources.flatMap(src=>src.cams.map(cam=>{
+    const tag = sources.length>1 ? `${src.title}／${cam.label}` : cam.label;
+    el._shots.push({src, cam});
+    const body = cam.videoUrl
+      ? `<video muted playsinline preload="auto" src="${esc(cam.videoUrl)}"></video>`
+      : `<img alt="${esc(tag)}">`;
+    return `<div class="shot">${body}<canvas class="ov"></canvas>
+      <div class="tag">${esc(tag)}</div><div class="ts">—</div>
+      <div class="badge" hidden></div></div>`;
+  })).join('');
+  el.innerHTML = html;
+  const boxes=[...el.querySelectorAll('.shot')];
+  el._shots.forEach((sh,i)=>{
+    sh.box   = boxes[i];
+    sh.video = boxes[i].querySelector('video');
+    sh.img   = boxes[i].querySelector('img');
+    sh.ov    = boxes[i].querySelector('canvas.ov');
+    sh.ts    = boxes[i].querySelector('.ts');
+    sh.badge = boxes[i].querySelector('.badge');
+    sh.last  = null;
+    if(sh.video){
+      sh.video.load();
+      ready(sh.video).then(()=>{ sh.dur = sh.video.duration; setTime(PT); });
+    }
+  });
+  return el._shots;
+}
+function stage(){ return CMP ? $('cmpStage') : $('pStage'); }
+function shots(){ return stage()._shots || []; }
+function master(){ return shots().find(s=>s.video) || null; }
+
+// スイング時刻 → その動画の中の秒
+const toVid = (sh, t)=> (t - sh.cam.offset)/1000;
+const toSwing = (sh, sec)=> sec*1000 + sh.cam.offset;
+
+// ---------------------------------------------------------------- 骨格を重ねる
+let PSKEL = true;
+function drawOverlay(sh, t){
+  const c = sh.ov;
+  const w = sh.box.clientWidth, h = sh.box.clientHeight;
+  if(!w || !h) return;
+  if(c.width!==w || c.height!==h){ c.width=w; c.height=h; }
+  const g = c.getContext('2d');
+  g.clearRect(0,0,w,h);
+  if(!PSKEL || !sh.cam.frames) return;
+  const lm = lerpAt(sh.cam.frames, t);
+  if(!lm) return;
+  // 映像は object-fit:contain なので、絵の実際の位置を計算して合わせる
+  const vw = sh.video ? (sh.video.videoWidth||16) : 16;
+  const vh = sh.video ? (sh.video.videoHeight||10) : 10;
+  const sc = Math.min(w/vw, h/vh);
+  const dw = vw*sc, dh = vh*sc, ox=(w-dw)/2, oy=(h-dh)/2;
+  const X = p=>ox+p.x*dw, Y = p=>oy+p.y*dh;
+  g.lineWidth = Math.max(2, w/320);
+  g.strokeStyle = 'rgba(232,135,58,.92)';
+  for(const [a,b] of BONES){
+    const p=lm[a], q=lm[b];
+    if(!p||!q||(p.visibility??1)<0.3||(q.visibility??1)<0.3) continue;
+    g.beginPath(); g.moveTo(X(p),Y(p)); g.lineTo(X(q),Y(q)); g.stroke();
+  }
+  g.fillStyle = '#fff';
+  for(const p of lm){
+    if(!p || (p.visibility??1)<0.3) continue;
+    g.beginPath(); g.arc(X(p),Y(p), Math.max(2.2,w/380), 0, 7); g.fill();
+  }
+}
+
+// ---------------------------------------------------------------- 時刻を動かす
+let PLAYING=false, PSPEED=0.25, PLOOP=true, PT=0, _raf=0, _last=0;
+
+function paint(){
+  for(const sh of shots()){
+    if(sh.img){                                  // 古い静止画方式
+      const list=sh.cam.shots||[];
+      if(list.length){
+        let best=list[0], bd=Math.abs(best.t-PT);
+        for(const f of list){ const d=Math.abs(f.t-PT); if(d<bd){bd=d;best=f;} }
+        if(sh.last!==best){ sh.last=best; sh.img.src=best.url; }
+      }
+    }
+    sh.ts.textContent = fmtRel(PT) + (sh.outside ? '（この時刻は録れていません）' : '');
+    sh.badge.hidden = !!sh.cam.frames;
+    if(!sh.cam.frames) sh.badge.textContent = '骨格はまだ読み込んでいません';
+    drawOverlay(sh, PT);
+  }
+  $('pBar').value = Math.round((PT-PL.t0)/(PL.t1-PL.t0)*1000);
+  $('pTime').innerHTML = `<b style="color:var(--ink);font-size:15px">${fmtRel(PT)}</b>`
+    + `<span style="color:var(--muted)"> ／ インパクトを0とする</span>`;
+}
+
+// 止まっているとき用。全部の動画をその時刻に合わせる。
+function setTime(t){
+  if(!PL) return;
+  PT = Math.max(PL.t0, Math.min(PL.t1, t));
+  for(const sh of shots()){
+    if(!sh.video) continue;
+    const sec = toVid(sh, PT);
+    const d = sh.video.duration;
+    const c = Math.max(0, Math.min(sec, isFinite(d)&&d>0 ? d-1e-3 : sec));
+    if(Math.abs(sh.video.currentTime - c) > 0.008) sh.video.currentTime = c;
+    sh.outside = (sec < -0.05) || (isFinite(d) && d>0 && sec > d+0.05);
+  }
+  paint();
+}
+
+// 再生中。**1台を主にして流し、他は遅れたときだけ合わせ直す。**
+// 毎コマ全部を seek すると、そのたび復号し直しになって逆にカクつく。
+function tickPlay(){
+  if(!PLAYING){ _raf=0; return; }
+  const m = master();
+  if(m){
+    PT = toSwing(m, m.video.currentTime);
+    if(PT >= PL.t1 - 8){
+      if(PLOOP){ setTime(PL.t0); startAll(); }
+      else { setPlaying(false); setTime(PL.t1); return; }
+    }else{
+      for(const sh of shots()){
+        if(!sh.video || sh===m) continue;
+        const want = toVid(sh, PT);
+        if(Math.abs(sh.video.currentTime - want) > 0.06) sh.video.currentTime = Math.max(0,want);
+      }
+      paint();
+    }
+  }else{
+    const now=performance.now(), dt=_last?(now-_last):16; _last=now;
+    let t = PT + dt*PSPEED;
+    if(t > PL.t1){ if(PLOOP) t=PL.t0; else { setPlaying(false); t=PL.t1; } }
+    setTime(t);
+  }
+  _raf = requestAnimationFrame(tickPlay);
+}
+
+function startAll(){
+  for(const sh of shots()){
+    if(!sh.video) continue;
+    sh.video.playbackRate = PSPEED;
+    sh.video.play().catch(()=>{});
+  }
+}
+function pauseAll(){ for(const sh of shots()) if(sh.video) sh.video.pause(); }
+
+function setPlaying(on){
+  PLAYING = on; _last = 0;
+  $('pPlay').textContent = on ? '❚❚' : '▶';
+  $('pPlay').classList.toggle('pri', !on);
+  if(on){
+    if(PT >= PL.t1 - 8) setTime(PL.t0);
+    startAll();
+    if(!_raf) _raf = requestAnimationFrame(tickPlay);
+  }else{
+    pauseAll();
+  }
+}
+function stepFrame(dir){
+  if(!PL) return;
+  setPlaying(false);
+  const fps = PL.cams[0]?.fps || 30;
+  setTime(PT + dir*1000/fps);
+}
+
+function renderTicks(){
+  if(!PL) return;
+  const {t0,t1,marks}=PL, w=t1-t0;
+  const put=(t,label,cls)=> t==null ? '' :
+    `<span class="${cls||''}" style="left:${((t-t0)/w*100).toFixed(2)}%">${label}</span>`;
+  $('pTicks').innerHTML = put(marks.address,'アドレス')+put(marks.top,'トップ')
+    + put(marks.impact,'インパクト','imp');
+}
+
+$('pSpeeds').innerHTML = SPEEDS.map(([v,l])=>
+  `<button class="big ${v===0.25?'on':''}" data-speed="${v}">${l}</button>`).join('');
+$('pSpeeds').onclick = e=>{
+  const b=e.target.closest('[data-speed]'); if(!b) return;
+  PSPEED = +b.dataset.speed;
+  [...$('pSpeeds').children].forEach(x=>x.classList.toggle('on', x===b));
+  if(PLAYING) startAll();
+};
+$('pPlay').onclick = ()=>setPlaying(!PLAYING);
+$('pPrev').onclick = ()=>stepFrame(-1);
+$('pNext').onclick = ()=>stepFrame(1);
+$('pLoop').onclick = ()=>{ PLOOP=!PLOOP; $('pLoop').classList.toggle('on',PLOOP); };
+$('pBar').oninput = ()=>{ setPlaying(false);
+  setTime(PL.t0 + (PL.t1-PL.t0)*(+$('pBar').value/1000)); };
+document.querySelectorAll('[data-jump]').forEach(b=>{
+  b.onclick=()=>{ if(PL && PL.marks[b.dataset.jump]!=null){
+    setPlaying(false); setTime(PL.marks[b.dataset.jump]); } };
+});
+$('pSkel').onclick = ()=>{
+  PSKEL=!PSKEL;
+  $('pSkel').textContent = PSKEL?'骨格を隠す':'骨格を表示';
+  $('pSkel').classList.toggle('on', PSKEL);
+  paint();
+};
+$('pClose').onclick = ()=>{ setPlaying(false); $('player').hidden=true;
+  $('compare').hidden=true; $('pStage').innerHTML=''; $('cmpStage').innerHTML='';
+  $('pStage')._shots=null; $('cmpStage')._shots=null;
+  clearUrls(); PL=null; CMP=null; };
+
+// 撮れたら、そのまま再生まで行く。押させない。
+function openPlayer(src, autoplay){
+  PL = src; CMP = null;
+  $('compare').hidden = true;
+  $('pinfo').innerHTML = describe(src);
+  $('pSave').hidden = !!src.saved;
+  $('player').hidden = false;
+  buildStage($('pStage'), [src]);
+  renderTicks();
+  refreshSkelUI();
+  setTime(src.marks.address ?? src.t0);
+  $('player').scrollIntoView({behavior:'smooth', block:'nearest'});
+  if(autoplay){ PSPEED=0.25;
+    [...$('pSpeeds').children].forEach(x=>x.classList.toggle('on', +x.dataset.speed===0.25));
+    setTimeout(()=>setPlaying(true), 250); }
+}
+function hasLm(src){ return !!src && src.cams.some(c=>c.frames && c.frames.length); }
+function refreshSkelUI(){
+  const done = hasLm(PL) || hasLm(CMP);
+  $('pSkel').hidden = !done;
+  $('pAnalyze').textContent = hasLm(PL) ? '骨格を読み込み直す' : '骨格を読み込む';
+  $('pAnalyze').classList.toggle('pri', !hasLm(PL));
+}
+function describe(src){
+  const m=src.marks;
+  const back = (m.top!=null && m.address!=null) ? ((m.top-m.address)/1000).toFixed(2)+'秒' : '—';
+  const down = (m.top!=null) ? ((0-m.top)/1000).toFixed(3)+'秒' : '—';
+  const n = src.cams.reduce((a,c)=>a+((c.frames||[]).length),0);
+  // 録画が実時間より短いのは、機械が追いつかずコマを落とした印。
+  // 黙って合わせると「なんか映像がずれる」になるので、出しておく。
+  const dr = Math.max(0, ...src.cams.map(c=>c.drift||0));
+  return `テイクバック ${back} ／ ダウンスイング ${down}`
+       + ` ／ ${src.cams.length}台` + (n?` ／ 骨格${n}コマ`:' ／ 骨格なし')
+       // 撮影中にインパクトが取れなかったとき。押せば映像の全コマから取り直せる。
+       + (src.approx && !n
+          ? ' ／ <span class="warn">インパクトは見積りです（「骨格を読み込む」で正確になります）</span>' : '')
+       + (dr > 400 ? ` ／ <span class="warn">録画が${(dr/1000).toFixed(1)}秒ぶん足りません（コマ落ち）</span>` : '');
+}
+
+// ---------------------------------------------------------------- 骨格を読み込む
+//
+// 撮り終わった動画を、頭から1コマずつ送って骨格にする。
+// 実時間の締切がないので、ここでは**重いモデル（full）**を使い、コマも落とさない。
+// これが狙いどおり効けば、高いカメラでなくても骨格は取れることになる。
+let FULL_LM = null;
+async function fullLandmarker(){
+  if(FULL_LM) return FULL_LM;
+  if(!LANDMARKER_READY) await initPose();
+  const opt = d => ({
+    baseOptions:{ modelAssetPath:'/api/model?kind=full', delegate:d },
+    runningMode:'VIDEO', numPoses:1,
+    minPoseDetectionConfidence:0.4, minPosePresenceConfidence:0.4,
+    minTrackingConfidence:0.4,
+  });
+  try{ FULL_LM = await PoseLandmarker.createFromOptions(VISION, opt('GPU')); }
+  catch(e){ FULL_LM = await PoseLandmarker.createFromOptions(VISION, opt('CPU')); }
+  return FULL_LM;
+}
+
+$('pAnalyze').onclick = async()=>{
+  if(!PL) return;
+  const btn=$('pAnalyze'), bar=$('pProg');
+  setPlaying(false);
+  btn.disabled=true; bar.classList.add('on');
+  const setP = f => bar.firstElementChild.style.width = (f*100).toFixed(1)+'%';
+  setP(0);
+  try{
+    btn.textContent='モデルを読み込んでいます…';
+    const lm = await fullLandmarker();
+    const targets = shots().filter(s=>s.video && s.src===PL);
+    if(!targets.length) throw new Error('解析できる映像がありません');
+    let done=0; const failed=[];
+    for(const sh of targets){
+      try{
+      btn.textContent=`${sh.cam.label} を解析しています…`;
+      await ready(sh.video);
+      // 表示中の要素をそのまま送ると絵が飛ぶので、同じ映像の別要素で回す
+      const off=document.createElement('video');
+      off.muted=true; off.playsInline=true; off.preload='auto';
+      off.src=sh.cam.videoUrl; off.load();
+      let dur = await ready(off);
+      // 同じ映像でも、読み直すと長さが取れないことがある。
+      // 撮ったときに測った値が残っているので、それを使う。
+      if(!isFinite(dur) || dur <= 0) dur = (sh.cam.dur||0)/1000;
+      if(!(dur > 0)) throw new Error('動画の長さが取れません');
+      await new Promise(r=>{ off.onseeked=r; off.currentTime=0; setTimeout(r,1500); });
+      // スイングの前後だけを見る（区間は10秒あるが、要るのは1〜2秒）
+      const pad = 0.15;
+      const from = Math.max(0, (PL.t0 - sh.cam.offset)/1000 - pad);
+      const to   = Math.min(dur, (PL.t1 - sh.cam.offset)/1000 + pad);
+      if(to - from < 0.1){ done++; continue; }     // この台には写っていない
+      const frames = await analyzeVideo(off, lm, {
+        fps: sh.cam.fps || 30, duration: dur, from, to,
+        onProgress:(n,total)=>setP((done + n/Math.max(1,total))/targets.length),
+      });
+      const fixed = fixJumps(frames);
+      // 動画の中の時刻 → スイングの時刻（インパクトを0とする）に直す
+      sh.cam.frames = frames.map(f=>({t:f.t + sh.cam.offset, lm:f.lm}));
+      sh.cam.fixed = fixed;
+      done++; setP(done/targets.length);
+      off.src='';
+      }catch(e){
+        // 1台こけても残りは読む。3台のうち1台だけ映像が壊れることはある。
+        failed.push(`${sh.cam.label}（${e.message}）`);
+        done++; setP(done/targets.length);
+      }
+    }
+    if(failed.length === targets.length) throw new Error(failed.join('／'));
+    // 局面を取り直す。全体が見えているので、撮影中の判定より確かになる。
+    const trig = PL.cams.find(c=>c.key===TRIGGER_KEY && c.frames) 
+              || PL.cams.find(c=>c.frames);
+    if(trig){
+      const ph = findPhases(trig.frames);
+      if(ph){
+        // インパクトが0になるよう、全部の時刻をずらし直す
+        const sh = ph.impact;
+        if(Math.abs(sh) > 1){
+          for(const c of PL.cams){
+            c.offset -= sh;
+            if(c.frames) c.frames = c.frames.map(f=>({t:f.t-sh, lm:f.lm}));
+            if(c.shots)  c.shots  = c.shots.map(f=>({...f, t:f.t-sh}));
+          }
+          PL.marks = {address:ph.address-sh, top:ph.top-sh, impact:0};
+          PL.t0 -= sh; PL.t1 -= sh;
+        }else{
+          PL.marks = {address:ph.address, top:ph.top, impact:0};
+        }
+        PL.phases = ph;
+        PL.approx = false;      // 映像の全コマから取り直したので、もう見積りではない
+      }
+    }
+    $('pinfo').innerHTML = describe(PL);
+    renderTicks();
+    refreshSkelUI();
+    setTime(PL.marks.address ?? PL.t0);
+    const nfix = PL.cams.reduce((a,c)=>a+(c.fixed||0),0);
+    $('msg').innerHTML = `骨格を読み込みました（飛びを${nfix}か所直しました）`
+      + (failed.length ? ` <span class="warn">／ 読めなかった台: ${esc(failed.join('、'))}</span>` : '');
+  }catch(e){
+    $('msg').innerHTML='<span class="ng">'+esc(e.message)+'</span>';
+  }
+  btn.disabled=false; bar.classList.remove('on');
+  refreshSkelUI();
+};
+
+// ------------------------------------------------------------ 保存
+//
+// 残すのは3つ。
+//   ・映像（webm）… 見るためのもの。重い
+//   ・骨格（landmarks.json）… 計算に使うもの。映像よりずっと軽い
+//   ・meta.json … 局面と、動画の0秒がスイングの何ミリ秒かの対応
+//
+// 将来コーチAIに渡すのは骨格のほうで、映像は人が見るために置いておく。
+// 容量が苦しくなったら、映像だけ消して骨格を残せる形にしてある。
+$('pSave').onclick = async()=>{
+  if(!PL || PL.saved) return;
+  const btn=$('pSave');
+  btn.disabled=true; btn.textContent='保存しています…';
+  try{
+    const fd = new FormData();
+    const lms = {};
+    const cams = [];
+    // 保存するのは**スイングのところだけ**。区間は10秒あるが、要るのは1〜2秒。
+    // そのまま置くと1本で数十MBになり、すぐ埋まる。
+    for(const c of PL.cams){
+      if(!c.blob) continue;
+      btn.textContent=`${c.label} を切り出しています…`;
+      const ext = (c.mime||'').includes('mp4') ? 'mp4' : 'webm';
+      const file = `${c.key}.${ext}`;
+      let blob = c.blob, offset = c.offset;
+      const a = (PL.t0 - c.offset)/1000, b = (PL.t1 - c.offset)/1000;
+      const cut = await trimClip(c.videoUrl, a, b, {bitsPerSecond:REC.saveBps});
+      if(cut && cut.size > 1024){ blob = cut; offset = PL.t0; }
+      fd.append('files', blob, file);
+      cams.push({key:c.key, label:c.label, role:c.role, file,
+                 offset:Math.round(offset), fps:c.fps,
+                 trimmed:blob!==c.blob, bytes:blob.size});
+      // 解析済みならそれを、まだなら撮影中に取れたぶんを入れておく
+      lms[c.key] = c.frames ? packLm(c.frames)
+                            : (c.live||[]).map(x=>({t:Math.round(x.t), lm:x.lm}));
+    }
+    btn.textContent='保存しています…';
+    if(!cams.length) throw new Error('保存できる映像がありません');
+    const m = PL.marks;
+    fd.append('meta', JSON.stringify({
+      at:new Date().toISOString(),
+      site:$('site').textContent.trim(),
+      marks:m,
+      span:{t0:Math.round(PL.t0), t1:Math.round(PL.t1)},
+      takeaway_sec:(m.top!=null&&m.address!=null)?(m.top-m.address)/1000:null,
+      downswing_sec:(m.top!=null)?(0-m.top)/1000:null,
+      cams,
+      record:{kind:'video', mime:PL.cams[0]?.mime||'', segment_ms:REC.segmentMs},
+      analyzed: hasLm(PL), impact_approx: !!PL.approx,
+      landmarks:{
+        format:'BlazePose33 [x,y,z,visibility] 画面比',
+        source: hasLm(PL) ? 'full/撮影後の全コマ解析' : 'lite/撮影中',
+        cams:lms,
+      },
+    }));
+    const r=await fetch('/api/swing/save',{method:'POST', body:fd});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.detail||'保存できません');
+    btn.textContent=`保存しました（${j.files}本）`;
+    $('msg').textContent=`${j.name} に保存しました`;
+    PL.name=j.name; PL.saved=true;
+    loadSaved();
+  }catch(e){
+    btn.textContent='保存に失敗';
+    $('msg').innerHTML='<span class="ng">'+esc(e.message)+'</span>';
+  }
+  setTimeout(()=>{ btn.disabled=false;
+    if(!PL?.saved) btn.textContent='このスイングを保存'; else btn.hidden=true; }, 2600);
+};
+
+// ------------------------------------------------------------ 比べる
+let SAVED=[];
+async function loadSaved(){
+  try{
+    const d=await (await fetch('/api/swing/list')).json();
+    SAVED=d.swings||[];
+    $('cmpPick').innerHTML = '<option value="">（選んでください）</option>'
+      + SAVED.map(s=>{
+          const m=s.meta||{};
+          const when = m.at ? new Date(m.at).toLocaleString('ja-JP',
+            {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : s.name;
+          const dn = m.downswing_sec ? ` ダウン${(+m.downswing_sec).toFixed(2)}秒` : '';
+          const kind = s.videos ? `${s.videos}台` : `${s.frames}コマ`;
+          return `<option value="${esc(s.name)}">${esc(when)}${dn}（${kind}）</option>`;
+        }).join('');
+    const st=await (await fetch('/api/storage')).json();
+    const mb=x=>(x/1048576).toFixed(0);
+    $('storage').textContent = st.swings
+      ? `保存済み ${st.swings}本 ／ 合計 ${mb(st.bytes)}MB ／ 1本あたり ${mb(st.avg_bytes)}MB`
+        + (st.free_bytes ? ` ／ 空き ${(st.free_bytes/1073741824).toFixed(1)}GB` : '')
+      : '保存済みのスイングはありません（このパソコンの recordings フォルダーに残ります）';
+    renderSavedList(st);
+  }catch(e){}
+}
+$('pCompare').onclick = async()=>{
+  $('compare').hidden=false;
+  $('cmpInfo').textContent='一覧を読み込んでいます…';
+  await loadSaved();
+  $('cmpInfo').textContent='';
+  if(!SAVED.length){
+    $('cmpInfo').textContent='比べる相手がまだありません。まず「このスイングを保存」を押してください';
+    return; }
+  $('compare').scrollIntoView({behavior:'smooth', block:'nearest'});
+};
+$('cmpPick').onchange = async()=>{
+  const name=$('cmpPick').value;
+  if(!name){ CMP=null; setTime(PT); return; }
+  $('cmpInfo').textContent='読み込んでいます…';
+  try{
+    setPlaying(false);
+    CMP = await fromSaved(name);
+    $('cmpInfo').innerHTML = describe(CMP);
+    $('pStage').innerHTML=''; $('pStage')._shots=null;
+    buildStage($('cmpStage'), [PL, CMP]);
+    refreshSkelUI();
+    setTime(PT);
+  }catch(e){ $('cmpInfo').innerHTML='<span class="ng">'+esc(e.message)+'</span>'; }
+};
+$('cmpClose').onclick = ()=>{ setPlaying(false);
+  $('compare').hidden=true; CMP=null; $('cmpStage').innerHTML='';
+  $('cmpStage')._shots=null;
+  $('cmpPick').value=''; buildStage($('pStage'), [PL]);
+  refreshSkelUI(); setTime(PT); };
+
+// ------------------------------------------------------------ 保存済みの管理
+function renderSavedList(st){
+  const mb=x=>(x/1048576).toFixed(1);
+  const byName = Object.fromEntries((st.per||[]).map(p=>[p.name,p.bytes]));
+  $('svList').innerHTML = SAVED.length ? SAVED.map(s=>{
+    const m=s.meta||{};
+    const when = m.at ? new Date(m.at).toLocaleString('ja-JP') : s.name;
+    const dn = m.downswing_sec!=null ? `ダウン ${(+m.downswing_sec).toFixed(3)}秒` : '';
+    return `<tr>
+      <td style="width:auto;color:var(--ink)">${esc(when)}
+        <span class="sub" style="color:var(--muted)"> ${esc(dn)}</span></td>
+      <td style="width:110px">${s.videos?`映像 ${s.videos}台`:`${s.frames}コマ`}${m.analyzed?' <span class="ok">骨格あり</span>':''}</td>
+      <td style="width:90px">${byName[s.name]!=null?mb(byName[s.name])+'MB':'—'}</td>
+      <td style="width:200px;text-align:right">
+        <button class="big" data-open="${esc(s.name)}">開く</button>
+        <button class="big" data-del="${esc(s.name)}">消す</button></td>
+    </tr>`;
+  }).join('') : '<tr><td>まだありません</td></tr>';
+}
+$('svList').onclick = async e=>{
+  const o=e.target.closest('[data-open]'), d=e.target.closest('[data-del]');
+  if(o){
+    try{ openPlayer(await fromSaved(o.dataset.open), false); }
+    catch(err){ $('msg').innerHTML='<span class="ng">'+esc(err.message)+'</span>'; }
+  }
+  if(d){
+    const name=d.dataset.del;
+    if(!confirm(`${name} を消します。戻せません。`)) return;
+    try{
+      const r=await fetch(`/api/swing/${encodeURIComponent(name)}`,{method:'DELETE'});
+      if(!r.ok) throw new Error('消せません');
+      $('msg').textContent=`${name} を消しました`;
+      if(PL && PL.name===name){ $('player').hidden=true; PL=null; }
+      if(CMP && CMP.name===name){ CMP=null; }
+      loadSaved();
+    }catch(err){ $('msg').innerHTML='<span class="ng">'+esc(err.message)+'</span>'; }
+  }
+};
+$('svReload').onclick = ()=>loadSaved();
+$('svOpenFolder').onclick = async()=>{
+  const st=await (await fetch('/api/storage')).json();
+  $('svPath').textContent = st.path ? `保存先: ${st.path}` : '保存先: recordings フォルダー';
+};
+
+window.addEventListener('pagehide',()=>{
+  CAMS.forEach(c=>c.close());
+  navigator.sendBeacon && navigator.sendBeacon('/api/cameras/resume');
+});
+
+// 開発用。動きを外から確かめられるようにしておく
+window.__bench = {
+  get cams(){ return CAMS; },
+  get pl(){ return PL; },
+  get clip(){ return CLIP; },
+  get armed(){ return ARMED; },
+  onSwingComplete,
+};
+window.__openPlayer = openPlayer;   // 動きを外から確かめるため
+window.__fromCapture = fromCapture;
+window.__setTime = setTime;
+
+loadSaved();
+
+fetch('/api/status').then(r=>r.json()).then(d=>{
+  $('site').textContent=`${d.site?.name||''} ／ BAY ${d.site?.bay||''}`;
+}).catch(()=>{});
+</script>

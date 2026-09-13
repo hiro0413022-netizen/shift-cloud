@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>プロゴルファー公式サイトのご案内（ビジュアル版）</title>
+<style>
+  @page { size:A4; margin:0; }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  :root{
+    --ink:#14452F; --ink2:#0E3221; --gold:#B08D3F; --gold-l:#E3D3A8;
+    --dim:#5B6660; --line:#E1E5E2; --panel:#F6F5F1; --cream:#FBFAF6;
+  }
+  body{ font-family:"Noto Sans CJK JP","Noto Sans JP",sans-serif; color:#1C2320; -webkit-font-smoothing:antialiased; }
+  .page{ width:210mm; height:297mm; padding:9mm 11mm 7mm; display:flex; flex-direction:column; background:#fff; }
+  .page > *{ flex:none; }
+
+  .brand{ display:flex; align-items:center; justify-content:space-between; border-bottom:1.4px solid var(--ink); padding-bottom:2mm; }
+  .brand .l{ font-size:8pt; letter-spacing:.14em; color:var(--ink); font-weight:700; }
+  .brand .r{ font-size:7.2pt; color:var(--dim); letter-spacing:.06em; }
+
+  /* ---------- HERO ---------- */
+  .hero{ margin-top:4mm; display:flex; gap:7mm; align-items:flex-start; }
+  .hero .txt{ flex:1; padding-top:1mm; }
+  .eyebrow{ font-size:7.2pt; letter-spacing:.22em; color:var(--gold); font-weight:700; }
+  h1{ font-size:17.5pt; line-height:1.42; margin-top:2mm; color:var(--ink); font-weight:900; letter-spacing:.005em; }
+  h1 .u{ background:linear-gradient(transparent 66%, var(--gold-l) 66%); }
+  .lead{ margin-top:3mm; font-size:8.5pt; line-height:1.72; color:#2C3430; }
+  .lead b{ color:var(--ink); }
+  ul.pt{ list-style:none; margin-top:3.4mm; }
+  ul.pt li{ font-size:7.6pt; line-height:1.55; padding-left:4mm; position:relative; margin-top:1.6mm; color:#2C3430; }
+  ul.pt li::before{ content:""; position:absolute; left:0; top:1.35mm; width:1.5mm; height:1.5mm; border-radius:50%; background:var(--gold); }
+  ul.pt li b{ color:var(--ink); }
+
+  .pricebar{ margin-top:4mm; display:flex; border:1.2px solid var(--ink); border-radius:2mm; overflow:hidden; }
+  .pricebar .cell{ flex:1; padding:2.6mm 3.4mm; }
+  .pricebar .cell+.cell{ border-left:1px solid rgba(255,255,255,.22); }
+  .pricebar .cell.dark{ background:var(--ink); color:#fff; }
+  .pricebar .cell.lite{ background:var(--cream); border-left:1px solid var(--line); }
+  .pb-k{ font-size:7pt; letter-spacing:.12em; font-weight:700; color:var(--gold-l); }
+  .lite .pb-k{ color:var(--dim); }
+  .pb-v{ font-size:13.5pt; font-weight:900; line-height:1.15; margin-top:.8mm; }
+  .pb-v small{ font-size:7.6pt; font-weight:700; }
+  .pb-n{ font-size:6.9pt; line-height:1.45; margin-top:.8mm; color:#B9C6BE; }
+  .lite .pb-n{ color:var(--dim); }
+
+  /* ---------- phone mockups ---------- */
+  .phone{ background:#121714; border-radius:5mm; padding:1.5mm; box-shadow:0 1.2mm 3mm rgba(20,69,47,.18); }
+  .screen{ background:#fff; border-radius:3.6mm; overflow:hidden; }
+  .ph-main{ width:57mm; flex:none; }
+  .ph-mini{ width:100%; }
+
+  .shot-hero{ position:relative; height:31mm; background:
+      radial-gradient(70% 60% at 72% 26%, rgba(176,141,63,.55), transparent 68%),
+      linear-gradient(150deg,#1E4636 0%, #0C2419 100%); color:#fff; }
+  .shot-hero .ph{ position:absolute; right:2mm; bottom:2mm; font-size:5.2pt; letter-spacing:.16em; color:rgba(255,255,255,.5); }
+  .shot-hero .cap{ position:absolute; left:3mm; bottom:3mm; }
+  .shot-hero .cap .e{ font-size:5pt; letter-spacing:.2em; color:var(--gold-l); font-weight:700; }
+  .shot-hero .cap .n{ font-size:11pt; font-weight:900; letter-spacing:.04em; margin-top:.6mm; }
+  .shot-hero .cap .n2{ font-size:5pt; letter-spacing:.18em; color:#CBD6CF; margin-top:.4mm; }
+  .shot-nav{ display:flex; gap:2.2mm; padding:1.6mm 3mm; border-bottom:1px solid var(--line); font-size:5pt; letter-spacing:.1em; color:var(--dim); }
+  .shot-nav b{ color:var(--ink); }
+  .shot-body{ padding:2.4mm 3mm 3mm; }
+  .st{ display:flex; align-items:center; gap:1.6mm; margin-bottom:1.4mm; }
+  .st b{ font-size:5.6pt; letter-spacing:.16em; color:var(--ink); }
+  .st span{ font-size:4.6pt; color:var(--gold); letter-spacing:.1em; }
+  .st i{ flex:1; height:1px; background:var(--line); }
+  .row{ display:flex; justify-content:space-between; align-items:baseline; padding:1.1mm 0; border-bottom:1px dotted var(--line); }
+  .row .d{ font-size:4.8pt; color:#98A29C; }
+  .row .t{ font-size:5.4pt; font-weight:700; color:#22302A; }
+  .row .r{ font-size:5.4pt; font-weight:900; color:#fff; background:var(--gold); border-radius:.8mm; padding:.3mm 1.2mm; }
+  .logos{ display:flex; gap:1.2mm; margin-top:1.6mm; }
+  .logos div{ flex:1; height:5mm; border:1px solid var(--line); border-radius:.8mm; background:var(--panel); display:flex; align-items:center; justify-content:center; font-size:4.2pt; color:#A8B1AB; letter-spacing:.08em; }
+  .igrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1.1mm; margin-top:1.4mm; }
+  .igrid div{ padding-top:100%; border-radius:.8mm; background:linear-gradient(140deg,#DDE5E0,#F1F3F0); }
+
+  /* ---------- section ---------- */
+  h2{ font-size:9.2pt; color:var(--ink); font-weight:900; display:flex; align-items:center; gap:2.4mm; }
+  h2::before{ content:""; width:2.4mm; height:2.4mm; background:var(--gold); transform:rotate(45deg); flex:none; }
+  h2 .en{ font-size:6.4pt; letter-spacing:.18em; color:var(--gold); font-weight:700; }
+
+  .body{ margin-top:4mm; flex:1 1 auto; display:flex; flex-direction:column; justify-content:space-between; gap:3.2mm; }
+
+  .shots{ display:flex; gap:3.2mm; margin-top:2.2mm; }
+  .shotcol{ flex:1; }
+  .shotcol .cap2{ font-size:7.4pt; font-weight:900; color:var(--ink); margin-top:1.8mm; line-height:1.4; }
+  .shotcol .cap3{ font-size:6.8pt; line-height:1.48; color:#4A534E; margin-top:.8mm; }
+
+  .mini{ height:31.5mm; overflow:hidden; }
+  .mini .shot-body{ padding:2mm 2.4mm; }
+  .mini-head{ background:var(--ink); color:#fff; padding:1.5mm 2.4mm; font-size:5.2pt; letter-spacing:.14em; }
+  .mini-head .s{ font-size:4.4pt; color:var(--gold-l); letter-spacing:.14em; }
+  .fld{ border:1px solid var(--line); border-radius:.8mm; padding:.9mm 1.4mm; margin-top:1.2mm; }
+  .fld .k{ font-size:4.4pt; color:#98A29C; letter-spacing:.08em; }
+  .fld .v{ font-size:5.2pt; color:#22302A; margin-top:.4mm; }
+  .btn{ margin-top:1.6mm; background:var(--gold); color:#fff; text-align:center; font-size:5.2pt; font-weight:900; border-radius:.9mm; padding:1.3mm; }
+
+  .effect{ display:flex; gap:3mm; }
+  .ecard{ flex:1; border:1px solid var(--line); border-top:2.2px solid var(--ink); border-radius:1.4mm; padding:2.6mm 3mm; background:var(--cream); }
+  .ecard h3{ font-size:8.2pt; color:var(--ink); font-weight:900; line-height:1.4; }
+  .ecard p{ font-size:7.2pt; line-height:1.54; color:#3A423E; margin-top:1.4mm; }
+
+  .steps{ display:flex; gap:2.6mm; align-items:stretch; }
+  .step{ flex:1; display:flex; gap:2mm; background:var(--panel); border-radius:1.4mm; padding:2.2mm 2.6mm; }
+  .step .n{ flex:none; font-size:6.4pt; font-weight:900; color:#fff; background:var(--ink); width:4.2mm; height:4.2mm; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .step h3{ font-size:7.6pt; font-weight:900; color:var(--ink); line-height:1.35; }
+  .step p{ font-size:6.9pt; line-height:1.5; color:#3A423E; margin-top:.7mm; }
+
+  .note{ font-size:6.8pt; line-height:1.5; color:var(--dim); }
+
+  footer{ margin-top:3mm; border-top:1px solid var(--line); padding-top:2.6mm; display:flex; justify-content:space-between; align-items:flex-end; gap:5mm; }
+  footer .co{ font-size:7.1pt; line-height:1.55; color:var(--dim); }
+  footer .co b{ color:var(--ink); font-size:8pt; }
+  footer .box{ flex:none; border:1.2px solid var(--ink); border-radius:1.4mm; padding:2.4mm 3.6mm; text-align:right; font-size:7.8pt; font-weight:900; color:var(--ink); line-height:1.45; }
+  footer .box small{ display:block; font-size:6.6pt; font-weight:400; color:var(--dim); margin-top:.7mm; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="brand">
+    <div class="l">株式会社YOZAN ｜ プロゴルファー公式サイト</div>
+    <div class="r">女子プロゴルファーの皆さまへ</div>
+  </div>
+
+  <!-- ============ HERO ============ -->
+  <div class="hero">
+    <div class="txt">
+      <div class="eyebrow">YOUR OFFICIAL SITE</div>
+      <h1>SNSは、切り取られて広がる。<br><span class="u">公式サイトは、自分で決められる。</span></h1>
+      <p class="lead">
+        あなたの名前を検索した人が最初に見る場所を、あなたが編集できる形にしませんか。<br>
+        載せたい写真を、載せたい順番で。試合も、成績も、メディア出演も、入力するたびに積み上がっていきます。企業があなたを検討するとき、<b>社内で回せる資料</b>になるのはSNSではなく、この1ページです。
+      </p>
+
+      <div class="pricebar">
+        <div class="cell dark">
+          <div class="pb-k">初期費用</div>
+          <div class="pb-v">無料</div>
+          <div class="pb-n">写真と経歴をいただければ、制作はこちらで</div>
+        </div>
+        <div class="cell dark">
+          <div class="pb-k">月額</div>
+          <div class="pb-v">5,000<small>円（税別）</small></div>
+          <div class="pb-n">サーバー・管理画面・更新サポート込み</div>
+        </div>
+        <div class="cell lite">
+          <div class="pb-k">契約の縛り</div>
+          <div class="pb-v" style="font-size:11.5pt;">なし</div>
+          <div class="pb-n">やめたいときは月末までに一言だけ</div>
+        </div>
+      </div>
+      <ul class="pt">
+        <li><b>更新は、あなたのスマホから。</b>お知らせ・試合予定・成績・写真の追加は数タップ。そのたびの追加費用はありません。</li>
+        <li><b>写真の見え方を、いちばん大事に作ります。</b>企業の担当者もファンも、ほとんどがスマホで見ています。</li>
+        <li><b>色と雰囲気は選べます。</b>白基調で上品に／ナチュラル／ダークで凛と。あなたの世界観に合わせます。</li>
+      </ul>
+    </div>
+
+    <!-- main phone -->
+    <div class="phone ph-main">
+      <div class="screen">
+        <div class="shot-hero">
+          <div class="ph">YOUR PHOTO</div>
+          <div class="cap">
+            <div class="e">PROFESSIONAL GOLFER</div>
+            <div class="n">山田 みずき</div>
+            <div class="n2">MIZUKI YAMADA</div>
+          </div>
+        </div>
+        <div class="shot-nav"><b>TOP</b><span>NEWS</span><span>SCHEDULE</span><span>PROFILE</span><span>CONTACT</span></div>
+        <div class="shot-body">
+          <div class="st"><b>NEWS</b><span>お知らせ</span><i></i></div>
+          <div class="row"><div><div class="d">2026.09.05</div><div class="t">◯◯レディース 予選通過のご報告</div></div></div>
+          <div class="row"><div><div class="d">2026.08.28</div><div class="t">ゴルフ雑誌◯◯に掲載されました</div></div></div>
+
+          <div class="st" style="margin-top:2.4mm;"><b>RESULT</b><span>成績</span><i></i></div>
+          <div class="row"><div><div class="d">2026.08.10-13</div><div class="t">◯◯オープン</div></div><div class="r">4位</div></div>
+          <div class="row"><div><div class="d">2026.07.20-23</div><div class="t">◯◯レディースカップ</div></div><div class="r">11位</div></div>
+
+          <div class="st" style="margin-top:2.4mm;"><b>SPONSOR</b><span>スポンサー</span><i></i></div>
+          <div class="logos"><div>LOGO</div><div>LOGO</div><div>LOGO</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ BODY ============ -->
+  <div class="body">
+
+    <div class="sec">
+      <h2>こんなページが、あなたの名前で公開されます <span class="en">SAMPLE</span></h2>
+      <div class="shots">
+        <div class="shotcol">
+          <div class="phone"><div class="screen mini">
+            <div class="mini-head">PROFILE<div class="s">プロフィール・使用クラブ</div></div>
+            <div class="shot-body">
+              <div class="row"><div class="t">出身</div><div class="d">兵庫県</div></div>
+              <div class="row"><div class="t">ゴルフ歴</div><div class="d">◯年</div></div>
+              <div class="row"><div class="t">ドライバー</div><div class="d">◯◯◯</div></div>
+              <div class="row"><div class="t">ボール</div><div class="d">◯◯◯</div></div>
+            </div>
+          </div></div>
+          <div class="cap2">経歴も、使用クラブも、<br>あなたの言葉で</div>
+          <div class="cap3">用具契約の相談で必ず聞かれるところ。ここが整っていると話が早く進みます。</div>
+        </div>
+
+        <div class="shotcol">
+          <div class="phone"><div class="screen mini">
+            <div class="mini-head">SPONSOR<div class="s">スポンサー紹介</div></div>
+            <div class="shot-body">
+              <div class="logos"><div>LOGO</div><div>LOGO</div></div>
+              <div class="logos" style="margin-top:1.2mm;"><div>LOGO</div><div>LOGO</div></div>
+              <div style="font-size:5pt; color:#4A534E; line-height:1.45; margin-top:1.4mm;">株式会社◯◯◯◯<br><span style="color:#98A29C;">2026年よりご支援</span></div>
+            </div>
+          </div></div>
+          <div class="cap2">ロゴが載る場所が、<br>ちゃんとある</div>
+          <div class="cap3">企業名リンクと紹介文つき。「支援」ではなく「広告」として社内で通しやすくなります。</div>
+        </div>
+
+        <div class="shotcol">
+          <div class="phone"><div class="screen mini">
+            <div class="mini-head">管理画面<div class="s">スマホから、ご自身で</div></div>
+            <div class="shot-body">
+              <div class="fld" style="margin-top:.4mm;"><div class="k">お知らせのタイトル</div><div class="v">予選通過のご報告</div></div>
+              <div class="fld" style="margin-top:1mm;"><div class="k">写真</div><div class="v">＋ カメラロール</div></div>
+              <div class="btn" style="margin-top:1mm;">公開する</div>
+            </div>
+          </div></div>
+          <div class="cap2">更新は、<br>スマホで数タップ</div>
+          <div class="cap3">試合の合間でも更新できます。そのたびに制作会社へ連絡も、追加費用も要りません。</div>
+        </div>
+
+        <div class="shotcol">
+          <div class="phone"><div class="screen mini">
+            <div class="mini-head">EVENT<div class="s">レッスン会・申込フォーム</div></div>
+            <div class="shot-body">
+              <div style="font-size:5.4pt; font-weight:900; color:#22302A;">秋のラウンドレッスン</div>
+              <div class="d" style="font-size:4.8pt; color:#98A29C; margin-top:.5mm;">10/12（土）10:00 ／ 定員8名</div>
+              <div class="fld" style="margin-top:1.4mm;"><div class="k">お名前</div><div class="v">&nbsp;</div></div>
+              <div class="btn">申し込む</div>
+            </div>
+          </div></div>
+          <div class="cap2">自分の名前で、<br>イベントを開ける</div>
+          <div class="cap3">申込はフォームに集まります。DMを一件ずつ返さなくてよくなります。</div>
+        </div>
+      </div>
+      <p class="note" style="margin-top:2mm;">※ 画面はすべてサンプルです。選手名・大会名・企業名は架空のものです。色や雰囲気は「白基調で上品に」「ナチュラル」「ダークで凛と」など、あなたの世界観に合わせてお作りします。</p>
+    </div>
+
+    <div class="sec">
+      <h2>持っていると、こう変わります <span class="en">WHAT CHANGES</span></h2>
+      <div class="effect" style="margin-top:2.4mm;">
+        <div class="ecard">
+          <h3>見られ方を、自分で決められる</h3>
+          <p>SNSは切り取られて広がりますが、公式は違います。どの写真を、どの言葉で、どの順番で見せるか。その積み重ねがそのまま「あなたらしさ」として企業にも伝わります。</p>
+        </div>
+        <div class="ecard">
+          <h3>応援したい人が、迷わない</h3>
+          <p>スポンサー・取材・レッスンの相談窓口が1か所にまとまります。連絡はフォームで受けられるので、個人のDMを開けっぱなしにしなくて済みます。</p>
+        </div>
+        <div class="ecard">
+          <h3>積み上がって、将来につながる</h3>
+          <p>試合も、メディア出演も、レッスンの実績も、入力するたびに残ります。ツアーの先にレッスンやイベント、ご自身のブランドを考えるとき、そのまま名刺になります。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>始め方は3ステップ <span class="en">HOW TO START</span></h2>
+      <div class="steps" style="margin-top:2.4mm;">
+        <div class="step"><div class="n">1</div><div><h3>写真と経歴を送る</h3><p>写真5〜10枚、経歴、使用クラブ、スポンサー、Instagram。箇条書きで結構です。</p></div></div>
+        <div class="step"><div class="n">2</div><div><h3>下書きを見て、直す</h3><p>5営業日ほどで下書きのURLをお送りします。実際の画面を見てから決められます。</p></div></div>
+        <div class="step"><div class="n">3</div><div><h3>公開して、自分で育てる</h3><p>管理画面のIDをお渡しします。あとはスマホから、あなたのペースで。</p></div></div>
+      </div>
+      <p class="note" style="margin-top:1.8mm;">※ 独自ドメイン（例：mizuki-golf.com）をご希望の場合のみ、実費が別途かかります（年1,500円程度〜）。※ 写真・ロゴは権利をお持ちのもの、または掲載許可を得たものをお送りください。所属先・マネジメント会社がある場合は事前にご確認をお願いします。</p>
+    </div>
+
+  </div>
+
+  <footer>
+    <div class="co">
+      <b>株式会社YOZAN</b>　ゴルフスクール「GOLF WING」／インドアゴルフ「FRANK GOLF」運営<br>
+      自社でスクール・ゴルフ施設を運営し、予約・会員管理・決済・レッスン記録のシステムを社内で開発・運用。<br>
+      プロゴルファーの公式サイトも制作・運用中です。ゴルフを知らない制作会社に一から説明する手間はありません。
+    </div>
+    <div class="box">
+      まずは、写真を送るところから。
+      <small>ご質問・お申し込みは、この資料をお送りした<br>担当者にそのままご返信ください。</small>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

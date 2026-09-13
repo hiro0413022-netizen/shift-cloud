@@ -1,0 +1,117 @@
+﻿=== ZWO driver install / 2026-09-06 18:06:39 ===
+Administrator: True
+
+--- local inf ---
+
+
+FullName      : C:\Program Files (x86)\ZWO Design\ZWO_USB_Cameras_driver\driver\x64\ASICAMUSB3.inf
+Length        : 47158
+LastWriteTime : 2026/05/21 5:54:56
+
+
+
+
+--- inf Version section ---
+[Version]
+Signature="$WINDOWS NT$"
+Class=Image
+ClassGuid = {6bdd1fc6-810f-11d0-bec7-08002be2092f} 
+provider=%ASICAMUSB3_Provider%
+CatalogFile=ASICAMUSB3.cat
+DriverVer=05/20/2026,3.28.0.0
+;Month/Day/Year,must be MM/DD/YY
+DriverPackageType = PlugAndPlay
+
+
+[SourceDisksNames]
+1=%ASICAMUSB3_Install%,,,
+
+;[SourceDisksFiles]
+;ASICAMUSB3.sys = 1
+
+
+;[DestinationDirs]
+;ASICAMUSB3.Files.Ext = 10,System32\Drivers
+
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[Manufacturer]
+%ASICAMUSB3_Provider%=Device,NT,NTx86,NTamd64,NTarm64
+
+;for all platforms
+[Device]
+%VID_03c3&PID_030A.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_030A
+%VID_03c3&PID_031A.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_031A
+%VID_03c3&PID_031B.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_031B
+%VID_03c3&PID_034B.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_034B
+%VID_03c3&PID_035A.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_035A
+%VID_03c3&PID_035B.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_035B
+%VID_03c3&PID_071A.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_071A
+%VID_03c3&PID_071B.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_071B
+%VID_03c3&PID_094A.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_094A
+%VID_03c3&PID_094B.DeviceDesc%=ASICAMUSB3, USB\VID_03C3&PID_094B
+
+--- before: device state ---
+
+
+Status       : Error
+Problem      : CM_PROB_FAILED_INSTALL
+Class        : 
+FriendlyName : 
+InstanceId   : USB\VID_03C3&PID_034A\00000
+
+Status       : Error
+Problem      : CM_PROB_FAILED_INSTALL
+Class        : 
+FriendlyName : 
+InstanceId   : USB\VID_03C3&PID_034C\00000
+
+
+
+
+--- pnputil /add-driver /install ---
+Microsoft PnP Utility
+
+Adding driver package:  ASICAMUSB3.inf
+Driver package added successfully. (Already exists in the system)
+Published Name:         oem57.inf
+
+Total driver packages:  1
+Added driver packages:  1
+--- pnputil /scan-devices ---
+Microsoft PnP Utility
+
+Scanning for device hardware changes.
+Scan complete.
+
+--- after: device state ---
+
+
+Status       : Error
+Problem      : CM_PROB_FAILED_INSTALL
+Class        : 
+FriendlyName : 
+InstanceId   : USB\VID_03C3&PID_034A\00000
+
+Status       : Error
+Problem      : CM_PROB_FAILED_INSTALL
+Class        : 
+FriendlyName : 
+InstanceId   : USB\VID_03C3&PID_034C\00000
+
+
+
+
+
+--- installed ZWO drivers in driver store ---
+Published Name:     oem57.inf
+Original Name:      asicamusb3.inf
+Provider Name:      ZWO
+Class Name:         Image
+Class GUID:         {6bdd1fc6-810f-11d0-bec7-08002be2092f}
+Driver Version:     05/20/2026 3.28.0.0
+Signer Name:        Microsoft Windows Hardware Compatibility Publisher
+Attributes:         Declarative
+WHCP Version:       Unknown

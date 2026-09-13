@@ -1,0 +1,889 @@
+From d8e411c630c55bdefd23aef280612a0389bc96fb Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 10 Sep 2026 06:17:33 +0000
+Subject: [PATCH] =?UTF-8?q?compe:=20=E4=BC=9A=E5=93=A1=E6=A7=98=E3=81=8C?=
+ =?UTF-8?q?=E3=81=94=E8=87=AA=E5=88=86=E3=81=A7=E7=94=B3=E3=81=97=E8=BE=BC?=
+ =?UTF-8?q?=E3=82=81=E3=82=8B=E5=8B=9F=E9=9B=86=E3=83=9A=E3=83=BC=E3=82=B8?=
+ =?UTF-8?q?=E3=82=92=E8=BF=BD=E5=8A=A0=EF=BC=88=E7=AC=AC10=E5=9B=9E?=
+ =?UTF-8?q?=E3=81=AE=E7=99=BB=E9=8C=B2=E3=81=A4=E3=81=8D=EF=BC=89=20(#233)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- /e/<slug> はログイン不要。開催概要・残り枠を出して申し込みを受ける
+- 定員超過は断らずキャンセル待ち（キャンセル時に誰へ声をかけるか分かるように）
+- 申込は参加者名簿と同じ表に入れる（entry_status）。表を2つに割らない
+- Web申込を確定に上げるのは人の操作
+- プレー代 play_fee を追加（募集ページ・案内文に表示）
+- migration 0158 適用済／第10回（10/27 滝野CC・募集35名・/e/gw10）を登録
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Y26gHf4o6uYTWPGXazitMn
+---
+ CHANGELOG.md                                  |  11 ++
+ NEXT_TASKS.md                                 |  12 +-
+ apps/compe-os/next-env.d.ts                   |   2 +
+ apps/compe-os/src/app/c/[id]/actions.ts       |  38 +++++
+ apps/compe-os/src/app/c/[id]/page.tsx         |  23 +++
+ .../app/c/[id]/participants/entry-status.tsx  |  59 +++++++
+ .../src/app/c/[id]/participants/page.tsx      |  15 +-
+ .../src/app/c/[id]/print/[doc]/page.tsx       |   1 +
+ apps/compe-os/src/app/c/[id]/setup/page.tsx   |  48 +++++-
+ apps/compe-os/src/app/e/[slug]/actions.ts     |  76 +++++++++
+ apps/compe-os/src/app/e/[slug]/entry-form.tsx |  68 ++++++++
+ apps/compe-os/src/app/e/[slug]/page.tsx       | 146 ++++++++++++++++++
+ apps/compe-os/src/lib/compe.ts                |  65 ++++++++
+ apps/compe-os/src/middleware.ts               |   2 +-
+ docs/genesis/DECISIONS.md                     |   4 +-
+ supabase/migrations/0158_compe_entry.sql      |  48 ++++++
+ supabase/migrations/README.md                 |   4 +-
+ 17 files changed, 611 insertions(+), 11 deletions(-)
+ create mode 100644 apps/compe-os/src/app/c/[id]/participants/entry-status.tsx
+ create mode 100644 apps/compe-os/src/app/e/[slug]/actions.ts
+ create mode 100644 apps/compe-os/src/app/e/[slug]/entry-form.tsx
+ create mode 100644 apps/compe-os/src/app/e/[slug]/page.tsx
+ create mode 100644 supabase/migrations/0158_compe_entry.sql
+
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3a7a1df..72c727b 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,16 @@
+ # CHANGELOG
+ 
++## 2026-09-10 — コンペの参加申し込みを会員様ご自身で出せるようにした（募集URL・#233）
++- **feat: 募集ページ `/e/<slug>`**（ログイン不要）。開催概要・参加費・プレー代・残り枠を出し、お名前／フリガナ／電話／メール／HCP／ご要望で申し込める。公式LINEにURLを貼るだけで使えます
++- **feat: 定員を超えた申し込みは断らずキャンセル待ち**。締め切ってしまうと、キャンセルが出たとき誰に声をかければよいか分からなくなるため。募集ページにも「残り◯名」「キャンセル待ち◯名」を表示
++- **feat: 申し込みは参加者名簿と同じ表に入る**（`cmp_participants.entry_status` = 確定／Web申込／キャンセル待ち／取消）。申込者の表と参加者の表を分けると、当日どちらが本当の人数か分からなくなるため
++- feat: **Web申込を「確定」に上げるのは人の操作**（参加者タブのプルダウン）。枠取りや同伴の調整があるので、申し込まれた瞬間には確定しない
++- feat: コンペ設定に**募集セクション**（URL末尾・募集人数・受付開始日／締切日・案内文・受付ON/OFF）。ダッシュボードにも募集URLと申込状況を表示
++- feat: **プレー代**（参加費とは別・当日精算）をコンペに追加し、募集ページと案内文に出すように
++- data: **第10回ゴルフウィング親睦ゴルフコンペ**を登録（2026-10-27・滝野カントリー倶楽部 迎賓館コース・トップ9:07・参加費3,000円・プレー代10,000円・募集35名・受付開始9/10）。募集URLは `/e/gw10`
++- db: migration **0158_compe_entry.sql** 適用済（`cmp_comps` に entry_* / play_fee、`cmp_participants` に entry_status / applied_at / source）
++- note: 競技形式は前回（第9回）と同じ**ダブルペリア（HCP上限36）**で入れています。違う場合はコンペ設定から変更してください
++
+ ## 2026-09-10 — 3Dセキュアで決済できなかった方に、保存カードから自動課金を立てられるようにした（#233）
+ - **発端: 中尾様（FR0047）のご入会**。カード入力後にカード会社から届く3Dセキュアのワンタイムパスワードが、**お客様がもう使っていないメールアドレス宛**だったため受信できず、決済リンクを完走できませんでした。店側でSquareのお客さま情報にカードを保存し（このときは認証を求められません）、10月分・11月分は「一回きりの決済」で30,360円をお預かりしました
+ - **feat: 会員カードに【保存カードから自動課金を開始する】を追加**（`/frunk/[id]` のプラン・請求パネル）。初回請求日の既定は**入会完了メールでお客様にご案内した日付と同じ**（入会日＋前取り月数＋1か月＝中尾様なら 2026/12/10）。日付は変更できます
+diff --git a/NEXT_TASKS.md b/NEXT_TASKS.md
+index e5fb5f4..4682574 100644
+--- a/NEXT_TASKS.md
++++ b/NEXT_TASKS.md
+@@ -7,12 +7,12 @@
+ 
+ ## A. ユーザー作業（これがブロッカー）
+ 
+-A-232. **Compe OS（コンペ管理）を本番に出す**（#232・コードとDBは完了済み）
+-   1. Vercel で新規プロジェクト作成: **Root Directory = `apps/compe-os`**、Framework = Next.js
+-   2. 環境変数3つ（`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`）
+-   3. デプロイが **READY** を確認（#180: pushしただけでは本番に届きません）
+-   4. 開いてログイン → 「第9回ゴルフウィング親睦ゴルフコンペ」が一覧に出る → 受付タブで23名が受付済みになっていることを確認
+-   5. `vault_systems` に登録（#26）／ネットワークマップ `topology.ts` にノード追加（#47）
++A-232. **Compe OS（コンペ管理）— 残りの登録作業**（本番は稼働中: https://compe-os.vercel.app ・#232/#233）
++   1. ~~Vercelプロジェクト作成・env3つ~~ → **完了（2026-09-10・Production READY）**
++   2. `vault_systems` に登録（#26）／ネットワークマップ `topology.ts` にノード追加（#47）
++   3. 第10回の**競技形式の確認**（第9回と同じダブルペリア上限36で仮置き。違えばコンペ設定から変更）
++   4. 第10回の**集合時刻**が未入力（トップスタート9:07のみ登録済み）
++
+ 
+ 
+ A-207. **AIカルテナレッジの音声メモ（#207）を動かす**
+diff --git a/apps/compe-os/next-env.d.ts b/apps/compe-os/next-env.d.ts
+index 84ab714..830fb59 100644
+--- a/apps/compe-os/next-env.d.ts
++++ b/apps/compe-os/next-env.d.ts
+@@ -1,4 +1,6 @@
+ /// <reference types="next" />
+ /// <reference types="next/image-types/global" />
++/// <reference path="./.next/types/routes.d.ts" />
+ 
+ // NOTE: This file should not be edited
++// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+diff --git a/apps/compe-os/src/app/c/[id]/actions.ts b/apps/compe-os/src/app/c/[id]/actions.ts
+index 5b56b00..4092950 100644
+--- a/apps/compe-os/src/app/c/[id]/actions.ts
++++ b/apps/compe-os/src/app/c/[id]/actions.ts
+@@ -49,11 +49,49 @@ export async function saveSetup(formData: FormData): Promise<void> {
+         .filter(Boolean),
+       notes: strOrNull(formData, "notes"),
+       status: str(formData, "status") || "planning",
++      play_fee: str(formData, "play_fee") === "" ? null : intOr(formData, "play_fee", 0),
+     })
+     .eq("id", compId);
+   refresh(compId);
+ }
+ 
++/* ========== 募集ページ（#233） ========== */
++
++export async function saveEntrySettings(formData: FormData): Promise<void> {
++  const compId = str(formData, "comp_id");
++  const { admin } = await guard(compId);
++  const slug = str(formData, "entry_slug")
++    .toLowerCase()
++    .replace(/[^a-z0-9-]/g, "");
++  await admin
++    .from("cmp_comps")
++    .update({
++      entry_slug: slug || null,
++      entry_open: str(formData, "entry_open") === "1",
++      entry_capacity: str(formData, "entry_capacity") === "" ? null : intOr(formData, "entry_capacity", 0),
++      entry_opens_on: strOrNull(formData, "entry_opens_on"),
++      entry_closes_on: strOrNull(formData, "entry_closes_on"),
++      entry_note: strOrNull(formData, "entry_note"),
++    })
++    .eq("id", compId);
++  refresh(compId);
++}
++
++/** 申込→確定、キャンセル待ち→確定、取消 などの状態変更 */
++export async function setEntryStatus(
++  compId: string,
++  participantId: string,
++  status: "confirmed" | "applied" | "waitlist" | "cancelled"
++): Promise<void> {
++  const { admin } = await guard(compId);
++  await admin
++    .from("cmp_participants")
++    .update({ entry_status: status })
++    .eq("id", participantId)
++    .eq("comp_id", compId);
++  refresh(compId);
++}
++
+ /* ========== 参加者 ========== */
+ 
+ export async function upsertParticipant(formData: FormData): Promise<void> {
+diff --git a/apps/compe-os/src/app/c/[id]/page.tsx b/apps/compe-os/src/app/c/[id]/page.tsx
+index 5e0a6e5..114076c 100644
+--- a/apps/compe-os/src/app/c/[id]/page.tsx
++++ b/apps/compe-os/src/app/c/[id]/page.tsx
+@@ -75,6 +75,29 @@ export default async function CompDashboard({ params }: { params: Promise<{ id:
+         </dl>
+       </section>
+ 
++      {comp.entry_slug && (
++        <section className={`${cardCls} mb-5`}>
++          <h2 className="mb-2 text-sm font-bold">
++            募集ページ
++            <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${comp.entry_open ? "bg-emerald-50 text-emerald-700" : "bg-(--color-panel-2) text-(--color-dim)"}`}>
++              {comp.entry_open ? "受付中" : "停止中"}
++            </span>
++          </h2>
++          <p className="text-sm">
++            <a href={`/e/${comp.entry_slug}`} target="_blank" className="font-mono text-(--color-accent) underline">
++              /e/{comp.entry_slug}
++            </a>
++            {comp.entry_capacity != null && (
++              <span className="ml-3 text-xs text-(--color-dim)">
++                募集 {comp.entry_capacity}名 ／ 申込・確定{" "}
++                {participants.filter((p) => p.entry_status === "confirmed" || p.entry_status === "applied").length}名 ／
++                キャンセル待ち {participants.filter((p) => p.entry_status === "waitlist").length}名
++              </span>
++            )}
++          </p>
++        </section>
++      )}
++
+       <section className={`${cardCls} mb-5`}>
+         <h2 className="mb-2 text-sm font-bold">受付状況</h2>
+         <p className="mb-2 text-xs text-(--color-dim)">
+diff --git a/apps/compe-os/src/app/c/[id]/participants/entry-status.tsx b/apps/compe-os/src/app/c/[id]/participants/entry-status.tsx
+new file mode 100644
+index 0000000..5ac19c3
+--- /dev/null
++++ b/apps/compe-os/src/app/c/[id]/participants/entry-status.tsx
+@@ -0,0 +1,59 @@
++"use client";
++
++import { useTransition } from "react";
++import { setEntryStatus } from "../actions";
++
++const LABEL: Record<string, string> = {
++  confirmed: "参加確定",
++  applied: "Web申込",
++  waitlist: "キャンセル待ち",
++  cancelled: "取消",
++};
++
++const TONE: Record<string, string> = {
++  confirmed: "bg-emerald-50 text-emerald-700",
++  applied: "bg-sky-50 text-sky-700",
++  waitlist: "bg-amber-50 text-amber-700",
++  cancelled: "bg-(--color-panel-2) text-(--color-dim) line-through",
++};
++
++/**
++ * 申込状況の変更。
++ * ★ Web申込を「確定」に上げるのは人の操作にする — 会場の枠取りや同伴の調整があるので、
++ *   申し込まれた瞬間に確定にはしない。
++ */
++export function EntryStatusCell({
++  compId,
++  participantId,
++  status,
++  source,
++}: {
++  compId: string;
++  participantId: string;
++  status: "confirmed" | "applied" | "waitlist" | "cancelled";
++  source: "staff" | "web";
++}) {
++  const [pending, startTransition] = useTransition();
++
++  return (
++    <div className="flex flex-col items-center gap-1">
++      <select
++        disabled={pending}
++        defaultValue={status}
++        onChange={(e) =>
++          startTransition(() => {
++            void setEntryStatus(compId, participantId, e.target.value as typeof status);
++          })
++        }
++        className={`rounded-full px-2 py-1 text-xs font-semibold ${TONE[status]}`}
++      >
++        {Object.entries(LABEL).map(([v, label]) => (
++          <option key={v} value={v}>
++            {label}
++          </option>
++        ))}
++      </select>
++      {source === "web" && <span className="text-[10px] text-(--color-dim)">ご本人申込</span>}
++    </div>
++  );
++}
+diff --git a/apps/compe-os/src/app/c/[id]/participants/page.tsx b/apps/compe-os/src/app/c/[id]/participants/page.tsx
+index bc58bbc..c81a5e8 100644
+--- a/apps/compe-os/src/app/c/[id]/participants/page.tsx
++++ b/apps/compe-os/src/app/c/[id]/participants/page.tsx
+@@ -4,6 +4,7 @@ import { getComp, listParticipants } from "@/lib/compe";
+ import { CompNav } from "@/components/nav";
+ import { Badge, btnCls, cardCls, Empty, inputCls, labelCls } from "@/components/ui";
+ import { deleteParticipant, importParticipants, upsertParticipant } from "../actions";
++import { EntryStatusCell } from "./entry-status";
+ 
+ export default async function ParticipantsPage({ params }: { params: Promise<{ id: string }> }) {
+   const { id } = await params;
+@@ -52,7 +53,15 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
+ 
+       <section className={`${cardCls} mb-5`}>
+         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+-          <h2 className="text-sm font-bold">参加者一覧（{participants.length}名）</h2>
++          <h2 className="text-sm font-bold">
++            参加者一覧（{participants.length}名）
++            <span className="ml-2 text-xs font-normal text-(--color-dim)">
++              確定 {participants.filter((p) => p.entry_status === "confirmed").length}／
++              申込 {participants.filter((p) => p.entry_status === "applied").length}／
++              キャンセル待ち {participants.filter((p) => p.entry_status === "waitlist").length}／
++              取消 {participants.filter((p) => p.entry_status === "cancelled").length}
++            </span>
++          </h2>
+           <a href={`/c/${id}/participants/export`} className="text-sm text-(--color-dim) underline hover:text-(--color-txt)">
+             CSVを書き出す
+           </a>
+@@ -71,6 +80,7 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
+                   <Th className="text-center">HCP</Th>
+                   <Th>所属</Th>
+                   <Th>連絡先</Th>
++                  <Th className="text-center">申込</Th>
+                   <Th className="text-center">参加費</Th>
+                   <Th className="w-24" />
+                 </tr>
+@@ -110,6 +120,9 @@ export default async function ParticipantsPage({ params }: { params: Promise<{ i
+                       {p.tel ?? ""}
+                       {p.email ? <div>{p.email}</div> : null}
+                     </td>
++                    <td className="px-3 py-2 text-center">
++                      <EntryStatusCell compId={id} participantId={p.id} status={p.entry_status} source={p.source} />
++                    </td>
+                     <td className="px-3 py-2 text-center">
+                       {p.paid ? <Badge tone="ok">徴収済</Badge> : <Badge tone="danger">未徴収</Badge>}
+                     </td>
+diff --git a/apps/compe-os/src/app/c/[id]/print/[doc]/page.tsx b/apps/compe-os/src/app/c/[id]/print/[doc]/page.tsx
+index 8330835..f0c5ec7 100644
+--- a/apps/compe-os/src/app/c/[id]/print/[doc]/page.tsx
++++ b/apps/compe-os/src/app/c/[id]/print/[doc]/page.tsx
+@@ -107,6 +107,7 @@ async function Announcement(id: string, comp: Awaited<ReturnType<typeof getComp>
+           <Row label="コース" value={comp.course ?? "—"} />
+           <Row label="競技形式" value={formatLabel(comp.format)} />
+           <Row label="参加費" value={yen(comp.fee)} />
++          {comp.play_fee != null && <Row label="プレー代" value={`${yen(comp.play_fee)}（当日精算）`} />}
+           {comp.contact && <Row label="お問合せ" value={comp.contact} />}
+           {comp.notes && <Row label="備考" value={comp.notes} />}
+         </tbody>
+diff --git a/apps/compe-os/src/app/c/[id]/setup/page.tsx b/apps/compe-os/src/app/c/[id]/setup/page.tsx
+index 5418711..12252d6 100644
+--- a/apps/compe-os/src/app/c/[id]/setup/page.tsx
++++ b/apps/compe-os/src/app/c/[id]/setup/page.tsx
+@@ -4,7 +4,7 @@ import { getComp } from "@/lib/compe";
+ import { CompNav } from "@/components/nav";
+ import { btnCls, cardCls, inputCls, labelCls } from "@/components/ui";
+ import { COMPE_FORMAT_LABELS } from "@yozan/core/compe-score";
+-import { saveSetup } from "../actions";
++import { saveEntrySettings, saveSetup } from "../actions";
+ import { deleteComp, duplicateComp } from "@/app/actions";
+ 
+ export default async function SetupPage({ params }: { params: Promise<{ id: string }> }) {
+@@ -67,6 +67,9 @@ export default async function SetupPage({ params }: { params: Promise<{ id: stri
+             <L label="参加費（円）">
+               <input type="number" name="fee" defaultValue={comp.fee} min={0} className={inputCls} />
+             </L>
++            <L label="プレー代（円・当日精算）">
++              <input type="number" name="play_fee" defaultValue={comp.play_fee ?? ""} min={0} className={inputCls} />
++            </L>
+             <L label="コース名（詳細）">
+               <input name="course" defaultValue={comp.course ?? ""} placeholder="例: OUT / IN" className={inputCls} />
+             </L>
+@@ -105,6 +108,49 @@ export default async function SetupPage({ params }: { params: Promise<{ id: stri
+         </div>
+       </form>
+ 
++      <section className={`${cardCls} mt-6`}>
++        <h2 className="mb-1 text-sm font-bold">募集ページ（会員様がご自分で申し込む画面）</h2>
++        <p className="mb-4 text-xs text-(--color-dim)">
++          ここで作ったURLを公式LINEなどでお知らせすると、会員様がご自分でお申し込みできます。
++          ログインは不要です。定員を超えたお申し込みは<strong>キャンセル待ち</strong>としてお預かりします。
++        </p>
++        <form action={saveEntrySettings} className="space-y-4">
++          <input type="hidden" name="comp_id" value={id} />
++          <div className="grid gap-4 sm:grid-cols-2">
++            <L label="URLの末尾（英小文字・数字・ハイフン）">
++              <input name="entry_slug" defaultValue={comp.entry_slug ?? ""} placeholder="gw10" className={inputCls} />
++            </L>
++            <L label="募集人数">
++              <input type="number" name="entry_capacity" defaultValue={comp.entry_capacity ?? ""} min={1} className={inputCls} />
++            </L>
++            <L label="受付開始日">
++              <input type="date" name="entry_opens_on" defaultValue={comp.entry_opens_on ?? ""} className={inputCls} />
++            </L>
++            <L label="受付締切日（空欄なら締切なし）">
++              <input type="date" name="entry_closes_on" defaultValue={comp.entry_closes_on ?? ""} className={inputCls} />
++            </L>
++          </div>
++          <L label="募集ページに出す案内（任意）">
++            <textarea name="entry_note" rows={3} defaultValue={comp.entry_note ?? ""} className={inputCls} />
++          </L>
++          <label className="flex items-center gap-2 text-sm">
++            <input type="checkbox" name="entry_open" value="1" defaultChecked={comp.entry_open} />
++            募集を受け付ける（チェックを外すと「受付を行っておりません」と表示されます）
++          </label>
++          {comp.entry_slug && (
++            <p className="rounded-lg bg-(--color-panel-2) p-3 text-sm">
++              募集URL：<code className="font-mono">/e/{comp.entry_slug}</code>
++              <span className="ml-2 text-xs text-(--color-dim)">
++                （本番では https://compe-os.vercel.app/e/{comp.entry_slug}）
++              </span>
++            </p>
++          )}
++          <div className="flex justify-end">
++            <button className={btnCls}>募集の設定を保存する</button>
++          </div>
++        </form>
++      </section>
++
+       <section className={`${cardCls} mt-6`}>
+         <h2 className="mb-3 text-sm font-bold">このコンペの操作</h2>
+         <div className="flex flex-wrap gap-3">
+diff --git a/apps/compe-os/src/app/e/[slug]/actions.ts b/apps/compe-os/src/app/e/[slug]/actions.ts
+new file mode 100644
+index 0000000..01905cc
+--- /dev/null
++++ b/apps/compe-os/src/app/e/[slug]/actions.ts
+@@ -0,0 +1,76 @@
++"use server";
++
++import { redirect } from "next/navigation";
++import { createAdmin } from "@yozan/core/supabase/admin";
++import { jstYmd } from "@yozan/core/jst";
++import { countEntries, entryGate, getCompByEntrySlug } from "@/lib/compe";
++
++/** 電話番号は数字だけにして比べる（090-1234-5678 と 09012345678 を同じ人とみなす） */
++function digits(s: string): string {
++  return s.replace(/[^0-9]/g, "");
++}
++
++/**
++ * 募集ページからのお申し込み。
++ *
++ * ★ ログイン不要の公開経路なので、ここで通すのは「新しい行を1つ足す」ことだけ。
++ *   既存の参加者を書き換えたり、名簿を読み出したりはしない。
++ * ★ 定員を超えたら断らずキャンセル待ちにする（キャンセルが出たとき誰に声をかけるか分かるように）。
++ */
++export async function submitEntry(
++  _prev: { error?: string },
++  formData: FormData
++): Promise<{ error?: string }> {
++  const slug = String(formData.get("slug") ?? "");
++  const comp = await getCompByEntrySlug(slug);
++  if (!comp) return { error: "この募集ページは見つかりませんでした" };
++
++  const gate = entryGate(comp, jstYmd());
++  if (!gate.ok) return { error: "現在このコンペのお申し込みは受け付けていません" };
++
++  const name = String(formData.get("name") ?? "").trim();
++  const kana = String(formData.get("kana") ?? "").trim();
++  const tel = String(formData.get("tel") ?? "").trim();
++  const email = String(formData.get("email") ?? "").trim();
++  const hcpRaw = String(formData.get("hcp") ?? "").trim();
++  const notes = String(formData.get("notes") ?? "").trim();
++
++  if (!name) return { error: "お名前を入力してください" };
++  if (digits(tel).length < 10) return { error: "電話番号を正しく入力してください（携帯番号など）" };
++
++  const admin = createAdmin();
++
++  // 二重申し込みの防止（同じコンペに同じ電話番号）
++  const { data: existing } = await admin
++    .from("cmp_participants")
++    .select("id, name, tel, entry_status")
++    .eq("comp_id", comp.id)
++    .is("deleted_at", null);
++  const mine = ((existing ?? []) as { tel: string | null; entry_status: string }[]).find(
++    (p) => p.tel && digits(p.tel) === digits(tel) && p.entry_status !== "cancelled"
++  );
++  if (mine) {
++    redirect(`/e/${slug}?done=already`);
++  }
++
++  const { taken } = await countEntries(comp.id);
++  const full = comp.entry_capacity != null && taken >= comp.entry_capacity;
++  const status = full ? "waitlist" : "applied";
++
++  const { error } = await admin.from("cmp_participants").insert({
++    comp_id: comp.id,
++    name,
++    kana: kana || null,
++    tel,
++    email: email || null,
++    hcp: hcpRaw === "" ? null : Number.parseFloat(hcpRaw),
++    notes: notes || null,
++    entry_status: status,
++    source: "web",
++    applied_at: new Date().toISOString(),
++    sort_order: taken,
++  });
++  if (error) return { error: "お申し込みを保存できませんでした。お手数ですがお電話ください" };
++
++  redirect(`/e/${slug}?done=${status}`);
++}
+diff --git a/apps/compe-os/src/app/e/[slug]/entry-form.tsx b/apps/compe-os/src/app/e/[slug]/entry-form.tsx
+new file mode 100644
+index 0000000..ef0befa
+--- /dev/null
++++ b/apps/compe-os/src/app/e/[slug]/entry-form.tsx
+@@ -0,0 +1,68 @@
++"use client";
++
++import { useActionState } from "react";
++import { submitEntry } from "./actions";
++
++const field =
++  "w-full rounded-xl border border-(--color-line) bg-white px-3 py-3 text-base outline-none focus:border-(--color-accent)";
++
++export function EntryForm({ slug, waitlistMode }: { slug: string; waitlistMode: boolean }) {
++  const [state, action, pending] = useActionState(submitEntry, {});
++
++  return (
++    <form action={action} className="space-y-4">
++      <input type="hidden" name="slug" value={slug} />
++
++      <L label="お名前" required>
++        <input name="name" required placeholder="山田 太郎" className={field} autoComplete="name" />
++      </L>
++      <L label="フリガナ">
++        <input name="kana" placeholder="ヤマダ タロウ" className={field} />
++      </L>
++      <L label="電話番号" required>
++        <input
++          name="tel"
++          type="tel"
++          required
++          inputMode="tel"
++          placeholder="090-1234-5678"
++          className={field}
++          autoComplete="tel"
++        />
++      </L>
++      <L label="メールアドレス">
++        <input name="email" type="email" placeholder="example@email.com" className={field} autoComplete="email" />
++      </L>
++      <L label="ハンディキャップ（お持ちの方のみ）">
++        <input name="hcp" type="number" step="0.1" min="0" max="54" placeholder="例: 15.0" className={field} />
++      </L>
++      <L label="ご要望・ご連絡事項">
++        <textarea name="notes" rows={3} placeholder="同伴のご希望、送迎の要否など" className={field} />
++      </L>
++
++      {state.error && <p className="text-sm text-red-600">{state.error}</p>}
++
++      <button
++        disabled={pending}
++        className="w-full rounded-xl bg-(--color-accent) px-4 py-4 text-base font-bold text-white disabled:opacity-50"
++      >
++        {pending ? "送信中..." : waitlistMode ? "キャンセル待ちで申し込む" : "この内容で申し込む"}
++      </button>
++      <p className="text-center text-xs text-(--color-dim)">
++        ご記入いただいた内容は、本コンペの運営のみに使用します。
++      </p>
++    </form>
++  );
++}
++
++function L({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
++  return (
++    <label className="block">
++      <span className="mb-1 block text-xs font-medium text-(--color-dim)">
++        {label}
++        {required && <span className="ml-1 text-red-600">必須</span>}
++      </span>
++      {children}
++    </label>
++  );
++}
+diff --git a/apps/compe-os/src/app/e/[slug]/page.tsx b/apps/compe-os/src/app/e/[slug]/page.tsx
+new file mode 100644
+index 0000000..a11cab1
+--- /dev/null
++++ b/apps/compe-os/src/app/e/[slug]/page.tsx
+@@ -0,0 +1,146 @@
++import { notFound } from "next/navigation";
++import { jstYmd } from "@yozan/core/jst";
++import { countEntries, entryGate, getCompByEntrySlug } from "@/lib/compe";
++import { dateJa, yen } from "@/lib/format";
++import { EntryForm } from "./entry-form";
++
++export const dynamic = "force-dynamic";
++
++export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
++  const { slug } = await params;
++  const comp = await getCompByEntrySlug(slug);
++  return { title: comp ? `${comp.name} 参加申し込み` : "参加申し込み" };
++}
++
++export default async function EntryPage({
++  params,
++  searchParams,
++}: {
++  params: Promise<{ slug: string }>;
++  searchParams: Promise<{ done?: string }>;
++}) {
++  const { slug } = await params;
++  const { done } = await searchParams;
++  const comp = await getCompByEntrySlug(slug);
++  if (!comp) notFound();
++
++  const gate = entryGate(comp, jstYmd());
++  const { taken, waitlist } = await countEntries(comp.id);
++  const capacity = comp.entry_capacity;
++  const remaining = capacity != null ? Math.max(capacity - taken, 0) : null;
++
++  return (
++    <main className="mx-auto max-w-xl px-4 py-8">
++      <header className="mb-6 rounded-2xl bg-(--color-accent) px-6 py-7 text-center text-white">
++        <p className="text-xs tracking-[0.3em] opacity-80">{comp.organizer ?? "GOLF WING"}</p>
++        <h1 className="mt-1 text-xl font-bold sm:text-2xl">{comp.name}</h1>
++        <p className="mt-2 text-sm opacity-90">参加申し込みフォーム</p>
++      </header>
++
++      {done && <DoneMessage done={done} />}
++
++      <section className="mb-6 rounded-2xl border border-(--color-line) bg-white p-5">
++        <h2 className="mb-3 text-sm font-bold">開催概要</h2>
++        <dl className="space-y-2 text-sm">
++          <Row label="開催日" value={dateJa(comp.held_on)} />
++          <Row label="会場" value={[comp.venue, comp.course].filter(Boolean).join("　")} />
++          {comp.start_time && <Row label="トップスタート" value={comp.start_time} />}
++          {comp.meet_time && <Row label="集合" value={comp.meet_time} />}
++          <Row label="参加費" value={yen(comp.fee)} />
++          {comp.play_fee != null && <Row label="プレー代" value={`${yen(comp.play_fee)}（当日精算）`} />}
++          {capacity != null && (
++            <Row
++              label="募集人数"
++              value={`${capacity}名${remaining != null ? `（残り ${remaining}名）` : ""}`}
++            />
++          )}
++          {comp.contact && <Row label="お問い合わせ" value={comp.contact} />}
++        </dl>
++        {comp.entry_note && (
++          <p className="mt-4 rounded-xl bg-(--color-panel-2) p-3 text-sm whitespace-pre-wrap">{comp.entry_note}</p>
++        )}
++      </section>
++
++      {!gate.ok ? (
++        <Closed gate={gate} />
++      ) : done ? null : (
++        <section className="rounded-2xl border border-(--color-line) bg-white p-5">
++          <h2 className="mb-1 text-sm font-bold">お申し込み</h2>
++          {remaining === 0 ? (
++            <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
++              定員（{capacity}名）に達しました。ここからは<strong>キャンセル待ち</strong>としてお預かりし、
++              空きが出ましたら順にご連絡いたします。
++            </p>
++          ) : (
++            <p className="mb-4 text-xs text-(--color-dim)">
++              先着順です。ご記入いただいた電話番号に、確定のご連絡を差し上げます。
++            </p>
++          )}
++          <EntryForm slug={slug} waitlistMode={remaining === 0} />
++        </section>
++      )}
++
++      {waitlist > 0 && gate.ok && (
++        <p className="mt-3 text-center text-xs text-(--color-dim)">
++          現在キャンセル待ち {waitlist}名
++        </p>
++      )}
++
++      <p className="mt-8 text-center text-xs text-(--color-dim)">
++        {comp.organizer ?? "GOLF WING"}
++        {comp.contact ? `　${comp.contact}` : ""}
++      </p>
++    </main>
++  );
++}
++
++function Row({ label, value }: { label: string; value: string }) {
++  return (
++    <div className="flex gap-3">
++      <dt className="w-28 shrink-0 text-(--color-dim)">{label}</dt>
++      <dd className="font-semibold">{value || "—"}</dd>
++    </div>
++  );
++}
++
++function DoneMessage({ done }: { done: string }) {
++  const map: Record<string, { tone: string; title: string; body: string }> = {
++    applied: {
++      tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
++      title: "お申し込みを受け付けました",
++      body: "ありがとうございます。組み合わせなど詳細が決まりましたら、あらためてご連絡いたします。",
++    },
++    waitlist: {
++      tone: "border-amber-200 bg-amber-50 text-amber-900",
++      title: "キャンセル待ちで承りました",
++      body: "定員に達しているため、キャンセル待ちとしてお預かりしました。空きが出ましたら順にご連絡いたします。",
++    },
++    already: {
++      tone: "border-(--color-line) bg-(--color-panel-2) text-(--color-txt)",
++      title: "すでにお申し込みいただいています",
++      body: "同じ電話番号でのお申し込みを確認しました。ご変更やキャンセルはお電話でご連絡ください。",
++    },
++  };
++  const m = map[done] ?? map.applied;
++  return (
++    <div className={`mb-6 rounded-2xl border p-5 ${m.tone}`}>
++      <p className="font-bold">{m.title}</p>
++      <p className="mt-1 text-sm">{m.body}</p>
++    </div>
++  );
++}
++
++function Closed({ gate }: { gate: Exclude<ReturnType<typeof entryGate>, { ok: true }> }) {
++  const text =
++    gate.reason === "before"
++      ? `お申し込みの受付は ${dateJa(gate.opensOn ?? null)} からです。`
++      : gate.reason === "after"
++        ? `お申し込みの受付は ${dateJa(gate.closesOn ?? null)} で締め切りました。`
++        : "現在、お申し込みの受付は行っておりません。";
++  return (
++    <section className="rounded-2xl border border-(--color-line) bg-(--color-panel-2) p-6 text-center">
++      <p className="text-sm font-semibold">{text}</p>
++      <p className="mt-1 text-xs text-(--color-dim)">お問い合わせは店舗までお願いいたします。</p>
++    </section>
++  );
++}
+diff --git a/apps/compe-os/src/lib/compe.ts b/apps/compe-os/src/lib/compe.ts
+index b0f9e5d..a8f3e9b 100644
+--- a/apps/compe-os/src/lib/compe.ts
++++ b/apps/compe-os/src/lib/compe.ts
+@@ -50,6 +50,14 @@ export type Comp = {
+   reception_fields: ReceptionField[];
+   sheet_cols: { personal?: SheetCol[]; team?: SheetCol[] };
+   status: "planning" | "running" | "closed";
++  /* 募集ページ（#233） */
++  entry_slug: string | null;
++  entry_open: boolean;
++  entry_capacity: number | null;
++  entry_opens_on: string | null;
++  entry_closes_on: string | null;
++  entry_note: string | null;
++  play_fee: number | null;
+   created_at: string;
+ };
+ 
+@@ -69,6 +77,10 @@ export type Participant = {
+   check_in_at: string | null;
+   custom_fields: Record<string, string | boolean>;
+   sort_order: number;
++  /** confirmed=参加確定 / applied=Web申込 / waitlist=キャンセル待ち / cancelled=取消（#233） */
++  entry_status: "confirmed" | "applied" | "waitlist" | "cancelled";
++  applied_at: string | null;
++  source: "staff" | "web";
+ };
+ 
+ export type Group = {
+@@ -281,3 +293,56 @@ export const DEFAULT_TEAM_SHEET_COLS: SheetCol[] = [
+   { id: "score", label: "スコア" },
+   { id: "rank", label: "順位" },
+ ];
++
++/* ========== 募集ページ（ログイン不要・#233） ========== */
++
++/**
++ * 募集URLのslugからコンペを引く。
++ * ★ ここはログインしていない人が触る経路なので、返すのは「掲示に出す情報」だけにする。
++ *   参加者名簿は返さない（誰が申し込んだかは、申し込む側からは見えない）。
++ */
++export async function getCompByEntrySlug(slug: string): Promise<Comp | null> {
++  const admin = createAdmin();
++  const { data } = await admin
++    .from("cmp_comps")
++    .select("*")
++    .eq("entry_slug", slug)
++    .is("deleted_at", null)
++    .maybeSingle();
++  const comp = data as Comp | null;
++  return comp ? normalizeComp(comp) : null;
++}
++
++/** 枠の残り。confirmed と applied を「席が埋まっている人」として数える（キャンセル待ちは数えない） */
++export async function countEntries(compId: string): Promise<{ taken: number; waitlist: number }> {
++  const admin = createAdmin();
++  const [{ count: taken }, { count: waitlist }] = await Promise.all([
++    admin
++      .from("cmp_participants")
++      .select("id", { count: "exact", head: true })
++      .eq("comp_id", compId)
++      .is("deleted_at", null)
++      .in("entry_status", ["confirmed", "applied"]),
++    admin
++      .from("cmp_participants")
++      .select("id", { count: "exact", head: true })
++      .eq("comp_id", compId)
++      .is("deleted_at", null)
++      .eq("entry_status", "waitlist"),
++  ]);
++  return { taken: taken ?? 0, waitlist: waitlist ?? 0 };
++}
++
++/** 募集ページを開いてよいか（受付前・締切・停止を1か所で判定する） */
++export type EntryGate =
++  | { ok: true }
++  | { ok: false; reason: "closed" | "before" | "after"; opensOn?: string; closesOn?: string };
++
++export function entryGate(comp: Comp, todayJst: string): EntryGate {
++  if (!comp.entry_open) return { ok: false, reason: "closed" };
++  if (comp.entry_opens_on && todayJst < comp.entry_opens_on)
++    return { ok: false, reason: "before", opensOn: comp.entry_opens_on };
++  if (comp.entry_closes_on && todayJst > comp.entry_closes_on)
++    return { ok: false, reason: "after", closesOn: comp.entry_closes_on };
++  return { ok: true };
++}
+diff --git a/apps/compe-os/src/middleware.ts b/apps/compe-os/src/middleware.ts
+index a7f3289..37e3eac 100755
+--- a/apps/compe-os/src/middleware.ts
++++ b/apps/compe-os/src/middleware.ts
+@@ -1,7 +1,7 @@
+ import { createAuthMiddleware } from "@yozan/core/middleware";
+ 
+ // 公開プレフィックス（ログイン不要ルート）。公開回答/受付ページ等をここに足す。
+-export const middleware = createAuthMiddleware({ publicPrefixes: ["/login"] });
++export const middleware = createAuthMiddleware({ publicPrefixes: ["/login", "/e"] });
+ 
+ // Next.jsの静的解析のためmatcherはリテラル必須（@yozan/coreからのimport識別子は使えない）
+ export const config = {
+diff --git a/docs/genesis/DECISIONS.md b/docs/genesis/DECISIONS.md
+index 1144a8c..ea7f4d6 100644
+--- a/docs/genesis/DECISIONS.md
++++ b/docs/genesis/DECISIONS.md
+@@ -16,7 +16,7 @@
+   **④のガードが導入直後に既存バグを4件検出**: スタッフ画面(/home)の今月労働時間が丸めなし（給与見込みと分数が食い違う）、`${ym}-31` 決め打ちが 勤怠管理・月末照合・スタッフ画面・caddy-os の計4箇所 → すべて修正。
+   実測（2026年7月）: 総労働時間 102時間36分 → **100時間45分**、人件費 ¥256,203 → **¥883,982**（時給者253,982＋月給者4名630,000＝古川80,000/小川80,000/山本200,000/林270,000）。**月給者が消えていた影響は古川さん1人ではなかった**。休憩は attendance_days.work_minutes の時点で控除済み（recalcAttendance = 拘束 − 休憩）＝二重控除も未控除も無いことを確認。
+ 
+-> ⚠採番注意: #28と#29は歴史的に重複採番（各2件）。参照を壊さないため振り直さず【#28a/#28b】【#29a/#29b】の注記で区別する（AUDIT_2026-07-11）。**次に使う番号は #233**。
++> ⚠採番注意: #28と#29は歴史的に重複採番（各2件）。参照を壊さないため振り直さず【#28a/#28b】【#29a/#29b】の注記で区別する（AUDIT_2026-07-11）。**次に使う番号は #234**。
+ 
+ - #1 (2026-07-02) リポジトリは軽量モノレポ（npm workspaces、単一Next.jsアプリ＋packages分離）。Turborepoはアプリ2つ目から — MVP速度優先、構造だけ将来対応
+ - #2 (2026-07-02) 認証はメール＋パスワード基本、メールなしスタッフはログインID＋パスワード（擬似メール方式）— アルバイトがメール非保持の可能性
+@@ -1596,3 +1596,5 @@
+ - #230 (2026-09-09) **通常予約にあとからパーソナルレッスン25分を付けられるようにした**（migrationなし・commit c5eebaa・member-os本番READY）。ユーザー依頼「お客様の電話で通常予約からパーソナルレッスンに変えれるようにしてください」。(1) これまで member-os `/reservations` のレッスン欄は `lesson_option_status` が付いた予約（お客様が予約時に希望した／確定済み／お断り）にしか出ず、**お電話で「レッスンも付けたい」を受けると予約を消して作り直すしかなかった**。(2) 通常予約にも「＋ パーソナルレッスンを追加（お電話でのご希望など）」を出す。対象は体験以外・取消/無断欠以外（画面とサーバー両方で止める）。確定は既存の `setLessonOption` mode=confirm をそのまま使う＝チケットがあれば1枚・無ければ当日精算、という #199 の扱いも同じ。(3) **確定時に担当コーチ（coach_staff_id）が未定なら、レッスンの担当プロを入れる**（#224 の「レッスンの指名があれば担当も同じ人」を setLessonOption にも適用。決まっている担当は動かさない）。(4) 希望なしの予約では「お断り」を出さず、「レッスンを外す（通常予約に戻す）」だけ（clear＝チケットも戻る）。(5) スタッフ側は同時受入上限（#225 canTakeLesson）で縛らない（#224 と同じ「店頭の操作は縛らない」）。周知は小川うらら・林和希へ公式LINE（ai_action_queue）で手順を送付。
+ 
+ - #232 (2026-09-10) **コンペ管理を genspark から GENESIS の独立アプリへ移設（Compe OS）**（migration 0156・0157適用済）。背景: ゴルフコンペの受付・組み合わせ・スコア・表彰を genspark の単一HTMLで回していたが、保存が **1アカウント＝JSON 1本**（`golf_savedata.data_json`）で、(a) **コンペが1個しか持てない**（次の回を作ると前の回が消えるか行方不明）、(b) **同じ人が2つの組に残っても検知できない**（組は参加者IDの配列。案内文とスコアシートで人数が食い違う）、(c) **ペリアの式が index.html と leaderboard.html に二重**にあり隠しホールが食い違っても気づけない、という3つが構造的に起きていた。決定: **(a) 独立アプリ `apps/compe-os`**（勝ちパターン #30/#33/#34 と同型・別Vercel・DB共有・port 3014・権限 `use_compe`/`view_hq`）。認証は GENESIS のスタッフ認証をそのまま使う（コンペ専用アカウントは作らない）。**(b) コンペを台帳に**（`cmp_comps` を親に participants/groups/scores/prizes/teams/receipts をぶら下げる）。「次回コンペを作る」で**名簿と景品だけ引き継ぎ、受付・支払い・スコアは持ち込まない**（前回の受付済みが残る事故を防ぐ）。**(c) 1人が入れる組は0か1をDBで守る**（`cmp_group_members.participant_id` の一意索引）。**(d) 計算の正典は `packages/core/src/compe-score.ts` の1か所**（DEVELOPMENT_RULES「数字の正典は1本」）。**GROSS/HCP/NET/順位はDBに保存しない**——保存すると、あとから隠しホールやパーを直したときに過去の表彰結果と画面が食い違う。**同点は同順位にして `tied` を立てる**（旧システムは配列順＝先に登録した人が自動で優勝になっていた。同スコアはマッチングカードで人が決めるので、システムは並んでいることを見せるところまで）。`tests/compe-score.test.ts` が式を固定。**(e) 印刷は普通のページ**（`/c/[id]/print/[doc]`、用紙サイズ・向き・色はクエリ）——旧方式の Blob＋`window.open` はポップアップブロックで止まる。URLに設定が乗るので同じ紙をそのまま再印刷・共有できる。**(f) 参加者は会員名簿(`mbr_members`)と繋がない**（ビジター・取引先・同伴者が普通に入る）。名寄せが要るようになったら `member_id` を足す。**(g) 移行**: 第9回ゴルフウィング親睦ゴルフコンペ（2026-05-19 吉川カントリー倶楽部・ダブルペリア上限36）を投入 — 参加者28名・組7・組メンバー28・景品11・チーム7、受付済23名・参加費徴収16名・懇親会20名まで旧データと一致。旧データで male に上書きされていた女性2名（播磨さん・宮﨑さん）だけ古いレコードに合わせて直した。森井さんのHCP 100（打ち間違い）は**直さずそのまま**。**残**: リアルタイム リーダーボード（会場モニター・30秒更新）はユーザー判断で見送り、Vercel新規プロジェクト作成と vault_systems 登録（#26）・ネットワークマップ登録（#47）は未了
++
++- #233 (2026-09-10) **コンペの参加申し込みを会員様ご自身で出せるようにした（募集URL）**（migration 0158適用済）。背景: 第10回（10/27 滝野カントリー倶楽部・募集35名）の告知を公式LINEで出すが、申し込みの受け口が電話とLINE返信しかなく、35名の枠が今何人埋まっているかを誰も把握できない。決定: **(a) ログイン不要の募集ページ `/e/<slug>`**（Survey OS #33・member-os `/trial` #72 と同型＝トークンレス公開・`entry_slug` と `entry_open` を検証して service_role で insert）。返すのは掲示に出す情報だけで、**参加者名簿は公開経路に出さない**（申し込む側から他の人の氏名・連絡先は見えない）。**(b) 申し込みを別テーブルにしない** — `cmp_participants.entry_status`（confirmed／applied／waitlist／cancelled）で1つの名簿に並べる。申込者の表と参加者の表を分けると、当日「どちらが本当の人数か」が分からなくなる（旧gensparkで人数が食い違った #232 と同じ形）。**(c) 定員超過は断らずキャンセル待ち**。締め切るとキャンセルが出たときに誰へ声をかけるか分からなくなる。席が埋まっている数は confirmed+applied で数え、waitlist は数えない。**(d) Web申込を「確定」に上げるのは人の操作**（枠取り・同伴の調整があるため、申し込まれた瞬間に確定にしない）。**(e) 二重申し込みは電話番号の数字だけで判定**（090-1234-5678 と 09012345678 を同じ人とみなす）。**(f) プレー代 `play_fee` をコンペに追加**（参加費とは別・当日精算）＝募集ページと案内文に出す。第10回を登録済み（`/e/gw10`・受付開始9/10・競技形式は第9回と同じダブルペリア上限36で仮置き）
+diff --git a/supabase/migrations/0158_compe_entry.sql b/supabase/migrations/0158_compe_entry.sql
+new file mode 100644
+index 0000000..f0d2c9d
+--- /dev/null
++++ b/supabase/migrations/0158_compe_entry.sql
+@@ -0,0 +1,48 @@
++-- #233 (2026-09-10) コンペの参加申し込みを会員様ご自身で出せるようにする（募集URL）
++--
++-- ★ 申し込みは「参加者」と別テーブルにしない。
++--   別にすると、受付当日に「申込者の表」と「参加者の表」を2つ見ることになり、
++--   どちらが本当の人数か分からなくなる（旧システムで人数が食い違った原因と同じ形）。
++--   cmp_participants に状態を持たせ、確定した人もキャンセルした人も1つの名簿に並べる。
++--
++-- ★ 定員を超えた申し込みは断らずキャンセル待ちにする。
++--   締め切ってしまうと、キャンセルが出たときに誰へ声をかければよいか分からなくなる。
++
++alter table public.cmp_comps
++  add column if not exists entry_slug text,
++  add column if not exists entry_open boolean not null default false,
++  add column if not exists entry_capacity integer,
++  add column if not exists entry_opens_on date,
++  add column if not exists entry_closes_on date,
++  add column if not exists entry_note text,
++  add column if not exists play_fee integer;
++
++comment on column public.cmp_comps.entry_slug is '募集ページのURL末尾（/e/<slug>）。null＝募集ページを持たない（#233）';
++comment on column public.cmp_comps.entry_open is '募集受付中か。false なら /e/<slug> は「受付前・締切」を表示する';
++comment on column public.cmp_comps.entry_capacity is '募集人数。超えた分はキャンセル待ちとして受け付ける';
++comment on column public.cmp_comps.play_fee is 'プレー代（円・参加費とは別）。案内と募集ページに出す';
++
++create unique index if not exists uq_cmp_comps_entry_slug
++  on public.cmp_comps (entry_slug) where entry_slug is not null;
++
++alter table public.cmp_participants
++  add column if not exists entry_status text not null default 'confirmed',
++  add column if not exists applied_at timestamptz,
++  add column if not exists source text not null default 'staff';
++
++do $$
++begin
++  if not exists (
++    select 1 from pg_constraint where conname = 'cmp_participants_entry_status'
++  ) then
++    alter table public.cmp_participants
++      add constraint cmp_participants_entry_status
++      check (entry_status in ('confirmed', 'applied', 'waitlist', 'cancelled'));
++  end if;
++end $$;
++
++comment on column public.cmp_participants.entry_status is 'confirmed=参加確定 / applied=Web申込（定員内）/ waitlist=キャンセル待ち / cancelled=取消。スタッフ登録は既定 confirmed（#233）';
++comment on column public.cmp_participants.source is 'staff=スタッフ登録 / web=募集ページからのご本人申込';
++
++create index if not exists idx_cmp_participants_entry
++  on public.cmp_participants (comp_id, entry_status) where deleted_at is null;
+diff --git a/supabase/migrations/README.md b/supabase/migrations/README.md
+index 78301da..047b361 100755
+--- a/supabase/migrations/README.md
++++ b/supabase/migrations/README.md
+@@ -2,7 +2,7 @@
+ 
+ ## 採番ルール（DECISIONS #38）
+ 
+-- **次に使う番号: `0158` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
++- **次に使う番号: `0159` から**（本台帳の最新+1。作成時にこのREADMEも更新すること）
+ - **関数を作ったら必ず service_role に EXECUTE を付ける**（0065 適用後のルール）:
+   `grant execute on function public.<名前>(<引数型>) to service_role;`
+   0065 で「新関数への PUBLIC 既定 EXECUTE」を止めたため、書かないと service_role から呼べない。
+@@ -53,3 +53,5 @@
+ 
+ - ✅ `0156_compe_os.sql` — 適用済（2026-09-10、MCP name=compe_os。Compe OS `cmp_*` 8テーブル＋`use_compe` 権限付与 #232）
+ - ✅ `0157_compe_import_9th.sql` — 適用済（2026-09-10、第9回ゴルフウィング親睦ゴルフコンペの移行データ #232）
++
++- ✅ `0158_compe_entry.sql` — 適用済（2026-09-10、MCP name=compe_entry。募集ページ用 entry_*/play_fee・参加者の entry_status #233）
+-- 
+2.43.0
+

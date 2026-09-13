@@ -1,0 +1,13 @@
+[2021-06-18 08:34] Register ExceptionFilter
+[2021-06-18 08:34:08] Log Data : Log_2021_0618_083408.txt
+[2021-06-18 08:34:09] Failed Auth Data
+
+[2021-06-18 08:34:11] Failed Initialize
+[2021-06-18 08:34:11] Initialize Failed
+[2021-06-18 08:34] Exclude ExceptionFilter
+[2021-06-18 08:34:11] [Release]
+      [Success Shot Count] : 0
+      [Error Shot Count] : 0
+      [UndeZero Delta Time Count] : 0
+      [FPS Under Count] : 0
+[2021-06-18 08:34:11] Release : 2021-06-18 08:34
