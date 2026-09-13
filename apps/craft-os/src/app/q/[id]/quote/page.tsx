@@ -133,9 +133,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
                         </td>
                         <td className="py-2">
                           <button
-                            formAction={removeItem}
-                            name="item_id"
-                            value={it.id}
+                            formAction={removeItem.bind(null, it.id)}
                             className="text-xs text-red-500 hover:underline"
                           >
                             削除

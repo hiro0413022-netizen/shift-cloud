@@ -193,9 +193,10 @@ export async function addSpecLine(formData: FormData): Promise<void> {
   revalidatePath(`/q/${id}/work`);
 }
 
-export async function removeSpecLine(formData: FormData): Promise<void> {
+/** 指示書の行を1つ消す。IDは bind で渡す（ボタンの name は React に上書きされる → removeItem のコメント参照） */
+export async function removeSpecLine(specId: number, formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
-  const specId = Number(formData.get("spec_id"));
+  if (!specId) return;
   const { actor } = await mustQuote(id);
   await admin().from("gw_work_order_specs").delete().eq("id", specId).eq("company_id", actor.companyId);
   revalidatePath(`/q/${id}/work`);

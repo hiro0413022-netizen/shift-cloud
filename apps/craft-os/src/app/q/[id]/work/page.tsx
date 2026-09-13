@@ -144,9 +144,7 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
                       </span>
                       {it?.club_type && <span className="text-xs text-(--color-dim)">{it.club_type}</span>}
                       <button
-                        formAction={removeSpecLine}
-                        name="spec_id"
-                        value={s.id}
+                        formAction={removeSpecLine.bind(null, s.id)}
                         className="ml-auto text-xs text-red-500 hover:underline"
                       >
                         この行を削除

@@ -171,9 +171,17 @@ export async function updateItems(formData: FormData): Promise<void> {
   revalidatePath(`/q/${id}/quote`);
 }
 
-export async function removeItem(formData: FormData): Promise<void> {
+/**
+ * 明細を1行消す。
+ *
+ * ⚠ 消す行のIDは bind で渡すこと。ボタンに name/value を付けても届かない。
+ *   React は formAction に関数を渡したボタンの name を自分用に使うので、
+ *   こちらの name は上書きされて消える（React 19 の仕様。開発中しか警告が出ない）。
+ *   実害: formData.get("item_id") が null → 0 行削除 → 200 が返るのに画面が変わらない（2026-09-13 実障害）
+ */
+export async function removeItem(itemId: number, formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
-  const itemId = Number(formData.get("item_id"));
+  if (!itemId) return;
   const { actor } = await mustQuote(id);
   await admin().from("gw_quote_items").delete().eq("id", itemId).eq("company_id", actor.companyId);
   revalidatePath(`/q/${id}/quote`);
