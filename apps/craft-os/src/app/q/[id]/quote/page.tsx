@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getFitting, getLaborRates, getQuote, refundBreakdown, QUOTE_STATUS_LABELS } from "@/lib/craft";
+import { getFitting, getLaborRates, getQuote, listSalesPostings, refundBreakdown, QUOTE_STATUS_LABELS } from "@/lib/craft";
 import { offLabel, yen, yenPlain } from "@/lib/format";
 import { btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
 import { ProductPicker } from "./product-picker";
-import { addFreeLine, addLaborLine, issueQuoteDoc, markReviewed, removeItem, setStatus, updateItems } from "../actions";
+import { addFreeLine, addLaborLine, issueQuoteDoc, markReviewed, postSalesNow, removeItem, setStatus, updateItems } from "../actions";
 import { adoptTrialInto } from "@/app/f/[id]/actions";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   // 表紙が紐づいていれば、試打したシャフトをここからそのまま入れられる
   const cover = full.fitting ? await getFitting(actor, full.fitting.id) : null;
   const coverTrials = (cover?.trials ?? []).filter((t) => t.product);
+  const postings = await listSalesPostings(actor, Number(id));
 
   return (
     <>
@@ -371,6 +372,17 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
               <button className={btnGhostCls}>御見積書を出した</button>
             </form>
           )}
+          {postings.length > 0 ? (
+            <p className="text-xs text-(--color-ok)">
+              売上計上済み（{postings.length}行・
+              {new Date(postings[0].posted_at).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" })}）
+            </p>
+          ) : items.length > 0 && !full.work ? (
+            <form action={postSalesNow}>
+              <input type="hidden" name="quote_id" value={q.id} />
+              <button className={btnGhostCls}>売上を計上する</button>
+            </form>
+          ) : null}
           <Link href={`/q/${id}/work`} className={btnCls}>
             注文書・工房へ
           </Link>
@@ -378,6 +390,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         <p className="mt-3 text-xs text-(--color-dim)">
           「お客様にお渡しする前に、必ず他のスタッフのチェックを受けてから提示」— 誰がいつ確認したかを残します。
           御見積書は出しても出さなくても構いません。ご注文書だけで完結する伝票が多いためです。
+          工房を通す伝票は、お渡し日を入れた時点で売上が Money OS に入ります。
         </p>
       </section>
     </>

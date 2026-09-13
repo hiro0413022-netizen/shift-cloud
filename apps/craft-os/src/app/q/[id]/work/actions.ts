@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { getQuote } from "@/lib/craft";
+import { postSales } from "@/lib/sales";
 
 const admin = () => createAdmin();
 
@@ -21,7 +22,7 @@ function txt(v: FormDataEntryValue | null): string | null {
 async function mustQuote(id: number) {
   const actor = await requireActor();
   const full = await getQuote(actor, id);
-  if (!full) throw new Error("見積が見つかりません");
+  if (!full) throw new Error("伝票が見つかりません");
   return { actor, full };
 }
 
@@ -103,8 +104,29 @@ export async function saveWork(formData: FormData): Promise<void> {
             : "open";
 
   await admin().from("gw_work_orders").update(patch).eq("id", full.work.id).eq("company_id", actor.companyId);
+
+  // お渡しが入ったら、その場で Money OS へ売上を計上する（二重計上は関数側で防ぐ）
+  if (patch.delivered_on) await postSales(actor, id);
+
   revalidatePath(`/q/${id}/work`);
+  revalidatePath(`/q/${id}/quote`);
   revalidatePath("/");
+}
+
+/**
+ * 発注管理の「発注プール」へ下書きを作る。
+ * 仕入先ごとに1件ずつ。あとは発注管理の画面からいつもどおり送るだけ。
+ */
+export async function createPurchaseDrafts(formData: FormData): Promise<void> {
+  const id = Number(formData.get("quote_id"));
+  const { actor } = await mustQuote(id);
+  const { error } = await admin().rpc("gw_create_purchase_drafts", {
+    p_company: actor.companyId,
+    p_quote_id: id,
+    p_ordered_by: actor.name,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath(`/q/${id}/work`);
 }
 
 /** 組立仕様。目標（範囲）と実測を、同じ画面で別の列として持つ */

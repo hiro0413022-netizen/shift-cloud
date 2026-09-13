@@ -27,7 +27,14 @@ export default async function QuoteLayout({
             ← 一覧へ
           </Link>
           <h1 className="mt-1 text-xl font-bold">
-            {q.customer_name} 様 <span className="ml-2 text-sm font-normal text-(--color-dim)">{q.quote_no}</span>
+            {q.guest_id ? (
+              <Link href={`/k/${q.guest_id}`} className="hover:underline">
+                {q.customer_name} 様
+              </Link>
+            ) : (
+              <>{q.customer_name} 様</>
+            )}{" "}
+            <span className="ml-2 text-sm font-normal text-(--color-dim)">{q.quote_no}</span>
           </h1>
           <p className="mt-1 text-xs text-(--color-dim)">
             {dateShort(q.quote_date)} ／ {q.member_kind}

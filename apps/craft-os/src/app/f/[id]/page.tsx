@@ -33,7 +33,13 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
             ← 表紙の一覧へ
           </Link>
           <h1 className="mt-1 text-xl font-bold">
-            {f.customer_name} 様{" "}
+            {f.guest_id ? (
+              <Link href={`/k/${f.guest_id}`} className="hover:underline">
+                {f.customer_name} 様
+              </Link>
+            ) : (
+              <>{f.customer_name} 様</>
+            )}{" "}
             <span className="ml-2 text-sm font-normal text-(--color-dim)">{f.fitting_no}</span>
           </h1>
           <p className="mt-1 text-xs text-(--color-dim)">
@@ -42,9 +48,16 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
             {f.fitting_minutes ? `（${f.fitting_minutes}分）` : ""}
           </p>
         </div>
-        <Link href={`/print/cover/${f.id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
-          表紙を印刷
-        </Link>
+        <div className="flex gap-2">
+          {f.guest_id && (
+            <Link href={`/k/${f.guest_id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
+              お客様カルテ
+            </Link>
+          )}
+          <Link href={`/print/cover/${f.id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
+            表紙を印刷
+          </Link>
+        </div>
       </header>
 
       <form action={saveCover} className="space-y-6">

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { getLaborRates, getQuote, searchProducts, type ProductRow } from "@/lib/craft";
+import { postSales } from "@/lib/sales";
 
 const admin = () => createAdmin();
 
@@ -229,5 +230,16 @@ export async function issueQuoteDoc(formData: FormData): Promise<void> {
     .update({ quote_issued_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("company_id", actor.companyId);
+  revalidatePath(`/q/${id}/quote`);
+}
+
+/**
+ * 工房を通さない伝票（グリップだけ等）の売上計上。
+ * 工房がある伝票は、お渡し日を入れた時点で自動的に計上される。
+ */
+export async function postSalesNow(formData: FormData): Promise<void> {
+  const id = Number(formData.get("quote_id"));
+  const { actor } = await mustQuote(id);
+  await postSales(actor, id);
   revalidatePath(`/q/${id}/quote`);
 }

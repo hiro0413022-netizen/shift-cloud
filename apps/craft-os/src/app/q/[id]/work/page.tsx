@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getQuote, WORK_STEPS } from "@/lib/craft";
+import { getQuote, listPurchaseDrafts, listSalesPostings, PO_STATUS_LABELS, WORK_STEPS } from "@/lib/craft";
 import { range, yen } from "@/lib/format";
 import { btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
-import { addSpecLine, createWorkOrder, removeSpecLine, saveSpecs, saveWork } from "./actions";
+import { addSpecLine, createPurchaseDrafts, createWorkOrder, removeSpecLine, saveSpecs, saveWork } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,11 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
   const full = await getQuote(actor, Number(id));
   if (!full) notFound();
   const { quote: q, items, work, specs } = full;
+  const [pos, postings] = await Promise.all([
+    listPurchaseDrafts(actor, full.work?.id ?? null),
+    listSalesPostings(actor, Number(id)),
+  ]);
+  const orderable = items.filter((it) => ["product", "grip", "sleeve", "coating"].includes(it.line_kind ?? ""));
 
   if (!work) {
     return (
@@ -287,8 +292,62 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
         </section>
       </form>
 
+      <section className={`${cardCls} mt-6`}>
+        <SectionTitle
+          right={
+            pos.length === 0 && orderable.length > 0 ? (
+              <form action={createPurchaseDrafts}>
+                <input type="hidden" name="quote_id" value={q.id} />
+                <button className={btnGhostCls}>発注の下書きをつくる</button>
+              </form>
+            ) : null
+          }
+        >
+          発注
+        </SectionTitle>
+
+        {pos.length === 0 ? (
+          <p className="text-sm text-(--color-dim)">
+            {orderable.length === 0
+              ? "取り寄せる商品の明細がありません。"
+              : "押すと、仕入先ごとに発注管理の「発注プール」へ下書きが入ります。送るのはいつもどおり発注管理の画面からです。"}
+          </p>
+        ) : (
+          <>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-(--color-line) text-left text-xs text-(--color-dim)">
+                  <th className="py-2 pr-3">発注番号</th>
+                  <th className="py-2 pr-3">仕入先</th>
+                  <th className="py-2 pr-3">発注日</th>
+                  <th className="py-2 pr-3 text-right">品数</th>
+                  <th className="py-2">状態</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pos.map((p) => (
+                  <tr key={p.purchase_order_id} className="border-b border-(--color-line) last:border-0">
+                    <td className="py-2 pr-3 whitespace-nowrap">{p.order_no}</td>
+                    <td className="py-2 pr-3">{p.supplier ?? "—"}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap text-(--color-dim)">{p.order_date}</td>
+                    <td className="py-2 pr-3 text-right">{p.itemCount}</td>
+                    <td className="py-2">{PO_STATUS_LABELS[p.status] ?? p.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-3 text-xs text-(--color-dim)">
+              発注管理で入荷を登録すると、上の「到着」日が自動で入ります。
+            </p>
+          </>
+        )}
+      </section>
+
       <p className="mt-4 text-xs text-(--color-dim)">
-        この注文書の見積合計は {yen(full.priced.totals.total)} です（税込）。
+        この注文書の合計は {yen(full.priced.totals.total)} です（税込）。
+        {postings.length > 0
+          ? `売上は ${postings.length} 行ぶん Money OS に計上済みです。`
+          : "お渡し日を入れると、Money OS へ売上を計上します。"}
       </p>
     </>
   );

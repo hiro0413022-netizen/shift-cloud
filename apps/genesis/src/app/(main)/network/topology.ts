@@ -252,6 +252,21 @@ export const NODES: SystemNode[] = [
     iy: 620,
   },
   {
+    id: "craft-os",
+    name: "Craft OS",
+    kind: "app",
+    status: "prod",
+    url: "https://craft-os-hironobu-s-projects.vercel.app",
+    healthUrl: "https://craft-os-hironobu-s-projects.vercel.app",
+    schema: "gw_（fittings / quotes / quote_items / work_orders / demo_shafts / discount_rules）",
+    description:
+      "GOLF WINGのフィッティング表紙・見積/注文書・工房の組立指示。表紙はお客様にお渡しする紙、伝票は表紙が無くても作れる（グリップ交換だけ等）。定価は持たず発注管理の商品マスタを引く。割引と返金の計算は @yozan/core/fitting-quote 1か所。試打シャフト1,490本の台帳つき。",
+    flow: "craft-os.svg",
+    aliases: ["craft", "フィッティング", "工房", "見積"],
+    ix: 150,
+    iy: 700,
+  },
+  {
     id: "report-os",
     name: "Report OS",
     kind: "script",
@@ -442,6 +457,13 @@ export const EDGES: SystemEdge[] = [
   { from: "inventory-os", to: "supabase", label: "inv_", type: "data" },
   // golfwing は別DBのため、入荷確定時に Inventory OS の /api/v1/movements を叩く（#96）
   { from: "golfwing", to: "inventory-os", label: "入荷→入庫(API)", type: "data" },
+  // craft-os（#フィッティング）: 定価は持たず発注管理の商品マスタを引く。発注はプールに下書きを入れるだけ
+  { from: "craft-os", to: "supabase", label: "gw_（表紙・伝票・工房）", type: "data" },
+  { from: "golfwing", to: "craft-os", label: "商品マスタ（gw_products）", type: "data" },
+  { from: "craft-os", to: "golfwing", label: "発注プールへ下書き", type: "auto" },
+  { from: "golfwing", to: "craft-os", label: "入荷→「到着」自動記入", type: "auto" },
+  { from: "member-os", to: "craft-os", label: "お客様台帳（mbr_guests）", type: "data" },
+  { from: "craft-os", to: "money-golfwing", label: "お渡しで売上計上（mon_sales_lines）", type: "auto" },
   { from: "inventory-os", to: "money-golfwing", label: "棚卸資産・売上原価(inv_monthly_valuation)", type: "kpi" },
   { from: "inventory-os", to: "report-os", label: "物販の在庫回転・粗利", type: "kpi" },
   { from: "reserve-os", to: "supabase", label: "res_", type: "data" },
@@ -487,6 +509,7 @@ export const FLOW_LIST: { file: string; title: string }[] = [
   { file: "money-os.svg", title: "Money OS（money-golfwing）" },
   { file: "caddy-os.svg", title: "Caddy OS（キャディ派遣）" },
   { file: "golfwing.svg", title: "GolfOrder（店頭注文・発注）" },
+  { file: "craft-os.svg", title: "Craft OS（フィッティング・見積・工房）" },
   { file: "legal-os.svg", title: "Legal OS（契約・期限管理）" },
   { file: "survey-os.svg", title: "Survey OS（アンケート）" },
   { file: "reserve-os.svg", title: "Reserve OS（ビジター予約）" },

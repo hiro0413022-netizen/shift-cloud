@@ -131,6 +131,9 @@ export type QuoteItem = QuoteItemInput & {
   labor_rate_id: number | null;
   product_name: string;
   spec: string | null;
+  /** DBに保存済みの金額（計算の正典は fitting-quote 側。ここは計上・カルテ用の写し） */
+  amount: number | null;
+  unit_price: number | null;
   finish_length_inch: number | null;
   discount_rate: number | null;
   discount_reason: string | null;
@@ -724,3 +727,177 @@ export function refundBreakdown(full: Pick<FullQuote, "fitting" | "items" | "ref
 }
 
 export { toItemInput, toQuoteInput, getRefundUsage, usedBefore, decorateTrials, getFittingsByIds };
+
+// ---------------------------------------------------------------------------
+// Phase 3: 発注・売上計上・お客様カルテ
+// ---------------------------------------------------------------------------
+
+export type PurchaseDraft = {
+  purchase_order_id: number;
+  order_no: string;
+  order_date: string;
+  status: string;
+  supplier: string | null;
+  itemCount: number;
+};
+
+export const PO_STATUS_LABELS: Record<string, string> = {
+  draft: "下書き",
+  pool: "発注プール（未発注）",
+  ordered: "発注済み",
+  partial: "一部入荷",
+  completed: "入荷済み",
+  canceled: "取消",
+};
+
+/** この伝票から出した発注（発注管理のプールに入っているもの） */
+export async function listPurchaseDrafts(actor: Actor, workOrderId: number | null): Promise<PurchaseDraft[]> {
+  if (!workOrderId) return [];
+  const { data: links } = await db()
+    .from("gw_work_order_pos")
+    .select("purchase_order_id")
+    .eq("company_id", actor.companyId)
+    .eq("work_order_id", workOrderId);
+  const ids = (links ?? []).map((l) => l.purchase_order_id as number);
+  if (ids.length === 0) return [];
+
+  // golfwing スキーマは PostgREST に出ていないので、読み取りビュー経由で引く
+  const { data } = await db()
+    .from("gw_purchase_orders")
+    .select("id, order_no, order_date, status, supplier_name, item_count")
+    .eq("company_id", actor.companyId)
+    .in("id", ids)
+    .order("id");
+  return ((data ?? []) as {
+    id: number; order_no: string; order_date: string; status: string; supplier_name: string | null; item_count: number;
+  }[]).map((p) => ({
+    purchase_order_id: p.id,
+    order_no: p.order_no,
+    order_date: p.order_date,
+    status: p.status,
+    supplier: p.supplier_name,
+    itemCount: Number(p.item_count ?? 0),
+  }));
+}
+
+export type SalesPosting = {
+  id: number;
+  quote_item_id: number | null;
+  line_kind: string;
+  amount: number;
+  posted_at: string;
+};
+
+/** 既に Money OS へ計上済みかどうか */
+export async function listSalesPostings(actor: Actor, quoteId: number): Promise<SalesPosting[]> {
+  const { data } = await db()
+    .from("gw_sales_postings")
+    .select("id, quote_item_id, line_kind, amount, posted_at")
+    .eq("company_id", actor.companyId)
+    .eq("quote_id", quoteId)
+    .order("id");
+  return ((data ?? []) as SalesPosting[]).map((r) => ({ ...r, amount: Number(r.amount) }));
+}
+
+// ---------------------------------------------------------------------------
+// お客様カルテ
+// ---------------------------------------------------------------------------
+
+export type KarteTrial = TrialRow & { fitting_no: string; fitting_date: string };
+
+export type Karte = {
+  guest: GuestRow | null;
+  customerName: string;
+  fittings: FittingListRow[];
+  quotes: QuoteListRow[];
+  /** 買った物（明細をすべて新しい順に） */
+  purchases: (QuoteItem & { quote_no: string; quote_date: string })[];
+  /** 採用した試打シャフト（何を選んだ方か） */
+  picked: KarteTrial[];
+  /** 組み上がりの実測（同じスペックで作り直すときの手がかり） */
+  builds: (WorkSpec & { quote_no: string; assembled_on: string | null })[];
+  totalSpend: number;
+};
+
+/**
+ * お客様1人ぶんを1画面に集める。
+ * 「前はどのシャフトを何インチで組んだか」を毎回ファイルから探していたのをやめるための画面。
+ */
+export async function getKarte(actor: Actor, guestId: string): Promise<Karte | null> {
+  const { data: guest } = await db()
+    .from("mbr_guests")
+    .select("id, name, name_kana, phone, mobile")
+    .eq("company_id", actor.companyId)
+    .eq("id", guestId)
+    .maybeSingle();
+
+  const [{ data: fRows }, { data: qRows }] = await Promise.all([
+    db().from("gw_fittings").select("*").eq("company_id", actor.companyId).eq("guest_id", guestId).is("deleted_at", null).order("fitting_date", { ascending: false }),
+    db().from("gw_quotes").select("id").eq("company_id", actor.companyId).eq("guest_id", guestId).is("deleted_at", null),
+  ]);
+  const fittings = (fRows ?? []) as Fitting[];
+  const quoteIds = ((qRows ?? []) as { id: number }[]).map((r) => r.id);
+  if (!guest && fittings.length === 0 && quoteIds.length === 0) return null;
+
+  const usage = await getRefundUsage(actor, fittings.map((f) => f.id));
+  const fittingRows: FittingListRow[] = fittings.map((f) => {
+    const list = usage.get(f.id) ?? [];
+    return { ...f, quoteCount: list.length, refundUsed: list.reduce((a, b) => a + b.amount, 0) };
+  });
+
+  const quotes = quoteIds.length > 0 ? await listQuotes(actor, { limit: 100 }).then((rows) => rows.filter((q) => quoteIds.includes(q.id))) : [];
+
+  const [{ data: itemRows }, { data: trialRows }, { data: workRows }] = await Promise.all([
+    quoteIds.length > 0
+      ? db().from("gw_quote_items").select("*").in("quote_id", quoteIds).order("quote_id", { ascending: false }).order("line_no")
+      : Promise.resolve({ data: [] as QuoteItem[] }),
+    fittings.length > 0
+      ? db().from("gw_fitting_trials").select("*").in("fitting_id", fittings.map((f) => f.id)).eq("picked", true).order("line_no")
+      : Promise.resolve({ data: [] as Trial[] }),
+    quoteIds.length > 0
+      ? db().from("gw_work_orders").select("id, quote_id, assembled_on").in("quote_id", quoteIds).is("deleted_at", null)
+      : Promise.resolve({ data: [] as { id: number; quote_id: number; assembled_on: string | null }[] }),
+  ]);
+
+  const quoteNo = new Map(quotes.map((q) => [q.id, { no: q.quote_no, date: q.quote_date }]));
+  const purchases = ((itemRows ?? []) as QuoteItem[]).map((it) => ({
+    ...it,
+    quote_no: quoteNo.get(it.quote_id)?.no ?? "",
+    quote_date: quoteNo.get(it.quote_id)?.date ?? "",
+  }));
+
+  const fittingByNo = new Map(fittings.map((f) => [f.id, f]));
+  const picked = (await decorateTrials(actor, (trialRows ?? []) as Trial[])).map((t) => ({
+    ...t,
+    fitting_no: fittingByNo.get(t.fitting_id)?.fitting_no ?? "",
+    fitting_date: fittingByNo.get(t.fitting_id)?.fitting_date ?? "",
+  }));
+
+  const works = (workRows ?? []) as { id: number; quote_id: number; assembled_on: string | null }[];
+  let builds: Karte["builds"] = [];
+  if (works.length > 0) {
+    const { data: specRows } = await db()
+      .from("gw_work_order_specs")
+      .select("*")
+      .in("work_order_id", works.map((w) => w.id))
+      .order("line_no");
+    const workById = new Map(works.map((w) => [w.id, w]));
+    builds = ((specRows ?? []) as WorkSpec[])
+      .filter((s) => s.actual_length != null || s.actual_cpm != null || s.actual_weight != null || s.actual_balance)
+      .map((s) => {
+        const w = workById.get(s.work_order_id);
+        return { ...s, quote_no: w ? quoteNo.get(w.quote_id)?.no ?? "" : "", assembled_on: w?.assembled_on ?? null };
+      });
+  }
+
+  return {
+    guest: (guest as GuestRow | null) ?? null,
+    customerName: (guest as GuestRow | null)?.name ?? fittings[0]?.customer_name ?? quotes[0]?.customer_name ?? "",
+    fittings: fittingRows,
+    quotes,
+    purchases,
+    picked,
+    builds,
+    totalSpend: quotes.filter((q) => q.status !== "void").reduce((a, q) => a + q.total, 0),
+  };
+}
