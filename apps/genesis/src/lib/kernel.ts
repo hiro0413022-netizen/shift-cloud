@@ -464,7 +464,7 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
     .is("deleted_at", null);
   const forecastTotal = (fcRows ?? []).reduce((s, r) => s + (Number((r as { amount: number | string }).amount) || 0), 0);
 
-  const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes] = await Promise.all([
+  const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes, frankRes] = await Promise.all([
     admin.from("fin_segments").select("id,name,code").eq("company_id", companyId).is("deleted_at", null),
     admin.from("fin_categories").select("id,kind,name").eq("company_id", companyId).is("deleted_at", null),
     month
@@ -472,7 +472,7 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     // stores だけは会社全件を取る（会員名簿の store_name 突き合わせに全店の名前が要るため）。
     // 表示に使う店舗は下で allowed に絞る（#134）
-    admin.from("stores").select("id,name,brand_id").eq("company_id", companyId).is("deleted_at", null),
+    admin.from("stores").select("id,name,brand_id,code").eq("company_id", companyId).is("deleted_at", null),
     // #134: 店舗またぎ廃止。allowed が指定されていれば、店舗に紐づくデータはその範囲だけを取る
     scopeStore(admin.from("staff_store_assignments").select("store_id").eq("company_id", companyId).is("deleted_at", null), allowed),
     scopeStore(admin.from("shifts").select("store_id,date").eq("company_id", companyId).gte("date", monthStart()), allowed),
@@ -489,6 +489,13 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
     ),
     // 会員名簿には store_id が無い（store_nameのテキストのみ）ので、店舗の絞りはアプリ側で行う
     admin.from("mbr_members").select("store_name,member_type,join_date,leave_date,leave_reason").eq("company_id", companyId),
+    // FRANK GOLF の会員は会員名簿(mbr_members)ではなく frunk_members が正典（#237）。
+    // FRANK は自前の入会フォーム→frunk_members に入るので、Smart Hello 由来の名簿には1件も載らない。
+    // これを見ていなかったため、姫路の「本会員数・今月入会・本会員退会」がずっと0だった。
+    scopeStore(
+      admin.from("frunk_members").select("store_id,status,join_date,leave_date").eq("company_id", companyId).is("deleted_at", null),
+      allowed
+    ),
   ]);
 
   const segments = (segRes.data ?? []) as { id: string; name: string; code: string }[];
@@ -499,7 +506,9 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
     catName.set(c.id, c.name);
   }
   // allStores＝名寄せ用（会社全店）／stores＝表示・集計に使う店舗（actorのスコープ・#134）
-  const allStores = (storeRes.data ?? []) as { id: string; name: string }[];
+  const allStores = (storeRes.data ?? []) as { id: string; name: string; code: string | null }[];
+  // 会員の集計を frunk_members 側で行う店舗（FRANK GOLF）。mbr_members 側では数えない＝二重計上を防ぐ。
+  const frankStoreIds = new Set(allStores.filter((s) => (s.code ?? "").startsWith("frunk")).map((s) => s.id));
   const stores = allowed ? allStores.filter((s) => allowed.has(s.id)) : allStores;
 
   // 店舗別カウント
@@ -548,6 +557,7 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
       continue;
     }
     if (allowed && !allowed.has(sid)) continue; // 自店舗以外は集計しない（#134）
+    if (frankStoreIds.has(sid)) continue; // FRANKの会員は frunk_members で数える（#237・二重計上防止）
     const isTrial = isTrialMember(mem.member_type);
 
     if (!mem.leave_date && !isTrial) bump(memberByStore, sid); // 在籍（本会員）
@@ -564,6 +574,23 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
         }
       }
     }
+  }
+
+  // FRANK GOLF の会員集計（#237）。status: active=在籍 / left=退会 / pending・rejected=入会前なので数えない。
+  // 退会理由の列が無いため leaveReasons は空、トライアル会員という区分も無いため leavesTrial は0のまま。
+  for (const fm of (frankRes.data ?? []) as {
+    store_id: string | null;
+    status: string | null;
+    join_date: string | null;
+    leave_date: string | null;
+  }[]) {
+    const sid = fm.store_id;
+    if (!sid) continue;
+    if (allowed && !allowed.has(sid)) continue;
+    if (fm.status === "pending" || fm.status === "rejected") continue; // 承認前・却下は会員ではない
+    if (fm.status === "active" && !fm.leave_date) bump(memberByStore, sid); // 在籍
+    if (inThisMonth(fm.join_date)) bump(joinByStore, sid); // 今月入会
+    if (inThisMonth(fm.leave_date)) bump(leaveCoreByStore, sid); // 今月退会
   }
 
   const storeMetric = (s: { id: string; name: string }, revenue: number | null): StoreMetric => {

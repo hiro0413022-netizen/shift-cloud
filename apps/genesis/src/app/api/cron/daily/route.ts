@@ -36,6 +36,14 @@ export async function GET(req: NextRequest) {
   for (const id of companyIds) {
     const c = { id };
     try {
+      // Money OS（売上・経費・カード/口座）→ fin_entries への転記（#237）。
+      // cron に入っておらず、Money OS の画面でボタンを押したときだけ走っていた。
+      // 実際 2026-08-22 の refresh_finance_kpis 例外以降、事業別PLがその日で凍結していた。
+      // CEOレポートより先に回して、その日の報告が最新の数字を見るようにする。
+      const money = await admin
+        .rpc("refresh_money_to_finance", { p_company_id: String(c.id) })
+        .then((r) => (r.error ? { error: r.error.message } : { ok: true }))
+        .catch((e) => ({ error: String(e) }));
       // 後工程の予算180秒。maxDuration(300秒)より十分短くする（レポート本体は数秒で終わる）。
       const r = await runDailyCeoReport(String(c.id), "cron", {
         afterworkBudgetMs: Number(process.env.DAILY_AFTERWORK_BUDGET_MS ?? 180_000),
@@ -54,7 +62,7 @@ export async function GET(req: NextRequest) {
       const scorecard = await runAiScorecard(String(c.id)).catch((e) => ({ error: String(e) }));
       // 朝の個人LINEダイジェスト（#83・毎日。宛先未設定なら自動skip）
       const digest = await runMorningDigest(String(c.id)).catch((e) => ({ error: String(e) }));
-      results.push({ company: c.id, ...r, executed: exec, salesLoop: sales, contentLoop: content, snsMetrics: metrics, activation, scorecard, digest });
+      results.push({ company: c.id, ...r, money, executed: exec, salesLoop: sales, contentLoop: content, snsMetrics: metrics, activation, scorecard, digest });
     } catch (e) {
       results.push({ company: c.id, error: String(e) });
     }

@@ -9,6 +9,7 @@
     "./auth": "./src/auth.ts",
     "./birth-date": "./src/birth-date.ts",
     "./compe-score": "./src/compe-score.ts",
+    "./fitting-quote": "./src/fitting-quote.ts",
     "./fitting-walkin": "./src/fitting-walkin.ts",
     "./frank-billing-start": "./src/frank-billing-start.ts",
     "./frank-booking": "./src/frank-booking.ts",

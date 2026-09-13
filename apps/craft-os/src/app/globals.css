@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  /* 明るいクリーンSaaS配色（member-os / compe-os と統一） */
+  --color-bg: #f6f7f9;
+  --color-panel: #ffffff;
+  --color-panel-2: #f4f6fa;
+  --color-line: #e6e9ef;
+  --color-txt: #111827;
+  --color-dim: #6b7280;
+  --color-accent: #1f3a5f;   /* 工房＝落ち着いたネイビー */
+  --color-accent-2: #2f5480;
+  --color-gold: #b7791f;
+  --color-ok: #059669;
+  --color-warn: #d97706;
+  --color-danger: #dc2626;
+}
+
+html,
+body {
+  background: var(--color-bg);
+}
+
+body {
+  font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  @apply text-(--color-txt) antialiased;
+}
+
+/* 印刷ページ用。画面ではプレビュー、印刷では紙そのもの */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .page-break {
+    page-break-after: always;
+  }
+}

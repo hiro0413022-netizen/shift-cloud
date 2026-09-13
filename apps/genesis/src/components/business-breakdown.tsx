@@ -199,7 +199,7 @@ export function BusinessBreakdown({
           <span className="tabular-nums text-sm font-semibold text-sky-200">{yen(forecastTotal)}</span>
         </div>
       )}
-      <p className="mb-3 text-[11px] text-(--color-dim)">下段のPLは最新の完了月（{monthLabel}）。事業別=Money OS(fin_entries)、店舗別の会員・入退会は会員名簿、スタッフ・シフトはShift Cloudから自動集計</p>
+      <p className="mb-3 text-[11px] text-(--color-dim)">下段のPLは最新の完了月（{monthLabel}）。事業別=Money OS(fin_entries)、店舗別の会員・入退会は会員名簿（FRANKはFRANK会員台帳）、スタッフ・シフトはShift Cloudから自動集計</p>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {segments.map((seg) => (
           <SegmentCard key={seg.code} seg={seg} />
