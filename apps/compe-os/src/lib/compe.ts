@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import type { Actor } from "@yozan/core/auth";
 import type { CompeFormat, ScoreInput } from "@yozan/core/compe-score";
@@ -126,8 +127,9 @@ export type Receipt = {
 /**
  * コンペを1件取り、アクターの会社・店舗スコープに入っているか確認する。
  * ★ 店舗が違えば「無い」として扱う（存在を教えない）。オーナーは会社の全店舗。
+ * ★ cache() — レイアウトとページの両方から呼ばれるので、1リクエストにつき1回だけDBを叩く。
  */
-export async function getComp(actor: Actor, compId: string): Promise<Comp | null> {
+export const getComp = cache(async (actor: Actor, compId: string): Promise<Comp | null> => {
   const admin = createAdmin();
   const { data } = await admin
     .from("cmp_comps")
@@ -140,7 +142,7 @@ export async function getComp(actor: Actor, compId: string): Promise<Comp | null
   if (comp.company_id !== actor.companyId) return null;
   if (comp.store_id && !actor.isOwner && !actor.storeIds.includes(comp.store_id)) return null;
   return normalizeComp(comp);
-}
+});
 
 function normalizeComp(comp: Comp): Comp {
   return {
