@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { createSale, createSales, type SaleInput } from "./actions";
 import ProductPicker, { invLabel, type InvPick } from "./ProductPicker";
+import CustomerPicker from "./CustomerPicker";
 
 /** 定番ボタン1つ分。unitPrice は「1個あたりの定価」（合計金額ではない） */
 export type Preset = { label: string; category: string; productName: string; unitPrice: number };
@@ -249,9 +250,6 @@ export default function SalesEntry({
       </div>
 
       {/* 共通データリスト */}
-      <datalist id="customer-suggestions">
-        {customerSuggestions.map((c) => <option key={c} value={c} />)}
-      </datalist>
       <datalist id="item-type-suggestions">
         {itemTypeSuggestions.map((t) => <option key={t} value={t} />)}
       </datalist>
@@ -263,12 +261,17 @@ export default function SalesEntry({
       </datalist>
 
       {/* ヘッダー（保持項目） */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-7">
+      <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-7">
         <input type="date" value={soldOn} onChange={(e) => setSoldOn(e.target.value)} className={inputCls} />
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
           {categories.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <input list="customer-suggestions" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="お客様名" className={inputCls} />
+        <CustomerPicker
+          value={customerName}
+          onPick={setCustomerName}
+          onMemberKind={setMemberKind}
+          recent={customerSuggestions}
+        />
         <select value={memberKind} onChange={(e) => setMemberKind(e.target.value)} className={inputCls}>
           <option value="">会員区分</option>
           {memberKinds.map((k) => <option key={k} value={k}>{k}</option>)}

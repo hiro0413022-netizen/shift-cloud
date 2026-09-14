@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireMoneyActor, type MoneyActor, type AccessibleStore } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore, canWriteStore, latestCashBalance, rebalanceCashLedger, toNum } from "@/lib/money";
+import { searchPeople, nameVariants, type Person } from "@/lib/people";
 
 type Admin = ReturnType<typeof createAdmin>;
 
@@ -399,6 +400,18 @@ export async function deleteSale(formData: FormData): Promise<void> {
 // お客様の購入履歴（明細のお客様名クリックで開く）
 // ============================================================
 
+/**
+ * お客様をお名前で探す（売上入力の入口）。
+ * 2026-09-13 ユーザー要望「名前をいちいち入力せずに、craft-os のように名前検索を主にしたい」。
+ * 検索は今開いている店舗の受付台帳だけを見る。q が空なら「よく来られる方」から出す。
+ */
+export async function findCustomers(q: string): Promise<Person[]> {
+  const actor = await requireMoneyActor();
+  const store = await getCurrentStore(actor);
+  if (!store) return [];
+  return searchPeople(actor.companyId, store.id, String(q ?? ""), 20);
+}
+
 export type CustomerPurchase = {
   soldOn: string;
   category: string;
@@ -441,17 +454,20 @@ export async function getCustomerHistory(name: string): Promise<CustomerHistory 
   if (!store || !customer) return null;
 
   const admin = createAdmin();
+  // 台帳側は「西原 康夫 / 西原　康夫 / 西原康夫」が混ざっている。
+  // 完全一致だけで引くと、同じ方の過去の履歴が落ちて「初めてのお客様」に見えてしまう。
+  const variants = nameVariants(customer);
   const [{ data: sales }, { data: lines }] = await Promise.all([
     admin.from("mon_sales")
       .select("sold_on, category, customer_name, member_kind, amount, pay_method, memo, detail")
       .eq("company_id", actor.companyId).eq("store_id", store.id)
-      .eq("customer_name", customer).eq("source", "app")
+      .in("customer_name", variants).eq("source", "app")
       .is("deleted_at", null)
       .order("sold_on", { ascending: false }).limit(HISTORY_LIMIT),
     admin.from("mon_sales_lines")
       .select("sold_on, customer_name, member_kind, item_category, product_name, qty, amount, pay_method, pro, memo")
       .eq("company_id", actor.companyId).eq("store_id", store.id)
-      .eq("customer_name", customer)
+      .in("customer_name", variants)
       .is("deleted_at", null)
       .order("sold_on", { ascending: false }).limit(HISTORY_LIMIT),
   ]);

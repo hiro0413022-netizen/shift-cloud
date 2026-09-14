@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { inputCls, btnCls, btnGhostCls, yen } from "@/components/ui";
 import { updateSale, deleteSaleById } from "./actions";
 import CustomerHistoryDialog from "./CustomerHistoryDialog";
+import CustomerPicker from "./CustomerPicker";
 import { matchesQuery, optionCounts, summarize, BLANK_LABEL } from "@/lib/table-filter";
 
 /** 一覧・編集用の1明細（サーバーで整形して渡す） */
@@ -437,7 +438,11 @@ export default function SalesTable({
                     <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls}>
                       {opts(categories, form.category).map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    <input value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} placeholder="お客様名" className={inputCls} />
+                    <CustomerPicker
+                      value={form.customerName}
+                      onPick={(name) => setForm((f) => (f ? { ...f, customerName: name } : f))}
+                      onMemberKind={(kind) => setForm((f) => (f ? { ...f, memberKind: kind } : f))}
+                    />
                     <select value={form.memberKind} onChange={(e) => setForm({ ...form, memberKind: e.target.value })} className={inputCls}>
                       <option value="">会員区分</option>
                       {opts(memberKinds, form.memberKind).map((k) => <option key={k} value={k}>{k}</option>)}
