@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
-import { searchGuests, type GuestRow } from "@/lib/craft";
 
 /**
  * 入口は2つある。
@@ -19,19 +18,46 @@ import { searchGuests, type GuestRow } from "@/lib/craft";
 
 const admin = () => createAdmin();
 
-/** お客様をお名前で探す（6,261人から選ぶだけにして、毎回書かせない） */
-export async function findGuests(
-  _prev: { rows?: GuestRow[]; error?: string },
-  formData: FormData
-): Promise<{ rows?: GuestRow[]; error?: string }> {
+/** 検索結果1件＝「人」。受付台帳は受付1回ごとの行なので、DB側でお名前ごとに束ねてある */
+export type GuestHit = {
+  guestId: string;
+  name: string;
+  nameKana: string | null;
+  phoneLast4: string | null;
+  visits: number;
+  isMember: boolean;
+};
+
+/**
+ * お客様をお名前・フリガナ・お電話で探す。
+ *
+ * 2026-09-14 直した理由：
+ *   受付台帳（mbr_guests）は受付1回ごとの記録で、同じ方が何十行も入っている
+ *   （6,251行・お名前2,009通り）。素のまま出すと同じ方がずらっと並んだ。
+ *   money-os と同じ mbr_search_people（お名前で束ねた「人」）に寄せる。
+ *   q が空なら「よく来られる方」から返す。
+ */
+export async function findGuests(q: string): Promise<GuestHit[]> {
   const actor = await requireActor();
-  const q = String(formData.get("q") ?? "").trim();
-  if (!q) return { rows: [] };
-  try {
-    return { rows: await searchGuests(actor, q) };
-  } catch {
-    return { error: "検索できませんでした" };
-  }
+  const { data, error } = await admin().rpc("mbr_search_people", {
+    p_company_id: actor.companyId,
+    p_store_id: actor.primaryStoreId,
+    p_q: String(q ?? ""),
+    p_limit: 12,
+  });
+  if (error) return [];
+  type Row = { guest_id: string; name: string | null; name_kana: string | null; phone: string | null; visits: number | null; is_member: boolean | null };
+  return ((data ?? []) as Row[]).map((r) => {
+    const d = String(r.phone ?? "").replace(/\D/g, "");
+    return {
+      guestId: r.guest_id,
+      name: (r.name ?? "").trim(),
+      nameKana: r.name_kana,
+      phoneLast4: d ? d.slice(-4) : null,
+      visits: Number(r.visits ?? 0),
+      isMember: !!r.is_member,
+    };
+  });
 }
 
 function txt(v: FormDataEntryValue | null): string | null {
