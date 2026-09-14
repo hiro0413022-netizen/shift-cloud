@@ -412,6 +412,51 @@ export async function findCustomers(q: string): Promise<Person[]> {
   return searchPeople(actor.companyId, store.id, String(q ?? ""), 20);
 }
 
+/** 発注管理の商品マスタ（gw_products）1件。在庫リストとは別で、在庫は減らさない */
+export type MasterProduct = {
+  id: number;
+  category: string;
+  maker: string;
+  name: string;
+  spec: string | null;
+  clubType: string | null;
+  listPrice: number | null;
+};
+
+/**
+ * 商品マスタを探す（2026-09-14 ユーザー要望「登録されている商品を、カテゴリーやメーカー名でも検索できるように」）。
+ * 品名ピッカーは在庫リスト（Inventory OS・362品番）しか見ていなかった。
+ * 発注管理には 3,158 品（シャフト2,255・クラブ518・グリップ258…）が登録されているので、そちらも引けるようにする。
+ * 空白区切りの語を全部含むもの＝「テーラーメイド グリップ」「ベンタス 6S」のような引き方。
+ * 各語は 品名／メーカー／仕様／区分 のどれかに当たればよい。
+ */
+export async function findMasterProducts(q: string): Promise<MasterProduct[]> {
+  const actor = await requireMoneyActor();
+  const words = String(q ?? "").trim().split(/[\s　]+/).filter(Boolean).slice(0, 4);
+  if (words.length === 0) return [];
+  let query = createAdmin()
+    .from("gw_products")
+    .select("id, item_category, manufacturer, name, spec, club_type, list_price")
+    .eq("company_id", actor.companyId)
+    .eq("is_active", true)
+    .limit(20);
+  for (const w of words) {
+    const t = w.replace(/[,%()]/g, "");
+    query = query.or(`name.ilike.%${t}%,manufacturer.ilike.%${t}%,spec.ilike.%${t}%,item_category.ilike.%${t}%,club_type.ilike.%${t}%`);
+  }
+  const { data } = await query.order("manufacturer").order("name");
+  type Row = { id: number; item_category: string | null; manufacturer: string | null; name: string | null; spec: string | null; club_type: string | null; list_price: number | string | null };
+  return ((data ?? []) as Row[]).map((r) => ({
+    id: Number(r.id),
+    category: r.item_category ?? "",
+    maker: r.manufacturer ?? "",
+    name: r.name ?? "",
+    spec: r.spec,
+    clubType: r.club_type,
+    listPrice: r.list_price == null ? null : Number(r.list_price),
+  }));
+}
+
 export type CustomerPurchase = {
   soldOn: string;
   category: string;

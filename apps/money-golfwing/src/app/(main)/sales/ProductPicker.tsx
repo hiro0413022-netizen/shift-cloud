@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { inputCls } from "@/components/ui";
+import { findMasterProducts, type MasterProduct } from "./actions";
 
 /** 在庫リスト（Inventory OS inv_stock）から渡す1品番 */
 export type InvPick = {
@@ -27,6 +28,10 @@ export function invLabel(it: InvPick): string {
   return [it.maker, it.name, it.variant].filter(Boolean).join(" ");
 }
 
+export function masterLabel(p: MasterProduct): string {
+  return [p.maker, p.name, p.spec].filter(Boolean).join(" ");
+}
+
 /**
  * 品名入力欄。自由入力＋ドロップダウンで「最近の入力」「在庫品番」から選べる。
  * 設計方針: 362品番を全部見せない。
@@ -45,6 +50,7 @@ export default function ProductPicker({
   autoFocusRef,
   onChange,
   onPick,
+  onPickMaster,
 }: {
   value: string;
   invItemId: string | null;
@@ -58,9 +64,15 @@ export default function ProductPicker({
   onChange: (name: string) => void;
   /** 在庫品番を選択（品名・invItemId・定価を親へ） */
   onPick: (it: InvPick) => void;
+  /** 商品マスタ（発注管理）を選択。在庫は減らさない（invItemId は付けない） */
+  onPickMaster?: (p: MasterProduct) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState<string | null>(null);
+  // 商品マスタ（発注管理・3,158品）はサーバーで探す。打鍵が止まって250msで1回だけ
+  const [master, setMaster] = useState<MasterProduct[]>([]);
+  const [searching, setSearching] = useState(false);
+  const seq = useRef(0);
   const innerRef = useRef<HTMLInputElement>(null);
   const inputRef = autoFocusRef ?? innerRef;
 
@@ -72,6 +84,21 @@ export default function ProductPicker({
 
   const q = norm(value.trim());
   const linked = items.find((it) => it.id === invItemId) ?? null;
+
+  useEffect(() => {
+    if (!open || !onPickMaster) return;
+    const raw = value.trim();
+    if (raw.length < 1 || invItemId) { setMaster([]); return; }
+    const mine = ++seq.current;
+    setSearching(true);
+    const t = setTimeout(() => {
+      findMasterProducts(raw)
+        .then((r) => { if (mine === seq.current) setMaster(r); })
+        .finally(() => { if (mine === seq.current) setSearching(false); });
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, open, invItemId]);
 
   // 履歴の一致（最大4件・在庫と重複する見た目は許容）
   const recentHits = useMemo(() => {
@@ -108,7 +135,7 @@ export default function ProductPicker({
         </div>
       )}
 
-      {open && (recentHits.length > 0 || invHits.length > 0 || categories.length > 0) && (
+      {open && (recentHits.length > 0 || invHits.length > 0 || master.length > 0 || categories.length > 0) && (
         <div className="absolute left-0 right-0 z-20 mt-1 max-h-80 overflow-y-auto rounded-lg border border-(--color-line) bg-(--color-panel) p-2 shadow-xl">
           {/* 品目チップ（在庫を品目で絞る） */}
           {categories.length > 0 && (
@@ -160,8 +187,30 @@ export default function ProductPicker({
             </>
           )}
 
-          {q && recentHits.length === 0 && invHits.length === 0 && (
-            <p className="px-2 py-1.5 text-xs text-(--color-dim)">一致なし。このまま自由入力で保存できます</p>
+          {master.length > 0 && (
+            <>
+              <p className="px-1 pb-1 pt-2 text-[11px] text-(--color-dim)">商品マスタ（発注管理） — 品名・メーカー・定価を写します（在庫は動きません）</p>
+              {master.map((p) => (
+                <button
+                  key={`m-${p.id}`}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { onPickMaster?.(p); setOpen(false); }}
+                  className="block w-full rounded px-2 py-1.5 text-left hover:bg-(--color-bg)"
+                >
+                  <span className="text-sm">{masterLabel(p)}</span>
+                  <span className="ml-2 text-xs tabular-nums text-(--color-dim)">
+                    {p.category}{p.clubType ? `・${p.clubType}` : ""}{p.listPrice ? ` ／ 定価 ${p.listPrice.toLocaleString("ja-JP")}` : ""}
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {q && recentHits.length === 0 && invHits.length === 0 && master.length === 0 && (
+            <p className="px-2 py-1.5 text-xs text-(--color-dim)">
+              {searching ? "商品マスタを探しています…" : "一致なし。このまま自由入力で保存できます"}
+            </p>
           )}
         </div>
       )}

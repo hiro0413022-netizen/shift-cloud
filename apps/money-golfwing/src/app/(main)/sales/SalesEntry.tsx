@@ -3,7 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { createSale, createSales, type SaleInput } from "./actions";
-import ProductPicker, { invLabel, type InvPick } from "./ProductPicker";
+import ProductPicker, { invLabel, masterLabel, type InvPick } from "./ProductPicker";
+import type { MasterProduct } from "./actions";
 import CustomerPicker from "./CustomerPicker";
 
 /** 定番ボタン1つ分。unitPrice は「1個あたりの定価」（合計金額ではない） */
@@ -177,6 +178,19 @@ export default function SalesEntry({
     apply((l) => pickInto(l, it));
   }
 
+  // 商品マスタ（発注管理）を選んだ: 品名・種類・メーカー・定価を写す。在庫リンクは付けない
+  function pickMasterInto(l: Line, p: MasterProduct): Line {
+    const next: Partial<Line> = { productName: masterLabel(p), invItemId: null };
+    if (p.category) next.itemType = p.category;
+    if (p.maker) next.maker = p.maker;
+    if (!num(l.listPrice) && p.listPrice) next.listPrice = String(Math.round(p.listPrice));
+    return patch(l, next);
+  }
+  function onPickMasterAny(p: MasterProduct, apply: (f: (l: Line) => Line) => void) {
+    if (category !== "販売") setCategory("販売");
+    apply((l) => pickMasterInto(l, p));
+  }
+
   // 連続追加：1件保存 → 商品欄だけクリア、ヘッダーは保持、品名にフォーカス
   function addSingle() {
     const bad = invalidReason(line);
@@ -315,6 +329,7 @@ export default function SalesEntry({
             autoFocusRef={productRef}
             onChange={(name) => setLine((prev) => ({ ...prev, productName: name, invItemId: null }))}
             onPick={(it) => onPickAny(it, (f) => setLine((prev) => f(prev)))}
+            onPickMaster={(p) => onPickMasterAny(p, (f) => setLine((prev) => f(prev)))}
           />
           <input
             list="item-type-suggestions"
@@ -412,6 +427,7 @@ export default function SalesEntry({
                 items={invItems}
                 onChange={(name) => setLines((prev) => prev.map((x, i) => i === idx ? { ...x, productName: name, invItemId: null } : x))}
                 onPick={(it) => onPickAny(it, (f) => setLines((prev) => prev.map((x, i) => i === idx ? f(x) : x)))}
+                onPickMaster={(p) => onPickMasterAny(p, (f) => setLines((prev) => prev.map((x, i) => i === idx ? f(x) : x)))}
               />
               <input
                 list="item-type-suggestions"
