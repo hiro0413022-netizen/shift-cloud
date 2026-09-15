@@ -37,7 +37,9 @@ type Msg = {
   intent?: string;
 };
 
-const VOICE_KEY = "gn.jarvis.voice";
+// 2026-09-15: 「急にしゃべりだすのをやめてほしい」→ 声は最初オフ。
+// 以前のキー(gn.jarvis.voice)は既定オンだったので読まない＝全員いったんオフから始まる。
+const VOICE_KEY = "gn.jarvis.voice.v2";
 const WAKE_KEY = "gn.jarvis.wake";
 const SPEED_KEY = "gn.jarvis.speed";
 
@@ -68,7 +70,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<Mode>("off");
   const [speaking, setSpeaking] = useState(false);
-  const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceOn, setVoiceOn] = useState(false);
   const [speed, setSpeed] = useState<string>("normal");
   const [needsGesture, setNeedsGesture] = useState(false);
   const [sttSupported, setSttSupported] = useState(false);
@@ -77,7 +79,6 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const threadRef = useRef<HTMLDivElement | null>(null);
-  const spokeOpening = useRef(false);
 
   // 認識コールバックは再生成しても中身を見失わないよう ref で持つ
   const wantListening = useRef(false); // 常時待受にしたいか（人の意思）
@@ -88,7 +89,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const busyRef = useRef(false);
   const speedRef = useRef("normal");
   const msgsRef = useRef<Msg[]>([]);
-  const voiceRef = useRef(true);
+  const voiceRef = useRef(false);
   // onend のクロージャは作られた時点の値を握るので、読み上げ中かどうかは ref で見る
   // （state を見ると「読み上げ終わったのにマイクが起きない」で黙り込む）
   const speakingRef = useRef(false);
@@ -188,7 +189,9 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
           ...prev,
           { role: "assistant", text: r.reply, link: r.link, dev: r.dev, act: r.act, sql: r.sql, rowCount: r.rowCount, intent: r.intent },
         ]);
-        if (voiceRef.current) {
+        // 読み上げるのは「🔊をオンにしている」か「声で話しかけた」ときだけ。
+        // 文字で打った質問に勝手に声で返さない（2026-09-15）
+        if (voiceRef.current || inputMode === "voice") {
           void speak(r.reply);
         }
         // 返事のあとしばらくは、呼びかけ無しで続けて話せる
@@ -305,7 +308,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   /* ---------- 初期化 ---------- */
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(VOICE_KEY) === "off") setVoiceOn(false);
+      if (window.localStorage.getItem(VOICE_KEY) === "on") setVoiceOn(true);
       const sp = window.localStorage.getItem(SPEED_KEY);
       if (sp) setSpeed(sp);
     } catch {
@@ -333,11 +336,8 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (spokeOpening.current || !voiceOn) return;
-    spokeOpening.current = true;
-    void speak(opening);
-  }, [voiceOn, opening, speak]);
+  // 2026-09-15: 開いた瞬間の読み上げは廃止（最初の一言は画面に文字で出すだけ）。
+  // ここで speak(opening) を呼ぶと「急にしゃべりだす」になる。戻さないこと。
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
@@ -404,12 +404,6 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   return (
     <section
       className="relative overflow-hidden rounded-2xl border border-sky-900/50 bg-[radial-gradient(120%_140%_at_15%_0%,#0f1a2e_0%,#0d1119_55%,#0b0e15_100%)] p-4 sm:p-5"
-      onClick={() => {
-        if (needsGesture && voiceOn && latest?.role === "assistant") {
-          setNeedsGesture(false);
-          void speak(latest.text);
-        }
-      }}
     >
       {/* ヘッダー */}
       <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -547,8 +541,8 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
           「🎧 待受にする」を1回押すと、以後は<b className="text-sky-300">「ジェネシス」と呼ぶだけ</b>で会話に入ります（このタブを開いている間、マイクは入りっぱなしになります）。
         </p>
       )}
-      {needsGesture && voiceOn && (
-        <p className="mt-2 text-xs text-(--color-dim)">画面を一度クリックすると声が出ます（ブラウザの自動再生制限）。</p>
+      {needsGesture && (
+        <p className="mt-2 text-xs text-(--color-dim)">ブラウザの設定で声を出せませんでした（文字の返事はそのまま使えます）。</p>
       )}
     </section>
   );
