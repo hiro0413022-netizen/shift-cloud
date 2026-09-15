@@ -341,3 +341,95 @@ export function detectScreenCommand(text: string): ScreenCommand | null {
   }
   return null;
 }
+
+/* ------------------------------------------------------------
+   声の精度を上げる（#245・2026-09-15 ユーザー要望「人間としゃべるレベルまで」）
+
+   遅い・聞き違える・途中で口を挟めない、の3つを別々に潰す:
+     1. 聞き取り: ブラウザ任せをやめ、録った音声をサーバー（Gemini）で文字にする。
+        ブラウザの認識は「呼びかけ（ジェネシス）の検出」と「保険」に格下げ。
+     2. 区切り: 文字ではなく**音量**で「言い終わった」を測る（VAD）。
+     3. 返事: 文ごとに音声を作って、最初の1文ができた瞬間から喋り始める。
+     4. 割り込み: 喋っている最中に人の声が入ったら黙って聞く。
+   ここは純関数（音の数値を受けて判定を返すだけ）。マイクもAPIも触らない。
+------------------------------------------------------------ */
+
+/** 読み上げを文ごとに割る。「。」「！」「？」で切り、短すぎる断片は前に足す */
+export function splitSentences(text: string, minLen = 6): string[] {
+  const raw = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!raw) return [];
+  const parts = raw.split(/(?<=[。！？!?])/).map((s) => s.trim()).filter(Boolean);
+  const out: string[] = [];
+  for (const p of parts) {
+    if (out.length > 0 && (p.length < minLen || out[out.length - 1].length < minLen)) out[out.length - 1] += p;
+    else out.push(p);
+  }
+  return out;
+}
+
+export type VadEvent = "start" | "end" | null;
+
+/**
+ * 音量で発話の始まり・終わりを判定する。
+ * - 無音の床（noise floor）は最初の数フレームで学習し、その後もゆっくり追従する
+ * - 床の何倍か（ratio）で「声」とみなす。絶対値（minRms）も下限に置く（無音室で誤爆しない）
+ * - 声が minSpeechMs 続いたら start、その後 silenceMs 静かなら end
+ */
+export function createVad(opts: { silenceMs: number; minSpeechMs?: number; ratio?: number; minRms?: number; frameMs?: number }) {
+  const silenceMs = opts.silenceMs;
+  const minSpeechMs = opts.minSpeechMs ?? 200;
+  const ratio = opts.ratio ?? 2.5;
+  const minRms = opts.minRms ?? 0.01;
+  const frameMs = opts.frameMs ?? 50;
+  let floor = 0;
+  let frames = 0;
+  let speaking = false;
+  let voiced = 0;
+  let quiet = 0;
+  return {
+    /** 1フレームぶんの RMS（0〜1）を渡す。start / end / null を返す */
+    feed(rms: number): VadEvent {
+      frames += 1;
+      if (frames <= 8) {
+        floor = frames === 1 ? rms : floor * 0.7 + rms * 0.3;
+        return null;
+      }
+      const threshold = Math.max(minRms, floor * ratio);
+      const isVoice = rms >= threshold;
+      if (!isVoice) floor = floor * 0.98 + rms * 0.02; // 静かなときだけ床を追従
+      if (!speaking) {
+        voiced = isVoice ? voiced + frameMs : 0;
+        if (voiced >= minSpeechMs) {
+          speaking = true;
+          quiet = 0;
+          return "start";
+        }
+        return null;
+      }
+      quiet = isVoice ? 0 : quiet + frameMs;
+      if (quiet >= silenceMs) {
+        speaking = false;
+        voiced = 0;
+        return "end";
+      }
+      return null;
+    },
+    get speaking() {
+      return speaking;
+    },
+    reset() {
+      speaking = false;
+      voiced = 0;
+      quiet = 0;
+    },
+  };
+}
+
+/** 文字起こしの後始末。呼びかけを落とし、末尾の言い淀みを削る */
+export function cleanTranscript(text: string): string {
+  let t = (text ?? "").replace(/\s+/g, " ").trim();
+  const w = detectWake(t);
+  if (w.hit) t = w.rest;
+  t = t.replace(/^(えー|えっと|あの|あのー|うーん)[、,\s]*/g, "").replace(/[、,]+$/g, "").trim();
+  return t;
+}

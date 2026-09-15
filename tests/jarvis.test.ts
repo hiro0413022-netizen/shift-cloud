@@ -225,3 +225,40 @@ test("intent=act のJSONを読める", () => {
   assert.equal(d?.act?.type, "booking_create");
   assert.equal((d?.act?.args as Record<string, unknown>)?.date, "2026-09-02");
 });
+
+/* ============================================================
+   #245 声の精度（2026-09-15）: 文の分割・音量VAD・文字起こしの後始末
+   ============================================================ */
+import { splitSentences, createVad, cleanTranscript } from "../apps/genesis/src/lib/jarvis-pure.ts";
+
+test("#245 読み上げは文ごとに分け、短い断片は前にくっつける", () => {
+  assert.deepEqual(splitSentences("本日の判断は4件です。いちばん上は入会申込です。急ぎますか？"), [
+    "本日の判断は4件です。",
+    "いちばん上は入会申込です。",
+    "急ぎますか？",
+  ]);
+  assert.deepEqual(splitSentences("はい。承知しました。"), ["はい。承知しました。"]);
+  assert.deepEqual(splitSentences("   "), []);
+});
+
+test("#245 VAD: 静かな床を学習し、声が続いたら start・黙ったら end", () => {
+  const vad = createVad({ silenceMs: 300, minSpeechMs: 100, ratio: 2.5, minRms: 0.01, frameMs: 50 });
+  for (let i = 0; i < 8; i++) assert.equal(vad.feed(0.004), null); // 床の学習
+  assert.equal(vad.feed(0.05), null); // 50ms
+  assert.equal(vad.feed(0.05), "start"); // 100ms
+  assert.equal(vad.speaking, true);
+  for (let i = 0; i < 5; i++) assert.equal(vad.feed(0.004), null); // 250ms
+  assert.equal(vad.feed(0.004), "end"); // 300ms
+  assert.equal(vad.speaking, false);
+});
+
+test("#245 VAD: 床より少し大きいだけの雑音では start しない", () => {
+  const vad = createVad({ silenceMs: 300, minSpeechMs: 100, ratio: 2.5, minRms: 0.01, frameMs: 50 });
+  for (let i = 0; i < 8; i++) vad.feed(0.02);
+  for (let i = 0; i < 10; i++) assert.equal(vad.feed(0.03), null);
+});
+
+test("#245 文字起こしの後始末: 呼びかけと言い淀みを落とす", () => {
+  assert.equal(cleanTranscript("ジェネシス、えっと、会員数を見せて、"), "会員数を見せて");
+  assert.equal(cleanTranscript("  今月の売上は？ "), "今月の売上は？");
+});

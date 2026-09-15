@@ -1,0 +1,12 @@
+genesis: 声の精度を上げた — Geminiで文字起こし・音量で区切る・文ごとに喋る・割り込み可 (#245)
+
+ユーザー要望「音声AIを人間としゃべるレベルまで」。方式は「今の仕組みを一段ずつ良くする」。
+
+- 耳: 録音(16kHz WAV)→/api/jarvis/transcribe→Gemini。店舗/スタッフ/プラン名をヒント。キー無しは204→ブラウザ認識で動く
+- 区切り: 音量VAD(createVad)で言い終わりを判定。先頭4フレームのプリロール。20秒で強制送信
+- 口: splitSentencesで文ごとに合成し最初の1文から再生。割り込みで停止(speakGen)
+- 話し方: 話し言葉・短く・名前を毎回呼ばない・誤変換は文脈で解釈
+- tests 4件追加(全757)・tsc 0・next build 成功・migration なし
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01THrJMT36meC47axGBwU1MR

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { talkToJarvis } from "@/app/(main)/jarvis-actions";
-import { detectWake, pauseMs, detectScreenCommand } from "@/lib/jarvis-pure";
+import { detectWake, pauseMs, detectScreenCommand, splitSentences, createVad, cleanTranscript } from "@/lib/jarvis-pure";
 import { Icon } from "./icons";
 import { openPalette } from "./command-palette";
 import type { JarvisReply } from "@/lib/jarvis";
@@ -97,6 +97,21 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   // （state を見ると「読み上げ終わったのにマイクが起きない」で黙り込む）
   const speakingRef = useRef(false);
 
+  /* #245: 耳の配線。ブラウザ認識は「呼びかけ」と「保険」、本命は音声→サーバー（Gemini）
+     mic: getUserMedia のストリーム / ctx: AudioContext / proc: 音量を測る ScriptProcessor
+     vad: 音量から発話の始まり終わりを判定 / pcm: いま録っている発話 / preroll: 直前の数フレーム（頭が欠けないように） */
+  const micRef = useRef<MediaStream | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const procRef = useRef<ScriptProcessorNode | null>(null);
+  const vadRef = useRef<ReturnType<typeof createVad> | null>(null);
+  const bargeVadRef = useRef<ReturnType<typeof createVad> | null>(null);
+  const pcmRef = useRef<Float32Array[]>([]);
+  const prerollRef = useRef<Float32Array[]>([]);
+  const capturingRef = useRef(false);
+  const micReadyRef = useRef(false); // 音量VADが動いている＝文字の間ではなく音で区切る
+  const speakGen = useRef(0); // 読み上げの世代。割り込まれたら古い世代の音は捨てる
+  const [level, setLevel] = useState(0);
+
   useEffect(() => {
     msgsRef.current = msgs;
   }, [msgs]);
@@ -133,40 +148,73 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     }
   }, []);
 
-  /* ---------- 声を出す ---------- */
+  /* ---------- 声を出す（#245: 文ごとに作って、最初の1文から喋り始める） ---------- */
+  const stopSpeaking = useCallback(() => {
+    speakGen.current += 1;
+    const el = audioRef.current;
+    if (el) {
+      try {
+        el.pause();
+        el.src = "";
+      } catch {
+        /* noop */
+      }
+    }
+    window.speechSynthesis?.cancel();
+    speakingRef.current = false;
+    setSpeaking(false);
+  }, []);
+
   const speak = useCallback(
     async (text: string) => {
       if (!text) return;
-      // 自分の声を聞いて自分に返事をしないよう、読み上げ前に必ずマイクを切る
+      // 自分の声を聞いて自分に返事をしないよう、読み上げ前にブラウザ認識は止める
+      // （音量VADのマイクは動かしたまま＝割り込みを聞く。エコーキャンセルが効く）
       stopRec();
       setMode(wantListening.current ? "waiting" : "off");
-      try {
-        const res = await fetch("/api/jarvis/speak", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-        if (res.status === 200) {
-          const blob = await res.blob();
-          const url = URL.createObjectURL(blob);
-          const el = audioRef.current ?? new Audio();
-          audioRef.current = el;
-          el.src = url;
-          el.onended = () => {
-            speakingRef.current = false;
-            setSpeaking(false);
-            URL.revokeObjectURL(url);
-          };
-          speakingRef.current = true;
-          setSpeaking(true);
-          await el.play();
-          setNeedsGesture(false);
-          return;
+      const gen = ++speakGen.current;
+      const sentences = splitSentences(text);
+      if (sentences.length === 0) return;
+      speakingRef.current = true;
+      setSpeaking(true);
+      // 全文ぶんを同時に頼み、届いた順ではなく文の順で再生する
+      const fetches = sentences.map((sn) =>
+        fetch("/api/jarvis/speak", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: sn }) })
+          .then(async (res) => (res.status === 200 ? await res.blob() : null))
+          .catch(() => null)
+      );
+      const el = audioRef.current ?? new Audio();
+      audioRef.current = el;
+      let anyPlayed = false;
+      for (let i = 0; i < sentences.length; i++) {
+        if (speakGen.current !== gen) return; // 割り込まれた
+        const blob = await fetches[i];
+        if (speakGen.current !== gen) return;
+        if (!blob) {
+          // 高品質音声が取れない文はブラウザ内蔵で読む（無音にしない）
+          await new Promise<void>((done) => browserSpeak(sentences[i], (v) => { if (!v) done(); }));
+          anyPlayed = true;
+          continue;
         }
-        browserSpeak(text, setSpeaking);
-      } catch {
+        const url = URL.createObjectURL(blob);
+        try {
+          await new Promise<void>((done, fail) => {
+            el.onended = () => done();
+            el.onerror = () => fail(new Error("play"));
+            el.src = url;
+            el.play().then(() => setNeedsGesture(false)).catch(fail);
+          });
+          anyPlayed = true;
+        } catch {
+          if (!anyPlayed) setNeedsGesture(true);
+          break;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      }
+      if (speakGen.current === gen) {
+        speakingRef.current = false;
         setSpeaking(false);
-        setNeedsGesture(true);
       }
     },
     [stopRec]
@@ -279,6 +327,8 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         setHeard(body);
       }
 
+      // #245: 音量VADが動いていれば区切りは音で測る（文字の間で送らない）。VADが無い環境だけ従来どおり
+      if (micReadyRef.current) return;
       // 無音がこの長さ続いたら「言い終わった」とみなす（#184）
       if (pauseTimer.current) clearTimeout(pauseTimer.current);
       pauseTimer.current = setTimeout(() => {
@@ -320,6 +370,126 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     }
   }, [send]);
 
+  /* ---------- #245: 音で聞く（録音→VAD→サーバーで文字起こし） ---------- */
+  const finishUtterance = useCallback(async () => {
+    const chunks = pcmRef.current;
+    pcmRef.current = [];
+    capturingRef.current = false;
+    const ctx = ctxRef.current;
+    const fallback = bufferRef.current.trim();
+    if (!ctx || chunks.length === 0) {
+      if (fallback) void send(fallback, "voice");
+      return;
+    }
+    const wavBlob = encodeWav16k(chunks, ctx.sampleRate);
+    setBusy(true);
+    let text = "";
+    try {
+      const res = await fetch("/api/jarvis/transcribe", { method: "POST", headers: { "content-type": "audio/wav" }, body: wavBlob, signal: AbortSignal.timeout(9000) });
+      if (res.status === 200) text = cleanTranscript(String(((await res.json()) as { text?: string }).text ?? ""));
+    } catch {
+      /* 保険へ */
+    } finally {
+      setBusy(false);
+    }
+    const q = text || cleanTranscript(fallback);
+    if (q) void send(q, "voice");
+    else setHeard("");
+  }, [send]);
+
+  const startMic = useCallback(async () => {
+    if (micRef.current) return;
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
+      const Ctx = (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
+      const ctx = new Ctx();
+      const src = ctx.createMediaStreamSource(stream);
+      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const frameMs = (4096 / ctx.sampleRate) * 1000;
+      const vad = createVad({ silenceMs: pauseMs(speedRef.current), minSpeechMs: 180, ratio: 2.5, minRms: 0.012, frameMs });
+      // 読み上げ中の割り込みは、スピーカーの漏れで誤爆しないよう厳しめ
+      const barge = createVad({ silenceMs: 400, minSpeechMs: 350, ratio: 4, minRms: 0.03, frameMs });
+      vadRef.current = vad;
+      bargeVadRef.current = barge;
+      micRef.current = stream;
+      ctxRef.current = ctx;
+      procRef.current = proc;
+      micReadyRef.current = true;
+      let tick = 0;
+      proc.onaudioprocess = (ev) => {
+        const input = ev.inputBuffer.getChannelData(0);
+        let sum = 0;
+        for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
+        const rms = Math.sqrt(sum / input.length);
+        if ((tick++ & 3) === 0) setLevel(Math.min(1, rms * 8));
+        if (!wantListening.current) return;
+
+        if (speakingRef.current) {
+          // 喋っている最中に人の声 → 黙って聞く（割り込み）
+          if (barge.feed(rms) === "start") {
+            stopSpeaking();
+            inConversation.current = true;
+            if (followupTimer.current) clearTimeout(followupTimer.current);
+            setMode("listening");
+            capturingRef.current = true;
+            pcmRef.current = [...prerollRef.current, new Float32Array(input)];
+            (vadRef.current ?? vad).reset();
+          }
+          return;
+        }
+        // 頭が欠けないよう直前の数フレームを持っておく
+        prerollRef.current.push(new Float32Array(input));
+        if (prerollRef.current.length > 4) prerollRef.current.shift();
+
+        const evt = (vadRef.current ?? vad).feed(rms);
+        if (!inConversation.current) return; // 呼びかけ待ち＝ブラウザ認識に任せる
+        if (evt === "start" && !capturingRef.current) {
+          capturingRef.current = true;
+          pcmRef.current = [...prerollRef.current];
+          setHeard("");
+        }
+        if (capturingRef.current) {
+          pcmRef.current.push(new Float32Array(input));
+          const tooLong = pcmRef.current.length * frameMs > 20000; // 20秒で強制送信
+          if (evt === "end" || tooLong) void finishUtterance();
+        }
+      };
+      src.connect(proc);
+      proc.connect(ctx.destination);
+    } catch {
+      micReadyRef.current = false; // 許可されなかった等 → ブラウザ認識だけで動く（従来どおり）
+    }
+  }, [finishUtterance, stopSpeaking]);
+
+  const stopMic = useCallback(() => {
+    micReadyRef.current = false;
+    capturingRef.current = false;
+    pcmRef.current = [];
+    try {
+      procRef.current?.disconnect();
+      micRef.current?.getTracks().forEach((t) => t.stop());
+      void ctxRef.current?.close();
+    } catch {
+      /* noop */
+    }
+    procRef.current = null;
+    micRef.current = null;
+    ctxRef.current = null;
+    setLevel(0);
+  }, []);
+
+  /** 「いま送る」: 録音中ならそこまでを送る */
+  useEffect(() => {
+    if (vadRef.current) {
+      // 待ちの長さ（はやい/ふつう/ゆっくり）を変えたら VAD にも反映
+      const ctx = ctxRef.current;
+      if (ctx) vadRef.current = createVad({ silenceMs: pauseMs(speed), minSpeechMs: 180, ratio: 2.5, minRms: 0.012, frameMs: (4096 / ctx.sampleRate) * 1000 });
+    }
+  }, [speed]);
+
   /* ---------- 読み上げが終わったらマイクを起こし直す ---------- */
   useEffect(() => {
     if (speaking) return;
@@ -346,7 +516,10 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       try {
         if (window.localStorage.getItem(WAKE_KEY) === "on") {
           wantListening.current = true;
-          setTimeout(() => startRec(), 600);
+          setTimeout(() => {
+            startRec();
+            void startMic();
+          }, 600);
         }
       } catch {
         /* noop */
@@ -356,6 +529,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       wantListening.current = false;
       clearTimers();
       stopRec();
+      stopMic();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -379,12 +553,14 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     if (next) {
       setMicError(null);
       startRec();
+      void startMic();
     } else {
       clearTimers();
       inConversation.current = false;
       bufferRef.current = "";
       setHeard("");
       stopRec();
+      stopMic();
       setMode("off");
     }
   };
@@ -397,11 +573,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       } catch {
         /* noop */
       }
-      if (!next) {
-        audioRef.current?.pause();
-        window.speechSynthesis?.cancel();
-        setSpeaking(false);
-      }
+      if (!next) stopSpeaking();
       return next;
     });
   };
@@ -417,6 +589,10 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
 
   /** いま溜まっている言葉をすぐ送る（待ちきれないとき） */
   const sendNow = () => {
+    if (capturingRef.current) {
+      void finishUtterance();
+      return;
+    }
     const q = bufferRef.current.trim();
     if (q) void send(q, "voice");
   };
@@ -445,7 +621,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         }}
         className="flex items-center gap-2 px-3 py-2"
       >
-        <Orb state={orbState} />
+        <Orb state={orbState} level={level} />
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -585,7 +761,7 @@ function Extras({ msg }: { msg: Msg }) {
 }
 
 /** 状態が一目で分かる光の輪。待受・聞いている・考えている・話している を色と動きで出す */
-function Orb({ state }: { state: "idle" | "waiting" | "thinking" | "listening" | "speaking" }) {
+function Orb({ state, level = 0 }: { state: "idle" | "waiting" | "thinking" | "listening" | "speaking"; level?: number }) {
   const tone =
     state === "listening"
       ? "from-red-400 to-rose-600"
@@ -601,7 +777,7 @@ function Orb({ state }: { state: "idle" | "waiting" | "thinking" | "listening" |
     <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
       <span className={`absolute inset-0 rounded-full bg-gradient-to-br ${tone} ${state === "idle" ? "opacity-40" : "opacity-90"} blur-[6px]`} />
       <span className={`absolute inset-0 rounded-full border-2 border-sky-300/60 ${ring}`} />
-      <span className="relative h-2.5 w-2.5 rounded-full bg-sky-100" />
+      <span className="relative rounded-full bg-sky-100" style={{ width: `${10 + level * 14}px`, height: `${10 + level * 14}px`, transition: "width 60ms, height 60ms" }} />
     </span>
   );
 }
@@ -621,4 +797,49 @@ function browserSpeak(text: string, setSpeaking: (v: boolean) => void) {
   } catch {
     setSpeaking(false);
   }
+}
+
+/**
+ * 録った音（ブラウザのサンプルレート・float）を 16kHz mono 16bit の WAV にする（#245）。
+ * サーバー側（Gemini）が確実に読める形式で、5秒で約160KB。
+ */
+function encodeWav16k(chunks: Float32Array[], inRate: number): Blob {
+  const total = chunks.reduce((a, c) => a + c.length, 0);
+  const merged = new Float32Array(total);
+  let off = 0;
+  for (const c of chunks) {
+    merged.set(c, off);
+    off += c.length;
+  }
+  const outRate = 16000;
+  const ratio = inRate / outRate;
+  const outLen = Math.floor(merged.length / ratio);
+  const pcm = new Int16Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    // 区間平均（単純な間引きだと高い音が折り返す）
+    const start = Math.floor(i * ratio);
+    const end = Math.min(merged.length, Math.floor((i + 1) * ratio));
+    let sum = 0;
+    for (let j = start; j < end; j++) sum += merged[j];
+    const v = end > start ? sum / (end - start) : 0;
+    pcm[i] = Math.max(-1, Math.min(1, v)) * 0x7fff;
+  }
+  const buf = new ArrayBuffer(44 + pcm.length * 2);
+  const dv = new DataView(buf);
+  const str = (o: number, t: string) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, "RIFF");
+  dv.setUint32(4, 36 + pcm.length * 2, true);
+  str(8, "WAVE");
+  str(12, "fmt ");
+  dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true);
+  dv.setUint16(22, 1, true);
+  dv.setUint32(24, outRate, true);
+  dv.setUint32(28, outRate * 2, true);
+  dv.setUint16(32, 2, true);
+  dv.setUint16(34, 16, true);
+  str(36, "data");
+  dv.setUint32(40, pcm.length * 2, true);
+  new Int16Array(buf, 44).set(pcm);
+  return new Blob([buf], { type: "audio/wav" });
 }

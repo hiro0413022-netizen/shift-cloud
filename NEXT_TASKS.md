@@ -7,6 +7,12 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-245. **声の精度アップ（#245）を本番へ**
+   1. **`.\deploy-245.ps1` を実行** → Vercel の yozan-genesis が READY になるまで待つ
+   2. **Vercel の yozan-genesis に `GEMINI_API_KEY` が入っているか確認**（Settings → Environment Variables）。lesson-os / swing-cortex と同じキーで可。**無いと聞き取りは今までどおりブラウザ任せ**（返事の声も出ない）
+   3. ホームで 🎤 → 「ジェネシス、会員数を見せて」「今月の売上は？」→ 途中で「ジェネシス、ちょっと待って」と割り込めること
+   4. 聞き違いが多い語があれば教えてください（ヒント語に足します）
+
 A-244. **GENESIS の UI 大幅改修（#244）を本番へ**
    1. **`.\deploy-244.ps1` を実行**（commit & push・migration なし）→ Vercel の yozan-genesis が READY になるまで待つ
    2. スマホで https://yozan-genesis.vercel.app を開き、下の5タブ・数字の横スクロール・右パネルを確認
