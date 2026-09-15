@@ -9,7 +9,7 @@ import { approveActionForm, rejectActionForm, reviseActionAiForm, reviseActionEd
 import { reviewDeliverable } from "@/app/(main)/deliverables/actions";
 import { approveInquiry } from "@/app/(main)/inbox/actions";
 import { decideTrialRequest, decideJoinRequest, dismissHotLead, acknowledgeAlert } from "@/app/(main)/feed-actions";
-import { approveJoinRequestsBulk } from "@/app/(main)/home-actions";
+import { approveJoinRequestsBulk, dismissProspect, clearAiBacklog } from "@/app/(main)/home-actions";
 import { alertKey } from "@/lib/kernel";
 
 /**
@@ -103,8 +103,18 @@ function Actions({ e, next }: { e: TodoEntry; next: string | null }) {
         )}
       </div>
     );
-  if (f.source === "prospect" && f.href)
-    return <a href={f.href} target="_blank" rel="noreferrer" className="btn-main">デモを確認する →</a>;
+  if (f.source === "prospect")
+    return (
+      <div className="flex gap-2">
+        <form action={dismissProspect}>
+          <input type="hidden" name="id" value={f.id} />
+          <button className="btn-sub" title="営業先は残したまま、今日やることから外します">消す</button>
+        </form>
+        {f.href && (
+          <a href={f.href} target="_blank" rel="noreferrer" className="btn-main">デモを確認する →</a>
+        )}
+      </div>
+    );
   if (f.source === "reserve" && f.href)
     return <a href={f.href} target="_blank" rel="noreferrer" className="btn-sub">開いて対応 →</a>;
   return null;
@@ -116,6 +126,19 @@ const TONE: Record<string, "accent" | "warn" | "danger" | "default"> = {
   確認: "warn",
   改善提案: "default",
 };
+
+/** #246 「AIが作ったものを全部消す」。お客様から来た件は消さない */
+export function ClearAiButton({ todos }: { todos: TodoEntry[] }) {
+  const n = todos.filter((t) => t.source === "queue" || t.source === "deliverable" || t.source === "prospect").length;
+  if (n === 0) return null;
+  return (
+    <form action={clearAiBacklog}>
+      <button className="btn-sub" title="承認待ちのAI実行・成果物レビュー・デモ完成をまとめて取り下げます（お客様の件は残ります）">
+        AIが作ったもの {n}件 を全部消す
+      </button>
+    </form>
+  );
+}
 
 export function TodoList({ todos, base = "/" }: { todos: TodoEntry[]; base?: string }) {
   if (todos.length === 0)

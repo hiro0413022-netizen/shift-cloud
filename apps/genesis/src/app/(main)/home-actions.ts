@@ -80,3 +80,47 @@ export async function approveJoinRequestsBulk(formData: FormData) {
   }
   if (approved > 0) revalidatePath("/");
 }
+
+/**
+ * #246 「デモ完成」を消す（ユーザー指摘「消すことができない」）。
+ * dms_prospects を hold にする＝営業先は残る（消さない）が、今日やることからは外れる。
+ * 連絡した扱い（last_contact_on）にはしない＝嘘を書かない。
+ */
+export async function dismissProspect(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const admin = createAdmin();
+  const { data: before } = await admin.from("dms_prospects").select("id, name, status").eq("id", id).eq("company_id", actor.companyId).maybeSingle();
+  if (!before) return;
+  await admin.from("dms_prospects").update({ status: "hold", updated_at: new Date().toISOString() }).eq("id", id).eq("company_id", actor.companyId);
+  await logAudit(actor, "prospect.hold", "dms_prospects", id, before, { status: "hold" });
+  revalidatePath("/");
+}
+
+/**
+ * #246 「一旦今日のやることは消しておいて」。
+ * AIが作ったもの（承認待ちのAI実行・成果物レビュー・デモ完成）をまとめて取り下げる。
+ * お客様から来たもの（問い合わせ・体験・入会・予約申込）は**消さない**（人が返事をする件）。
+ * 取り下げは記録に残る（cancelled / rejected / hold）ので、必要なら各画面から辿れる。
+ */
+export async function clearAiBacklog() {
+  const actor = await requireGenesisActor();
+  const admin = createAdmin();
+  const now = new Date().toISOString();
+  const note = `${jstYmd()} ホームの「AIが作ったものを全部消す」で取り下げ（${actor.name}）`;
+  const [q, d, p] = await Promise.all([
+    admin.from("ai_action_queue").update({ status: "cancelled", cancelled_at: now, error: note }).eq("company_id", actor.companyId).eq("status", "awaiting_approval").select("id"),
+    admin.from("ai_execution_logs").update({ review_status: "rejected", reviewed_at: now, reviewed_by: actor.staffId }).eq("company_id", actor.companyId).eq("review_status", "pending").select("id"),
+    admin.from("dms_prospects").update({ status: "hold", updated_at: now }).eq("company_id", actor.companyId).eq("status", "demo_done").is("last_contact_on", null).is("deleted_at", null).select("id"),
+  ]);
+  const counts = { queue: q.data?.length ?? 0, deliverables: d.data?.length ?? 0, prospects: p.data?.length ?? 0 };
+  await logAudit(actor, "home.clear_ai_backlog", "ai_action_queue", null, null, counts);
+  await logEvent(actor.companyId, {
+    event_type: "home.cleared",
+    title: `AIが作ったものをまとめて取り下げ（AI実行 ${counts.queue}・成果物 ${counts.deliverables}・デモ ${counts.prospects}）`,
+    source: "manual",
+    source_type: "human",
+  });
+  revalidatePath("/");
+}

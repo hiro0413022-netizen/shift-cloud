@@ -216,6 +216,8 @@ export function normalizePriority(p: unknown): "urgent" | "normal" | "low" {
 export const WAKE_WORDS = [
   "ジェネシス", "じぇねしす", "ゼネシス", "ぜねしす", "ジェニシス", "ジェネシズ", "ジェネスス",
   "genesis", "ジャービス", "ジャーヴィス", "じゃーびす",
+  // #246 ユーザー指摘「ジェネシスと声をかけても反応しない」→ 実際に出やすい聞き取り違いを追加
+  "ゲネシス", "げねしす", "ジェネシー", "ジェネス", "ジェネシ", "ゼネシズ", "ジェネスィス", "ゼネシ",
 ];
 
 /** 呼びかけの直後に来がちな区切り記号。用件の頭から削る */
@@ -233,7 +235,8 @@ export function detectWake(text: string): { hit: boolean; rest: string } {
   let len = 0;
   for (const w of WAKE_WORDS) {
     const i = lower.lastIndexOf(w.toLowerCase());
-    if (i >= 0 && i >= at) {
+    // 同じ位置なら長いほうを採る（「ジェネシ」が「ジェネシス」の途中で止まらないように・#246）
+    if (i >= 0 && (i > at || (i === at && w.length > len))) {
       at = i;
       len = w.length;
     }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireGenesisActor, storeScope } from "@/lib/auth";
-import { getHomeData } from "@/lib/todo";
+import { getHomeData, isMonthlyCheckDay } from "@/lib/todo";
 import { getDrill, isDrillMetric } from "@/lib/drilldown";
 import { kpiScopeLabel } from "@/lib/kernel";
 import { toBriefing, openingLine } from "@/lib/jarvis-pure";
@@ -11,7 +11,7 @@ import { KpiCard, fmtDate, Badge } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { StalledBand } from "@/components/home/stalled-band";
 import { ChangesLine } from "@/components/home/changes-line";
-import { TodoList, TodoPanel } from "@/components/home/todo";
+import { TodoList, TodoPanel, ClearAiButton } from "@/components/home/todo";
 import { DrillPanel } from "@/components/home/drill-panel";
 import { TodoHotkeys } from "@/components/home/todo-hotkeys";
 import { cancelActionForm } from "./executions/actions";
@@ -26,13 +26,14 @@ export const dynamic = "force-dynamic";
   右パネルは URL（?panel= / ?drill=）で開く＝サーバーで描く・戻るで閉じる・JARVIS（声）からも開ける。
   REDESIGN_2026-07 §3-1 の「1カード=1判断」「数字は画面が計算した値だけを喋る」は変えていない。
 */
-type SP = { panel?: string; next?: string; drill?: string; store?: string; kind?: string; alias?: string };
+type SP = { panel?: string; next?: string; drill?: string; store?: string; kind?: string; alias?: string; checks?: string };
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireGenesisActor();
   const sp = await searchParams;
-  const home = await getHomeData(actor);
-  const { cockpit: d, score, todos, undo, stalled } = home;
+  const home = await getHomeData(actor, { includeChecks: sp.checks === "1" });
+  const { cockpit: d, score, todos, undo, stalled, checks } = home;
+  const showChecksLine = !sp.checks && !isMonthlyCheckDay() && checks.length > 0;
 
   const kpiOrder = ["monthly_sales", "members", "conversion_rate", "churn_rate", "trial_bookings", "labor_cost"];
   const kpis = kpiOrder.map((code) => d.kpis.find((k) => k.code === code)).filter((k): k is NonNullable<typeof k> => k != null);
@@ -113,12 +114,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <h2 className="text-lg font-bold">今日やること</h2>
             <span className={`tnum text-[15px] font-bold ${todos.length ? "text-(--color-danger)" : "text-(--color-ok)"}`}>{todos.length}件</span>
             <span className="ml-auto hidden text-xs text-(--color-faint) md:inline">↑↓で選ぶ ・ Enterで開く ・ Aで承認</span>
+            <ClearAiButton todos={todos} />
             <span className="text-xs text-(--color-faint)">
               スコア <b className={scoreColor}><CountUp value={score.score} /></b>
               {score.factors.length > 0 && <span className="ml-1">（{score.factors.join("・")}）</span>}
             </span>
           </div>
           <TodoList todos={todos} />
+          {showChecksLine && (
+            <p className="border-t border-(--color-line) px-4 py-2.5 text-xs text-(--color-dim) md:px-5">
+              データの点検・改善提案 {checks.length}件は毎月1〜3日にここへ出ます。
+              <Link href="/?checks=1" className="ml-2 text-(--color-accent) hover:underline">今すぐ見る</Link>
+            </p>
+          )}
           <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-(--color-line) bg-(--color-bg)/60 px-4 py-2.5 text-xs text-(--color-dim) md:px-5">
             <span className="font-bold text-(--color-txt)">AIの動き</span>
             {ticker.length === 0 ? (

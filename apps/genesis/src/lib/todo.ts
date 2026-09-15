@@ -18,6 +18,12 @@ import { getOpenSuggestions } from "@/lib/suggestions";
 import { getJudgmentFeed, type JudgmentItem } from "@/lib/judgment-feed";
 import { getStalledItems, type StalledItem } from "@/lib/stalled";
 import { panelKey } from "@/lib/home-pure";
+import { jstYmd } from "@/lib/jst";
+
+/** データの点検（整合性・法務・KPI）と改善提案を「今日やること」に混ぜる日。毎月1〜3日だけ（#246） */
+export function isMonthlyCheckDay(today: string = jstYmd()): boolean {
+  return Number(today.slice(8, 10)) <= 3;
+}
 
 /**
  * 「今日やること」の1行（#244 ③）。
@@ -43,13 +49,15 @@ export type HomeData = {
   cockpit: CockpitData;
   score: GenesisScore;
   todos: TodoEntry[];
+  /** #246: 月次の点検（整合性・法務・KPI・改善提案）。毎月1〜3日か ?checks=1 のときだけ todos に混ざる */
+  checks: TodoEntry[];
   undo: JudgmentItem[];
   stalled: StalledItem[];
   feed: JudgmentItem[];
   alerts: AlertItem[];
 };
 
-export async function getHomeData(actor: GenesisActor): Promise<HomeData> {
+export async function getHomeData(actor: GenesisActor, opts: { includeChecks?: boolean } = {}): Promise<HomeData> {
   const scope = storeScope(actor);
   const [d, suggestions, feed, ackedKeys, stalledAll] = await Promise.all([
     getCockpitData(actor.companyId, scope),
@@ -84,8 +92,9 @@ export async function getHomeData(actor: GenesisActor): Promise<HomeData> {
   for (const f of feed.filter((f) => f.source !== "undo")) {
     todos.push({ key: panelKey(f.source, f.id), source: f.source, tag: f.tag, title: f.title, detail: f.detail, href: f.href, stale: f.stale, feed: f });
   }
+  const checks: TodoEntry[] = [];
   alerts.slice(0, 7).forEach((j, i) => {
-    todos.push({
+    checks.push({
       key: panelKey("alert", String(i)),
       source: "alert",
       tag: j.kind === "risk" ? "リスク" : j.kind === "blocker" ? "ブロッカー" : "確認",
@@ -96,7 +105,7 @@ export async function getHomeData(actor: GenesisActor): Promise<HomeData> {
     });
   });
   for (const sg of suggestions as { id: string; title: string; impact?: string | null; suggested_action?: string | null }[]) {
-    todos.push({
+    checks.push({
       key: panelKey("suggestion", String(sg.id)),
       source: "suggestion",
       tag: "改善提案",
@@ -106,5 +115,8 @@ export async function getHomeData(actor: GenesisActor): Promise<HomeData> {
       suggestion: sg,
     });
   }
-  return { cockpit: d, score, todos, undo, stalled, feed, alerts };
+  // #246 ユーザー指摘「データ検証からの修正までが早すぎる。月次でいい」「修正項目が多すぎる」
+  // → 点検と改善提案は毎月1〜3日だけ今日やることに混ぜ、それ以外の日は1行のリンクにする
+  const merged = opts.includeChecks || isMonthlyCheckDay() ? [...todos, ...checks] : todos;
+  return { cockpit: d, score, todos: merged, checks, undo, stalled, feed, alerts };
 }

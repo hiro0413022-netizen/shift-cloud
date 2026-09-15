@@ -111,6 +111,8 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const micReadyRef = useRef(false); // 音量VADが動いている＝文字の間ではなく音で区切る
   const speakGen = useRef(0); // 読み上げの世代。割り込まれたら古い世代の音は捨てる
   const [level, setLevel] = useState(0);
+  // #246: 呼びかけ待ちの間にブラウザが何を聞き取っているか（「反応しない」の切り分け用に見せる）
+  const [preview, setPreview] = useState("");
 
   useEffect(() => {
     msgsRef.current = msgs;
@@ -313,7 +315,9 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
 
       if (!inConversation.current) {
         const { hit, rest } = detectWake(text);
+        setPreview(text.slice(-40));
         if (!hit) return; // 呼びかけが無いうちは何も拾わない
+        setPreview("");
         inConversation.current = true;
         if (followupTimer.current) clearTimeout(followupTimer.current);
         setMode("listening");
@@ -649,11 +653,12 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
             type="button"
             onClick={toggleWake}
             title={mode === "off" ? "常時待受にする（「ジェネシス」で起動）" : "待受をやめる"}
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+            className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2 ${
               mode === "off" ? "border-(--color-line) text-(--color-dim)" : "border-sky-700 bg-sky-950/40 text-sky-200"
             }`}
           >
             <Icon name="mic" size={16} />
+            <span className="ml-1 hidden text-xs md:inline">{mode === "off" ? "待受にする" : "待受中"}</span>
           </button>
         )}
         <button type="submit" disabled={busy || !input.trim()} className="btn-main hidden disabled:opacity-40 sm:block">
@@ -695,6 +700,14 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       )}
 
       {micError && <p className="px-4 pb-2 text-xs text-amber-300">{micError}</p>}
+      {mode === "off" && sttSupported && !micError && (
+        <p className="px-4 pb-2 text-xs text-(--color-faint)">🎤 を1回押すと、以後は「ジェネシス」と呼ぶだけで会話に入ります。</p>
+      )}
+      {mode === "waiting" && !busy && !speaking && (
+        <p className="truncate px-4 pb-2 text-xs text-(--color-faint)">
+          聞こえている言葉：{preview || "（まだ何も）"}　— 「ジェネシス」と呼ぶと会話に入ります
+        </p>
+      )}
       {needsGesture && voiceOn && latest?.role === "assistant" && (
         <p className="px-4 pb-2 text-xs text-(--color-dim)">ブラウザの設定で声を出せませんでした（文字の返事はそのまま使えます）。</p>
       )}

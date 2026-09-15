@@ -1,0 +1,8 @@
+genesis: 今日やることの整理（問い合わせを先頭・AIが作ったものは消せる・点検は月次・呼びかけ改善）＋声の精度アップ (#245 #246)
+
+#245 声: 録音→/api/jarvis/transcribe(Gemini)で文字起こし・音量VADで区切る・文ごとにTTSして最初の1文から再生・割り込み可・話し言葉のプロンプト
+#246 やること: LINE返信を新しい順で先頭「◯◯ 様：本文」／デモ完成に【消す】／【AIが作ったものを全部消す】(お客様の件は残す)／点検・改善提案は毎月1〜3日だけ／WAKE_WORDS追加＋同位置は長い語優先／待受中に聞こえている言葉を表示
+tests 757・tsc 0・next build 成功・migration なし
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01THrJMT36meC47axGBwU1MR

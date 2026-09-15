@@ -175,12 +175,13 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
       .limit(10),
     admin
       .from("sec_inquiries")
-      .select("id, subject, from_name, ai_summary, ai_draft_reply, received_at")
+      // #246: お客様からの問い合わせ（公式LINEの返信）は「いちばん最初に見たい」もの。件数を絞らず新しい順に出す
+      .select("id, subject, from_name, ai_summary, ai_draft_reply, received_at, source")
       .eq("company_id", companyId)
       .in("status", ["new", "awaiting_approval"])
       .is("deleted_at", null)
       .order("received_at", { ascending: false })
-      .limit(5),
+      .limit(40),
     // #134: 体験申込は GOLF WING / FRANK 両方が入る。店舗で絞り、タイトルに店舗名を出す
     scopeStore(
       admin
@@ -289,12 +290,17 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
   }
 
   for (const r of (inqRes.data ?? []) as Row[]) {
+    // #246: 公式LINEの返信は「誰から・何を」を1行目に。subject は "LINE返信（◯◯用）: 本文" の形なので本文だけ取り出す
+    const subject = s(r.subject) ?? "";
+    const isLine = String(r.source ?? "") === "line" || subject.startsWith("LINE返信");
+    const body = isLine ? subject.replace(/^LINE返信（[^）]*）:\s*/, "").replace(/\s+/g, " ").trim() : subject;
+    const channel = isLine ? (/ビジター/.test(subject) ? "LINE・ビジター" : "LINE") : "問い合わせ";
     items.push({
       id: String(r.id),
       source: "inquiry",
-      tag: "問い合わせ",
-      title: s(r.subject) ?? s(r.from_name) ?? "問い合わせ",
-      detail: s(r.ai_summary),
+      tag: channel,
+      title: isLine ? `${s(r.from_name) ?? "お客様"} 様：${body.slice(0, 60) || "（本文なし）"}` : subject || s(r.from_name) || "問い合わせ",
+      detail: s(r.ai_summary) ?? (isLine && body.length > 60 ? body : null),
       createdAt: s(r.received_at),
       href: "/inbox",
       scheduledAt: null,
@@ -385,14 +391,15 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
   for (const it of items) {
     if (it.source !== "undo" && it.createdAt && it.createdAt < staleLine) it.stale = true;
   }
-  // undo（実行予定・時間切れが近い）→ hotlead（鮮度が命）→ その他
-  // hotlead だけは「新しい順」。開封直後ほど架電が繋がるため（#95）
-  const rank = (it: JudgmentItem) => (it.source === "undo" ? 0 : it.source === "hotlead" ? 1 : 2);
+  // #246 並び: undo（実行予定）→ お客様から来たもの（問い合わせ・体験・入会・予約申込・開封）→ AIが作ったもの
+  // ユーザー指摘「一番最初に見たいのは問い合わせ情報」。問い合わせと開封は新しい順、他は古い順（放置を上へ）
+  const rank = (it: JudgmentItem) =>
+    it.source === "undo" ? 0 : it.source === "inquiry" ? 1 : it.source === "hotlead" ? 2 : ["trial", "join", "reserve"].includes(it.source) ? 3 : 4;
   items.sort((a, b) => {
     const ra = rank(a);
     const rb = rank(b);
     if (ra !== rb) return ra - rb;
-    if (ra === 1) return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
+    if (ra === 1 || ra === 2) return (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
     if (Boolean(a.stale) !== Boolean(b.stale)) return a.stale ? -1 : 1;
     return (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
   });
