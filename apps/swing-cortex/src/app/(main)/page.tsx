@@ -2,12 +2,14 @@ import { requireCoachActor } from "@/lib/auth";
 import { loadSymptomTree, loadFrequentSymptoms, loadStudents } from "@/lib/data";
 import { loadFeatures } from "@/lib/plan";
 import DiagnosisClient from "./diagnosis-client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const actor = await requireCoachActor();
   const features = await loadFeatures(actor.companyId);
+  if (features.mode === "online") redirect("/online");
   const [tree, frequent, students] = await Promise.all([
     loadSymptomTree(actor.companyId),
     loadFrequentSymptoms(actor.companyId),

@@ -34,3 +34,60 @@ body {
   @apply w-full rounded-xl border border-(--color-line) bg-(--color-panel) px-4 py-3 text-sm outline-none placeholder:text-(--color-faint);
 }
 .input-lite:focus { @apply border-(--color-brand) ring-2 ring-teal-100; }
+
+/* ============================================================
+   RaRa LESSON テーマ（オンラインレッスン・モード / 2026-09-15）
+   公式サイト（online-golflesson.com）のチャコール #313131 × 白を基調に、
+   シャンパンゴールドを差し色に。英字の見出し＋日本語の小見出しはサイトの構成に合わせた。
+   既存の --color-* を上書きするだけなので、共通部品もこの色で描かれる。
+   ============================================================ */
+.theme-rara {
+  --color-bg: #f6f4f0;
+  --color-panel: #ffffff;
+  --color-panel-2: #faf8f5;
+  --color-line: #e8e3db;
+  --color-txt: #2a2a2a;
+  --color-dim: #77716a;
+  --color-faint: #a8a198;
+  --color-brand: #313131;
+  --color-brand-2: #b08d57;
+  --rr-ink: #313131;
+  --rr-gold: #b08d57;
+  --rr-gold-soft: #f4ede2;
+  --rr-line-green: #06c755;
+  --rr-wait: #c0563e;
+  --rr-wait-soft: #fbece7;
+  background: var(--color-bg);
+  color: var(--color-txt);
+}
+.rr-en {
+  font-family: "Cormorant Garamond", "Playfair Display", Georgia, "Times New Roman", serif;
+  letter-spacing: 0.08em;
+  font-variant-numeric: lining-nums;
+}
+.rr-card {
+  @apply rounded-2xl border border-(--color-line) bg-(--color-panel);
+  box-shadow: 0 1px 2px rgba(49, 49, 49, 0.04), 0 8px 24px -18px rgba(49, 49, 49, 0.25);
+}
+.rr-input {
+  @apply w-full rounded-xl border border-(--color-line) bg-(--color-panel-2) px-3.5 py-3 text-[15px] leading-relaxed outline-none placeholder:text-(--color-faint);
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.rr-input:focus {
+  @apply border-(--rr-gold) bg-white;
+  box-shadow: 0 0 0 3px rgba(176, 141, 87, 0.15);
+}
+.rr-btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-40;
+}
+.rr-btn-ink { @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-40 bg-(--rr-ink) text-white hover:bg-black; }
+.rr-btn-line { @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-40 bg-(--rr-line-green) text-white hover:brightness-95; }
+.rr-btn-ghost { @apply inline-flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-40 border border-(--color-line) bg-white text-(--color-txt) hover:border-(--rr-gold); }
+.rr-chip {
+  @apply inline-flex items-center gap-1 rounded-full border border-(--color-line) bg-white px-3 py-1.5 text-[13px] text-(--color-dim) transition;
+}
+.rr-chip[data-on="true"] { @apply border-(--rr-ink) bg-(--rr-ink) text-white; }
+.rr-bubble-in { @apply rounded-2xl rounded-tl-md border border-(--color-line) bg-white; }
+.rr-bubble-out { @apply rounded-2xl rounded-tr-md bg-(--rr-ink) text-white; }
+@keyframes rrPop { 0% { transform: scale(.96); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
+.rr-pop { animation: rrPop .18s ease-out; }

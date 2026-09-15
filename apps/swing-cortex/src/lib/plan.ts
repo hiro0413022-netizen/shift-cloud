@@ -10,15 +10,20 @@ import { createAdmin } from "@/lib/supabase/admin";
 
 export type Plan = "standard" | "pro";
 
+/** 画面モード: coaching=従来の診断ナレッジ / online=オンラインレッスン（LINE返信デスク）※0182 */
+export type Mode = "coaching" | "online";
+
 export type Features = {
   plan: Plan;
+  mode: Mode;
   /** P3: 生徒台帳・カルテ保存・パーソナライズ（proのみ） */
   studentCrm: boolean;
 };
 
-function featuresForPlan(plan: Plan): Features {
+function featuresForPlan(plan: Plan, mode: Mode = "coaching"): Features {
   return {
     plan,
+    mode,
     studentCrm: plan === "pro",
   };
 }
@@ -26,7 +31,9 @@ function featuresForPlan(plan: Plan): Features {
 /** テナントの機能セットを返す（行なし=standard） */
 export async function loadFeatures(companyId: string): Promise<Features> {
   const admin = createAdmin();
-  const { data } = await admin.from("sc_settings").select("plan").eq("company_id", companyId).maybeSingle();
-  const plan = ((data as { plan?: string } | null)?.plan === "pro" ? "pro" : "standard") as Plan;
-  return featuresForPlan(plan);
+  const { data } = await admin.from("sc_settings").select("plan, mode").eq("company_id", companyId).maybeSingle();
+  const row = data as { plan?: string; mode?: string } | null;
+  const plan = (row?.plan === "pro" ? "pro" : "standard") as Plan;
+  const mode = (row?.mode === "online" ? "online" : "coaching") as Mode;
+  return featuresForPlan(plan, mode);
 }

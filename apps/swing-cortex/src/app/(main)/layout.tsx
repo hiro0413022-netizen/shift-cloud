@@ -1,9 +1,16 @@
 import { requireCoachActor } from "@/lib/auth";
 import Nav from "./nav";
 import VoiceBar from "./voice-bar";
+import { loadFeatures } from "@/lib/plan";
+import OnlineShell from "./online/online-shell";
 
 export default async function MainLayout({ children }: { children: React.ReactNode }) {
   const actor = await requireCoachActor();
+  const features = await loadFeatures(actor.companyId);
+  // オンラインレッスン・モード（RaRa LESSON / 0182）は専用の外枠。録音バーも出さない。
+  if (features.mode === "online") {
+    return <OnlineShell coachName={actor.name}>{children}</OnlineShell>;
+  }
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col bg-(--color-bg)">
       {/* トップバー */}
