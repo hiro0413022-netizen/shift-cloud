@@ -390,8 +390,12 @@ export function createVad(opts: { silenceMs: number; minSpeechMs?: number; ratio
   let voiced = 0;
   let quiet = 0;
   return {
-    /** 1フレームぶんの RMS（0〜1）を渡す。start / end / null を返す */
-    feed(rms: number): VadEvent {
+    /**
+     * 1フレームぶんの RMS（0〜1）を渡す。start / end / null を返す。
+     * dtMs: 前のフレームからの実時間（#247: タブが裏に回ると音の処理が間引かれ、フレーム数で数えると無音が終わらない）
+     */
+    feed(rms: number, dtMs: number = frameMs): VadEvent {
+      const step = Math.max(0, Math.min(dtMs, 1000));
       frames += 1;
       if (frames <= 8) {
         floor = frames === 1 ? rms : floor * 0.7 + rms * 0.3;
@@ -401,7 +405,7 @@ export function createVad(opts: { silenceMs: number; minSpeechMs?: number; ratio
       const isVoice = rms >= threshold;
       if (!isVoice) floor = floor * 0.98 + rms * 0.02; // 静かなときだけ床を追従
       if (!speaking) {
-        voiced = isVoice ? voiced + frameMs : 0;
+        voiced = isVoice ? voiced + step : 0;
         if (voiced >= minSpeechMs) {
           speaking = true;
           quiet = 0;
@@ -409,7 +413,7 @@ export function createVad(opts: { silenceMs: number; minSpeechMs?: number; ratio
         }
         return null;
       }
-      quiet = isVoice ? 0 : quiet + frameMs;
+      quiet = isVoice ? 0 : quiet + step;
       if (quiet >= silenceMs) {
         speaking = false;
         voiced = 0;

@@ -20,7 +20,8 @@ export type IconName =
   | "close"
   | "menu"
   | "box"
-  | "flag";
+  | "flag"
+  | "ear";
 
 const PATHS: Record<IconName, string> = {
   home: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
@@ -47,6 +48,7 @@ const PATHS: Record<IconName, string> = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   box: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+  ear: '<path d="M7 9a5 5 0 0 1 10 0c0 3-3 4-3 7a3 3 0 0 1-6 0"/><path d="M10 9a2 2 0 0 1 4 0c0 1.5-2 2-2 3.5"/>',
 };
 
 export function Icon({ name, size = 18, className = "" }: { name: IconName; size?: number; className?: string }) {

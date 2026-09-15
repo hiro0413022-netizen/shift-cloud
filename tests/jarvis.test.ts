@@ -262,3 +262,19 @@ test("#245 文字起こしの後始末: 呼びかけと言い淀みを落とす"
   assert.equal(cleanTranscript("ジェネシス、えっと、会員数を見せて、"), "会員数を見せて");
   assert.equal(cleanTranscript("  今月の売上は？ "), "今月の売上は？");
 });
+
+test("#247 VAD は実時間で数える（音の処理が間引かれても無音の終わりを判定できる）", () => {
+  const vad = createVad({ silenceMs: 1800, minSpeechMs: 180, ratio: 2.5, minRms: 0.012, frameMs: 85 });
+  for (let i = 0; i < 8; i++) vad.feed(0.002, 85);
+  vad.feed(0.3, 85);
+  assert.equal(vad.feed(0.3, 170), "start");
+  // タブが裏に回って 1 フレームの間隔が 600ms に伸びても、3 フレームで 1800ms に届く
+  assert.equal(vad.feed(0.0003, 600), null);
+  assert.equal(vad.feed(0.0003, 600), null);
+  assert.equal(vad.feed(0.0003, 600), "end");
+});
+
+test("#247 呼びかけ: 同じ位置なら長い語を採る（「ジェネシ」で止まらない）", () => {
+  assert.deepEqual(detectWake("ジェネシス、会員数を見せて"), { hit: true, rest: "会員数を見せて" });
+  assert.deepEqual(detectWake("ゲネシス 売上は"), { hit: true, rest: "売上は" });
+});

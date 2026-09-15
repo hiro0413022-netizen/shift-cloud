@@ -109,6 +109,17 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const prerollRef = useRef<Float32Array[]>([]);
   const capturingRef = useRef(false);
   const micReadyRef = useRef(false); // 音量VADが動いている＝文字の間ではなく音で区切る
+  /* #247: 「ジェネシス、会員数を見せて」を一息で言うと、呼びかけに気づいた時にはもう喋り終わっていて
+     録音が始まらず、何も送られなかった（#245 の不具合）。直近5秒を常に持っておき、呼びかけに気づいたらそこから録る */
+  const ringRef = useRef<Float32Array[]>([]);
+  const frameMsRef = useRef(85);
+  const pttRef = useRef(false); // 「押して話す」で聞いている最中
+  const pttTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resultBaseRef = useRef(0); // ブラウザ認識の結果のうち、もう使い終わった件数（古い「ジェネシス」を拾い直さない）
+  const lastResultLenRef = useRef(0);
+  const [recError, setRecError] = useState<string | null>(null);
+  const [ptt, setPtt] = useState(false);
+  const [wakeOn, setWakeOn] = useState(false); // 画面表示用（wantListening は ref なので再描画されない）
   const speakGen = useRef(0); // 読み上げの世代。割り込まれたら古い世代の音は捨てる
   const [level, setLevel] = useState(0);
   // #246: 呼びかけ待ちの間にブラウザが何を聞き取っているか（「反応しない」の切り分け用に見せる）
@@ -230,6 +241,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       clearTimers();
       inConversation.current = false;
       bufferRef.current = "";
+      resultBaseRef.current = lastResultLenRef.current; // ここまでの聞き取りは使い終わり
       setHeard("");
       setInput("");
       busyRef.current = true;
@@ -287,9 +299,24 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     [speak, router]
   );
 
+  /* #247: 呼びかけに気づいた瞬間、直近5秒ぶんから録り始める（一息で言っても頭から録れる） */
+  const beginCaptureFromWake = useCallback(() => {
+    if (!micReadyRef.current || capturingRef.current) return;
+    const vad = vadRef.current;
+    capturingRef.current = true;
+    pcmRef.current = [...ringRef.current];
+    if (vad && !vad.speaking) {
+      // もう喋り終わっている → 少しだけ待って（語尾を拾う）そのまま文字にする
+      setTimeout(() => {
+        if (capturingRef.current && !(vadRef.current?.speaking ?? false)) void finishRef.current?.();
+      }, 350);
+    }
+  }, []);
+  const finishRef = useRef<(() => Promise<void>) | null>(null);
+
   /* ---------- 常時待受の本体 ---------- */
   const startRec = useCallback(() => {
-    if (!wantListening.current || recRef.current || busyRef.current) return;
+    if (!(wantListening.current || pttRef.current) || recRef.current || busyRef.current) return;
     const w = window as unknown as {
       SpeechRecognition?: new () => SpeechRecognitionLike;
       webkitSpeechRecognition?: new () => SpeechRecognitionLike;
@@ -305,13 +332,17 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
 
     rec.onstart = () => {
       setMicError(null);
+      setRecError(null);
+      resultBaseRef.current = 0;
+      lastResultLenRef.current = 0;
       setMode(inConversation.current ? "listening" : "waiting");
     };
 
     rec.onresult = (e) => {
       if (busyRef.current) return;
       let text = "";
-      for (let i = 0; i < e.results.length; i++) text += e.results[i][0]?.transcript ?? "";
+      lastResultLenRef.current = e.results.length;
+      for (let i = resultBaseRef.current; i < e.results.length; i++) text += e.results[i][0]?.transcript ?? "";
 
       if (!inConversation.current) {
         const { hit, rest } = detectWake(text);
@@ -323,6 +354,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         setMode("listening");
         bufferRef.current = rest;
         setHeard(rest);
+        beginCaptureFromWake();
       } else {
         // 会話モードに入ったあとは、呼びかけより後ろを丸ごと用件とみなす
         const { hit, rest } = detectWake(text);
@@ -331,11 +363,13 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         setHeard(body);
       }
 
-      // #245: 音量VADが動いていれば区切りは音で測る（文字の間で送らない）。VADが無い環境だけ従来どおり
-      if (micReadyRef.current) return;
+      // #245: 音量VADが録っている間は区切りは音で測る（文字の間で送らない）
+      // #247: VADが録っていない（呼びかけの取りこぼし等）ときは、文字の間で送る保険を必ず残す
+      if (micReadyRef.current && capturingRef.current) return;
       // 無音がこの長さ続いたら「言い終わった」とみなす（#184）
       if (pauseTimer.current) clearTimeout(pauseTimer.current);
       pauseTimer.current = setTimeout(() => {
+        if (capturingRef.current) return; // その間にVADが録り始めた＝そちらに任せる
         const q = bufferRef.current.trim();
         if (!q) return; // 呼びかけただけ。用件が来るまで待つ
         void send(q, "voice");
@@ -344,11 +378,14 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
 
     rec.onerror = (ev) => {
       const err = String(ev?.error ?? "");
+      // #247: 黙っていただけ（no-speech / aborted）以外は画面に出す。「反応しない」の原因がここに出る
+      if (err && err !== "no-speech" && err !== "aborted") setRecError(err);
       // no-speech / aborted は「黙っていただけ」。止めずに起こし直す
       if (err === "not-allowed" || err === "service-not-allowed") {
         wantListening.current = false;
+        setWakeOn(false);
         setMode("off");
-        setMicError("マイクの使用が許可されていません。アドレスバーの🎤から許可してください。");
+        setMicError("マイクの使用が許可されていません。アドレスバー左の鍵マーク → マイク → 許可 にしてください。");
         try {
           window.localStorage.setItem(WAKE_KEY, "off");
         } catch {
@@ -360,7 +397,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     rec.onend = () => {
       recRef.current = null;
       // Chromeは無音が続くと勝手に止まる。待受のつもりなら必ず起こし直す
-      if (wantListening.current && !speakingRef.current) {
+      if ((wantListening.current || pttRef.current) && !speakingRef.current) {
         setTimeout(() => startRec(), 400);
       } else if (!wantListening.current) {
         setMode("off");
@@ -379,13 +416,25 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     const chunks = pcmRef.current;
     pcmRef.current = [];
     capturingRef.current = false;
+    if (pauseTimer.current) clearTimeout(pauseTimer.current);
+    if (pttTimer.current) clearTimeout(pttTimer.current);
+    const wasPtt = pttRef.current;
+    pttRef.current = false;
+    setPtt(false);
     const ctx = ctxRef.current;
+    const rate = ctx?.sampleRate ?? 48000;
     const fallback = bufferRef.current.trim();
-    if (!ctx || chunks.length === 0) {
+    // 押して話す（待受ではない）ときは、録り終わったらマイクを離す
+    if (wasPtt && !wantListening.current) {
+      stopRecRef.current?.();
+      stopMicRef.current?.();
+      setMode("off");
+    }
+    if (chunks.length === 0) {
       if (fallback) void send(fallback, "voice");
       return;
     }
-    const wavBlob = encodeWav16k(chunks, ctx.sampleRate);
+    const wavBlob = encodeWav16k(chunks, rate);
     setBusy(true);
     let text = "";
     try {
@@ -400,10 +449,11 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     if (q) void send(q, "voice");
     else setHeard("");
   }, [send]);
+  finishRef.current = finishUtterance;
 
-  const startMic = useCallback(async () => {
-    if (micRef.current) return;
-    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return;
+  const startMic = useCallback(async (): Promise<boolean> => {
+    if (micRef.current) return true;
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) return false;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
@@ -413,6 +463,8 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       const src = ctx.createMediaStreamSource(stream);
       const proc = ctx.createScriptProcessor(4096, 1, 1);
       const frameMs = (4096 / ctx.sampleRate) * 1000;
+      frameMsRef.current = frameMs;
+      const ringMax = Math.ceil(5000 / frameMs);
       const vad = createVad({ silenceMs: pauseMs(speedRef.current), minSpeechMs: 180, ratio: 2.5, minRms: 0.012, frameMs });
       // 読み上げ中の割り込みは、スピーカーの漏れで誤爆しないよう厳しめ
       const barge = createVad({ silenceMs: 400, minSpeechMs: 350, ratio: 4, minRms: 0.03, frameMs });
@@ -423,17 +475,24 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       procRef.current = proc;
       micReadyRef.current = true;
       let tick = 0;
+      let lastAt = performance.now();
       proc.onaudioprocess = (ev) => {
+        const nowAt = performance.now();
+        const dt = nowAt - lastAt;
+        lastAt = nowAt;
         const input = ev.inputBuffer.getChannelData(0);
         let sum = 0;
         for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
         const rms = Math.sqrt(sum / input.length);
         if ((tick++ & 3) === 0) setLevel(Math.min(1, rms * 8));
-        if (!wantListening.current) return;
+        // 直近5秒は常に持っておく（呼びかけに遅れて気づいても頭から録れる）
+        ringRef.current.push(new Float32Array(input));
+        if (ringRef.current.length > ringMax) ringRef.current.shift();
+        if (!wantListening.current && !pttRef.current) return;
 
         if (speakingRef.current) {
           // 喋っている最中に人の声 → 黙って聞く（割り込み）
-          if (barge.feed(rms) === "start") {
+          if (barge.feed(rms, dt) === "start") {
             stopSpeaking();
             inConversation.current = true;
             if (followupTimer.current) clearTimeout(followupTimer.current);
@@ -448,7 +507,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         prerollRef.current.push(new Float32Array(input));
         if (prerollRef.current.length > 4) prerollRef.current.shift();
 
-        const evt = (vadRef.current ?? vad).feed(rms);
+        const evt = (vadRef.current ?? vad).feed(rms, dt);
         if (!inConversation.current) return; // 呼びかけ待ち＝ブラウザ認識に任せる
         if (evt === "start" && !capturingRef.current) {
           capturingRef.current = true;
@@ -463,8 +522,19 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       };
       src.connect(proc);
       proc.connect(ctx.destination);
-    } catch {
+      if (ctx.state === "suspended") await ctx.resume().catch(() => undefined);
+      return true;
+    } catch (e) {
       micReadyRef.current = false; // 許可されなかった等 → ブラウザ認識だけで動く（従来どおり）
+      const name = (e as { name?: string })?.name ?? "";
+      setMicError(
+        name === "NotAllowedError"
+          ? "マイクの使用が許可されていません。アドレスバー左の鍵マーク → マイク → 許可 にしてください。"
+          : name === "NotFoundError"
+            ? "マイクが見つかりません。パソコンにマイクがつながっているか確認してください。"
+            : `マイクを開けませんでした（${name || "不明なエラー"}）。`
+      );
+      return false;
     }
   }, [finishUtterance, stopSpeaking]);
 
@@ -472,6 +542,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     micReadyRef.current = false;
     capturingRef.current = false;
     pcmRef.current = [];
+    ringRef.current = [];
     try {
       procRef.current?.disconnect();
       micRef.current?.getTracks().forEach((t) => t.stop());
@@ -484,6 +555,70 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     ctxRef.current = null;
     setLevel(0);
   }, []);
+  const stopMicRef = useRef<(() => void) | null>(null);
+  const stopRecRef = useRef<(() => void) | null>(null);
+  stopMicRef.current = stopMic;
+  stopRecRef.current = stopRec;
+
+  /* ---------- #247: 押して話す（ヒアリングボタン）----------
+     呼びかけ無しで、押した瞬間から聞く。話し終わったら（無音で）自動で送る。
+     もう一度押すとその場で送る。待受にしていなくても使える。 */
+  const listenNow = useCallback(async () => {
+    if (busyRef.current) return;
+    if (pttRef.current || capturingRef.current) {
+      void finishUtterance();
+      return;
+    }
+    stopSpeaking();
+    clearTimers();
+    setMicError(null);
+    pttRef.current = true;
+    setPtt(true);
+    inConversation.current = true;
+    bufferRef.current = "";
+    setHeard("");
+    setMode("listening");
+    const ok = await startMic();
+    // ブラウザ認識も並べて走らせる（サーバーの文字起こしが使えないときの保険・聞き取り中の文字の表示）
+    startRec();
+    if (!pttRef.current) return;
+    if (ok) {
+      vadRef.current?.reset();
+      capturingRef.current = true;
+      pcmRef.current = [...prerollRef.current];
+    } else if (!recRef.current) {
+      pttRef.current = false;
+      setPtt(false);
+      inConversation.current = false;
+      setMode(wantListening.current ? "waiting" : "off");
+      return;
+    }
+    // 8秒たっても何も話さなければやめる／30秒で強制的に送る
+    pttTimer.current = setTimeout(() => {
+      if (!pttRef.current) return;
+      if (vadRef.current?.speaking) {
+        // まだ話している → 最長30秒まで待つ
+        pttTimer.current = setTimeout(() => pttRef.current && void finishUtterance(), 22000);
+        return;
+      }
+      if (bufferRef.current.trim()) {
+        // 音量では区切れなかったが言葉は取れている（小さい声・雑音の多い部屋）→ ここで送る
+        void finishUtterance();
+        return;
+      }
+      pttRef.current = false;
+      setPtt(false);
+      capturingRef.current = false;
+      pcmRef.current = [];
+      inConversation.current = false;
+      if (!wantListening.current) {
+        stopRec();
+        stopMic();
+        setMode("off");
+      } else setMode("waiting");
+      setHeard("");
+    }, 8000);
+  }, [finishUtterance, startMic, startRec, stopMic, stopRec, stopSpeaking]);
 
   /** 「いま送る」: 録音中ならそこまでを送る */
   useEffect(() => {
@@ -520,6 +655,8 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       try {
         if (window.localStorage.getItem(WAKE_KEY) === "on") {
           wantListening.current = true;
+          setWakeOn(true);
+          setMode("waiting");
           setTimeout(() => {
             startRec();
             void startMic();
@@ -538,6 +675,21 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // #247: 開き直したとき、ブラウザは音の処理を「一時停止」で始める（クリックするまで音量が測れない）。
+  // 画面のどこかを最初に触ったら再開する
+  useEffect(() => {
+    const resume = () => {
+      const ctx = ctxRef.current;
+      if (ctx && ctx.state === "suspended") void ctx.resume().catch(() => undefined);
+    };
+    window.addEventListener("pointerdown", resume);
+    window.addEventListener("keydown", resume);
+    return () => {
+      window.removeEventListener("pointerdown", resume);
+      window.removeEventListener("keydown", resume);
+    };
+  }, []);
+
   // 2026-09-15: 開いた瞬間の読み上げは廃止（最初の一言は画面に文字で出すだけ）。
   // ここで speak(opening) を呼ぶと「急にしゃべりだす」になる。戻さないこと。
 
@@ -549,6 +701,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const toggleWake = () => {
     const next = !wantListening.current;
     wantListening.current = next;
+    setWakeOn(next);
     try {
       window.localStorage.setItem(WAKE_KEY, next ? "on" : "off");
     } catch {
@@ -556,6 +709,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     }
     if (next) {
       setMicError(null);
+      setMode("waiting");
       startRec();
       void startMic();
     } else {
@@ -652,15 +806,28 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
           <button
             type="button"
             onClick={toggleWake}
-            title={mode === "off" ? "常時待受にする（「ジェネシス」で起動）" : "待受をやめる"}
+            title={wakeOn ? "待受をやめる" : "常時待受にする（「ジェネシス」と呼ぶだけで会話に入る）"}
             className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2 ${
-              mode === "off" ? "border-(--color-line) text-(--color-dim)" : "border-sky-700 bg-sky-950/40 text-sky-200"
+              wakeOn ? "border-emerald-700 bg-emerald-950/40 text-emerald-200" : "border-(--color-line) text-(--color-dim)"
             }`}
           >
-            <Icon name="mic" size={16} />
-            <span className="ml-1 hidden text-xs md:inline">{mode === "off" ? "待受にする" : "待受中"}</span>
+            <Icon name="ear" size={16} />
+            <span className="ml-1 hidden text-xs md:inline">{wakeOn ? "待受中" : "待受"}</span>
           </button>
         )}
+        {/* #247 ヒアリングボタン: 押した瞬間から聞く（呼びかけ不要）。もう一度押すと送る */}
+        <button
+          type="button"
+          onClick={() => void listenNow()}
+          disabled={busy}
+          title={ptt ? "押すと、ここまでを送ります" : "押してから話してください（「ジェネシス」は不要）"}
+          className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-bold disabled:opacity-40 ${
+            ptt ? "animate-pulse bg-red-500 text-white" : "bg-(--color-accent) text-[#06121c]"
+          }`}
+        >
+          <Icon name="mic" size={18} />
+          <span>{ptt ? "聞いています（押すと送る）" : "話す"}</span>
+        </button>
         <button type="submit" disabled={busy || !input.trim()} className="btn-main hidden disabled:opacity-40 sm:block">
           送る
         </button>
@@ -700,8 +867,17 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       )}
 
       {micError && <p className="px-4 pb-2 text-xs text-amber-300">{micError}</p>}
-      {mode === "off" && sttSupported && !micError && (
-        <p className="px-4 pb-2 text-xs text-(--color-faint)">🎤 を1回押すと、以後は「ジェネシス」と呼ぶだけで会話に入ります。</p>
+      {recError && !micError && (
+        <p className="px-4 pb-2 text-xs text-amber-300">
+          音声認識が止まっています（{recError === "network" ? "ネットにつながらない" : recError === "audio-capture" ? "マイクの音が取れない" : recError === "language-not-supported" ? "日本語に未対応のブラウザ" : recError}）。
+          「話す」ボタンは使えます。{recError === "network" ? "Chrome か Edge でお試しください。" : ""}
+        </p>
+      )}
+      {mode === "off" && !micError && (
+        <p className="px-4 pb-2 text-xs text-(--color-faint)">
+          「話す」を押してそのまま話しかけてください。
+          {sttSupported ? "「待受」をオンにすると、以後は「ジェネシス」と呼ぶだけで会話に入ります。" : "（このブラウザは「ジェネシス」の呼びかけに未対応です。Chrome か Edge なら使えます）"}
+        </p>
       )}
       {mode === "waiting" && !busy && !speaking && (
         <p className="truncate px-4 pb-2 text-xs text-(--color-faint)">
