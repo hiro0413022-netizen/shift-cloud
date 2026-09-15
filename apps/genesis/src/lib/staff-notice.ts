@@ -179,7 +179,7 @@ export async function sendStaffNotice(actor: GenesisActor, input: SendNoticeInpu
      もとは gn_line_outbox に status='pending' で積み、n8n が拾って Push する設計だった。
      しかし #102 以降その拾い役は存在しない＝**積んだだけで永久に届かない**。
      スタッフ用OAのトークンでその場で Push し、outbox には履歴(status='sent')として残す。 */
-  const { getLineChannel, linePush } = await import("@/lib/line");
+  const { getLineChannel, linePush, forLine } = await import("@/lib/line");
   const staffCh = await getLineChannel(admin, companyId, "staff");
   if (!staffCh) return { ok: false, error: "記録はできましたが、スタッフ用LINEチャネルが未設定で送れません" };
 
@@ -188,12 +188,12 @@ export async function sendStaffNotice(actor: GenesisActor, input: SendNoticeInpu
   for (const g of targets) {
     const label = g.store_name ?? g.label ?? "グループ";
     try {
-      await linePush(staffCh.access_token, g.line_group_id, body);
+      await linePush(staffCh, g.line_group_id, body);
       sent.push(label);
       await admin.from("gn_line_outbox").insert({
         company_id: companyId,
         to_group_id: g.line_group_id,
-        body,
+        body: forLine(staffCh, body), // #243
         directive_id: dir.id,
         status: "sent",
         sent_at: new Date().toISOString(),
@@ -204,7 +204,7 @@ export async function sendStaffNotice(actor: GenesisActor, input: SendNoticeInpu
       await admin.from("gn_line_outbox").insert({
         company_id: companyId,
         to_group_id: g.line_group_id,
-        body,
+        body: forLine(staffCh, body), // #243
         directive_id: dir.id,
         status: "error",
         error: e instanceof Error ? e.message : "送信に失敗しました",

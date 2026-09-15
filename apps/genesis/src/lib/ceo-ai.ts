@@ -413,7 +413,7 @@ export async function runDailyCeoReport(
         const q = admin.from("stores").select("id, name").eq("company_id", companyId).is("deleted_at", null);
         return allowedStores ? q.in("id", storeInValues(allowedStores)) : q;
       })(),
-      admin.from("staff").select("id, name").eq("company_id", companyId).is("deleted_at", null),
+      admin.from("staff").select("id, name, line_hidden").eq("company_id", companyId).is("deleted_at", null),
       // 本日の連絡事項（#215）。店頭で書いた申し送りをそのまま朝のLINEに載せる。
       // 期間の連絡は「今日が期間の中」なら毎朝出る（当日だけの連絡は date_from=date_to）
       admin
@@ -429,6 +429,12 @@ export async function runDailyCeoReport(
     ]);
     const storeName = new Map((storesRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
     const staffName = new Map((staffRes.data ?? []).map((s) => [String(s.id), String(s.name)]));
+    /* #243: LINEに名前を出さないスタッフ（staff.line_hidden）。
+       出勤欄からは行ごと外す（「担当プロ(10:00〜)」と出すのも名前が分かるので出さない）。
+       タスクの担当者名は伏せ字にする。本文全体の最後の砦は linePush 側（forLine）。 */
+    const lineHidden = new Set(
+      (staffRes.data ?? []).filter((s) => (s as { line_hidden?: boolean }).line_hidden === true).map((s) => String(s.id))
+    );
 
     /* ------------------------------------------------------------
        朝連絡は「店舗ごとに1通」にする（2026-09-02 古川さん指示）
@@ -455,7 +461,7 @@ export async function runDailyCeoReport(
     const inScope = (storeId: unknown) =>
       !allowedStores || storeId == null || allowedStores.has(String(storeId));
 
-    const shifts = (shiftsRes.data ?? []).filter((sh) => inScope(sh.store_id));
+    const shifts = (shiftsRes.data ?? []).filter((sh) => inScope(sh.store_id) && !lineHidden.has(String(sh.staff_id)));
     const tasksAll = (tasksRes.data ?? []).filter((t) => inScope(t.store_id));
     const carryAll = (carryoverRes.data ?? []).filter((t) => inScope(t.store_id));
     const noticesAll = (noticesRes.data ?? []).filter((n) => inScope(n.store_id));
@@ -495,7 +501,7 @@ export async function runDailyCeoReport(
       if (tasks.length > 0) {
         lines.push("", "▼今日のやることリスト");
         for (const t of tasks) {
-          const who = t.staff_id ? staffName.get(String(t.staff_id)) : null;
+          const who = t.staff_id && !lineHidden.has(String(t.staff_id)) ? staffName.get(String(t.staff_id)) : null;
           const common = t.store_id == null ? "【全店共通】" : "";
           lines.push(`・${String(t.title)}${common}${who ? `（${who}さん）` : ""}`);
         }

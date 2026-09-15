@@ -205,7 +205,7 @@ export async function runMorningDigest(companyId: string, storeIds?: string[] | 
   }
   lines.push("", `▼判断はこちらから`, HOME_URL);
 
-  await linePush(staffCh.access_token, userId, lines.join("\n"));
+  await linePush(staffCh, userId, lines.join("\n"));
 
   await admin.from("gn_loop_runs").insert({
     company_id: companyId,

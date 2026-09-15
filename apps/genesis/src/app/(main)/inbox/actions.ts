@@ -67,7 +67,7 @@ export async function approveInquiry(formData: FormData) {
       const ch = await getLineChannel(admin, actor.companyId, code);
       if (!ch) throw new Error(`LINEチャネル未登録または無効: ${code}（gn_line_channels）`);
 
-      await linePush(ch.access_token, to, finalReply);
+      await linePush(ch, to, finalReply);
 
       await admin
         .from("sec_inquiries")

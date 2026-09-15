@@ -30,6 +30,7 @@
     "./jst": "./src/jst.ts",
     "./kernel": "./src/kernel.ts",
     "./lesson-share": "./src/lesson-share.ts",
+    "./line-redact": "./src/line-redact.ts",
     "./members": "./src/members.ts",
     "./middleware": "./src/middleware.ts",
     "./night-payroll": "./src/night-payroll.ts",

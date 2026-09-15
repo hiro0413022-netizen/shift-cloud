@@ -164,17 +164,17 @@ async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string
 
   // #85: n8n経由をやめ、スタッフ用OAトークンで直接push（複数グループ対応）。
   // outboxには履歴として status='sent' で残す（n8nは拾わない）。
-  const { getLineChannel, linePush } = await import("@/lib/line");
+  const { getLineChannel, linePush, forLine } = await import("@/lib/line");
   const staffCh = await getLineChannel(admin, row.company_id, "staff");
   if (!staffCh) throw new Error("LINEチャネル未登録: staff（gn_line_channels）");
   const sentTo: string[] = [];
   for (const g of targets) {
-    await linePush(staffCh.access_token, g.line_group_id, body);
+    await linePush(staffCh, g.line_group_id, body);
     sentTo.push(g.line_group_id);
     await admin.from("gn_line_outbox").insert({
       company_id: row.company_id,
       to_group_id: g.line_group_id,
-      body,
+      body: forLine(staffCh, body), // #243 送った文面（伏せ字後）を残す
       directive_id: dir?.id ?? null,
       status: "sent",
       created_by: null,
@@ -229,19 +229,19 @@ const HANDLERS: Record<string, Handler> = {
   // 顧客向けLINE一斉配信（#80: gn_line_channelsのトークンでLINE APIへ直接broadcast）
   // payload.channel = 'gw_visitor' | 'gw_member'（既定 gw_visitor）。audience=customer のみ許可。
   line_broadcast: async ({ admin, row }) => {
-    const { getLineChannel, lineBroadcast } = await import("@/lib/line");
+    const { getLineChannel, lineBroadcast, forLine } = await import("@/lib/line");
     const channelCode = String(row.payload.channel ?? "gw_visitor");
     const body = String(row.payload.body ?? row.payload.message ?? "").trim();
     if (!body) throw new Error("body が空です");
     const ch = await getLineChannel(admin, row.company_id, channelCode);
     if (!ch) throw new Error(`LINEチャネル未登録: ${channelCode}（gn_line_channels）`);
     if (ch.audience !== "customer") throw new Error(`${channelCode} は顧客向けチャネルではありません`);
-    await lineBroadcast(ch.access_token, body);
+    await lineBroadcast(ch, body);
     // 送信履歴を outbox にも残す（status=sent なので n8n は拾わない）
     await admin.from("gn_line_outbox").insert({
       company_id: row.company_id,
       to_group_id: `broadcast:${channelCode}`,
-      body,
+      body: forLine(ch, body), // #243 送った文面（伏せ字後）を残す
       status: "sent",
       created_by: null,
     });
@@ -257,7 +257,7 @@ const HANDLERS: Record<string, Handler> = {
   // payload.contact = 宛名（person_name 部分一致・一意必須） / payload.contact_id = uuid直指定
   // 例: 「小川にメッセージ送って」→ { contact: '小川', body: '...' } を enqueue（policy=auto）
   line_push_contact: async ({ admin, row }) => {
-    const { getLineChannel, linePush } = await import("@/lib/line");
+    const { getLineChannel, linePush, forLine } = await import("@/lib/line");
     const body = String(row.payload.body ?? row.payload.message ?? "").trim();
     if (!body) throw new Error("body が空です");
     const contactId = row.payload.contact_id ? String(row.payload.contact_id) : null;
@@ -282,12 +282,12 @@ const HANDLERS: Record<string, Handler> = {
       );
     const ch = await getLineChannel(admin, row.company_id, String(c.channel_code ?? "staff"));
     if (!ch) throw new Error(`LINEチャネル未登録: ${String(c.channel_code ?? "staff")}（gn_line_channels）`);
-    await linePush(ch.access_token, String(c.line_user_id), body);
+    await linePush(ch, String(c.line_user_id), body);
     // 送信履歴を outbox にも残す（status=sent）
     await admin.from("gn_line_outbox").insert({
       company_id: row.company_id,
       to_group_id: String(c.line_user_id),
-      body,
+      body: forLine(ch, body), // #243 送った文面（伏せ字後）を残す
       status: "sent",
       created_by: null,
     });
