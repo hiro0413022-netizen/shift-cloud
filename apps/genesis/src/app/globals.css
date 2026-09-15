@@ -5,9 +5,12 @@
   --color-bg: #07090f;
   --color-panel: #0d1119;
   --color-panel-2: #121826;
-  --color-line: #1e2637;
-  --color-txt: #e2e8f0;
-  --color-dim: #7c8aa5;
+  /* 2026-09-15 (#244) 「見にくい」対策: 文字と区切り線を明るくしてコントラストを上げる。
+     旧: line #1e2637 / txt #e2e8f0 / dim #7c8aa5（薄すぎて本文が読めなかった） */
+  --color-line: #2b3649;
+  --color-txt: #f1f4f9;
+  --color-dim: #b3bdcf;
+  --color-faint: #8591a7;
   --color-accent: #38bdf8;
   --color-accent-2: #818cf8;
   --color-gold: #d4af37;
@@ -325,4 +328,55 @@ body::before {
 .jarvis-breathe { animation: jarvis-breathe 3s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .jarvis-breathe { animation: none; }
+}
+
+/* ============================================================
+   #244 UI改修: スマホは下タブ（5つ）で移動する。
+   本文がタブに隠れないよう、md未満では main の下に余白を足す。
+   ============================================================ */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .kpi-scroll {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin-left: -12px;
+    margin-right: -12px;
+    padding: 0 12px 4px;
+    scrollbar-width: none;
+  }
+  .kpi-scroll > * {
+    flex: 0 0 150px;
+    scroll-snap-align: start;
+  }
+}
+/* 右から開くパネル（#244 ③⑦）。md未満は全画面 */
+.gn-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}
+.gn-panel-body {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100vw, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel);
+  border-left: 1px solid var(--color-line);
+  box-shadow: -24px 0 48px rgba(0, 0, 0, 0.45);
+  overflow-y: auto;
+}
+.gn-panel-body.wide {
+  width: min(100vw, 1000px);
+}
+/* 今日やることの選択行（キーボード操作 ⑥） */
+.todo-row[data-selected="true"] {
+  background: var(--color-panel-2);
+  box-shadow: inset 3px 0 0 0 var(--color-accent);
 }

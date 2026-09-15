@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { talkToJarvis } from "@/app/(main)/jarvis-actions";
-import { detectWake, pauseMs } from "@/lib/jarvis-pure";
+import { detectWake, pauseMs, detectScreenCommand } from "@/lib/jarvis-pure";
+import { Icon } from "./icons";
+import { openPalette } from "./command-palette";
 import type { JarvisReply } from "@/lib/jarvis";
 
 /* ============================================================
@@ -46,7 +49,6 @@ const SPEED_KEY = "gn.jarvis.speed";
 /** 返事のあと、呼びかけ無しで続けて話せる時間 */
 const FOLLOWUP_MS = 10000;
 
-const SUGGESTIONS = ["今日はどんな状況？", "今月の売上は？", "承認待ちを教えて", "体験からの入会率は？"];
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -64,6 +66,7 @@ type SpeechRecognitionLike = {
 type Mode = "off" | "waiting" | "listening";
 
 export function Jarvis({ opening, name }: { opening: string; name: string }) {
+  const router = useRouter();
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "assistant", text: opening, intent: "brief" }]);
   const [input, setInput] = useState("");
   const [heard, setHeard] = useState(""); // いま聞き取っている途中の言葉
@@ -183,12 +186,33 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       setBusy(true);
       const history = msgsRef.current.slice(-8).map((m) => ({ role: m.role, text: m.text }));
       setMsgs((prev) => [...prev, { role: "user", text: q }]);
+      // #244: 「会員数を見せて」「フランクの予約を開いて」＝画面を出す指示は LLM に投げず、その場で開く
+      const cmd = detectScreenCommand(q);
+      if (cmd) {
+        setMsgs((prev) => [...prev, { role: "assistant", text: cmd.label, intent: "show" }]);
+        if (cmd.kind === "search") openPalette(cmd.q);
+        else router.push(cmd.href);
+        if (voiceRef.current || inputMode === "voice") void speak(cmd.label);
+        if (wantListening.current) {
+          inConversation.current = true;
+          followupTimer.current = setTimeout(() => {
+            inConversation.current = false;
+            bufferRef.current = "";
+            setHeard("");
+          }, FOLLOWUP_MS);
+        }
+        busyRef.current = false;
+        setBusy(false);
+        return;
+      }
       try {
         const r: JarvisReply = await talkToJarvis(q, history, inputMode);
         setMsgs((prev) => [
           ...prev,
           { role: "assistant", text: r.reply, link: r.link, dev: r.dev, act: r.act, sql: r.sql, rowCount: r.rowCount, intent: r.intent },
         ]);
+        // #244: 案内先が決まった返事は、ボタンを押させずにそのまま開く（声で操作できるように）
+        if (r.intent === "navigate" && r.link?.href) router.push(r.link.href);
         // 読み上げるのは「🔊をオンにしている」か「声で話しかけた」ときだけ。
         // 文字で打った質問に勝手に声で返さない（2026-09-15）
         if (voiceRef.current || inputMode === "voice") {
@@ -210,7 +234,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         setBusy(false);
       }
     },
-    [speak]
+    [speak, router]
   );
 
   /* ---------- 常時待受の本体 ---------- */
@@ -400,153 +424,108 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const latest = msgs[msgs.length - 1];
   const showThread = msgs.length > 1;
   const orbState = busy ? "thinking" : mode === "listening" ? "listening" : speaking ? "speaking" : mode === "waiting" ? "waiting" : "idle";
+  const statusText = busy
+    ? "考えています…"
+    : mode === "listening"
+      ? "はい、聞いています"
+      : speaking
+        ? "話しています…"
+        : mode === "waiting"
+          ? "「ジェネシス」と呼んでください"
+          : "";
 
+  /* #244: ホーム上部の1行に収める。会話が始まったら下に広がる。
+     声は最初オフ（🔇）。開いた瞬間には喋らない。 */
   return (
-    <section
-      className="relative overflow-hidden rounded-2xl border border-sky-900/50 bg-[radial-gradient(120%_140%_at_15%_0%,#0f1a2e_0%,#0d1119_55%,#0b0e15_100%)] p-4 sm:p-5"
-    >
-      {/* ヘッダー */}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <Orb state={orbState} />
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] tracking-[0.35em] text-(--color-gold)">YOZAN</p>
-          <p className="text-sm font-semibold tracking-wide">
-            GENESIS
-            <span className="ml-2 text-xs font-normal text-(--color-dim)">
-              {busy
-                ? "考えています…"
-                : mode === "listening"
-                  ? "はい、聞いています"
-                  : speaking
-                    ? "話しています…"
-                    : mode === "waiting"
-                      ? "「ジェネシス」と呼んでください"
-                      : `${name}さんの分身`}
-            </span>
-          </p>
-        </div>
-
-        {sttSupported && (
-          <button
-            type="button"
-            onClick={toggleWake}
-            title={mode === "off" ? "常時待受にする（「ジェネシス」で起動）" : "待受をやめる"}
-            className={`rounded-lg border px-3 py-1.5 text-xs transition-colors ${
-              mode === "off"
-                ? "border-(--color-line) text-(--color-dim) hover:bg-(--color-panel-2)"
-                : "border-sky-700 bg-sky-950/40 text-sky-200"
-            }`}
-          >
-            {mode === "off" ? "🎧 待受にする" : "🎧 待受中"}
-          </button>
-        )}
-
-        {mode !== "off" && (
-          <select
-            value={speed}
-            onChange={(e) => changeSpeed(e.target.value)}
-            title="どれくらい黙ったら「言い終わった」とみなすか"
-            className="rounded-lg border border-(--color-line) bg-(--color-panel-2) px-2 py-1.5 text-xs"
-          >
-            <option value="fast">待ち: はやい</option>
-            <option value="normal">待ち: ふつう</option>
-            <option value="slow">待ち: ゆっくり</option>
-          </select>
-        )}
-
-        <button
-          type="button"
-          onClick={toggleVoice}
-          title={voiceOn ? "読み上げを止める" : "読み上げを再開する"}
-          className="rounded-lg border border-(--color-line) px-2.5 py-1.5 text-sm hover:bg-(--color-panel-2)"
-        >
-          {voiceOn ? "🔊" : "🔇"}
-        </button>
-      </div>
-
-      {/* 会話 */}
-      {showThread && (
-        <div ref={threadRef} className="mb-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-          {msgs.slice(0, -1).map((m, i) => (
-            <Bubble key={i} msg={m} />
-          ))}
-        </div>
-      )}
-
-      {/* 最新の発話 */}
-      {latest && (
-        <div className="mb-3">
-          {latest.role === "assistant" ? (
-            <>
-              <p className="text-lg leading-relaxed text-sky-50">{latest.text}</p>
-              <Extras msg={latest} />
-            </>
-          ) : (
-            <Bubble msg={latest} />
-          )}
-          {busy && <p className="mt-2 text-sm text-(--color-dim)">…</p>}
-        </div>
-      )}
-
-      {/* いま聞き取っている言葉 — 何が聞こえているかが見えないと直しようがない */}
-      {mode === "listening" && !busy && (
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-sky-800/60 bg-sky-950/30 px-4 py-2.5">
-          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-red-400" />
-          <span className="min-w-0 flex-1 text-sm text-sky-100">{heard || "どうぞ"}</span>
-          {heard && (
-            <button type="button" onClick={sendNow} className="shrink-0 rounded-md border border-sky-700 px-2 py-1 text-xs text-sky-200">
-              いま送る
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* 入力（キーボードでもいつでも） */}
+    <section className="rounded-2xl border border-(--color-line) bg-(--color-panel)">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           void send(input, "text");
         }}
-        className="flex items-center gap-2"
+        className="flex items-center gap-2 px-3 py-2"
       >
+        <Orb state={orbState} />
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={mode === "waiting" ? "「ジェネシス」と呼ぶか、ここに入力" : "入力して送る"}
-          className="min-w-0 flex-1 rounded-xl border border-(--color-line) bg-(--color-panel-2) px-4 py-3 text-sm outline-none focus:border-sky-700"
+          placeholder={statusText || "GENESISに聞く・指示する（例：会員数を見せて／先週の体験は何件？）"}
+          className="min-w-0 flex-1 bg-transparent py-2 text-[15px] outline-none placeholder:text-(--color-faint)"
         />
-        <button type="submit" disabled={busy || !input.trim()} className="btn-main disabled:opacity-40">
+        {heard && mode === "listening" && !busy && (
+          <button type="button" onClick={sendNow} className="hidden shrink-0 rounded-md border border-sky-700 px-2 py-1 text-xs text-sky-200 sm:block">
+            いま送る
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={toggleVoice}
+          title={voiceOn ? "読み上げを止める" : "返事を声で読み上げる"}
+          className={`flex h-9 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs ${
+            voiceOn ? "border-sky-700 bg-sky-950/40 text-sky-200" : "border-(--color-line) text-(--color-dim)"
+          }`}
+        >
+          <Icon name={voiceOn ? "sound" : "mute"} size={16} />
+          <span className="hidden sm:inline">{voiceOn ? "声 オン" : "声 オフ"}</span>
+        </button>
+        {sttSupported && (
+          <button
+            type="button"
+            onClick={toggleWake}
+            title={mode === "off" ? "常時待受にする（「ジェネシス」で起動）" : "待受をやめる"}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+              mode === "off" ? "border-(--color-line) text-(--color-dim)" : "border-sky-700 bg-sky-950/40 text-sky-200"
+            }`}
+          >
+            <Icon name="mic" size={16} />
+          </button>
+        )}
+        <button type="submit" disabled={busy || !input.trim()} className="btn-main hidden disabled:opacity-40 sm:block">
           送る
         </button>
       </form>
 
-      {!showThread && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => void send(s, "text")}
-              className="rounded-full border border-(--color-line) px-3 py-1 text-xs text-(--color-dim) hover:border-sky-800 hover:text-sky-200"
-            >
-              {s}
-            </button>
-          ))}
+      {(showThread || (mode === "listening" && !busy) || busy) && (
+        <div className="border-t border-(--color-line) px-3 py-3 sm:px-4">
+          {mode !== "off" && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-(--color-dim)">
+              <select
+                value={speed}
+                onChange={(e) => changeSpeed(e.target.value)}
+                title="どれくらい黙ったら「言い終わった」とみなすか"
+                className="rounded-md border border-(--color-line) bg-(--color-panel-2) px-2 py-1 text-xs"
+              >
+                <option value="fast">待ち: はやい</option>
+                <option value="normal">待ち: ふつう</option>
+                <option value="slow">待ち: ゆっくり</option>
+              </select>
+              {mode === "listening" && (
+                <span className="flex items-center gap-2 text-sky-100">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-400" />
+                  {heard || "どうぞ"}
+                </span>
+              )}
+            </div>
+          )}
+          {showThread && (
+            <div ref={threadRef} className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              {msgs.slice(1).map((m, i) => (
+                <Bubble key={i} msg={m} />
+              ))}
+              {busy && <p className="text-sm text-(--color-dim)">…</p>}
+            </div>
+          )}
         </div>
       )}
 
-      {micError && <p className="mt-2 text-xs text-amber-300">{micError}</p>}
-      {mode === "off" && sttSupported && !micError && (
-        <p className="mt-2 text-xs text-(--color-dim)">
-          「🎧 待受にする」を1回押すと、以後は<b className="text-sky-300">「ジェネシス」と呼ぶだけ</b>で会話に入ります（このタブを開いている間、マイクは入りっぱなしになります）。
-        </p>
-      )}
-      {needsGesture && (
-        <p className="mt-2 text-xs text-(--color-dim)">ブラウザの設定で声を出せませんでした（文字の返事はそのまま使えます）。</p>
+      {micError && <p className="px-4 pb-2 text-xs text-amber-300">{micError}</p>}
+      {needsGesture && voiceOn && latest?.role === "assistant" && (
+        <p className="px-4 pb-2 text-xs text-(--color-dim)">ブラウザの設定で声を出せませんでした（文字の返事はそのまま使えます）。</p>
       )}
     </section>
   );
 }
+
 
 function Bubble({ msg }: { msg: Msg }) {
   if (msg.role === "user") {

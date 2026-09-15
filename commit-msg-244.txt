@@ -1,0 +1,17 @@
+genesis: UI大幅改修 — 7グループのメニュー・止まっているもの・右パネル承認・数字の3段深掘り・店舗直行・Ctrl K・スマホ5タブ・声で画面操作 (#244)
+
+ユーザー指摘「見にくい」「情報を取りに行きにくい」「他システムに飛びにくい」「会員数→店舗→種別と深掘りしたい」「スマホで見やすく」「音声AIで画面操作」への対応。
+
+- 配色: 本文・区切り線を明るく（globals.css）
+- メニュー: 管理25画面の一並びをやめ、やることの種類で7グループ（lib/nav.ts が正典・URLは不変・件数バッジ）
+- ホーム: GENESISに聞く1行 → 止まっているもの（LINE 429・RESEND_API_KEY・日次レポート停止・LINE配信エラー＝直し方つき）→ 前回からの変化 → 今日やること／今月の数字
+- 今日やること: 右パネル（?panel=）で文面全文・実行プラン・修正・決済状況・次の件へ。入金確認済みWeb入会のまとめて承認。↑↓/Enter/A。/todo 全件ページ
+- 数字: カードを押すと 全店→店舗→種別→その人 の3段（?drill=）。6指標同じ作り。出どころ表示。目標は「1日あたり」
+- /stores: 店舗のシステムへ直行（状態つき入口・別タブ）
+- Ctrl K: 画面・お客様（受付台帳＋FRANK会員）・その人にすること
+- スマホ: 下5タブ・上バー＋メニュー・横スクロール・全画面パネル
+- 声: detectScreenCommand で「会員数を見せて」等を LLM に投げずその場で開く。声は最初オフのまま
+- tests/genesis-home-244.test.ts 12件・全747件通過・tsc 0・next build 成功・migration なし
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01THrJMT36meC47axGBwU1MR

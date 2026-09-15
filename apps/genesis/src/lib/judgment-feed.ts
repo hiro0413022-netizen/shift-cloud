@@ -42,6 +42,8 @@ export type JudgmentItem = {
   plan?: ExecutionPlan | null;
   /** queue: 修正指示UIを出すか（awaiting_approval の文面系のみ） */
   revisable?: boolean;
+  /** join: 決済状況（#244 右パネルで「入金済みか」を承認の手前に出す） */
+  billingStatus?: string | null;
 };
 
 /** 「承認すると何がどう実行されるか」の説明（ホームの詳細展開用） */
@@ -194,7 +196,7 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
     scopeStore(
       admin
         .from("frunk_members")
-        .select("id, name, created_at, store_id")
+        .select("id, name, created_at, store_id, billing_status, plan_id, frunk_plans(name)")
         .eq("company_id", companyId)
         .eq("status", "pending")
         .is("deleted_at", null)
@@ -315,13 +317,18 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
   }
 
   for (const r of (joinRes.data ?? []) as Row[]) {
+    const billing = s(r.billing_status);
+    const plan = r.frunk_plans as { name?: string } | { name?: string }[] | null;
+    const planName = Array.isArray(plan) ? plan[0]?.name : plan?.name;
+    const paid = billing === "active" ? "入金確認済み（Square）" : billing === "checkout" ? "決済ページへ案内済み・入金待ち" : "未入金";
     items.push({
       id: String(r.id),
       source: "join",
       tag: "Web入会",
       // #134: 店舗名はDBの値を出す（"FRANK"決め打ちにしない）
       title: `【${storeLabel(r.store_id)}】${s(r.name) ?? "お客様"} 様の入会申込`,
-      detail: "承認すると会員番号を発行して在籍化します",
+      detail: `${planName ? `${planName} ・ ` : ""}${paid} ・ 承認すると会員番号を発行して在籍化します`,
+      billingStatus: billing,
       createdAt: s(r.created_at),
       href: `${MEMBER_OS_URL}/frunk`,
       scheduledAt: null,

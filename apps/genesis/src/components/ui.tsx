@@ -174,6 +174,7 @@ export function KpiCard({
   target,
   note,
   scopeLabel,
+  sub,
 }: {
   name: string;
   value: number | null;
@@ -183,9 +184,11 @@ export function KpiCard({
   note?: string | null;
   /** どの範囲の数字か（#134: 「全店合算」を隠さない）。null なら表示しない */
   scopeLabel?: string | null;
+  /** #244 ④: 「あと◯◯＝1日◯◯」。あれば目標行の代わりに出す（次の行動に繋がる言い方） */
+  sub?: string | null;
 }) {
   return (
-    <div className="hud reveal rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+    <div className="hud reveal h-full rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
       <p className="flex items-center gap-1 text-xs tracking-wide text-(--color-dim)">
         <span className="min-w-0 truncate">{name}</span>
         {scopeLabel && (
@@ -206,8 +209,8 @@ export function KpiCard({
         )}
       </p>
       {value != null && <Sparkline trend={trend} />}
-      <p className="mt-1 truncate text-[11px] text-(--color-dim)" title={note ?? undefined}>
-        {target != null ? `目標 ${Number(target).toLocaleString("ja-JP")}${unit}` : (note ?? "")}
+      <p className="mt-1 truncate text-[12px] text-(--color-dim)" title={note ?? undefined}>
+        {sub ?? (target != null ? `目標 ${Number(target).toLocaleString("ja-JP")}${unit}` : (note ?? ""))}
       </p>
     </div>
   );

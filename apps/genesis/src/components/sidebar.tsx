@@ -3,103 +3,125 @@
 import Link from "next/link";
 import { useState } from "react";
 import { usePathname } from "next/navigation";
+import { NAV_GROUPS, groupOfPath, navItemActive, type NavGroup } from "@/lib/nav";
+import { Icon } from "./icons";
+import { openPalette } from "./command-palette";
 
-// REDESIGN_2026-07 §3: 26画面 → 5＋管理（折りたたみ）。
-// 日常で使うのは PRIMARY の4つ＋管理グループのみ。既存URLは全て温存（cron・通知リンクを壊さない）。
-export const PRIMARY_NAV = [
-  { href: "/", label: "ホーム", en: "Home", icon: "◉" },
-  { href: "/chat", label: "チャット", en: "Chat / Ask Data", icon: "💬" },
-  { href: "/agents", label: "AI社員", en: "AI Agents", icon: "🤖" },
-  { href: "/finance", label: "数字", en: "Finance", icon: "¥" },
-];
+/**
+ * 左メニュー（#244・2026-09-15）
+ * REDESIGN_2026-07 §3 の「5＋管理（折りたたみ）」をやめ、やることの種類で7グループにした。
+ * 開いているグループだけ中身を見せる（アコーディオン）。件数バッジは layout が数える。
+ * 既存URLは全て温存（cron・通知リンクを壊さない）。
+ */
+export type SidebarStore = { id: string; name: string };
 
-export const ADMIN_NAV = [
-  { href: "/command", label: "CEO AI 司令室", en: "CEO AI Command", icon: "⌘" },
-  { href: "/ai-sales", label: "AI営業 司令室", en: "AI Sales Live", icon: "📡" },
-  { href: "/suggestions", label: "改善提案", en: "Suggestions", icon: "💡" },
-  { href: "/directives", label: "実行指示", en: "Directives", icon: "📣" },
-  { href: "/executions", label: "AI自動実行", en: "AI Executor", icon: "⚙" },
-  { href: "/approvals", label: "承認待ち", en: "Approvals", icon: "✓" },
-  { href: "/inbox", label: "問い合わせ受信箱", en: "CEO Inbox", icon: "📨" },
-  { href: "/deliverables", label: "成果物レビュー", en: "AI Deliverables", icon: "🎁" },
-  { href: "/incidents", label: "イレギュラー分析", en: "Incidents", icon: "⚠" },
-  { href: "/notes", label: "社内連絡", en: "Notes", icon: "📝" },
-  { href: "/notice", label: "スタッフへ連絡", en: "Staff Notice", icon: "📢" },
-  { href: "/legal", label: "契約・法務", en: "Legal", icon: "📄" },
-  { href: "/reserve", label: "予約申込", en: "Reserve", icon: "📅" },
-  { href: "/library", label: "資料室", en: "Library", icon: "📁" },
-  { href: "/network", label: "システム相関図", en: "System Network", icon: "🕸" },
-  { href: "/memories", label: "経営メモ（AIの記憶）", en: "Business Memory", icon: "🧠" },
-  { href: "/decisions", label: "決定事項ログ", en: "Decision Log", icon: "⚖" },
-  { href: "/events", label: "出来事ログ", en: "Company Events", icon: "⚡" },
-  { href: "/dev-requests", label: "開発依頼", en: "Dev Requests", icon: "🧾" },
-  { href: "/dev", label: "開発状況", en: "Development", icon: "🛠" },
-  { href: "/future", label: "未来シミュレーション", en: "Future", icon: "📈" },
-  { href: "/connectors", label: "外部連携", en: "Connectors", icon: "🔌" },
-  { href: "/site-admin", label: "FRANKサイト管理", en: "Site CMS", icon: "🌐" },
-  { href: "/vault", label: "システム台帳（ID/URL）", en: "Vault", icon: "🔐" },
-  { href: "/accounts", label: "アカウント管理", en: "Accounts", icon: "👤" },
-];
+// mobile-nav・jarvis の互換用（旧 PRIMARY_NAV/ADMIN_NAV を参照していた所のため）
+export const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
-// mobile-nav 互換のため統合リストも維持
-export const NAV = [...PRIMARY_NAV, ...ADMIN_NAV];
-
-function itemActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  // チャット(/chat)は /command（CEO AI司令室タブ）でもアクティブ扱い（#78 §3-2統合）
-  if (href === "/chat") return pathname.startsWith("/chat") || pathname.startsWith("/command");
-  // /dev と /dev-requests は別物（startsWith だと両方が光る）
-  if (href === "/dev") return pathname === "/dev";
-  return pathname.startsWith(href);
-}
-
-function NavLink({ item, active }: { item: (typeof NAV)[number]; active: boolean }) {
-  return (
-    <Link
-      href={item.href}
-      title={item.en}
-      className={`relative flex items-center gap-2 rounded-lg px-3 py-2 text-sm leading-snug transition-colors ${
-        active
-          ? "bg-(--color-panel-2) text-sky-300 shadow-[inset_2px_0_0_0_#38bdf8]"
-          : "text-(--color-dim) hover:bg-(--color-panel-2) hover:text-(--color-txt)"
-      }`}
-    >
-      <span className="w-4 shrink-0 text-center text-xs">{item.icon}</span>
-      <span className="min-w-0">{item.label}</span>
-    </Link>
-  );
-}
-
-export function Sidebar({ userName }: { userName: string }) {
+export function Sidebar({
+  userName,
+  badges,
+  stores,
+}: {
+  userName: string;
+  badges: { approve: number; customers: number };
+  stores: SidebarStore[];
+}) {
   const pathname = usePathname();
-  const inAdmin = ADMIN_NAV.some((i) => itemActive(pathname, i.href));
-  const [adminOpen, setAdminOpen] = useState(inAdmin);
+  const current = groupOfPath(pathname);
+  const [open, setOpen] = useState<NavGroup["key"] | null>(current);
+
+  const badgeOf = (key: NavGroup["key"]) => (key === "approve" ? badges.approve : key === "customers" ? badges.customers : 0);
 
   return (
-    /* 文字を+15%したぶん幅も足す（w-60だと「経営メモ（AIの記憶）」等が折り返す） */
-    <aside className="hidden w-68 shrink-0 flex-col border-r border-(--color-line) bg-(--color-panel) p-3 md:flex">
-      <div className="mb-6 px-2 pt-2">
-        <p className="text-xs tracking-[0.3em] text-(--color-gold)">YOZAN</p>
-        <p className="text-lg font-bold tracking-wide">GENESIS</p>
+    <aside className="hidden w-64 shrink-0 flex-col border-r border-(--color-line) bg-(--color-panel) p-3 md:flex">
+      <div className="mb-4 px-2 pt-2">
+        <p className="text-[11px] font-bold tracking-[0.3em] text-(--color-gold)">YOZAN</p>
+        <p className="text-xl font-bold tracking-wide">GENESIS</p>
       </div>
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
-        {PRIMARY_NAV.map((item) => (
-          <NavLink key={item.href} item={item} active={itemActive(pathname, item.href)} />
-        ))}
-        <button
-          onClick={() => setAdminOpen((v) => !v)}
-          className="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-(--color-dim) hover:bg-(--color-panel-2) hover:text-(--color-txt)"
-        >
-          <span className="w-4 text-center text-xs">{adminOpen ? "▾" : "▸"}</span>
-          管理
-        </button>
-        {adminOpen &&
-          ADMIN_NAV.map((item) => (
-            <div key={item.href} className="pl-2">
-              <NavLink item={item} active={itemActive(pathname, item.href)} />
+
+      <button
+        type="button"
+        onClick={() => openPalette()}
+        className="mb-4 flex h-10 items-center gap-2 rounded-lg border border-(--color-line) bg-(--color-bg) px-3 text-sm text-(--color-faint) hover:border-sky-700"
+      >
+        <Icon name="search" size={16} />
+        <span className="flex-1 text-left">探す・移動する</span>
+        <kbd className="rounded border border-(--color-line) px-1.5 text-[11px]">Ctrl K</kbd>
+      </button>
+
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
+        {NAV_GROUPS.map((g) => {
+          const isCurrent = g.key === current;
+          const isOpen = open === g.key;
+          const badge = badgeOf(g.key);
+          const single = g.items.length === 1;
+          const head = (
+            <>
+              <Icon name={g.icon} size={20} className={isCurrent ? "text-(--color-accent)" : "text-(--color-dim)"} />
+              <span className="min-w-0 flex-1 truncate">{g.label}</span>
+              {badge > 0 && (
+                <span className="tnum flex h-5 min-w-5 items-center justify-center rounded-full bg-(--color-danger) px-1.5 text-[12px] font-bold text-[#0b0f17]">
+                  {badge}
+                </span>
+              )}
+              {!single && <span className="text-xs text-(--color-faint)">{isOpen ? "▾" : "▸"}</span>}
+            </>
+          );
+          const cls = `flex h-11 items-center gap-3 rounded-lg px-3 text-[15px] transition-colors ${
+            isCurrent ? "bg-(--color-panel-2) font-bold text-(--color-accent)" : "text-(--color-txt) hover:bg-(--color-panel-2)"
+          }`;
+          return (
+            <div key={g.key}>
+              {single ? (
+                <Link href={g.items[0].href} className={cls}>
+                  {head}
+                </Link>
+              ) : (
+                <button type="button" onClick={() => setOpen(isOpen ? null : g.key)} className={`w-full ${cls}`}>
+                  {head}
+                </button>
+              )}
+              {isOpen && !single && (
+                <div className="mb-1 ml-4 flex flex-col gap-0.5 border-l border-(--color-line) pl-3">
+                  {g.items.map((it) => {
+                    const on = navItemActive(pathname, it.href);
+                    return (
+                      <Link
+                        key={it.href}
+                        href={it.href}
+                        className={`flex h-9 items-center rounded-md px-2 text-sm ${
+                          on ? "text-(--color-accent)" : "text-(--color-dim) hover:bg-(--color-panel-2) hover:text-(--color-txt)"
+                        }`}
+                      >
+                        {it.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ))}
+          );
+        })}
+
+        {/* 店舗のシステム（⑧）: 店名を押すとその店の入口一覧へ */}
+        {stores.length > 0 && (
+          <div className="mt-4 border-t border-(--color-line) px-3 pt-3">
+            <p className="mb-1 text-xs font-bold text-(--color-faint)">店舗のシステム</p>
+            {stores.map((s) => (
+              <Link
+                key={s.id}
+                href={`/stores?store=${s.id}`}
+                className="flex h-9 items-center gap-2 rounded-md text-sm text-(--color-dim) hover:text-(--color-txt)"
+              >
+                <Icon name="store" size={16} />
+                <span className="truncate">{s.name}</span>
+              </Link>
+            ))}
+          </div>
+        )}
       </nav>
+
       <div className="border-t border-(--color-line) px-2 pt-3 text-xs text-(--color-dim)">
         <p>{userName}</p>
         <form action="/api/logout" method="post">

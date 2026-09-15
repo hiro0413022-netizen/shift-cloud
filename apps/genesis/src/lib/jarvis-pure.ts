@@ -17,7 +17,9 @@
 export type NavEntry = { href: string; label: string; about: string };
 
 export const NAV_MAP: NavEntry[] = [
-  { href: "/", label: "ホーム", about: "全体スコア・今日の判断・5大KPI" },
+  { href: "/", label: "ホーム", about: "今日やること・今月の数字・止まっているもの" },
+  { href: "/todo", label: "今日やること", about: "判断が要る案件の全件一覧" },
+  { href: "/stores", label: "店舗のシステム", about: "予約・受付台帳・シフト・お金など各アプリへの入口" },
   { href: "/chat", label: "データに聞く", about: "売上・会員・勤怠などへの自由質問" },
   { href: "/agents", label: "AI社員", about: "21体のAIエージェントの稼働状況" },
   { href: "/finance", label: "数字", about: "事業別の売上・経費・収支" },
@@ -252,4 +254,90 @@ export type PauseSpeed = keyof typeof PAUSE_MS;
 
 export function pauseMs(speed: string | null | undefined): number {
   return PAUSE_MS[(speed as PauseSpeed) in PAUSE_MS ? (speed as PauseSpeed) : "normal"];
+}
+
+/* ------------------------------------------------------------
+   声で画面を動かす（#244・2026-09-15 ユーザー要望
+   「音声AIで画面も操作して僕が見たいものを見せるようにしてください」）
+
+   「会員数を見せて」「フランクの予約を開いて」「やることを出して」のような
+   **画面を出す指示**は、LLMに投げずここで判定して即座に開く。
+   （数字の質問「今月の売上は？」は従来どおり Ask Data に行く＝ここでは拾わない）
+
+   返すのは GENESIS 内の URL だけ。存在しない画面を開かせない（NAV_MAP と同じ考え方）。
+   店舗は別名（frank / gw）で返し、サーバー側（drilldown / stores）が実IDに直す。
+------------------------------------------------------------ */
+export type ScreenCommand =
+  | { kind: "drill"; metric: string; store: string | null; href: string; label: string }
+  | { kind: "todo"; href: string; label: string }
+  | { kind: "stores"; store: string | null; href: string; label: string }
+  | { kind: "nav"; href: string; label: string }
+  | { kind: "search"; q: string; label: string };
+
+const SHOW_VERBS = /(見せて|みせて|開いて|ひらいて|出して|だして|表示|見たい|みたい|開け|見せろ|見る|確認したい|チェックしたい)/;
+
+const METRIC_WORDS: { re: RegExp; metric: string; label: string }[] = [
+  { re: /(会員数|会員の数|かいいんすう|メンバー数|会員)/, metric: "members", label: "会員数" },
+  { re: /(売上|うりあげ|売り上げ|売上げ)/, metric: "monthly_sales", label: "今月の売上" },
+  { re: /(入会率|にゅうかいりつ|成約率)/, metric: "conversion_rate", label: "体験からの入会率" },
+  { re: /(退会|たいかい|解約)/, metric: "churn_rate", label: "退会" },
+  { re: /(体験|たいけん|トライアル)/, metric: "trial_bookings", label: "体験" },
+  { re: /(人件費|じんけんひ|シフト数)/, metric: "labor_cost", label: "人件費" },
+];
+
+/** 店舗の別名。サーバーが stores.code / name で実IDに直す */
+export function detectStoreAlias(text: string): "frank" | "gw" | null {
+  const t = text.toLowerCase();
+  if (/(フランク|ふらんく|frank|frunk|姫路|ひめじ)/.test(t)) return "frank";
+  if (/(ゴルフウィング|ゴルフウイング|golf ?wing|ウィング|宝塚|たからづか)/.test(t)) return "gw";
+  return null;
+}
+
+export function detectScreenCommand(text: string): ScreenCommand | null {
+  const t = (text ?? "").trim();
+  if (!t) return null;
+  const store = detectStoreAlias(t);
+
+  // 「〇〇を探して」「〇〇さんを出して」→ 検索（お客様・画面）
+  const search = t.match(/^(.+?)(さん|様)?(を|の)?(探して|さがして|検索|けんさく)/);
+  if (search && search[1] && !/(画面|やること|会員数|売上)/.test(search[1])) {
+    const q = search[1].replace(/^(ジェネシス|genesis)[、,\s]*/i, "").trim();
+    if (q) return { kind: "search", q, label: `「${q}」を探します` };
+  }
+
+  // 店舗のシステム（予約・受付・シフト・レジ）
+  if (/(予約|受付台帳|受付|シフト|レジ|店舗のシステム|店のシステム)/.test(t) && SHOW_VERBS.test(t)) {
+    const href = store ? `/stores?alias=${store}` : "/stores";
+    return { kind: "stores", store, href, label: `${store === "frank" ? "FRANK GOLF" : store === "gw" ? "GOLF WING" : "店舗"}のシステムを開きます` };
+  }
+
+  // やること・承認
+  if (/(やること|やる事|判断|承認待ち|承認)/.test(t) && SHOW_VERBS.test(t)) {
+    return { kind: "todo", href: "/?panel=first", label: "今日やることを開きます" };
+  }
+
+  // 数字の深掘り（「会員数を見せて」「フランクの売上を出して」）
+  if (SHOW_VERBS.test(t) || /(内訳|うちわけ|種別|店舗ごと|店ごと)/.test(t)) {
+    for (const m of METRIC_WORDS) {
+      if (m.re.test(t)) {
+        const p = new URLSearchParams({ drill: m.metric });
+        if (store) p.set("alias", store);
+        return {
+          kind: "drill",
+          metric: m.metric,
+          store,
+          href: `/?${p.toString()}`,
+          label: `${store === "frank" ? "FRANK GOLFの" : store === "gw" ? "GOLF WINGの" : ""}${m.label}を開きます`,
+        };
+      }
+    }
+  }
+
+  // 画面名（「契約書を開いて」「システム相関図を見せて」）
+  if (SHOW_VERBS.test(t)) {
+    const noun = t.replace(SHOW_VERBS, "").replace(/(を|の|画面|ページ|ください|くれ|ほしい|欲しい)/g, "").trim();
+    const hit = noun ? NAV_MAP.find((n) => noun.includes(n.label) || n.label.includes(noun)) : null;
+    if (hit) return { kind: "nav", href: hit.href, label: `${hit.label}を開きます` };
+  }
+  return null;
 }

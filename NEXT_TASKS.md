@@ -7,6 +7,12 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-244. **GENESIS の UI 大幅改修（#244）を本番へ**
+   1. **`.\deploy-244.ps1` を実行**（commit & push・migration なし）→ Vercel の yozan-genesis が READY になるまで待つ
+   2. スマホで https://yozan-genesis.vercel.app を開き、下の5タブ・数字の横スクロール・右パネルを確認
+   3. ホーム上部の「止まっているもの」に **朝の出勤LINE（月200通上限）** と **メール送信設定なし（RESEND_API_KEY）** が出るはず。LINE公式のプラン変更（ライトプラン）と Vercel の env 設定（A-240）は引き続きユーザー作業
+   4. 声の操作: ホームの 🎤 を押して「ジェネシス、会員数を見せて」→ 右パネルが開くこと（声は最初オフ。返事を声で聞きたいときだけ「声 オン」）
+
 A-240. **全システムチェック（2026-09-13）の残り＝メール送信のenvと再送**（#240・詳細は CHANGELOG 2026-09-13）
    1. **`.\deploy-240.ps1` を実行**（commit & push。migration 0169 は適用済みなのでコードだけ）→ Vercel の member-os / yozan-genesis / craft-os / inventory-os が READY になるまで待つ
    2. **Vercel `yozan-genesis` に `RESEND_API_KEY` と `FRANK_MAIL_FROM`（例: `FRANK GOLF <info@frankgolf.jp>`）を設定**（Settings → Environment Variables → Production → Redeploy）。
