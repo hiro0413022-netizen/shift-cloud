@@ -122,6 +122,66 @@ export async function dismissInquiry(formData: FormData) {
   await logAudit(actor, "inquiry.dismiss", "sec_inquiries", id, before, after);
   revalidatePath("/inbox");
   revalidatePath("/command");
+  revalidatePath("/");
+  revalidatePath("/todo");
+}
+
+/**
+ * 対応済み（#255）。LINE公式アカウントの画面や電話など、GENESIS の外で返信・対応したもの。
+ * LINE は「お店から送ったメッセージ」を webhook で知らせてくれないので、GENESIS からは返信したか分からない。
+ * 押さないと「今日やること」に残り続けるため、ここで閉じる。何も送信しない。
+ */
+export async function markInquiryHandled(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+
+  const admin = createAdmin();
+  const { data: before } = await admin
+    .from("sec_inquiries")
+    .select("id, status, from_name, subject")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!before || !["new", "awaiting_approval"].includes(String(before.status))) return;
+
+  const after = { status: "handled", decided_by: actor.staffId, decided_at: new Date().toISOString() };
+  await admin
+    .from("sec_inquiries")
+    .update(after)
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .in("status", ["new", "awaiting_approval"]);
+
+  await logAudit(actor, "inquiry.handled", "sec_inquiries", id, before, after);
+  revalidatePath("/");
+  revalidatePath("/todo");
+  revalidatePath("/inbox");
+  revalidatePath("/command");
+}
+
+/**
+ * 対応済みをまとめて（#255）。ホームの「◯日以上前のLINEを対応済みに」から。
+ * 画面に出ていた id だけを閉じる（見ていない件を勝手に閉じない）。何も送信しない。
+ */
+export async function markInquiriesHandledBulk(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const ids = [...new Set(formData.getAll("ids").map(String).filter(Boolean))].slice(0, 200);
+  if (ids.length === 0) return;
+  const admin = createAdmin();
+  const after = { status: "handled", decided_by: actor.staffId, decided_at: new Date().toISOString() };
+  const { data } = await admin
+    .from("sec_inquiries")
+    .update(after)
+    .eq("company_id", actor.companyId)
+    .in("id", ids)
+    .in("status", ["new", "awaiting_approval"])
+    .select("id");
+  await logAudit(actor, "inquiry.handled_bulk", "sec_inquiries", null, null, { ...after, count: data?.length ?? 0, ids });
+  revalidatePath("/");
+  revalidatePath("/todo");
+  revalidatePath("/inbox");
 }
 
 /** 種別・優先度を手動修正（AI分類の訂正用） */

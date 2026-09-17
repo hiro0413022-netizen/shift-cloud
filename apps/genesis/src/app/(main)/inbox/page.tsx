@@ -12,6 +12,7 @@ import {
 import {
   approveInquiry,
   dismissInquiry,
+  markInquiryHandled,
   draftReply,
   draftAllReplies,
   addFilterRule,
@@ -135,6 +136,9 @@ export default async function InboxPage() {
                     <button className={btnGhostCls} formAction={draftReply}>
                       返信案を作る（AI）
                     </button>
+                    <button className={btnGhostCls} formAction={markInquiryHandled} title="LINEの画面や電話で対応済み（送信はしません）">
+                      対応済み
+                    </button>
                     <button className={btnGhostCls} formAction={dismissInquiry}>
                       対応不要
                     </button>
@@ -206,7 +210,7 @@ export default async function InboxPage() {
           <ul className="space-y-2 text-sm">
             {handled.map((q) => (
               <li key={q.id} className="flex flex-wrap items-center gap-2">
-                <Badge tone={q.status === "dismissed" ? "default" : q.status === "replied" ? "ok" : "accent"}>
+                <Badge tone={q.status === "dismissed" ? "default" : q.status === "replied" || q.status === "handled" ? "ok" : "accent"}>
                   {q.inquiry_type === "noise" ? "自動除外" : (INQUIRY_STATUS_LABELS[q.status] ?? q.status)}
                 </Badge>
                 <span>{q.from_name ?? q.from_email ?? "問い合わせ"}</span>

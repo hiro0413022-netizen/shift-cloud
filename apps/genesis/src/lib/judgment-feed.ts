@@ -179,6 +179,7 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
       .select("id, subject, from_name, ai_summary, ai_draft_reply, received_at, source")
       .eq("company_id", companyId)
       .in("status", ["new", "awaiting_approval"])
+      .neq("inquiry_type", "noise")
       .is("deleted_at", null)
       .order("received_at", { ascending: false })
       .limit(40),
@@ -305,6 +306,8 @@ export async function getJudgmentFeed(companyId: string, storeIds?: string[] | n
       href: "/inbox",
       scheduledAt: null,
       hasDraft: Boolean(String(r.ai_draft_reply ?? "").trim()),
+      // 右パネルに「送信される文面（全文）」として出す＝承認の前に中身が見える（#255）
+      body: s(r.ai_draft_reply),
     });
   }
 

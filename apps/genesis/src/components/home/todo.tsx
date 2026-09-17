@@ -7,7 +7,7 @@ import { Icon } from "@/components/icons";
 import { decideApproval } from "@/app/(main)/approvals/actions";
 import { approveActionForm, rejectActionForm, reviseActionAiForm, reviseActionEditForm } from "@/app/(main)/executions/actions";
 import { reviewDeliverable } from "@/app/(main)/deliverables/actions";
-import { approveInquiry } from "@/app/(main)/inbox/actions";
+import { approveInquiry, markInquiryHandled, markInquiriesHandledBulk } from "@/app/(main)/inbox/actions";
 import { decideTrialRequest, decideJoinRequest, dismissHotLead, acknowledgeAlert } from "@/app/(main)/feed-actions";
 import { approveJoinRequestsBulk, dismissProspect, clearAiBacklog } from "@/app/(main)/home-actions";
 import { alertKey } from "@/lib/kernel";
@@ -67,13 +67,24 @@ function Actions({ e, next }: { e: TodoEntry; next: string | null }) {
       </form>
     );
   if (f.source === "inquiry")
-    return f.hasDraft ? (
-      <form action={approveInquiry}>
-        <input type="hidden" name="id" value={f.id} />
-        <button className="btn-main" data-primary>下書きを承認して送信</button>
-      </form>
-    ) : (
-      <Link href="/inbox" className="btn-sub">下書きを作る</Link>
+    return (
+      <div className="flex gap-2">
+        {/* LINE公式アカウントの画面などで返信済みのものを閉じる（#255）。何も送らない */}
+        <form action={markInquiryHandled}>
+          <input type="hidden" name="id" value={f.id} />
+          <button className="btn-sub" title="LINEの画面や電話で対応済みのものを、今日やることから外します（送信はしません）">
+            対応済み
+          </button>
+        </form>
+        {f.hasDraft ? (
+          <form action={approveInquiry}>
+            <input type="hidden" name="id" value={f.id} />
+            <button className="btn-main" data-primary>下書きを承認して送信</button>
+          </form>
+        ) : (
+          <Link href="/inbox" className="btn-sub">下書きを作る</Link>
+        )}
+      </div>
     );
   if (f.source === "trial")
     return (
@@ -137,6 +148,39 @@ export function ClearAiButton({ todos }: { todos: TodoEntry[] }) {
         AIが作ったもの {n}件 を全部消す
       </button>
     </form>
+  );
+}
+
+/** 何日前より古いお客様LINEを「まとめて対応済み」の対象にするか */
+const OLD_LINE_DAYS = 3;
+
+/**
+ * #255 LINE公式アカウントの画面で返信済みの古いLINEが残り続ける対策。
+ * 押し間違いで消えないよう、開いてからもう一度押す2段にする。対象は画面に出ている件だけ。
+ */
+export function OldLineButton({ todos, now }: { todos: TodoEntry[]; now: number }) {
+  const limit = now - OLD_LINE_DAYS * 24 * 60 * 60 * 1000;
+  const old = todos.filter((t) => {
+    if (t.source !== "inquiry" || !t.feed?.createdAt) return false;
+    const at = Date.parse(t.feed.createdAt);
+    return Number.isFinite(at) && at < limit;
+  });
+  if (old.length === 0) return null;
+  return (
+    <details className="relative">
+      <summary className="btn-sub cursor-pointer list-none" title="LINE公式アカウントの画面などで返信済みのものを、まとめて今日やることから外します">
+        {OLD_LINE_DAYS}日以上前のLINE {old.length}件
+      </summary>
+      <form action={markInquiriesHandledBulk}
+        className="absolute right-0 z-20 mt-1 w-72 space-y-2 rounded-lg border border-(--color-line) bg-(--color-panel) p-3 text-sm shadow-xl">
+        {old.map((t) => <input key={t.key} type="hidden" name="ids" value={t.feed?.id ?? ""} />)}
+        <p className="text-(--color-dim)">
+          {OLD_LINE_DAYS}日以上前に届いたお客様のLINE {old.length}件を「対応済み」にします。
+          お客様には何も送りません。まだ返信していない件が無いか、先に確かめてください。
+        </p>
+        <button className="btn-main w-full">{old.length}件を対応済みにする</button>
+      </form>
+    </details>
   );
 }
 

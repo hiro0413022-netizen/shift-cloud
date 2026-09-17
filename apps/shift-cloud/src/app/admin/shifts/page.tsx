@@ -32,9 +32,11 @@ export default async function ShiftBuilderPage({
 
   const [{ data: staffRows }, { data: templates }, { data: shifts }, { data: workTypes }] = await Promise.all([
     // 並び順は staff.sort_order（紙シフトと同じ・#147）。同値なら氏名順
-    admin.from("staff").select("id, name, sort_order, staff_store_assignments!inner(store_id)")
+    // 外した所属（staff_store_assignments.deleted_at）は出さない。#253 で本部へ移した人が残っていた（#255）
+    admin.from("staff").select("id, name, sort_order, staff_store_assignments!inner(store_id, deleted_at)")
       .eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null)
-      .eq("staff_store_assignments.store_id", storeId).order("sort_order").order("name"),
+      .eq("staff_store_assignments.store_id", storeId).is("staff_store_assignments.deleted_at", null)
+      .order("sort_order").order("name"),
     admin.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color, scope_type, scope_id")
       .eq("company_id", actor.companyId).is("deleted_at", null).order("sort_order"),
     admin.from("shifts").select("staff_id, date, template_id, schedule_type_id, status, start_time, end_time")

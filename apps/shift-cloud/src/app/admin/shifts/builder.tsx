@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef, useCallback } from "react";
 import { saveShifts, publishShifts, publishCells, unpublishCells, type CellShift } from "./actions";
 import { Button } from "@/components/ui";
+import { staffPeriodHours, formatWorkHours, type StaffHours } from "@/lib/shift-hours";
 
 type Template = { id: string; name: string; start_time: string | null; end_time: string | null; is_day_off: boolean; color: string };
 type StaffRow = { id: string; name: string };
@@ -432,6 +433,33 @@ export function ShiftBuilder({
   const dirtyOutside = [...dirty].filter((k) => !inRange.has(k.split("|")[1])).length;
   const publishedInRange = days.reduce((n, d) => n + staff.filter((s) => grid[`${s.id}|${d}`]?.status === "published").length, 0);
 
+  // 人ごとの総労働時間（表示中の期間・確定＋下書き＋未保存・休憩控除後）。名前の横に出す（#255）
+  const hoursBy = new Map<string, StaffHours>(staff.map((s) => [s.id, staffPeriodHours(s.id, days, grid, tmap)]));
+  function hoursTitle(s: StaffRow): string {
+    const h = hoursBy.get(s.id);
+    if (!h) return "";
+    return [
+      `${rangeShort}の予定: ${formatWorkHours(h.minutes)}（出勤${h.workDays}日・休憩を引いた時間）`,
+      h.draftMinutes > 0 ? `うち下書き ${formatWorkHours(h.draftMinutes)}` : "すべて確定済み",
+      h.dutyDays > 0 ? `ほかに時間の無い業務 ${h.dutyDays}日（時間には入れていません）` : "",
+    ].filter(Boolean).join("\n");
+  }
+  /** 名前の下に出す小さな1行 */
+  function hoursBadge(s: StaffRow, size: "sm" | "lg" = "sm") {
+    const h = hoursBy.get(s.id);
+    if (!h || (h.minutes === 0 && h.dutyDays === 0)) {
+      return <span className={`block font-normal text-zinc-300 ${size === "lg" ? "text-[11px]" : "text-[10px]"}`}>0h</span>;
+    }
+    const hasDraft = h.draftMinutes > 0;
+    return (
+      <span title={hoursTitle(s)}
+        className={`block font-normal tabular-nums ${size === "lg" ? "text-[11px]" : "text-[10px]"} ${hasDraft ? "text-sky-600" : "text-emerald-700"}`}>
+        計 <span className="font-semibold">{formatWorkHours(h.minutes)}</span>
+        <span className="text-zinc-400">・{h.workDays}日{h.dutyDays > 0 ? `+業務${h.dutyDays}` : ""}</span>
+      </span>
+    );
+  }
+
   // ===== カレンダー（店舗ダッシュボードのシフト表と同じ見た目・#252） =====
   /** マスに出すチップの中身。確定=濃い色／下書き=点線（ダッシュボードと同じ決まり） */
   function chipFor(s: StaffRow, d: string) {
@@ -532,6 +560,11 @@ export function ShiftBuilder({
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-semibold">{s.name}</p>
+            <p className="text-xs text-zinc-500" title={hoursTitle(s)}>
+              {rangeShort}の予定 <span className="font-semibold tabular-nums text-zinc-700">{formatWorkHours(hoursBy.get(s.id)?.minutes ?? 0)}</span>
+              （{hoursBy.get(s.id)?.workDays ?? 0}日
+              {(hoursBy.get(s.id)?.draftMinutes ?? 0) > 0 ? `・うち下書き ${formatWorkHours(hoursBy.get(s.id)?.draftMinutes ?? 0)}` : ""}）
+            </p>
             <p className={`text-sm ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-500"}`}>
               {md(d)}（{w}）
               {published
@@ -709,7 +742,7 @@ export function ShiftBuilder({
                   <ul className="divide-y divide-zinc-100">
                     {shown.map((r) => (
                       <li key={r.st.id} className={`flex items-start gap-2 px-3 py-2 ${r.bg}`}>
-                        <p className="w-24 shrink-0 pt-2 text-sm font-medium leading-tight text-zinc-700">{r.st.name}</p>
+                        <p className="w-24 shrink-0 pt-2 text-sm font-medium leading-tight text-zinc-700">{r.st.name}{hoursBadge(r.st, "lg")}</p>
                         <div className="min-w-0 flex-1 md:max-w-sm">{r.body}</div>
                       </li>
                     ))}
@@ -728,6 +761,7 @@ export function ShiftBuilder({
                 <tr>
                   <th className="sticky left-0 z-10 min-w-20 border-b border-r border-zinc-200 bg-zinc-50 px-2 py-2 text-left text-[11px] font-medium text-zinc-500">
                     スタッフ
+                    <span className="block text-[9px] font-normal text-zinc-400">{rangeShort}の時間</span>
                   </th>
                   {days.map((d, di) => {
                     const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
@@ -763,6 +797,7 @@ export function ShiftBuilder({
                   <tr key={s.id}>
                     <th className={`sticky left-0 z-10 whitespace-nowrap border-b border-r border-zinc-200 px-2 py-1.5 text-left text-xs font-semibold text-zinc-700 ${sel?.staffId === s.id ? "bg-brand-light" : "bg-white"}`}>
                       {s.name}
+                      {hoursBadge(s)}
                     </th>
                     {days.map((d) => {
                       const key = `${s.id}|${d}`;
@@ -804,6 +839,7 @@ export function ShiftBuilder({
               <span><span className="mr-1 inline-block rounded border border-dashed border-zinc-300 px-1 text-[9px]">希望</span>本人の希望（未入力）</span>
               <span><span className="mr-1 inline-block h-2.5 w-3 rounded-sm outline-2 outline-dashed outline-amber-400" />未保存</span>
               <span>⛳ キャディ派遣</span>
+              <span><span className="mr-1 font-semibold text-sky-600">計 8h</span>名前の下＝表示中の期間の労働時間（下書き・未保存も含む／休憩を引いた時間。緑は全部確定）</span>
             </div>
           </div>
 

@@ -11,7 +11,7 @@ import { KpiCard, fmtDate, Badge } from "@/components/ui";
 import { CountUp } from "@/components/count-up";
 import { StalledBand } from "@/components/home/stalled-band";
 import { ChangesLine } from "@/components/home/changes-line";
-import { TodoList, TodoPanel, ClearAiButton } from "@/components/home/todo";
+import { TodoList, TodoPanel, ClearAiButton, OldLineButton } from "@/components/home/todo";
 import { DrillPanel } from "@/components/home/drill-panel";
 import { TodoHotkeys } from "@/components/home/todo-hotkeys";
 import { SystemCards } from "@/components/home/system-cards";
@@ -116,6 +116,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             <h2 className="text-lg font-bold">今日やること</h2>
             <span className={`tnum text-[15px] font-bold ${todos.length ? "text-(--color-danger)" : "text-(--color-ok)"}`}>{todos.length}件</span>
             <span className="ml-auto hidden text-xs text-(--color-faint) md:inline">↑↓で選ぶ ・ Enterで開く ・ Aで承認</span>
+            <OldLineButton todos={todos} now={Date.now()} />
             <ClearAiButton todos={todos} />
             <span className="text-xs text-(--color-faint)">
               スコア <b className={scoreColor}><CountUp value={score.score} /></b>

@@ -64,9 +64,10 @@ export async function ShiftPrintSheet({
 
   const [{ data: staffRows }, { data: templates }, { data: shifts }, { data: workTypes }] = await Promise.all([
     // 並び順は staff.sort_order（スタッフ管理の▲▼・店舗ダッシュボードのドラッグで決める・#147/#171）。同値なら氏名順
-    admin.from("staff").select("id, name, position, sort_order, staff_store_assignments!inner(store_id)")
+    admin.from("staff").select("id, name, position, sort_order, staff_store_assignments!inner(store_id, deleted_at)")
       .eq("company_id", companyId).eq("status", "active").is("deleted_at", null)
-      .eq("staff_store_assignments.store_id", storeId).order("sort_order").order("name"),
+      .eq("staff_store_assignments.store_id", storeId).is("staff_store_assignments.deleted_at", null)
+      .order("sort_order").order("name"),
     admin.from("shift_templates").select("id, name, start_time, end_time, is_day_off, color")
       .eq("company_id", companyId).is("deleted_at", null),
     admin.from("shifts").select("staff_id, date, start_time, end_time, is_day_off, template_id, schedule_type_id")

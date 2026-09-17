@@ -3,6 +3,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
 import { matchesContactHint, contactFromName } from "@/lib/line-contact-pure";
+import { findFilterRule, type FilterRuleLike } from "@/lib/inquiry-filter";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ code: stri
   } catch {
     return NextResponse.json({ ok: true });
   }
+
+  // 受信フィルタ（リッチメニューの定型文など）。受けた時点で当てて、返信文の提案を作らせない（#255）
+  let rules: Array<FilterRuleLike & { hits: number | null }> | null = null;
+  const loadRules = async () => {
+    if (rules) return rules;
+    const { data } = await admin
+      .from("sec_filter_rules")
+      .select("id, source, pattern, match_type, action, active, hits")
+      .eq("company_id", channel.company_id)
+      .eq("active", true)
+      .is("deleted_at", null);
+    rules = (data ?? []) as Array<FilterRuleLike & { hits: number | null }>;
+    return rules;
+  };
 
   let stored = 0;
   for (const ev of events) {
@@ -206,22 +221,41 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ code: stri
       }
     }
 
+    let rule: (FilterRuleLike & { hits: number | null }) | null = null;
+    try {
+      rule = findFilterRule(await loadRules(), "line", text);
+    } catch {
+      rule = null; // フィルタの読み込み失敗で受信を落とさない（従来どおり未対応として入れる）
+    }
+    const noise = rule?.action === "noise";
+    const trial = !noise && text.includes("体験");
+
     await admin.from("sec_inquiries").insert({
       company_id: channel.company_id,
       source: "line",
       external_id: externalId,
-      inquiry_type: text.includes("体験") ? "trial" : "general",
-      priority: text.includes("体験") ? "high" : "normal",
+      // noise＝リッチメニュー等。最初から「対応不要」で入れる＝今日やること・返信案の対象にならない
+      inquiry_type: noise ? "noise" : trial ? "trial" : "general",
+      priority: rule && !noise ? "low" : trial ? "high" : "normal",
       from_name: fromName,
       subject: `LINE返信（${channel.name}）: ${text.slice(0, 40)}`,
       snippet: text.slice(0, 500),
       received_at: new Date(Number(ev.timestamp ?? Date.now())).toISOString(),
-      status: "new",
+      status: noise ? "dismissed" : "new",
+      filtered_by_rule: rule?.id ?? null,
       proposed_event: { line_user_id: userId, line_channel: channel.code },
     });
     stored += 1;
 
-    if (text.includes("体験")) {
+    if (rule) {
+      rule.hits = (rule.hits ?? 0) + 1;
+      await admin
+        .from("sec_filter_rules")
+        .update({ hits: rule.hits, last_hit_at: new Date().toISOString() })
+        .eq("id", rule.id);
+    }
+
+    if (trial) {
       await logEvent(String(channel.company_id), {
         event_type: "sales.trial_reply",
         title: `体験希望のLINE返信を受信（${channel.name}）`,

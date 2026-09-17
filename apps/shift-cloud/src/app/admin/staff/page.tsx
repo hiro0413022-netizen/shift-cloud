@@ -69,13 +69,15 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   // （＝無所属の役員・本部スタッフは出ない。全員を見られるのはオーナーだけ / #128a）。
   const owner = isOwner(actor);
   const assignSelect = owner
-    ? "staff_store_assignments(store_id, is_primary, stores(name))"
-    : "staff_store_assignments!inner(store_id, is_primary, stores(name))";
+    ? "staff_store_assignments(store_id, is_primary, deleted_at, stores(name))"
+    : "staff_store_assignments!inner(store_id, is_primary, deleted_at, stores(name))";
   let staffQuery = admin
     .from("staff")
     .select(`id, name, email, login_id, employment_type, position, status, ${assignSelect}, staff_roles(roles(name)), staff_wages(hourly_wage, effective_from, created_at)`)
     .eq("company_id", actor.companyId)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    // 外した所属は数えない（オーナーは埋め込みの行だけ落ちる／非オーナーはその店舗に居ない人ごと落ちる・#255）
+    .is("staff_store_assignments.deleted_at", null);
   if (!owner) {
     staffQuery = staffQuery.in(
       "staff_store_assignments.store_id",

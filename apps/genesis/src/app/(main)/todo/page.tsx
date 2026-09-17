@@ -1,6 +1,6 @@
 import { requireGenesisActor } from "@/lib/auth";
 import { getHomeData } from "@/lib/todo";
-import { TodoList } from "@/components/home/todo";
+import { TodoList, OldLineButton } from "@/components/home/todo";
 import { StalledBand } from "@/components/home/stalled-band";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ export default async function TodoPage() {
       <div className="flex items-baseline gap-3">
         <h1 className="text-2xl font-bold">今日やること</h1>
         <span className={`tnum text-[15px] font-bold ${todos.length ? "text-(--color-danger)" : "text-(--color-ok)"}`}>{todos.length}件</span>
+        <span className="ml-auto"><OldLineButton todos={todos} now={Date.now()} /></span>
       </div>
       <StalledBand items={stalled} />
       <section className="rounded-xl border border-(--color-line) bg-(--color-panel)">

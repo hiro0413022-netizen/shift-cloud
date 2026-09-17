@@ -70,3 +70,4 @@
 - ✅ `0188_stores_kind_hq.sql` — 適用済（2026-09-17、MCP name=0187_stores_kind_hq ※適用時の名前。HP管理の0187と重なったためファイルは0188に。stores.kind（store/hq）・本部は会社に1つ・refresh_member_kpis と gnv_stores を実店舗だけに #253）
 - ✅ `0189_hq_store_yamamoto.sql` — 適用済（2026-09-17、#253 のアプリ反映後。本部「YOZAN 本部」を作成し、山本さんを GOLF WING 宝塚から移す。10月の下書き31件も本部へ）
 - ✅ `0190_ask_data_frank_members.sql` — 適用済（2026-09-17、「データに聞く」に FRANK 会員のビュー gnv_frank_members を追加。gnv_bookings / gnv_walkins / gnv_orders に gn_chat_reader の閲覧権限が無く失敗していたのを修正 #254）
+- ✅ `0191_line_richmenu_filter.sql` — 適用済（2026-09-17、LINE受信フィルタに「お問い合わせを希望します」（GOLF WING ビジターのリッチメニュー）を追加し、開いていたリッチメニュー押下13件を対応不要に #255）

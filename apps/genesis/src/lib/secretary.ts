@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
+import { findFilterRule } from "@/lib/inquiry-filter";
 
 /* ============================================================
    CEO AI 秘書（Secretary）— 問い合わせ受信箱のドメインロジック
@@ -25,6 +26,7 @@ export const INQUIRY_STATUS_LABELS: Record<string, string> = {
   awaiting_approval: "承認待ち",
   approved: "承認済み（送信予約）",
   replied: "返信済み",
+  handled: "対応済み（GENESIS以外で返信）",
   scheduled: "予定登録済み",
   dismissed: "保留",
 };
@@ -111,14 +113,6 @@ export async function getFilterRules(companyId: string): Promise<FilterRule[]> {
   return (data ?? []) as FilterRule[];
 }
 
-function ruleMatches(rule: FilterRule, text: string): boolean {
-  const t = text.trim();
-  if (!t) return false;
-  if (rule.match_type === "exact") return t === rule.pattern;
-  if (rule.match_type === "prefix") return t.startsWith(rule.pattern);
-  return t.includes(rule.pattern);
-}
-
 /** 未処理の問い合わせにフィルタを適用。noise は対応不要（dismissed）へ、low は優先度を下げる。
  *  戻り値: 除外した件数 */
 export async function applyFilterRules(companyId: string): Promise<number> {
@@ -138,7 +132,7 @@ export async function applyFilterRules(companyId: string): Promise<number> {
   const now = new Date().toISOString();
   for (const q of rows ?? []) {
     const text = String(q.snippet ?? q.subject ?? "");
-    const rule = rules.find((r) => (r.source === "any" || r.source === String(q.source)) && ruleMatches(r, text));
+    const rule = findFilterRule(rules, String(q.source), text);
     if (!rule) continue;
 
     if (rule.action === "noise") {
@@ -260,7 +254,7 @@ export async function generateMissingDrafts(companyId: string, limit = 8): Promi
   return made;
 }
 
-/** 処理済み（承認済み・返信済み・予定登録・保留）を直近で取得 */
+/** 処理済み（承認済み・返信済み・対応済み・予定登録・保留）を直近で取得 */
 export async function getRecentHandledInquiries(companyId: string): Promise<SecInquiry[]> {
   const admin = createAdmin();
   const { data } = await admin
@@ -268,7 +262,7 @@ export async function getRecentHandledInquiries(companyId: string): Promise<SecI
     .select("*")
     .eq("company_id", companyId)
     .is("deleted_at", null)
-    .in("status", ["approved", "replied", "scheduled", "dismissed"])
+    .in("status", ["approved", "replied", "handled", "scheduled", "dismissed"])
     .order("updated_at", { ascending: false })
     .limit(20);
   return (data ?? []) as SecInquiry[];
