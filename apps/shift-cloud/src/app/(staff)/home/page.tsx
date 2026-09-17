@@ -2,11 +2,22 @@ import { requireActor } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdmin } from "@/lib/supabase/admin";
 import { Card, Badge } from "@/components/ui";
+import { SystemLinkCards } from "@/components/system-links";
 import { todayJST, currentYM, hm, timeJST, fmtMinutes, yen, dowJP } from "@/lib/util";
 import { calcMonthlyPayroll, monthRange, type WageRow, type AllowanceRow } from "@/lib/payroll-calc";
 import { TasksCard, type TaskItem } from "./tasks-card";
 import { taskScopeFilter } from "@/lib/task-scope";
 import Link from "next/link";
+
+/** 権限（roles.permissions）で出し分ける業務システム。キーは lib/permissions.ts の PERMISSIONS と揃える */
+const ROLE_LINKS: Array<{ perm: string; label: string; url: string; note: string | null }> = [
+  {
+    perm: "use_demo_sales",
+    label: "AI DEMO SALES（HP営業）",
+    url: process.env.DEMO_SALES_URL || "https://demo-sales-delta.vercel.app",
+    note: "営業先リスト・デモサイト",
+  },
+];
 
 export default async function HomePage() {
   const actor = await requireActor();
@@ -53,7 +64,7 @@ export default async function HomePage() {
       .eq("company_id", actor.companyId)
       .or(taskScopeFilter(actor.staffId, actor.storeIds))
       .eq("date", today).is("deleted_at", null).order("sort"),
-    admin.from("sp_links").select("label, url, note, store_id")
+    admin.from("sp_links").select("id, label, url, note, store_id")
       .eq("company_id", actor.companyId).is("deleted_at", null).order("sort"),
     admin.from("companies").select("settings").eq("id", actor.companyId).single(),
     admin.from("payroll_periods").select("id").eq("company_id", actor.companyId).eq("target_month", `${ym}-01`).maybeSingle(),
@@ -84,7 +95,15 @@ export default async function HomePage() {
   const workMin = payroll?.work ?? 0;
 
   // クイックリンク: 全店共通(store_id null) + 所属店舗のもの
-  const myLinks = (links ?? []).filter((l) => !l.store_id || actor.storeIds.includes(l.store_id));
+  const storeLinks = (links ?? []).filter((l) => !l.store_id || actor.storeIds.includes(l.store_id));
+  // 担当者だけが使うアプリは sp_links（会社・店舗単位でしか絞れない）に置けないので、ロールの権限で足す。
+  // 例: 営業（HP制作）ロール = use_demo_sales → AI DEMO SALES。先頭に出す（その人の主業務のため）
+  const perms = actor.permissions as Record<string, boolean | undefined>;
+  const roleLinks = ROLE_LINKS
+    .filter((l) => !perms.read_only && perms[l.perm])
+    .filter((l) => !storeLinks.some((s) => s.url === l.url))
+    .map(({ perm, ...l }) => ({ id: `role-${perm}`, ...l }));
+  const myLinks = [...roleLinks, ...storeLinks];
 
   const statusLabel =
     !lastRecord ? "未出勤" :
@@ -124,6 +143,15 @@ export default async function HomePage() {
 
       <TasksCard today={today} tasks={(tasks ?? []) as TaskItem[]} />
 
+      {/* 業務システム（店舗ダッシュボードと同じカード・共通部品）。
+          出すのは sp_links のうち「全店共通 + 自分の配属店舗」のもの。 */}
+      {!!myLinks.length && (
+        <section>
+          <p className="mb-2 text-sm font-medium text-zinc-500">業務システム</p>
+          <SystemLinkCards links={myLinks} gridClassName="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3" />
+        </section>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <p className="text-xs font-medium text-zinc-500">今月の勤務時間</p>
@@ -135,26 +163,6 @@ export default async function HomePage() {
           <p className="mt-0.5 text-[10px] leading-tight text-zinc-400">確定額は給与明細が正</p>
         </Card>
       </div>
-
-      {!!myLinks.length && (
-        <Card>
-          <p className="mb-3 text-sm font-medium text-zinc-500">クイックリンク</p>
-          <div className="grid grid-cols-2 gap-2">
-            {myLinks.map((l, i) => (
-              <a
-                key={i}
-                href={l.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-700 active:bg-brand-light"
-              >
-                {l.label} <span className="text-zinc-400">↗</span>
-                {l.note && <span className="mt-0.5 block text-[10px] font-normal text-zinc-400">{l.note}</span>}
-              </a>
-            ))}
-          </div>
-        </Card>
-      )}
 
       {!!events?.length && (
         <Card>

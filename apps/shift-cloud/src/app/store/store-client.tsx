@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { dowJP, hm, fmtDateJP, addMonths } from "@/lib/util";
 import type { FittingBoard, KpiCard, StoreInfo, StoreLink, StoreMonthFeed } from "@/lib/store-dash";
 import { toggleStoreTask, addStoreTask, reorderStoreStaff, logoutStore, markFittingArrived } from "./actions";
+import { SystemLinkCards } from "@/components/system-links";
 
 /**
  * 店舗ダッシュボード（店頭PC共有表示）
@@ -182,7 +183,7 @@ export function StoreDashClient({
   const day = feed[selected];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-4 pb-10 lg:p-6">
+    <div className="mx-auto max-w-[1440px] space-y-5 p-4 pb-10 lg:p-6">
       {/* ヘッダー: 店舗切替 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">店舗ダッシュボード</h1>
@@ -301,8 +302,11 @@ export function StoreDashClient({
         </div>
       )}
 
-      {/* シフト表グリッド＋選択日詳細（PCは2カラム・狭い画面は縦積み） */}
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+      {/* シフト表グリッド＋選択日詳細（PCは2カラム・狭い画面は縦積み）
+          半月（最大16日）が横スクロールなしで収まる幅を確保する。
+          以前は右パネル400px＋日付列56px固定で、幅1280pxの店頭PCだと12日までしか見えなかった。
+          → 2カラムは xl（1280px〜）から・右パネル340px・日付列44px・出勤時刻は2段表示 */}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-3">
       <div className="flex items-center gap-3">
         <button onClick={() => goHalf(-1)} className="rounded-md border border-zinc-200 bg-white px-2.5 py-1 text-zinc-500">←</button>
@@ -325,7 +329,7 @@ export function StoreDashClient({
         <table className="w-full border-separate border-spacing-0 text-xs">
           <thead>
             <tr>
-              <th className="sticky left-0 z-10 min-w-24 border-b border-r border-zinc-200 bg-zinc-50 px-2 py-2 text-left text-[11px] font-medium text-zinc-500">
+              <th className="sticky left-0 z-10 min-w-20 border-b border-r border-zinc-200 bg-zinc-50 px-2 py-2 text-left text-[11px] font-medium text-zinc-500">
                 スタッフ
               </th>
               {gridDays.map((d) => {
@@ -334,7 +338,7 @@ export function StoreDashClient({
                 const isToday = d === today;
                 const isSel = d === selected;
                 return (
-                  <th key={d} className={`min-w-14 border-b border-r border-zinc-100 p-0 last:border-r-0 ${isSel ? "bg-brand-light" : "bg-zinc-50"}`}>
+                  <th key={d} className={`min-w-11 border-b border-r border-zinc-100 p-0 last:border-r-0 ${isSel ? "bg-brand-light" : "bg-zinc-50"}`}>
                     <button onClick={() => { setSelected(d); setMsg(null); }} className="w-full px-1 py-1.5 text-center">
                       <span
                         className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-semibold ${
@@ -423,14 +427,16 @@ export function StoreDashClient({
                           ) : (
                             <span
                               key={j}
-                              title={s.is_draft ? "下書き（未確定）" : undefined}
+                              title={`${hm(s.start_time)}〜${hm(s.end_time)}${s.is_draft ? "（下書き・未確定）" : ""}`}
                               className={
                                 s.is_draft
-                                  ? "block rounded border border-dashed border-sky-300 bg-white px-0.5 py-1 text-center text-[10px] font-semibold tabular-nums text-sky-400"
-                                  : "block rounded border border-sky-300 bg-sky-50 px-0.5 py-1 text-center text-[10px] font-semibold tabular-nums text-sky-700"
+                                  ? "block rounded border border-dashed border-sky-300 bg-white px-0.5 py-0.5 text-center text-[10px] font-semibold leading-tight tabular-nums text-sky-400"
+                                  : "block rounded border border-sky-300 bg-sky-50 px-0.5 py-0.5 text-center text-[10px] font-semibold leading-tight tabular-nums text-sky-700"
                               }
                             >
-                              {hm(s.start_time)}-{hm(s.end_time)}
+                              {/* 列幅を詰めるため開始・終了を2段にする（1段だと1列56px必要で半月が入りきらない） */}
+                              <span className="block">{hm(s.start_time)}</span>
+                              <span className="block">{hm(s.end_time)}</span>
                             </span>
                           ),
                         )}
@@ -462,7 +468,7 @@ export function StoreDashClient({
 
       {/* 選択日の詳細（PCはカレンダー右に固定表示） */}
       {day && (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm lg:sticky lg:top-4">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm xl:sticky xl:top-4">
           <p className="font-semibold">{fmtDateJP(selected)}</p>
 
           {/* 出勤者 */}
@@ -572,21 +578,7 @@ export function StoreDashClient({
       {/* 業務リンク集 */}
       <div>
         <p className="mb-2 text-xs font-medium text-zinc-500">業務システム</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {links.map((l) => (
-            <a
-              key={l.id}
-              href={l.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-colors active:bg-zinc-50"
-            >
-              <p className="text-sm font-semibold">{l.label}</p>
-              {l.note && <p className="mt-0.5 text-[11px] text-zinc-400">{l.note}</p>}
-            </a>
-          ))}
-          {links.length === 0 && <p className="text-sm text-zinc-400">リンク未登録（sp_links）</p>}
-        </div>
+        <SystemLinkCards links={links} emptyText="リンク未登録（sp_links）" />
       </div>
 
       {/* フッター導線 */}

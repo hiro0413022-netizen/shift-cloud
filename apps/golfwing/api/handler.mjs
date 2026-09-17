@@ -8920,6 +8920,8 @@ app2.get("/receipts", async (c) => {
            COALESCE(sa.id,   s.id)   AS supplier_id,
            CASE WHEN r.actual_supplier_id IS NOT NULL THEN 1 ELSE 0 END AS supplier_changed,
            COUNT(ri.id) AS item_count,
+           -- \u7D0D\u54C1\u66F8\u3068\u7A81\u304D\u5408\u308F\u305B\u308B\u305F\u3081\u306E\u5546\u54C1\u540D\uFF08\u30B7\u30B9\u30C6\u30E0\u5916\u7D0D\u54C1\u306F receipt_items.note \u306E\u5148\u982D\uFF1D\u5546\u54C1\u540D\uFF09
+           string_agg(DISTINCT COALESCE(NULLIF(poi.product_name, ''), NULLIF(split_part(ri.note, ' / ', 1), '')), chr(31)) AS product_names,
            SUM(ri.received_quantity) AS total_qty,
            SUM(ri.received_quantity * COALESCE(poi.unit_price, 0)) AS total_amount
     FROM receipts r
@@ -8967,11 +8969,18 @@ app2.get("/receipts", async (c) => {
     if (r["slip_verified"]) return `<span class="badge bg-success"   title="\u78BA\u8A8D\u8005: ${esc(r["slip_checked_by"]) || "\u2015"}"><i class="fas fa-check me-1"></i>\u78BA\u8A8D\u6E08</span>`;
     return `<span class="badge bg-warning text-dark"><i class="fas fa-exclamation me-1"></i>\u672A\u78BA\u8A8D</span>`;
   };
+  const productCell = (r) => {
+    const names = String(r["product_names"] ?? "").split("").filter(Boolean);
+    const shown = names.length ? esc(names.slice(0, 2).join("\u3001")) : '<span class="text-muted">\uFF08\u5546\u54C1\u540D\u306A\u3057\uFF09</span>';
+    const more = names.length > 2 ? ` <span class="text-muted">\u4ED6${names.length - 2}\u54C1</span>` : "";
+    const tip = esc([names.join("\u3001"), r["order_no"] ? `\u767A\u6CE8\u756A\u53F7: ${r["order_no"]}` : ""].filter(Boolean).join("\n"));
+    return r["purchase_order_id"] ? `<a href="/orders/${r["purchase_order_id"]}" class="text-decoration-none fw-semibold" title="${tip}">${shown}</a>${more}` : `<span class="fw-semibold" title="${tip}">${shown}</span>${more} <span class="badge bg-secondary ms-1">\u30B7\u30B9\u30C6\u30E0\u5916</span>`;
+  };
   const rows = res.results.map((r) => `<tr class="${!r["slip_verified"] && !r["no_slip"] ? "table-warning" : ""}">
     <td class="fw-semibold">${esc(r["received_date"])}</td>
     <td class="text-muted">${esc(r["slip_date"]) || "\u2015"}</td>
-    <td>
-      ${r["purchase_order_id"] ? `<a href="/orders/${r["purchase_order_id"]}" class="text-decoration-none fw-semibold">${esc(r["order_no"])}</a>` : `<span class="badge bg-secondary">\u30B7\u30B9\u30C6\u30E0\u5916</span>`}
+    <td style="min-width:200px;max-width:340px">
+      ${productCell(r)}
     </td>
     <td>
       ${r["supplier_name"] ? esc(r["supplier_name"]) : '<span class="text-muted">\u2015</span>'}
@@ -9083,7 +9092,7 @@ ${uncheckedCount > 0 ? `<div class="alert alert-warning py-2 mb-3 d-flex align-i
     <table class="table table-hover align-middle mb-0 small">
       <thead>
         <tr>
-          <th>\u5165\u8377\u65E5</th><th>\u7D0D\u54C1\u66F8\u65E5\u4ED8</th><th>\u767A\u6CE8\u756A\u53F7</th><th>\u4ED5\u5165\u5148</th>
+          <th>\u5165\u8377\u65E5</th><th>\u7D0D\u54C1\u66F8\u65E5\u4ED8</th><th>\u5546\u54C1\u540D</th><th>\u4ED5\u5165\u5148</th>
           <th>\u9867\u5BA2\u540D</th><th class="text-center">\u54C1\u76EE\u6570</th>
           <th class="text-end">\u5165\u8377\u6570</th><th class="text-end">\u91D1\u984D</th>
           <th class="text-center">\u7D0D\u54C1\u66F8</th><th>\u691C\u54C1\u8005</th><th>\u64CD\u4F5C</th>

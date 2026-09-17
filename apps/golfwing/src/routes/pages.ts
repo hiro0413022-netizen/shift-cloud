@@ -4162,6 +4162,8 @@ app.get('/receipts', async (c) => {
            COALESCE(sa.id,   s.id)   AS supplier_id,
            CASE WHEN r.actual_supplier_id IS NOT NULL THEN 1 ELSE 0 END AS supplier_changed,
            COUNT(ri.id) AS item_count,
+           -- 納品書と突き合わせるための商品名（システム外納品は receipt_items.note の先頭＝商品名）
+           string_agg(DISTINCT COALESCE(NULLIF(poi.product_name, ''), NULLIF(split_part(ri.note, ' / ', 1), '')), chr(31)) AS product_names,
            SUM(ri.received_quantity) AS total_qty,
            SUM(ri.received_quantity * COALESCE(poi.unit_price, 0)) AS total_amount
     FROM receipts r
@@ -4201,14 +4203,23 @@ app.get('/receipts', async (c) => {
     return `<span class="badge bg-warning text-dark"><i class="fas fa-exclamation me-1"></i>未確認</span>`
   }
 
+  // 商品名セル（納品書と照合しやすいよう発注番号の代わりに商品名を出す）
+  // 3品目以上は先頭2品＋「他N品」。全品名と発注番号はマウスを乗せると出る
+  const productCell = (r: Record<string,unknown>) => {
+    const names = String(r['product_names'] ?? '').split('\u001f').filter(Boolean)  // 区切りは chr(31)（品名に「、」が入っても割れない）
+    const shown = names.length ? esc(names.slice(0, 2).join('、')) : '<span class="text-muted">（商品名なし）</span>'
+    const more  = names.length > 2 ? ` <span class="text-muted">他${names.length - 2}品</span>` : ''
+    const tip   = esc([names.join('、'), r['order_no'] ? `発注番号: ${r['order_no']}` : ''].filter(Boolean).join('\n'))
+    return r['purchase_order_id']
+      ? `<a href="/orders/${r['purchase_order_id']}" class="text-decoration-none fw-semibold" title="${tip}">${shown}</a>${more}`
+      : `<span class="fw-semibold" title="${tip}">${shown}</span>${more} <span class="badge bg-secondary ms-1">システム外</span>`
+  }
+
   const rows = res.results.map(r => `<tr class="${(!r['slip_verified'] && !r['no_slip']) ? 'table-warning' : ''}">
     <td class="fw-semibold">${esc(r['received_date'])}</td>
     <td class="text-muted">${esc(r['slip_date']) || '―'}</td>
-    <td>
-      ${r['purchase_order_id']
-        ? `<a href="/orders/${r['purchase_order_id']}" class="text-decoration-none fw-semibold">${esc(r['order_no'])}</a>`
-        : `<span class="badge bg-secondary">システム外</span>`
-      }
+    <td style="min-width:200px;max-width:340px">
+      ${productCell(r)}
     </td>
     <td>
       ${r['supplier_name'] ? esc(r['supplier_name']) : '<span class="text-muted">―</span>'}
@@ -4324,7 +4335,7 @@ ${uncheckedCount > 0 ? `<div class="alert alert-warning py-2 mb-3 d-flex align-i
     <table class="table table-hover align-middle mb-0 small">
       <thead>
         <tr>
-          <th>入荷日</th><th>納品書日付</th><th>発注番号</th><th>仕入先</th>
+          <th>入荷日</th><th>納品書日付</th><th>商品名</th><th>仕入先</th>
           <th>顧客名</th><th class="text-center">品目数</th>
           <th class="text-end">入荷数</th><th class="text-end">金額</th>
           <th class="text-center">納品書</th><th>検品者</th><th>操作</th>
