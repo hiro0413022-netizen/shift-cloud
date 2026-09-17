@@ -102,7 +102,7 @@ export default async function ShiftBuilderPage({
       <PageTitle>シフト作成</PageTitle>
 
       {/* 期間切替（日/週/半月/月）＋期間送り。列が31日ぶん並ぶ横スクロールを解消する（#135） */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-2 md:gap-3">
         <div className="flex gap-0.5 rounded-lg bg-zinc-100 p-0.5">
           {SPAN_KINDS.map((k) => (
             <Link key={k} href={shiftsHref(storeId, k, range.base)}
@@ -111,12 +111,13 @@ export default async function ShiftBuilderPage({
             </Link>
           ))}
         </div>
-        <div className="flex items-center gap-2 rounded-lg bg-white px-2 py-1 shadow-sm ring-1 ring-zinc-200">
+        {/* スマホでは1行まるごと使う（←→を押しやすく・期間名を折り返さない） */}
+        <div className="order-first flex w-full items-center gap-2 rounded-lg bg-white px-1 py-1 shadow-sm ring-1 ring-zinc-200 sm:order-none sm:w-auto sm:px-2">
           <Link href={shiftsHref(storeId, range.span, range.prev)} aria-label="前の期間"
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-100">←</Link>
-          <p className="whitespace-nowrap font-semibold">{range.label}</p>
+            className="rounded px-3 py-1 text-lg text-zinc-400 hover:bg-zinc-100 sm:px-1.5 sm:py-0 sm:text-base">←</Link>
+          <p className="min-w-0 flex-1 truncate text-center text-sm font-semibold sm:flex-none sm:text-base">{range.label}</p>
           <Link href={shiftsHref(storeId, range.span, range.next)} aria-label="次の期間"
-            className="rounded px-1.5 text-zinc-400 hover:bg-zinc-100">→</Link>
+            className="rounded px-3 py-1 text-lg text-zinc-400 hover:bg-zinc-100 sm:px-1.5 sm:py-0 sm:text-base">→</Link>
         </div>
         <Link href={shiftsHref(storeId, range.span, today)}
           className="rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-600 hover:bg-zinc-50">
@@ -139,7 +140,7 @@ export default async function ShiftBuilderPage({
       </div>
 
       {pendingTimeOff > 0 && (
-        <div className="mb-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm">
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm md:gap-3 md:px-4">
           <span className="text-amber-800">
             {range.label}に未処理の休み希望が{pendingTimeOff}件あります。シフトを組む前に処理してください。
           </span>
@@ -149,7 +150,7 @@ export default async function ShiftBuilderPage({
         </div>
       )}
 
-      <div className="mb-4 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm text-zinc-500">
+      <div className="mb-4 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-xs text-zinc-500 md:px-4 md:text-sm">
         スタッフはいつでもシフトを提出できます（募集の開始は不要）。
         <span className="ml-1 font-medium text-zinc-700">{range.shortLabel}の提出は{(requests ?? []).length}件</span>
         。セルの下に「希望」として出ます。
@@ -160,6 +161,7 @@ export default async function ShiftBuilderPage({
       ) : (
         <ShiftBuilder
           storeId={storeId}
+          today={today}
           days={days}
           rangeLabel={range.label}
           rangeShort={range.shortLabel}

@@ -159,11 +159,13 @@ async function insertOneSale(
   store: AccessibleStore,
   input: SaleInput,
   cashBalance: number,
-): Promise<number> {
+): Promise<{ saved: boolean; balance: number; error?: string }> {
   const n = normalizeInput(input);
-  if (!n.soldOn || !n.category || n.amount === 0) return cashBalance;
+  if (!n.soldOn || !n.category || n.amount === 0) {
+    return { saved: false, balance: cashBalance, error: "日付・区分・金額のどれかが空です" };
+  }
 
-  const { data: sale } = await admin
+  const { data: sale, error: saleError } = await admin
     .from("mon_sales")
     .insert({
       company_id: actor.companyId,
@@ -183,6 +185,10 @@ async function insertOneSale(
     })
     .select("id")
     .single();
+  if (saleError || !sale) {
+    console.error("[money-os] mon_sales insert failed", saleError);
+    return { saved: false, balance: cashBalance, error: "売上の書き込みに失敗しました" };
+  }
 
   // 在庫リストの品番を選んで売った → 在庫を減らす（Inventory OS 連携。DECISIONS #96(e)）
   if (sale && n.invItemId) {
@@ -209,44 +215,74 @@ async function insertOneSale(
       source: "sales",
       source_ref: sale?.id ?? null,
     });
-    return newBalance;
+    return { saved: true, balance: newBalance };
   }
-  return cashBalance;
+  return { saved: true, balance: cashBalance };
+}
+
+/** 保存系の戻り値。error があれば画面に出す（黙って「追加しました」と出さない） */
+export type SaveResult = { ok: true; saved: number } | { ok: false; error: string };
+
+/** 書き込める店舗か。ダメなら理由を返す */
+function storeProblem(actor: MoneyActor, store: AccessibleStore | null): string | null {
+  if (!store) return "店舗が選ばれていません。上の店舗切替で選んでください";
+  if (!store.segmentId) return "この店舗は事業区分が未設定のため保存できません（本部に連絡してください）";
+  if (!canWriteStore(actor, store.id)) return "この店舗に入力する権限がありません";
+  return null;
 }
 
 /** 売上1件を追加（連続入力モード）。 */
-export async function createSale(input: SaleInput): Promise<void> {
+export async function createSale(input: SaleInput): Promise<SaveResult> {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
   const store = await getCurrentStore(actor);
-  if (!store || !store.segmentId || !canWriteStore(actor, store.id)) return;
+  const problem = storeProblem(actor, store);
+  if (problem || !store) return { ok: false, error: problem ?? "保存できませんでした" };
 
   const prev = await latestCashBalance(actor.companyId, store.id);
-  await insertOneSale(admin, actor, store, input, prev);
+  const r = await insertOneSale(admin, actor, store, input, prev);
+  if (!r.saved) return { ok: false, error: r.error ?? "保存できませんでした" };
 
   await admin.rpc("refresh_money_to_finance", { p_company_id: actor.companyId });
   revalidatePath("/sales");
   revalidatePath("/cash");
   revalidatePath("/");
+  return { ok: true, saved: 1 };
 }
 
-/** 複数の売上をまとめて追加（まとめ入力モード）。現金残高は行をまたいで累積。 */
-export async function createSales(inputs: SaleInput[]): Promise<void> {
+/**
+ * 複数の売上をまとめて追加（まとめ入力モード）。現金残高は行をまたいで累積。
+ * 行は画面の上から順に入れる＝明細一覧の「入力順」と同じ並びになる。
+ * 途中の行で失敗したら、そこで止めて「何行目まで入ったか」を返す（残りを画面に残して直せるように）。
+ */
+export async function createSales(inputs: SaleInput[]): Promise<SaveResult> {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
   const store = await getCurrentStore(actor);
-  if (!store || !store.segmentId || !canWriteStore(actor, store.id)) return;
-  if (!Array.isArray(inputs) || inputs.length === 0) return;
+  const problem = storeProblem(actor, store);
+  if (problem || !store) return { ok: false, error: problem ?? "保存できませんでした" };
+  if (!Array.isArray(inputs) || inputs.length === 0) return { ok: false, error: "保存する行がありません" };
 
   let balance = await latestCashBalance(actor.companyId, store.id);
+  let saved = 0;
+  let failure: string | null = null;
   for (const input of inputs) {
-    balance = await insertOneSale(admin, actor, store, input, balance);
+    const r = await insertOneSale(admin, actor, store, input, balance);
+    if (!r.saved) { failure = `${saved + 1}行目: ${r.error ?? "保存できませんでした"}`; break; }
+    balance = r.balance;
+    saved += 1;
   }
 
-  await admin.rpc("refresh_money_to_finance", { p_company_id: actor.companyId });
-  revalidatePath("/sales");
-  revalidatePath("/cash");
-  revalidatePath("/");
+  if (saved > 0) {
+    await admin.rpc("refresh_money_to_finance", { p_company_id: actor.companyId });
+    revalidatePath("/sales");
+    revalidatePath("/cash");
+    revalidatePath("/");
+  }
+  if (failure) {
+    return { ok: false, error: saved > 0 ? `${saved}件は保存しました。${failure}（この行から下は保存していません）` : failure };
+  }
+  return { ok: true, saved };
 }
 
 /**

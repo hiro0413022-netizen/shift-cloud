@@ -43,9 +43,11 @@ function reqTimes(r: Request, tmap: Map<string, Template>): { start: string; end
 }
 
 export function ShiftBuilder({
-  storeId, days, rangeLabel, rangeShort, staff, templates, workTypes, allowedTypes, caddyDays, shifts, requests, timeOff,
+  storeId, today, days, rangeLabel, rangeShort, staff, templates, workTypes, allowedTypes, caddyDays, shifts, requests, timeOff,
 }: {
   storeId: string;
+  /** JSTの今日（日ごとリストで今日を目立たせる・スクロール先） */
+  today: string;
   /** 表示する日付（日/週/半月/月。範囲は lib/shift-span.ts が決める・#135） */
   days: string[];
   /** 見出し用「2026年9月1日（火） 〜 9月15日（火）」 */
@@ -74,6 +76,10 @@ export function ShiftBuilder({
   const [msg, setMsg] = useState("");
   const [restored, setRestored] = useState(false);
   const [pending, start] = useTransition();
+  // 表示方法。auto = スマホは日ごとリスト・PCは表（CSSで出し分け）。スマホで「表」を選ぶこともできる
+  const [view, setView] = useState<"auto" | "table">("auto");
+  // 日ごとリストで「入っている人だけ」を出す（見るとき用）
+  const [onlyFilled, setOnlyFilled] = useState(false);
   // 退避キーは「店舗」だけ。表示範囲（日/週/半月/月）や月を混ぜると、
   // 期間を切り替えたとたんに未保存のドラフトが行方不明になる（#135）。
   const lsKey = `shiftdraft:${storeId}`;
@@ -145,6 +151,14 @@ export function ShiftBuilder({
     for (const k of dirty) if (grid[k]) picked[k] = grid[k];
     try { localStorage.setItem(lsKey, JSON.stringify({ grid: picked, dirty: [...dirty] })); } catch { /* ignore */ }
   }, [grid, dirty, lsKey]);
+
+  // スマホの日ごとリストは縦に長いので、今日が範囲内なら今日の位置まで送る
+  useEffect(() => {
+    if (typeof window === "undefined" || window.innerWidth >= 768) return;
+    if (days.length <= 1 || !days.includes(today) || days[0] === today) return;
+    document.getElementById(`shift-day-${today}`)?.scrollIntoView({ block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days.join(","), today]);
 
   // ① 離脱前の警告
   useEffect(() => {
@@ -303,6 +317,114 @@ export function ShiftBuilder({
     });
   }
 
+  /**
+   * 1マス（スタッフ×日）の中身。表（PC）と日ごとリスト（スマホ）で同じものを使う。
+   * size="lg" はスマホ用＝文字とタップ領域を大きくする。
+   */
+  function renderCell(s: StaffRow, d: string, size: "sm" | "lg" = "sm") {
+    const key = `${s.id}|${d}`;
+                  const cell = grid[key];
+                  const req = reqMap.get(key);
+                  const t = cell?.template_id ? tmap.get(cell.template_id) : null;
+                  const wt = cell?.schedule_type_id ? wtMap.get(cell.schedule_type_id) : null;
+                  const isCustom = !cell?.template_id && !cell?.schedule_type_id && !!(cell?.start_time || cell?.end_time);
+                  const filled = !!(cell?.template_id || cell?.schedule_type_id || (cell?.start_time && cell?.end_time));
+                  const myTypes = typesFor(s.id);
+                  const caddy = caddyDays[key];
+                  const published = cell?.status === "published";
+                  const off = timeOff[key];
+                  const bg = off?.status === "approved" ? "bg-rose-50"
+                    : published ? "bg-emerald-50/60"
+                    : dirty.has(key) ? "bg-amber-50"
+                    : off ? "bg-rose-50/40" : "";
+                      const lg = size === "lg";
+    const body = (
+      <>
+                      <select
+                        value={
+                          isCustom ? CUSTOM
+                            : cell?.schedule_type_id ? `${WT_PREFIX}${cell.schedule_type_id}`
+                            : cell?.template_id ?? ""
+                        }
+                        onChange={(e) => setTemplate(s.id, d, e.target.value)}
+                        className={lg
+                          ? "w-full cursor-pointer rounded-lg border border-zinc-200 bg-white px-2 py-2 text-sm focus:border-brand focus:outline-none"
+                          : "w-full cursor-pointer rounded border-0 bg-transparent px-1 py-1 text-[11px] focus:outline-none"}
+                        style={wt ? { color: wt.color, fontWeight: 600 } : t ? { color: t.color, fontWeight: 600 } : undefined}
+                      >
+                        <option value="">—</option>
+                        {templates.map((tp) => (<option key={tp.id} value={tp.id}>{tLabel(tp)}</option>))}
+                        <option value={CUSTOM}>⌚ 時間指定</option>
+                        {myTypes.length > 0 && (
+                          <optgroup label="業務">
+                            {myTypes.map((w) => (
+                              <option key={w.id} value={`${WT_PREFIX}${w.id}`}>{w.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                      {isCustom && (
+                        <div className={lg ? "mt-1 flex items-center gap-1" : "flex items-center gap-0.5 px-0.5 pb-0.5"}>
+                          <input type="time" value={cell?.start_time ?? ""} onChange={(e) => setCustomTime(s.id, d, "start", e.target.value)}
+                            className={lg ? "w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm" : "w-full rounded border border-zinc-200 px-0.5 py-0.5 text-[10px]"} />
+                          <span className={lg ? "text-xs text-zinc-400" : "text-[9px] text-zinc-400"}>〜</span>
+                          <input type="time" value={cell?.end_time ?? ""} onChange={(e) => setCustomTime(s.id, d, "end", e.target.value)}
+                            className={lg ? "w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm" : "w-full rounded border border-zinc-200 px-0.5 py-0.5 text-[10px]"} />
+                        </div>
+                      )}
+
+                      {/* 1マスごとの確定 / 確定解除（#138）。まとめ確定を待たずにここだけ決められる */}
+                      {filled && (
+                        published ? (
+                          <button type="button" disabled={pending} onClick={() => unpublishOne(s.id, d)}
+                            className={`w-full rounded px-1 text-left font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 ${lg ? "py-1.5 text-xs" : "py-0.5 text-[10px]"}`}
+                            title="確定済み。クリックすると確定を解除して編集できます（本人へ通知）">
+                            🔒 確定済み
+                          </button>
+                        ) : (
+                          <button type="button" disabled={pending} onClick={() => publishOne(s.id, d)}
+                            className={`w-full rounded px-1 text-left text-zinc-400 hover:bg-brand-light hover:text-brand disabled:opacity-50 ${lg ? "py-1.5 text-xs" : "py-0.5 text-[10px]"}`}
+                            title="この日だけ確定して本人に通知します（未保存の変更もまとめて保存されます）">
+                            ✓ この日を確定
+                          </button>
+                        )
+                      )}
+
+                      {/* Caddy OS で確定した派遣。ここでは入力させず「その日は外に出ている」と分かるだけ（#147） */}
+                      {caddy && (
+                        <p className={`truncate px-1 pb-0.5 font-medium text-amber-700 ${lg ? "text-xs" : "text-[10px]"}`}
+                          title={`Caddy OSで確定済みのキャディ派遣: ${caddy}`}>
+                          ⛳ {caddy}
+                        </p>
+                      )}
+
+                      {off && (
+                        <p className={`truncate px-1 pb-0.5 font-medium ${lg ? "text-xs" : "text-[10px]"} ${off.status === "approved" ? "text-rose-600" : "text-rose-400"}`}
+                          title={`${off.status === "approved" ? "承認済みの休み" : "休み希望（未処理）"}${off.reason ? `: ${off.reason}` : ""}`}>
+                          {off.status === "approved" ? "🛌 休み確定" : "🛌 休み希望"}
+                        </p>
+                      )}
+                      {req && (
+                        reqTimes(req, tmap) ? (
+                          <button type="button" onClick={() => applyRequest(s.id, d)}
+                            className={`w-full truncate rounded px-1 text-left text-zinc-400 hover:bg-brand-light hover:text-brand ${lg ? "py-1 text-xs" : "pb-0.5 text-[10px]"}`}
+                            title={`クリックでこの希望を反映（あとから時間を変えられます）\n希望: ${reqLabel(req, tmap)}${req.memo ? ` / ${req.memo}` : ""}`}>
+                            希望: {reqLabel(req, tmap)}{req.memo ? " 📝" : ""}
+                          </button>
+                        ) : (
+                          <p className={`truncate px-1 pb-0.5 text-zinc-400 ${lg ? "text-xs" : "text-[10px]"}`}
+                            title={`希望: ${reqLabel(req, tmap)}${req.memo ? ` / ${req.memo}` : ""}`}>
+                            希望: {reqLabel(req, tmap)}{req.memo ? " 📝" : ""}
+                          </p>
+                        )
+                      )}
+      </>
+    );
+    // 出勤している（休みテンプレ以外が入っている）か。日ごとリストの「出勤◯人」に使う
+    const working = filled && !t?.is_day_off;
+    return { bg, body, filled, published, working };
+  }
+
   const dow = ["日", "月", "火", "水", "木", "金", "土"];
   // 未保存だが今は画面に出ていないセル（期間を切り替えたあと）。保存対象には入るので件数だけ伝える
   const dirtyOutside = [...dirty].filter((k) => !inRange.has(k.split("|")[1])).length;
@@ -327,7 +449,61 @@ export function ShiftBuilder({
         {msg && <p className="text-sm font-medium text-brand">{msg}</p>}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
+      {/* スマホだけ: 表示の切替（日ごと / 表）と「入っている人だけ」 */}
+      <div className="mb-3 flex items-center gap-2 md:hidden">
+        <div className="flex gap-0.5 rounded-lg bg-zinc-100 p-0.5 text-sm">
+          <button type="button" onClick={() => setView("auto")}
+            className={`rounded-md px-3 py-1.5 ${view === "auto" ? "bg-white font-semibold text-brand shadow-sm" : "text-zinc-500"}`}>
+            日ごと
+          </button>
+          <button type="button" onClick={() => setView("table")}
+            className={`rounded-md px-3 py-1.5 ${view === "table" ? "bg-white font-semibold text-brand shadow-sm" : "text-zinc-500"}`}>
+            表
+          </button>
+        </div>
+        {view === "auto" && (
+          <label className="ml-auto flex items-center gap-1.5 text-sm text-zinc-600">
+            <input type="checkbox" checked={onlyFilled} onChange={(e) => setOnlyFilled(e.target.checked)} className="h-4 w-4 accent-brand" />
+            入っている人だけ
+          </label>
+        )}
+      </div>
+
+      {/* スマホ: 日ごとのリスト（1日＝1枚のカード、1行＝1人）。表の横スクロールで見づらかったため（#251） */}
+      <div className={view === "auto" ? "space-y-3 md:hidden" : "hidden"}>
+        {days.map((d) => {
+          const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
+          const rows = staff.map((st) => ({ st, ...renderCell(st, d, "lg") }));
+          const shown = onlyFilled ? rows.filter((r) => r.filled) : rows;
+          const workingCount = rows.filter((r) => r.working).length;
+          const isToday = d === today;
+          return (
+            <section key={d} id={`shift-day-${d}`} className="scroll-mt-16 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+              <header className={`flex items-center gap-2 border-b border-zinc-200 px-3 py-2 ${isToday ? "bg-brand-light" : "bg-zinc-50"}`}>
+                <p className={`text-base font-semibold ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-800"}`}>
+                  {md(d)}<span className="ml-0.5 text-sm">（{w}）</span>
+                </p>
+                {isToday && <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">今日</span>}
+                <span className="ml-auto text-xs text-zinc-500">出勤 {workingCount}人</span>
+              </header>
+              {shown.length === 0 ? (
+                <p className="px-3 py-3 text-sm text-zinc-400">入っている人はいません</p>
+              ) : (
+                <ul className="divide-y divide-zinc-100">
+                  {shown.map((r) => (
+                    <li key={r.st.id} className={`flex items-start gap-2 px-3 py-2 ${r.bg}`}>
+                      <p className="w-20 shrink-0 pt-2 text-sm font-medium leading-tight text-zinc-700">{r.st.name}</p>
+                      <div className="min-w-0 flex-1">{r.body}</div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      <div className={`overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm ${view === "auto" ? "hidden md:block" : ""}`}>
         {/* 列が少ない期間（日/週/半月）は横幅いっぱいに広げる＝横スクロールが要らない（#135） */}
         <table className={`text-xs ${days.length <= 16 ? "w-full" : ""}`}>
           <thead>
@@ -351,99 +527,10 @@ export function ShiftBuilder({
               <tr key={s.id} className={i % 2 ? "bg-zinc-50/40" : ""}>
                 <td className="sticky left-0 z-10 border-b border-r border-zinc-100 bg-inherit px-3 py-1 font-medium">{s.name}</td>
                 {days.map((d) => {
-                  const key = `${s.id}|${d}`;
-                  const cell = grid[key];
-                  const req = reqMap.get(key);
-                  const t = cell?.template_id ? tmap.get(cell.template_id) : null;
-                  const wt = cell?.schedule_type_id ? wtMap.get(cell.schedule_type_id) : null;
-                  const isCustom = !cell?.template_id && !cell?.schedule_type_id && !!(cell?.start_time || cell?.end_time);
-                  const filled = !!(cell?.template_id || cell?.schedule_type_id || (cell?.start_time && cell?.end_time));
-                  const myTypes = typesFor(s.id);
-                  const caddy = caddyDays[key];
-                  const published = cell?.status === "published";
-                  const off = timeOff[key];
-                  const bg = off?.status === "approved" ? "bg-rose-50"
-                    : published ? "bg-emerald-50/60"
-                    : dirty.has(key) ? "bg-amber-50"
-                    : off ? "bg-rose-50/40" : "";
+                  const { bg, body } = renderCell(s, d);
                   return (
                     <td key={d} className={`border-b border-zinc-100 p-0.5 align-top ${bg}`}>
-                      <select
-                        value={
-                          isCustom ? CUSTOM
-                            : cell?.schedule_type_id ? `${WT_PREFIX}${cell.schedule_type_id}`
-                            : cell?.template_id ?? ""
-                        }
-                        onChange={(e) => setTemplate(s.id, d, e.target.value)}
-                        className="w-full cursor-pointer rounded border-0 bg-transparent px-1 py-1 text-[11px] focus:outline-none"
-                        style={wt ? { color: wt.color, fontWeight: 600 } : t ? { color: t.color, fontWeight: 600 } : undefined}
-                      >
-                        <option value="">—</option>
-                        {templates.map((tp) => (<option key={tp.id} value={tp.id}>{tLabel(tp)}</option>))}
-                        <option value={CUSTOM}>⌚ 時間指定</option>
-                        {myTypes.length > 0 && (
-                          <optgroup label="業務">
-                            {myTypes.map((w) => (
-                              <option key={w.id} value={`${WT_PREFIX}${w.id}`}>{w.name}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
-                      {isCustom && (
-                        <div className="flex items-center gap-0.5 px-0.5 pb-0.5">
-                          <input type="time" value={cell?.start_time ?? ""} onChange={(e) => setCustomTime(s.id, d, "start", e.target.value)}
-                            className="w-full rounded border border-zinc-200 px-0.5 py-0.5 text-[10px]" />
-                          <span className="text-[9px] text-zinc-400">〜</span>
-                          <input type="time" value={cell?.end_time ?? ""} onChange={(e) => setCustomTime(s.id, d, "end", e.target.value)}
-                            className="w-full rounded border border-zinc-200 px-0.5 py-0.5 text-[10px]" />
-                        </div>
-                      )}
-
-                      {/* 1マスごとの確定 / 確定解除（#138）。まとめ確定を待たずにここだけ決められる */}
-                      {filled && (
-                        published ? (
-                          <button type="button" disabled={pending} onClick={() => unpublishOne(s.id, d)}
-                            className="w-full rounded px-1 py-0.5 text-left text-[10px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                            title="確定済み。クリックすると確定を解除して編集できます（本人へ通知）">
-                            🔒 確定済み
-                          </button>
-                        ) : (
-                          <button type="button" disabled={pending} onClick={() => publishOne(s.id, d)}
-                            className="w-full rounded px-1 py-0.5 text-left text-[10px] text-zinc-400 hover:bg-brand-light hover:text-brand disabled:opacity-50"
-                            title="この日だけ確定して本人に通知します（未保存の変更もまとめて保存されます）">
-                            ✓ この日を確定
-                          </button>
-                        )
-                      )}
-
-                      {/* Caddy OS で確定した派遣。ここでは入力させず「その日は外に出ている」と分かるだけ（#147） */}
-                      {caddy && (
-                        <p className="truncate px-1 pb-0.5 text-[10px] font-medium text-amber-700"
-                          title={`Caddy OSで確定済みのキャディ派遣: ${caddy}`}>
-                          ⛳ {caddy}
-                        </p>
-                      )}
-
-                      {off && (
-                        <p className={`truncate px-1 pb-0.5 text-[10px] font-medium ${off.status === "approved" ? "text-rose-600" : "text-rose-400"}`}
-                          title={`${off.status === "approved" ? "承認済みの休み" : "休み希望（未処理）"}${off.reason ? `: ${off.reason}` : ""}`}>
-                          {off.status === "approved" ? "🛌 休み確定" : "🛌 休み希望"}
-                        </p>
-                      )}
-                      {req && (
-                        reqTimes(req, tmap) ? (
-                          <button type="button" onClick={() => applyRequest(s.id, d)}
-                            className="w-full truncate rounded px-1 pb-0.5 text-left text-[10px] text-zinc-400 hover:bg-brand-light hover:text-brand"
-                            title={`クリックでこの希望を反映（あとから時間を変えられます）\n希望: ${reqLabel(req, tmap)}${req.memo ? ` / ${req.memo}` : ""}`}>
-                            希望: {reqLabel(req, tmap)}{req.memo ? " 📝" : ""}
-                          </button>
-                        ) : (
-                          <p className="truncate px-1 pb-0.5 text-[10px] text-zinc-400"
-                            title={`希望: ${reqLabel(req, tmap)}${req.memo ? ` / ${req.memo}` : ""}`}>
-                            希望: {reqLabel(req, tmap)}{req.memo ? " 📝" : ""}
-                          </p>
-                        )
-                      )}
+                      {body}
                     </td>
                   );
                 })}
@@ -452,7 +539,7 @@ export function ShiftBuilder({
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-zinc-400">
+      <p className="mt-2 text-xs leading-relaxed text-zinc-400">
         緑=確定済み / 黄=未保存 / 桃=休み希望。「⌚ 時間指定」で任意の時間を入力できます。
         <span className="font-medium text-zinc-500">「✓ この日を確定」で1日だけ確定</span>、
         <span className="font-medium text-zinc-500">「🔒 確定済み」を押すと確定を解除して直せます</span>（どちらも本人へ通知）。

@@ -13,6 +13,8 @@ export type SaleRow = {
   /** app=アプリ入力(mon_sales・編集可) / ledger=売上台帳の取込明細(mon_sales_lines・閲覧のみ) */
   source: "app" | "ledger";
   soldOn: string;
+  /** 入力した日時（created_at）。同じ日の明細を「入力した順」に並べるのに使う */
+  enteredAt: string;
   category: string;
   customerName: string;
   memberKind: string;
@@ -71,23 +73,26 @@ function toForm(r: SaleRow): Form {
  * どの欄を直したかで再計算の開始点を変える（売価を直接直したら定価・割引額は触らない）。
  */
 /** ソート対象の列。ラベルは見出しに出す文言と同じ */
-type SortKey = "soldOn" | "category" | "customerName" | "productName" | "pro" | "amount" | "payMethod";
+type SortKey = "soldOn" | "enteredAt" | "category" | "customerName" | "productName" | "pro" | "amount" | "payMethod";
 
 /**
  * 明細のソート比較。文字列は日本語ロケールで比較（濁点・カナの並びを自然に）。
- * 同値のときは日付降順→金額降順で安定させる（毎回同じ並びになる）。
+ * 昇順/降順（desc）は**選んだ列にだけ**効かせる。同値のときは
+ *   日付の新しい順 → 同じ日の中は入力した順（先に入れたものが上）
+ * で固定する。以前は同じ日の中が「金額の大きい順」で、しかも降順のときは全体を reverse していたため、
+ * まとめ入力した明細が入力とバラバラの順に並んでいた（2026-09-17 ユーザー指摘）。
  */
-function compareRows(a: SaleRow, b: SaleRow, key: SortKey, amountOf: (r: SaleRow) => number): number {
+function compareRows(a: SaleRow, b: SaleRow, key: SortKey, desc: boolean, amountOf: (r: SaleRow) => number): number {
   let c = 0;
   if (key === "amount") {
     c = amountOf(a) - amountOf(b);
-  } else if (key === "soldOn") {
-    c = a.soldOn.localeCompare(b.soldOn);
+  } else if (key === "soldOn" || key === "enteredAt") {
+    c = a[key].localeCompare(b[key]);
   } else {
     c = String(a[key] ?? "").localeCompare(String(b[key] ?? ""), "ja");
   }
-  if (c !== 0) return c;
-  return b.soldOn.localeCompare(a.soldOn) || (b.amount - a.amount);
+  if (c !== 0) return desc ? -c : c;
+  return b.soldOn.localeCompare(a.soldOn) || a.enteredAt.localeCompare(b.enteredAt) || a.id.localeCompare(b.id);
 }
 
 function recalcFrom(f: Form, p: Partial<Form>, start: "price" | "unit" | "amount"): Form {
@@ -156,8 +161,8 @@ export default function SalesTable({
       setSortDesc((d) => !d);
     } else {
       setSortKey(key);
-      // 金額・日付は「大きい/新しい順」から、名前系は「あいうえお順」から始める
-      setSortDesc(key === "amount" || key === "soldOn");
+      // 金額・日付・入力日時は「大きい/新しい順」から、名前系は「あいうえお順」から始める
+      setSortDesc(key === "amount" || key === "soldOn" || key === "enteredAt");
     }
   }
   // 検索と絞り込み（Excelのオートフィルタ相当）。URLに出さず画面内で完結させる＝打った瞬間に絞れる
@@ -189,11 +194,10 @@ export default function SalesTable({
     });
   }, [rows, picked, query]);
 
-  const sortedRows = useMemo(() => {
-    const arr = [...filteredRows].sort((a, b) => compareRows(a, b, sortKey, amountOf));
-    if (sortDesc) arr.reverse();
-    return arr;
-  }, [filteredRows, sortKey, sortDesc, amountOf]);
+  const sortedRows = useMemo(
+    () => [...filteredRows].sort((a, b) => compareRows(a, b, sortKey, sortDesc, amountOf)),
+    [filteredRows, sortKey, sortDesc, amountOf],
+  );
 
   /**
    * プルダウンの候補。
@@ -256,6 +260,7 @@ export default function SalesTable({
     if (num(form.qty) < 1) { setError("個数を入力してください（1以上）"); return; }
     setError(null);
     startTransition(async () => {
+      try {
       await updateSale({
         id: r.id,
         soldOn: form.soldOn,
@@ -278,12 +283,24 @@ export default function SalesTable({
       });
       setEditingId(null);
       setForm(null);
+      } catch (e) {
+        // ログイン切れ・通信切れ。白い画面にせず、編集中の内容を残して知らせる
+        console.error("[money-os] 明細の保存に失敗", e);
+        setError("保存できませんでした（ログインが切れたか、通信が切れました）。編集中の内容はそのままです。画面を再読み込みしてログインし直してから、もう一度保存してください");
+      }
     });
   }
 
   function remove(r: SaleRow) {
     if (!window.confirm(`この明細を削除しますか？\n${r.soldOn} ${r.productName || r.customerName || r.category} ${yen(r.amount)}円${r.invItemId ? "\n（在庫連動も取り消され、在庫が戻ります）" : ""}${r.payMethod === "現金" ? "\n（現金出納の自動連携行も削除されます）" : ""}`)) return;
-    startTransition(async () => { await deleteSaleById(r.id); });
+    startTransition(async () => {
+      try {
+        await deleteSaleById(r.id);
+      } catch (e) {
+        console.error("[money-os] 明細の削除に失敗", e);
+        window.alert("削除できませんでした（ログインが切れたか、通信が切れました）。画面を再読み込みしてから、もう一度お試しください");
+      }
+    });
   }
 
   // 選択肢に無い値（過去データ・無効化したプロ等）も落とさず出す
@@ -351,6 +368,16 @@ export default function SalesTable({
             >税込</button>
           </span>
           <span className="text-(--color-dim) tabular-nums">個数 {filteredQty}</span>
+          <button
+            type="button"
+            onClick={() => (sortKey === "enteredAt" ? (setSortKey("soldOn"), setSortDesc(true)) : (setSortKey("enteredAt"), setSortDesc(true)))}
+            className={sortKey === "enteredAt"
+              ? "rounded-lg bg-(--color-gold) px-2.5 py-1 text-xs font-medium text-white"
+              : `${btnGhostCls} !px-2.5 !py-1 !text-xs`}
+            title="押すと、日付に関係なく「最後に入力したもの」から並べます。もう一度押すと日付順（同じ日は入力した順）に戻ります"
+          >
+            {sortKey === "enteredAt" ? "最近入力した順で表示中" : "最近入力した順"}
+          </button>
           <span className="ml-auto flex flex-wrap items-center gap-1">
             <span className="text-xs text-(--color-dim)">集計:</span>
             {PIVOTS.map((p) => (

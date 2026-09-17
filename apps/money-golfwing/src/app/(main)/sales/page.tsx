@@ -24,6 +24,7 @@ type Sale = {
   member_kind: string | null; amount: number; tax_included: number | null;
   pay_method: string | null; memo: string | null; detail: Record<string, unknown>;
   source: string;
+  created_at: string;
 };
 
 /** 台帳明細（mon_sales_lines）。過去期のExcel取込明細はここに入っている */
@@ -33,6 +34,7 @@ type LedgerLine = {
   product_name: string | null; list_price: number | string | null; discount: number | string | null;
   qty: number | string | null; amount: number | string; tax_included: number | string | null;
   pay_method: string | null; pro: string | null; memo: string | null;
+  created_at: string;
 };
 
 /**
@@ -88,13 +90,14 @@ export default async function SalesPage({ searchParams }: {
         admin.from("mon_sales").select("*")
           .eq("company_id", actor.companyId).eq("store_id", store.id)
           .gte("sold_on", from).lt("sold_on", to).is("deleted_at", null)
-          .order("sold_on", { ascending: false }).limit(ROW_LIMIT),
+          // 同じ日の中は入力した順（明細一覧の並びと同じ）
+          .order("sold_on", { ascending: false }).order("created_at", { ascending: true }).limit(ROW_LIMIT),
         // 台帳明細（Excel取込）。過去期の明細はmon_salesではなくここにある
         admin.from("mon_sales_lines")
-          .select("id, sold_on, customer_name, member_kind, item_category, item_type, maker, product_name, list_price, discount, qty, amount, tax_included, pay_method, pro, memo")
+          .select("id, sold_on, customer_name, member_kind, item_category, item_type, maker, product_name, list_price, discount, qty, amount, tax_included, pay_method, pro, memo, created_at")
           .eq("company_id", actor.companyId).eq("store_id", store.id)
           .gte("sold_on", from).lt("sold_on", to).is("deleted_at", null)
-          .order("sold_on", { ascending: false }).limit(ROW_LIMIT),
+          .order("sold_on", { ascending: false }).order("created_at", { ascending: true }).limit(ROW_LIMIT),
       ])
     : [{ data: [] }, { data: [] }];
   const rows = (data ?? []) as Sale[];
@@ -214,6 +217,7 @@ export default async function SalesPage({ searchParams }: {
       id: r.id,
       source: "app" as const,
       soldOn: r.sold_on,
+      enteredAt: String(r.created_at ?? ""),
       category: r.category,
       customerName: r.customer_name ?? "",
       memberKind: r.member_kind ?? "",
@@ -235,6 +239,7 @@ export default async function SalesPage({ searchParams }: {
     id: `line:${r.id}`,
     source: "ledger" as const,
     soldOn: String(r.sold_on),
+    enteredAt: String(r.created_at ?? ""),
     category: r.item_category ?? "",
     customerName: r.customer_name ?? "",
     memberKind: r.member_kind ?? "",
@@ -252,8 +257,9 @@ export default async function SalesPage({ searchParams }: {
     pro: r.pro ?? "",
     invItemId: null,
   }));
+  // 日付の新しい順・同じ日の中は入力した順（SalesTable の既定の並びと同じ）
   const saleRows: SaleRow[] = [...fromApp, ...fromLedger]
-    .sort((a, b) => b.soldOn.localeCompare(a.soldOn));
+    .sort((a, b) => b.soldOn.localeCompare(a.soldOn) || a.enteredAt.localeCompare(b.enteredAt));
   /** 明細合計（税抜）: 一覧に出している明細の合計 */
   const detailTotal = saleRows.reduce((a, r) => a + r.amount, 0);
 

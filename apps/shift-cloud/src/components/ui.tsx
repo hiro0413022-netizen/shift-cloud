@@ -2,8 +2,8 @@ import type { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAt
 
 export function PageTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mb-6 flex items-center justify-between">
-      <h1 className="text-xl font-semibold tracking-tight">{children}</h1>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 md:mb-6">
+      <h1 className="text-lg font-semibold tracking-tight md:text-xl">{children}</h1>
       {action}
     </div>
   );
@@ -11,7 +11,7 @@ export function PageTitle({ children, action }: { children: ReactNode; action?: 
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-lg border border-zinc-200 bg-white p-6 shadow-sm ${className}`}>
+    <div className={`rounded-lg border border-zinc-200 bg-white p-4 shadow-sm md:p-6 ${className}`}>
       {children}
     </div>
   );
@@ -91,7 +91,7 @@ export function Table({ headers, children }: { headers: string[]; children: Reac
         <thead>
           <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
             {headers.map((h) => (
-              <th key={h} className="px-4 py-3 text-xs font-medium text-zinc-500">{h}</th>
+              <th key={h} className="whitespace-nowrap px-3 py-2.5 text-xs font-medium text-zinc-500 md:px-4 md:py-3">{h}</th>
             ))}
           </tr>
         </thead>
@@ -102,7 +102,7 @@ export function Table({ headers, children }: { headers: string[]; children: Reac
 }
 
 export function Td({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return <td className={`px-4 py-3 ${className}`}>{children}</td>;
+  return <td className={`px-3 py-2.5 md:px-4 md:py-3 ${className}`}>{children}</td>;
 }
 
 export function Empty({ children }: { children: ReactNode }) {

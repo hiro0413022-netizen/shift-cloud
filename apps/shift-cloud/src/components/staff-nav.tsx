@@ -9,6 +9,7 @@ const tabs = [
   { href: "/requests", label: "シフト提出", icon: "✋" },
   { href: "/reports", label: "報告", icon: "⚠️" },
   { href: "/notices", label: "お知らせ", icon: "🔔" },
+  { href: "/promo", label: "広報素材", icon: "🖼" },
   { href: "/chat", label: "聞く", icon: "💬" },
 ];
 
@@ -21,7 +22,7 @@ export function StaffNav() {
           <Link
             key={t.href}
             href={t.href}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] ${
+            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2.5 text-[10px] leading-tight sm:text-[11px] ${
               path.startsWith(t.href) ? "font-semibold text-brand" : "text-zinc-400"
             }`}
           >

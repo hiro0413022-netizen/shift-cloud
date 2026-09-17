@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { inputCls, btnCls, btnGhostCls } from "@/components/ui";
-import { createSale, createSales, type SaleInput } from "./actions";
+import { createSale, createSales, type SaleInput, type SaveResult } from "./actions";
 import ProductPicker, { invLabel, masterLabel, type InvPick } from "./ProductPicker";
 import type { MasterProduct } from "./actions";
 import CustomerPicker from "./CustomerPicker";
@@ -45,6 +45,22 @@ const emptyLine = (): Line => ({
   unitPrice: "", unitManual: false, qty: "1",
   amount: "", amountManual: false, taxIncluded: "", taxManual: false, pro: "", memo: "",
 });
+
+/**
+ * 保存できなかった入力の退避先（この端末のブラウザだけ）。
+ * ログイン切れ・通信切れで保存が失敗したとき、再読み込みしても入力をやり直さなくていいように残す。
+ */
+const DRAFT_KEY = "money-os:sales-draft";
+type Draft = {
+  savedAt: number;
+  mode: "single" | "batch";
+  soldOn: string; category: string; customerName: string; memberKind: string;
+  payMethod: string; pro: string; seller: string;
+  line: Line; lines: Line[];
+};
+const FAIL_MSG =
+  "保存できませんでした（ログインが切れたか、通信が切れました）。入力内容はこの端末に残してあります。"
+  + "画面を再読み込みしてログインし直し、下の明細に入っていないことを確かめてから、もう一度保存してください。";
 
 /** 税抜→税込（10%・円未満切り捨て）。空/非数値は空。 */
 function calcTax(amountStr: string): string {
@@ -123,6 +139,11 @@ export default function SalesEntry({
   const [mode, setMode] = useState<"single" | "batch">("single");
   const [pending, startTransition] = useTransition();
   const [flash, setFlash] = useState<string | null>(null);
+  const [flashError, setFlashError] = useState(false);
+  /** 前回保存できなかった入力（再読み込み後に「戻す」を出す） */
+  const [pendingDraft, setPendingDraft] = useState<Draft | null>(null);
+  const ok = (m: string) => { setFlash(m); setFlashError(false); };
+  const ng = (m: string) => { setFlash(m); setFlashError(true); };
 
   // 連続入力モードの1商品
   const [line, setLine] = useState<Line>(emptyLine());
@@ -130,6 +151,51 @@ export default function SalesEntry({
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
   const productRef = useRef<HTMLInputElement>(null);
+
+  // 前回保存できなかった入力があれば知らせる（24時間以内のものだけ）
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as Draft;
+      if (!d?.savedAt || Date.now() - d.savedAt > 24 * 3600 * 1000) { localStorage.removeItem(DRAFT_KEY); return; }
+      setPendingDraft(d);
+    } catch { /* 使えないブラウザでは何もしない */ }
+  }, []);
+
+  function keepDraft() {
+    const d: Draft = { savedAt: Date.now(), mode, soldOn, category, customerName, memberKind, payMethod, pro, seller, line, lines };
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch { /* ignore */ }
+  }
+  function clearDraft() {
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    setPendingDraft(null);
+  }
+  function restoreDraft(d: Draft) {
+    setMode(d.mode); setSoldOn(d.soldOn); setCategory(d.category); setCustomerName(d.customerName);
+    setMemberKind(d.memberKind); setPayMethod(d.payMethod); setPro(d.pro); setSeller(d.seller);
+    setLine(d.line ?? emptyLine());
+    setLines(d.lines?.length ? d.lines : [emptyLine()]);
+    clearDraft();
+    ok("前回保存できなかった入力を戻しました。下の明細に入っていないことを確かめてから保存してください");
+  }
+
+  /**
+   * サーバーへ保存。失敗しても白い画面にしない（例外をここで受け止める）。
+   * 例外＝ログイン切れ（401）・通信切れ。このときは入力を消さずに退避する。
+   */
+  async function save(run: () => Promise<SaveResult>): Promise<SaveResult | null> {
+    try {
+      const r = await run();
+      if (!r.ok) ng(r.error);
+      return r;
+    } catch (e) {
+      console.error("[money-os] 売上の保存に失敗", e);
+      keepDraft();
+      ng(FAIL_MSG);
+      return null;
+    }
+  }
 
   const header = () => ({
     soldOn,
@@ -194,12 +260,14 @@ export default function SalesEntry({
   // 連続追加：1件保存 → 商品欄だけクリア、ヘッダーは保持、品名にフォーカス
   function addSingle() {
     const bad = invalidReason(line);
-    if (bad) { setFlash(bad); return; }
+    if (bad) { ng(bad); return; }
     const input = lineToInput(line);
     startTransition(async () => {
-      await createSale(input);
+      const r = await save(() => createSale(input));
+      if (!r?.ok) return;
       setLine(emptyLine());
-      setFlash(`追加しました：${input.productName ?? category} ${input.qty}個 / ${input.amount.toLocaleString("ja-JP")}円${input.pro ? `（担当 ${input.pro}）` : ""}${input.invItemId ? "（在庫を減らしました）" : ""}`);
+      clearDraft();
+      ok(`追加しました：${input.productName ?? category} ${input.qty}個 / ${input.amount.toLocaleString("ja-JP")}円${input.pro ? `（担当 ${input.pro}）` : ""}${input.invItemId ? "（在庫を減らしました）" : ""}`);
       productRef.current?.focus();
     });
   }
@@ -207,14 +275,23 @@ export default function SalesEntry({
   // まとめ保存：全商品行を一括保存
   function saveBatch() {
     const valid = lines.filter((l) => num(l.amount) !== 0);
-    if (valid.length === 0) { setFlash("金額のある商品行がありません"); return; }
+    if (valid.length === 0) { ng("金額のある商品行がありません"); return; }
     const badIdx = valid.findIndex((l) => invalidReason(l) !== null);
-    if (badIdx >= 0) { setFlash(`${badIdx + 1}行目: ${invalidReason(valid[badIdx])}`); return; }
+    if (badIdx >= 0) { ng(`${badIdx + 1}行目: ${invalidReason(valid[badIdx])}`); return; }
     const inputs = valid.map(lineToInput);
     startTransition(async () => {
-      await createSales(inputs);
+      const r = await save(() => createSales(inputs));
+      if (!r) return;
+      if (!r.ok) {
+        // 途中まで入った場合は、入った行を画面から外す（もう一度押して二重にならないように）
+        const m = /^(\d+)件は保存しました/.exec(r.error);
+        const done = m ? Number(m[1]) : 0;
+        if (done > 0) setLines(valid.slice(done));
+        return;
+      }
       setLines([emptyLine()]);
-      setFlash(`${inputs.length}件をまとめて追加しました（${customerName || "お客様名なし"}）`);
+      clearDraft();
+      ok(`${r.saved}件をまとめて追加しました（${customerName || "お客様名なし"}）`);
     });
   }
 
@@ -246,6 +323,18 @@ export default function SalesEntry({
 
   return (
     <div className="space-y-3">
+      {pendingDraft && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-(--color-gold) px-3 py-2 text-sm">
+          <span>
+            保存できなかった入力が残っています（{new Date(pendingDraft.savedAt).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}・
+            {pendingDraft.mode === "batch"
+              ? `まとめ入力 ${pendingDraft.lines.filter((l) => num(l.amount) !== 0).length}行`
+              : pendingDraft.line.productName || "1件"}）
+          </span>
+          <button type="button" onClick={() => restoreDraft(pendingDraft)} className={btnCls}>入力を戻す</button>
+          <button type="button" onClick={clearDraft} className={btnGhostCls}>捨てる</button>
+        </div>
+      )}
       {/* モード切替 */}
       <div className="flex items-center gap-2">
         <button
@@ -524,7 +613,14 @@ export default function SalesEntry({
         </div>
       )}
 
-      {flash && <p className="text-xs text-(--color-ok)">{flash}</p>}
+      {flash && (
+        <p role={flashError ? "alert" : "status"}
+          className={flashError
+            ? "rounded-lg border border-(--color-accent) px-3 py-2 text-sm font-medium text-(--color-accent)"
+            : "text-xs text-(--color-ok)"}>
+          {flash}
+        </p>
+      )}
     </div>
   );
 }
