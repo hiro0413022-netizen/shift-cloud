@@ -56,10 +56,23 @@ gnv_sales — 店頭売上（1行=1決済/月次取込）
 gnv_sales_lines — 物販/フィッティング明細（1行=1商品）
   sold_on(date), item_category, item_type, maker, product_name, list_price, discount, sale_price,
   qty, amount(税抜), tax_included, pay_method, member_kind, pro, store_name
-gnv_members — 会員（スナップショット）
+gnv_members — **GOLF WING（ゴルフウィング宝塚）の**会員台帳（スナップショット）。FRANK の会員はここに居ない
   member_no, member_name, gender, age, join_date(date), leave_date(date), leave_reason,
-  member_type, class_name, store_name, campaign, payment_method, monthly_visits, last_visit_date,
+  member_type, class_name, store_name('ゴルフウィング'), campaign, payment_method, monthly_visits, last_visit_date,
   is_active(bool: leave_date が null なら true = 在籍中)
+  ※member_type の値: レギュラー会員 / プラチナレギュラー会員 / レギュラー家族割会員 / ライト会員 / マスター会員 /
+    チケット会員 / 法人会員 / 法人会員2枚目 / スタッフ / モニター会員
+gnv_frank_members — **FRANK GOLF（フランク・姫路）の**会員。1行=1会員
+  member_no, member_name, plan_name, plan_type, is_corporate(bool), member_role, monthly_price,
+  status, status_label, is_active(bool), join_date(date), start_date(date), leave_date(date),
+  scheduled_leave_date, suspend_start, suspend_end, payment_method, billing_status, join_campaign,
+  gender, age, occupation, company_name(法人名), created_at, store_name
+  ※plan_type の値: '一般'（ライト/レギュラー/マスター会員）/ '法人' / 'スタッフ' / 'モニター' / 'テスト'
+  ※member_role: '個人' / '法人契約'（法人の契約1件）/ '法人利用者'（法人契約にぶら下がる利用者）
+  ※status: 'active'(在籍) / 'suspended'(休会中) / 'pending'(審査待ち) / 'left'(退会) / 'rejected'(否認)
+  ※「FRANKの会員数」は status='active' で数える（休会も含めるなら is_active）。
+    「法人・スタッフ・モニターを除く」＝ plan_type='一般'。テスト会員は常に除く。
+  ※「フランク」「FRANK」「姫路」と聞かれた会員の質問は必ずこのビュー。gnv_members を使わない。
 gnv_trials — 体験レッスン（元データは受付台帳。0135以前は空テーブルを読んでいて常に0件だった）
   booking_seq, program, lesson_date(date), start_time, status, joined(bool:入会したか),
   joined_at(date), decline_reason, source, created_at, store_name
@@ -134,6 +147,8 @@ function sqlSystemPrompt(scope: AskScope, today: string): string {
     "- SELECT または WITH で始まる単一文のみ。書き込み・DDLは不可。",
     "- 上記ビュー以外の名前（実体テーブル、システムカタログ）を FROM/JOIN に書かない。",
     "- company_id や店舗の絞り込みは書かなくてよい（DBが自動で適用する）。",
+    "- 会員の質問は店舗で見るビューが違う: FRANK（フランク・姫路）は gnv_frank_members、GOLF WING（ゴルフウィング・宝塚）は gnv_members。店舗の指定が無ければ両方を union all で店舗別に出す。",
+    "- 値の候補がカタログに書いてある列は、その値だけを使う（推測した値で絞ると0件になる）。",
     "- 金額は原則 amount（税抜）。税込を聞かれたら tax_included を使う。",
     "- 「先月」「今月」は今日の日付から計算し、日付リテラルで書く。",
     "- 件数は count(*)、金額合計は sum(...) を使い、必要なら group by で内訳を出す。",
