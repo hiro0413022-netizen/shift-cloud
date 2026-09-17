@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { talkToJarvis } from "@/app/(main)/jarvis-actions";
-import { detectWake, pauseMs, detectScreenCommand, splitSentences, createVad, cleanTranscript } from "@/lib/jarvis-pure";
+import { detectWake, pauseMs, detectScreenCommand, splitSentences, createVad, cleanTranscript, wakeStartup } from "@/lib/jarvis-pure";
 import { Icon } from "./icons";
 import { openPalette } from "./command-palette";
 import type { JarvisReply } from "@/lib/jarvis";
@@ -120,6 +120,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
   const [recError, setRecError] = useState<string | null>(null);
   const [ptt, setPtt] = useState(false);
   const [wakeOn, setWakeOn] = useState(false); // 画面表示用（wantListening は ref なので再描画されない）
+  const [wakeHint, setWakeHint] = useState(false); // #248: 待受をまだ一度も選んでいない＋マイク未許可 → 待受ボタンを光らせる
   const speakGen = useRef(0); // 読み上げの世代。割り込まれたら古い世代の音は捨てる
   const [level, setLevel] = useState(0);
   // #246: 呼びかけ待ちの間にブラウザが何を聞き取っているか（「反応しない」の切り分け用に見せる）
@@ -299,20 +300,48 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     [speak, router]
   );
 
+  /* #248: 呼びかけに気づいたら小さく「ピコッ」と鳴らす（聞こえたことが分かるように。喋りはしない） */
+  const chime = useCallback(() => {
+    const ctx = ctxRef.current;
+    if (!ctx || ctx.state !== "running") return;
+    try {
+      const t = ctx.currentTime;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.06, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      g.connect(ctx.destination);
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(880, t);
+      o.frequency.setValueAtTime(1320, t + 0.09);
+      o.connect(g);
+      o.start(t);
+      o.stop(t + 0.24);
+    } catch {
+      /* 鳴らなくても動作は続ける */
+    }
+  }, []);
+
   /* #247: 呼びかけに気づいた瞬間、直近5秒ぶんから録り始める（一息で言っても頭から録れる） */
   const beginCaptureFromWake = useCallback(() => {
-    if (!micReadyRef.current || capturingRef.current) return;
+    chime();
+    // #248: 画面を触る前は音の処理が一時停止中＝直近の音が無い。そのときは文字の保険に任せる
+    if (!micReadyRef.current || capturingRef.current || ctxRef.current?.state !== "running") return;
     const vad = vadRef.current;
     capturingRef.current = true;
-    pcmRef.current = [...ringRef.current];
+    // #248: さかのぼるのは3秒（呼びかけの前の雑談まで文字起こしに混ぜない。認識の遅れは実測1秒弱）
+    const back = Math.ceil(3000 / (frameMsRef.current || 85));
+    pcmRef.current = ringRef.current.slice(-back);
     if (vad && !vad.speaking) {
       // もう喋り終わっている → 少しだけ待って（語尾を拾う）そのまま文字にする
       setTimeout(() => {
         if (capturingRef.current && !(vadRef.current?.speaking ?? false)) void finishRef.current?.();
       }, 350);
     }
-  }, []);
+  }, [chime]);
   const finishRef = useRef<(() => Promise<void>) | null>(null);
+
 
   /* ---------- 常時待受の本体 ---------- */
   const startRec = useCallback(() => {
@@ -650,21 +679,35 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
     const ok = Boolean(w.SpeechRecognition || w.webkitSpeechRecognition);
     setSttSupported(ok);
-    // 前回「待受にする」を選んでいたら自動で戻す（マイク許可はオリジンに残る）
+    // #248: 前回オン、またはまだ選んでいなくてマイクが許可済みなら、開いた時点で待受にする
+    // （ユーザー指摘「ジェネシスと呼んでも反応しない」＝実機の Edge で待受を一度も押していなかった）
+    // 自分でオフにした人は触らない。未許可の人に開いた瞬間の許可の窓は出さない（待受ボタンを光らせる）
     if (ok) {
+      let stored: string | null = null;
       try {
-        if (window.localStorage.getItem(WAKE_KEY) === "on") {
-          wantListening.current = true;
-          setWakeOn(true);
-          setMode("waiting");
-          setTimeout(() => {
-            startRec();
-            void startMic();
-          }, 600);
-        }
+        stored = window.localStorage.getItem(WAKE_KEY);
       } catch {
         /* noop */
       }
+      const begin = (perm: string | null) => {
+        const d = wakeStartup(stored, perm);
+        if (d === "hint") setWakeHint(true);
+        if (d !== "auto" || wantListening.current) return;
+        wantListening.current = true;
+        setWakeOn(true);
+        setMode("waiting");
+        setTimeout(() => {
+          startRec();
+          void startMic();
+        }, 600);
+      };
+      const perms = (navigator as unknown as { permissions?: { query: (d: { name: string }) => Promise<{ state: string }> } }).permissions;
+      if (stored === "on" || stored === "off" || !perms) begin(null);
+      else
+        perms
+          .query({ name: "microphone" })
+          .then((p) => begin(p.state))
+          .catch(() => begin(null));
     }
     return () => {
       wantListening.current = false;
@@ -707,6 +750,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     } catch {
       /* noop */
     }
+    setWakeHint(false);
     if (next) {
       setMicError(null);
       setMode("waiting");
@@ -808,7 +852,11 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
             onClick={toggleWake}
             title={wakeOn ? "待受をやめる" : "常時待受にする（「ジェネシス」と呼ぶだけで会話に入る）"}
             className={`flex h-9 shrink-0 items-center justify-center rounded-lg border px-2 ${
-              wakeOn ? "border-emerald-700 bg-emerald-950/40 text-emerald-200" : "border-(--color-line) text-(--color-dim)"
+              wakeOn
+                ? "border-emerald-700 bg-emerald-950/40 text-emerald-200"
+                : wakeHint
+                  ? "animate-pulse border-amber-500 bg-amber-950/40 text-amber-200"
+                  : "border-(--color-line) text-(--color-dim)"
             }`}
           >
             <Icon name="ear" size={16} />
@@ -876,7 +924,11 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
       {mode === "off" && !micError && (
         <p className="px-4 pb-2 text-xs text-(--color-faint)">
           「話す」を押してそのまま話しかけてください。
-          {sttSupported ? "「待受」をオンにすると、以後は「ジェネシス」と呼ぶだけで会話に入ります。" : "（このブラウザは「ジェネシス」の呼びかけに未対応です。Chrome か Edge なら使えます）"}
+          {sttSupported
+            ? wakeHint
+              ? "「ジェネシス」と呼んで使うには、光っている【待受】を一度だけ押してマイクを許可してください（次からは開いただけで待受になります）。"
+              : "「待受」をオンにすると、以後は「ジェネシス」と呼ぶだけで会話に入ります。"
+            : "（このブラウザは「ジェネシス」の呼びかけに未対応です。Chrome か Edge なら使えます）"}
         </p>
       )}
       {mode === "waiting" && !busy && !speaking && (

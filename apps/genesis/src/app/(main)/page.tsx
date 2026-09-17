@@ -14,6 +14,8 @@ import { ChangesLine } from "@/components/home/changes-line";
 import { TodoList, TodoPanel, ClearAiButton } from "@/components/home/todo";
 import { DrillPanel } from "@/components/home/drill-panel";
 import { TodoHotkeys } from "@/components/home/todo-hotkeys";
+import { SystemCards } from "@/components/home/system-cards";
+import { getSystemCards } from "@/lib/system-links";
 import { cancelActionForm } from "./executions/actions";
 
 export const dynamic = "force-dynamic";
@@ -31,7 +33,7 @@ type SP = { panel?: string; next?: string; drill?: string; store?: string; kind?
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireGenesisActor();
   const sp = await searchParams;
-  const home = await getHomeData(actor, { includeChecks: sp.checks === "1" });
+  const [home, systemCards] = await Promise.all([getHomeData(actor, { includeChecks: sp.checks === "1" }), getSystemCards(actor)]);
   const { cockpit: d, score, todos, undo, stalled, checks } = home;
   const showChecksLine = !sp.checks && !isMonthlyCheckDay() && checks.length > 0;
 
@@ -181,6 +183,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           </Link>
         </section>
       </div>
+
+      {/* システムへ直行（#248・GOLF WING 店舗ダッシュボード下のカードと同じ形） */}
+      <SystemCards cards={systemCards} />
 
       {/* パネル */}
       {panel && (

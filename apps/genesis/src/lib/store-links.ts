@@ -135,3 +135,72 @@ export function launcherCards(isFrank: boolean): LauncherCard[] {
   ];
   return cards;
 }
+
+/* ============================================================
+   システムへ直行カード（#248）
+   ユーザー指摘「各システムにすぐ飛べるように。ゴルフウィングのダッシュボードの下の
+   カードみたいになっているのが使いやすい」（Shift Cloud /store の「業務システム」＝ sp_links）。
+   GENESIS ホームの下に同じ形（名前＋一言・押すと別タブ）で並べる。
+   並び: 下の既知アプリ → sp_links（店舗の業務リンク。Smart Hello・発注サイト等）。
+   sp_links は Shift Cloud と同じ台帳なので、あちらで足したリンクはこちらにも出る。
+   同じ URL（ホスト）が両方にあれば既知アプリ側を残す。
+   ============================================================ */
+
+export type SystemCard = {
+  key: string;
+  name: string;
+  note: string | null;
+  href: string;
+  icon: "cal" | "user" | "store" | "chart" | "doc" | "book" | "box" | "spark" | "flag" | "link" | "check";
+  /** sp_links 由来のときの店舗名（全店共通なら null） */
+  store?: string | null;
+};
+
+export const SYSTEM_CARDS: SystemCard[] = [
+  { key: "member", name: "Member OS", note: "予約・受付台帳・会員", href: MEMBER_OS_URL, icon: "user" },
+  { key: "reservations", name: "今日の予約", note: "Member OS の予約表", href: `${MEMBER_OS_URL}/reservations`, icon: "cal" },
+  { key: "shift", name: "Shift Cloud", note: "シフト・勤怠・店舗ダッシュボード", href: SHIFT_CLOUD_URL, icon: "store" },
+  { key: "money", name: "Money OS", note: "売上・経費・分析", href: MONEY_OS_URL, icon: "chart" },
+  { key: "lesson", name: "Lesson OS", note: "レッスンカルテ・動画", href: LESSON_OS_URL, icon: "book" },
+  { key: "craft", name: "Craft OS", note: "フィッティング・見積・工房", href: CRAFT_OS_URL, icon: "doc" },
+  { key: "reserve", name: "Reserve OS", note: "ビジター・フィッティング申込", href: RESERVE_OS_URL, icon: "cal" },
+  { key: "inventory", name: "Inventory OS", note: "在庫・棚卸・入出庫", href: INVENTORY_OS_URL, icon: "box" },
+  { key: "compe", name: "Compe OS", note: "コンペ・成績表", href: COMPE_OS_URL, icon: "flag" },
+  { key: "cortex", name: "SWING CORTEX", note: "AIカルテナレッジ・診断", href: SWING_CORTEX_URL, icon: "spark" },
+  { key: "legal", name: "Legal OS", note: "契約書・法務", href: LEGAL_OS_URL, icon: "check" },
+];
+
+export type RawLink = { id: string; label: string; url: string; note: string | null; store?: string | null };
+
+function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** 「Smart Hello（予約スケジュール）」→ 名前「Smart Hello」・一言「予約スケジュール」 */
+export function splitLinkLabel(label: string): { name: string; note: string | null } {
+  const m = label.match(/^(.+?)[（(](.+)[）)]\s*$/);
+  return m ? { name: m[1].trim(), note: m[2].trim() } : { name: label.trim(), note: null };
+}
+
+/**
+ * 既知アプリ＋ sp_links を1列にする（純関数・テスト対象）。
+ * 既知アプリと同じホストの sp_links は捨てる（二重に出さない）。sp_links 同士の重複も1つに。
+ * 一言は sp_links の note より、ラベルの括弧（何のシステムか）を優先する。
+ */
+export function mergeSystemCards(base: SystemCard[], links: RawLink[]): SystemCard[] {
+  const seen = new Set(base.map((c) => hostOf(c.href)).filter((h): h is string => h != null));
+  const out = [...base];
+  for (const l of links) {
+    const host = hostOf(l.url);
+    if (!host || !/^https?:/i.test(l.url)) continue;
+    if (seen.has(host)) continue;
+    seen.add(host);
+    const { name, note } = splitLinkLabel(l.label);
+    out.push({ key: `link:${l.id}`, name, note: note ?? l.note, href: l.url, icon: "link", store: l.store ?? null });
+  }
+  return out;
+}

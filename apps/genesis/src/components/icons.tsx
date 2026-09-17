@@ -21,7 +21,9 @@ export type IconName =
   | "menu"
   | "box"
   | "flag"
-  | "ear";
+  | "ear"
+  | "link"
+  | "ext";
 
 const PATHS: Record<IconName, string> = {
   home: '<path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z"/>',
@@ -48,6 +50,8 @@ const PATHS: Record<IconName, string> = {
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   box: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',
   flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+  ext: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v6H4V6h6"/>',
   ear: '<path d="M7 9a5 5 0 0 1 10 0c0 3-3 4-3 7a3 3 0 0 1-6 0"/><path d="M10 9a2 2 0 0 1 4 0c0 1.5-2 2-2 3.5"/>',
 };
 

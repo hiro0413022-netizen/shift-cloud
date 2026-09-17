@@ -3,6 +3,8 @@ import { requireGenesisActor, visibleStores } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getStoreLauncher } from "@/lib/store-launcher";
 import { Icon } from "@/components/icons";
+import { SystemCards } from "@/components/home/system-cards";
+import { getSystemCards } from "@/lib/system-links";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,10 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
   const { data: storeRow } = chosenId
     ? await admin.from("stores").select("id,name,code").eq("id", chosenId).eq("company_id", actor.companyId).maybeSingle()
     : { data: null };
-  const launcher = storeRow ? await getStoreLauncher(actor.companyId, storeRow as { id: string; name: string; code: string | null }) : null;
+  const [launcher, systemCards] = await Promise.all([
+    storeRow ? getStoreLauncher(actor.companyId, storeRow as { id: string; name: string; code: string | null }) : Promise.resolve(null),
+    getSystemCards(actor),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -107,6 +112,9 @@ export default async function StoresPage({ searchParams }: { searchParams: Promi
           })}
         </div>
       )}
+
+      {/* #248 すべてのシステム（ホーム下と同じカード） */}
+      <SystemCards cards={systemCards} />
     </div>
   );
 }

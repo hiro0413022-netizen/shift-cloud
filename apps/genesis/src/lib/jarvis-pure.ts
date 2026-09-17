@@ -224,17 +224,35 @@ export const WAKE_WORDS = [
 const LEAD_TRIM = /^[\s、,。.！!？?ー・:：]+/;
 
 /**
+ * #248: 呼びかけの照合用に文字をそろえる（1文字→1文字なので位置はずれない）。
+ * ひらがな→カタカナ・全角英字→半角・英字は小文字。
+ * Edge（Azure系の認識）は「ジェネシス」を「Genesis」「ＧＥＮＥＳＩＳ」「げねしす」と返すことがある。
+ */
+export function normalizeForWake(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const c = ch.codePointAt(0) ?? 0;
+    if (c >= 0x3041 && c <= 0x3096) out += String.fromCodePoint(c + 0x60); // ひらがな→カタカナ
+    else if (c >= 0xff01 && c <= 0xff5e) out += String.fromCodePoint(c - 0xfee0).toLowerCase(); // 全角→半角
+    else out += ch.toLowerCase();
+  }
+  return out;
+}
+
+/**
  * 聞き取ったテキストに呼びかけが含まれるかを見る。
  * 含まれていたら、**最後の**呼びかけより後ろを用件として返す
  * （「ジェネシス、ジェネシス、今月の売上は？」でも用件だけが残る）。
  */
 export function detectWake(text: string): { hit: boolean; rest: string } {
   if (!text) return { hit: false, rest: "" };
-  const lower = text.toLowerCase();
+  const norm = normalizeForWake(text);
+  // 位置を text と揃えるため、サロゲートペアを含む場合は素の比較に戻す
+  const lower = norm.length === text.length ? norm : text.toLowerCase();
   let at = -1;
   let len = 0;
   for (const w of WAKE_WORDS) {
-    const i = lower.lastIndexOf(w.toLowerCase());
+    const i = lower.lastIndexOf(normalizeForWake(w));
     // 同じ位置なら長いほうを採る（「ジェネシ」が「ジェネシス」の途中で止まらないように・#246）
     if (i >= 0 && (i > at || (i === at && w.length > len))) {
       at = i;
@@ -243,6 +261,19 @@ export function detectWake(text: string): { hit: boolean; rest: string } {
   }
   if (at < 0) return { hit: false, rest: "" };
   return { hit: true, rest: text.slice(at + len).replace(LEAD_TRIM, "").trim() };
+}
+
+/**
+ * #248: 開いたときに待受を自動で始めるか。
+ * ユーザーは「ジェネシスと呼べば反応する」と思っている（実機の Edge で 待受 を一度も押していなかった）。
+ * - 自分で「オフ」にした → 触らない
+ * - 前回オン、またはまだ選んでいない＋マイクがすでに許可済み → 自動で待受（許可の窓は出ない）
+ * - まだ選んでいない＋マイク未許可 → 開いた瞬間に許可の窓を出さない。待受ボタンを光らせて案内
+ */
+export function wakeStartup(stored: string | null, micPermission: string | null): "auto" | "hint" | "off" {
+  if (stored === "off") return "off";
+  if (stored === "on") return "auto";
+  return micPermission === "granted" ? "auto" : "hint";
 }
 
 /**

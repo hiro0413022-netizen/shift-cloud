@@ -7,6 +7,19 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
+A-249. **ホームページ管理画面「HP管理」（#249）を本番へ**（DB・Edge Function は適用済み。コードだけ）
+   1. **先に `.\deploy-248.ps1` が済んでいること**（済んでいなければ先に実行）
+   2. **`.\deploy-249.ps1` を実行** → Vercel の **yozan-hp-admin（新規）** と **yozan-corporate** が READY になるまで待つ（Claude が確認）
+   3. https://yozan-hp-admin.vercel.app に LINE で届いた ID/パスワードでログイン →「ブログ」で1本書いて公開 → 1分後に https://yozan-inc.jp のトップに出ること
+   4. **Google検索の表示回数を出すには**: yozan-inc.jp を Search Console に登録（Cloudflare の DNS に TXT を1行）→ Google Cloud でサービスアカウント作成 → HP管理「設定」に JSON を貼る → 各サイトの Search Console にそのメールを「ユーザー」追加。**Claude が Chrome で代行可**
+   5. 本番確認後、テスト用ログイン `zz-test` を削除（Claude 作業）
+
+A-248. **システムへ直行カード＋開いただけで待受（#248）を本番へ**
+   1. **`.\deploy-248.ps1` を実行** → Vercel の yozan-genesis が READY になるまで待つ
+   2. ホームを開き直す → 【待受】が緑の「待受中」になっていること（押さなくてよい）
+   3. 「ジェネシス」→「ピコッ」と鳴る → 「会員数を見せて」→ 数字のパネルが開くこと
+   4. ホームの一番下「システムへ直行」から Smart Hello・Money OS などが別タブで開くこと
+
 A-247. **「ジェネシス」反応の修正＋【話す】ボタン（#247）を本番へ**
    1. **`.\deploy-247.ps1` を実行** → Vercel の yozan-genesis が READY になるまで待つ
    2. ホームの【話す】を押して「会員数を見せて」→ 数字のパネルが開くこと
