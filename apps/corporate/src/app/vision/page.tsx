@@ -2,17 +2,21 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import FadeUp from '@/components/FadeUp'
 import { IMG } from '@/lib/constants'
+import { getSite, pic } from '@/lib/cms'
+
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: 'VISION',
   description: 'ゴルフ業界のインフラ企業化を目指すYOZANの成長戦略。人材・DX・マーケ・運営支援・アパレルの5事業で業界を支える構想を紹介。',
 }
 
-export default function VisionPage() {
+export default async function VisionPage() {
+  const { slots } = await getSite()
   return (
     <>
       <section className="page-hero" style={{ minHeight: '520px' }}>
-        <div className="page-hero-bg" style={{ backgroundImage: `url('${IMG.golfAerial}')` }} />
+        <div className="page-hero-bg" style={{ backgroundImage: `url('${pic(slots, 'vision.photo1', IMG.golfAerial)}')` }} />
         <div className="container hero-inner">
           <div className="breadcrumb">HOME / VISION</div>
           <div className="section-head">
@@ -69,7 +73,7 @@ export default function VisionPage() {
                 </div>
               </div>
               <div className="img-split-photo">
-                <img src={IMG.golfGreen} alt="ゴルフコース" loading="lazy" />
+                <img src={pic(slots, 'vision.photo2', IMG.golfGreen)} alt="ゴルフコース" loading="lazy" />
               </div>
             </div>
           </FadeUp>
@@ -77,7 +81,7 @@ export default function VisionPage() {
       </section>
 
       <section className="parallax-banner">
-        <div className="parallax-banner-bg" style={{ backgroundImage: `url('${IMG.golfCourse}')` }} />
+        <div className="parallax-banner-bg" style={{ backgroundImage: `url('${pic(slots, 'vision.photo3', IMG.golfCourse)}')` }} />
         <div className="container">
           <FadeUp className="parallax-banner-body">
             <div className="eyebrow">Infrastructure</div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 
 /**
  * Global motion effects:
@@ -10,6 +11,8 @@ import { useEffect } from 'react'
  * - Soft parallax for [data-parallax] backgrounds
  */
 export default function MotionFx() {
+  // ページ移動のたびに新しい [data-reveal] を拾い直す（#249 でブログを足したときに対応）
+  const pathname = usePathname()
   useEffect(() => {
     // Scroll progress bar
     const bar = document.getElementById('scroll-progress')
@@ -39,7 +42,7 @@ export default function MotionFx() {
     document.querySelectorAll('[data-reveal]').forEach(el => io.observe(el))
 
     return () => { window.removeEventListener('scroll', onScroll); io.disconnect() }
-  }, [])
+  }, [pathname])
 
   return <div id="scroll-progress" aria-hidden="true" />
 }

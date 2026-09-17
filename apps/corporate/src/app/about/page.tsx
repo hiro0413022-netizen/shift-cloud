@@ -2,17 +2,21 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import FadeUp from '@/components/FadeUp'
 import { IMG } from '@/lib/constants'
+import { getSite, pic } from '@/lib/cms'
+
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: 'ABOUT',
   description: '株式会社YOZANの理念とメッセージ。共に歩む、共に成す。を軸に、ゴルフ業界の成長を支える企業像を紹介します。',
 }
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const { slots } = await getSite()
   return (
     <>
       <section className="page-hero" style={{ minHeight: '500px' }}>
-        <div className="page-hero-bg" style={{ backgroundImage: `url('${IMG.golfFairway}')` }} />
+        <div className="page-hero-bg" style={{ backgroundImage: `url('${pic(slots, 'about.photo1', IMG.golfFairway)}')` }} />
         <div className="container hero-inner">
           <div className="breadcrumb">HOME / ABOUT</div>
           <div className="section-head">
@@ -28,7 +32,7 @@ export default function AboutPage() {
           <FadeUp>
             <div className="img-split">
               <div className="img-split-photo">
-                <img src={IMG.teamMeeting} alt="チームミーティング" loading="lazy" />
+                <img src={pic(slots, 'about.photo2', IMG.teamMeeting)} alt="チームミーティング" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">Message</div>
@@ -47,7 +51,7 @@ export default function AboutPage() {
           <FadeUp>
             <div className="grid grid-2">
               <div className="photo-feature" style={{ minHeight: '380px' }}>
-                <img src={IMG.golfCoach} alt="経営理念" loading="lazy" />
+                <img src={pic(slots, 'about.photo3', IMG.golfCoach)} alt="経営理念" loading="lazy" />
                 <div className="photo-feature-overlay">
                   <div className="eyebrow">Philosophy</div>
                   <h3>経営理念</h3>
@@ -55,7 +59,7 @@ export default function AboutPage() {
                 </div>
               </div>
               <div className="photo-feature" style={{ minHeight: '380px' }}>
-                <img src={IMG.golfSimulator2} alt="会社のあり方" loading="lazy" />
+                <img src={pic(slots, 'about.photo4', IMG.golfSimulator2)} alt="会社のあり方" loading="lazy" />
                 <div className="photo-feature-overlay">
                   <div className="eyebrow">Identity</div>
                   <h3>会社のあり方</h3>

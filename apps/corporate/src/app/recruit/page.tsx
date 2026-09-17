@@ -2,13 +2,17 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import FadeUp from '@/components/FadeUp'
 import { IMG } from '@/lib/constants'
+import { getSite, pic } from '@/lib/cms'
+
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: 'RECRUIT',
   description: 'YOZANの採用情報。人材・DX・マーケティング・運営支援・アパレルの成長企業で伸びたい人材を募集。',
 }
 
-export default function RecruitPage() {
+export default async function RecruitPage() {
+  const { slots } = await getSite()
   const jobs = [
     { icon: '🎒', title: 'キャディースタッフ', desc: 'ゴルフ場へのキャディー派遣。プレーサポート・接客・顧客体験向上。' },
     { icon: '🏌️', title: 'レッスンプロ / コーチ', desc: '施設・スクール・イベントへのコーチ派遣。教育品質と顧客満足を高める。' },
@@ -23,7 +27,7 @@ export default function RecruitPage() {
   return (
     <>
       <section className="page-hero" style={{ minHeight: '500px' }}>
-        <div className="page-hero-bg" style={{ backgroundImage: `url('${IMG.golfSwing}')` }} />
+        <div className="page-hero-bg" style={{ backgroundImage: `url('${pic(slots, 'recruit.photo1', IMG.golfSwing)}')` }} />
         <div className="container hero-inner">
           <div className="breadcrumb">HOME / RECRUIT</div>
           <div className="section-head">
@@ -43,7 +47,7 @@ export default function RecruitPage() {
           <FadeUp>
             <div className="img-split reverse">
               <div className="img-split-photo">
-                <img src={IMG.teamMeeting} alt="チーム" loading="lazy" />
+                <img src={pic(slots, 'recruit.photo2', IMG.teamMeeting)} alt="チーム" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">Ideal Profile</div>
@@ -87,7 +91,7 @@ export default function RecruitPage() {
           <FadeUp>
             <div className="img-split">
               <div className="img-split-photo">
-                <img src={IMG.golfCoach} alt="キャリアパス" loading="lazy" />
+                <img src={pic(slots, 'recruit.photo3', IMG.golfCoach)} alt="キャリアパス" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">Career Path</div>

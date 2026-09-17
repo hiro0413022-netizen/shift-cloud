@@ -632,3 +632,52 @@ p  { margin: 0; }
   [data-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* ═══════════════════════════════════════════════
+   NEWS & BLOG / INSTAGRAM（#249 HP管理）
+═══════════════════════════════════════════════ */
+.news-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 32px; }
+.news-head h2 { margin-top: 10px; }
+.post-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.post-card {
+  display: flex; flex-direction: column; background: var(--white); border-radius: var(--radius);
+  overflow: hidden; border: 1px solid var(--line); transition: transform .25s ease, box-shadow .25s ease;
+}
+.post-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+.post-card-img { aspect-ratio: 16 / 9; overflow: hidden; background: var(--surface); }
+.post-card-img img { width: 100%; height: 100%; transition: transform .5s ease; }
+.post-card:hover .post-card-img img { transform: scale(1.04); }
+.post-card-body { padding: 20px 22px 24px; display: grid; gap: 8px; }
+.post-card-body h3 { font-size: 17px; line-height: 1.5; letter-spacing: 0; color: var(--navy); }
+.post-card-body p { font-size: 13px; color: var(--text-soft); line-height: 1.7;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.post-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-soft); }
+.post-cat { padding: 2px 10px; border-radius: 999px; background: rgba(200,169,107,.16); color: #8a6a26; font-weight: 700; font-size: 11px; }
+.pill-nav a.active { background: var(--navy); color: var(--white); border-color: var(--navy); }
+
+.article-hero { padding: 56px 0 28px; background: var(--white); }
+.article-wrap { max-width: 780px; }
+.article-title { font-size: clamp(26px, 3.6vw, 40px); line-height: 1.35; letter-spacing: -.01em; margin: 14px 0 10px; color: var(--navy); }
+.article-cover { width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius); margin-bottom: 36px; }
+.article-body { font-size: 16px; line-height: 2; color: var(--text); }
+.article-body h2 { font-size: clamp(20px, 2.4vw, 26px); line-height: 1.4; letter-spacing: 0; margin: 2.2em 0 .8em; padding-left: 14px; border-left: 4px solid var(--gold); color: var(--navy); }
+.article-body h3 { font-size: 18px; line-height: 1.5; letter-spacing: 0; margin: 1.8em 0 .6em; color: var(--navy); }
+.article-body p { margin: 0 0 1.4em; }
+.article-body ul { margin: 0 0 1.4em 1.4em; }
+.article-body li { margin: .2em 0; }
+.article-body a { color: var(--navy-2); text-decoration: underline; }
+.article-body figure { margin: 2em 0; }
+.article-body figure img { border-radius: 12px; width: 100%; height: auto; }
+.article-body figcaption { font-size: 12px; color: var(--text-soft); margin-top: 6px; text-align: center; }
+
+.ig-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.ig-item { min-width: 0; }
+.ig-item .instagram-media { min-width: 0 !important; width: 100% !important; margin: 0 !important; }
+
+@media (max-width: 960px) {
+  .post-grid, .ig-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .post-grid, .ig-grid { grid-template-columns: 1fr; }
+  .article-hero { padding-top: 36px; }
+}

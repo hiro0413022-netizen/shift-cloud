@@ -3,6 +3,7 @@ import './globals.css'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import MotionFx from '@/components/MotionFx'
+import Tracker from '@/components/Tracker'
 
 export const metadata: Metadata = {
   title: { default: '株式会社YOZAN | ゴルフ業界の成長を、仕組みで支える会社', template: '%s | 株式会社YOZAN' },
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <main>{children}</main>
         <Footer />
+        <Tracker site="yozan" />
       </body>
     </html>
   )

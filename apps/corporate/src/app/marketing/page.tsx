@@ -2,18 +2,22 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import FadeUp from '@/components/FadeUp'
 import { IMG } from '@/lib/constants'
+import { getSite, pic } from '@/lib/cms'
+
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: 'MARKETING',
   description: 'YOZANのマーケティング事業。ゴルフ施設・練習場・スクール向けSNS運用・LP制作・HP制作・広告運用を一気通貫で提供。',
 }
 
-export default function MarketingPage() {
+export default async function MarketingPage() {
+  const { slots } = await getSite()
   return (
     <>
       {/* ▌PAGE HERO */}
       <section className="page-hero" style={{ minHeight: '560px' }}>
-        <div className="page-hero-bg" style={{ backgroundImage: `url('${IMG.snsMarketing}')` }} />
+        <div className="page-hero-bg" style={{ backgroundImage: `url('${pic(slots, 'marketing.photo1', IMG.snsMarketing)}')` }} />
         <div className="container hero-inner">
           <div className="breadcrumb">HOME / MARKETING</div>
           <div className="section-head">
@@ -45,7 +49,7 @@ export default function MarketingPage() {
                 </ul>
               </div>
               <div className="img-split-photo">
-                <img src={IMG.golfSimulator2} alt="ゴルフ施設" loading="lazy" />
+                <img src={pic(slots, 'marketing.photo2', IMG.golfSimulator2)} alt="ゴルフ施設" loading="lazy" />
               </div>
             </div>
           </FadeUp>
@@ -62,10 +66,10 @@ export default function MarketingPage() {
           <FadeUp>
             <div className="grid grid-2" style={{ gap: '32px' }}>
               {[
-                { img: IMG.golfAerial, eyebrow: '01 / SNS運用', title: 'SNS運用', desc: '戦略設計・撮影ディレクション・投稿制作・数値分析・改善提案まで一気通貫で対応。' },
-                { img: IMG.golfSimulator, eyebrow: '02 / LP制作', title: 'LP制作', desc: '体験申込・問い合わせ獲得に特化したランディングページ。CVRを最大化する設計で制作します。' },
-                { img: IMG.teamMeeting, eyebrow: '03 / HP制作', title: 'HP制作', desc: '施設・スクール・企業の信頼性を高めるコーポレートサイト。SEOと更新性を考慮した設計。' },
-                { img: IMG.golfCourse, eyebrow: '04 / 広告運用', title: '広告運用', desc: 'Meta広告・Google広告を活用し、ターゲット設計から入稿・改善まで費用対効果重視で運用。' },
+                { img: pic(slots, 'marketing.photo3', IMG.golfAerial), eyebrow: '01 / SNS運用', title: 'SNS運用', desc: '戦略設計・撮影ディレクション・投稿制作・数値分析・改善提案まで一気通貫で対応。' },
+                { img: pic(slots, 'marketing.photo4', IMG.golfSimulator), eyebrow: '02 / LP制作', title: 'LP制作', desc: '体験申込・問い合わせ獲得に特化したランディングページ。CVRを最大化する設計で制作します。' },
+                { img: pic(slots, 'marketing.photo5', IMG.teamMeeting), eyebrow: '03 / HP制作', title: 'HP制作', desc: '施設・スクール・企業の信頼性を高めるコーポレートサイト。SEOと更新性を考慮した設計。' },
+                { img: pic(slots, 'marketing.photo6', IMG.golfCourse), eyebrow: '04 / 広告運用', title: '広告運用', desc: 'Meta広告・Google広告を活用し、ターゲット設計から入稿・改善まで費用対効果重視で運用。' },
               ].map(({ img, eyebrow, title, desc }) => (
                 <div key={title} className="photo-feature" style={{ minHeight: '360px' }}>
                   <img src={img} alt={title} loading="lazy" />
@@ -83,7 +87,7 @@ export default function MarketingPage() {
 
       {/* ▌Why Yozan */}
       <section className="parallax-banner">
-        <div className="parallax-banner-bg" style={{ backgroundImage: `url('${IMG.golfFairway}')` }} />
+        <div className="parallax-banner-bg" style={{ backgroundImage: `url('${pic(slots, 'marketing.photo7', IMG.golfFairway)}')` }} />
         <div className="container">
           <FadeUp className="parallax-banner-body">
             <div className="eyebrow">Why Yozan</div>

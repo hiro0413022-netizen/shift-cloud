@@ -1,0 +1,12 @@
+hp-admin: ホームページのノーコード管理画面（ブログ・写真・インスタ・閲覧数）＋yozan-inc.jp 接続 (#249)
+
+- 新アプリ apps/hp-admin（Vercel yozan-hp-admin）: ログイン・サイト切替（YOZAN/FRANK GOLF/KALLINOS）・数字・ブログ・インスタ・写真と文言・使い方・設定。スマホ下タブ。env なし（権限はDBの hp_admin_* RPC が判定）
+- ブログ: 書式ボタン＋見え方プレビュー・アイキャッチ・下書き/公開/予約公開。インスタ: 投稿URLを貼るだけ。写真: 場所ごとの枠で差し替え（自動縮小・元に戻す）
+- 数字: 閲覧数・訪問者・日別・ページ別・流入元・記事別。Google検索の表示回数/クリック/キーワードは Search Console（サービスアカウント）連携後
+- apps/corporate: 全ページの写真を枠化（revalidate 60）・トップにお知らせ/ブログとInstagram・/blog と記事ページ（OGP・JSON-LD）・閲覧計測・sitemap/robots・MotionFx のページ移動後の出現アニメ修正
+- db: migration 0184（hp_* 10表・RPC・hp-media バケット・枠41件）/ 0185（hp_sites.live）適用済。Edge Function hp-admin（写真アップロード・Search Console 取り込み）デプロイ済・ソース控えを supabase/functions に
+- ルート package-lock に apps/hp-admin ワークスペースを追加
+- 検証: 本番DBでRPC一式・Edge Function・Playwright（管理画面/表示側・XSSエスケープ）・hp-admin/corporate とも next build 成功
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JoG5HAQWSdLw3VCnRJYGuE

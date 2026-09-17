@@ -16,6 +16,7 @@ export default function Header() {
           <Link href="/about">ABOUT</Link>
           <Link href="/vision">VISION</Link>
           <Link href="/recruit">RECRUIT</Link>
+          <Link href="/blog">BLOG</Link>
           <Link href="/contact">CONTACT</Link>
         </nav>
         <div className="header-cta">
@@ -37,6 +38,7 @@ export default function Header() {
         <Link href="/about"     onClick={() => setMenuOpen(false)}>ABOUT</Link>
         <Link href="/vision"    onClick={() => setMenuOpen(false)}>VISION</Link>
         <Link href="/recruit"   onClick={() => setMenuOpen(false)}>RECRUIT</Link>
+        <Link href="/blog"      onClick={() => setMenuOpen(false)}>BLOG</Link>
         <Link href="/contact"   onClick={() => setMenuOpen(false)}>CONTACT</Link>
       </div>
     </header>

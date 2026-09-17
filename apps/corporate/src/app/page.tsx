@@ -2,6 +2,11 @@ import Link from 'next/link'
 import FadeUp from '@/components/FadeUp'
 import CountUp from '@/components/CountUp'
 import { IMG } from '@/lib/constants'
+import { getSite, pic, text } from '@/lib/cms'
+import PostCard from '@/components/PostCard'
+import InstagramFeed from '@/components/InstagramFeed'
+
+export const revalidate = 60
 
 const MARQUEE = (
   <>
@@ -13,19 +18,20 @@ const MARQUEE = (
   </>
 )
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { slots, posts, instagram } = await getSite()
+  const igUrl = text(slots, 'site.instagram_url', '')
   return (
     <>
       {/* ▌HERO */}
       <section className="hero hero--tall">
-        <div className="hero-bg" style={{ backgroundImage: `url('${IMG.heroTop}')` }} />
+        <div className="hero-bg" style={{ backgroundImage: `url('${pic(slots, 'home.photo1', IMG.heroTop)}')` }} />
         <div className="container hero-inner">
           <FadeUp className="hero-copy hero-copy--center">
             <div className="eyebrow" style={{ justifyContent: 'center' }}>Corporate Site / Yozan Group</div>
-            <h1>ゴルフ業界の成長を、<br /><span className="grad-word">仕組み</span>で支える。</h1>
-            <p className="lead hero-sub" style={{ textAlign: 'center', maxWidth: '640px', margin: '18px auto 0' }}>
-              株式会社YOZANは、人材・DX・マーケティング・運営支援・アパレルの
-              5事業で、業界に必要な機能を丸ごと提供します。
+            <h1><AccentText value={text(slots, 'home.hero_title', 'ゴルフ業界の成長を、\n【仕組み】で支える。')} /></h1>
+            <p className="lead hero-sub" style={{ textAlign: 'center', maxWidth: '640px', margin: '18px auto 0', whiteSpace: 'pre-line' }}>
+              {text(slots, 'home.hero_lead', '株式会社YOZANは、人材・DX・マーケティング・運営支援・アパレルの5事業で、業界に必要な機能を丸ごと提供します。')}
             </p>
             <div className="hero-chips">
               <span className="badge">自社施設で現場運営</span>
@@ -127,7 +133,7 @@ export default function HomePage() {
         <div className="container">
           <div className="img-split" data-reveal="">
             <div className="img-split-photo">
-              <img src={IMG.golfAerial} alt="ゴルフコース空撮" loading="lazy" />
+              <img src={pic(slots, 'home.photo2', IMG.golfAerial)} alt="ゴルフコース空撮" loading="lazy" />
             </div>
             <div className="img-split-body">
               <div className="eyebrow">Why Yozan</div>
@@ -178,6 +184,26 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ▌NEWS & BLOG（HP管理で更新） */}
+      {posts.length > 0 && (
+        <section className="section alt">
+          <div className="container">
+            <div className="news-head">
+              <div>
+                <div className="eyebrow">News &amp; Blog</div>
+                <h2>お知らせ・ブログ</h2>
+              </div>
+              <Link className="btn secondary dark" href="/blog">すべて見る →</Link>
+            </div>
+            <div className="post-grid">
+              {posts.slice(0, 3).map((p) => (
+                <PostCard key={p.slug} post={p} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* ▌Photo Mosaic */}
       <section className="section">
         <div className="container">
@@ -186,18 +212,36 @@ export default function HomePage() {
             <h2>YOZANの現場</h2>
           </div>
           <div className="photo-mosaic" data-reveal="">
-            <div className="photo-mosaic-item" data-cap="インドアゴルフ施設の運営現場"><img src={IMG.golfSimulator2} alt="インドアゴルフ施設" loading="lazy" /></div>
-            <div className="photo-mosaic-item" data-cap="レッスン・コーチング"><img src={IMG.golfCoach} alt="ゴルフコーチング" loading="lazy" /></div>
-            <div className="photo-mosaic-item" data-cap="ゴルフコース"><img src={IMG.golfGreen} alt="ゴルフコース" loading="lazy" /></div>
-            <div className="photo-mosaic-item" data-cap="KALLINOS アパレル"><img src={IMG.golfApparel} alt="ゴルフアパレル" loading="lazy" /></div>
-            <div className="photo-mosaic-item" data-cap="チームでの業務改善"><img src={IMG.teamMeeting} alt="チームミーティング" loading="lazy" /></div>
+            <div className="photo-mosaic-item" data-cap={text(slots, 'home.cap3', 'インドアゴルフ施設の運営現場')}><img src={pic(slots, 'home.photo3', IMG.golfSimulator2)} alt="インドアゴルフ施設" loading="lazy" /></div>
+            <div className="photo-mosaic-item" data-cap={text(slots, 'home.cap4', 'レッスン・コーチング')}><img src={pic(slots, 'home.photo4', IMG.golfCoach)} alt="ゴルフコーチング" loading="lazy" /></div>
+            <div className="photo-mosaic-item" data-cap={text(slots, 'home.cap5', 'ゴルフコース')}><img src={pic(slots, 'home.photo5', IMG.golfGreen)} alt="ゴルフコース" loading="lazy" /></div>
+            <div className="photo-mosaic-item" data-cap={text(slots, 'home.cap6', 'KALLINOS アパレル')}><img src={pic(slots, 'home.photo6', IMG.golfApparel)} alt="ゴルフアパレル" loading="lazy" /></div>
+            <div className="photo-mosaic-item" data-cap={text(slots, 'home.cap7', 'チームでの業務改善')}><img src={pic(slots, 'home.photo7', IMG.teamMeeting)} alt="チームミーティング" loading="lazy" /></div>
           </div>
         </div>
       </section>
 
+      {/* ▌Instagram（HP管理で更新） */}
+      {instagram.length > 0 && (
+        <section className="section alt">
+          <div className="container">
+            <div className="news-head">
+              <div>
+                <div className="eyebrow">Instagram</div>
+                <h2>最新の投稿</h2>
+              </div>
+              {igUrl && (
+                <a className="btn secondary dark" href={igUrl} target="_blank" rel="noopener">フォローする ↗</a>
+              )}
+            </div>
+            <InstagramFeed items={instagram.slice(0, 9)} />
+          </div>
+        </section>
+      )}
+
       {/* ▌Parallax Banner */}
       <section className="parallax-banner">
-        <div className="parallax-banner-bg" style={{ backgroundImage: `url('${IMG.golfFairway}')` }} />
+        <div className="parallax-banner-bg" style={{ backgroundImage: `url('${pic(slots, 'home.photo8', IMG.golfFairway)}')` }} />
         <div className="container">
           <div className="parallax-banner-body" data-reveal="">
             <div className="eyebrow">Numbers &amp; Vision</div>
@@ -225,6 +269,23 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+    </>
+  )
+}
+
+/** 【】で囲んだ文字を金色に。改行はそのまま */
+function AccentText({ value }: { value: string }) {
+  const lines = value.split('\n')
+  return (
+    <>
+      {lines.map((line, i) => (
+        <span key={i}>
+          {line.split(/(【[^】]*】)/).map((part, j) =>
+            /^【.*】$/.test(part) ? <span key={j} className="grad-word">{part.slice(1, -1)}</span> : part,
+          )}
+          {i < lines.length - 1 && <br />}
+        </span>
+      ))}
     </>
   )
 }

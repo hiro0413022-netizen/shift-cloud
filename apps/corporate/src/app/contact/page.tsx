@@ -2,13 +2,17 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import FadeUp from '@/components/FadeUp'
 import { IMG } from '@/lib/constants'
+import { getSite, pic } from '@/lib/cms'
+
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: 'CONTACT',
   description: '株式会社YOZANへのお問い合わせ。法人相談、マーケティング相談、採用に関するご相談を受け付けています。',
 }
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const { slots } = await getSite()
   const cards = [
     {
       icon: '🤝', eyebrow: 'For Business', title: '法人のお問い合わせ',
@@ -33,7 +37,7 @@ export default function ContactPage() {
   return (
     <>
       <section className="page-hero" style={{ minHeight: '420px' }}>
-        <div className="page-hero-bg" style={{ backgroundImage: `url('${IMG.golfGreen}')` }} />
+        <div className="page-hero-bg" style={{ backgroundImage: `url('${pic(slots, 'contact.photo1', IMG.golfGreen)}')` }} />
         <div className="container hero-inner">
           <div className="breadcrumb">HOME / CONTACT</div>
           <div className="section-head">
@@ -74,7 +78,7 @@ export default function ContactPage() {
           <FadeUp>
             <div className="img-split">
               <div className="img-split-photo">
-                <img src={IMG.golfSimulator} alt="YOZAN" loading="lazy" />
+                <img src={pic(slots, 'contact.photo2', IMG.golfSimulator)} alt="YOZAN" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">Mail</div>

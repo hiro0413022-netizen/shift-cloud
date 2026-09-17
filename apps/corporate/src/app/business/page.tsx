@@ -2,18 +2,22 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import FadeUp from '@/components/FadeUp'
 import { IMG } from '@/lib/constants'
+import { getSite, pic } from '@/lib/cms'
+
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: 'BUSINESS',
   description: 'YOZANの5事業を紹介。人材事業・DX事業・マーケティング事業・運営支援・アパレル事業でゴルフ業界を支える一貫モデル。',
 }
 
-export default function BusinessPage() {
+export default async function BusinessPage() {
+  const { slots } = await getSite()
   return (
     <>
       {/* ▌PAGE HERO */}
       <section className="page-hero">
-        <div className="page-hero-bg" style={{ backgroundImage: `url('${IMG.golfCourse}')` }} />
+        <div className="page-hero-bg" style={{ backgroundImage: `url('${pic(slots, 'business.photo1', IMG.golfCourse)}')` }} />
         <div className="container hero-inner">
           <div className="breadcrumb">HOME / BUSINESS</div>
           <div className="section-head">
@@ -30,7 +34,7 @@ export default function BusinessPage() {
           <FadeUp>
             <div className="img-split">
               <div className="img-split-photo">
-                <img src={IMG.golfCoach} alt="人材事業" loading="lazy" />
+                <img src={pic(slots, 'business.photo2', IMG.golfCoach)} alt="人材事業" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">01 / 人材事業</div>
@@ -68,7 +72,7 @@ export default function BusinessPage() {
           <FadeUp>
             <div className="img-split reverse">
               <div className="img-split-photo">
-                <img src={IMG.golfSimulator} alt="DX事業" loading="lazy" />
+                <img src={pic(slots, 'business.photo3', IMG.golfSimulator)} alt="DX事業" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">02 / DX事業</div>
@@ -108,7 +112,7 @@ export default function BusinessPage() {
           <FadeUp>
             <div className="img-split">
               <div className="img-split-photo">
-                <img src={IMG.snsMarketing} alt="マーケティング事業" loading="lazy" />
+                <img src={pic(slots, 'business.photo4', IMG.snsMarketing)} alt="マーケティング事業" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">03 / マーケティング事業</div>
@@ -137,7 +141,7 @@ export default function BusinessPage() {
           <FadeUp>
             <div className="img-split reverse">
               <div className="img-split-photo">
-                <img src={IMG.golfSimulator2} alt="運営支援" loading="lazy" />
+                <img src={pic(slots, 'business.photo5', IMG.golfSimulator2)} alt="運営支援" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">04 / 運営支援</div>
@@ -175,7 +179,7 @@ export default function BusinessPage() {
           <FadeUp>
             <div className="img-split">
               <div className="img-split-photo">
-                <img src={IMG.golfApparel} alt="アパレル事業" loading="lazy" />
+                <img src={pic(slots, 'business.photo6', IMG.golfApparel)} alt="アパレル事業" loading="lazy" />
               </div>
               <div className="img-split-body">
                 <div className="eyebrow">05 / アパレル事業</div>
