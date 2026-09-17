@@ -64,3 +64,4 @@
 - ✅ `0169_security_hardening_0913.sql` — 適用済（2026-09-13、MCP name=security_hardening_0913。anon/authenticated から REST で叩けた SECURITY DEFINER 関数12本（search_visitors / find_guest_by_contact 等）の実行権を service_role だけに。search_path 未固定の関数12本を固定。重複索引2本を削除 #240）
 - ✅ `0184_hp_cms.sql` — 適用済（2026-09-17、MCP name=0184_hp_cms。HP管理 hp_* 10表・公開/管理RPC・hp-media バケット・YOZANの差し替え枠41件 #249）
 - ✅ `0185_hp_sites_live.sql` — 適用済（2026-09-17、MCP name=0185_hp_sites_live。hp_sites.live と hp_admin_me の返り値 #249）
+- ✅ `0186_hp_slots_frank_kallinos.sql` — 適用済（2026-09-17、MCP name=0186_hp_slots_frank_kallinos。FRANK GOLF 9件・KALLINOS 14件の差し替え枠 #249c）

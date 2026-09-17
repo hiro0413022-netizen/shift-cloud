@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { arpc, uploadImage, type Post, type SiteData, type SiteInfo } from "@/lib/api";
+import { arpc, postUrl, uploadImage, type Post, type SiteData, type SiteInfo } from "@/lib/api";
 import { renderBody } from "@/lib/body";
 import ImagePicker from "./ImagePicker";
 import { Empty, Spinner, fmtDate, type ToastApi } from "./ui";
@@ -169,7 +169,7 @@ function Editor({
         </button>
         <h2 className="text-lg font-bold text-navy">{post.id ? "記事を直す" : "新しい記事"}</h2>
         {post.id && post.status === "published" && (
-          <a className="ml-auto text-xs font-semibold text-navy-2 underline" href={`https://${site.domain}/blog/${post.slug}`} target="_blank" rel="noopener">
+          <a className="ml-auto text-xs font-semibold text-navy-2 underline" href={postUrl(site, post.slug)} target="_blank" rel="noopener">
             ホームページで見る ↗
           </a>
         )}

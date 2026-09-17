@@ -4,7 +4,7 @@
 ブログ・写真・文言・Instagram の差し替えと、閲覧数・Google検索の表示回数を見る。
 
 - 管理画面: `apps/hp-admin`（Vercel `yozan-hp-admin`・https://yozan-hp-admin.vercel.app ・git連携 root=apps/hp-admin）
-- 表示側: `apps/corporate`（yozan-inc.jp）。FRANK / KALLINOS は未接続（`hp_sites.live=false`）
+- 表示側: `apps/corporate`（yozan-inc.jp・サーバー描画）／`sites/frank-golf/assets/hp.js`（frankgolf.jp）／`apps/kallinos/js/hp.js`（www.kallinos.jp）。静的の2サイトはブラウザで `hp_public_site` を読む
 - DB: `hp_*`（migration 0184 / 0185）
 - Edge Function: `hp-admin`（写真アップロード・Search Console 取り込み）。ソース控え `supabase/functions/hp-admin/index.ts`
 - ログイン: `hp_users`（Supabase Auth とは別）。初期パスワードは Vault（`vault_systems` の「HP管理（氏名）」）
@@ -50,9 +50,23 @@
 - 数字タブを開いたときに 12時間に1回だけ取り込み（`gsc_sync`）。直近90日を入れ替え（初回は480日）。日次合計（dim=total）と日×キーワード（dim=query）。
 - **サービスアカウントのメールを各プロパティのユーザーに追加しないと 403**。yozan-inc.jp は Search Console 未登録（2026-09-17時点）。
 
-## FRANK GOLF / KALLINOS をつなぐとき（次の段）
+## FRANK GOLF（#249c）
+- 枠のキー = `img.<site-data.js の images のキー>`。hp.js が `window.FRANK.images` を上書きして `FRANK_RENDER()`（site.js の init 再実行）
+- トップ「新着情報」= site-data.js の news ＋ Genesis /site-admin のお知らせ ＋ HP管理のブログ（日付順・8件まで）
+- 「お店の様子」= Instagram（0件なら非表示）。`blog.html` = 一覧／`blog.html?slug=` = 記事（`_build.py` の build_blog）
+- **hp.js は site.js より前**（foot() と booking.html / lesson-booking.html の手書き部分）
+- 検索で上げたい読みものは HP管理ではなく `_build.py` の INTENT_COLUMNS（#229）に書く（クライアント描画はSEOが弱い）
 
-1. `hp_slots` に枠を足す（FRANK は `sites/frank-golf/assets/site-data.js` の images が候補）
-2. 表示側で `hp_public_site('frank-golf')` を読む（FRANK は静的サイト＝`cms.js` と同じくブラウザで読むか、`_build.py` で焼く）
-3. `Tracker` 相当のビーコンを入れる → `hp_sites.live = true`
-4. FRANK の既存 CMS（Genesis `/site-admin`・`gn_site_content`）はお知らせと予約設定。お知らせは hp_posts に寄せるか要判断
+## KALLINOS（#249c）
+- `<img data-hp-img="index.look1">` / `<div data-hp-bg="index.hero">` → 枠 `img.index.look1` など
+- `[data-hp-ig]`（トップの仮グリッド）は登録があるときだけ埋め込みに置き換え。`site.instagram_url` でフォローボタンの行き先
+- お知らせ = トップの `[data-hp-news-section]`（0件なら非表示）と `news.html`（`?slug=` で記事）
+
+## 記事のURL（サイトごとに違う）
+- YOZAN `/blog/<slug>` ／ FRANK `/blog.html?slug=<slug>` ／ KALLINOS `/news.html?slug=<slug>`
+- 計測のパスは3サイトとも `/blog/<slug>`（記事別の閲覧数を同じ集計で出すため）。管理画面は `postUrl()` / `pageUrl()` で変換
+
+## Search Console（2026-09-17 設定）
+- Google Cloud プロジェクト `yozan-hp-admin`（ID causal-guide-508908-f3・hiro0413022@gmail.com）／サービスアカウント `hp-admin-gsc@causal-guide-508908-f3.iam.gserviceaccount.com`
+- 鍵は hp_settings.gsc_sa（鍵を作り直したら HP管理「設定」で貼り直す）
+- プロパティ: frank-golf=`https://frankgolf.jp/`（取り込み済み）／yozan・kallinos は所有権確認用ファイル `google2b364b4dcd5146c9.html` を配置済み → 確認とユーザー追加が済んだら設定

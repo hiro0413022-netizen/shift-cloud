@@ -1,0 +1,12 @@
+hp-admin: FRANK GOLF・KALLINOS をHP管理につなぐ（写真・お知らせ/ブログ・インスタ・閲覧計測）＋Search Console 確認ファイル (#249c)
+
+- sites/frank-golf: assets/hp.js（HP管理の写真9枠を window.FRANK.images に上書き→FRANK_RENDER、トップ新着情報にブログを混ぜる、Instagram「お店の様子」欄、blog.html 一覧/記事、閲覧計測）。_build.py に build_blog・フッター導線・sitemap。booking/lesson-booking にも hp.js
+- apps/kallinos: js/hp.js（data-hp-img / data-hp-bg の写真13枠、トップ「お知らせ」、news.html 一覧/記事、Instagram 置き換え、閲覧計測）。ナビ/フッターに News
+- apps/hp-admin: 記事・ページのリンクをサイト別の形に（postUrl / pageUrl / siteOrigin）
+- apps/corporate: Search Console 所有権確認（meta + public/google2b364b4dcd5146c9.html）。kallinos にも同じ確認ファイル
+- db: migration 0186（FRANK・KALLINOS の差し替え枠 23件）適用済
+- Search Console: Google Cloud yozan-hp-admin / サービスアカウント hp-admin-gsc を登録・frankgolf.jp 取り込み開始
+- 検証: ローカル配信＋Playwright で2サイトの写真差し替え・お知らせ・記事表示、hp-admin next build 成功
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JoG5HAQWSdLw3VCnRJYGuE

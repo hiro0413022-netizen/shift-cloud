@@ -335,7 +335,7 @@
   <main>
     <!-- Hero -->
     <section class="brand-hero" aria-label="ブランドストーリー">
-      <div class="brand-hero-bg"></div>
+      <div class="brand-hero-bg" data-hp-bg="brand.hero"></div>
       <div class="brand-hero-content">
         <span class="brand-hero-label">Our Story</span>
         <h1 class="brand-hero-title">静かに伝わる、<br>上質という哲学。</h1>
@@ -360,7 +360,7 @@
           </p>
         </div>
         <div class="philosophy-image fade-in delay-2">
-          <img
+          <img data-hp-img="brand.photo1"
             src="https://images.unsplash.com/photo-1594938298603-c8148c4b4e48?w=900&q=80"
             alt="KALLINOS ブランドイメージ"
             loading="lazy"
@@ -386,7 +386,7 @@
           </p>
         </div>
         <div class="philosophy-image fade-in delay-2" style="direction:ltr">
-          <img
+          <img data-hp-img="brand.photo2"
             src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=900&q=80"
             alt="KALLINOS コースイメージ"
             loading="lazy"
@@ -467,28 +467,28 @@
 
         <div class="craft-grid fade-up">
           <div class="craft-item">
-            <img src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=800&q=80" alt="素材へのこだわり" loading="lazy">
+            <img data-hp-img="brand.craft1" src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=800&q=80" alt="素材へのこだわり" loading="lazy">
             <div class="craft-item-overlay">
               <span class="craft-item-label">Premium Material</span>
               <div class="craft-item-title">厳選された高機能素材</div>
             </div>
           </div>
           <div class="craft-item">
-            <img src="https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&q=80" alt="縫製のこだわり" loading="lazy">
+            <img data-hp-img="brand.craft2" src="https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800&q=80" alt="縫製のこだわり" loading="lazy">
             <div class="craft-item-overlay">
               <span class="craft-item-label">Artisan Sewing</span>
               <div class="craft-item-title">職人による丁寧な縫製</div>
             </div>
           </div>
           <div class="craft-item">
-            <img src="https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=800&q=80" alt="品質管理" loading="lazy">
+            <img data-hp-img="brand.craft3" src="https://images.unsplash.com/photo-1581235720704-06d3acfcb36f?w=800&q=80" alt="品質管理" loading="lazy">
             <div class="craft-item-overlay">
               <span class="craft-item-label">Quality Control</span>
               <div class="craft-item-title">厳格な品質管理プロセス</div>
             </div>
           </div>
           <div class="craft-item">
-            <img src="https://images.unsplash.com/photo-1536304993881-ff86e6c73d33?w=800&q=80" alt="パッケージング" loading="lazy">
+            <img data-hp-img="brand.craft4" src="https://images.unsplash.com/photo-1536304993881-ff86e6c73d33?w=800&q=80" alt="パッケージング" loading="lazy">
             <div class="craft-item-overlay">
               <span class="craft-item-label">Premium Packaging</span>
               <div class="craft-item-title">特別な体験のための梱包</div>
@@ -564,6 +564,7 @@
 
   <script src="js/components.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/hp.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       injectComponents('brand.html');

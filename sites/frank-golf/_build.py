@@ -37,6 +37,7 @@ PAGE_FILE = {
     "trial-booking": "trial-booking.html",
     "lp-trial": "lp-trial.html", "lp-campaign": "lp-campaign.html",
     "tokushoho": "tokushoho.html", "privacy": "privacy.html", "terms": "terms.html", "404": "404.html",
+    "blog": "blog.html",
 }
 
 
@@ -59,6 +60,7 @@ PAGE_LABEL = {
     "faq": "よくあるご質問", "trial": "体験のご予約", "trial-booking": "体験予約フォーム",
     "lp-trial": "無料体験レッスン", "lp-campaign": "年内入会キャンペーン",
     "tokushoho": "特定商取引法に基づく表記", "privacy": "プライバシーポリシー", "terms": "会員規約",
+    "blog": "お知らせ・ブログ",
 }
 
 
@@ -208,6 +210,7 @@ FOOT_NAV = [
         ("lounge.html", "バー・ラウンジ"),
         ("community.html", "会員コミュニティ"),
         ("column.html", "コラム・読みもの"),
+        ("blog.html", "お知らせ・ブログ"),
     ]),
     ("VISIT", [
         ("plan.html", "料金・会員プラン"),
@@ -439,6 +442,8 @@ def foot():
   </div>
 </footer>
 
+<!-- HP管理（#249）: 写真・ブログ・Instagram の反映と閲覧計測。site.js より前に読む -->
+<script src="assets/hp.js"></script>
 <script src="assets/site.js"></script>
 </body>
 </html>
@@ -916,6 +921,19 @@ def build_index():
       <h2 class="ph">新着情報</h2>
     </div>
     <ul class="news-pop rv" data-news style="margin-top:32px"></ul>
+    <p class="center" style="margin-top:24px"><a class="btn btn--ghost" href="blog.html">お知らせ・ブログをすべて見る</a></p>
+  </div>
+</section>
+
+<!-- 10.5 Instagram（HP管理で登録した投稿。0件なら非表示・#249） -->
+<section class="sec sec--alt" data-hp-ig-section hidden>
+  <div class="wrap">
+    <div class="center">
+      <p class="pill">INSTAGRAM</p>
+      <h2 class="ph">お店の様子</h2>
+    </div>
+    <div class="hp-ig" data-hp-ig style="margin-top:32px"></div>
+    <p class="center" style="margin-top:28px"><a class="btn btn--ghost" data-link="links.instagram" target="_blank" rel="noopener">Instagram をフォローする</a></p>
   </div>
 </section>
 
@@ -2755,6 +2773,38 @@ def build_404():
 
 
 
+def build_blog():
+    """お知らせ・ブログ（#249）。中身は HP管理（hp_posts）から assets/hp.js が描画する。
+    一覧 = blog.html ／ 記事 = blog.html?slug=xxx（同じHTMLで出し分け）"""
+    b = head("お知らせ・ブログ｜姫路のインドアゴルフ FRANK GOLF",
+             "姫路・土山のインドアゴルフ FRANK GOLF のお知らせとブログ。キャンペーン、イベント、レッスンの様子などをお届けします。",
+             "blog")
+    b += """
+<div data-hp-blog-index>
+""" + page_head("お知らせ・ブログ", "NEWS &amp; BLOG", "お知らせ・ブログ",
+                "キャンペーンやイベント、お店の様子をお届けします。") + """
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <div class="grid grid--3" data-hp-blog-list>
+      <p class="center" style="grid-column:1/-1">読み込み中…</p>
+    </div>
+  </div>
+</section>
+</div>
+<section class="sec" style="padding-top:calc(var(--nav-h) + var(--bar-h) + 40px)" data-hp-blog-wrap>
+  <div class="wrap article" data-hp-blog-article hidden></div>
+</section>
+<script>
+  // 記事表示（?slug=）のときは一覧側を最初から隠す（ちらつき防止）
+  if (/[?&]slug=/.test(location.search)) { document.querySelector("[data-hp-blog-index]").hidden = true; }
+  else { document.querySelector("[data-hp-blog-wrap]").hidden = true; }
+</script>
+"""
+    b += cta_block()
+    b += foot()
+    write("blog.html", b)
+
+
 def build_sitemap():
     """sitemap.xml / robots.txt。SITE_URL 未設定なら sitemap は出力しない
     （相対URLのsitemapは無効なため、嘘のURLを書くより出さない方が安全）"""
@@ -2769,7 +2819,7 @@ def build_sitemap():
             ("facility", "0.8"), ("beginner", "0.8"), ("faq", "0.7"), ("trial-booking", "0.7"),
             ("concept", "0.6"), ("lounge", "0.6"), ("community", "0.6"), ("corporate", "0.6"),
             ("lp-campaign", "0.5"),
-            ("column", "0.6")] + [(c["page"], "0.7") for c in COLUMNS + INTENT_COLUMNS] + [
+            ("column", "0.6"), ("blog", "0.6")] + [(c["page"], "0.7") for c in COLUMNS + INTENT_COLUMNS] + [
             ("tokushoho", "0.3"), ("privacy", "0.3"), ("terms", "0.3")]
     body = "\n".join(
         f"  <url><loc>{page_url(p)}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>"
@@ -3356,6 +3406,7 @@ if __name__ == "__main__":
     build_privacy()
     build_terms()
     build_404()
+    build_blog()
     build_column_index()
     build_column_indoor()
     build_column_beginner()

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { arpc, edge, type SiteInfo } from "@/lib/api";
+import { arpc, edge, pageUrl, type SiteInfo } from "@/lib/api";
 import { Spinner, fmtDate } from "./ui";
 
 type Stats = {
@@ -183,7 +183,7 @@ export default function Dashboard({ site, onError }: { site: SiteInfo; onError: 
           <Table
             head={["ページ", "閲覧", "人"]}
             rows={s.pages.map((p) => [
-              <a key="p" href={`https://${site.domain}${p.path}`} target="_blank" rel="noopener" className="line-clamp-1 hover:underline">
+              <a key="p" href={pageUrl(site, p.path)} target="_blank" rel="noopener" className="line-clamp-1 hover:underline">
                 {pageName(p.path, p.title)}
               </a>,
               n(p.views),

@@ -7,6 +7,7 @@ function getHeaderHTML(activePage = '') {
   const navLinks = [
     { href: 'products.html',  label: 'Collection' },
     { href: 'brand.html',     label: 'Brand Story' },
+    { href: 'news.html',      label: 'News' },
     { href: 'size-guide.html',label: 'Size Guide' },
     { href: 'faq.html',       label: 'FAQ' },
     { href: 'contact.html',   label: 'Contact' },
@@ -116,6 +117,7 @@ function getFooterHTML() {
             <h4 class="footer-nav-title">Information</h4>
             <ul class="footer-nav-list">
               <li><a href="brand.html" class="footer-nav-link">ブランドストーリー</a></li>
+              <li><a href="news.html" class="footer-nav-link">お知らせ</a></li>
               <li><a href="size-guide.html" class="footer-nav-link">サイズガイド</a></li>
               <li><a href="faq.html" class="footer-nav-link">よくあるご質問</a></li>
               <li><a href="contact.html" class="footer-nav-link">お問い合わせ</a></li>

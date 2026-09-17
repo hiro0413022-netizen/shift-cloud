@@ -7,12 +7,10 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
-A-249. **ホームページ管理画面「HP管理」（#249）を本番へ**（DB・Edge Function は適用済み。コードだけ）
-   1. **先に `.\deploy-248.ps1` が済んでいること**（済んでいなければ先に実行）
-   2. **`.\deploy-249.ps1` を実行** → Vercel の **yozan-hp-admin（新規）** と **yozan-corporate** が READY になるまで待つ（Claude が確認）
-   3. https://yozan-hp-admin.vercel.app に LINE で届いた ID/パスワードでログイン →「ブログ」で1本書いて公開 → 1分後に https://yozan-inc.jp のトップに出ること
-   4. **Google検索の表示回数を出すには**: yozan-inc.jp を Search Console に登録（Cloudflare の DNS に TXT を1行）→ Google Cloud でサービスアカウント作成 → HP管理「設定」に JSON を貼る → 各サイトの Search Console にそのメールを「ユーザー」追加。**Claude が Chrome で代行可**
-   5. 本番確認後、テスト用ログイン `zz-test` を削除（Claude 作業）
+A-249. **HP管理（#249）の続き＝FRANK GOLF・KALLINOS の接続（#249c）を本番へ**
+   1. **`.\deploy-hp-admin-249c.ps1` を実行** → Vercel の frank-golf / kallinos / yozan-corporate / yozan-hp-admin が READY になるまで待つ（Claude が確認）
+   2. Claude が Search Console で yozan-inc.jp と www.kallinos.jp の所有権を確認し、サービスアカウントを追加する
+   3. **ダウンロードフォルダの `causal-guide-508908-f3-4cd949cc919b.json` を削除**（HP管理に登録済み。手元に残す必要はありません）
 
 A-248. **システムへ直行カード＋開いただけで待受（#248）を本番へ**
    1. **`.\deploy-248.ps1` を実行** → Vercel の yozan-genesis が READY になるまで待つ

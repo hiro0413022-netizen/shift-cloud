@@ -482,7 +482,7 @@
   <main>
     <!-- ====== HERO ====== -->
     <section class="hero" aria-label="メインビジュアル">
-      <div class="hero-bg"></div>
+      <div class="hero-bg" data-hp-bg="index.hero"></div>
       <div class="hero-overlay"></div>
 
       <div class="hero-content">
@@ -546,7 +546,7 @@
             <a href="brand.html" class="btn btn-secondary">Brand Story →</a>
           </div>
           <div class="brand-intro-image fade-in delay-2">
-            <img
+            <img data-hp-img="index.brand"
               src="https://images.unsplash.com/photo-1594938298603-c8148c4b4e48?w=900&q=80"
               alt="KALLINOS ブランドイメージ"
               loading="lazy"
@@ -596,7 +596,7 @@
 
     <!-- ====== CONCEPT BANNER ====== -->
     <section class="concept-banner" aria-label="ブランドコンセプト">
-      <div class="concept-banner-bg"></div>
+      <div class="concept-banner-bg" data-hp-bg="index.concept"></div>
       <div class="concept-banner-overlay"></div>
       <div class="concept-banner-content">
         <p class="concept-quote fade-up">
@@ -619,21 +619,21 @@
 
         <div class="lookbook-grid fade-up">
           <div class="lookbook-item lookbook-large">
-            <img src="https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=900&q=80" alt="KALLINOS スタイリング1" loading="lazy">
+            <img data-hp-img="index.look1" src="https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=900&q=80" alt="KALLINOS スタイリング1" loading="lazy">
             <div class="lookbook-item-info">
               <div class="lookbook-tag">New Season</div>
               <div class="lookbook-name">Minimal Golf Style</div>
             </div>
           </div>
           <div class="lookbook-item">
-            <img src="https://images.unsplash.com/photo-1593079831268-3381b0db4a77?w=800&q=80" alt="KALLINOS スタイリング2" loading="lazy">
+            <img data-hp-img="index.look2" src="https://images.unsplash.com/photo-1593079831268-3381b0db4a77?w=800&q=80" alt="KALLINOS スタイリング2" loading="lazy">
             <div class="lookbook-item-info">
               <div class="lookbook-tag">Collection</div>
               <div class="lookbook-name">INCEPTION Series</div>
             </div>
           </div>
           <div class="lookbook-item">
-            <img src="https://images.unsplash.com/photo-1580927752452-89d86da3fa0a?w=800&q=80" alt="KALLINOS スタイリング3" loading="lazy">
+            <img data-hp-img="index.look3" src="https://images.unsplash.com/photo-1580927752452-89d86da3fa0a?w=800&q=80" alt="KALLINOS スタイリング3" loading="lazy">
             <div class="lookbook-item-info">
               <div class="lookbook-tag">Premium</div>
               <div class="lookbook-name">Course to City</div>
@@ -649,7 +649,7 @@
         <span class="section-label">Instagram</span>
         <h2 class="section-title" style="font-size:1.5rem">@kallinos_official</h2>
       </div>
-      <div class="insta-grid">
+      <div class="insta-grid" data-hp-ig>
         <a href="#" class="insta-item" target="_blank" rel="noopener">
           <img src="https://images.unsplash.com/photo-1535131749006-b7f58c99034b?w=400&q=80" alt="Instagram" loading="lazy">
           <div class="insta-item-overlay"><i class="fab fa-instagram"></i></div>
@@ -676,9 +676,23 @@
         </a>
       </div>
       <div class="text-center" style="padding:2rem 0">
-        <a href="https://instagram.com/kallinos_official" class="btn btn-secondary" target="_blank" rel="noopener">
+        <a href="https://instagram.com/kallinos_official" class="btn btn-secondary" target="_blank" rel="noopener" data-hp-ig-follow>
           <i class="fab fa-instagram"></i>&nbsp; Follow on Instagram
         </a>
+      </div>
+    </section>
+
+    <!-- ====== NEWS（HP管理 #249・0件なら非表示） ====== -->
+    <section class="section bg-beige" aria-label="お知らせ" data-hp-news-section hidden>
+      <div class="container">
+        <div class="section-header">
+          <span class="section-label">News</span>
+          <h2 class="section-title">お知らせ</h2>
+        </div>
+        <div class="hp-cards" data-hp-news></div>
+        <div class="text-center mt-lg">
+          <a href="news.html" class="btn btn-secondary">すべてのお知らせ →</a>
+        </div>
       </div>
     </section>
 
@@ -713,6 +727,7 @@
 
   <script src="js/components.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/hp.js"></script>
   <script>
     // ページ固有の初期化
     document.addEventListener('DOMContentLoaded', () => {

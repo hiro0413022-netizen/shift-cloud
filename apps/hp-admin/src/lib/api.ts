@@ -105,6 +105,23 @@ export async function uploadImage(site: string, file: File, maxSide = 2000): Pro
 }
 
 export type SiteInfo = { code: string; name: string; domain: string; live: boolean };
+
+/** サイトごとの公開URL（記事ページの形がサイトで違う） */
+export function siteOrigin(site: SiteInfo) {
+  return site.code === "kallinos" ? "https://www.kallinos.jp" : `https://${site.domain}`;
+}
+export function postUrl(site: SiteInfo, slug: string) {
+  const s = encodeURIComponent(slug);
+  if (site.code === "frank-golf") return `${siteOrigin(site)}/blog.html?slug=${s}`;
+  if (site.code === "kallinos") return `${siteOrigin(site)}/news.html?slug=${s}`;
+  return `${siteOrigin(site)}/blog/${s}`;
+}
+/** 計測上のパス → 開けるURL（静的サイトの記事は /blog/<slug> で記録している） */
+export function pageUrl(site: SiteInfo, path: string) {
+  const m = path.match(/^\/blog\/([^/?#]+)$/);
+  if (m) return postUrl(site, decodeURIComponent(m[1]));
+  return `${siteOrigin(site)}${path}`;
+}
 export type Me = { name: string; login_id: string; role: "owner" | "editor"; sites: SiteInfo[] };
 export type Slot = {
   key: string;

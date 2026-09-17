@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>お知らせ | KALLINOS</title>
+  <meta name="description" content="KALLINOS（カリノス）のお知らせ。新作・入荷・イベントなどの最新情報をお届けします。">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Montserrat:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Header Mount -->
+  <div id="header-mount"></div>
+
+  <main>
+    <!-- 一覧（?slug= のときは隠す） -->
+    <div data-hp-news-index>
+      <section class="page-header">
+        <div class="container">
+          <span class="page-header-label">News</span>
+          <h1 class="page-header-title">お知らせ</h1>
+          <p class="page-header-desc">新作・入荷・イベントなど、KALLINOSの最新情報をお届けします。</p>
+        </div>
+      </section>
+      <section class="section">
+        <div class="container">
+          <div class="hp-cards" data-hp-news-list>
+            <p style="text-align:center;padding:3rem 0">読み込み中…</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 記事（HP管理 #249 の hp_posts を js/hp.js が描画） -->
+    <section class="section" data-hp-article-wrap>
+      <div class="container hp-article" data-hp-article hidden></div>
+    </section>
+  </main>
+
+  <!-- Footer Mount -->
+  <div id="footer-mount"></div>
+
+  <script>
+    if (/[?&]slug=/.test(location.search)) { document.querySelector('[data-hp-news-index]').hidden = true; }
+    else { document.querySelector('[data-hp-article-wrap]').hidden = true; }
+  </script>
+  <script src="js/components.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/hp.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      injectComponents('news.html');
+    });
+  </script>
+</body>
+</html>

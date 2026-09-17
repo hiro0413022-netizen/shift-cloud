@@ -1537,3 +1537,37 @@ h1, h2, h3, h4, h5 {
   from { background-position: 200% 0; }
   to   { background-position: -200% 0; }
 }
+
+/* ============================================================
+   HP管理（#249）: お知らせカード・記事・Instagram
+   ============================================================ */
+.hp-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2rem; }
+.hp-card { display: flex; flex-direction: column; background: #fff; color: inherit; text-decoration: none; transition: transform .3s ease; }
+.hp-card:hover { transform: translateY(-4px); }
+.hp-card__img { aspect-ratio: 16 / 10; overflow: hidden; background: var(--color-grey-7, #f1efea); }
+.hp-card__img img { width: 100%; height: 100%; object-fit: cover; }
+.hp-card__body { padding: 1.25rem 0.25rem 1.5rem; }
+.hp-card__meta { display: flex; gap: .75rem; align-items: center; font-family: var(--font-secondary); font-size: .7rem; letter-spacing: .12em; color: var(--color-grey-4, #888); margin: 0 0 .5rem; }
+.hp-card__meta span { text-transform: uppercase; }
+.hp-card__t { font-size: 1rem; font-weight: 500; line-height: 1.7; margin: 0 0 .5rem; }
+.hp-card__x { font-size: .82rem; line-height: 1.8; color: var(--color-grey-3, #666); margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hp-article { max-width: 760px; }
+.hp-article__crumb { font-family: var(--font-secondary); font-size: .7rem; letter-spacing: .12em; color: var(--color-grey-4, #888); margin-bottom: 1.5rem; }
+.hp-article__t { font-family: var(--font-primary); font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 400; line-height: 1.4; margin: .5rem 0 2rem; }
+.hp-article__cover { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; margin-bottom: 2.5rem; }
+.hp-body { font-size: .95rem; line-height: 2; }
+.hp-body h2 { font-family: var(--font-primary); font-size: 1.5rem; font-weight: 400; margin: 2.5rem 0 1rem; }
+.hp-body h3 { font-size: 1.05rem; font-weight: 500; margin: 2rem 0 .75rem; }
+.hp-body p { margin: 0 0 1.25rem; }
+.hp-body ul { margin: 0 0 1.25rem 1.3em; list-style: disc; }
+.hp-body a { text-decoration: underline; }
+.hp-fig { margin: 2rem 0; }
+.hp-fig img { width: 100%; height: auto; }
+.hp-fig figcaption { font-size: .75rem; color: var(--color-grey-4, #888); margin-top: .4rem; text-align: center; }
+.hp-ig { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding: 0 1rem; max-width: 1200px; margin: 0 auto; align-items: start; }
+.hp-ig__item { min-width: 0; }
+.hp-ig .instagram-media { min-width: 0 !important; width: 100% !important; margin: 0 !important; }
+[data-hp-news-index][hidden], [data-hp-article-wrap][hidden], [data-hp-news-section][hidden] { display: none !important; }
+@media (max-width: 900px) { .hp-cards, .hp-ig { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .hp-cards, .hp-ig { grid-template-columns: 1fr; } }

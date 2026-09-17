@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { AuthError, arpc, getToken, rpc, setToken, type Me } from "@/lib/api";
+import { AuthError, arpc, getToken, rpc, setToken, siteOrigin, type Me } from "@/lib/api";
 import { Spinner, useToast } from "./ui";
 import Dashboard from "./Dashboard";
 import SlotsPanel from "./SlotsPanel";
@@ -133,7 +133,7 @@ export default function AdminApp() {
           ))}
           {current && (
             <a
-              href={`https://${current.domain}`}
+              href={siteOrigin(current)}
               target="_blank"
               rel="noopener"
               className="ml-auto self-center text-xs font-semibold text-navy-2 hover:underline"
