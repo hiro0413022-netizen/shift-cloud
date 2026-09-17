@@ -40,7 +40,7 @@
 
 - `apps/corporate/src/components/Tracker.tsx`。Cookie は使わず localStorage の乱数ID（訪問者）と sessionStorage（セッション）。
 - localhost・`?preview`・自動操作ブラウザ（navigator.webdriver）は数えない。同じ人・同じページの10秒以内は1回。
-- 流入元は `?src=` / `utm_source` が最優先。無ければ referrer のホストで google / yahoo / bing / instagram / facebook / line / x / ai / other / direct。
+- 流入元は `?src=` / `utm_source` が最優先。無ければ referrer のホストで google / yahoo / bing / instagram / facebook / line / x / youtube / tiktok / ai / other / direct（youtube・tiktok は 0187）。
   サイト内の移動は `internal`（集計の「どこから来たか」からは除外）。
 
 ## Google Search Console
@@ -69,4 +69,6 @@
 ## Search Console（2026-09-17 設定）
 - Google Cloud プロジェクト `yozan-hp-admin`（ID causal-guide-508908-f3・hiro0413022@gmail.com）／サービスアカウント `hp-admin-gsc@causal-guide-508908-f3.iam.gserviceaccount.com`
 - 鍵は hp_settings.gsc_sa（鍵を作り直したら HP管理「設定」で貼り直す）
-- プロパティ: frank-golf=`https://frankgolf.jp/`（取り込み済み）／yozan・kallinos は所有権確認用ファイル `google2b364b4dcd5146c9.html` を配置済み → 確認とユーザー追加が済んだら設定
+- プロパティ: frank-golf=`https://frankgolf.jp/`／yozan=`https://yozan-inc.jp/`／kallinos=`https://www.kallinos.jp/`（3つとも所有権確認・サービスアカウント追加・設定済み 2026-09-17。yozan・kallinos は新規登録のためデータが溜まるまで数日0件）
+- 所有権確認は `google2b364b4dcd5146c9.html`（3サイト共通・hiro0413022 のトークン）。**消さない**。yozan-inc.jp は meta も併用。yozan-inc.jp の sitemap.xml は送信済み
+- サービスアカウントの権限は「フル」（画面で「制限付き」に切り替えられなかった。コードは readonly スコープ）

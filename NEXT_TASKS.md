@@ -7,10 +7,9 @@
 
 ## A. ユーザー作業（これがブロッカー）
 
-A-249. **HP管理（#249）の続き＝FRANK GOLF・KALLINOS の接続（#249c）を本番へ**
-   1. **`.\deploy-hp-admin-249c.ps1` を実行** → Vercel の frank-golf / kallinos / yozan-corporate / yozan-hp-admin が READY になるまで待つ（Claude が確認）
-   2. Claude が Search Console で yozan-inc.jp と www.kallinos.jp の所有権を確認し、サービスアカウントを追加する
-   3. **ダウンロードフォルダの `causal-guide-508908-f3-4cd949cc919b.json` を削除**（HP管理に登録済み。手元に残す必要はありません）
+A-249. **HP管理（#249）の仕上げ**（FRANK・KALLINOS 接続と Search Console 連携は 2026-09-17 に本番確認済み）
+   1. **`.\deploy-hp-admin-249d.ps1` を実行**（流入元に YouTube・TikTok の表示名。migration 0187 は適用済み）
+   2. **ダウンロードフォルダの `causal-guide-508908-f3-4cd949cc919b.json` を削除**（HP管理に登録済みの鍵。手元に残す必要なし）
 
 A-248. **システムへ直行カード＋開いただけで待受（#248）を本番へ**
    1. **`.\deploy-248.ps1` を実行** → Vercel の yozan-genesis が READY になるまで待つ

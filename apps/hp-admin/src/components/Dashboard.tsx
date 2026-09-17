@@ -31,6 +31,8 @@ const SOURCE_LABEL: Record<string, string> = {
   facebook: "Facebook",
   line: "LINE",
   x: "X（旧Twitter）",
+  youtube: "YouTube",
+  tiktok: "TikTok",
   ai: "AI（ChatGPT等）",
   direct: "直接（ブックマーク・URL入力など）",
   other: "その他のサイト",

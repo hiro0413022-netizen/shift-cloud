@@ -1,0 +1,8 @@
+hp-admin: 流入元に YouTube / TikTok を追加・Search Console 3サイト連携の記録 (#249d)
+
+- apps/hp-admin: 「どこから来たか」に YouTube / TikTok の表示名（FRANK は RaRa LESSON の YouTube からの流入が多い）
+- db: migration 0187（hp_track の source 判定に youtube / tiktok・既存行も付け替え）適用済
+- docs: Search Console は frankgolf.jp / yozan-inc.jp / www.kallinos.jp の3つとも確認・サービスアカウント追加・プロパティ設定済み。hp_sites.live を3サイト true に
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JoG5HAQWSdLw3VCnRJYGuE
