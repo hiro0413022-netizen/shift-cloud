@@ -4,7 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
-type Item = { href: string; label: string };
+export const MENU_GROUPS = ["シフト", "勤怠・給与", "スタッフ", "お知らせ・広報", "設定"] as const;
+export type MenuGroup = (typeof MENU_GROUPS)[number];
+type Item = { href: string; label: string; group: MenuGroup | null };
+
+const OPEN_KEY = "shiftcloud:admin-menu-open";
 
 /**
  * 管理画面のメニュー。
@@ -12,11 +16,28 @@ type Item = { href: string; label: string };
  * スマホ（md未満）= 上の細いバー＋「メニュー」で開く引き出し。
  *   以前はスマホでも幅208pxのサイドバーが常に出ていて、本文が100px程度しか残らず
  *   シフト表などがほぼ読めなかった。
+ * 項目が19個並んで探しにくかったため、よく使う3つだけを上に出し、残りはグループでたたむ（#252）。
+ * 今いる画面のグループは自動で開く。開閉はこの端末に覚えておく。
  */
 export function AdminSidebar({ items, name, hq }: { items: Item[]; name: string; hq: boolean }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const current = items.find((i) => path.startsWith(i.href));
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(OPEN_KEY) ?? "[]");
+      if (Array.isArray(saved)) setOpenGroups(saved.filter((g): g is string => typeof g === "string"));
+    } catch { /* 使えないブラウザでは全部たたんだまま */ }
+  }, []);
+  function toggleGroup(g: string) {
+    setOpenGroups((prev) => {
+      const next = prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g];
+      try { localStorage.setItem(OPEN_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   // 画面を移ったら引き出しを閉じる
   useEffect(() => setOpen(false), [path]);
@@ -28,34 +49,62 @@ export function AdminSidebar({ items, name, hq }: { items: Item[]; name: string;
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
+  const link = (i: Item, indent = false) => (
+    <Link
+      key={i.href}
+      href={i.href}
+      className={`block rounded-md py-2 text-sm md:py-1.5 ${indent ? "pl-4 pr-2" : "px-2"} ${
+        path.startsWith(i.href)
+          ? "bg-brand-light font-medium text-brand"
+          : "text-zinc-600 hover:bg-zinc-50"
+      }`}
+    >
+      {i.label}
+    </Link>
+  );
+
+  const top = items.filter((i) => i.group === null);
   const nav = (
     <nav className="space-y-0.5">
-      {items.map((i) => (
-        <Link
-          key={i.href}
-          href={i.href}
-          className={`block rounded-md px-2 py-2 text-sm md:py-1.5 ${
-            path.startsWith(i.href)
-              ? "bg-brand-light font-medium text-brand"
-              : "text-zinc-600 hover:bg-zinc-50"
-          }`}
-        >
-          {i.label}
+      {top.map((i) => link(i))}
+
+      {MENU_GROUPS.map((g) => {
+        const list = items.filter((i) => i.group === g);
+        if (list.length === 0) return null;
+        const hasCurrent = list.some((i) => path.startsWith(i.href));
+        const open = hasCurrent || openGroups.includes(g);
+        return (
+          <div key={g} className="pt-1">
+            <button
+              type="button"
+              onClick={() => toggleGroup(g)}
+              aria-expanded={open}
+              disabled={hasCurrent}
+              className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-xs font-semibold text-zinc-400 hover:bg-zinc-50 disabled:hover:bg-transparent md:py-1.5"
+            >
+              <span>{g}</span>
+              <span className="text-[10px]">{open ? "▾" : `▸ ${list.length}`}</span>
+            </button>
+            {open && <div className="space-y-0.5">{list.map((i) => link(i, true))}</div>}
+          </div>
+        );
+      })}
+
+      <div className="mt-3 space-y-0.5 border-t border-zinc-100 pt-3">
+        {hq && (
+          <Link href="/hq" className="block rounded-md px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-50 md:py-1.5">
+            🏢 本部ダッシュボード
+          </Link>
+        )}
+        <Link href="/home" className="block rounded-md px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-50 md:py-1.5">
+          📱 スタッフ画面
         </Link>
-      ))}
-      {hq && (
-        <Link href="/hq" className="mt-3 block rounded-md px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-50 md:py-1.5">
-          🏢 本部ダッシュボード
-        </Link>
-      )}
-      <Link href="/home" className="block rounded-md px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-50 md:py-1.5">
-        📱 スタッフ画面
-      </Link>
-      <form action="/api/logout" method="post" className="mt-3">
-        <button className="w-full rounded-md px-2 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50 md:py-1.5">
-          ログアウト
-        </button>
-      </form>
+        <form action="/api/logout" method="post">
+          <button className="w-full rounded-md px-2 py-2 text-left text-sm text-zinc-400 hover:bg-zinc-50 md:py-1.5">
+            ログアウト
+          </button>
+        </form>
+      </div>
     </nav>
   );
 

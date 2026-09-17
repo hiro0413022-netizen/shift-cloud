@@ -76,8 +76,10 @@ export function ShiftBuilder({
   const [msg, setMsg] = useState("");
   const [restored, setRestored] = useState(false);
   const [pending, start] = useTransition();
-  // 表示方法。auto = スマホは日ごとリスト・PCは表（CSSで出し分け）。スマホで「表」を選ぶこともできる
-  const [view, setView] = useState<"auto" | "table">("auto");
+  // 表示方法。calendar = 店舗ダッシュボードと同じシフト表（既定・#252）／ list = 日ごとのリスト
+  const [view, setView] = useState<"calendar" | "list">("calendar");
+  // カレンダーで選んだマス（右のパネル／スマホは下から出るパネルで編集する）
+  const [sel, setSel] = useState<{ staffId: string; date: string } | null>(null);
   // 日ごとリストで「入っている人だけ」を出す（見るとき用）
   const [onlyFilled, setOnlyFilled] = useState(false);
   // 退避キーは「店舗」だけ。表示範囲（日/週/半月/月）や月を混ぜると、
@@ -152,13 +154,13 @@ export function ShiftBuilder({
     try { localStorage.setItem(lsKey, JSON.stringify({ grid: picked, dirty: [...dirty] })); } catch { /* ignore */ }
   }, [grid, dirty, lsKey]);
 
-  // スマホの日ごとリストは縦に長いので、今日が範囲内なら今日の位置まで送る
+  // 日ごとリストは縦に長いので、今日が範囲内なら今日の位置まで送る
   useEffect(() => {
-    if (typeof window === "undefined" || window.innerWidth >= 768) return;
+    if (view !== "list" || typeof window === "undefined") return;
     if (days.length <= 1 || !days.includes(today) || days[0] === today) return;
     document.getElementById(`shift-day-${today}`)?.scrollIntoView({ block: "start" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days.join(","), today]);
+  }, [days.join(","), today, view]);
 
   // ① 離脱前の警告
   useEffect(() => {
@@ -430,122 +432,393 @@ export function ShiftBuilder({
   const dirtyOutside = [...dirty].filter((k) => !inRange.has(k.split("|")[1])).length;
   const publishedInRange = days.reduce((n, d) => n + staff.filter((s) => grid[`${s.id}|${d}`]?.status === "published").length, 0);
 
+  // ===== カレンダー（店舗ダッシュボードのシフト表と同じ見た目・#252） =====
+  /** マスに出すチップの中身。確定=濃い色／下書き=点線（ダッシュボードと同じ決まり） */
+  function chipFor(s: StaffRow, d: string) {
+    const key = `${s.id}|${d}`;
+    const c = grid[key];
+    if (!c) return null;
+    const draft = c.status !== "published";
+    if (c.schedule_type_id) {
+      const w = wtMap.get(c.schedule_type_id);
+      return { kind: "work" as const, label: w?.name ?? "業務", color: w?.color ?? "#71717a", draft };
+    }
+    if (c.template_id) {
+      const t = tmap.get(c.template_id);
+      if (!t) return { kind: "time" as const, start: "", end: "", label: "?", draft };
+      if (t.is_day_off) return { kind: "off" as const, draft };
+      if (t.start_time && t.end_time) return { kind: "time" as const, start: t.start_time.slice(0, 5), end: t.end_time.slice(0, 5), label: t.name, draft };
+      return { kind: "work" as const, label: t.name, color: t.color, draft };
+    }
+    if (c.start_time || c.end_time) {
+      return { kind: "time" as const, start: (c.start_time ?? "").slice(0, 5), end: (c.end_time ?? "").slice(0, 5), label: "時間指定", draft };
+    }
+    return null;
+  }
+
+  function renderChip(s: StaffRow, d: string) {
+    const ch = chipFor(s, d);
+    if (!ch) return null;
+    if (ch.kind === "off") {
+      return (
+        <span className={ch.draft
+          ? "block rounded border border-dashed border-rose-300 bg-rose-50 px-0.5 py-1 text-center text-[10px] font-semibold text-rose-400"
+          : "block rounded bg-rose-500 px-0.5 py-1 text-center text-[10px] font-semibold text-white"}>
+          休み
+        </span>
+      );
+    }
+    if (ch.kind === "work") {
+      return (
+        <span
+          className={`block truncate rounded px-0.5 py-1 text-center text-[10px] font-semibold ${ch.draft ? "border border-dashed bg-white" : "text-white"}`}
+          style={ch.draft ? { borderColor: ch.color, color: ch.color } : { backgroundColor: ch.color }}
+        >
+          {ch.label}
+        </span>
+      );
+    }
+    return (
+      <span className={ch.draft
+        ? "block rounded border border-dashed border-sky-300 bg-white px-0.5 py-0.5 text-center text-[10px] font-semibold leading-tight tabular-nums text-sky-500"
+        : "block rounded border border-sky-300 bg-sky-50 px-0.5 py-0.5 text-center text-[10px] font-semibold leading-tight tabular-nums text-sky-700"}>
+        <span className="block">{ch.start || "--:--"}</span>
+        <span className="block">{ch.end || "--:--"}</span>
+      </span>
+    );
+  }
+
+  const selKey = sel ? `${sel.staffId}|${sel.date}` : null;
+  const selStaff = sel ? staff.find((x) => x.id === sel.staffId) ?? null : null;
+
+  /** パネルの前後移動（同じ人の前の日／次の日） */
+  function moveSel(delta: number) {
+    if (!sel) return;
+    const i = days.indexOf(sel.date);
+    const j = i + delta;
+    if (j < 0 || j >= days.length) return;
+    setSel({ staffId: sel.staffId, date: days[j] });
+  }
+
+  /** 選んだマスの編集パネル（PCは右に固定・スマホは下から出す） */
+  function editor() {
+    if (!sel || !selStaff || !selKey) {
+      return (
+        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-4 text-sm text-zinc-400">
+          表のマスを押すと、ここでシフトを入れられます。
+          <p className="mt-2 text-xs leading-relaxed">
+            確定は濃い色、下書きは点線です。「{rangeShort}をまとめて確定・通知」で表示中の期間を一度に確定できます。
+          </p>
+        </div>
+      );
+    }
+    const s = selStaff;
+    const d = sel.date;
+    const c = grid[selKey];
+    const req = reqMap.get(selKey);
+    const off = timeOff[selKey];
+    const caddy = caddyDays[selKey];
+    const published = c?.status === "published";
+    const filled = !!(c?.template_id || c?.schedule_type_id || (c?.start_time && c?.end_time));
+    const isCustom = !!c && !c.template_id && !c.schedule_type_id && !!(c.start_time || c.end_time);
+    const myTypes = typesFor(s.id);
+    const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
+    const idx = days.indexOf(d);
+    const opt = (active: boolean) =>
+      `rounded-lg border px-2 py-2 text-sm font-semibold transition-colors ${active ? "border-brand bg-brand text-white" : "border-zinc-200 bg-white text-zinc-700 active:bg-zinc-50"}`;
+
+    return (
+      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-semibold">{s.name}</p>
+            <p className={`text-sm ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-500"}`}>
+              {md(d)}（{w}）
+              {published
+                ? <span className="ml-2 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">確定済み</span>
+                : filled ? <span className="ml-2 rounded border border-dashed border-zinc-300 px-1.5 py-0.5 text-[11px] text-zinc-500">下書き</span> : null}
+              {dirty.has(selKey) && <span className="ml-1 text-[11px] text-amber-600">● 未保存</span>}
+            </p>
+          </div>
+          <button type="button" onClick={() => moveSel(-1)} disabled={idx <= 0} aria-label="前の日"
+            className="h-9 w-9 rounded-lg border border-zinc-200 text-zinc-500 disabled:opacity-30">←</button>
+          <button type="button" onClick={() => moveSel(1)} disabled={idx >= days.length - 1} aria-label="次の日"
+            className="h-9 w-9 rounded-lg border border-zinc-200 text-zinc-500 disabled:opacity-30">→</button>
+          <button type="button" onClick={() => setSel(null)} aria-label="閉じる"
+            className="h-9 w-9 rounded-lg text-xl text-zinc-400 xl:hidden">×</button>
+        </div>
+
+        {(off || caddy || req) && (
+          <div className="mt-3 space-y-1 rounded-lg bg-zinc-50 p-2 text-xs">
+            {off && (
+              <p className={off.status === "approved" ? "font-medium text-rose-600" : "text-rose-500"}>
+                🛌 {off.status === "approved" ? "休み（承認済み）" : "休み希望（未処理）"}{off.reason ? `：${off.reason}` : ""}
+              </p>
+            )}
+            {caddy && <p className="font-medium text-amber-700">⛳ キャディ派遣：{caddy}</p>}
+            {req && (
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 text-zinc-600">
+                  本人の希望：<span className="font-semibold">{reqLabel(req, tmap)}</span>{req.memo ? `（${req.memo}）` : ""}
+                </p>
+                {reqTimes(req, tmap) && !published && (
+                  <button type="button" onClick={() => applyRequest(s.id, d)}
+                    className="shrink-0 rounded-md border border-brand px-2 py-1 text-xs font-medium text-brand">
+                    希望どおりに入れる
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <p className="mb-1.5 mt-3 text-xs font-medium text-zinc-500">シフト</p>
+        <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-1.5">
+          {templates.map((tp) => {
+            const active = c?.template_id === tp.id;
+            return (
+              <button key={tp.id} type="button" onClick={() => setTemplate(s.id, d, tp.id)}
+                className={opt(active)}
+                style={!active ? { color: tp.is_day_off ? "#e11d48" : tp.color } : undefined}>
+                {tLabel(tp)}
+                {!tp.is_day_off && tp.name && tLabel(tp) !== tp.name && (
+                  <span className={`block text-[10px] font-normal ${active ? "text-white/80" : "text-zinc-400"}`}>{tp.name}</span>
+                )}
+              </button>
+            );
+          })}
+          <button type="button" onClick={() => setTemplate(s.id, d, CUSTOM)} className={opt(isCustom)}>
+            ⌚ 時間指定
+          </button>
+        </div>
+
+        {isCustom && (
+          <div className="mt-2 flex items-center gap-2">
+            <input type="time" value={c?.start_time?.slice(0, 5) ?? ""} onChange={(e) => setCustomTime(s.id, d, "start", e.target.value)}
+              className="w-full rounded-lg border border-zinc-300 px-2 py-2 text-base md:text-sm" />
+            <span className="text-zinc-400">〜</span>
+            <input type="time" value={c?.end_time?.slice(0, 5) ?? ""} onChange={(e) => setCustomTime(s.id, d, "end", e.target.value)}
+              className="w-full rounded-lg border border-zinc-300 px-2 py-2 text-base md:text-sm" />
+          </div>
+        )}
+
+        {myTypes.length > 0 && (
+          <>
+            <p className="mb-1.5 mt-3 text-xs font-medium text-zinc-500">業務</p>
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-1.5">
+              {myTypes.map((wt) => {
+                const active = c?.schedule_type_id === wt.id;
+                return (
+                  <button key={wt.id} type="button" onClick={() => setTemplate(s.id, d, `${WT_PREFIX}${wt.id}`)}
+                    className={opt(active)} style={!active ? { color: wt.color } : undefined}>
+                    {wt.name}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-3">
+          {filled && (published ? (
+            <button type="button" disabled={pending} onClick={() => unpublishOne(s.id, d)}
+              className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 disabled:opacity-50">
+              🔒 確定を解除して直す
+            </button>
+          ) : (
+            <button type="button" disabled={pending} onClick={() => publishOne(s.id, d)}
+              className="rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white disabled:opacity-50">
+              ✓ この日を確定・通知
+            </button>
+          ))}
+          {filled && !published && (
+            <button type="button" onClick={() => setTemplate(s.id, d, "")}
+              className="rounded-lg px-3 py-2 text-sm text-zinc-500 active:bg-zinc-100">
+              空にする
+            </button>
+          )}
+          {dirty.size > 0 && (
+            <button type="button" disabled={pending} onClick={() => save(false)}
+              className="ml-auto rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-700 disabled:opacity-50">
+              保存（{dirty.size}件）
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 md:gap-3">
         <Button onClick={() => save(false)} disabled={pending || dirty.size === 0}>
           {pending ? "処理中…" : `保存（${dirty.size}件）`}
         </Button>
         <Button variant="secondary" onClick={applyAllRequests} disabled={pending} title={`${rangeLabel}の空いているセルにだけ希望を入れます`}>
-          希望を一括反映（{rangeShort}）
+          希望を一括反映
         </Button>
         <Button variant="secondary" onClick={publish} disabled={pending} title={`${rangeLabel}の未確定ぶんだけを確定します`}>
           {rangeShort}をまとめて確定・通知
         </Button>
+        <div className="ml-auto flex gap-0.5 rounded-lg bg-zinc-100 p-0.5 text-sm">
+          <button type="button" onClick={() => setView("calendar")}
+            className={`rounded-md px-3 py-1.5 ${view === "calendar" ? "bg-white font-semibold text-brand shadow-sm" : "text-zinc-500"}`}>
+            シフト表
+          </button>
+          <button type="button" onClick={() => { setView("list"); setSel(null); }}
+            className={`rounded-md px-3 py-1.5 ${view === "list" ? "bg-white font-semibold text-brand shadow-sm" : "text-zinc-500"}`}>
+            日ごと
+          </button>
+        </div>
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-xs text-zinc-400">{rangeShort}の確定済み {publishedInRange}件</span>
         {dirty.size > 0 && <span className="text-xs text-amber-600">● 未保存の変更あり（15秒ごとに自動保存）</span>}
         {dirtyOutside > 0 && <span className="text-xs text-zinc-400">うち{dirtyOutside}件は表示範囲の外（保存すると一緒に反映されます）</span>}
         {restored && <span className="text-xs text-blue-600">前回の編集内容を復元しました</span>}
-        {msg && <p className="text-sm font-medium text-brand">{msg}</p>}
-      </div>
-
-      {/* スマホだけ: 表示の切替（日ごと / 表）と「入っている人だけ」 */}
-      <div className="mb-3 flex items-center gap-2 md:hidden">
-        <div className="flex gap-0.5 rounded-lg bg-zinc-100 p-0.5 text-sm">
-          <button type="button" onClick={() => setView("auto")}
-            className={`rounded-md px-3 py-1.5 ${view === "auto" ? "bg-white font-semibold text-brand shadow-sm" : "text-zinc-500"}`}>
-            日ごと
-          </button>
-          <button type="button" onClick={() => setView("table")}
-            className={`rounded-md px-3 py-1.5 ${view === "table" ? "bg-white font-semibold text-brand shadow-sm" : "text-zinc-500"}`}>
-            表
-          </button>
-        </div>
-        {view === "auto" && (
-          <label className="ml-auto flex items-center gap-1.5 text-sm text-zinc-600">
+        {view === "list" && (
+          <label className="flex items-center gap-1.5 text-sm text-zinc-600">
             <input type="checkbox" checked={onlyFilled} onChange={(e) => setOnlyFilled(e.target.checked)} className="h-4 w-4 accent-brand" />
             入っている人だけ
           </label>
         )}
+        {msg && <p className="w-full text-sm font-medium text-brand">{msg}</p>}
       </div>
 
-      {/* スマホ: 日ごとのリスト（1日＝1枚のカード、1行＝1人）。表の横スクロールで見づらかったため（#251） */}
-      <div className={view === "auto" ? "space-y-3 md:hidden" : "hidden"}>
-        {days.map((d) => {
-          const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
-          const rows = staff.map((st) => ({ st, ...renderCell(st, d, "lg") }));
-          const shown = onlyFilled ? rows.filter((r) => r.filled) : rows;
-          const workingCount = rows.filter((r) => r.working).length;
-          const isToday = d === today;
-          return (
-            <section key={d} id={`shift-day-${d}`} className="scroll-mt-16 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-              <header className={`flex items-center gap-2 border-b border-zinc-200 px-3 py-2 ${isToday ? "bg-brand-light" : "bg-zinc-50"}`}>
-                <p className={`text-base font-semibold ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-800"}`}>
-                  {md(d)}<span className="ml-0.5 text-sm">（{w}）</span>
-                </p>
-                {isToday && <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">今日</span>}
-                <span className="ml-auto text-xs text-zinc-500">出勤 {workingCount}人</span>
-              </header>
-              {shown.length === 0 ? (
-                <p className="px-3 py-3 text-sm text-zinc-400">入っている人はいません</p>
-              ) : (
-                <ul className="divide-y divide-zinc-100">
-                  {shown.map((r) => (
-                    <li key={r.st.id} className={`flex items-start gap-2 px-3 py-2 ${r.bg}`}>
-                      <p className="w-20 shrink-0 pt-2 text-sm font-medium leading-tight text-zinc-700">{r.st.name}</p>
-                      <div className="min-w-0 flex-1">{r.body}</div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })}
-      </div>
-
-      <div className={`overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm ${view === "auto" ? "hidden md:block" : ""}`}>
-        {/* 列が少ない期間（日/週/半月）は横幅いっぱいに広げる＝横スクロールが要らない（#135） */}
-        <table className={`text-xs ${days.length <= 16 ? "w-full" : ""}`}>
-          <thead>
-            <tr className="bg-gradient-to-r from-brand-light to-white">
-              <th className="sticky left-0 z-10 min-w-28 border-b border-r border-zinc-200 bg-brand-light px-3 py-2 text-left font-semibold text-brand">スタッフ</th>
-              {days.map((d, di) => {
-                const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
-                // 週表示は月をまたぐので、月初と先頭には「◯月」を出す
-                const showMonth = di === 0 || d.slice(8) === "01";
-                return (
-                  <th key={d} className={`min-w-24 border-b border-zinc-200 px-1 py-2 font-medium ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-500"}`}>
-                    {showMonth && <span className="block text-[10px] font-normal text-zinc-400">{Number(d.slice(5, 7))}月</span>}
-                    {d.slice(8)}<span className="block text-[10px]">（{w}）</span>
+      {view === "list" ? (
+        /* 日ごとのリスト（1日＝1枚のカード、1行＝1人）。スマホで縦に見たいとき用（#251） */
+        <div className="space-y-3">
+          {days.map((d) => {
+            const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
+            const rows = staff.map((st) => ({ st, ...renderCell(st, d, "lg") }));
+            const shown = onlyFilled ? rows.filter((r) => r.filled) : rows;
+            const workingCount = rows.filter((r) => r.working).length;
+            const isToday = d === today;
+            return (
+              <section key={d} id={`shift-day-${d}`} className="scroll-mt-16 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+                <header className={`flex items-center gap-2 border-b border-zinc-200 px-3 py-2 ${isToday ? "bg-brand-light" : "bg-zinc-50"}`}>
+                  <p className={`text-base font-semibold ${w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-800"}`}>
+                    {md(d)}<span className="ml-0.5 text-sm">（{w}）</span>
+                  </p>
+                  {isToday && <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">今日</span>}
+                  <span className="ml-auto text-xs text-zinc-500">出勤 {workingCount}人</span>
+                </header>
+                {shown.length === 0 ? (
+                  <p className="px-3 py-3 text-sm text-zinc-400">入っている人はいません</p>
+                ) : (
+                  <ul className="divide-y divide-zinc-100">
+                    {shown.map((r) => (
+                      <li key={r.st.id} className={`flex items-start gap-2 px-3 py-2 ${r.bg}`}>
+                        <p className="w-24 shrink-0 pt-2 text-sm font-medium leading-tight text-zinc-700">{r.st.name}</p>
+                        <div className="min-w-0 flex-1 md:max-w-sm">{r.body}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        /* シフト表（店舗ダッシュボードと同じ見た目）＋ 右に編集パネル */
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_284px]">
+          <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white shadow-sm">
+            <table className="w-full border-separate border-spacing-0 text-xs">
+              <thead>
+                <tr>
+                  <th className="sticky left-0 z-10 min-w-20 border-b border-r border-zinc-200 bg-zinc-50 px-2 py-2 text-left text-[11px] font-medium text-zinc-500">
+                    スタッフ
                   </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {staff.map((s, i) => (
-              <tr key={s.id} className={i % 2 ? "bg-zinc-50/40" : ""}>
-                <td className="sticky left-0 z-10 border-b border-r border-zinc-100 bg-inherit px-3 py-1 font-medium">{s.name}</td>
-                {days.map((d) => {
-                  const { bg, body } = renderCell(s, d);
-                  return (
-                    <td key={d} className={`border-b border-zinc-100 p-0.5 align-top ${bg}`}>
-                      {body}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-2 text-xs leading-relaxed text-zinc-400">
-        緑=確定済み / 黄=未保存 / 桃=休み希望。「⌚ 時間指定」で任意の時間を入力できます。
-        <span className="font-medium text-zinc-500">「✓ この日を確定」で1日だけ確定</span>、
-        <span className="font-medium text-zinc-500">「🔒 確定済み」を押すと確定を解除して直せます</span>（どちらも本人へ通知）。
-        確定済みのままセルを直して保存した場合も、変更内容が本人へ通知されます。
-        セル下の「希望」はスタッフの提出内容で、クリックするとその時間が入ります。
-      </p>
+                  {days.map((d, di) => {
+                    const w = dow[new Date(d + "T00:00:00Z").getUTCDay()];
+                    const isToday = d === today;
+                    const isSelDay = sel?.date === d;
+                    const showMonth = di === 0 || d.slice(8) === "01";
+                    const working = staff.filter((st) => {
+                      const ch = chipFor(st, d);
+                      return ch && ch.kind !== "off";
+                    }).length;
+                    const hasReq = staff.some((st) => reqMap.has(`${st.id}|${d}`));
+                    const hasOff = staff.some((st) => !!timeOff[`${st.id}|${d}`]);
+                    return (
+                      <th key={d} className={`min-w-10 border-b border-r border-zinc-100 px-0.5 py-1.5 text-center last:border-r-0 ${isSelDay ? "bg-brand-light" : "bg-zinc-50"}`}>
+                        {showMonth && <span className="block text-[9px] font-normal text-zinc-400">{Number(d.slice(5, 7))}月</span>}
+                        <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[11px] font-semibold ${
+                          isToday ? "bg-brand text-white" : w === "日" ? "text-red-500" : w === "土" ? "text-blue-500" : "text-zinc-600"}`}>
+                          {Number(d.slice(8))}
+                        </span>
+                        <span className={`block text-[10px] font-normal ${w === "日" ? "text-red-400" : w === "土" ? "text-blue-400" : "text-zinc-400"}`}>（{w}）</span>
+                        <span className="block text-[9px] font-normal text-zinc-400">{working}人</span>
+                        <span className="flex h-2 items-center justify-center gap-0.5">
+                          {hasReq && <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" title="希望あり" />}
+                          {hasOff && <span className="h-1.5 w-1.5 rounded-full bg-rose-400" title="休み希望あり" />}
+                        </span>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map((s) => (
+                  <tr key={s.id}>
+                    <th className={`sticky left-0 z-10 whitespace-nowrap border-b border-r border-zinc-200 px-2 py-1.5 text-left text-xs font-semibold text-zinc-700 ${sel?.staffId === s.id ? "bg-brand-light" : "bg-white"}`}>
+                      {s.name}
+                    </th>
+                    {days.map((d) => {
+                      const key = `${s.id}|${d}`;
+                      const chip = renderChip(s, d);
+                      const req = reqMap.get(key);
+                      const off = timeOff[key];
+                      const caddy = caddyDays[key];
+                      const isSel = key === selKey;
+                      return (
+                        <td key={d} className={`border-b border-r border-zinc-100 p-0 align-top last:border-r-0 ${
+                          isSel ? "bg-brand-light" : d === today ? "bg-amber-50/60" : off?.status === "approved" ? "bg-rose-50/60" : ""}`}>
+                          <button type="button" onClick={() => setSel({ staffId: s.id, date: d })}
+                            aria-label={`${s.name} ${md(d)}`}
+                            className={`block min-h-11 w-full space-y-0.5 p-0.5 text-left ${isSel ? "ring-2 ring-inset ring-brand" : "hover:bg-zinc-50"} ${dirty.has(key) ? "outline-2 -outline-offset-2 outline-dashed outline-amber-400" : ""}`}>
+                            {chip}
+                            {!chip && req && (
+                              <span className="block truncate rounded border border-dashed border-zinc-300 px-0.5 py-0.5 text-center text-[9px] leading-tight text-zinc-400">
+                                希望<br />{reqLabel(req, tmap)}
+                              </span>
+                            )}
+                            {off && !chip && (
+                              <span className={`block text-center text-[9px] font-medium ${off.status === "approved" ? "text-rose-600" : "text-rose-400"}`}>
+                                休希望
+                              </span>
+                            )}
+                            {caddy && <span className="block truncate text-center text-[9px] font-medium text-amber-700" title={caddy}>⛳</span>}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="flex flex-wrap gap-3 border-t border-zinc-100 px-3 py-2 text-[10px] text-zinc-400">
+              <span><span className="mr-1 inline-block rounded border border-sky-300 bg-sky-50 px-1 text-[9px] font-semibold text-sky-700">10:00</span>確定</span>
+              <span><span className="mr-1 inline-block rounded border border-dashed border-sky-300 bg-white px-1 text-[9px] font-semibold text-sky-500">10:00</span>下書き</span>
+              <span><span className="mr-1 inline-block rounded bg-rose-500 px-1 text-[9px] font-semibold text-white">休み</span>休み</span>
+              <span><span className="mr-1 inline-block rounded border border-dashed border-zinc-300 px-1 text-[9px]">希望</span>本人の希望（未入力）</span>
+              <span><span className="mr-1 inline-block h-2.5 w-3 rounded-sm outline-2 outline-dashed outline-amber-400" />未保存</span>
+              <span>⛳ キャディ派遣</span>
+            </div>
+          </div>
+
+          {/* PC: 右に固定 */}
+          <div className="hidden xl:sticky xl:top-4 xl:block">{editor()}</div>
+        </div>
+      )}
+
+      {/* PCより狭い画面: 下から出るパネル。表の下の方が隠れないように同じ高さの余白を足す */}
+      {view === "calendar" && sel && <div className="h-[60vh] xl:hidden" aria-hidden />}
+      {view === "calendar" && sel && (
+        <div className="fixed inset-x-0 bottom-0 z-40 max-h-[75vh] overflow-y-auto rounded-t-2xl border-t border-zinc-200 bg-white shadow-2xl xl:hidden">
+          {editor()}
+        </div>
+      )}
     </div>
   );
 }

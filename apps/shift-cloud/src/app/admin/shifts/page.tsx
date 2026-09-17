@@ -22,7 +22,8 @@ export default async function ShiftBuilderPage({
   const sp = await searchParams;
   // 表示する期間（日/週/半月/月）。日付計算は lib/shift-span.ts に集約（#135）
   const today = todayJST();
-  const range = resolveSpan({ span: sp.span, d: sp.d, ym: sp.ym, today });
+  // 既定は「半月」＝店舗ダッシュボードのシフト表と同じ幅（#252）。?span= があればそれ
+  const range = resolveSpan({ span: sp.span ?? "half", d: sp.d, ym: sp.ym, today });
   const { start, end, days } = range;
 
   const stores = await visibleStores(actor); // オーナー=全店 / それ以外=配属店舗のみ（#128）
@@ -153,7 +154,7 @@ export default async function ShiftBuilderPage({
       <div className="mb-4 rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-xs text-zinc-500 md:px-4 md:text-sm">
         スタッフはいつでもシフトを提出できます（募集の開始は不要）。
         <span className="ml-1 font-medium text-zinc-700">{range.shortLabel}の提出は{(requests ?? []).length}件</span>
-        。セルの下に「希望」として出ます。
+        。空いているマスに点線の「希望」として出ます。マスを押すと入力できます。
       </div>
 
       {!staffRows?.length ? (
