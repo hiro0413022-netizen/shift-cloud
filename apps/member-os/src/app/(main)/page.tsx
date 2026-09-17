@@ -59,7 +59,7 @@ export default async function LedgerPage({
   if (typeFilter) q = q.eq("visit_type", typeFilter);
   if (scopeIds) q = q.in("store_id", scopeIds);
 
-  let storesQ = admin.from("stores").select("id, name").eq("company_id", actor.companyId).is("deleted_at", null).order("name");
+  let storesQ = admin.from("stores").select("id, name").eq("company_id", actor.companyId).eq("kind", "store").is("deleted_at", null).order("name"); // 本部（kind='hq'）は店舗ではない（#253）
   if (scopeIds) storesQ = storesQ.in("id", scopeIds);
   let monthQ = admin.from("mbr_walkin_visits").select("visit_type, result")
     .eq("company_id", actor.companyId).is("deleted_at", null)

@@ -55,6 +55,7 @@ export const getMoneyActor = cache(async (): Promise<MoneyActor | null> => {
       .from("stores")
       .select("id, name, segment_id")
       .eq("company_id", staff.company_id)
+      .eq("kind", "store") // 本部（kind='hq'）は店舗ではない（#253）
       .is("deleted_at", null)
       .order("name");
     stores = (data ?? []).map((s) => ({
@@ -63,13 +64,13 @@ export const getMoneyActor = cache(async (): Promise<MoneyActor | null> => {
   } else {
     const { data } = await admin
       .from("staff_store_assignments")
-      .select("is_primary, stores(id, name, segment_id, deleted_at)")
+      .select("is_primary, stores(id, name, segment_id, kind, deleted_at)")
       .eq("staff_id", staff.id)
       .is("deleted_at", null);
     stores = (data ?? [])
       .map((a) => {
-        const st = (a as unknown as { stores: { id: string; name: string; segment_id: string | null; deleted_at: string | null } | null }).stores;
-        if (!st || st.deleted_at) return null;
+        const st = (a as unknown as { stores: { id: string; name: string; segment_id: string | null; kind: string | null; deleted_at: string | null } | null }).stores;
+        if (!st || st.deleted_at || st.kind === "hq") return null; // 本部は売上・現金を持たない（#253）
         return { id: String(st.id), name: String(st.name), segmentId: st.segment_id ? String(st.segment_id) : null, isPrimary: !!(a as { is_primary?: boolean }).is_primary };
       })
       .filter((x): x is AccessibleStore => x !== null);

@@ -410,7 +410,7 @@ export async function runDailyCeoReport(
         return allowedStores ? q.in("store_id", storeInValues(allowedStores)) : q;
       })(),
       (() => {
-        const q = admin.from("stores").select("id, name").eq("company_id", companyId).is("deleted_at", null);
+        const q = admin.from("stores").select("id, name").eq("company_id", companyId).eq("kind", "store").is("deleted_at", null); // 本部に朝のLINEを作らない（#253）
         return allowedStores ? q.in("id", storeInValues(allowedStores)) : q;
       })(),
       admin.from("staff").select("id, name, line_hidden").eq("company_id", companyId).is("deleted_at", null),

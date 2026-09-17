@@ -23,6 +23,7 @@ export async function listOperatingCompanyIds(
     .from("stores")
     .select("company_id")
     .eq("status", "active")
+    .eq("kind", "store") // 本部（kind='hq'）は店舗ではない（#253）
     .is("deleted_at", null);
 
   const withStores = new Set(

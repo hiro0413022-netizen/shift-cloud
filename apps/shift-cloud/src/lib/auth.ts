@@ -110,18 +110,25 @@ export function isOwner(actor: Actor) {
  * オーナー = 会社の全店舗 / それ以外 = 配属店舗（staff_store_assignments）のみ。
  * 店舗が1つなら切替タブは自然に消える（map描画のため）。
  */
-export async function visibleStores(actor: Actor): Promise<Array<{ id: string; name: string }>> {
+export async function visibleStores(
+  actor: Actor,
+  opts: { storesOnly?: boolean } = {},
+): Promise<Array<{ id: string; name: string; kind: string }>> {
   if (!isOwner(actor) && actor.storeIds.length === 0) return [];
   const admin = createAdmin();
   let q = admin
     .from("stores")
-    .select("id, name")
+    .select("id, name, kind")
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
+    // 本部（kind='hq'）は実店舗の後ろに並べる。シフト・勤怠・給与・スタッフでは本部も選べる（#253）
+    .order("kind", { ascending: false })
     .order("name");
+  // 打刻端末・出勤募集・店舗イベントなど「お店そのもの」の画面では本部を出さない
+  if (opts.storesOnly) q = q.eq("kind", "store");
   if (!isOwner(actor)) q = q.in("id", actor.storeIds);
   const { data } = await q;
-  return (data ?? []) as Array<{ id: string; name: string }>;
+  return (data ?? []) as Array<{ id: string; name: string; kind: string }>;
 }
 
 /** .in() に空配列を渡すとクエリが壊れるため、絶対に一致しないUUIDを使う（#134） */

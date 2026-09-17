@@ -108,7 +108,9 @@ export function createActorResolver(options: {
         .select("id")
         .eq("company_id", staff.company_id)
         .eq("status", "active")
-        .is("deleted_at", null);
+        .eq("kind", "store") // 本部（kind='hq'）は店舗ではない（#253）
+        .is("deleted_at", null)
+        .order("name");
       storeIds = (stores ?? []).map((s: { id: string }) => s.id);
       primaryStoreId = storeIds[0] ?? null;
     } else if (assignmentsEmbedded) {
@@ -124,6 +126,21 @@ export function createActorResolver(options: {
       const rows = (assigns ?? []) as Array<{ store_id: string; is_primary: boolean | null }>;
       storeIds = rows.map((r) => r.store_id);
       primaryStoreId = rows.find((r) => r.is_primary)?.store_id ?? storeIds[0] ?? null;
+    }
+
+    // 本部（kind='hq'）の所属は、店舗を選ぶアプリ（受付・レッスン・在庫・コンペ等）では店舗として扱わない（#253）。
+    // 本部だけに所属する人は「店舗なし」になる＝どの店舗のデータも見えない（GOLF WING 扱いにしない）
+    if (!isOwner && storeIds.length) {
+      const { data: hq } = await admin
+        .from("stores")
+        .select("id")
+        .eq("company_id", staff.company_id)
+        .eq("kind", "hq");
+      const hqIds = new Set(((hq ?? []) as Array<{ id: string }>).map((h) => h.id));
+      if (hqIds.size) {
+        storeIds = storeIds.filter((id) => !hqIds.has(id));
+        if (primaryStoreId && hqIds.has(primaryStoreId)) primaryStoreId = storeIds[0] ?? null;
+      }
     }
 
     return {

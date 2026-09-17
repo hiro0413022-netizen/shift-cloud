@@ -63,6 +63,7 @@ export async function listStores(companyId: string, allowedIds?: string[]): Prom
     .from("stores")
     .select("id, name")
     .eq("company_id", companyId)
+    .eq("kind", "store") // 店頭の画面に本部（kind='hq'）を出さない（#253）
     .is("deleted_at", null)
     .order("name");
   // 空配列を .in() に渡すと壊れるので、絶対に一致しないUUIDに置き換える

@@ -8,7 +8,7 @@ import { hm, dowJP, todayJST } from "@/lib/util";
 export default async function EventsPage() {
   const actor = await requireActor("manage_announcements");
   const admin = createAdmin();
-  const stores = await visibleStores(actor); // オーナー=全店 / それ以外=配属店舗のみ（#128）
+  const stores = await visibleStores(actor, { storesOnly: true }); // オーナー=全店 / それ以外=配属店舗のみ（#128）
   const storeIds = stores.length > 0 ? stores.map((s) => s.id) : [NO_STORE];
   const [{ data: events }, { data: types }] = await Promise.all([
     // 一覧も店舗で絞る（#134）。以前は company_id だけで、姫路のイベントが宝塚の画面に出ていた

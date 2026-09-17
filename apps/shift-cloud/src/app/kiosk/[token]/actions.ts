@@ -21,6 +21,28 @@ export async function verifyDevice(token: string) {
 
 export type ClockType = "clock_in" | "clock_out" | "break_start" | "break_end";
 
+/**
+ * 本部（stores.kind='hq'）に所属する人の本部ID。本部には打刻端末が無いので、
+ * 本部の人は会社のどの店舗の端末でも打刻でき、打刻は本部の勤怠として残す（#253）。
+ * その端末の店舗にも所属している人は、従来どおりその店舗の打刻にする。
+ */
+async function hqStoreFor(
+  admin: ReturnType<typeof createAdmin>,
+  companyId: string,
+  staffId: string,
+  deviceStoreId: string,
+): Promise<string | null> {
+  const { data } = await admin
+    .from("staff_store_assignments")
+    .select("store_id, stores!inner(kind)")
+    .eq("staff_id", staffId)
+    .eq("company_id", companyId)
+    .is("deleted_at", null);
+  const rows = (data ?? []) as unknown as Array<{ store_id: string; stores: { kind: string } | null }>;
+  if (rows.some((r) => r.store_id === deviceStoreId)) return null;
+  return rows.find((r) => r.stores?.kind === "hq")?.store_id ?? null;
+}
+
 export async function recordTime(
   token: string,
   staffId: string,
@@ -41,13 +63,16 @@ export async function recordTime(
     .maybeSingle();
   if (!staff) return { error: "スタッフが見つかりません" };
 
+  // 本部の人は本部の打刻として記録する（#253）
+  const hqStoreId = await hqStoreFor(admin, device.company_id, staffId, device.store_id);
+
   const now = new Date().toISOString();
   const { data: rec, error } = await admin
     .from("time_records")
     .insert({
       company_id: device.company_id,
       staff_id: staffId,
-      store_id: device.store_id,
+      store_id: hqStoreId ?? device.store_id,
       type,
       recorded_at: now,
       device_id: device.id,
@@ -96,20 +121,34 @@ export async function getKioskState(token: string) {
   const admin = createAdmin();
   const today = dateJST(new Date().toISOString());
 
-  const [{ data: staffRows }, { data: records }] = await Promise.all([
-    admin.from("staff")
-      .select("id, name, staff_store_assignments!inner(store_id)")
-      .eq("company_id", device.company_id)
-      .eq("status", "active")
-      .is("deleted_at", null)
-      .eq("staff_store_assignments.store_id", device.store_id)
-      .order("name"),
-    admin.from("time_records")
-      .select("staff_id, type, recorded_at")
-      .eq("store_id", device.store_id)
-      .gte("recorded_at", `${today}T00:00:00+09:00`)
-      .order("recorded_at"),
-  ]);
+  // この店舗の人 ＋ 本部の人（本部には端末が無いので、どの店舗の端末でも打刻できる・#253）
+  const { data: hq } = await admin
+    .from("stores").select("id")
+    .eq("company_id", device.company_id).eq("kind", "hq").is("deleted_at", null);
+  const storeIds = [device.store_id, ...((hq ?? []) as Array<{ id: string }>).map((h) => h.id)];
+
+  const { data: staffRaw } = await admin.from("staff")
+    .select("id, name, staff_store_assignments!inner(store_id, deleted_at)")
+    .eq("company_id", device.company_id)
+    .eq("status", "active")
+    .is("deleted_at", null)
+    .in("staff_store_assignments.store_id", storeIds)
+    .is("staff_store_assignments.deleted_at", null)
+    .order("name");
+  const seen = new Set<string>();
+  const staffRows = ((staffRaw ?? []) as Array<{ id: string; name: string }>).filter((s) =>
+    seen.has(s.id) ? false : (seen.add(s.id), true),
+  );
+
+  // 今日の打刻は「表示する人」で引く（本部の人の打刻は本部の店舗IDで入っているため）
+  const { data: records } = staffRows.length
+    ? await admin.from("time_records")
+        .select("staff_id, type, recorded_at")
+        .eq("company_id", device.company_id)
+        .in("staff_id", staffRows.map((s) => s.id))
+        .gte("recorded_at", `${today}T00:00:00+09:00`)
+        .order("recorded_at")
+    : { data: [] as Array<{ staff_id: string; type: string; recorded_at: string }> };
 
   const lastByStaff = new Map<string, string>();
   for (const r of records ?? []) lastByStaff.set(r.staff_id, r.type);

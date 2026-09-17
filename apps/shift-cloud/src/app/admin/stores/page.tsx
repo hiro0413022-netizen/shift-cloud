@@ -56,7 +56,11 @@ export default async function StoresPage() {
             <Table headers={["店舗名", "ブランド", "コード", "営業時間", ""]}>
               {stores.map((s) => (
                 <tr key={s.id} className="hover:bg-zinc-50">
-                  <Td className="font-medium">{s.name}</Td>
+                  <Td className="font-medium">
+                    {s.name}
+                    {/* 本部はお店ではない（シフト・勤怠・給与だけで使う・#253） */}
+                    {s.kind === "hq" && <span className="ml-2 rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-normal text-zinc-500">本部</span>}
+                  </Td>
                   <Td>{(s.brands as unknown as { name: string } | null)?.name}</Td>
                   <Td>{s.code}</Td>
                   <Td>{hm(s.open_time)}〜{hm(s.close_time)}</Td>

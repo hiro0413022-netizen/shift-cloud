@@ -75,7 +75,9 @@ export const getGenesisActor = cache(async (): Promise<GenesisActor | null> => {
       .select("id")
       .eq("company_id", staff.company_id)
       .eq("status", "active")
-      .is("deleted_at", null);
+      .eq("kind", "store") // 本部（kind='hq'）は店舗ではない（#253）。既定の店舗が本部にならないように
+      .is("deleted_at", null)
+      .order("name");
     storeIds = ((stores ?? []) as Array<{ id: string }>).map((s) => s.id);
     primaryStoreId = storeIds[0] ?? null;
   } else {
@@ -88,6 +90,16 @@ export const getGenesisActor = cache(async (): Promise<GenesisActor | null> => {
     const rows = (assigns ?? []) as Array<{ store_id: string; is_primary: boolean | null }>;
     storeIds = rows.map((r) => r.store_id);
     primaryStoreId = rows.find((r) => r.is_primary)?.store_id ?? storeIds[0] ?? null;
+    // 本部（kind='hq'）の所属は店舗として扱わない（声での受付登録などが本部に入らないように・#253）
+    if (storeIds.length) {
+      const { data: hq } = await admin
+        .from("stores").select("id").eq("company_id", staff.company_id).eq("kind", "hq");
+      const hqIds = new Set(((hq ?? []) as Array<{ id: string }>).map((h) => h.id));
+      if (hqIds.size) {
+        storeIds = storeIds.filter((id) => !hqIds.has(id));
+        if (primaryStoreId && hqIds.has(primaryStoreId)) primaryStoreId = storeIds[0] ?? null;
+      }
+    }
   }
 
   return {
@@ -120,6 +132,7 @@ export async function visibleStores(actor: GenesisActor): Promise<Array<{ id: st
     .from("stores")
     .select("id, name")
     .eq("company_id", actor.companyId)
+    .eq("kind", "store") // メニュー・/stores の店舗タブに本部を出さない（#253）
     .is("deleted_at", null)
     .order("name");
   if (!actor.isOwner) q = q.in("id", actor.storeIds);

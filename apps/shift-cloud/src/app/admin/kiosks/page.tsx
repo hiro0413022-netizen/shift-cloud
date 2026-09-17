@@ -14,7 +14,7 @@ export default async function KiosksPage({ searchParams }: { searchParams: Promi
 
   const [{ data: devices }, stores, { data: storeLogins }] = await Promise.all([
     admin.from("kiosk_devices").select("*, stores(name)").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at"),
-    visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
+    visibleStores(actor, { storesOnly: true }), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("store_dash_logins").select("id, login_id, status, created_at, stores(name)").eq("company_id", actor.companyId).is("deleted_at", null).order("created_at"),
   ]);
 

@@ -17,6 +17,7 @@ export default async function HomePage() {
     .select("id, name")
     .eq("company_id", actor.companyId)
     .eq("status", "active")
+    .eq("kind", "store") // 本部（kind='hq'）は店舗ではない（#253）
     .is("deleted_at", null)
     .order("name");
   const visibleStores = (stores ?? []).filter(

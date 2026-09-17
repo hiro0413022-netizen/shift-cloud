@@ -17,7 +17,7 @@ export default async function FittingsPage({ searchParams }: { searchParams: Pro
 
   const admin = createAdmin();
   const [{ data: stores }, { data: staff }] = await Promise.all([
-    admin.from("stores").select("id, name").eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null).order("name"),
+    admin.from("stores").select("id, name").eq("company_id", actor.companyId).eq("status", "active").eq("kind", "store").is("deleted_at", null).order("name"), // 本部（kind='hq'）は店舗ではない（#253）
     admin.from("staff").select("id, name").eq("company_id", actor.companyId).eq("status", "active").is("deleted_at", null).order("sort_order"),
   ]);
   const visibleStores = ((stores ?? []) as { id: string; name: string }[]).filter(

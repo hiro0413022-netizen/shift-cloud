@@ -66,6 +66,7 @@ export async function visibleStores(
     .from("stores")
     .select("id, name")
     .eq("company_id", actor.companyId)
+    .eq("kind", "store") // 本部（kind='hq'）は店舗ではない（#253）
     .is("deleted_at", null)
     .order("name");
   if (!actor.isOwner) q = q.in("id", actor.storeIds);

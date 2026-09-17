@@ -94,6 +94,7 @@ export const getInventoryActor = cache(async (): Promise<InventoryActor | null> 
       .from("stores")
       .select("id, name")
       .eq("company_id", staff.company_id)
+      .eq("kind", "store") // 本部（kind='hq'）は店舗ではない（#253）
       .is("deleted_at", null)
       .order("name");
     stores = ((data ?? []) as Array<{ id: string; name: string }>).map((s) => ({
@@ -104,16 +105,16 @@ export const getInventoryActor = cache(async (): Promise<InventoryActor | null> 
   } else {
     const { data } = await admin
       .from("staff_store_assignments")
-      .select("is_primary, stores(id, name, deleted_at)")
+      .select("is_primary, stores(id, name, kind, deleted_at)")
       .eq("staff_id", staff.id)
       .is("deleted_at", null);
     type AssignRow = {
       is_primary: boolean | null;
-      stores: { id: string; name: string; deleted_at: string | null } | null;
+      stores: { id: string; name: string; kind: string | null; deleted_at: string | null } | null;
     };
     stores = ((data ?? []) as unknown as AssignRow[])
       .map((a) =>
-        a.stores && !a.stores.deleted_at
+        a.stores && !a.stores.deleted_at && a.stores.kind !== "hq" // 本部は在庫を持たない（#253）
           ? { id: String(a.stores.id), name: String(a.stores.name), isPrimary: !!a.is_primary }
           : null
       )

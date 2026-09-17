@@ -10,7 +10,7 @@ export default async function HelpPage() {
   const admin = createAdmin();
 
   const [stores, { data: helps }] = await Promise.all([
-    visibleStores(actor), // オーナー=全店 / それ以外=配属店舗のみ（#128）
+    visibleStores(actor, { storesOnly: true }), // オーナー=全店 / それ以外=配属店舗のみ（#128）
     admin.from("help_requests")
       .select("*, stores(name), help_applications(id, status, staff_id, staff(name))")
       .eq("company_id", actor.companyId).is("deleted_at", null)

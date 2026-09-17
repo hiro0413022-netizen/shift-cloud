@@ -83,7 +83,7 @@ export async function getDrill(
 ): Promise<DrillLevel> {
   const admin = createAdmin();
   const allowed = Array.isArray(storeIds) ? new Set(storeIds) : null;
-  const { data: storeRows } = await admin.from("stores").select("id,name,code").eq("company_id", companyId).is("deleted_at", null).order("name");
+  const { data: storeRows } = await admin.from("stores").select("id,name,code").eq("company_id", companyId).eq("kind", "store").is("deleted_at", null).order("name"); // 本部（kind='hq'）は店舗ではない（#253）
   const allStores = (storeRows ?? []) as Store[];
   const stores = allowed ? allStores.filter((s) => allowed.has(s.id)) : allStores;
   const isFrank = (s: Store) => (s.code ?? "").startsWith("frunk");

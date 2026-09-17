@@ -478,7 +478,7 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
     // stores だけは会社全件を取る（会員名簿の store_name 突き合わせに全店の名前が要るため）。
     // 表示に使う店舗は下で allowed に絞る（#134）
-    admin.from("stores").select("id,name,brand_id,code").eq("company_id", companyId).is("deleted_at", null),
+    admin.from("stores").select("id,name,brand_id,code").eq("company_id", companyId).eq("kind", "store").is("deleted_at", null), // 本部（kind='hq'）は店舗ではない（#253）
     // #134: 店舗またぎ廃止。allowed が指定されていれば、店舗に紐づくデータはその範囲だけを取る
     scopeStore(admin.from("staff_store_assignments").select("store_id").eq("company_id", companyId).is("deleted_at", null), allowed),
     scopeStore(admin.from("shifts").select("store_id,date").eq("company_id", companyId).gte("date", monthStart()), allowed),
