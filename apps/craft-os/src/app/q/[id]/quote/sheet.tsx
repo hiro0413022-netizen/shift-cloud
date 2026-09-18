@@ -387,6 +387,8 @@ export function QuoteSheet({
                       <select
                         name={`rate_${r.id}`}
                         defaultValue={r.manual ? String(r.rate ?? "") : "auto"}
+                        // 2026-09-19 ユーザー指摘「定価にしても反応しない」: 選んだ瞬間に保存して金額を出し直す
+                        onChange={(e) => e.currentTarget.form?.requestSubmit()}
                         title={r.discountReason || "掛け率"}
                         className="no-print w-full rounded-sm border border-dashed border-transparent bg-transparent text-right text-[8pt] text-gray-600 outline-none hover:border-sky-400 focus:border-sky-600"
                       >
@@ -416,6 +418,10 @@ export function QuoteSheet({
                     <input
                       name={`qty_${it.id}`}
                       defaultValue={it.qty}
+                      // 数量も欄を離れたら保存して金額を出し直す（変わったときだけ）
+                      onBlur={(e) => {
+                        if (e.currentTarget.value !== String(it.qty)) e.currentTarget.form?.requestSubmit();
+                      }}
                       inputMode="numeric"
                       className={`${pin} text-right tabular-nums`}
                     />
@@ -436,7 +442,7 @@ export function QuoteSheet({
                           defaultValue={s.finishInch ?? ""}
                           inputMode="decimal"
                           placeholder="—"
-                          className={`${pin} w-16 text-right tabular-nums`}
+                          className={`${pin.replace("w-full ", "")} w-16 shrink-0 text-right tabular-nums`}
                         />
                         <span className="no-print truncate text-[8pt] text-gray-400">{s.name}</span>
                       </span>

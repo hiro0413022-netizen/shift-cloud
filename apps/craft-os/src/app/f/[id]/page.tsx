@@ -120,7 +120,7 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
                 demoNo: <DemoNoInput fittingId={f.id} lineNo={t.line_no} defaultValue={t.demo_no} />,
                 name: (
                   <span className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate" title={t.shelf ? `棚 ${t.shelf}` : undefined}>
+                    <span className="min-w-0 flex-1 truncate font-medium" title={t.shelf ? `棚 ${t.shelf}` : undefined}>
                       {t.product ? (
                         <>
                           {t.product.name}
@@ -137,7 +137,7 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
                         name={`head_${t.line_no}`}
                         defaultValue={t.head_name ?? ""}
                         placeholder="ヘッド"
-                        className={`${PIN} no-print w-24 shrink-0 text-[8pt] text-gray-600`}
+                        className="no-print w-24 shrink-0 rounded-sm border border-dashed border-transparent bg-transparent px-0.5 text-[8pt] text-gray-600 outline-none hover:border-sky-400 focus:border-sky-600 focus:bg-sky-50"
                       />
                     ) : (
                       <input type="hidden" name={`head_${t.line_no}`} value="" />
