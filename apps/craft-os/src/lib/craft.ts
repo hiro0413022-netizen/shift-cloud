@@ -169,6 +169,10 @@ export type WorkOrder = {
   sales_posted_at: string | null;
   status: string;
   note: string | null;
+  /** 組立データを残すか（null=自動・true=残す・false=残さない）#262 */
+  assembly_record?: boolean | null;
+  /** お礼状に添える一言 #262 */
+  thanks_note?: string | null;
 };
 
 export type WorkSpec = {
@@ -200,6 +204,9 @@ export type WorkSpec = {
   actual_weight: number | null;
   actual_head_weight: number | null;
   actual_note: string | null;
+  actual_loft?: number | null;
+  actual_lie?: number | null;
+  grip_name?: string | null;
   measured_at: string | null;
   measured_by: string | null;
 };

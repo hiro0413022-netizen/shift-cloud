@@ -135,6 +135,11 @@ function Card({ card, lane, today }: { card: WorkBoardCard; lane: string; today:
           </Link>
         )}
         {lane !== "done" && <AddTasksButton quoteId={q.id} small />}
+        {(lane === "handover" || lane === "done") && (
+          <Link href={`/q/${q.id}/work#assembly`} className="rounded-lg border border-(--color-line) px-2.5 py-1 text-xs">
+            組立データ・お礼状
+          </Link>
+        )}
         <Link href={`/print/spec/${q.id}`} className="rounded-lg border border-(--color-line) px-2.5 py-1 text-xs">
           組立指示書
         </Link>

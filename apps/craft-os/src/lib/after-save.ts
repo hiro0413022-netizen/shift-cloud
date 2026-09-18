@@ -6,6 +6,6 @@ import { redirect } from "next/navigation";
  */
 export function afterSave(formData: FormData, id: number): void {
   const then = String(formData.get("then") ?? "");
-  const m = then.match(/^print:(quote|order|cover|spec)$/);
+  const m = then.match(/^print:(quote|order|cover|spec|thanks)$/);
   if (m) redirect(`/print/${m[1]}/${id}?auto=1`);
 }

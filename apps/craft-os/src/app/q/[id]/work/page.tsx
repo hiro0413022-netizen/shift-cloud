@@ -13,7 +13,8 @@ import { mdw } from "@/lib/work-schedule";
 import { range, yen } from "@/lib/format";
 import { btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
-import { addSpecLine, createWorkOrder, removeSpecLine, saveSpecs, saveWork } from "./actions";
+import { addSpecLine, createWorkOrder, removeSpecLine, saveAssemblyData, saveSpecs, saveWork, setAssemblyRecord } from "./actions";
+import { needsAssemblyRecord } from "@/lib/assembly";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
   const itemById = new Map(items.map((i) => [i.id, i]));
   const paperItems = toPaperItems(items, full.priced.items);
   const plan = workPlanOf(full);
+  const recordOn = needsAssemblyRecord(work, items, specs);
   const t = full.priced.totals;
 
   return (
@@ -298,40 +300,23 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
                         </div>
                       </div>
 
-                      <div className="rounded-lg bg-(--color-panel-2) p-3">
-                        <p className="mb-2 text-xs font-bold text-(--color-dim)">
-                          組み上がり（実測）— 次回「前回の仕上がり」として出ます
+                      <div className="rounded-lg bg-(--color-panel-2) p-3 text-xs text-(--color-dim)">
+                        <p className="font-bold">組み上がり（実測）</p>
+                        <p className="mt-1">
+                          組み上がったら、下の【組立データ】に実測を入れてください（お礼状に載ります）。
                         </p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <label className="block">
-                            <span className={labelCls}>振動数（cpm）</span>
-                            <input name={`a_cpm_${s.id}`} defaultValue={s.actual_cpm ?? ""} className={CELL} />
-                          </label>
-                          <label className="block">
-                            <span className={labelCls}>バランス</span>
-                            <input name={`a_bal_${s.id}`} defaultValue={s.actual_balance ?? ""} className={CELL} />
-                          </label>
-                          <label className="block">
-                            <span className={labelCls}>長さ（inch）</span>
-                            <input name={`a_len_${s.id}`} defaultValue={s.actual_length ?? ""} className={CELL} />
-                          </label>
-                          <label className="block">
-                            <span className={labelCls}>総重量（g）</span>
-                            <input name={`a_wt_${s.id}`} defaultValue={s.actual_weight ?? ""} className={CELL} />
-                          </label>
-                          <label className="block">
-                            <span className={labelCls}>ヘッド重量（g）</span>
-                            <input name={`a_hw_${s.id}`} defaultValue={s.actual_head_weight ?? ""} className={CELL} />
-                          </label>
-                          <label className="block sm:col-span-2">
-                            <span className={labelCls}>組立メモ</span>
-                            <input name={`a_note_${s.id}`} defaultValue={s.actual_note ?? ""} className={CELL} />
-                          </label>
-                        </div>
-                        <p className="mt-2 text-[11px] text-(--color-dim)">
-                          目標 {range(s.cpm_min, s.cpm_max, "cpm") || "—"} ／ {range(s.balance_min, s.balance_max) || "—"} ／{" "}
-                          {range(s.length_min, s.length_max, "inch") || "—"} ／ {range(s.weight_min, s.weight_max, "g") || "—"}
-                        </p>
+                        {s.actual_length != null || s.actual_weight != null ? (
+                          <p className="mt-1 text-(--color-txt)">
+                            入力済み：{[
+                              s.actual_length != null && `${s.actual_length}inch`,
+                              s.actual_weight != null && `${s.actual_weight}g`,
+                              s.actual_balance,
+                              s.actual_cpm != null && `${s.actual_cpm}cpm`,
+                            ]
+                              .filter(Boolean)
+                              .join("・")}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -348,6 +333,129 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
           </div>
         </section>
       </form>
+
+      {/* 組立データ（#262）。グリップ交換など不要な注文は【残さない】で隠せる（手で線引き） */}
+      <section id="assembly" className={`${cardCls} mt-6 scroll-mt-4`}>
+        <SectionTitle
+          right={
+            <form action={setAssemblyRecord} className="flex items-center gap-1 text-xs">
+              <input type="hidden" name="quote_id" value={q.id} />
+              <span className="mr-1 text-(--color-dim)">この注文の組立データ：</span>
+              {(
+                [
+                  ["on", "残す"],
+                  ["off", "残さない（グリップ交換など）"],
+                  ["auto", "自動"],
+                ] as const
+              ).map(([v, label]) => {
+                const cur = work.assembly_record === true ? "on" : work.assembly_record === false ? "off" : "auto";
+                return (
+                  <button
+                    key={v}
+                    name="value"
+                    value={v}
+                    className={`rounded-lg border px-2.5 py-1 ${
+                      cur === v ? "border-(--color-accent) bg-(--color-accent) font-medium text-white" : "border-(--color-line) bg-white"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </form>
+          }
+        >
+          組立データ（組み上がり）
+        </SectionTitle>
+
+        {!recordOn ? (
+          <p className="text-sm text-(--color-dim)">
+            この注文は組立データを残しません（{work.assembly_record === false ? "手で「残さない」にしました" : "シャフトの明細がないため"}）。
+            クラブを組んだ場合は右上の【残す】を押してください。
+          </p>
+        ) : specs.length === 0 ? (
+          <div className="text-sm text-(--color-dim)">
+            組立指示書の行がありません。上の組立指示書で【行を足す】を押すと、ここに1本ずつ入力欄が出ます。
+          </div>
+        ) : (
+          <form action={saveAssemblyData}>
+            <input type="hidden" name="quote_id" value={q.id} />
+            <button type="submit" className="sr-only" tabIndex={-1} aria-hidden>
+              保存
+            </button>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-xs">
+                <thead>
+                  <tr className="border-b border-(--color-line) text-left text-(--color-dim)">
+                    <th className="py-2 pr-2">クラブ</th>
+                    <th className="w-16 py-2 pr-1">ロフト°</th>
+                    <th className="w-16 py-2 pr-1">ライ°</th>
+                    <th className="w-20 py-2 pr-1">長さ inch</th>
+                    <th className="w-20 py-2 pr-1">総重量 g</th>
+                    <th className="w-16 py-2 pr-1">バランス</th>
+                    <th className="w-20 py-2 pr-1">振動数 cpm</th>
+                    <th className="w-20 py-2 pr-1">ヘッド重量 g</th>
+                    <th className="w-36 py-2 pr-1">グリップ</th>
+                    <th className="py-2">メモ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {specs.map((s) => {
+                    const it = s.quote_item_id ? itemById.get(s.quote_item_id) : null;
+                    return (
+                      <tr key={s.id} className="border-b border-(--color-line) align-top last:border-0">
+                        <td className="py-2 pr-2">
+                          <div className="font-medium">
+                            {it?.club_type ? <span className="mr-1 rounded bg-(--color-panel-2) px-1">{it.club_type}</span> : null}
+                            {it ? `${it.manufacturer ?? ""} ${it.product_name}${it.spec ? ` ${it.spec}` : ""}` : "（明細なし）"}
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-(--color-dim)">
+                            ヘッド {s.head_name || "—"} ／ 目標 {range(s.length_min, s.length_max, "inch") || "—"}・
+                            {range(s.weight_min, s.weight_max, "g") || "—"}・{range(s.balance_min, s.balance_max) || "—"}・
+                            {range(s.cpm_min, s.cpm_max, "cpm") || "—"}
+                          </div>
+                        </td>
+                        <td className="py-2 pr-1"><input name={`a_loft_${s.id}`} defaultValue={s.actual_loft ?? ""} inputMode="decimal" className={CELL} /></td>
+                        <td className="py-2 pr-1"><input name={`a_lie_${s.id}`} defaultValue={s.actual_lie ?? ""} inputMode="decimal" className={CELL} /></td>
+                        <td className="py-2 pr-1"><input name={`a_len_${s.id}`} defaultValue={s.actual_length ?? ""} inputMode="decimal" className={CELL} /></td>
+                        <td className="py-2 pr-1"><input name={`a_wt_${s.id}`} defaultValue={s.actual_weight ?? ""} inputMode="decimal" className={CELL} /></td>
+                        <td className="py-2 pr-1"><input name={`a_bal_${s.id}`} defaultValue={s.actual_balance ?? ""} placeholder="D2" className={CELL} /></td>
+                        <td className="py-2 pr-1"><input name={`a_cpm_${s.id}`} defaultValue={s.actual_cpm ?? ""} inputMode="numeric" className={CELL} /></td>
+                        <td className="py-2 pr-1"><input name={`a_hw_${s.id}`} defaultValue={s.actual_head_weight ?? ""} inputMode="decimal" className={CELL} /></td>
+                        <td className="py-2 pr-1"><input name={`a_grip_${s.id}`} defaultValue={s.grip_name ?? ""} placeholder="モデル・下巻き" className={CELL} /></td>
+                        <td className="py-2"><input name={`a_note_${s.id}`} defaultValue={s.actual_note ?? ""} className={CELL} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-4">
+              <label className="block">
+                <span className={labelCls}>組立日（空なら入力した日）</span>
+                <input name="assembled_on" defaultValue={work.assembled_on ? md(work.assembled_on) : ""} placeholder="9/18" className={inputCls} />
+              </label>
+              <label className="block">
+                <span className={labelCls}>組立担当</span>
+                <input name="assembled_by_name" defaultValue={work.assembled_by_name ?? ""} className={inputCls} />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className={labelCls}>お礼状に添える一言（任意）</span>
+                <input name="thanks_note" defaultValue={work.thanks_note ?? ""} placeholder="例: 次回のラウンドのご報告を楽しみにしております" className={inputCls} />
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button className={btnCls}>組立データを保存</button>
+              <PrintButtons items={[{ doc: "thanks", label: "お礼状を印刷（A4）", primary: false }]} />
+              <span className="text-xs text-(--color-dim)">
+                お礼状には、お客様名・ご購入のクラブと上の組立データが載ります。【お礼状を印刷】は保存してから印刷画面を開きます。
+              </span>
+            </div>
+          </form>
+        )}
+      </section>
 
       <section className={`${cardCls} mt-6`}>
         <SectionTitle

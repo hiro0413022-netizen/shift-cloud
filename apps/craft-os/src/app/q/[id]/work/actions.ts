@@ -8,7 +8,7 @@ import { postSales } from "@/lib/sales";
 import { afterSave } from "@/lib/after-save";
 import { ensureWorkOrder } from "@/lib/work-order";
 import { placeOrder } from "@/lib/place-order";
-import { parseDay, workStatusOf } from "@/lib/work-status";
+import { parseDay, todayJst, workStatusOf } from "@/lib/work-status";
 
 const admin = () => createAdmin();
 
@@ -93,12 +93,6 @@ export async function saveSpecs(formData: FormData): Promise<void> {
   if (!full.work) return;
 
   for (const s of full.specs) {
-    const hasActual =
-      num(formData.get(`a_cpm_${s.id}`)) != null ||
-      txt(formData.get(`a_bal_${s.id}`)) != null ||
-      num(formData.get(`a_len_${s.id}`)) != null ||
-      num(formData.get(`a_wt_${s.id}`)) != null;
-
     await admin()
       .from("gw_work_order_specs")
       .update({
@@ -119,14 +113,7 @@ export async function saveSpecs(formData: FormData): Promise<void> {
         sleeve_source: txt(formData.get(`sleeve_${s.id}`)),
         sleeve_position: txt(formData.get(`pos_${s.id}`)),
         spec_note: txt(formData.get(`note_${s.id}`)),
-        actual_cpm: num(formData.get(`a_cpm_${s.id}`)),
-        actual_balance: txt(formData.get(`a_bal_${s.id}`)),
-        actual_length: num(formData.get(`a_len_${s.id}`)),
-        actual_weight: num(formData.get(`a_wt_${s.id}`)),
-        actual_head_weight: num(formData.get(`a_hw_${s.id}`)),
-        actual_note: txt(formData.get(`a_note_${s.id}`)),
-        measured_at: hasActual ? (s.measured_at ?? new Date().toISOString()) : null,
-        measured_by: hasActual ? (s.measured_by ?? actor.staffId) : null,
+        // 組み上がりの実測は【組立データ】（saveAssemblyData）で入れる。ここでは触らない（#262）
         updated_at: new Date().toISOString(),
       })
       .eq("id", s.id)
@@ -157,4 +144,74 @@ export async function removeSpecLine(specId: number, formData: FormData): Promis
   const { actor } = await mustQuote(id);
   await admin().from("gw_work_order_specs").delete().eq("id", specId).eq("company_id", actor.companyId);
   revalidatePath(`/q/${id}/work`);
+}
+
+/**
+ * 組立データを残す／残さない を手で決める（#262。グリップ交換などは残さない）。value: on / off / auto
+ */
+export async function setAssemblyRecord(formData: FormData): Promise<void> {
+  const id = Number(formData.get("quote_id"));
+  const v = String(formData.get("value") ?? "auto");
+  const { actor, full } = await mustQuote(id);
+  if (!full.work) return;
+  await admin()
+    .from("gw_work_orders")
+    .update({ assembly_record: v === "on" ? true : v === "off" ? false : null, updated_at: new Date().toISOString() })
+    .eq("id", full.work.id)
+    .eq("company_id", actor.companyId);
+  revalidatePath(`/q/${id}/work`);
+  revalidatePath("/w");
+}
+
+/**
+ * 組立データ（組み上がりの実測）を保存する（#262）。
+ * 1本でも数字が入っていて「組立」日が空なら、今日を組立日にする（工房ボードで次の段へ進む）。
+ * お礼状の一言（thanks_note）もここで保存。【お礼状を印刷】から来たら保存のあと印刷画面へ。
+ */
+export async function saveAssemblyData(formData: FormData): Promise<void> {
+  const id = Number(formData.get("quote_id"));
+  const { actor, full } = await mustQuote(id);
+  if (!full.work) return;
+
+  let any = false;
+  for (const s of full.specs) {
+    const v = {
+      actual_loft: num(formData.get(`a_loft_${s.id}`)),
+      actual_lie: num(formData.get(`a_lie_${s.id}`)),
+      actual_length: num(formData.get(`a_len_${s.id}`)),
+      actual_weight: num(formData.get(`a_wt_${s.id}`)),
+      actual_balance: txt(formData.get(`a_bal_${s.id}`)),
+      actual_cpm: num(formData.get(`a_cpm_${s.id}`)),
+      actual_head_weight: num(formData.get(`a_hw_${s.id}`)),
+      grip_name: txt(formData.get(`a_grip_${s.id}`)),
+      actual_note: txt(formData.get(`a_note_${s.id}`)),
+    };
+    const has = v.actual_length != null || v.actual_weight != null || v.actual_balance != null || v.actual_cpm != null;
+    if (has) any = true;
+    await admin()
+      .from("gw_work_order_specs")
+      .update({
+        ...v,
+        measured_at: has ? (s.measured_at ?? new Date().toISOString()) : null,
+        measured_by: has ? (s.measured_by ?? actor.staffId) : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", s.id)
+      .eq("company_id", actor.companyId);
+  }
+
+  const w = full.work;
+  const patch: Record<string, unknown> = {
+    assembled_by_name: txt(formData.get("assembled_by_name")) ?? w.assembled_by_name,
+    thanks_note: txt(formData.get("thanks_note")),
+    updated_at: new Date().toISOString(),
+  };
+  const assembled = parseDay(txt(formData.get("assembled_on"))) ?? (any && !w.assembled_on ? todayJst() : w.assembled_on);
+  patch.assembled_on = assembled;
+  patch.status = workStatusOf({ ...w, assembled_on: assembled });
+  await admin().from("gw_work_orders").update(patch).eq("id", w.id).eq("company_id", actor.companyId);
+
+  revalidatePath(`/q/${id}/work`);
+  revalidatePath("/w");
+  afterSave(formData, id);
 }

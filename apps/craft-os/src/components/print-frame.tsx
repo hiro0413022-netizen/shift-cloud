@@ -66,7 +66,7 @@ export function PrintToolbar({ title, note, next }: { title: string; note?: stri
  * 押すと「いま直した内容を保存 → 印刷画面を開いて印刷ダイアログ」まで一度に行う（保存し忘れた紙を刷らない）。
  * サーバー側は各保存アクションの afterSave() が then=print:<doc> を見て /print/<doc>/<id>?auto=1 へ飛ばす。
  */
-export function PrintButtons({ items }: { items: { doc: "quote" | "order" | "cover" | "spec"; label: string; primary?: boolean }[] }) {
+export function PrintButtons({ items }: { items: { doc: "quote" | "order" | "cover" | "spec" | "thanks"; label: string; primary?: boolean }[] }) {
   return (
     <div className="no-print flex flex-wrap items-center justify-end gap-2">
       {items.map((it) => (

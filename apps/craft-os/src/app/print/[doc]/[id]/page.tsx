@@ -20,6 +20,7 @@ import {
   MENU_LABELS,
 } from "@/components/paper";
 import { finishInfoOf } from "@/lib/paper-data";
+import { ThanksLetter } from "@/components/thanks-letter";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,7 @@ type Priced = NonNullable<Awaited<ReturnType<typeof getQuote>>>;
 
 export default async function PrintPage({ params }: { params: Promise<{ id: string; doc: string }> }) {
   const { id, doc } = await params;
-  if (!["cover", "quote", "order", "spec"].includes(doc)) notFound();
+  if (!["cover", "quote", "order", "spec", "thanks"].includes(doc)) notFound();
   const actor = await requireActor();
 
   if (doc === "cover") {
@@ -132,7 +133,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
   const full = await getQuote(actor, Number(id));
   if (!full) notFound();
   const landscape = doc === "spec";
-  const title = doc === "quote" ? "御見積書" : doc === "order" ? "御注文書" : "組立指示書";
+  const title = doc === "quote" ? "御見積書" : doc === "order" ? "御注文書" : doc === "thanks" ? "お礼状" : "組立指示書";
 
   return (
     <>
@@ -143,7 +144,13 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
         next={<NextSteps doc={doc} id={full.quote.id} hasOrder={Boolean(full.work)} />}
       />
       <PaperSheet landscape={landscape}>
-        {doc === "spec" ? <SpecSheet full={full} /> : <QuoteDoc full={full} doc={doc as "quote" | "order"} />}
+        {doc === "spec" ? (
+          <SpecSheet full={full} />
+        ) : doc === "thanks" ? (
+          <ThanksLetter full={full} />
+        ) : (
+          <QuoteDoc full={full} doc={doc as "quote" | "order"} />
+        )}
       </PaperSheet>
     </>
   );
@@ -353,3 +360,4 @@ function SpecSheet({ full }: { full: Priced }) {
     </>
   );
 }
+
