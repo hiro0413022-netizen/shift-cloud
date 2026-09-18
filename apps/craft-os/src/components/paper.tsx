@@ -284,6 +284,7 @@ export function QuotePaper({
   bottom,
   goodsMin = 6,
   onEmptyGoods,
+  onEmptyDemo,
 }: {
   doc: "quote" | "order";
   customerName: ReactNode;
@@ -302,6 +303,8 @@ export function QuotePaper({
   goodsMin?: number;
   /** 空いている商品行に出すもの（編集画面の「＋ 商品」など）。1行目の空きにだけ出る */
   onEmptyGoods?: ReactNode;
+  /** 空いている商品行の「試打NO.」欄に出すもの（編集画面の番号入力）。1行目の空きにだけ出る */
+  onEmptyDemo?: ReactNode;
 }) {
   const isOrder = doc === "order";
   const L = layoutItems(items);
@@ -403,7 +406,9 @@ export function QuotePaper({
             const it = L.goods[i];
             return (
               <tr key={`g${i}`} style={{ height: "18pt" }}>
-                <td style={{ ...bd("tblr"), ...cellPad, textAlign: "center" }}>{it?.demoNo ?? ""}</td>
+                <td style={{ ...bd("tblr"), padding: it ? "1px 4px" : "0 1px", textAlign: "center" }}>
+                  {it ? (it.demoNo ?? "") : i === L.goods.length && onEmptyDemo ? onEmptyDemo : ""}
+                </td>
                 <td style={{ ...bd("tblr"), ...cellPad, textAlign: "center", fontSize: "8.5pt" }}>{it?.kind ?? ""}</td>
                 <td style={{ ...bd("tblr"), ...cellPad }}>
                   <div className="flex items-center gap-1">

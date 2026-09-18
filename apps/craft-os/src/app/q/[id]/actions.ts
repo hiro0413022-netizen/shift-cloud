@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
-import { getLaborRates, getQuote, searchProducts, type ProductRow } from "@/lib/craft";
+import { getLaborRates, getQuote, lookupDemoShafts, searchProducts, type ProductRow } from "@/lib/craft";
 import { postSales } from "@/lib/sales";
 
 const admin = () => createAdmin();
@@ -95,6 +95,34 @@ export async function addProductLine(formData: FormData): Promise<void> {
   const p = data as ProductRow;
   await insertProductLine(id, actor.companyId, { ...p, list_price: p.list_price == null ? null : Number(p.list_price) });
   revalidatePath(`/q/${id}/quote`);
+}
+
+/**
+ * 試打NOを打って入れる（2026-09-19 ユーザー要望「試打NO.の欄に番号を入れたら出るように」）。
+ * 試打シャフト台帳（gw_demo_shafts）→ 商品マスタで商品名・メーカー・定価を引き、試打NOつきで明細に入れる。
+ * 種類（DR/FW/UT）は台帳の値を優先（同じシャフトでも DR 用・FW 用で定価が違うため）。
+ */
+export async function addDemoLine(quoteId: number, demoNo: number): Promise<{ ok: boolean; message?: string }> {
+  const { actor } = await assertQuote(quoteId);
+  const n = Math.trunc(Number(demoNo));
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, message: "試打NOを数字で入れてください" };
+  const hit = (await lookupDemoShafts(actor, [n])).get(n);
+  if (!hit) return { ok: false, message: `試打NO ${n} は試打シャフト台帳にありません` };
+  if (!hit.product) {
+    return {
+      ok: false,
+      message: `試打NO ${n}（${hit.import_name ?? "名前なし"}）は商品マスタにまだ紐づいていません。試打シャフト台帳で紐づけてください`,
+    };
+  }
+  const p = hit.product;
+  await insertProductLine(
+    quoteId,
+    actor.companyId,
+    { ...p, club_type: hit.club_type ?? p.club_type, list_price: p.list_price == null ? null : Number(p.list_price) },
+    { demoNo: n },
+  );
+  revalidatePath(`/q/${quoteId}/quote`);
+  return { ok: true };
 }
 
 /** 工賃・加工部品を入れる */

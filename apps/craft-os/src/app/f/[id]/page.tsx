@@ -4,6 +4,7 @@ import { requireActor } from "@/lib/auth";
 import { FITTING_MENUS, getFitting, QUOTE_STATUS_LABELS } from "@/lib/craft";
 import { dateShort, yen } from "@/lib/format";
 import { CoverPaper, MENU_LABELS, Money } from "@/components/paper";
+import { DemoNoInput } from "@/components/demo-no-input";
 import { Badge, btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { makeQuoteFromFitting, saveCover } from "./actions";
 
@@ -108,14 +109,7 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
                     className="no-print h-3 w-3"
                   />
                 ),
-                demoNo: (
-                  <input
-                    name={`demo_${t.line_no}`}
-                    defaultValue={t.demo_no ?? ""}
-                    inputMode="numeric"
-                    className={`${PIN} text-center`}
-                  />
-                ),
+                demoNo: <DemoNoInput fittingId={f.id} lineNo={t.line_no} defaultValue={t.demo_no} />,
                 name: (
                   <span className="flex items-center gap-2">
                     <span className="min-w-0 flex-1 truncate" title={t.shelf ? `棚 ${t.shelf}` : undefined}>
@@ -129,12 +123,17 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
                         <span className="text-[8pt] text-gray-400">{t.demoNote ?? ""}</span>
                       )}
                     </span>
-                    <input
-                      name={`head_${t.line_no}`}
-                      defaultValue={t.head_name ?? ""}
-                      placeholder="ヘッド"
-                      className={`${PIN} no-print w-24 shrink-0 text-[8pt] text-gray-600`}
-                    />
+                    {/* ヘッドは紙に無い欄。シャフトが入った行だけ出す（空行に「ヘッド」が並ぶと紙が読みにくい） */}
+                    {t.product || t.head_name ? (
+                      <input
+                        name={`head_${t.line_no}`}
+                        defaultValue={t.head_name ?? ""}
+                        placeholder="ヘッド"
+                        className={`${PIN} no-print w-24 shrink-0 text-[8pt] text-gray-600`}
+                      />
+                    ) : (
+                      <input type="hidden" name={`head_${t.line_no}`} value="" />
+                    )}
                   </span>
                 ),
                 maker: t.product?.manufacturer ?? "",

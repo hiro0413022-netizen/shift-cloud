@@ -175,3 +175,37 @@ export async function adoptTrialInto(formData: FormData): Promise<void> {
   revalidatePath(`/q/${quoteId}/quote`);
   redirect(`/q/${quoteId}/quote`);
 }
+
+/**
+ * 表紙の試打NO.を1行だけその場で保存する（2026-09-19 ユーザー要望「試打番号を入れたら出るように」）。
+ * 番号を打って Enter／欄を離れた時点で台帳を引き、シャフト名・メーカー・定価が出る。【保存する】を待たない。
+ * 空にすれば、その行の試打NOと商品を外す。
+ */
+export async function setTrialDemo(
+  fittingId: number,
+  lineNo: number,
+  raw: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const { actor, full } = await mustFitting(fittingId);
+  const t = full.trials.find((x) => x.line_no === lineNo);
+  if (!t) return { ok: false, message: "行が見つかりません" };
+  const v = String(raw ?? "").normalize("NFKC").trim();
+  const demoNo = v === "" ? null : Math.trunc(Number(v));
+  if (demoNo != null && (!Number.isFinite(demoNo) || demoNo <= 0)) return { ok: false, message: "試打NOは数字で入れてください" };
+
+  let productId: number | null = null;
+  let message: string | undefined;
+  if (demoNo != null) {
+    const hit = (await lookupDemoShafts(actor, [demoNo])).get(demoNo);
+    if (!hit) message = `試打NO ${demoNo} は台帳にありません`;
+    else if (!hit.product) message = `試打NO ${demoNo} は商品マスタに未紐づけです（試打シャフト台帳で紐づけ）`;
+    productId = hit?.product?.id ?? null;
+  }
+  await admin()
+    .from("gw_fitting_trials")
+    .update({ demo_no: demoNo, product_id: productId, picked: productId ? t.picked : false, updated_at: new Date().toISOString() })
+    .eq("id", t.id)
+    .eq("company_id", actor.companyId);
+  revalidatePath(`/f/${fittingId}`);
+  return { ok: !message, message };
+}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  addDemoLine,
   addFreeLine,
   addLaborLine,
   addProductLine,
@@ -159,6 +160,25 @@ export function QuoteSheet({
   const [searched, setSearched] = useState(false);
   const [ghosts, setGhosts] = useState<{ key: string; name: string; maker: string; price: number }[]>([]);
   const [dirty, setDirty] = useState(false);
+  const [demoMsg, setDemoMsg] = useState<string | null>(null);
+  const demoRef = useRef<HTMLInputElement>(null);
+
+  /** 試打NO.欄に番号を入れて Enter（または欄を離れる）→ 台帳から引いて明細に入れる */
+  function addDemo() {
+    const v = (demoRef.current?.value ?? "").normalize("NFKC").trim();
+    if (!v) return;
+    const n = Number(v);
+    if (demoRef.current) demoRef.current.value = "";
+    setDemoMsg(null);
+    run(
+      async () => {
+        const r = await addDemoLine(quoteId, n);
+        if (!r.ok) setDemoMsg(r.message ?? "入れられませんでした");
+        setTimeout(() => demoRef.current?.focus(), 300);
+      },
+      { name: `試打NO ${v}`, maker: "", price: 0 },
+    );
+  }
   const qRef = useRef<HTMLInputElement>(null);
   const catRef = useRef<HTMLSelectElement>(null);
   const toolRef = useRef<HTMLDivElement>(null);
@@ -305,6 +325,23 @@ export function QuoteSheet({
               staffName={staffName}
               total={totals.total}
               items={items}
+              onEmptyDemo={
+                <input
+                  ref={demoRef}
+                  inputMode="numeric"
+                  placeholder="番号"
+                  title="試打NOを入れて Enter で、シャフト名・メーカー・定価が入ります"
+                  form="demo-no-form"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addDemo();
+                    }
+                  }}
+                  onBlur={addDemo}
+                  className="w-full rounded-sm border border-dashed border-sky-400 bg-sky-50 px-0.5 text-center text-[9pt] outline-none placeholder:text-sky-400 focus:border-sky-600"
+                />
+              }
               onEmptyGoods={
                 <button type="button" className={plus} onClick={() => openTool("product")}>
                   ＋ 商品を入れる
@@ -475,7 +512,11 @@ export function QuoteSheet({
                 </button>
               ))}
               {pending && <span className="text-xs text-(--color-dim)">保存中…</span>}
+              <span className="text-xs text-(--color-dim)">／ 試打したシャフトは、紙の「試打NO.」欄に番号を入れて Enter でも入ります</span>
             </div>
+            {demoMsg && (
+              <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">{demoMsg}</p>
+            )}
 
           <div className="mt-3 space-y-3">
             {adding === "product" && (

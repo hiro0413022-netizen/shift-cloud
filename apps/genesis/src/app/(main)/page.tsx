@@ -75,6 +75,9 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
   return (
     <div className="space-y-4">
+      {/* 全システムへの入口（#248 → 2026-09-19 ユーザー要望でホームの一番上へ。GOLF WING のシフトボード＝店舗ダッシュボードの業務システムカードと同じ形） */}
+      <SystemCards cards={systemCards} title="全システム" />
+
       {/* 上段: 挨拶＋GENESISに聞く（声は最初オフ・#244） */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:gap-6">
         <div className="shrink-0">
@@ -185,8 +188,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         </section>
       </div>
 
-      {/* システムへ直行（#248・GOLF WING 店舗ダッシュボード下のカードと同じ形） */}
-      <SystemCards cards={systemCards} />
 
       {/* パネル */}
       {panel && (

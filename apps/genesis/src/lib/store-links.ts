@@ -17,6 +17,11 @@ export const COMPE_OS_URL = "https://compe-os.vercel.app";
 export const SWING_CORTEX_URL = "https://swing-cortex.vercel.app";
 export const RESERVE_OS_URL = "https://shift-cloud-reserve-os.vercel.app";
 export const LEGAL_OS_URL = "https://legal-os-peach.vercel.app";
+export const ORDER_URL = "https://shift-cloud-golfwing.vercel.app";
+export const CADDY_OS_URL = "https://caddy-os-omega.vercel.app";
+export const SURVEY_OS_URL = "https://survey-os-mu.vercel.app";
+export const DEMO_SALES_URL = "https://demo-sales-delta.vercel.app";
+export const HP_ADMIN_URL = "https://yozan-hp-admin.vercel.app";
 
 export type LauncherLink = { label: string; href: string; /** 状態つきの入口（今日の件数など）か */ status?: boolean };
 export type LauncherCard = {
@@ -157,16 +162,23 @@ export type SystemCard = {
 };
 
 export const SYSTEM_CARDS: SystemCard[] = [
+  // 2026-09-19 ユーザー要望「GOLF WING のシフトボードみたいに全システムへ飛べるカードを、ホームの一番最初に」。
+  // 店舗でよく使う順 → 管理・営業の順。新しいアプリを本番に出したらここに足す（テストが https を確かめる）。
   { key: "member", name: "Member OS", note: "予約・受付台帳・会員", href: MEMBER_OS_URL, icon: "user" },
   { key: "reservations", name: "今日の予約", note: "Member OS の予約表", href: `${MEMBER_OS_URL}/reservations`, icon: "cal" },
   { key: "shift", name: "Shift Cloud", note: "シフト・勤怠・店舗ダッシュボード", href: SHIFT_CLOUD_URL, icon: "store" },
   { key: "money", name: "Money OS", note: "売上・経費・分析", href: MONEY_OS_URL, icon: "chart" },
   { key: "lesson", name: "Lesson OS", note: "レッスンカルテ・動画", href: LESSON_OS_URL, icon: "book" },
-  { key: "craft", name: "Craft OS", note: "フィッティング・見積・工房", href: CRAFT_OS_URL, icon: "doc" },
-  { key: "reserve", name: "Reserve OS", note: "ビジター・フィッティング申込", href: RESERVE_OS_URL, icon: "cal" },
+  { key: "craft", name: "Craft OS", note: "フィッティング表紙・見積・注文書・工房", href: CRAFT_OS_URL, icon: "doc" },
+  { key: "order", name: "発注管理", note: "仕入先への発注・入荷・商品マスタ", href: ORDER_URL, icon: "box" },
   { key: "inventory", name: "Inventory OS", note: "在庫・棚卸・入出庫", href: INVENTORY_OS_URL, icon: "box" },
-  { key: "compe", name: "Compe OS", note: "コンペ・成績表", href: COMPE_OS_URL, icon: "flag" },
+  { key: "reserve", name: "Reserve OS", note: "ビジター・フィッティング申込", href: RESERVE_OS_URL, icon: "cal" },
   { key: "cortex", name: "SWING CORTEX", note: "AIカルテナレッジ・診断", href: SWING_CORTEX_URL, icon: "spark" },
+  { key: "compe", name: "Compe OS", note: "コンペ・成績表", href: COMPE_OS_URL, icon: "flag" },
+  { key: "caddy", name: "Caddy OS", note: "キャディ派遣・台帳", href: CADDY_OS_URL, icon: "user" },
+  { key: "hp", name: "HP管理", note: "ホームページ・ブログ・閲覧数", href: HP_ADMIN_URL, icon: "doc" },
+  { key: "sales", name: "AI DEMO SALES", note: "HP制作営業・デモ", href: DEMO_SALES_URL, icon: "spark" },
+  { key: "survey", name: "Survey OS", note: "アンケート・集計", href: SURVEY_OS_URL, icon: "check" },
   { key: "legal", name: "Legal OS", note: "契約書・法務", href: LEGAL_OS_URL, icon: "check" },
 ];
 
