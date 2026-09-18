@@ -9,6 +9,7 @@ import { placeOrder as placeOrderCore, type PlaceOrderResult } from "@/lib/place
 import { postSales } from "@/lib/sales";
 import { ensureWorkOrder } from "@/lib/work-order";
 import { todayJst, workStatusOf } from "@/lib/work-status";
+import { addWorkTasks, type AddTasksResult } from "@/lib/work-tasks";
 
 /**
  * 伝票の上の「流れ」のボタン。
@@ -80,5 +81,14 @@ export async function placeOrder(quoteId: number): Promise<PlaceOrderResult> {
   const actor = await requireActor();
   const r = await placeOrderCore(actor, quoteId);
   touch(quoteId);
+  return r;
+}
+
+/** やることリストに追加（工房の段取りを Shift Cloud の店舗の「やること」へ）。押したときだけ入れる */
+export async function addTasksForWork(quoteId: number): Promise<AddTasksResult> {
+  const { actor, full } = await mustQuote(quoteId);
+  const r = await addWorkTasks(actor, full);
+  revalidatePath(`/q/${quoteId}/work`);
+  revalidatePath("/w");
   return r;
 }

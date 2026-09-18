@@ -5,6 +5,7 @@ import { dateShort, range } from "@/lib/format";
 import { TopNav } from "@/components/nav";
 import { todayJst } from "@/lib/work-status";
 import { markWorkStep } from "./actions";
+import { AddTasksButton } from "@/components/add-tasks-button";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,7 @@ function Card({ card, lane, today }: { card: WorkBoardCard; lane: string; today:
             発注する
           </Link>
         )}
+        {lane !== "done" && <AddTasksButton quoteId={q.id} small />}
         <Link href={`/print/spec/${q.id}`} className="rounded-lg border border-(--color-line) px-2.5 py-1 text-xs">
           組立指示書
         </Link>

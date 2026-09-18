@@ -7,6 +7,9 @@ import { finishInfoOf } from "@/lib/paper-data";
 import { GOLFWING_POOL_URL, golfwingOrderUrl } from "@/lib/links";
 import { OrderButton } from "@/components/order-button";
 import { PrintButtons } from "@/components/print-frame";
+import { AddTasksButton } from "@/components/add-tasks-button";
+import { workPlanOf } from "@/lib/work-tasks";
+import { mdw } from "@/lib/work-schedule";
 import { range, yen } from "@/lib/format";
 import { btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
@@ -53,6 +56,7 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
 
   const itemById = new Map(items.map((i) => [i.id, i]));
   const paperItems = toPaperItems(items, full.priced.items);
+  const plan = workPlanOf(full);
   const t = full.priced.totals;
 
   return (
@@ -140,6 +144,32 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </form>
+
+      {/* 工房の段取り（発注→入荷→組立→お渡し連絡）と【やることリストに追加】（2026-09-19） */}
+      <section className={`${cardCls} mb-6`}>
+        <SectionTitle right={<AddTasksButton quoteId={q.id} />}>段取り（見込み）</SectionTitle>
+        <ol className="grid gap-2 sm:grid-cols-4">
+          {plan.map((s) => {
+            const doneKey = { order: "ordered_on", arrive: "arrived_on", assemble: "assembled_on", contact: "delivered_on" }[s.key] as
+              | "ordered_on"
+              | "arrived_on"
+              | "assembled_on"
+              | "delivered_on";
+            const done = Boolean(work[doneKey]);
+            return (
+              <li key={s.key} className={`rounded-lg border p-3 ${done ? "border-emerald-200 bg-emerald-50/50" : "border-(--color-line)"}`}>
+                <p className="text-xs text-(--color-dim)">{done ? "済み" : mdw(s.date)}</p>
+                <p className="text-sm font-bold">{s.label}</p>
+                <p className="mt-0.5 text-[11px] text-(--color-dim)">{s.note}</p>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="mt-3 text-xs text-(--color-dim)">
+          メーカーの発送は平日だけ（土日の発注は月曜発送）・発送の翌日夕方着・火曜定休なら水曜着、で計算しています（祝日は見ていません）。
+          【やることリストに追加】で Shift Cloud の店舗の「やること」に入ります。押し直しても二重には入りません。
+        </p>
+      </section>
 
       {/* 流れのバー【工房（到着・組立・お渡し）】の飛び先。同じ画面にいるときはここまでスクロールする */}
       <form action={saveSpecs} id="koubou" className="scroll-mt-4">

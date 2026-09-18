@@ -26,4 +26,5 @@ export const TASK_SOURCE_LABEL: Record<string, string> = {
   genesis: "本部",
   ai: "AI",
   reserve: "予約",
+  craft: "工房",
 };
