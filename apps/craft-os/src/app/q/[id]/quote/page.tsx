@@ -105,6 +105,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         labor={laborOptions}
         trials={trials}
         fittingId={full.fitting?.id ?? null}
+        hasOrder={Boolean(full.work)}
       />
 
       <section className={`${cardCls} no-print mt-6`}>

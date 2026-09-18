@@ -5,6 +5,7 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { getLaborRates, getQuote, lookupDemoShafts, searchProducts, type ProductRow } from "@/lib/craft";
 import { postSales } from "@/lib/sales";
+import { afterSave } from "@/lib/after-save";
 
 const admin = () => createAdmin();
 
@@ -225,6 +226,7 @@ export async function updateItems(formData: FormData): Promise<void> {
     .eq("company_id", actor.companyId);
 
   revalidatePath(`/q/${id}/quote`);
+  afterSave(formData, id);
 }
 
 /**

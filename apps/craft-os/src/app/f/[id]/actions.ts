@@ -6,6 +6,7 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { getFitting, lookupDemoShafts } from "@/lib/craft";
 import { createQuoteRow } from "@/app/actions";
+import { afterSave } from "@/lib/after-save";
 
 const admin = () => createAdmin();
 
@@ -74,6 +75,7 @@ export async function saveCover(formData: FormData): Promise<void> {
   }
 
   revalidatePath(`/f/${id}`);
+  afterSave(formData, id);
 }
 
 async function nextLineNo(quoteId: number): Promise<number> {

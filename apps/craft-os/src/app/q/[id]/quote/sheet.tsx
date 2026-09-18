@@ -12,6 +12,7 @@ import {
   updateItems,
 } from "../actions";
 import { adoptTrialInto } from "@/app/f/[id]/actions";
+import { PrintButtons } from "@/components/print-frame";
 import { Money, QuoteBottom, QuotePaper, sumsOf, type PaperItem, type PaperSlot } from "@/components/paper";
 
 /**
@@ -126,7 +127,9 @@ export function QuoteSheet({
   labor,
   trials,
   fittingId,
+  hasOrder = false,
 }: {
+  hasOrder?: boolean;
   quoteId: number;
   customerName: string;
   customerContact: string;
@@ -311,6 +314,19 @@ export function QuoteSheet({
       <div className="overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 sm:p-6">
         <form action={updateItems} id="sheet-form" onChange={() => setDirty(true)} onSubmit={() => setDirty(false)}>
           <input type="hidden" name="quote_id" value={quoteId} />
+          {/* Enter で送ったときは「保存」だけ（先頭の送信ボタンが既定になるので、印刷ボタンより前に置く） */}
+          <button type="submit" className="sr-only" tabIndex={-1} aria-hidden>
+            保存
+          </button>
+
+          <div className="mx-auto mb-3 min-w-[760px] max-w-[210mm]">
+            <PrintButtons
+              items={[
+                { doc: "quote", label: "御見積書を印刷", primary: !hasOrder },
+                ...(hasOrder ? [{ doc: "order" as const, label: "御注文書を印刷", primary: true }] : []),
+              ]}
+            />
+          </div>
 
           <div className="mx-auto min-w-[760px] max-w-[210mm] bg-white p-8 text-black shadow-md">
             <QuotePaper
@@ -720,6 +736,12 @@ export function QuoteSheet({
             <button className="inline-flex items-center gap-2 rounded-lg bg-(--color-accent) px-5 py-2.5 text-sm font-medium text-white hover:bg-(--color-accent-2)">
               保存する
             </button>
+            <PrintButtons
+              items={[
+                { doc: "quote", label: "御見積書を印刷" },
+                ...(hasOrder ? [{ doc: "order" as const, label: "御注文書を印刷" }] : []),
+              ]}
+            />
             {dirty ? (
               <span className="text-xs font-medium text-amber-700">直したところがまだ保存されていません</span>
             ) : (

@@ -5,6 +5,7 @@ import { FITTING_MENUS, getFitting, QUOTE_STATUS_LABELS } from "@/lib/craft";
 import { dateShort, yen } from "@/lib/format";
 import { CoverPaper, MENU_LABELS, Money } from "@/components/paper";
 import { DemoNoInput } from "@/components/demo-no-input";
+import { PrintButtons } from "@/components/print-frame";
 import { Badge, btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { makeQuoteFromFitting, saveCover } from "./actions";
 
@@ -68,9 +69,16 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
 
       <form action={saveCover} className="space-y-4">
         <input type="hidden" name="fitting_id" value={f.id} />
+        {/* Enter で送ったときは「保存」だけ（先頭の送信ボタンが既定になるので、印刷ボタンより前に置く） */}
+        <button type="submit" className="sr-only" tabIndex={-1} aria-hidden>
+          保存
+        </button>
 
         {/* Fitting Report そのもの（印刷と同じ紙・A4横）。点線の欄はここで直して【保存】 */}
         <div className="overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 sm:p-6">
+          <div className="mx-auto mb-3 min-w-[980px] max-w-[297mm]">
+            <PrintButtons items={[{ doc: "cover", label: "表紙を印刷", primary: true }]} />
+          </div>
           <div className="mx-auto min-w-[980px] max-w-[297mm] bg-white p-6 text-black shadow-md">
             <CoverPaper
               customer={<input name="customer_name" defaultValue={f.customer_name} className={`${PIN} text-center font-bold`} />}
@@ -179,9 +187,7 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
 
         <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-3 rounded-lg border border-(--color-line) bg-white/95 p-3 shadow-lg backdrop-blur">
           <button className={btnCls}>保存する</button>
-          <Link href={`/print/cover/${f.id}`} className={btnGhostCls}>
-            表紙を印刷
-          </Link>
+          <PrintButtons items={[{ doc: "cover", label: "表紙を印刷" }]} />
           <span className="text-xs text-(--color-dim)">
             試打NOを入れて【保存する】と、シャフト名・メーカー・定価が出ます。左端のチェック＝採用（伝票に写す）。
           </span>

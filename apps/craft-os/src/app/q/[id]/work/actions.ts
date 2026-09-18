@@ -5,6 +5,7 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { getQuote } from "@/lib/craft";
 import { postSales } from "@/lib/sales";
+import { afterSave } from "@/lib/after-save";
 import { ensureWorkOrder } from "@/lib/work-order";
 import { placeOrder } from "@/lib/place-order";
 import { parseDay, workStatusOf } from "@/lib/work-status";
@@ -70,6 +71,7 @@ export async function saveWork(formData: FormData): Promise<void> {
   revalidatePath(`/q/${id}/work`);
   revalidatePath(`/q/${id}/quote`);
   revalidatePath("/");
+  afterSave(formData, id);
 }
 
 /**

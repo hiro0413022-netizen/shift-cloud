@@ -6,6 +6,7 @@ import { jpDate, md, Money, ORDER_STEPS, OrderBottom, QuotePaper, sumsOf, toPape
 import { finishInfoOf } from "@/lib/paper-data";
 import { GOLFWING_POOL_URL, golfwingOrderUrl } from "@/lib/links";
 import { OrderButton } from "@/components/order-button";
+import { PrintButtons } from "@/components/print-frame";
 import { range, yen } from "@/lib/format";
 import { btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
@@ -61,7 +62,19 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
       {/* 御注文書そのもの（印刷と同じ紙）。点線の欄はここで直して【保存】 */}
       <form action={saveWork} className="mb-6">
         <input type="hidden" name="quote_id" value={q.id} />
+        {/* Enter で送ったときは「保存」だけ（先頭の送信ボタンが既定になるので、印刷ボタンより前に置く） */}
+        <button type="submit" className="sr-only" tabIndex={-1} aria-hidden>
+          保存
+        </button>
         <div className="overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 sm:p-6">
+          <div className="mx-auto mb-3 min-w-[760px] max-w-[210mm]">
+            <PrintButtons
+              items={[
+                { doc: "order", label: "御注文書を印刷", primary: true },
+                { doc: "spec", label: "組立指示書を印刷" },
+              ]}
+            />
+          </div>
           <div className="mx-auto min-w-[760px] max-w-[210mm] bg-white p-8 text-black shadow-md">
             <QuotePaper
               doc="order"
@@ -115,12 +128,12 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
               <input name="assembled_by_name" defaultValue={work.assembled_by_name ?? ""} className={`${inputCls} w-40`} />
             </label>
             <button className={btnCls}>注文書を保存</button>
-            <Link href={`/print/order/${id}`} className={btnGhostCls}>
-              御注文書を印刷
-            </Link>
-            <Link href={`/print/spec/${id}`} className={btnGhostCls}>
-              工房の指示書を印刷
-            </Link>
+            <PrintButtons
+              items={[
+                { doc: "order", label: "御注文書を印刷" },
+                { doc: "spec", label: "組立指示書を印刷" },
+              ]}
+            />
             <span className="text-xs text-(--color-dim)">
               {work.order_no}・日付は「9/18」の形で。お渡しを入れると売上が Money OS に入ります。仕上げ情報は下の組立指示書の1本目から出ます。
             </span>
