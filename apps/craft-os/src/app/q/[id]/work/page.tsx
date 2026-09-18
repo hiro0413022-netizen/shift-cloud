@@ -141,7 +141,8 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
         </div>
       </form>
 
-      <form action={saveSpecs}>
+      {/* 流れのバー【工房（到着・組立・お渡し）】の飛び先。同じ画面にいるときはここまでスクロールする */}
+      <form action={saveSpecs} id="koubou" className="scroll-mt-4">
         <input type="hidden" name="quote_id" value={q.id} />
         <section className={cardCls}>
           <SectionTitle

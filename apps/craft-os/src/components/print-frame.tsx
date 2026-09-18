@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 /**
  * 印刷ツールバー（画面にだけ出る）。
@@ -9,31 +9,55 @@ import { useEffect } from "react";
  *
  * 2026-09-19: 編集画面の【印刷】（保存してからここへ来る）は ?auto=1 付きで来るので、開いたらそのまま印刷ダイアログを出す。
  */
-export function PrintToolbar({ title, note }: { title: string; note?: string }) {
+export function PrintToolbar({ title, note, next }: { title: string; note?: string; next?: ReactNode }) {
+  const [done, setDone] = useState(false);
+
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("auto") !== "1") return;
-    // 画像（ロゴ）が読み込まれてから
-    const t = setTimeout(() => window.print(), 400);
-    return () => clearTimeout(t);
+    // 印刷ダイアログを閉じたら「次に進む」を出す（2026-09-19 ユーザー要望「印刷してからそのまま前の画面か注文書に進みたい」）
+    const onAfter = () => setDone(true);
+    window.addEventListener("afterprint", onAfter);
+    let t: ReturnType<typeof setTimeout> | undefined;
+    if (new URLSearchParams(window.location.search).get("auto") === "1") {
+      // 画像（ロゴ）が読み込まれてから
+      t = setTimeout(() => window.print(), 400);
+    }
+    return () => {
+      window.removeEventListener("afterprint", onAfter);
+      if (t) clearTimeout(t);
+    };
   }, []);
 
   return (
-    <div className="no-print sticky top-0 z-10 mb-6 flex flex-wrap items-center gap-3 border-b border-(--color-line) bg-(--color-panel) px-4 py-3">
-      <button
-        onClick={() => window.history.back()}
-        className="rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm"
-      >
-        ← 戻る
-      </button>
-      <span className="text-sm font-bold">{title}</span>
-      {note && <span className="text-xs text-(--color-dim)">{note}</span>}
-      <button
-        onClick={() => window.print()}
-        className="ml-auto rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-medium text-white"
-      >
-        印刷する
-      </button>
-    </div>
+    <>
+      <div className="no-print sticky top-0 z-10 mb-6 flex flex-wrap items-center gap-3 border-b border-(--color-line) bg-(--color-panel) px-4 py-3">
+        <span className="text-sm font-bold">{title}</span>
+        {note && <span className="text-xs text-(--color-dim)">{note}</span>}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {next}
+          <button
+            onClick={() => window.print()}
+            className="rounded-lg bg-(--color-accent) px-4 py-2 text-sm font-medium text-white"
+          >
+            印刷する
+          </button>
+        </div>
+      </div>
+
+      {done && next && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setDone(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <p className="text-base font-bold">{title}の印刷が終わりました</p>
+            <p className="mt-1 text-sm text-(--color-dim)">次はどこへ進みますか？</p>
+            <div className="mt-4 flex flex-col gap-2 [&_a]:w-full [&_a]:justify-center [&_button]:w-full [&_button]:justify-center [&_form]:w-full">
+              {next}
+            </div>
+            <button onClick={() => setDone(false)} className="mt-3 w-full text-center text-xs text-(--color-dim) hover:underline">
+              このまま（もう一度印刷する）
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

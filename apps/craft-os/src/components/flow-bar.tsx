@@ -105,8 +105,9 @@ export function FlowBar({ full, poCount }: { full: FullQuote; poCount: number })
               ) : (
                 <OrderButton quoteId={id} label="⑤ 発注する（発注管理のオーダー用紙へ）" />
               ))}
-            <Link href={`/q/${id}/work`} className={ghost}>
-              工房（到着・組立・お渡し）
+            {/* 2026-09-19 ユーザー指摘「押しても反応しない」: 注文書タブにいると同じURLで何も起きなかった → 組立指示書まで飛ぶ */}
+            <Link href={`/q/${id}/work#koubou`} className={ghost}>
+              工房（到着・組立・お渡し）↓
             </Link>
           </>
         )}

@@ -47,7 +47,8 @@ export async function acceptOrder(formData: FormData): Promise<void> {
   const { actor, full } = await mustQuote(id);
   await ensureWorkOrder(actor, full);
   touch(id);
-  redirect(`/print/order/${id}`);
+  // 御見積書の印刷画面から来たとき（then=work）は注文書の画面へ。流れのバーからは御注文書の印刷へ
+  redirect(formData.get("then") === "work" ? `/q/${id}/work` : `/print/order/${id}`);
 }
 
 /** お支払い済み: 注文書の「お支払い」日に今日を入れる（取り消しは注文書タブで日付を消す） */

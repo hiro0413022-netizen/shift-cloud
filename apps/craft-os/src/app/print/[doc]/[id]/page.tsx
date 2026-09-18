@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
 import { FITTING_MENUS, getFitting, getQuote, type TrialRow } from "@/lib/craft";
+import Link from "next/link";
 import { PrintToolbar } from "@/components/print-frame";
+import { acceptOrder } from "@/app/q/[id]/flow-actions";
 import {
   Check,
   CoverPaper,
@@ -32,6 +34,57 @@ export const dynamic = "force-dynamic";
  * 画面で見えている形がそのまま印刷される。
  */
 
+const NEXT_GHOST =
+  "inline-flex items-center gap-1 rounded-lg border border-(--color-line) bg-white px-3 py-2 text-sm font-medium hover:bg-(--color-panel-2)";
+const NEXT_MAIN =
+  "inline-flex items-center gap-1 rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700";
+
+/**
+ * 印刷のあとに進む先（ツールバーと、印刷ダイアログを閉じたあとの案内に出る）。
+ *   御見積書 → 見積の画面に戻る ／ ご注文いただいた → 注文書へ（注文書が無ければ作る）
+ *   御注文書 → 注文書の画面に戻る ／ 見積の画面へ
+ *   組立指示書 → 注文書・工房の画面に戻る
+ */
+function NextSteps({ doc, id, hasOrder }: { doc: string; id: number; hasOrder: boolean }) {
+  if (doc === "quote") {
+    return (
+      <>
+        <Link href={`/q/${id}/quote`} className={NEXT_GHOST}>
+          ← 見積の画面に戻る
+        </Link>
+        {hasOrder ? (
+          <Link href={`/q/${id}/work`} className={NEXT_MAIN}>
+            注文書へ進む →
+          </Link>
+        ) : (
+          <form action={acceptOrder}>
+            <input type="hidden" name="quote_id" value={id} />
+            <input type="hidden" name="then" value="work" />
+            <button className={NEXT_MAIN}>ご注文いただいた → 注文書へ進む</button>
+          </form>
+        )}
+      </>
+    );
+  }
+  if (doc === "order") {
+    return (
+      <>
+        <Link href={`/q/${id}/quote`} className={NEXT_GHOST}>
+          ← 見積の画面へ
+        </Link>
+        <Link href={`/q/${id}/work`} className={NEXT_MAIN}>
+          注文書の画面に戻る（お支払い・発注）
+        </Link>
+      </>
+    );
+  }
+  return (
+    <Link href={`/q/${id}/work`} className={NEXT_GHOST}>
+      ← 注文書・工房の画面に戻る
+    </Link>
+  );
+}
+
 type Priced = NonNullable<Awaited<ReturnType<typeof getQuote>>>;
 
 export default async function PrintPage({ params }: { params: Promise<{ id: string; doc: string }> }) {
@@ -46,7 +99,15 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
     return (
       <>
         <style>{`@page { size: A4 landscape; margin: 8mm; }`}</style>
-        <PrintToolbar title="Fitting Report（試打シャフト表紙）" note={`A4横 ／ ${f.fitting_no}`} />
+        <PrintToolbar
+          title="Fitting Report（試打シャフト表紙）"
+          note={`A4横 ／ ${f.fitting_no}`}
+          next={
+            <Link href={`/f/${f.id}`} className={NEXT_GHOST}>
+              ← 表紙の画面に戻る
+            </Link>
+          }
+        />
         <PaperSheet landscape>
           <CoverPaper
             customer={f.customer_name}
@@ -79,6 +140,7 @@ export default async function PrintPage({ params }: { params: Promise<{ id: stri
       <PrintToolbar
         title={title}
         note={`A4${landscape ? "横" : "縦"} ／ ${full.quote.quote_no}${full.work ? ` ／ ${full.work.order_no}` : ""}`}
+        next={<NextSteps doc={doc} id={full.quote.id} hasOrder={Boolean(full.work)} />}
       />
       <PaperSheet landscape={landscape}>
         {doc === "spec" ? <SpecSheet full={full} /> : <QuoteDoc full={full} doc={doc as "quote" | "order"} />}
