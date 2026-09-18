@@ -933,3 +933,95 @@ export async function getKarte(actor: Actor, guestId: string): Promise<Karte | n
     totalSpend: quotes.filter((q) => q.status !== "void").reduce((a, q) => a + q.total, 0),
   };
 }
+
+// ---------------------------------------------------------------------------
+// 工房ボード（/w）— 2026-09-19 ユーザー要望「上のタブに工房作業用のものを出しておいて」
+// ---------------------------------------------------------------------------
+
+export type WorkBoardCard = {
+  work: WorkOrder;
+  quote: Pick<Quote, "id" | "quote_no" | "customer_name" | "store_id" | "status">;
+  /** 組立指示書の行（シャフトごと）＋見積の明細名 */
+  specs: (WorkSpec & { shaft: string | null; clubType: string | null })[];
+};
+
+/** 工房の段（進み具合の日付から決める。手で選ばせない） */
+export const WORK_LANES = [
+  { key: "order", label: "発注待ち", hint: "注文書はできた・まだ発注していない" },
+  { key: "arrive", label: "入荷待ち", hint: "発注済み・シャフトが届くのを待っている" },
+  { key: "assemble", label: "組立待ち", hint: "届いた・組み立てる" },
+  { key: "handover", label: "お渡し待ち", hint: "組み上がった・お客様にお渡しする" },
+  { key: "done", label: "お渡し済み（直近）", hint: "お渡しした。お支払い未記録は赤" },
+] as const;
+
+export function laneOf(w: Pick<WorkOrder, "ordered_on" | "arrived_on" | "assembled_on" | "delivered_on">): (typeof WORK_LANES)[number]["key"] {
+  if (w.delivered_on) return "done";
+  if (w.assembled_on) return "handover";
+  if (w.arrived_on) return "assemble";
+  if (w.ordered_on) return "arrive";
+  return "order";
+}
+
+export async function listWorkBoard(actor: Actor): Promise<WorkBoardCard[]> {
+  // お渡し済みは直近30日だけ（ボードが伸び続けないように）
+  const since = new Date(Date.now() - 30 * 86400000).toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+  const { data: works } = await db()
+    .from("gw_work_orders")
+    .select("*")
+    .eq("company_id", actor.companyId)
+    .is("deleted_at", null)
+    .or(`delivered_on.is.null,delivered_on.gte.${since}`)
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("order_seq", { ascending: true })
+    .limit(300);
+  const ws = (works ?? []) as WorkOrder[];
+  if (ws.length === 0) return [];
+
+  const quoteIds = [...new Set(ws.map((w) => w.quote_id))];
+  const workIds = ws.map((w) => w.id);
+  const [{ data: quotes }, { data: specs }] = await Promise.all([
+    db()
+      .from("gw_quotes")
+      .select("id, quote_no, customer_name, store_id, status")
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .in("id", quoteIds),
+    db().from("gw_work_order_specs").select("*").in("work_order_id", workIds).order("line_no"),
+  ]);
+  const qs = new Map(
+    ((quotes ?? []) as WorkBoardCard["quote"][])
+      .filter((q) => actor.isOwner || !q.store_id || actor.storeIds.includes(q.store_id))
+      .map((q) => [q.id, q]),
+  );
+  const sp = (specs ?? []) as WorkSpec[];
+  const itemIds = sp.map((s) => s.quote_item_id).filter((v): v is number => v != null);
+  const { data: items } = itemIds.length
+    ? await db().from("gw_quote_items").select("id, manufacturer, product_name, spec, club_type").in("id", itemIds)
+    : { data: [] };
+  const itemBy = new Map(
+    ((items ?? []) as { id: number; manufacturer: string | null; product_name: string; spec: string | null; club_type: string | null }[]).map(
+      (i) => [i.id, i],
+    ),
+  );
+
+  const out: WorkBoardCard[] = [];
+  for (const w of ws) {
+    const q = qs.get(w.quote_id);
+    if (!q) continue;
+    out.push({
+      work: w,
+      quote: q,
+      specs: sp
+        .filter((s) => s.work_order_id === w.id)
+        .map((s) => {
+          const it = s.quote_item_id ? itemBy.get(s.quote_item_id) : undefined;
+          return {
+            ...s,
+            shaft: it ? `${it.manufacturer ? `${it.manufacturer} ` : ""}${it.product_name}${it.spec ? ` ${it.spec}` : ""}` : null,
+            clubType: it?.club_type ?? null,
+          };
+        }),
+    });
+  }
+  return out;
+}

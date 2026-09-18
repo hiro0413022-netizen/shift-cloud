@@ -30,10 +30,11 @@ export function QuoteNav({ id, active }: { id: number | string; active: string }
   );
 }
 
-export function TopNav({ active }: { active: "home" | "fittings" | "demo" }) {
+export function TopNav({ active }: { active: "home" | "fittings" | "work" | "demo" }) {
   const items = [
     { href: "/", key: "home", label: "伝票・工房" },
     { href: "/f", key: "fittings", label: "フィッティング表紙" },
+    { href: "/w", key: "work", label: "工房" },
     { href: "/demo-shafts", key: "demo", label: "試打シャフト台帳" },
   ] as const;
   return (
