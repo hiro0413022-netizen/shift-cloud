@@ -5,6 +5,9 @@ import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
 import { getQuote } from "@/lib/craft";
 import { postSales } from "@/lib/sales";
+import { ensureWorkOrder } from "@/lib/work-order";
+import { placeOrder } from "@/lib/place-order";
+import { parseDay, workStatusOf } from "@/lib/work-status";
 
 const admin = () => createAdmin();
 
@@ -33,44 +36,9 @@ async function mustQuote(id: number) {
 export async function createWorkOrder(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
   const { actor, full } = await mustQuote(id);
-  if (full.work) return;
-
-  const { data: seq } = await admin().rpc("gw_next_work_order_seq", { p_company: actor.companyId });
-  const n = Number(seq ?? 1);
-
-  const { data, error } = await admin()
-    .from("gw_work_orders")
-    .insert({
-      company_id: actor.companyId,
-      store_id: full.quote.store_id,
-      quote_id: id,
-      order_seq: n,
-      order_no: `W-${String(n).padStart(4, "0")}`,
-      created_by: actor.staffId,
-    })
-    .select("id")
-    .single();
-  if (error || !data) throw new Error(error?.message ?? "注文書を作成できませんでした");
-
-  const shafts = full.items.filter((it) => it.line_kind === "product" && it.item_category === "シャフト");
-  if (shafts.length > 0) {
-    await admin()
-      .from("gw_work_order_specs")
-      .insert(
-        shafts.map((it, i) => ({
-          company_id: actor.companyId,
-          work_order_id: data.id,
-          line_no: i + 1,
-          priority: i + 1,
-          quote_item_id: it.id,
-          length_min: it.finish_length_inch,
-          length_max: it.finish_length_inch,
-        }))
-      );
-  }
-
-  await admin().from("gw_quotes").update({ status: "accepted" }).eq("id", id).eq("company_id", actor.companyId);
+  await ensureWorkOrder(actor, full);
   revalidatePath(`/q/${id}/work`);
+  revalidatePath(`/q/${id}/quote`);
 }
 
 /** 進捗と REVE の情報。紙の注文書 最終行と同じ並び */
@@ -88,20 +56,11 @@ export async function saveWork(formData: FormData): Promise<void> {
     note: txt(formData.get("work_note")),
     updated_at: new Date().toISOString(),
   };
-  for (const s of steps) patch[s] = txt(formData.get(s));
+  // 紙と同じ「9／18」でも、日付の入力（2026-09-18）でも受ける。欄が無いフォームから来たときは今の値を残す
+  for (const s of steps) patch[s] = formData.has(s) ? parseDay(txt(formData.get(s))) : full.work[s];
 
   // 状態は進捗から決める（手で選ばせない＝画面と実態がずれない）
-  patch.status = patch.paid_on
-    ? "closed"
-    : patch.delivered_on
-      ? "delivered"
-      : patch.assembled_on
-        ? "ready"
-        : patch.arrived_on
-          ? "arrived"
-          : patch.ordered_on
-            ? "ordered"
-            : "open";
+  patch.status = workStatusOf(patch as Record<string, string | null>);
 
   await admin().from("gw_work_orders").update(patch).eq("id", full.work.id).eq("company_id", actor.companyId);
 
@@ -119,13 +78,9 @@ export async function saveWork(formData: FormData): Promise<void> {
  */
 export async function createPurchaseDrafts(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
-  const { actor } = await mustQuote(id);
-  const { error } = await admin().rpc("gw_create_purchase_drafts", {
-    p_company: actor.companyId,
-    p_quote_id: id,
-    p_ordered_by: actor.name,
-  });
-  if (error) throw new Error(error.message);
+  const actor = await requireActor();
+  const r = await placeOrder(actor, id);
+  if (!r.ok && r.message) throw new Error(r.message);
   revalidatePath(`/q/${id}/work`);
 }
 

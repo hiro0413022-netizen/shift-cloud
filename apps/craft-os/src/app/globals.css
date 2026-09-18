@@ -28,6 +28,11 @@ body {
 
 /* 印刷ページ用。画面ではプレビュー、印刷では紙そのもの */
 @media print {
+  /* 帳票の水色見出し・オレンジの帯を紙にも出す（既定では背景色が落ちる） */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   .no-print {
     display: none !important;
   }

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getQuote, QUOTE_STATUS_LABELS } from "@/lib/craft";
+import { getQuote, listPurchaseDrafts, QUOTE_STATUS_LABELS } from "@/lib/craft";
+import { FlowBar } from "@/components/flow-bar";
 import { dateShort } from "@/lib/format";
 import { Badge } from "@/components/ui";
 
@@ -18,6 +19,7 @@ export default async function QuoteLayout({
   if (!full) notFound();
   const q = full.quote;
   const f = full.fitting;
+  const pos = await listPurchaseDrafts(actor, full.work?.id ?? null);
 
   return (
     <main className="mx-auto max-w-6xl p-6">
@@ -55,6 +57,7 @@ export default async function QuoteLayout({
           {QUOTE_STATUS_LABELS[q.status] ?? q.status}
         </Badge>
       </header>
+      <FlowBar full={full} poCount={pos.length} />
       {children}
     </main>
   );

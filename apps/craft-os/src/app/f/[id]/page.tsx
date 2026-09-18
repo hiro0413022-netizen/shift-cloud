@@ -3,13 +3,18 @@ import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
 import { FITTING_MENUS, getFitting, QUOTE_STATUS_LABELS } from "@/lib/craft";
 import { dateShort, yen } from "@/lib/format";
+import { CoverPaper, MENU_LABELS, Money } from "@/components/paper";
 import { Badge, btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { makeQuoteFromFitting, saveCover } from "./actions";
 
 export const dynamic = "force-dynamic";
 
+/** 紙の上の入力欄（点線。印刷には出ない） */
+const PIN =
+  "w-full rounded-sm border border-dashed border-transparent bg-transparent px-0.5 outline-none hover:border-sky-400 focus:border-sky-600 focus:bg-sky-50";
+
 /**
- * 表紙。紙（01_試打シャフト表紙.xlsm の A4横）と同じ並びにしてある。
+ * 表紙。紙（01_試打シャフト表紙.xlsm の A4横＝Fitting Report）そのものの上で直す（2026-09-18〜・印刷と同じ部品）。
  * 違うのは3つだけ:
  *   ・お名前は受付台帳から来るので書かない
  *   ・試打NOを入れると商品名・メーカー・定価が出る
@@ -60,46 +65,94 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
         </div>
       </header>
 
-      <form action={saveCover} className="space-y-6">
+      <form action={saveCover} className="space-y-4">
         <input type="hidden" name="fitting_id" value={f.id} />
 
+        {/* Fitting Report そのもの（印刷と同じ紙・A4横）。点線の欄はここで直して【保存】 */}
+        <div className="overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 sm:p-6">
+          <div className="mx-auto min-w-[980px] max-w-[297mm] bg-white p-6 text-black shadow-md">
+            <CoverPaper
+              customer={<input name="customer_name" defaultValue={f.customer_name} className={`${PIN} text-center font-bold`} />}
+              date={<input type="date" name="fitting_date" defaultValue={f.fitting_date} className={`${PIN} text-right`} />}
+              fitter={<input name="fitter_name" defaultValue={f.fitter_name ?? ""} className={PIN} />}
+              kindPicker={
+                <>
+                  {(["会員", "ビジター"] as const).map((k) => (
+                    <label key={k} className="inline-flex cursor-pointer items-center gap-2">
+                      <input type="radio" name="member_kind" value={k} defaultChecked={f.member_kind === k} className="h-3 w-3" />
+                      {k}
+                    </label>
+                  ))}
+                  <label className="no-print inline-flex cursor-pointer items-center gap-2 text-gray-500">
+                    <input type="radio" name="member_kind" value="スタッフ" defaultChecked={f.member_kind === "スタッフ"} className="h-3 w-3" />
+                    スタッフ
+                  </label>
+                </>
+              }
+              menuPicker={FITTING_MENUS.map((m) => (
+                <label key={m} className="inline-flex cursor-pointer items-center gap-2">
+                  <input type="radio" name="fitting_menu" value={m} defaultChecked={f.fitting_menu === m} className="h-3 w-3" />
+                  {MENU_LABELS[m]}
+                </label>
+              ))}
+              rows={full.trials.map((t) => ({
+                key: t.id,
+                lineNo: t.line_no,
+                lead: (
+                  <input
+                    type="checkbox"
+                    name={`picked_${t.line_no}`}
+                    defaultChecked={t.picked}
+                    disabled={!t.product}
+                    title="採用（伝票に写す）"
+                    className="no-print h-3 w-3"
+                  />
+                ),
+                demoNo: (
+                  <input
+                    name={`demo_${t.line_no}`}
+                    defaultValue={t.demo_no ?? ""}
+                    inputMode="numeric"
+                    className={`${PIN} text-center`}
+                  />
+                ),
+                name: (
+                  <span className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate" title={t.shelf ? `棚 ${t.shelf}` : undefined}>
+                      {t.product ? (
+                        <>
+                          {t.product.name}
+                          {t.product.spec ? ` ${t.product.spec}` : ""}
+                          {t.product.club_type ? <span className="ml-1 text-[8pt] text-gray-500">{t.product.club_type}</span> : null}
+                        </>
+                      ) : (
+                        <span className="text-[8pt] text-gray-400">{t.demoNote ?? ""}</span>
+                      )}
+                    </span>
+                    <input
+                      name={`head_${t.line_no}`}
+                      defaultValue={t.head_name ?? ""}
+                      placeholder="ヘッド"
+                      className={`${PIN} no-print w-24 shrink-0 text-[8pt] text-gray-600`}
+                    />
+                  </span>
+                ),
+                maker: t.product?.manufacturer ?? "",
+                price: <Money v={t.product?.list_price ?? null} />,
+                memo: <input name={`memo_${t.line_no}`} defaultValue={t.memo ?? ""} className={PIN} />,
+              }))}
+            />
+          </div>
+        </div>
+
         <section className={cardCls}>
-          <SectionTitle>お客様とフィッティング</SectionTitle>
+          <SectionTitle right={<p className="text-xs text-(--color-dim)">ここは紙には出ません（伝票の掛け率・返金に使います）</p>}>
+            フィッティングの設定
+          </SectionTitle>
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="block">
-              <span className={labelCls}>お客様氏名</span>
-              <input name="customer_name" defaultValue={f.customer_name} className={inputCls} />
-            </label>
             <label className="block">
               <span className={labelCls}>ご連絡先</span>
               <input name="customer_contact" defaultValue={f.customer_contact ?? ""} className={inputCls} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>実施日</span>
-              <input type="date" name="fitting_date" defaultValue={f.fitting_date} className={inputCls} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>担当フィッター</span>
-              <input name="fitter_name" defaultValue={f.fitter_name ?? ""} className={inputCls} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>会員／ビジター</span>
-              <select name="member_kind" defaultValue={f.member_kind} className={inputCls}>
-                <option value="会員">会員</option>
-                <option value="ビジター">ビジター</option>
-                <option value="スタッフ">スタッフ</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className={labelCls}>メニュー</span>
-              <select name="fitting_menu" defaultValue={f.fitting_menu ?? ""} className={inputCls}>
-                <option value="">（選択）</option>
-                {FITTING_MENUS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
             </label>
             <label className="block">
               <span className={labelCls}>フィッティング料</span>
@@ -109,7 +162,7 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
                 <option value="55">55分（16,500円）</option>
               </select>
             </label>
-            <label className="block sm:col-span-2">
+            <label className="block">
               <span className={labelCls}>割引区分（伝票の掛け率が決まります）</span>
               <select name="segment" defaultValue={f.segment} className={inputCls}>
                 <option value="visitor_no_fitting">フィッティング歴なし（一見のお客様）</option>
@@ -119,80 +172,20 @@ export default async function CoverPage({ params }: { params: Promise<{ id: stri
               </select>
             </label>
             <label className="block sm:col-span-3">
-              <span className={labelCls}>メモ（表紙に出ます）</span>
+              <span className={labelCls}>メモ</span>
               <input name="note" defaultValue={f.note ?? ""} className={inputCls} />
             </label>
           </div>
         </section>
 
-        <section className={cardCls}>
-          <SectionTitle right={<p className="text-xs text-(--color-dim)">試打NOを入れて保存すると、商品名・メーカー・定価が出ます</p>}>
-            試打したシャフト
-          </SectionTitle>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-(--color-line) text-left text-xs text-(--color-dim)">
-                  <th className="w-10 py-2">#</th>
-                  <th className="w-24 py-2 pr-2">試打NO</th>
-                  <th className="py-2 pr-2">シャフト名</th>
-                  <th className="w-40 py-2 pr-2">メーカー</th>
-                  <th className="w-24 py-2 pr-2 text-right">定価</th>
-                  <th className="w-16 py-2 pr-2">棚</th>
-                  <th className="w-36 py-2 pr-2">ヘッド</th>
-                  <th className="py-2 pr-2">memo</th>
-                  <th className="w-16 py-2 text-center">採用</th>
-                </tr>
-              </thead>
-              <tbody>
-                {full.trials.map((t) => (
-                  <tr key={t.id} className="border-b border-(--color-line) align-top last:border-0">
-                    <td className="py-2 text-(--color-dim)">{t.line_no}</td>
-                    <td className="py-2 pr-2">
-                      <input
-                        name={`demo_${t.line_no}`}
-                        defaultValue={t.demo_no ?? ""}
-                        inputMode="numeric"
-                        className={`${inputCls} px-2 py-1`}
-                      />
-                    </td>
-                    <td className="py-2 pr-2">
-                      {t.product ? (
-                        <span>
-                          {t.product.name}
-                          {t.product.spec ? ` ${t.product.spec}` : ""}
-                          {t.product.club_type ? (
-                            <span className="ml-1 text-xs text-(--color-dim)">{t.product.club_type}</span>
-                          ) : null}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-(--color-dim)">{t.demoNote ?? "—"}</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-2 text-(--color-dim)">{t.product?.manufacturer ?? "—"}</td>
-                    <td className="py-2 pr-2 text-right">{t.product ? yen(t.product.list_price) : "—"}</td>
-                    <td className="py-2 pr-2 text-xs text-(--color-dim)">{t.shelf ?? "—"}</td>
-                    <td className="py-2 pr-2">
-                      <input name={`head_${t.line_no}`} defaultValue={t.head_name ?? ""} className={`${inputCls} px-2 py-1`} />
-                    </td>
-                    <td className="py-2 pr-2">
-                      <input name={`memo_${t.line_no}`} defaultValue={t.memo ?? ""} className={`${inputCls} px-2 py-1`} />
-                    </td>
-                    <td className="py-2 text-center">
-                      <input type="checkbox" name={`picked_${t.line_no}`} defaultChecked={t.picked} disabled={!t.product} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-3 text-xs text-(--color-dim)">
-            定価は商品マスタ（発注管理）から出しています。この表紙は定価を持たないので、値上げがあっても直す必要はありません。
-          </p>
-        </section>
-
-        <div className="flex flex-wrap gap-3">
+        <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-3 rounded-lg border border-(--color-line) bg-white/95 p-3 shadow-lg backdrop-blur">
           <button className={btnCls}>保存する</button>
+          <Link href={`/print/cover/${f.id}`} className={btnGhostCls}>
+            表紙を印刷
+          </Link>
+          <span className="text-xs text-(--color-dim)">
+            試打NOを入れて【保存する】と、シャフト名・メーカー・定価が出ます。左端のチェック＝採用（伝票に写す）。
+          </span>
         </div>
       </form>
 

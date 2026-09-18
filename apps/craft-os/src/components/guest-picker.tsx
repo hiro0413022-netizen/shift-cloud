@@ -17,6 +17,8 @@ import { inputCls, labelCls } from "@/components/ui";
  *   ・打っている途中から候補が出る。押せば台帳の表記に揃い、guest_id と会員区分が入る
  *   ・受付台帳は受付1回ごとの行なので、同じ方が並ばないよう DB 側で束ねた「人」を出す
  *   ・電話は下4桁だけ出す（店頭で他の方の番号を出さない）
+ *   ・2026-09-18: 会員名簿（member-os の mbr_members）にだけ居る会員も候補に出す。
+ *     受付台帳から選んだ方は、ご連絡先が空ならサーバー側で台帳のお電話を入れる
  */
 export function GuestPicker() {
   const [name, setName] = useState("");
@@ -83,7 +85,7 @@ export function GuestPicker() {
         required
       />
       {guestId ? (
-        <p className="mt-1 text-xs text-(--color-dim)">受付台帳から選びました</p>
+        <p className="mt-1 text-xs text-(--color-dim)">受付台帳から選びました（ご連絡先が空なら台帳のお電話が入ります）</p>
       ) : name ? (
         <p className="mt-1 text-xs text-(--color-dim)">このお名前のまま作れます（台帳にあれば下から選ぶと表記が揃います）</p>
       ) : null}
@@ -92,7 +94,7 @@ export function GuestPicker() {
         <div className="absolute left-0 right-0 top-full z-30 mt-1 rounded-lg border border-(--color-line) bg-(--color-panel) shadow-xl">
           <ul className="max-h-64 overflow-y-auto">
             {hits.map((h) => (
-              <li key={h.guestId}>
+              <li key={h.guestId || `m-${h.memberNo ?? h.name}`}>
                 <button
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
@@ -104,6 +106,9 @@ export function GuestPicker() {
                     <span className="rounded bg-(--color-gold) px-1 text-[10px] font-bold text-black">会員</span>
                   )}
                   {h.nameKana && <span className="truncate text-xs text-(--color-dim)">{h.nameKana}</span>}
+                  {!h.guestId && h.memberNo && (
+                    <span className="shrink-0 text-[10px] text-(--color-dim)">会員名簿 No.{h.memberNo}</span>
+                  )}
                   <span className="ml-auto shrink-0 text-xs text-(--color-dim)">
                     {h.phoneLast4 ? `…${h.phoneLast4}` : ""}
                     {h.visits > 1 ? `　受付${h.visits}回` : ""}

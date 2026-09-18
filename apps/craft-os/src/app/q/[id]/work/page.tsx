@@ -1,15 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getQuote, listPurchaseDrafts, listSalesPostings, PO_STATUS_LABELS, WORK_STEPS } from "@/lib/craft";
+import { getQuote, listPurchaseDrafts, listSalesPostings, PO_STATUS_LABELS } from "@/lib/craft";
+import { jpDate, md, Money, ORDER_STEPS, OrderBottom, QuotePaper, sumsOf, toPaperItems } from "@/components/paper";
+import { finishInfoOf } from "@/lib/paper-data";
+import { GOLFWING_POOL_URL, golfwingOrderUrl } from "@/lib/links";
+import { OrderButton } from "@/components/order-button";
 import { range, yen } from "@/lib/format";
 import { btnCls, btnGhostCls, cardCls, inputCls, labelCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
-import { addSpecLine, createPurchaseDrafts, createWorkOrder, removeSpecLine, saveSpecs, saveWork } from "./actions";
+import { addSpecLine, createWorkOrder, removeSpecLine, saveSpecs, saveWork } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const CELL = "w-full rounded border border-(--color-line) px-1.5 py-1 text-xs";
+/** 紙の上の入力欄（点線。印刷には出ない） */
+const PIN =
+  "w-full rounded-sm border border-dashed border-transparent bg-transparent px-0.5 outline-none hover:border-sky-400 focus:border-sky-600 focus:bg-sky-50";
 
 export default async function WorkPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -44,73 +51,81 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
   }
 
   const itemById = new Map(items.map((i) => [i.id, i]));
+  const paperItems = toPaperItems(items, full.priced.items);
+  const t = full.priced.totals;
 
   return (
     <>
       <QuoteNav id={id} active="work" />
 
+      {/* 御注文書そのもの（印刷と同じ紙）。点線の欄はここで直して【保存】 */}
       <form action={saveWork} className="mb-6">
         <input type="hidden" name="quote_id" value={q.id} />
-        <section className={cardCls}>
-          <SectionTitle
-            right={
-              <div className="flex gap-2">
-                <Link href={`/print/order/${id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
-                  御注文書を印刷
-                </Link>
-                <Link href={`/print/spec/${id}`} className="rounded-lg border border-(--color-line) px-3 py-1.5 text-xs">
-                  工房の指示書を印刷
-                </Link>
-              </div>
-            }
-          >
-            {work.order_no} の進み具合
-          </SectionTitle>
-
-          <div className="grid gap-3 sm:grid-cols-4 lg:grid-cols-7">
-            {WORK_STEPS.map((s) => (
-              <label key={s.key} className="block">
-                <span className={labelCls}>{s.label}</span>
-                <input
-                  type="date"
-                  name={s.key}
-                  defaultValue={(work[s.key] as string | null) ?? ""}
-                  className={`${inputCls} px-2 py-1 text-xs`}
+        <div className="overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 sm:p-6">
+          <div className="mx-auto min-w-[760px] max-w-[210mm] bg-white p-8 text-black shadow-md">
+            <QuotePaper
+              doc="order"
+              customerName={q.customer_name}
+              contact={q.customer_contact ?? ""}
+              date={jpDate(work.order_date ?? q.quote_date)}
+              subject={q.subject}
+              delivery={
+                <span className="flex items-center gap-2">
+                  <input type="date" name="due_date" defaultValue={work.due_date ?? ""} className={PIN} />
+                  {!work.due_date && <span className="no-print shrink-0 text-[8pt] text-gray-400">{q.delivery_note}</span>}
+                </span>
+              }
+              payment={q.payment_terms}
+              validity={q.validity_note}
+              staffName={q.staff_name ?? ""}
+              total={full.priced.totals.total}
+              items={paperItems}
+              bottom={
+                <OrderBottom
+                  info={finishInfoOf(full)}
+                  totals={[
+                    { label: "小計", value: <Money v={t.subtotal} zero />, sums: sumsOf(paperItems) },
+                    { label: "消費税", value: <Money v={t.tax} zero /> },
+                    ...(t.refund > 0 ? [{ label: "返金", value: <>▲¥{t.refund.toLocaleString("ja-JP")}</> }] : []),
+                    { label: "前受金", value: <Money v={t.prepaid} zero /> },
+                    { label: "合計", value: <Money v={t.total} zero />, strong: true },
+                  ]}
+                  reveColor={<input name="reve_color" defaultValue={work.reve_color ?? ""} className={PIN} />}
+                  reveSerial={<input name="reve_serial" defaultValue={work.reve_serial ?? ""} className={PIN} />}
+                  steps={ORDER_STEPS.map((st) => ({
+                    label: st.label,
+                    value: (
+                      <input
+                        name={st.key}
+                        defaultValue={work[st.key] ? md(work[st.key]) : ""}
+                        placeholder="／"
+                        title="例: 9/18（「今日」でも入ります）"
+                        className={`${PIN} text-center`}
+                      />
+                    ),
+                  }))}
+                  memo={<textarea name="work_note" defaultValue={work.note ?? ""} rows={3} className={`${PIN} h-full resize-none`} />}
                 />
-              </label>
-            ))}
+              }
+            />
           </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-4">
-            <label className="block">
-              <span className={labelCls}>仕上げ期日</span>
-              <input type="date" name="due_date" defaultValue={work.due_date ?? ""} className={inputCls} />
-            </label>
+          <div className="mx-auto mt-3 flex min-w-[760px] max-w-[210mm] flex-wrap items-end gap-3 rounded-lg border border-(--color-line) bg-white p-3">
             <label className="block">
               <span className={labelCls}>組立担当</span>
-              <input name="assembled_by_name" defaultValue={work.assembled_by_name ?? ""} className={inputCls} />
+              <input name="assembled_by_name" defaultValue={work.assembled_by_name ?? ""} className={`${inputCls} w-40`} />
             </label>
-            <label className="block">
-              <span className={labelCls}>REVE カラー</span>
-              <input name="reve_color" defaultValue={work.reve_color ?? ""} className={inputCls} />
-            </label>
-            <label className="block">
-              <span className={labelCls}>REVE シリアル番号</span>
-              <input name="reve_serial" defaultValue={work.reve_serial ?? ""} className={inputCls} />
-            </label>
-            <label className="block sm:col-span-4">
-              <span className={labelCls}>MEMO</span>
-              <input name="work_note" defaultValue={work.note ?? ""} className={inputCls} />
-            </label>
-          </div>
-
-          <div className="mt-4 flex items-center gap-3">
-            <button className={btnCls}>進み具合を保存</button>
+            <button className={btnCls}>注文書を保存</button>
+            <Link href={`/print/order/${id}`} className={btnGhostCls}>
+              御注文書を印刷
+            </Link>
+            <Link href={`/print/spec/${id}`} className={btnGhostCls}>
+              工房の指示書を印刷
+            </Link>
             <span className="text-xs text-(--color-dim)">
-              入荷登録（発注管理）とつなぐと「到着」は自動で立ちます。いまは手入力です。
+              {work.order_no}・日付は「9/18」の形で。お渡しを入れると売上が Money OS に入ります。仕上げ情報は下の組立指示書の1本目から出ます。
             </span>
           </div>
-        </section>
+        </div>
       </form>
 
       <form action={saveSpecs}>
@@ -294,10 +309,11 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
         <SectionTitle
           right={
             pos.length === 0 && orderable.length > 0 ? (
-              <form action={createPurchaseDrafts}>
-                <input type="hidden" name="quote_id" value={q.id} />
-                <button className={btnGhostCls}>発注の下書きをつくる</button>
-              </form>
+              <OrderButton quoteId={q.id} />
+            ) : pos.length > 0 ? (
+              <a href={GOLFWING_POOL_URL} target="_blank" rel="noreferrer" className={btnGhostCls}>
+                発注管理の発注プールを開く
+              </a>
             ) : null
           }
         >
@@ -308,7 +324,7 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
           <p className="text-sm text-(--color-dim)">
             {orderable.length === 0
               ? "取り寄せる商品の明細がありません。"
-              : "押すと、仕入先ごとに発注管理の「発注プール」へ下書きが入ります。送るのはいつもどおり発注管理の画面からです。"}
+              : "押すと、仕入先ごとに発注管理の「発注プール」へ入り、オーダー用紙が別タブで開きます。送るのはいつもどおり発注管理の画面からです。"}
           </p>
         ) : (
           <>
@@ -325,7 +341,11 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
               <tbody>
                 {pos.map((p) => (
                   <tr key={p.purchase_order_id} className="border-b border-(--color-line) last:border-0">
-                    <td className="py-2 pr-3 whitespace-nowrap">{p.order_no}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">
+                      <a href={golfwingOrderUrl(p.purchase_order_id)} target="_blank" rel="noreferrer" className="text-(--color-accent) underline">
+                        {p.order_no}
+                      </a>
+                    </td>
                     <td className="py-2 pr-3">{p.supplier ?? "—"}</td>
                     <td className="py-2 pr-3 whitespace-nowrap text-(--color-dim)">{p.order_date}</td>
                     <td className="py-2 pr-3 text-right">{p.itemCount}</td>

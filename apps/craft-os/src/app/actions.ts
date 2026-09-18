@@ -26,6 +26,8 @@ export type GuestHit = {
   phoneLast4: string | null;
   visits: number;
   isMember: boolean;
+  /** 会員名簿（Smart Hello → member-os の mbr_members）にだけ居る方の会員番号。受付台帳に居る方は null */
+  memberNo?: string | null;
 };
 
 /**
@@ -39,25 +41,80 @@ export type GuestHit = {
  */
 export async function findGuests(q: string): Promise<GuestHit[]> {
   const actor = await requireActor();
-  const { data, error } = await admin().rpc("mbr_search_people", {
-    p_company_id: actor.companyId,
-    p_store_id: actor.primaryStoreId,
-    p_q: String(q ?? ""),
-    p_limit: 12,
-  });
-  if (error) return [];
+  const query = String(q ?? "").trim();
+  const [{ data, error }, members] = await Promise.all([
+    admin().rpc("mbr_search_people", {
+      p_company_id: actor.companyId,
+      p_store_id: actor.primaryStoreId,
+      p_q: query,
+      p_limit: 12,
+    }),
+    query ? findMembersOnly(actor.companyId, query) : Promise.resolve([] as GuestHit[]),
+  ]);
   type Row = { guest_id: string; name: string | null; name_kana: string | null; phone: string | null; visits: number | null; is_member: boolean | null };
-  return ((data ?? []) as Row[]).map((r) => {
-    const d = String(r.phone ?? "").replace(/\D/g, "");
-    return {
-      guestId: r.guest_id,
-      name: (r.name ?? "").trim(),
-      nameKana: r.name_kana,
-      phoneLast4: d ? d.slice(-4) : null,
-      visits: Number(r.visits ?? 0),
-      isMember: !!r.is_member,
-    };
-  });
+  const guests = error
+    ? []
+    : ((data ?? []) as Row[]).map((r) => {
+        const d = String(r.phone ?? "").replace(/\D/g, "");
+        return {
+          guestId: r.guest_id,
+          name: (r.name ?? "").trim(),
+          nameKana: r.name_kana,
+          phoneLast4: d ? d.slice(-4) : null,
+          visits: Number(r.visits ?? 0),
+          isMember: !!r.is_member,
+        };
+      });
+  // 受付台帳に同じお名前が居れば、そちら（電話・来店回数がある）を優先する
+  const key = (n: string) => n.replace(/[\s　]/g, "");
+  const seen = new Set(guests.map((g) => key(g.name)));
+  return [...guests, ...members.filter((m) => !seen.has(key(m.name)))].slice(0, 15);
+}
+
+/**
+ * 会員名簿（mbr_members・在籍中）だけに居る方。
+ * 2026-09-18 追加: 受付台帳（mbr_guests）を通っていない会員が、見積・表紙のお名前検索に出てこなかった。
+ * 名簿には電話が無いので、ご連絡先は画面で入れてもらう。
+ */
+async function findMembersOnly(companyId: string, query: string): Promise<GuestHit[]> {
+  const bare = query.replace(/[\s　]/g, "");
+  if (!bare || /^\d+$/.test(bare)) return []; // 電話番号の検索は受付台帳だけ（名簿に電話が無い）
+  const esc = bare.replace(/[%_,()]/g, "");
+  if (!esc) return [];
+  const { data } = await admin()
+    .from("mbr_members")
+    .select("member_no, name, name_kana")
+    .eq("company_id", companyId)
+    .is("leave_date", null)
+    .or(`name.ilike.%${esc}%,name_kana.ilike.%${esc}%,member_no.ilike.%${esc}%`)
+    .limit(8);
+  return ((data ?? []) as { member_no: string | null; name: string | null; name_kana: string | null }[])
+    .filter((m) => (m.name ?? "").trim())
+    .map((m) => ({
+      guestId: "",
+      name: (m.name ?? "").trim(),
+      nameKana: m.name_kana,
+      phoneLast4: null,
+      visits: 0,
+      isMember: true,
+      memberNo: m.member_no,
+    }));
+}
+
+/**
+ * 受付台帳から選ばれた方のご連絡先（携帯→電話）。欄が空のときだけ、表紙・伝票に自動で入れる。
+ * 画面の候補には下4桁しか出さない（店頭で他の方の番号を見せない）ので、サーバー側で引く。
+ */
+async function contactOf(companyId: string, guestId: string | null, typed: string | null): Promise<string | null> {
+  if (typed || !guestId) return typed;
+  const { data } = await admin()
+    .from("mbr_guests")
+    .select("mobile, phone")
+    .eq("company_id", companyId)
+    .eq("id", guestId)
+    .maybeSingle();
+  const g = data as { mobile: string | null; phone: string | null } | null;
+  return (g?.mobile || g?.phone || null) ?? null;
 }
 
 function txt(v: FormDataEntryValue | null): string | null {
@@ -101,7 +158,7 @@ export async function createFitting(formData: FormData): Promise<void> {
       fitting_no: `F${two(year)}-${four(n)}`,
       guest_id: txt(formData.get("guest_id")),
       customer_name: name,
-      customer_contact: txt(formData.get("customer_contact")),
+      customer_contact: await contactOf(actor.companyId, txt(formData.get("guest_id")), txt(formData.get("customer_contact"))),
       member_kind: String(formData.get("member_kind") ?? "ビジター"),
       segment: String(formData.get("segment") ?? "visitor_no_fitting"),
       fitting_date: fittingDate,
@@ -167,7 +224,7 @@ export async function createQuoteRow(
       fitting_id: input.fittingId ?? null,
       guest_id: input.guestId ?? null,
       customer_name: input.customerName,
-      customer_contact: input.customerContact ?? null,
+      customer_contact: await contactOf(actor.companyId, input.guestId ?? null, input.customerContact ?? null),
       member_kind: input.memberKind ?? "ビジター",
       segment: input.segment ?? "visitor_no_fitting",
       quote_date: quoteDate,

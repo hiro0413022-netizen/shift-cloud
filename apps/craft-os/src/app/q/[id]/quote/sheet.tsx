@@ -11,12 +11,16 @@ import {
   updateItems,
 } from "../actions";
 import { adoptTrialInto } from "@/app/f/[id]/actions";
+import { Money, QuoteBottom, QuotePaper, sumsOf, type PaperItem, type PaperSlot } from "@/components/paper";
 
 /**
  * 御見積書そのものを編集する画面。
  *
  * 紙（00_雛形.xlsm）と同じ並び・同じ罫線で出して、そのセルの上で数量と掛け率を触る。
  * 「明細を作る画面」と「印刷プレビュー」を分けると、出来上がりが想像できないので分けない。
+ * 2026-09-18: 紙の部品を components/paper.tsx にまとめ、印刷（/print/quote）と1つの部品で描くようにした。
+ *   ＝ 画面で見えている水色の見出し・固定枠（加工部品／グリップ／工賃）・仕上げ長さ・備考が、そのまま紙に出る。
+ *   空いている固定枠（グリップ装着・シャフトカット調整など）は、その場の「＋」で入れられる。
  *
  * ★ 追加は画面を作り直さない。押した瞬間に薄い行が出て、裏で保存してから実体になる。
  *   以前は追加のたびに全体が再描画され、探した商品の一覧まで消えていた。
@@ -24,6 +28,11 @@ import { adoptTrialInto } from "@/app/f/[id]/actions";
 
 export type SheetRow = {
   id: number;
+  /** product / grip / sleeve / coating / labor（紙のどの枠に入るか） */
+  lineKind: string;
+  category: string | null;
+  /** 規格を含まない名前（工賃の固定枠との突き合わせ用） */
+  productName: string;
   demoNo: number | null;
   kind: string;
   name: string;
@@ -93,19 +102,11 @@ const offLabel = (rate: number | null) => {
   return off === 0 ? "定価" : `${off}%OFF`;
 };
 
-/** 帳票のセル。画面では枠線つきの入力欄、印刷では紙と同じ罫線だけ残る */
-const cell = "border-b border-(--color-line) px-2 py-1.5 align-middle";
-const numInput =
-  "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-right text-sm tabular-nums hover:border-(--color-line) focus:border-(--color-accent) focus:bg-white focus:outline-none";
-const textInput =
-  "w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-sm hover:border-(--color-line) focus:border-(--color-accent) focus:bg-white focus:outline-none";
-
 export function QuoteSheet({
   quoteId,
-  quoteNo,
   customerName,
+  customerContact,
   quoteDate,
-  issuer,
   staffName,
   subject,
   deliveryNote,
@@ -124,13 +125,11 @@ export function QuoteSheet({
   labor,
   trials,
   fittingId,
-  fittingNo,
 }: {
   quoteId: number;
-  quoteNo: string;
   customerName: string;
+  customerContact: string;
   quoteDate: string;
-  issuer: string;
   staffName: string;
   subject: string;
   deliveryNote: string;
@@ -149,17 +148,20 @@ export function QuoteSheet({
   labor: LaborOption[];
   trials: TrialOption[];
   fittingId: number | null;
-  fittingNo: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [adding, setAdding] = useState<null | "product" | "labor" | "free" | "trial">(null);
+  const [presetCat, setPresetCat] = useState("");
+  const [presetLabor, setPresetLabor] = useState("");
   const [hits, setHits] = useState<ProductHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [ghosts, setGhosts] = useState<{ key: string; name: string; maker: string; price: number }[]>([]);
+  const [dirty, setDirty] = useState(false);
   const qRef = useRef<HTMLInputElement>(null);
   const catRef = useRef<HTMLSelectElement>(null);
+  const toolRef = useRef<HTMLDivElement>(null);
 
   /** 押した瞬間に行を見せる。裏で保存してから実体に差し替わる */
   function run(action: () => Promise<unknown>, ghost?: { name: string; maker: string; price: number }) {
@@ -189,263 +191,291 @@ export function QuoteSheet({
     }
   }
 
+  /** 行を足す道具を開く（空いている枠の「＋」からも来る） */
+  function openTool(kind: "product" | "labor" | "free" | "trial", opts: { cat?: string; labor?: string } = {}) {
+    setPresetCat(opts.cat ?? "");
+    setPresetLabor(opts.labor ?? "");
+    setAdding(kind);
+    setTimeout(() => toolRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  }
+
   // 「＋ 商品」を開いた時点で、まず棚を見せる。
   // キーワードを打つまで真っ白、では何が入っているのか分からない（2026-09-13 ユーザー報告）。
   useEffect(() => {
-    if (adding === "product" && hits.length === 0 && !searching) void search();
+    if (adding !== "product") return;
+    if (catRef.current) catRef.current.value = presetCat;
+    void search();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adding]);
+  }, [adding, presetCat]);
 
-  const colCount = 9;
+  /** 工賃の固定枠は、押せばその工賃がその場で入る */
+  function addLaborNow(code: string) {
+    const hit = labor.find((l) => l.code === code);
+    if (!hit) return openTool("labor", { labor: code });
+    const fd = new FormData();
+    fd.set("quote_id", String(quoteId));
+    fd.set("labor_code", code);
+    fd.set("price_kind", "price");
+    run(() => addLaborLine(fd), { name: hit.name, maker: "", price: hit.price ?? 0 });
+  }
+
+  const items: PaperItem[] = [
+    ...rows.map((r) => ({
+      id: r.id,
+      lineKind: r.lineKind,
+      category: r.category,
+      demoNo: r.demoNo,
+      kind: r.kind,
+      name: r.name,
+      productName: r.productName,
+      maker: r.maker,
+      listPrice: r.listPrice,
+      discount: r.discountAmount,
+      qty: r.quantity,
+      amount: r.amount,
+      finishInch: r.finishInch,
+    })),
+    // 保存待ちの行（薄く出す）。商品の枠の最後に並ぶ
+    ...ghosts.map((g, i) => ({
+      id: -1 - i,
+      lineKind: "product",
+      category: null,
+      demoNo: null,
+      kind: "",
+      name: `${g.name}（保存中…）`,
+      productName: g.name,
+      maker: g.maker,
+      listPrice: g.price,
+      discount: 0,
+      qty: 1,
+      amount: 0,
+      finishInch: null,
+    })),
+  ];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const shafts = rows.filter((r) => r.isShaft);
+  const finishSlots = Math.max(3, shafts.length);
+
+  const pin =
+    "w-full rounded-sm border border-dashed border-transparent bg-transparent px-0.5 outline-none hover:border-sky-400 focus:border-sky-600 focus:bg-sky-50";
+  const plus = "no-print shrink-0 rounded border border-sky-300 bg-sky-50 px-1.5 text-[10px] leading-4 text-sky-700 hover:bg-sky-100";
+
+  const emptySlot = (slot: PaperSlot, laborCode?: string) => {
+    if (slot === "labor" && laborCode) {
+      return (
+        <button type="button" className={plus} onClick={() => addLaborNow(laborCode)} title="この工賃を入れる">
+          ＋ 入れる
+        </button>
+      );
+    }
+    if (slot === "coating") {
+      return (
+        <button type="button" className={plus} onClick={() => openTool("labor", { labor: "hadras_head_dr" })}>
+          ＋ 選ぶ
+        </button>
+      );
+    }
+    return (
+      <button
+        type="button"
+        className={plus}
+        onClick={() => openTool("product", { cat: slot === "grip" ? "グリップ" : "スリーブ" })}
+      >
+        ＋ 探す
+      </button>
+    );
+  };
 
   return (
     <>
-      {/* ── 帳票そのもの ───────────────────────────────────────── */}
-      <div className="rounded-xl border border-(--color-line) bg-white p-6 shadow-sm sm:p-10">
-        <form action={updateItems} id="sheet-form">
+      <div className="overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 sm:p-6">
+        <form action={updateItems} id="sheet-form" onChange={() => setDirty(true)} onSubmit={() => setDirty(false)}>
           <input type="hidden" name="quote_id" value={quoteId} />
 
-          <header className="mb-6 flex flex-wrap items-start justify-between gap-6">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-xl font-bold tracking-[0.3em]">御見積書</h2>
-              <p className="mt-4 border-b border-black pb-1 text-lg">
-                {customerName} <span className="ml-2 text-sm">様</span>
-              </p>
-            </div>
-            <div className="text-right text-xs leading-6">
-              <p>{quoteDate}</p>
-              <p>No. {quoteNo}</p>
-              <p className="mt-2 font-bold">{issuer}</p>
-              <p>担当：{staffName}</p>
-              {fittingId && (
-                <p className="mt-1">
-                  表紙{" "}
-                  <a href={`/f/${fittingId}`} className="text-(--color-accent) underline">
-                    {fittingNo}
-                  </a>
-                </p>
-              )}
-            </div>
-          </header>
-
-          <table className="mb-5 w-full text-xs">
-            <tbody>
-              <tr>
-                <td className="w-24 py-0.5 text-(--color-dim)">件名</td>
-                <td>
-                  <input name="subject" defaultValue={subject} className={textInput} />
-                </td>
-              </tr>
-              <tr>
-                <td className="py-0.5 text-(--color-dim)">納期</td>
-                <td>
-                  <input name="delivery_note" defaultValue={deliveryNote} className={textInput} />
-                </td>
-              </tr>
-              <tr>
-                <td className="py-0.5 text-(--color-dim)">支払条件</td>
-                <td>
-                  <input name="payment_terms" defaultValue={paymentTerms} className={textInput} />
-                </td>
-              </tr>
-              <tr>
-                <td className="py-0.5 text-(--color-dim)">有効期限</td>
-                <td>
-                  <input name="validity_note" defaultValue={validityNote} className={textInput} />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div className="mb-6 flex items-end gap-4 border-y-2 border-black py-3">
-            <span className="text-sm font-bold">合計金額</span>
-            <span className="text-3xl font-bold tabular-nums">{yen(totals.total)}</span>
-            <span className="text-xs">（税込）</span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] border-collapse text-sm">
-              <thead>
-                <tr className="border-y border-black text-xs text-(--color-dim)">
-                  <th className="w-14 px-2 py-1.5 text-left font-medium">試打NO</th>
-                  <th className="w-20 px-2 py-1.5 text-left font-medium">種類</th>
-                  <th className="px-2 py-1.5 text-left font-medium">商品名</th>
-                  <th className="w-28 px-2 py-1.5 text-left font-medium">メーカー名</th>
-                  <th className="w-24 px-2 py-1.5 text-right font-medium">定価</th>
-                  <th className="w-32 px-2 py-1.5 text-left font-medium">掛け率／割引額</th>
-                  <th className="w-16 px-2 py-1.5 text-right font-medium">数量</th>
-                  <th className="w-28 px-2 py-1.5 text-right font-medium">金額</th>
-                  <th className="w-8 px-1 py-1.5"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-(--color-panel-2)">
-                    <td className={`${cell} text-xs text-(--color-dim)`}>{r.demoNo ?? ""}</td>
-                    <td className={`${cell} text-xs text-(--color-dim)`}>{r.kind}</td>
-                    <td className={cell}>
-                      <div>{r.name}</div>
-                      {r.isShaft && (
-                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-(--color-dim)">
-                          仕上げ
-                          <input
-                            name={`finish_${r.id}`}
-                            defaultValue={r.finishInch ?? ""}
-                            placeholder="—"
-                            className="w-14 rounded border border-transparent bg-transparent px-1 text-right hover:border-(--color-line) focus:border-(--color-accent) focus:bg-white focus:outline-none"
-                          />
-                          inch
-                        </div>
-                      )}
-                    </td>
-                    <td className={`${cell} text-xs text-(--color-dim)`}>{r.maker}</td>
-                    <td className={`${cell} text-right tabular-nums`}>{yen(r.listPrice)}</td>
-                    <td className={cell}>
+          <div className="mx-auto min-w-[760px] max-w-[210mm] bg-white p-8 text-black shadow-md">
+            <QuotePaper
+              doc="quote"
+              customerName={customerName}
+              contact={<input name="customer_contact" defaultValue={customerContact} placeholder="お電話・メール" className={pin} />}
+              date={quoteDate}
+              subject={<input name="subject" defaultValue={subject} className={`${pin} font-bold`} />}
+              delivery={<input name="delivery_note" defaultValue={deliveryNote} className={pin} />}
+              payment={<input name="payment_terms" defaultValue={paymentTerms} className={pin} />}
+              validity={<input name="validity_note" defaultValue={validityNote} className={pin} />}
+              staffName={staffName}
+              total={totals.total}
+              items={items}
+              onEmptyGoods={
+                <button type="button" className={plus} onClick={() => openTool("product")}>
+                  ＋ 商品を入れる
+                </button>
+              }
+              edit={{
+                name: (it) =>
+                  it.id > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const fd = new FormData();
+                        fd.set("quote_id", String(quoteId));
+                        run(() => removeItem(it.id, fd));
+                      }}
+                      title="この行を消す"
+                      className="no-print shrink-0 px-0.5 text-[11px] text-gray-400 hover:text-red-500"
+                    >
+                      ✕
+                    </button>
+                  ) : null,
+                discount: (it) => {
+                  const r = byId.get(it.id);
+                  if (!r) return <Money v={it.discount} />;
+                  return (
+                    <div className="text-right">
                       <select
                         name={`rate_${r.id}`}
                         defaultValue={r.manual ? String(r.rate ?? "") : "auto"}
-                        className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-xs hover:border-(--color-line) focus:border-(--color-accent) focus:bg-white focus:outline-none"
+                        title={r.discountReason || "掛け率"}
+                        className="no-print w-full rounded-sm border border-dashed border-transparent bg-transparent text-right text-[8pt] text-gray-600 outline-none hover:border-sky-400 focus:border-sky-600"
                       >
-                        <option value="auto">自動（{offLabel(r.rate)}）</option>
+                        <option value="auto">自動 {offLabel(r.rate)}</option>
                         {RATE_OPTIONS.map((v) => (
                           <option key={v} value={v}>
                             {offLabel(v)}
                           </option>
                         ))}
                       </select>
-                      <div className="mt-0.5 text-right text-xs tabular-nums text-(--color-dim)">
-                        {r.discountAmount ? yen(r.discountAmount) : ""}
+                      <div>
+                        <Money v={it.discount} />
                       </div>
                       {r.manual && (
                         <input
                           name={`reason_${r.id}`}
                           defaultValue={r.reason ?? ""}
                           placeholder="理由（必須）"
-                          className="mt-1 w-full rounded border border-amber-300 bg-amber-50/40 px-1 py-0.5 text-[11px] focus:outline-none"
+                          className="no-print mt-0.5 w-full rounded-sm border border-amber-300 bg-amber-50 px-1 text-[8pt] outline-none"
                         />
                       )}
-                    </td>
-                    <td className={cell}>
-                      <input name={`qty_${r.id}`} defaultValue={r.quantity} inputMode="numeric" className={numInput} />
-                    </td>
-                    <td className={`${cell} text-right font-medium tabular-nums`}>{yen(r.amount)}</td>
-                    <td className={`${cell} text-center`}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const fd = new FormData();
-                          fd.set("quote_id", String(quoteId));
-                          run(() => removeItem(r.id, fd));
-                        }}
-                        title="この行を消す"
-                        className="text-(--color-dim) hover:text-red-500"
-                      >
-                        ✕
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-
-                {ghosts.map((g) => (
-                  <tr key={g.key} className="animate-pulse opacity-60">
-                    <td className={cell}></td>
-                    <td className={cell}></td>
-                    <td className={cell}>{g.name}</td>
-                    <td className={`${cell} text-xs text-(--color-dim)`}>{g.maker}</td>
-                    <td className={`${cell} text-right tabular-nums`}>{yen(g.price)}</td>
-                    <td className={`${cell} text-xs text-(--color-dim)`}>計算中…</td>
-                    <td className={`${cell} text-right`}>1</td>
-                    <td className={cell}></td>
-                    <td className={cell}></td>
-                  </tr>
-                ))}
-
-                {rows.length === 0 && ghosts.length === 0 && (
-                  <tr>
-                    <td colSpan={colCount} className="px-2 py-8 text-center text-sm text-(--color-dim)">
-                      まだ何も入っていません。下の「＋ 商品」から足してください。
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-
-              <tfoot>
-                <tr>
-                  <td colSpan={6}></td>
-                  <td className="border-t border-black px-2 py-1 text-right text-xs text-(--color-dim)">小計</td>
-                  <td className="border-t border-black px-2 py-1 text-right tabular-nums">{yen(totals.subtotal)}</td>
-                  <td className="border-t border-black"></td>
-                </tr>
-                <tr>
-                  <td colSpan={6}></td>
-                  <td className="px-2 py-1 text-right text-xs text-(--color-dim)">消費税（{totals.taxPct}%）</td>
-                  <td className="px-2 py-1 text-right tabular-nums">{yen(totals.tax)}</td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td colSpan={6}></td>
-                  <td className="px-2 py-1 text-right text-xs text-(--color-dim)">税別品</td>
-                  <td className="px-2 py-1 text-right">
-                    <input name="tax_free_amount" defaultValue={taxFreeAmount} inputMode="numeric" className={numInput} />
-                  </td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td colSpan={6}></td>
-                  <td className="px-2 py-1 text-right text-xs text-(--color-dim)">フィッティング料 返金</td>
-                  <td className="px-2 py-1 text-right tabular-nums">
-                    {refundAuto ? (
-                      <span>{totals.refund ? `▲ ${yen(totals.refund)}` : "—"}</span>
-                    ) : (
-                      <input name="refund_amount" defaultValue={refundAmount} inputMode="numeric" className={numInput} />
-                    )}
-                  </td>
-                  <td></td>
-                </tr>
-                <tr>
-                  <td colSpan={6}></td>
-                  <td className="px-2 py-1 text-right text-xs text-(--color-dim)">前受金</td>
-                  <td className="px-2 py-1 text-right">
-                    <input name="prepaid_amount" defaultValue={prepaidAmount} inputMode="numeric" className={numInput} />
-                  </td>
-                  <td></td>
-                </tr>
-                <tr className="border-y-2 border-black text-base font-bold">
-                  <td colSpan={6}></td>
-                  <td className="px-2 py-1.5 text-right">合計</td>
-                  <td className="px-2 py-1.5 text-right tabular-nums">{yen(totals.total)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
+                    </div>
+                  );
+                },
+                qty: (it) =>
+                  byId.has(it.id) ? (
+                    <input
+                      name={`qty_${it.id}`}
+                      defaultValue={it.qty}
+                      inputMode="numeric"
+                      className={`${pin} text-right tabular-nums`}
+                    />
+                  ) : (
+                    it.qty
+                  ),
+                empty: emptySlot,
+              }}
+              bottom={
+                <QuoteBottom
+                  finish={Array.from({ length: finishSlots }, (_, i) => {
+                    const s = shafts[i];
+                    if (!s) return "";
+                    return (
+                      <span className="flex items-center gap-1">
+                        <input
+                          name={`finish_${s.id}`}
+                          defaultValue={s.finishInch ?? ""}
+                          inputMode="decimal"
+                          placeholder="—"
+                          className={`${pin} w-16 text-right tabular-nums`}
+                        />
+                        <span className="no-print truncate text-[8pt] text-gray-400">{s.name}</span>
+                      </span>
+                    );
+                  })}
+                  totals={[
+                    { label: "小計", value: <Money v={totals.subtotal} zero />, sums: sumsOf(items.filter((i) => i.id > 0)) },
+                    { label: `消費税`, value: <Money v={totals.tax} zero /> },
+                    {
+                      label: "税別品",
+                      value: (
+                        <input
+                          name="tax_free_amount"
+                          defaultValue={taxFreeAmount || ""}
+                          placeholder="0"
+                          inputMode="numeric"
+                          className={`${pin} text-right tabular-nums`}
+                        />
+                      ),
+                    },
+                    {
+                      label: "返金",
+                      value: refundAuto ? (
+                        totals.refund ? (
+                          <>▲¥{yen(totals.refund)}</>
+                        ) : (
+                          ""
+                        )
+                      ) : (
+                        <input
+                          name="refund_amount"
+                          defaultValue={refundAmount || ""}
+                          placeholder="0"
+                          inputMode="numeric"
+                          className={`${pin} text-right tabular-nums`}
+                        />
+                      ),
+                    },
+                    {
+                      label: "前受金",
+                      value: (
+                        <input
+                          name="prepaid_amount"
+                          defaultValue={prepaidAmount || ""}
+                          placeholder="0"
+                          inputMode="numeric"
+                          className={`${pin} text-right tabular-nums`}
+                        />
+                      ),
+                    },
+                    { label: "合計", value: <Money v={totals.total} zero />, strong: true },
+                  ]}
+                  note={
+                    <textarea
+                      name="note"
+                      defaultValue={note}
+                      rows={5}
+                      className="h-[86pt] w-full resize-none bg-transparent leading-[17.2pt] outline-none focus:bg-sky-50/50"
+                    />
+                  }
+                />
+              }
+            />
           </div>
 
-          {/* ── 行を足す ─────────────────────────────────────── */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-dashed border-(--color-line) pb-3">
-            <span className="text-xs text-(--color-dim)">行を足す</span>
-            {(
-              [
-                ["product", "＋ 商品"],
-                ["labor", "＋ 工賃・加工"],
-                ["free", "＋ 手入力"],
-                ...(trials.length > 0 ? ([["trial", "＋ 試打したシャフト"]] as const) : []),
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setAdding(adding === key ? null : key)}
-                className={`rounded-lg border px-3 py-1.5 text-xs ${
-                  adding === key
-                    ? "border-(--color-accent) bg-(--color-accent) font-medium text-white"
-                    : "border-(--color-line) hover:bg-(--color-panel-2)"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-            {pending && <span className="text-xs text-(--color-dim)">保存中…</span>}
-          </div>
+          {/* ── 紙の外：行を足す道具・返金の設定・保存 ───────────── */}
+          <div ref={toolRef} className="mx-auto mt-4 max-w-[210mm] min-w-[760px] space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-(--color-line) bg-white p-3">
+              <span className="text-xs text-(--color-dim)">行を足す</span>
+              {(
+                [
+                  ["product", "＋ 商品"],
+                  ["labor", "＋ 工賃・加工"],
+                  ["free", "＋ 手入力"],
+                  ...(trials.length > 0 ? ([["trial", "＋ 試打したシャフト"]] as const) : []),
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => (adding === key ? setAdding(null) : openTool(key))}
+                  className={`rounded-lg border px-3 py-1.5 text-xs ${
+                    adding === key
+                      ? "border-(--color-accent) bg-(--color-accent) font-medium text-white"
+                      : "border-(--color-line) hover:bg-(--color-panel-2)"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              {pending && <span className="text-xs text-(--color-dim)">保存中…</span>}
+            </div>
 
           <div className="mt-3 space-y-3">
             {adding === "product" && (
@@ -453,7 +483,7 @@ export function QuoteSheet({
                 <div className="flex flex-wrap gap-2">
                   <select
                     ref={catRef}
-                    defaultValue=""
+                    defaultValue={presetCat}
                     onChange={() => void search()}
                     className="rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm"
                   >
@@ -533,7 +563,7 @@ export function QuoteSheet({
 
             {adding === "labor" && (
               <div className="flex flex-wrap items-end gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
-                <select id="labor_code" className="w-72 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm">
+                <select id="labor_code" key={presetLabor} defaultValue={presetLabor} className="w-72 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm">
                   {labor.map((r) => (
                     <option key={r.code} value={r.code}>
                       [{r.section}] {r.name}
@@ -623,12 +653,11 @@ export function QuoteSheet({
             )}
           </div>
 
-          {/* ── 返金と備考 ───────────────────────────────────── */}
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-(--color-line) p-3">
+
+            <div className="rounded-lg border border-(--color-line) bg-white p-3">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" name="refund_auto" defaultChecked={refundAuto} />
-                フィッティング料の返金を自動で計算する
+                フィッティング料の返金を自動で計算する（消費税のあとに税込で差し引きます）
               </label>
               <div className="mt-2 space-y-0.5 text-xs text-(--color-dim)">
                 {refundAvailable ? (
@@ -644,19 +673,19 @@ export function QuoteSheet({
                 className="mt-2 w-full rounded-lg border border-(--color-line) px-2 py-1.5 text-xs"
               />
             </div>
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-(--color-dim)">備考（御見積書に出ます）</span>
-              <textarea name="note" defaultValue={note} rows={4} className="w-full rounded-lg border border-(--color-line) px-3 py-2 text-sm" />
-            </label>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3">
+          <div className="sticky bottom-0 z-20 mx-auto mt-4 flex max-w-[210mm] min-w-[760px] flex-wrap items-center gap-3 rounded-lg border border-(--color-line) bg-white/95 p-3 shadow-lg backdrop-blur">
             <button className="inline-flex items-center gap-2 rounded-lg bg-(--color-accent) px-5 py-2.5 text-sm font-medium text-white hover:bg-(--color-accent-2)">
               保存する
             </button>
-            <span className="text-xs text-(--color-dim)">
-              数量・掛け率・仕上げ長さ・件名などを直したら押してください。行の追加と削除はその場で保存されます。
-            </span>
+            {dirty ? (
+              <span className="text-xs font-medium text-amber-700">直したところがまだ保存されていません</span>
+            ) : (
+              <span className="text-xs text-(--color-dim)">
+                点線の欄は紙の上でそのまま直せます。数量・掛け率・仕上げ長さ・件名などを直したら【保存する】。行の追加と削除はその場で保存されます。
+              </span>
+            )}
           </div>
         </form>
       </div>

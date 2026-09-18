@@ -183,6 +183,8 @@ export async function updateItems(formData: FormData): Promise<void> {
       delivery_note: txt(formData.get("delivery_note")) ?? full.quote.delivery_note,
       payment_terms: txt(formData.get("payment_terms")) ?? full.quote.payment_terms,
       validity_note: txt(formData.get("validity_note")) ?? full.quote.validity_note,
+      // ご連絡先（紙の「ご連絡先：」欄）。欄が無いフォームから来たときは今の値を残す
+      customer_contact: formData.has("customer_contact") ? txt(formData.get("customer_contact")) : full.quote.customer_contact,
       tax_free_amount: num(formData.get("tax_free_amount")) ?? 0,
       prepaid_amount: num(formData.get("prepaid_amount")) ?? 0,
       refund_auto: formData.get("refund_auto") === "on",

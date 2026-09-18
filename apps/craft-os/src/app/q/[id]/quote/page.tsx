@@ -2,16 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
 import { getFitting, getLaborRates, getQuote, listSalesPostings, refundBreakdown, QUOTE_STATUS_LABELS } from "@/lib/craft";
-import { dateJa } from "@/lib/format";
+import { jpDate } from "@/components/paper";
 import { btnCls, btnGhostCls, cardCls, inputCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
 import { issueQuoteDoc, markReviewed, postSalesNow, setStatus } from "../actions";
 import { QuoteSheet, type LaborOption, type SheetRow, type TrialOption } from "./sheet";
 
 export const dynamic = "force-dynamic";
-
-/** 帳票の発行元。印刷側（/print）と同じものを出す */
-const ISSUER = "株式会社ファイン";
 
 export default async function QuotePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,6 +29,9 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     const p = priced.items[i];
     return {
       id: it.id,
+      lineKind: it.line_kind ?? "product",
+      category: it.item_category ?? null,
+      productName: it.product_name,
       demoNo: it.demo_no,
       kind: it.club_type ?? it.item_category ?? "",
       name: `${it.product_name}${it.spec ? ` ${it.spec}` : ""}`,
@@ -71,21 +71,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
     <>
       <QuoteNav id={id} active="quote" />
 
-      <div className="no-print mb-3 flex flex-wrap justify-end gap-2">
-        <Link href={`/print/order/${id}`} className="rounded-lg bg-(--color-accent) px-3 py-1.5 text-xs font-medium text-white">
-          御注文書を印刷
-        </Link>
-        <Link href={`/print/quote/${id}`} className="rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-xs">
-          御見積書を印刷
-        </Link>
-      </div>
-
       <QuoteSheet
         quoteId={q.id}
-        quoteNo={q.quote_no}
         customerName={q.customer_name}
-        quoteDate={dateJa(q.quote_date)}
-        issuer={ISSUER}
+        customerContact={q.customer_contact ?? ""}
+        quoteDate={jpDate(q.quote_date)}
         staffName={q.staff_name ?? ""}
         subject={q.subject}
         deliveryNote={q.delivery_note}
@@ -115,7 +105,6 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         labor={laborOptions}
         trials={trials}
         fittingId={full.fitting?.id ?? null}
-        fittingNo={full.fitting?.fitting_no ?? null}
       />
 
       <section className={`${cardCls} no-print mt-6`}>
