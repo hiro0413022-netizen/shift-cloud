@@ -184,9 +184,38 @@ export async function updateItems(formData: FormData): Promise<void> {
     const rateRaw = String(formData.get(`rate_${it.id}`) ?? "").trim();
     const reason = txt(formData.get(`reason_${it.id}`));
     const finish = num(formData.get(`finish_${it.id}`));
-    const manual = rateRaw !== "" && rateRaw !== "auto";
-    const rate = manual ? Number(rateRaw) : null;
-    const changed = manual !== Boolean(it.discount_manual) || (manual && Number(it.discount_rate) !== rate);
+    // 値引きの決め方: auto（自動）／決まった掛け率／pct（任意の%OFF）／yen（販売単価を直接）
+    let manual = rateRaw !== "" && rateRaw !== "auto";
+    let rate: number | null = null;
+    let discountAmount: number | null = null;
+    if (rateRaw === "pct") {
+      const pct = num(formData.get(`pct_${it.id}`));
+      if (pct == null || pct < 0 || pct > 100) {
+        // 数字が入っていないときは今の値のまま
+        manual = Boolean(it.discount_manual);
+        rate = it.discount_rate == null ? null : Number(it.discount_rate);
+        discountAmount = it.discount_amount == null ? null : Number(it.discount_amount);
+      } else {
+        rate = Math.round((1 - pct / 100) * 10000) / 10000;
+      }
+    } else if (rateRaw === "yen") {
+      const price = num(formData.get(`yen_${it.id}`));
+      if (price == null || price < 0) {
+        manual = Boolean(it.discount_manual);
+        rate = it.discount_rate == null ? null : Number(it.discount_rate);
+        discountAmount = it.discount_amount == null ? null : Number(it.discount_amount);
+      } else {
+        // 単価 = 定価 + 値引額（値引額はマイナス）
+        discountAmount = Math.round(price) - Number(it.list_price ?? 0);
+      }
+    } else if (manual) {
+      rate = Number(rateRaw);
+    }
+    const changed =
+      manual !== Boolean(it.discount_manual) ||
+      (manual &&
+        ((it.discount_rate == null ? null : Number(it.discount_rate)) !== rate ||
+          (it.discount_amount == null ? null : Number(it.discount_amount)) !== (rate == null ? discountAmount : null)));
 
     await admin()
       .from("gw_quote_items")
@@ -195,6 +224,7 @@ export async function updateItems(formData: FormData): Promise<void> {
         finish_length_inch: finish,
         discount_manual: manual,
         discount_rate: rate,
+        discount_amount: manual && rate == null ? discountAmount : null,
         discount_reason: manual ? reason : null,
         discount_by: manual && changed ? actor.staffId : it.discount_by,
         discount_at: manual && changed ? new Date().toISOString() : undefined,

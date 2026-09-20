@@ -141,6 +141,8 @@ export type QuoteItem = QuoteItemInput & {
   unit_price: number | null;
   finish_length_inch: number | null;
   discount_rate: number | null;
+  /** 金額で値引きしたとき（discount_rate が null）の値引額。マイナス */
+  discount_amount: number | null;
   discount_reason: string | null;
   discount_by: string | null;
   discount_at: string | null;

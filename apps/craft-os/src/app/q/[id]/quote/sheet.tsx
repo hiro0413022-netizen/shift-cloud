@@ -98,6 +98,9 @@ const CATEGORIES = [
 const RATE_OPTIONS = [1, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5];
 
 const yen = (n: number) => n.toLocaleString("ja-JP");
+
+/** 選択肢に無い掛け率か（任意の％で入れたもの） */
+const isPreset = (rate: number | null) => rate != null && RATE_OPTIONS.some((v) => Math.abs(v - rate) < 1e-6);
 const offLabel = (rate: number | null) => {
   if (rate == null) return "—";
   const off = Math.round((1 - rate) * 1000) / 10;
@@ -382,36 +385,7 @@ export function QuoteSheet({
                 discount: (it) => {
                   const r = byId.get(it.id);
                   if (!r) return <Money v={it.discount} />;
-                  return (
-                    <div className="text-right">
-                      <select
-                        name={`rate_${r.id}`}
-                        defaultValue={r.manual ? String(r.rate ?? "") : "auto"}
-                        // 2026-09-19 ユーザー指摘「定価にしても反応しない」: 選んだ瞬間に保存して金額を出し直す
-                        onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                        title={r.discountReason || "掛け率"}
-                        className="no-print w-full rounded-sm border border-dashed border-transparent bg-transparent text-right text-[8pt] text-gray-600 outline-none hover:border-sky-400 focus:border-sky-600"
-                      >
-                        <option value="auto">自動 {offLabel(r.rate)}</option>
-                        {RATE_OPTIONS.map((v) => (
-                          <option key={v} value={v}>
-                            {offLabel(v)}
-                          </option>
-                        ))}
-                      </select>
-                      <div>
-                        <Money v={it.discount} />
-                      </div>
-                      {r.manual && (
-                        <input
-                          name={`reason_${r.id}`}
-                          defaultValue={r.reason ?? ""}
-                          placeholder="理由（必須）"
-                          className="no-print mt-0.5 w-full rounded-sm border border-amber-300 bg-amber-50 px-1 text-[8pt] outline-none"
-                        />
-                      )}
-                    </div>
-                  );
+                  return <DiscountCell r={r} discount={it.discount} />;
                 },
                 qty: (it) =>
                   byId.has(it.id) ? (
@@ -759,5 +733,89 @@ export function QuoteSheet({
         </form>
       </div>
     </>
+  );
+}
+
+/**
+ * 値引き欄。決まった掛け率のほかに「％を入力」「金額を入力」を選べる。
+ * 2026-09-20 ユーザー依頼「任意の金額と割引率も入れれるように（スタッフ購入に対応していない）」
+ * - ％を入力 … 何%OFFでも（例 37.5）
+ * - 金額を入力 … 1本あたりの販売単価（税抜）をそのまま入れる。値引額は定価との差で自動
+ */
+function DiscountCell({ r, discount }: { r: SheetRow; discount: number }) {
+  const initial = !r.manual ? "auto" : r.rate == null ? "yen" : isPreset(r.rate) ? String(r.rate) : "pct";
+  const [mode, setMode] = useState(initial);
+  const submit = (el: HTMLElement) => (el as HTMLInputElement).form?.requestSubmit();
+  const commitOnBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (e.currentTarget.value !== e.currentTarget.defaultValue && e.currentTarget.value.trim() !== "") submit(e.currentTarget);
+  };
+  const pctDefault = r.manual && r.rate != null ? String(Math.round((1 - r.rate) * 1000) / 10) : "";
+  const yenDefault = r.manual && r.rate == null ? String(r.listPrice + r.discountAmount) : "";
+  const inputCls =
+    "no-print w-full rounded-sm border border-sky-400 bg-sky-50 px-1 text-right text-[8pt] tabular-nums outline-none focus:border-sky-600";
+  return (
+    <div className="text-right">
+      <select
+        name={`rate_${r.id}`}
+        value={mode}
+        onChange={(e) => {
+          const v = e.currentTarget.value;
+          setMode(v);
+          // 入力欄が出るものは、数字を入れてから保存する
+          if (v !== "pct" && v !== "yen") submit(e.currentTarget);
+        }}
+        title={r.discountReason || "掛け率"}
+        className="no-print w-full rounded-sm border border-dashed border-transparent bg-transparent text-right text-[8pt] text-gray-600 outline-none hover:border-sky-400 focus:border-sky-600"
+      >
+        <option value="auto">自動 {r.manual ? "" : offLabel(r.rate)}</option>
+        {RATE_OPTIONS.map((v) => (
+          <option key={v} value={v}>
+            {offLabel(v)}
+          </option>
+        ))}
+        <option value="pct">％を入力…</option>
+        <option value="yen">金額を入力…</option>
+      </select>
+      {mode === "pct" && (
+        <label className="no-print mt-0.5 flex items-center gap-0.5 text-[8pt] text-gray-500">
+          <input
+            name={`pct_${r.id}`}
+            defaultValue={pctDefault}
+            placeholder="例 37.5"
+            inputMode="decimal"
+            autoFocus={initial !== "pct"}
+            onBlur={commitOnBlur}
+            className={inputCls}
+          />
+          %OFF
+        </label>
+      )}
+      {mode === "yen" && (
+        <label className="no-print mt-0.5 flex items-center gap-0.5 text-[8pt] text-gray-500">
+          単価
+          <input
+            name={`yen_${r.id}`}
+            defaultValue={yenDefault}
+            placeholder="税抜"
+            inputMode="numeric"
+            autoFocus={initial !== "yen"}
+            onBlur={commitOnBlur}
+            className={inputCls}
+          />
+          円
+        </label>
+      )}
+      <div>
+        <Money v={discount} />
+      </div>
+      {mode !== "auto" && (
+        <input
+          name={`reason_${r.id}`}
+          defaultValue={r.reason ?? ""}
+          placeholder="理由（例 スタッフ購入）"
+          className="no-print mt-0.5 w-full rounded-sm border border-amber-300 bg-amber-50 px-1 text-[8pt] outline-none"
+        />
+      )}
+    </div>
   );
 }
