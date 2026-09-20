@@ -211,20 +211,24 @@ export async function updateItems(formData: FormData): Promise<void> {
     } else if (manual) {
       rate = Number(rateRaw);
     }
+    // 金額指定なのに金額が無い＝決めようがないので自動に戻す
+    if (manual && rate == null && discountAmount == null) manual = false;
     const changed =
       manual !== Boolean(it.discount_manual) ||
       (manual &&
         ((it.discount_rate == null ? null : Number(it.discount_rate)) !== rate ||
-          (it.discount_amount == null ? null : Number(it.discount_amount)) !== (rate == null ? discountAmount : null)));
+          (rate == null && Number(it.discount_amount ?? 0) !== discountAmount)));
 
-    await admin()
+    const { error } = await admin()
       .from("gw_quote_items")
       .update({
         quantity: Math.max(1, Math.trunc(qty)),
         finish_length_inch: finish,
         discount_manual: manual,
         discount_rate: rate,
-        discount_amount: manual && rate == null ? discountAmount : null,
+        // discount_amount は NOT NULL（既定 0）。金額指定のときだけ値引額、それ以外は 0。
+        // 2026-09-20: #264 で null を入れていたため更新が丸ごと失敗し、掛け率も数量も保存されていなかった
+        discount_amount: manual && rate == null ? discountAmount : 0,
         discount_reason: manual ? reason : null,
         discount_by: manual && changed ? actor.staffId : it.discount_by,
         discount_at: manual && changed ? new Date().toISOString() : undefined,
@@ -232,6 +236,8 @@ export async function updateItems(formData: FormData): Promise<void> {
       })
       .eq("id", it.id)
       .eq("company_id", actor.companyId);
+    // 失敗を黙って捨てない（捨てると「押したのに戻る」になる）
+    if (error) throw new Error(`明細の保存に失敗しました（${it.product_name}）: ${error.message}`);
   }
 
   await admin()

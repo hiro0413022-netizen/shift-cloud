@@ -315,7 +315,25 @@ export function QuoteSheet({
   return (
     <>
       <div className="overflow-x-auto rounded-xl border border-(--color-line) bg-(--color-panel-2) p-3 sm:p-6">
-        <form action={updateItems} id="sheet-form" onChange={() => setDirty(true)} onSubmit={() => setDirty(false)}>
+        {/*
+          2026-09-20 ユーザー指摘「30%OFFにしたら勝手に20%OFFに戻る」:
+          <form action={...}> だと React 19 が保存のあとにフォームを自動リセットし、
+          掛け率の欄が「自動」の表示に戻っていた（DBは30%のまま）。その状態で数量など別の欄を保存すると、
+          見えている「自動」がそのまま送られて本当に20%（自動）に戻る。
+          → 送信は自前で行い、自動リセットをさせない（画面の値＝保存した値のまま残る）。
+        */}
+        <form
+          id="sheet-form"
+          onChange={() => setDirty(true)}
+          onSubmit={(e) => {
+            e.preventDefault();
+            setDirty(false);
+            const fd = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
+            startTransition(async () => {
+              await updateItems(fd);
+            });
+          }}
+        >
           <input type="hidden" name="quote_id" value={quoteId} />
           {/* Enter で送ったときは「保存」だけ（先頭の送信ボタンが既定になるので、印刷ボタンより前に置く） */}
           <button type="submit" className="sr-only" tabIndex={-1} aria-hidden>
