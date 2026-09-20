@@ -102,7 +102,9 @@ export function AccountsTable({ staff, roles }: { staff: StaffRow[]; roles: Role
                       >
                         <input type="hidden" name="staff_id" value={r.id} />
                         {/* 高さ固定(h-7 py-0)にすると文字サイズを上げた時に下が見切れる。paddingで自然に伸ばす */}
+                        {/* key: 保存後に React 19 がフォームを自動リセットしても、新しい役割の表示で作り直す */}
                         <select
+                          key={r.roleId ?? ""}
                           name="role_id"
                           defaultValue={r.roleId ?? ""}
                           className={`${inputCls} max-w-[15rem] leading-normal`}
