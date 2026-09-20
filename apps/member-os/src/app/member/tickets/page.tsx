@@ -76,6 +76,8 @@ export default async function MemberTicketsPage({
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold text-(--color-dim)">チケットを購入する</h2>
         <TicketBuyForm
+          unitExTax={price.unitExTax}
+          packs={price.packs}
           unitTaxIncluded={price.unitTaxIncluded}
           minutes={price.minutes}
           action={buyTickets}

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ticketAmountExTax } from "@yozan/core/frank-lesson-tickets";
+import { withTax } from "@yozan/core/frank-tax";
 
 /**
  * チケット購入（#199）。
@@ -8,23 +10,54 @@ import { useState } from "react";
  * 二度押しでの二重購入を止めるため、送信中はボタンを無効にする。
  */
 export function TicketBuyForm({
+  unitExTax,
   unitTaxIncluded,
+  packs = [],
   minutes,
   action,
 }: {
+  unitExTax: number;
   unitTaxIncluded: number;
+  /** まとめ買い（例 4枚 税抜9,000／税込9,900）。2026-09-19 */
+  packs?: { qty: number; priceExTax: number; priceTaxIncluded: number }[];
   minutes: number;
   action: (formData: FormData) => void;
 }) {
   const [qty, setQty] = useState(1);
   const [busy, setBusy] = useState(false);
-  const total = unitTaxIncluded * qty;
+  // サーバー（purchaseTickets）と同じ計算: まとめ買いを当ててから税を足す
+  const total = withTax(ticketAmountExTax(qty, unitExTax, packs.map((p) => ({ qty: p.qty, price: p.priceExTax }))));
+  const plain = unitTaxIncluded * qty;
 
   return (
     <form action={action} onSubmit={() => setBusy(true)} className="rounded-2xl border border-(--color-line) bg-(--color-panel) p-5">
       <input type="hidden" name="qty" value={qty} />
       <p className="text-sm font-semibold">パーソナルレッスン {minutes}分</p>
-      <p className="mt-0.5 text-xs text-(--color-dim)">1枚 {unitTaxIncluded.toLocaleString("ja-JP")}円（税込）</p>
+      <p className="mt-0.5 text-xs text-(--color-dim)">
+        1枚 {unitTaxIncluded.toLocaleString("ja-JP")}円（税込）
+        {packs.map((p) => (
+          <span key={p.qty}>
+            {" ／ "}
+            <span className="font-semibold text-(--color-gold)">
+              {p.qty}枚 {p.priceTaxIncluded.toLocaleString("ja-JP")}円（税込）
+            </span>
+          </span>
+        ))}
+      </p>
+      {packs.length > 0 && (
+        <div className="mt-3 flex justify-center gap-2">
+          {[1, ...packs.map((p) => p.qty)].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setQty(n)}
+              className={`rounded-full border px-3 py-1 text-xs ${qty === n ? "border-(--color-gold) bg-(--color-gold) text-white" : "border-(--color-line) text-(--color-dim)"}`}
+            >
+              {n === 1 ? "1枚" : `${n}枚セット`}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4 flex items-center justify-center gap-5">
         <button
@@ -49,6 +82,9 @@ export function TicketBuyForm({
       <p className="mt-4 text-center text-sm">
         お支払い <span className="text-lg font-bold">{total.toLocaleString("ja-JP")}円</span>（税込）
       </p>
+      {total < plain && (
+        <p className="mt-1 text-center text-xs text-(--color-gold)">まとめ買いで {(plain - total).toLocaleString("ja-JP")}円 お得です</p>
+      )}
 
       <button
         disabled={busy}

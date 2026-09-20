@@ -31,7 +31,13 @@ export type BookingCfg = {
   /** お客様（会員）が選べる利用時間。スタッフ側（max_minutes_options）とは別に持つ */
   member_minutes_options?: number[];
   /** 打席予約に付けられる25分パーソナルレッスンのオプション（申込は「希望」。担当は店舗が確定する） */
-  lesson_option?: { enabled: boolean; minutes: number; price: number };
+  lesson_option?: {
+    enabled: boolean;
+    minutes: number;
+    price: number;
+    /** まとめ買いの割引（税抜）。例 [{ qty: 4, price: 9000 }]＝4枚で9,000円（税込9,900円）。2026-09-19 ユーザー指摘 */
+    packs?: { qty: number; price: number }[];
+  };
   /** この日付は土日祝の営業時間を適用（自動判定に「追加」するもの。臨時の祝日・お盆など） */
   holiday_dates: string[];
   /** 日本の祝日を自動で土日祝あつかいにする（既定 true）。false にすると holiday_dates だけを見る */
@@ -57,7 +63,7 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   max_minutes_options: [30, 60, 90, 120],
   member_start_step: 60, // 毎時00分スタートのみ
   member_minutes_options: [60, 120],
-  lesson_option: { enabled: true, minutes: 25, price: 2500 },
+  lesson_option: { enabled: true, minutes: 25, price: 2500, packs: [{ qty: 4, price: 9000 }] },
   holiday_dates: [],
   auto_holidays: true,
   closed_dates: [],

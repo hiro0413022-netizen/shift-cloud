@@ -203,3 +203,25 @@ export async function grantJoinCampaignTickets(
     return 0;
   }
 }
+
+
+/**
+ * チケットの代金（税抜）。まとめ買いの割引を大きい束から当てる（2026-09-19 ユーザー指摘:
+ * 「4枚で9,900円（税込）のはずが11,000円になっている」＝1枚2,500円×4で計算していた）。
+ *   例 unit=2500, packs=[{qty:4, price:9000}]
+ *     1枚 2,500 ／ 4枚 9,000 ／ 5枚 9,000+2,500 ／ 8枚 18,000
+ * 束の値段が単価×枚数より高い設定は使わない（お客様が損をしない）。
+ */
+export function ticketAmountExTax(qty: number, unitExTax: number, packs: { qty: number; price: number }[] = []): number {
+  let rest = Math.max(0, Math.floor(qty));
+  let total = 0;
+  const usable = packs
+    .filter((p) => p.qty > 1 && p.price > 0 && p.price < unitExTax * p.qty)
+    .sort((a, b) => b.qty - a.qty);
+  for (const p of usable) {
+    const n = Math.floor(rest / p.qty);
+    total += n * p.price;
+    rest -= n * p.qty;
+  }
+  return total + rest * unitExTax;
+}

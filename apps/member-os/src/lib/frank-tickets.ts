@@ -2,7 +2,7 @@ import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { chargeCardOnFile } from "@/lib/frank-square";
 import { loadBookingCfg } from "@yozan/core/frank-booking";
-import { ticketBalance } from "@yozan/core/frank-lesson-tickets";
+import { ticketAmountExTax, ticketBalance } from "@yozan/core/frank-lesson-tickets";
 import { withTax } from "@yozan/core/frank-tax";
 
 /**
@@ -19,16 +19,32 @@ import { withTax } from "@yozan/core/frank-tax";
  *   **お客様に見せるのは必ず税込**（総額表示義務・frank-tax.ts）。
  */
 
-export type TicketPrice = { unitExTax: number; unitTaxIncluded: number; minutes: number };
+export type TicketPrice = {
+  unitExTax: number;
+  unitTaxIncluded: number;
+  minutes: number;
+  /** まとめ買い（税抜・税込）。例 4枚 9,000 / 9,900 */
+  packs: { qty: number; priceExTax: number; priceTaxIncluded: number }[];
+};
+
+/** 枚数に対するお支払い（税込）。まとめ買いを当ててから税を足す（画面とサーバーで同じ計算） */
+export function ticketTotalTaxIncluded(price: TicketPrice, qty: number): number {
+  return withTax(ticketAmountExTax(qty, price.unitExTax, price.packs.map((p) => ({ qty: p.qty, price: p.priceExTax }))));
+}
 
 export async function ticketPrice(): Promise<TicketPrice> {
   const admin = createAdmin();
   const cfg = await loadBookingCfg(admin);
   const unitExTax = Number(cfg.lesson_option?.price ?? 2500);
+  const packs = (cfg.lesson_option?.packs ?? [{ qty: 4, price: 9000 }])
+    .map((p) => ({ qty: Number(p.qty), priceExTax: Number(p.price) }))
+    .filter((p) => p.qty > 1 && p.priceExTax > 0)
+    .map((p) => ({ ...p, priceTaxIncluded: withTax(p.priceExTax) }));
   return {
     unitExTax,
     unitTaxIncluded: withTax(unitExTax),
     minutes: Number(cfg.lesson_option?.minutes ?? 25),
+    packs,
   };
 }
 
@@ -49,7 +65,7 @@ export async function purchaseTickets(input: {
 
   const admin = createAdmin();
   const price = await ticketPrice();
-  const amount = price.unitTaxIncluded * qty;
+  const amount = ticketTotalTaxIncluded(price, qty);
 
   // ① まずカードで試す。ここで通れば、すぐ使える
   let paid = false;
