@@ -1,9 +1,17 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { assignDispatch, confirmDay, confirmMonth, removeDispatch, setAvailability, setDispatchStatus } from "../actions";
-import { STATUS_LABEL, STATUS_TONE, type BoardAvailability, type BoardDispatch } from "@/lib/shift";
+import {
+  assignDispatch,
+  confirmDay,
+  confirmMonth,
+  removeDispatch,
+  setAvailability,
+  setAvailabilityCourses,
+  setDispatchStatus,
+} from "../actions";
+import { STATUS_LABEL, STATUS_TONE, shortCourseName, type BoardAvailability, type BoardDispatch } from "@/lib/shift";
 import { clientTone, dispatchChipCls } from "@/lib/client-colors";
 
 const WD = ["日", "月", "火", "水", "木", "金", "土"];
@@ -45,6 +53,7 @@ export function CalendarBoard({
   clients,
   partners,
   staff,
+  partnerClients,
 }: {
   ym: string;
   days: string[];
@@ -53,6 +62,8 @@ export function CalendarBoard({
   clients: Named[];
   partners: Named[];
   staff: Named[];
+  /** キャディID → 担当ゴルフ場ID（migration 0195） */
+  partnerClients: Record<string, string[]>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -60,6 +71,28 @@ export function CalendarBoard({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [clientId, setClientId] = useState<string>(clients[0]?.id ?? "");
   const [assignee, setAssignee] = useState<string>("");
+
+  // キャディ本人の提出は別の端末から入るので、開いたままでも自動で取り直す（30秒ごと・画面が見えているときだけ）。
+  // router.refresh() は選んでいる日・入力中の選択を消さない。
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible" && !pending) router.refresh();
+    }, 30_000);
+    const onFocus = () => router.refresh();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [router, pending]);
+
+  const clientById = useMemo(() => new Map(clients.map((c) => [c.id, c.name])), [clients]);
+  const courseLabel = (ids: string[]) =>
+    ids
+      .map((id) => clientById.get(id))
+      .filter((n): n is string => !!n)
+      .map(shortCourseName)
+      .join(" / ");
 
   const byDay = useMemo(() => {
     const m = new Map<string, BoardDispatch[]>();
@@ -123,18 +156,28 @@ export function CalendarBoard({
     const assigned = new Map<string, BoardDispatch>();
     for (const d of dayDispatches) if (d.status !== "cancelled") assigned.set(d.partner_id ?? d.staff_id ?? "", d);
     const avail = new Map(dayAvailability.map((a) => [a.partner_id, a.status]));
+    const avCourses = new Map(dayAvailability.map((a) => [a.partner_id, a.client_ids]));
     const rank = (id: string) =>
       avail.get(id) === "available" ? 0 : avail.get(id) === "maybe" ? 1 : avail.get(id) === "unavailable" ? 3 : 2;
     return partners
-      .map((p) => ({
-        ...p,
-        av: avail.get(p.id) ?? "",
-        mark: AV_MARK[avail.get(p.id) ?? ""] ?? "",
-        rank: rank(p.id),
-        taken: assigned.get(p.id) ?? null,
-      }))
-      .sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name, "ja"));
-  }, [partners, dayAvailability, dayDispatches]);
+      .map((p) => {
+        const courses = avail.get(p.id) === "unavailable" ? [] : (avCourses.get(p.id) ?? []);
+        return {
+          ...p,
+          av: avail.get(p.id) ?? "",
+          mark: AV_MARK[avail.get(p.id) ?? ""] ?? "",
+          rank: rank(p.id),
+          taken: assigned.get(p.id) ?? null,
+          courses,
+          // 選んでいるゴルフ場で「出られる」と言っていない（ゴルフ場を指定して提出した人だけ判定）
+          otherCourse: !!clientId && courses.length > 0 && !courses.includes(clientId),
+        };
+      })
+      .sort(
+        (a, b) =>
+          a.rank - b.rank || Number(a.otherCourse) - Number(b.otherCourse) || a.name.localeCompare(b.name, "ja")
+      );
+  }, [partners, dayAvailability, dayDispatches, clientId]);
 
   // ドロップダウンの見出し（希望の有無で分ける。未回答でもそのまま選べることを文言で示す）
   const candidateGroups = useMemo(
@@ -178,6 +221,11 @@ export function CalendarBoard({
           </span>
           白地＋破線
         </span>
+        <span className="flex items-center gap-1">
+          <span className="text-emerald-800">○ 名前</span>
+          <span className="inline-block h-2 w-2 rounded-sm bg-slate-400" />
+          出勤できる人（まだ割り当てていない人）と、出られるゴルフ場の色
+        </span>
       </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
@@ -211,7 +259,16 @@ export function CalendarBoard({
         {cells.map((d, i) => {
           if (!d) return <div key={`e${i}`} className="min-h-20 bg-(--color-panel-2)" />;
           const list = byDay.get(d) ?? [];
-          const okCount = (avByDay.get(d) ?? []).filter((a) => a.status === "available").length;
+          // 出勤できる人（○/△）。その日もう割り当てた人は上の色付きチップに出るのでここには出さない＝同じ人を二重に並べない
+          const taken = new Set(list.filter((x) => x.status !== "cancelled").map((x) => x.partner_id));
+          const free = (avByDay.get(d) ?? [])
+            .filter((a) => (a.status === "available" || a.status === "maybe") && !taken.has(a.partner_id))
+            .sort(
+              (a, b) =>
+                (a.status === "available" ? 0 : 1) - (b.status === "available" ? 0 : 1) ||
+                a.partner_name.localeCompare(b.partner_name, "ja")
+            );
+          const okCount = free.filter((a) => a.status === "available").length;
           const wd = new Date(`${d}T00:00:00Z`).getUTCDay();
           const isSel = selected === d;
           return (
@@ -229,7 +286,7 @@ export function CalendarBoard({
                 >
                   {Number(d.slice(-2))}
                 </span>
-                {okCount > 0 ? <span className="text-[10px] text-(--color-dim)">出可{okCount}</span> : null}
+                {okCount > 0 ? <span className="text-[10px] text-(--color-dim)">出勤可 {okCount}</span> : null}
               </div>
               <div className="mt-0.5 space-y-0.5">
                 {list.slice(0, 4).map((x) => (
@@ -247,6 +304,38 @@ export function CalendarBoard({
                   <div className="px-1 text-[10px] text-(--color-dim)">ほか{list.length - 4}件</div>
                 ) : null}
               </div>
+              {free.length > 0 ? (
+                <div className="mt-1 space-y-px border-t border-dashed border-(--color-line) pt-0.5">
+                  {free.slice(0, 6).map((a) => (
+                    <div
+                      key={a.partner_id}
+                      className={`flex items-center gap-1 text-[10px] leading-4 ${
+                        a.status === "available" ? "text-emerald-800" : "text-amber-700"
+                      }`}
+                      title={`${AV_MARK[a.status]} ${a.partner_name}${
+                        a.client_ids.length ? `\n${a.client_ids.map((id) => clientById.get(id) ?? "").join(" / ")}` : ""
+                      }`}
+                    >
+                      <span className="truncate">
+                        {AV_MARK[a.status]} {a.partner_name}
+                      </span>
+                      <span className="flex shrink-0 gap-px">
+                        {a.client_ids
+                          .filter((id) => clientById.has(id))
+                          .map((id) => (
+                            <span
+                              key={id}
+                              className={`inline-block h-2 w-2 rounded-sm ${clientTone(id, clientById.get(id)).dot}`}
+                            />
+                          ))}
+                      </span>
+                    </div>
+                  ))}
+                  {free.length > 6 ? (
+                    <div className="text-[10px] text-(--color-dim)">ほか{free.length - 6}名</div>
+                  ) : null}
+                </div>
+              ) : null}
             </button>
           );
         })}
@@ -301,6 +390,8 @@ export function CalendarBoard({
                     <option key={p.id} value={`p:${p.id}`} disabled={p.taken?.status === "confirmed"}>
                       {p.mark ? `${p.mark} ` : ""}
                       {p.name}
+                      {p.courses.length ? `［${courseLabel(p.courses)}］` : ""}
+                      {p.otherCourse ? " ※このゴルフ場は希望外" : ""}
                       {p.taken ? `（${STATUS_LABEL[p.taken.status]}で割当済）` : ""}
                     </option>
                   ))}
@@ -468,6 +559,78 @@ export function CalendarBoard({
               <b>希望が来ていなくても、上の「キャディを選ぶ」からそのまま割り当てできます。</b>
             </p>
           </div>
+
+          {/* ── 出勤できる人 × ゴルフ場（migration 0195）。担当が2つ以上の人はここで直せる ── */}
+          {candidates.some((p) => p.rank <= 1) ? (
+            <div className="mt-4">
+              <p className="mb-1.5 text-xs font-medium text-(--color-dim)">出勤できる人と、出られるゴルフ場</p>
+              <ul className="space-y-1">
+                {candidates
+                  .filter((p) => p.rank <= 1)
+                  .map((p) => {
+                    const own = partnerClients[p.id] ?? [];
+                    return (
+                      <li
+                        key={p.id}
+                        className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-(--color-line) bg-white px-3 py-1.5 text-sm"
+                      >
+                        <span className={p.av === "available" ? "text-emerald-800" : "text-amber-700"}>{p.mark}</span>
+                        <span className="min-w-24 font-medium">{p.name}</span>
+                        {p.taken ? (
+                          <span className="rounded bg-slate-100 px-1 text-[10px] text-slate-600">
+                            {STATUS_LABEL[p.taken.status]}で割当済
+                          </span>
+                        ) : null}
+                        {own.length >= 2 ? (
+                          <span className="flex flex-wrap gap-1">
+                            {own
+                              .filter((id) => clientById.has(id))
+                              .map((id) => {
+                                const on = p.courses.includes(id);
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    disabled={pending}
+                                    title="押すと出られる／出られないが切り替わります"
+                                    onClick={() => {
+                                      const next = on ? p.courses.filter((x) => x !== id) : [...p.courses, id];
+                                      run(
+                                        () => setAvailabilityCourses(p.id, selected, next),
+                                        `${p.name} のゴルフ場を更新しました`
+                                      );
+                                    }}
+                                    className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs disabled:opacity-50 ${
+                                      on ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-(--color-line) text-slate-400 line-through"
+                                    }`}
+                                  >
+                                    <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(id, clientById.get(id)).dot}`} />
+                                    {clientById.get(id)}
+                                  </button>
+                                );
+                              })}
+                          </span>
+                        ) : p.courses.length > 0 ? (
+                          <span className="flex flex-wrap gap-1 text-xs text-(--color-dim)">
+                            {p.courses.map((id) => (
+                              <span key={id} className="flex items-center gap-1">
+                                <span className={`inline-block h-2 w-2 rounded-sm ${clientTone(id, clientById.get(id)).dot}`} />
+                                {clientById.get(id) ?? "（無効のゴルフ場）"}
+                              </span>
+                            ))}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-(--color-dim)">ゴルフ場の指定なし</span>
+                        )}
+                      </li>
+                    );
+                  })}
+              </ul>
+              <p className="mt-1 text-[11px] text-(--color-dim)">
+                担当ゴルフ場は 設定 ＞ 委託先 で登録します。担当が2つ以上ある人は、本人が提出時に日ごとに選べます。
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

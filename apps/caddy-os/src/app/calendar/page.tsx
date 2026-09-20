@@ -59,6 +59,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           clients={masters.clients.map((c) => ({ id: c.id, name: c.name }))}
           partners={masters.partners.map((p) => ({ id: p.id, name: p.name }))}
           staff={masters.staff}
+          partnerClients={masters.partnerClients}
         />
       </section>
 

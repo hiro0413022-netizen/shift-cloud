@@ -140,7 +140,9 @@ export function ClientEditor({ clients }: { clients: Client[] }) {
 }
 
 /* ── 委託先（キャディ）1件のフォーム ── */
-function PartnerForm({ p }: { p?: Partner }) {
+type Course = { id: string; name: string };
+
+function PartnerForm({ p, courses, assigned }: { p?: Partner; courses: Course[]; assigned: string[] }) {
   const { onAction, pending, msg } = useSaver(savePartner);
   return (
     <form action={onAction} className="grid grid-cols-12 items-center gap-1.5 border-t border-(--color-line) py-2 text-sm">
@@ -160,6 +162,23 @@ function PartnerForm({ p }: { p?: Partner }) {
         <option value="inactive">無効</option>
       </select>
       <input name="memo" defaultValue={p?.memo ?? ""} placeholder="備考" className={`${cell} col-span-1`} />
+      {/* 担当ゴルフ場（migration 0195）— 本人のシフト提出で「どこで出られるか」を選ぶ選択肢になる */}
+      <div className="col-span-12 flex flex-wrap items-center gap-x-3 gap-y-1 rounded bg-emerald-50/60 p-1.5">
+        <input type="hidden" name="courses_present" value="1" />
+        <span className="text-[11px] text-(--color-dim)">担当ゴルフ場</span>
+        {courses.length === 0 ? (
+          <span className="text-xs text-(--color-dim)">有効なゴルフ場がありません（上の取引先で登録）</span>
+        ) : (
+          courses.map((c) => (
+            <label key={c.id} className="flex items-center gap-1 text-xs">
+              <input type="checkbox" name="course_ids" value={c.id} defaultChecked={assigned.includes(c.id)} />
+              {c.name}
+            </label>
+          ))
+        )}
+        <span className="text-[10px] text-(--color-dim)">※ シフト提出でこの中から選べます。2つ以上なら日ごとに選択</span>
+      </div>
+
       {/* 連絡先＋本人提出URL（migration 0118）— LINEでURLを配れば、以後は本人がスマホから希望日を入れられる */}
       <div className="col-span-12 grid grid-cols-12 items-center gap-1.5 rounded bg-slate-50 p-1.5">
         <span className="col-span-1 text-[11px] text-(--color-dim)">連絡先</span>
@@ -191,7 +210,16 @@ function PartnerForm({ p }: { p?: Partner }) {
   );
 }
 
-export function PartnerEditor({ partners }: { partners: Partner[] }) {
+export function PartnerEditor({
+  partners,
+  courses,
+  assigned,
+}: {
+  partners: Partner[];
+  courses: Course[];
+  /** キャディID → 担当ゴルフ場ID */
+  assigned: Record<string, string[]>;
+}) {
   return (
     <div>
       <div className="grid grid-cols-12 gap-1.5 text-[11px] text-(--color-dim)">
@@ -207,11 +235,11 @@ export function PartnerEditor({ partners }: { partners: Partner[] }) {
         <div className="col-span-1">備考</div>
       </div>
       {partners.map((p) => (
-        <PartnerForm key={p.id} p={p} />
+        <PartnerForm key={p.id} p={p} courses={courses} assigned={assigned[p.id] ?? []} />
       ))}
       <div className="mt-2 border-t-2 border-dashed border-(--color-line) pt-2">
         <p className="mb-1 text-xs font-medium text-(--color-dim)">＋ 新規追加</p>
-        <PartnerForm />
+        <PartnerForm courses={courses} assigned={[]} />
       </div>
     </div>
   );

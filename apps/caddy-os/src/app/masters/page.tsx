@@ -11,7 +11,7 @@ export default async function MastersPage() {
   const actor = await requireActor();
   const admin = createAdmin();
 
-  const [{ data: clients }, { data: partners }, { data: rates }, { data: caddyStaff }, { data: company }] = await Promise.all([
+  const [{ data: clients }, { data: partners }, { data: rates }, { data: caddyStaff }, { data: company }, { data: pcs }] = await Promise.all([
     admin
       .from("cad_clients")
       .select("id, code, name, unit_price, partner_fee, closing_day, payment_day, postal_code, address, has_contract, status, csv_format, contact_name, contact_email")
@@ -37,7 +37,13 @@ export default async function MastersPage() {
       .not("staff_id", "is", null)
       .is("deleted_at", null),
     admin.from("companies").select("settings").eq("id", actor.companyId).single(),
+    // 担当ゴルフ場（migration 0195）
+    admin.from("cad_partner_clients").select("partner_id, client_id").eq("company_id", actor.companyId),
   ]);
+  const assigned: Record<string, string[]> = {};
+  for (const r of (pcs ?? []) as Array<{ partner_id: string; client_id: string }>) {
+    (assigned[r.partner_id] ??= []).push(r.client_id);
+  }
 
   const invoiceSettings = (((company?.settings ?? {}) as { invoice?: InvoiceSettingsValue }).invoice ?? {}) as InvoiceSettingsValue;
 
@@ -96,7 +102,11 @@ export default async function MastersPage() {
           「時給(GW)」はゴルフウィング勤務の時給（#62 ⑤）。
           「振込先口座」を登録すると、そのキャディ→YOZANの支払請求書に振込先として印字されます（任意）
         </p>
-        <PartnerEditor partners={ps} />
+        <PartnerEditor
+          partners={ps}
+          courses={activeClients.map((c) => ({ id: c.id, name: c.name }))}
+          assigned={assigned}
+        />
       </section>
 
       <section className={cardCls}>

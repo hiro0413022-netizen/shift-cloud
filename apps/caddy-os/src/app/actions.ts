@@ -231,7 +231,8 @@ async function refreshFinance(companyId: string, ym: string) {
 export async function setAvailability(
   partnerId: string,
   date: string,
-  status: "available" | "maybe" | "unavailable" | ""
+  status: "available" | "maybe" | "unavailable" | "",
+  clientIds?: string[]
 ): Promise<{ error?: string }> {
   const actor = await requireActor();
   const admin = createAdmin();
@@ -244,7 +245,24 @@ export async function setAvailability(
       .eq("partner_id", partnerId)
       .eq("date", date);
     revalidatePath("/availability");
+    revalidatePath("/calendar");
     return {};
+  }
+
+  // ゴルフ場（migration 0195）: 指定があればそれ（担当の範囲に絞る）。
+  // 指定が無ければ、既にある行はそのまま／新しい行は担当ゴルフ場ぜんぶ。
+  const allowed = await partnerCourseIds(admin, partnerId);
+  let courses: string[] | undefined;
+  if (clientIds) {
+    courses = pickCourses(clientIds, allowed);
+  } else {
+    const { data: cur } = await admin
+      .from("cad_availability")
+      .select("id")
+      .eq("partner_id", partnerId)
+      .eq("date", date)
+      .maybeSingle();
+    if (!cur) courses = allowed;
   }
 
   const { error } = await admin
@@ -255,6 +273,7 @@ export async function setAvailability(
         partner_id: partnerId,
         date,
         status,
+        ...(courses ? { client_ids: courses } : {}),
         source: "admin", // 管理者の代理入力。本人提出は submitSelfAvailability が "self" を立てる
         submitted_at: new Date().toISOString(),
         deleted_at: null,
@@ -265,6 +284,53 @@ export async function setAvailability(
   revalidatePath("/availability");
   revalidatePath("/calendar");
   return {};
+}
+
+/**
+ * その日の「出勤できるゴルフ場」だけを直す（カレンダーの日パネルから・管理者）。
+ * 出勤希望（○/△）が無い日は直せない＝ゴルフ場だけの行は作らない。
+ */
+export async function setAvailabilityCourses(
+  partnerId: string,
+  date: string,
+  clientIds: string[]
+): Promise<{ error?: string }> {
+  const actor = await requireActor();
+  const admin = createAdmin();
+  const allowed = await partnerCourseIds(admin, partnerId);
+  const courses = pickCourses(clientIds, allowed);
+  if (allowed.length > 0 && courses.length === 0) return { error: "ゴルフ場を1つ以上選んでください" };
+  const { data, error } = await admin
+    .from("cad_availability")
+    .update({ client_ids: courses, updated_at: new Date().toISOString() })
+    .eq("company_id", actor.companyId)
+    .eq("partner_id", partnerId)
+    .eq("date", date)
+    .is("deleted_at", null)
+    .select("id");
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { error: "先に出勤希望（○/△）を入れてください" };
+  revalidatePath("/calendar");
+  revalidatePath("/availability");
+  return {};
+}
+
+/** キャディの担当ゴルフ場（有効なゴルフ場だけ）。本人提出の選択肢もこれ */
+async function partnerCourseIds(admin: ReturnType<typeof createAdmin>, partnerId: string): Promise<string[]> {
+  const { data } = await admin
+    .from("cad_partner_clients")
+    .select("client_id, cad_clients!inner(status, deleted_at)")
+    .eq("partner_id", partnerId);
+  type Row = { client_id: string; cad_clients: { status: string; deleted_at: string | null } | null };
+  return ((data ?? []) as unknown as Row[])
+    .filter((r) => r.cad_clients && r.cad_clients.status === "active" && !r.cad_clients.deleted_at)
+    .map((r) => r.client_id);
+}
+
+/** 送られてきたゴルフ場を「担当の範囲」に絞り、重複を消す（URLを持っていても担当外は選べない） */
+function pickCourses(clientIds: string[], allowed: string[]): string[] {
+  const ok = new Set(allowed);
+  return [...new Set(clientIds)].filter((id) => ok.has(id));
 }
 
 /** 財務へ再集計（同上・Server Componentのformから呼ぶため戻り値はvoid） */
@@ -390,12 +456,43 @@ export async function savePartner(fd: FormData): Promise<{ error?: string }> {
   const { id, ...row } = parsed.data;
 
   const admin = createAdmin();
+  let partnerId = id ?? null;
   if (id) {
     const { error } = await admin.from("cad_partners").update(row).eq("id", id).eq("company_id", actor.companyId);
     if (error) return { error: error.message };
   } else {
-    const { error } = await admin.from("cad_partners").insert({ ...row, company_id: actor.companyId });
+    const { data, error } = await admin
+      .from("cad_partners")
+      .insert({ ...row, company_id: actor.companyId })
+      .select("id")
+      .single();
     if (error) return { error: error.message };
+    partnerId = (data as { id: string }).id;
+  }
+
+  // 担当ゴルフ場（migration 0195）。欄が無いフォームから来たときは触らない
+  if (partnerId && fd.get("courses_present") === "1") {
+    const wanted = [...new Set(fd.getAll("course_ids").map(String).filter(Boolean))];
+    const { data: valid } = await admin
+      .from("cad_clients")
+      .select("id")
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .in("id", wanted.length ? wanted : ["00000000-0000-0000-0000-000000000000"]);
+    const keep = ((valid ?? []) as Array<{ id: string }>).map((c) => c.id);
+    const del = admin.from("cad_partner_clients").delete().eq("partner_id", partnerId).eq("company_id", actor.companyId);
+    const { error: delErr } = keep.length ? await del.not("client_id", "in", `(${keep.join(",")})`) : await del;
+    if (delErr) return { error: delErr.message };
+    if (keep.length) {
+      const { error: insErr } = await admin
+        .from("cad_partner_clients")
+        .upsert(
+          keep.map((client_id) => ({ partner_id: partnerId, client_id, company_id: actor.companyId })),
+          { onConflict: "partner_id,client_id", ignoreDuplicates: true }
+        );
+      if (insErr) return { error: insErr.message };
+    }
+    revalidatePath("/calendar");
   }
   revalidatePath("/masters");
   revalidatePath("/dispatches");
@@ -1027,8 +1124,9 @@ export async function submitSelfAvailability(
   token: string,
   date: string,
   status: "available" | "maybe" | "unavailable" | "",
-  memo?: string | null
-): Promise<{ error?: string }> {
+  memo?: string | null,
+  clientIds?: string[]
+): Promise<{ error?: string; clientIds?: string[] }> {
   if (!/^[0-9a-f]{16,64}$/.test(token)) return { error: "URLが不正です" };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "日付が不正です" };
 
@@ -1042,9 +1140,30 @@ export async function submitSelfAvailability(
   const p = partner as { id: string; company_id: string; status: string } | null;
   if (!p || p.status !== "active") return { error: "このURLは無効です。担当者へご連絡ください" };
 
+  // 過去の日・派遣が確定した日は本人からは動かさない（画面でも押せないが、URL直叩きに備えてサーバーでも止める）
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  if (date < today) return { error: "過ぎた日は変更できません" };
+  const { data: fixed } = await admin
+    .from("cad_dispatches")
+    .select("id")
+    .eq("partner_id", p.id)
+    .eq("dispatch_date", date)
+    .eq("status", "confirmed")
+    .is("deleted_at", null)
+    .limit(1);
+  if (fixed && fixed.length > 0) return { error: "この日は派遣が確定しています。変更は担当者へご連絡ください" };
+
+  let saved: string[] = [];
   if (!status) {
     await admin.from("cad_availability").delete().eq("partner_id", p.id).eq("date", date);
   } else {
+    // ゴルフ場（migration 0195）: 担当ゴルフ場の中から。× の日は持たない。
+    // 指定が無いとき（初めて○を付けたとき）は担当ゴルフ場ぜんぶ＝あとで外せる
+    const allowed = await partnerCourseIds(admin, p.id);
+    saved = status === "unavailable" ? [] : clientIds ? pickCourses(clientIds, allowed) : allowed;
+    if (status !== "unavailable" && allowed.length > 0 && saved.length === 0) {
+      return { error: "出勤できるゴルフ場を1つ以上選んでください" };
+    }
     const { error } = await admin.from("cad_availability").upsert(
       {
         company_id: p.company_id,
@@ -1052,6 +1171,7 @@ export async function submitSelfAvailability(
         date,
         status,
         memo: memo ?? null,
+        client_ids: saved,
         source: "self",
         submitted_at: new Date().toISOString(),
         deleted_at: null,
@@ -1064,5 +1184,5 @@ export async function submitSelfAvailability(
   revalidatePath("/availability");
   revalidatePath("/calendar");
   revalidatePath(`/s/${token}`);
-  return {};
+  return { clientIds: saved };
 }

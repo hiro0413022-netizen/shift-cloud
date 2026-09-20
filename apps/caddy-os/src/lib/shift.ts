@@ -53,10 +53,14 @@ export type BoardDispatch = {
 
 export type BoardAvailability = {
   partner_id: string;
+  /** キャディ名（台帳表示を外した人・無効の人の提出でも名前が出るように、行と一緒に取る） */
+  partner_name: string;
   date: string;
   status: AvailabilityStatus;
   memo: string | null;
   source: string;
+  /** その日に出勤できるゴルフ場（cad_clients.id）。空＝指定なし（migration 0195） */
+  client_ids: string[];
 };
 
 export type MonthBoard = {
@@ -65,3 +69,16 @@ export type MonthBoard = {
   dispatches: BoardDispatch[];
   availability: BoardAvailability[];
 };
+
+/**
+ * ゴルフ場名を短くする（カレンダーのマスに入れる用）。
+ * 「延田エンタープライズ マスターズゴルフ倶楽部」→「マスターズ」、「加古川ゴルフ倶楽部」→「加古川」。
+ */
+export function shortCourseName(name: string | null | undefined): string {
+  if (!name) return "";
+  const last = name.trim().split(/[\s　]+/).pop() ?? name;
+  const s = last
+    .replace(/(ゴルフ|カンツリー|カントリー)?(倶楽部|俱楽部|クラブ|コース|場)$/u, "")
+    .replace(/(ゴルフ|カンツリー|カントリー)$/u, "");
+  return s || last;
+}

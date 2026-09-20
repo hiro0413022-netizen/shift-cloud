@@ -34,10 +34,10 @@ export default async function SelfPage({ params }: { params: Promise<{ token: st
   const from = `${months[0]}-01`;
   const to = lastDay(months[months.length - 1]);
 
-  const [{ data: avail }, { data: dispatches }] = await Promise.all([
+  const [{ data: avail }, { data: dispatches }, { data: pcs }] = await Promise.all([
     admin
       .from("cad_availability")
-      .select("date, status, memo")
+      .select("date, status, memo, client_ids")
       .eq("partner_id", p.id)
       .gte("date", from)
       .lte("date", to)
@@ -51,7 +51,18 @@ export default async function SelfPage({ params }: { params: Promise<{ token: st
       .lte("dispatch_date", to)
       .is("deleted_at", null)
       .order("dispatch_date"),
+    // 担当ゴルフ場（migration 0195）。有効なゴルフ場だけを選択肢にする
+    admin
+      .from("cad_partner_clients")
+      .select("client_id, cad_clients!inner(name, status, deleted_at)")
+      .eq("partner_id", p.id),
   ]);
+
+  type RawC = { client_id: string; cad_clients: { name: string; status: string; deleted_at: string | null } | null };
+  const courses = ((pcs ?? []) as unknown as RawC[])
+    .filter((r) => r.cad_clients && r.cad_clients.status === "active" && !r.cad_clients.deleted_at)
+    .map((r) => ({ id: r.client_id, name: r.cad_clients!.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "ja"));
 
   type RawD = { dispatch_date: string; status: string; cad_clients: { name: string } | null };
   const confirmed = ((dispatches ?? []) as unknown as RawD[]).map((d) => ({
@@ -70,8 +81,9 @@ export default async function SelfPage({ params }: { params: Promise<{ token: st
       <SelfSubmit
         token={token}
         months={months}
-        availability={(avail ?? []) as Array<{ date: string; status: string; memo: string | null }>}
+        availability={(avail ?? []) as Array<{ date: string; status: string; memo: string | null; client_ids: string[] | null }>}
         confirmed={confirmed}
+        courses={courses}
       />
 
       <p className="mt-6 text-center text-[11px] text-(--color-dim)">

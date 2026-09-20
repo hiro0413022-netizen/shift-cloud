@@ -219,7 +219,7 @@ export function byStaff(rows: DispatchRow[]) {
 
 export async function getMasters(companyId: string) {
   const admin = createAdmin();
-  const [{ data: clients }, { data: partners }, { data: staff }, { data: rates }] = await Promise.all([
+  const [{ data: clients }, { data: partners }, { data: staff }, { data: rates }, { data: pcs }] = await Promise.all([
     admin
       .from("cad_clients")
       .select("id, name, unit_price, partner_fee, closing_day, payment_day")
@@ -241,7 +241,13 @@ export async function getMasters(companyId: string) {
       .select("client_id, partner_id, staff_id, amount")
       .eq("company_id", companyId)
       .is("deleted_at", null),
+    // 担当ゴルフ場（migration 0195）
+    admin.from("cad_partner_clients").select("partner_id, client_id").eq("company_id", companyId),
   ]);
+  const partnerClients: Record<string, string[]> = {};
+  for (const r of (pcs ?? []) as Array<{ partner_id: string; client_id: string }>) {
+    (partnerClients[r.partner_id] ??= []).push(r.client_id);
+  }
   // 委託先(partner_id)・社員(staff_id) どちらの単価も同じマップに入れる（idはUUIDで衝突しない）
   const transportRates: Record<string, number> = {};
   for (const r of (rates ?? []) as Array<{ client_id: string; partner_id: string | null; staff_id: string | null; amount: number }>) {
@@ -266,6 +272,8 @@ export async function getMasters(companyId: string) {
     }>,
     staff: (staff ?? []) as Array<{ id: string; name: string }>,
     transportRates,
+    /** キャディID → 担当ゴルフ場ID（migration 0195） */
+    partnerClients,
   };
 }
 
@@ -330,7 +338,7 @@ export async function getMonthBoard(companyId: string, ym: string): Promise<Mont
       .order("dispatch_date"),
     admin
       .from("cad_availability")
-      .select("partner_id, date, status, memo, source")
+      .select("partner_id, date, status, memo, source, client_ids, cad_partners(name)")
       .eq("company_id", companyId)
       .gte("date", from)
       .lte("date", to)
@@ -379,7 +387,13 @@ export async function getMonthBoard(companyId: string, ym: string): Promise<Mont
     ym,
     days: Array.from({ length: lastDay }, (_, i) => `${ym}-${String(i + 1).padStart(2, "0")}`),
     dispatches,
-    availability: (av ?? []) as BoardAvailability[],
+    availability: (
+      (av ?? []) as unknown as Array<Omit<BoardAvailability, "partner_name"> & { cad_partners: { name: string } | null }>
+    ).map(({ cad_partners, ...a }) => ({
+      ...a,
+      partner_name: cad_partners?.name ?? "（不明）",
+      client_ids: a.client_ids ?? [],
+    })),
   };
 }
 

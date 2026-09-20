@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
     let q = admin
       .from("cad_availability")
-      .select("id, partner_id, date, status, memo, source, submitted_at, cad_partners(name)")
+      .select("id, partner_id, date, status, memo, source, submitted_at, client_ids, cad_partners(name)")
       .eq("company_id", companyId)
       .gte("date", range.from)
       .lte("date", range.to)
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
       memo: string | null;
       source: string;
       submitted_at: string | null;
+      client_ids: string[] | null;
       cad_partners: { name: string } | null;
     };
     return ok({
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
         memo: r.memo,
         source: r.source,
         submitted_at: r.submitted_at,
+        client_ids: r.client_ids ?? [],
       })),
     });
   });
