@@ -16,7 +16,7 @@ export function FlowBar({ full, poCount }: { full: FullQuote; poCount: number })
   const w = full.work;
   const id = q.id;
   const hasItems = full.items.length > 0;
-  const orderable = full.items.some((it) => ["product", "grip", "sleeve", "coating"].includes(it.line_kind ?? ""));
+  const orderable = full.items.some((it) => ["product", "grip", "sleeve", "coating", "free"].includes(it.line_kind ?? ""));
   const presented = Boolean(q.quote_issued_at) || ["presented", "accepted", "ordered"].includes(q.status) || Boolean(w);
   const ordered = Boolean(w?.ordered_on) || poCount > 0;
 

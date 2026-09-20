@@ -791,6 +791,16 @@ export const PO_STATUS_LABELS: Record<string, string> = {
 };
 
 /** この伝票から出した発注（発注管理のプールに入っているもの） */
+/** まだ発注管理に載っていない明細の数（migration 0196）。載っていれば 0 */
+export async function countUnorderedItems(actor: Actor, quoteId: number): Promise<number> {
+  const { data, error } = await db().rpc("gw_unordered_quote_item_count", {
+    p_company: actor.companyId,
+    p_quote_id: quoteId,
+  });
+  if (error) return 0;
+  return Number(data ?? 0);
+}
+
 export async function listPurchaseDrafts(actor: Actor, workOrderId: number | null): Promise<PurchaseDraft[]> {
   if (!workOrderId) return [];
   const { data: links } = await db()

@@ -28,29 +28,28 @@ export async function placeOrder(actor: Actor, quoteId: number): Promise<PlaceOr
   const admin = createAdmin();
   const full = await getQuote(actor, quoteId);
   if (!full) return { ok: false, message: "伝票が見つかりません", orders: [], skipped: [], already: false };
-  const orderable = full.items.filter((it) => ["product", "grip", "sleeve", "coating"].includes(it.line_kind ?? ""));
+  // 手入力の行（free）も取り寄せる商品。2026-09-20 まで対象外にしていて、発注から黙って抜けていた（migration 0196）
+  const orderable = full.items.filter((it) => ["product", "grip", "sleeve", "coating", "free"].includes(it.line_kind ?? ""));
   if (orderable.length === 0) {
     return { ok: false, message: "取り寄せる商品の明細がありません（工賃だけの伝票です）", orders: [], skipped: [], already: false };
   }
 
   const workId = await ensureWorkOrder(actor, full);
   const existing = await listPurchaseDrafts(actor, workId);
-  let skipped: PlaceOrderResult["skipped"] = [];
-  let already = existing.length > 0;
 
-  if (!already) {
-    const { data, error } = await admin.rpc("gw_create_purchase_drafts", {
-      p_company: actor.companyId,
-      p_quote_id: quoteId,
-      p_ordered_by: actor.name,
-    });
-    if (error) return { ok: false, message: error.message, orders: [], skipped: [], already: false };
-    const r = (data ?? {}) as { error?: string; skipped?: PlaceOrderResult["skipped"] };
-    if (r.error) return { ok: false, message: r.error, orders: [], skipped: [], already: false };
-    skipped = r.skipped ?? [];
-  } else {
-    already = true;
-  }
+  // 何度押しても「まだ発注に載っていない明細」だけを足す（載せ済みの明細は二重に入れない）。
+  // 以前は1度でも発注があると何もしなかったので、あとから足した明細や手入力の行が抜けたままになった。
+  const { data, error } = await admin.rpc("gw_create_purchase_drafts", {
+    p_company: actor.companyId,
+    p_quote_id: quoteId,
+    p_ordered_by: actor.name,
+  });
+  if (error) return { ok: false, message: error.message, orders: [], skipped: [], already: false };
+  const r = (data ?? {}) as { error?: string; skipped?: PlaceOrderResult["skipped"]; orders?: { added?: number }[] };
+  if (r.error) return { ok: false, message: r.error, orders: [], skipped: [], already: false };
+  const skipped: PlaceOrderResult["skipped"] = r.skipped ?? [];
+  const added = (r.orders ?? []).reduce((n, o) => n + (o.added ?? 0), 0);
+  const already = existing.length > 0 && added === 0;
 
   const pos = await listPurchaseDrafts(actor, workId);
 

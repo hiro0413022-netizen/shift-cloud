@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getQuote, listPurchaseDrafts, listSalesPostings, PO_STATUS_LABELS } from "@/lib/craft";
+import { countUnorderedItems, getQuote, listPurchaseDrafts, listSalesPostings, PO_STATUS_LABELS } from "@/lib/craft";
 import { jpDate, md, Money, ORDER_STEPS, OrderBottom, QuotePaper, sumsOf, toPaperItems } from "@/components/paper";
 import { finishInfoOf } from "@/lib/paper-data";
 import { GOLFWING_POOL_URL, golfwingOrderUrl } from "@/lib/links";
@@ -29,11 +29,12 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
   const full = await getQuote(actor, Number(id));
   if (!full) notFound();
   const { quote: q, items, work, specs } = full;
-  const [pos, postings] = await Promise.all([
+  const [pos, postings, unordered] = await Promise.all([
     listPurchaseDrafts(actor, full.work?.id ?? null),
     listSalesPostings(actor, Number(id)),
+    countUnorderedItems(actor, Number(id)),
   ]);
-  const orderable = items.filter((it) => ["product", "grip", "sleeve", "coating"].includes(it.line_kind ?? ""));
+  const orderable = items.filter((it) => ["product", "grip", "sleeve", "coating", "free"].includes(it.line_kind ?? ""));
 
   if (!work) {
     return (
@@ -463,9 +464,15 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
             pos.length === 0 && orderable.length > 0 ? (
               <OrderButton quoteId={q.id} />
             ) : pos.length > 0 ? (
-              <a href={GOLFWING_POOL_URL} target="_blank" rel="noreferrer" className={btnGhostCls}>
-                発注管理の発注プールを開く
-              </a>
+              <span className="flex flex-wrap items-start gap-2">
+                {/* 発注のあとに足した明細など、まだ載っていない行があるときだけ出す（押し直しても二重にはならない） */}
+                {unordered > 0 ? (
+                  <OrderButton quoteId={q.id} label={`発注に載っていない明細 ${unordered}件を足す`} />
+                ) : null}
+                <a href={GOLFWING_POOL_URL} target="_blank" rel="noreferrer" className={btnGhostCls}>
+                  発注管理の発注プールを開く
+                </a>
+              </span>
             ) : null
           }
         >
