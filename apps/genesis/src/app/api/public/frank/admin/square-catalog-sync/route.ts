@@ -29,11 +29,11 @@ const FEE_CATEGORY = "会費・その他";
 
 /** 税込・円。scripts/frank-square-setup.mjs の FEE_ITEMS と同じ値に保つこと */
 const FEE_ITEMS: Array<[string, number]> = [
-  ["入会金", 11000],
+  ["入会金", 5500], // 5,000円税抜（#131）。旧11,000円は誤り
   ["休会費（1か月）", 2200],
   ["ビジター利用料", 5500],
   ["体験レッスン", 3300], // キャンペーン中はレジで金額を0円に変更して打つ
-  ["レッスン単発（25分）", 2500],
+  ["レッスン単発（25分）", 2750], // 2,500円税抜
 ];
 
 async function sq(token: string, method: string, path: string, body?: Record<string, unknown>) {
@@ -88,9 +88,11 @@ export async function POST(req: NextRequest) {
   try {
     // 既存の商品名（冪等の判定に使う。setup.mjs と同じく「名前が一致したらスキップ」）
     const items = await listCatalog(squareToken, "ITEM");
-    const existingNames = new Set(
-      items.map((o) => String((o.item_data as { name?: string } | undefined)?.name ?? "")),
-    );
+    const existingByName = new Map<string, Record<string, unknown>>();
+    for (const o of items) {
+      const n = String((o.item_data as { name?: string } | undefined)?.name ?? "");
+      if (n) existingByName.set(n, o);
+    }
 
     // 税（消費税10%・INCLUSIVE）とカテゴリを find（無ければ税なし/カテゴリなしで作る）
     const taxes = await listCatalog(squareToken, "TAX");
@@ -100,10 +102,31 @@ export async function POST(req: NextRequest) {
       (c) => (c.category_data as { name?: string } | undefined)?.name === FEE_CATEGORY,
     );
 
-    const results: Array<{ name: string; created: boolean; price?: number; error?: string }> = [];
+    const results: Array<{ name: string; created: boolean; updated?: boolean; price?: number; error?: string }> = [];
     for (const [name, price] of FEE_ITEMS) {
-      if (existingNames.has(name)) {
-        results.push({ name, created: false });
+      const existing = existingByName.get(name);
+      if (existing) {
+        // 既にある商品は「価格が違うときだけ」バリエーションの価格を直す（2026-09-20）。
+        // 入会金がレジで 11,000円のまま残っていた（正しくは 5,500円・#131）ため。
+        // ITEM_VARIATION は単体で upsert できる（version を付けないと 409 になる）。
+        const variations =
+          ((existing.item_data as { variations?: Array<Record<string, unknown>> } | undefined)?.variations ?? []);
+        const v = variations[0];
+        const cur = Number((v?.item_variation_data as { price_money?: { amount?: number } } | undefined)?.price_money?.amount ?? NaN);
+        if (!v || cur === price) {
+          results.push({ name, created: false, price: Number.isFinite(cur) ? cur : undefined });
+          continue;
+        }
+        try {
+          const vd = { ...(v.item_variation_data as Record<string, unknown>), pricing_type: "FIXED_PRICING", price_money: { amount: price, currency: "JPY" } };
+          await sq(squareToken, "POST", "/catalog/object", {
+            idempotency_key: randomUUID(),
+            object: { type: "ITEM_VARIATION", id: String(v.id), version: v.version, present_at_all_locations: true, item_variation_data: vd },
+          });
+          results.push({ name, created: false, updated: true, price });
+        } catch (e) {
+          results.push({ name, created: false, price: cur, error: String(e instanceof Error ? e.message : e) });
+        }
         continue;
       }
       const object: Record<string, unknown> = {

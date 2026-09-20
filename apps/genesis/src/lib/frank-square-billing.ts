@@ -164,13 +164,19 @@ export async function createJoinCheckoutForMember(
 
   const { data: row } = await admin
     .from("frunk_members")
-    .select("id, name, email, phone, status, billing_status, joining_fee_waived, start_date, frunk_plans(name, monthly_price, joining_fee, square_variation_id)")
+    .select("id, name, email, phone, status, billing_status, joining_fee_waived, start_date, corporate_parent_id, square_subscription_id, frunk_plans(name, monthly_price, joining_fee, square_variation_id)")
     .eq("id", memberId)
     .is("deleted_at", null)
     .maybeSingle();
   if (!row) return { ok: false, error: "member_not_found" };
   if (!["pending", "active"].includes(String(row.status))) return { ok: false, error: "invalid_status" };
   if (String(row.billing_status) === "active") return { ok: false, error: "already_active" };
+  // 法人プランの「ご利用者」行（社員）は月会費を持たない＝契約者の行だけが払う（#206）。
+  // ここを通すと社員個人に法人月額のサブスクが立つ（2026-09-12 FR0046 で実際に決済リンクが作られた）。
+  if (row.corporate_parent_id) return { ok: false, error: "corporate_user" };
+  // 稼働中のサブスクが既にある人には新しい決済リンクを作らない（現金前取り済みの方など・#238）。
+  // 解除は会員カードの【この自動課金を解除して登録し直せるようにする】から。
+  if (row.square_subscription_id) return { ok: false, error: "subscription_exists" };
 
   const plan = (row as unknown as {
     frunk_plans: { name: string; monthly_price: number | null; joining_fee: number | null; square_variation_id: string | null } | null;
@@ -263,7 +269,7 @@ export async function createSquareBillingCheckout(
 
   const { data: row } = await admin
     .from("frunk_members")
-    .select("id, email, phone, billing_status, frunk_plans(name, monthly_price, square_variation_id)")
+    .select("id, email, phone, billing_status, corporate_parent_id, square_subscription_id, frunk_plans(name, monthly_price, square_variation_id)")
     .eq("id", member.id)
     .maybeSingle();
   if (!row) return { ok: false, error: "会員情報を取得できませんでした" };
@@ -273,6 +279,10 @@ export async function createSquareBillingCheckout(
   const priceExTax = Number(plan?.monthly_price ?? 0);
   if (!plan || priceExTax <= 0) return { ok: false, error: "このプランは月会費のお支払い登録が不要です（月会費0円）" };
   if (String(row.billing_status) === "active") return { ok: false, error: "すでにカードのご登録が完了しています（毎月自動でお支払いになります）" };
+  // 法人プランのご利用者様は月会費のお支払いがない（御社のご契約者様に一括請求・#206）
+  if (row.corporate_parent_id) return { ok: false, error: "法人プランのご利用者様は月会費のお支払い登録は不要です（御社にまとめてご請求しています）" };
+  // 稼働中のサブスクがある方に二重に作らない（#238）
+  if (row.square_subscription_id) return { ok: false, error: "月会費のお支払い登録は受付済みです。ご不明な点は店頭までお申し付けください。" };
 
   // 入会金（#124）は決済リンクに乗せない。
   // Squareの決済リンクは「有料フェーズ1つ」のバリエーションしか受け付けないため、

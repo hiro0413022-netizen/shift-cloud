@@ -20,7 +20,7 @@ export default async function MemberSettingsPage({
   const admin = createAdmin();
   const { data: m } = await admin
     .from("frunk_members")
-    .select("billing_status, frunk_plans(name, monthly_price)")
+    .select("billing_status, corporate_parent_id, square_subscription_id, frunk_plans(name, monthly_price)")
     .eq("company_id", member.companyId)
     .eq("member_no", member.memberNo)
     .is("deleted_at", null)
@@ -30,7 +30,12 @@ export default async function MemberSettingsPage({
   const monthly = Number(plan?.monthly_price ?? 0);
   const billingStatus = String(row?.billing_status ?? "");
   const cardDone = billingStatus === "active";
-  const showBilling = !member.isProvisional && monthly > 0;
+  // 法人プランのご利用者（社員）は月会費を持たない＝カード登録を出さない（#206）。
+  // 出すと「法人プレミアム 65,780円/月」の登録ボタンが社員全員に見え、個人にサブスクが立ってしまう。
+  const isCorporateUser = !!row?.corporate_parent_id;
+  // 自動課金がすでにある方（現金で前取り済みなど・#238）にも出さない＝二重登録の入口を閉じる
+  const hasSubscription = !!row?.square_subscription_id;
+  const showBilling = !member.isProvisional && monthly > 0 && !isCorporateUser && !(hasSubscription && !cardDone);
 
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 py-8">
@@ -74,7 +79,7 @@ export default async function MemberSettingsPage({
                   カードを登録する
                 </button>
               </form>
-              <p className="mt-2 text-[11px] text-(--color-dim)">口座振替をご希望の方は店頭でお手続きください。</p>
+              <p className="mt-2 text-[11px] text-(--color-dim)">お支払いはクレジットカードのみです。ご不明な点は店頭までお申し付けください。</p>
             </>
           )}
         </section>

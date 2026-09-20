@@ -952,7 +952,7 @@ export async function openJoinCheckout(formData: FormData) {
   // 他店・他社の会員の決済リンクを作らせない（#134）
   const { data: m } = await admin
     .from("frunk_members")
-    .select("id, name, status, billing_status")
+    .select("id, name, status, billing_status, corporate_parent_id, square_subscription_id")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID)
@@ -960,6 +960,14 @@ export async function openJoinCheckout(formData: FormData) {
   if (!m) redirect(`${dest}?err=` + encodeURIComponent("対象の会員が見つかりません"));
   if (String(m.billing_status) === "active") {
     redirect(`${dest}?msg=` + encodeURIComponent("この方はすでにカードのお支払いが登録されています（二重には作りません）。"));
+  }
+  // 法人プランのご利用者（社員）は月会費を持たない＝ご契約者の行だけに決済ページを作る（#206）。
+  // 2026-09-12 に利用者の行で決済ページが作られ、法人月額(131,560円)の二重契約になりかけた。
+  if (m.corporate_parent_id) {
+    redirect(`${dest}?err=` + encodeURIComponent("法人プランのご利用者様には決済ページを作れません。月会費は御社のご契約者様の会員カードからご登録ください。"));
+  }
+  if (m.square_subscription_id) {
+    redirect(`${dest}?err=` + encodeURIComponent("この方には自動課金がすでにあります。作り直す場合は先に【この自動課金を解除して登録し直せるようにする】を押してください。"));
   }
 
   const h = await headers();
@@ -998,6 +1006,8 @@ export async function openJoinCheckout(formData: FormData) {
 function joinCheckoutError(code?: string): string {
   const c = String(code ?? "");
   if (c === "already_active") return "この方はすでにカードのお支払いが登録されています。";
+  if (c === "corporate_user") return "法人プランのご利用者様には決済ページを作れません。月会費は御社のご契約者様の会員カードからご登録ください。";
+  if (c === "subscription_exists") return "この方には自動課金がすでにあります。作り直す場合は先に【この自動課金を解除して登録し直せるようにする】を押してください。";
   if (c === "plan_free") return "このプランは月会費が0円か、Squareの商品が未設定のため決済ページを作れません（プラン設定の square_variation_id をご確認ください）。";
   if (c === "invalid_status") return "退会・却下された方には決済ページを作れません。";
   if (c === "member_not_found") return "対象の会員が見つかりません。";
