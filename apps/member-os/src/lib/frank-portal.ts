@@ -17,6 +17,7 @@ import {
 } from "@yozan/core/frank-portal";
 import { chargeOrderOnFile } from "@/lib/frank-square";
 import { memberDisplayName } from "@yozan/core/frank-corporate";
+import { notifyOrderToShiftStaff } from "@/lib/frank-order-line";
 
 /**
  * FRANK 会員ポータルのサーバー側処理（#154）
@@ -428,6 +429,21 @@ export async function placeOrder(input: PlaceOrderInput): Promise<PlaceOrderResu
   await admin.from("frunk_order_items").insert(
     lines.map((l) => ({ order_id: orderId, menu_item_id: l.menu_item_id, name: l.name, price_kind: l.price_kind, unit_price: l.unit_price, qty: l.qty, amount: l.amount })),
   );
+
+  // その時間シフトに入っているスタッフへLINE（#273）。
+  // 決済の前に投げる＝カードが通らなくても「注文が入った」ことは必ず伝わる。
+  // 中で全部握りつぶす（LINEの不調で注文を落とさない）。
+  await notifyOrderToShiftStaff({
+    companyId: input.companyId,
+    storeId: input.storeId,
+    orderId,
+    orderNo: no,
+    bayId: input.bayId,
+    isMember: !!input.member,
+    lines: lines.map((l) => ({ name: l.name, qty: l.qty })),
+    total,
+    settlement: input.member?.squareCustomerId ? "oncard" : "register",
+  }).catch(() => {});
 
   // 会員＋保存カードがあれば即時決済
   if (input.member?.squareCustomerId) {

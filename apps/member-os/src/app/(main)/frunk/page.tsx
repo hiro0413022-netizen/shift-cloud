@@ -18,6 +18,14 @@ import { monthEndLabel, monthFromLabel } from "@yozan/core/frank-membership";
 import { createPlan, updatePlan, approveSignup, rejectSignup, issueSignupToken, checkJoinPayment, confirmJoinPayment, openJoinCheckout, rebaseBillingDayAll } from "./actions";
 import { joinPaymentView } from "@/lib/frunk-join-view";
 import { memberDisplayName } from "@yozan/core/frank-corporate";
+import {
+  countBillable,
+  matchesBillableFilter,
+  notBillableReason,
+  planLookup,
+  NOT_BILLABLE_LABEL,
+  type BillableFilter,
+} from "@yozan/core/frank-billable";
 
 export const dynamic = "force-dynamic";
 // 10日払いへの一括切り替え（#235）は1人あたりSquareを数回呼ぶので、サーバーアクションの時間を延ばす
@@ -56,6 +64,7 @@ export default async function FrunkPage({
     status?: string;
     plan?: string;
     sort?: string;
+    billable?: string;
   }>;
 }) {
   const actor = await requireReceptionActor();
@@ -115,16 +124,25 @@ export default async function FrunkPage({
     : "active"; // 既定は在籍だけ（退会者が混ざると店頭で読み違える）
   const planId = planList.some((p) => String(p.id) === sp.plan) ? (sp.plan as string) : "";
   const sort = (SORTS.some((s) => s.value === sp.sort) ? sp.sort : "member_no") as MemberSort;
+  // 課金対象での絞り込み（#273）。既定は絞らない＝今までと同じ一覧が出る
+  const billable = (["billable", "excluded"].includes(sp.billable ?? "") ? sp.billable : "") as BillableFilter;
+
+  // 月会費の請求が立つ人だけを数える（#273・判定は @yozan/core/frank-billable の1か所）。
+  // 見出しの「在籍」はスタッフ・モニター・法人のご利用者まで足していたので、30名ぶん多く見えていた。
+  const planById = planLookup(planList as never);
+  const billing = countBillable(memberList as never, planById);
 
   const shown = sortMembers(
-    filterMembers(memberList as unknown as FrunkMemberLike[], { q, status, planId }),
+    filterMembers(memberList as unknown as FrunkMemberLike[], { q, status, planId }).filter((m) =>
+      matchesBillableFilter(m as never, billable, planById),
+    ),
     sort,
   );
   const today = jstYmd();
 
   const qs = (over: Record<string, string>) => {
     const p = new URLSearchParams();
-    const base: Record<string, string> = { q, status, plan: planId, sort, ...over };
+    const base: Record<string, string> = { q, status, plan: planId, sort, billable, ...over };
     for (const [k, v] of Object.entries(base)) if (v) p.set(k, v);
     return `/frunk?${p.toString()}`;
   };
@@ -138,12 +156,24 @@ export default async function FrunkPage({
             会員を探す・状態を変える・プランを設定する。名前を押すと会員カード（詳細）が開きます。
           </p>
         </div>
+{/* 見出しの数字は「月会費をいただいている人数」（#273・2026-09-24 ユーザー指示）。
+            スタッフ・モニター・法人のご利用者は請求が立たないので数えない */}
         <div className="text-right text-sm">
-          <span className="text-(--color-dim)">在籍</span>{" "}
-          <span className="text-2xl font-bold tabular-nums text-emerald-600">{counts.active}</span>
-          <span className="ml-2 text-xs text-(--color-dim)">
-            休会 {counts.suspended} ・ 退会 {counts.left}
-          </span>
+          <span className="text-(--color-dim)">課金対象</span>{" "}
+          <span className="text-2xl font-bold tabular-nums text-emerald-600">{billing.billable}</span>
+          <span className="text-(--color-dim)">名</span>
+          <div className="mt-0.5 text-xs text-(--color-dim)">
+            うち休会 {billing.suspended} ／ 在籍 {counts.active + counts.suspended}名（
+            {[
+              billing.excluded["corporate-user"] > 0 && `法人のご利用者 ${billing.excluded["corporate-user"]}`,
+              billing.excluded["free-plan"] > 0 && `スタッフ・モニター ${billing.excluded["free-plan"]}`,
+              billing.excluded["no-plan"] > 0 && `プラン未設定 ${billing.excluded["no-plan"]}`,
+            ]
+              .filter(Boolean)
+              .join("・") || "除外なし"}
+            を除く）
+          </div>
+          <div className="text-xs text-(--color-dim)">退会 {counts.left}</div>
         </div>
       </header>
 
@@ -307,7 +337,10 @@ export default async function FrunkPage({
       )}
 
       {/* 会員一覧（探す・絞る） */}
-      <Panel title={`会員一覧　${shown.length}名 / 全${memberList.length}名`} className="d2">
+      <Panel
+        title={`会員一覧　${shown.length}名 / 全${memberList.length}名${billable === "billable" ? "（課金対象のみ）" : billable === "excluded" ? "（課金対象外のみ）" : ""}`}
+        className="d2"
+      >
         <form className="mb-3 flex flex-wrap items-end gap-2">
           <label className="min-w-56 flex-1">
             <span className="mb-1 block text-xs text-(--color-dim)">
@@ -340,6 +373,16 @@ export default async function FrunkPage({
               ))}
             </select>
           </Field>
+          <Field label="課金">
+            <select name="billable" defaultValue={billable} className={`${inputCls} !w-44`}>
+              <option value="">すべて</option>
+              <option value="billable">課金対象のみ（{billing.billable}）</option>
+              <option value="excluded">
+                課金対象外のみ（
+                {billing.excluded["corporate-user"] + billing.excluded["free-plan"] + billing.excluded["no-plan"]}）
+              </option>
+            </select>
+          </Field>
           <Field label="並び順">
             <select name="sort" defaultValue={sort} className={`${inputCls} !w-40`}>
               {SORTS.map((s) => (
@@ -350,7 +393,7 @@ export default async function FrunkPage({
             </select>
           </Field>
           <button className={btnCls}>絞り込む</button>
-          {(q || planId || status !== "active" || sort !== "member_no") && (
+          {(q || planId || billable || status !== "active" || sort !== "member_no") && (
             <Link href="/frunk" className={btnGhostCls}>
               条件をクリア
             </Link>
@@ -360,10 +403,16 @@ export default async function FrunkPage({
         {/* 状態のショートカット（押すだけで切り替わる） */}
         <div className="mb-3 flex flex-wrap gap-1.5 text-xs">
           <Link
-            href={qs({ status: "all" })}
+            href={qs({ status: "all", billable: "" })}
             className={`rounded-full border px-2.5 py-1 ${status === "all" ? "border-accent bg-accent/10 text-accent" : "border-(--color-line) text-(--color-dim)"}`}
           >
             すべて {memberList.length}
+          </Link>
+          <Link
+            href={qs({ status: "all", billable: "billable" })}
+            className={`rounded-full border px-2.5 py-1 ${billable === "billable" ? "border-accent bg-accent/10 text-accent" : "border-(--color-line) text-(--color-dim)"}`}
+          >
+            課金対象 {billing.billable}
           </Link>
           {STATUS_TABS.map((s) => (
             <Link
@@ -410,7 +459,20 @@ export default async function FrunkPage({
                         </Link>
                         {m.name_kana ? <div className="text-[11px] text-(--color-dim)">{m.name_kana}</div> : null}
                       </td>
-                      <td className="px-2 py-2 text-(--color-dim)">{planName((m as Row).plan_id) ?? "—"}</td>
+                      <td className="px-2 py-2 text-(--color-dim)">
+                        {planName((m as Row).plan_id) ?? "—"}
+                        {/* 課金対象から外れている人は、その場で理由が分かるようにする（#273）。
+                            「人数が合わない」と言われたときに1人ずつ会員カードを開かなくて済む */}
+                        {(() => {
+                          const why = notBillableReason(m as never, planById);
+                          if (!why || why === "not-enrolled") return null;
+                          return (
+                            <div className="text-[10px] text-(--color-dim)" title="月会費の請求が立たないため会員数に数えていません">
+                              数えず: {NOT_BILLABLE_LABEL[why]}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-2 py-2">
                         <Badge tone={FRUNK_STATUS_TONE[st] ?? "default"}>{FRUNK_STATUS_LABEL[st] ?? st}</Badge>
                         {inMinTerm ? (

@@ -3,6 +3,7 @@ import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import type { GenesisActor } from "@/lib/auth";
 import { inDateWindow, isStaffMember, isTrialMember, PLACEHOLDER_LEAVE_REASONS } from "@yozan/core/members";
+import { planIsBillable, planLookup } from "@yozan/core/frank-billable";
 
 /** すべての重要操作をCompany Eventに記録する（MASTER_PROMPT 3-5） */
 export async function logEvent(
@@ -343,7 +344,7 @@ export type StoreMetric = {
   staff: number;
   shifts: number; // 当月シフト数
   trials: number; // 当月体験（一時利用者名簿 visit_type='trial'）
-  members: number; // 在籍会員数（スタッフ除外・leave_date無し）
+  members: number; // 在籍会員数（スタッフ除外・leave_date無し。FRANKは課金対象のみ＝#273）
   joins: number; // 今月入会数（本会員・スタッフ除外）
   leavesCore: number; // 今月退会（本会員＝トライアル・スタッフ除く）痛い退会
   leavesTrial: number; // 今月退会（トライアル会員）想定内
@@ -470,7 +471,8 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
     .is("deleted_at", null);
   const forecastTotal = (fcRows ?? []).reduce((s, r) => s + (Number((r as { amount: number | string }).amount) || 0), 0);
 
-  const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes, frankRes, mtdRes] = await Promise.all([
+  const [segRes, catRes, entRes, storeRes, assignRes, shiftRes, trialRes, memberRes, frankRes, frankPlanRes, mtdRes] =
+    await Promise.all([
     admin.from("fin_segments").select("id,name,code").eq("company_id", companyId).is("deleted_at", null),
     admin.from("fin_categories").select("id,kind,name").eq("company_id", companyId).is("deleted_at", null),
     month
@@ -499,9 +501,15 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
     // FRANK は自前の入会フォーム→frunk_members に入るので、Smart Hello 由来の名簿には1件も載らない。
     // これを見ていなかったため、姫路の「本会員数・今月入会・本会員退会」がずっと0だった。
     scopeStore(
-      admin.from("frunk_members").select("store_id,status,join_date,leave_date").eq("company_id", companyId).is("deleted_at", null),
+      admin
+        .from("frunk_members")
+        .select("store_id,status,join_date,leave_date,plan_id,corporate_parent_id")
+        .eq("company_id", companyId)
+        .is("deleted_at", null),
       allowed
     ),
+    // FRANKのプラン（#273）。会員数は「月会費の請求が立つ人」だけ数えるので、課金対象かの判定に要る
+    admin.from("frunk_plans").select("id,name,billable,monthly_price").eq("company_id", companyId).is("deleted_at", null),
     // 進行中の当月の実績（#237b）。FRANK は9月開業で、最新の完了月（8月）には実績が1件も無い。
     // 完了月だけを出していると「まだ何も動いていない店」に見えてしまうので、当月も併記する。
     // 予測（source='forecast'）は forecastTotal 側の別枠なので、下の集計で除く。
@@ -593,16 +601,25 @@ export async function getBusinessBreakdown(companyId: string, storeIds?: string[
 
   // FRANK GOLF の会員集計（#237）。status: active=在籍 / left=退会 / pending・rejected=入会前なので数えない。
   // 退会理由の列が無いため leaveReasons は空、トライアル会員という区分も無いため leavesTrial は0のまま。
+  // #273: 数えるのは「月会費の請求が立つ人」だけ。スタッフ・モニター・法人のご利用者は外す。
+  //   （これを入れる前は姫路の会員数が 58 と出ていたが、いただいているのは 28 名ぶんだった）
+  const frankPlanById = planLookup(
+    (frankPlanRes.data ?? []) as { id: string; billable?: boolean | null; monthly_price?: number | null }[],
+  );
   for (const fm of (frankRes.data ?? []) as {
     store_id: string | null;
     status: string | null;
     join_date: string | null;
     leave_date: string | null;
+    plan_id: string | null;
+    corporate_parent_id: string | null;
   }[]) {
     const sid = fm.store_id;
     if (!sid) continue;
     if (allowed && !allowed.has(sid)) continue;
     if (fm.status === "pending" || fm.status === "rejected") continue; // 承認前・却下は会員ではない
+    // 法人のご利用者・スタッフ・モニターは「入会」「退会」としても数えない（請求が動いていないため）
+    if (fm.corporate_parent_id || !planIsBillable(frankPlanById(fm.plan_id))) continue;
     if (fm.status === "active" && !fm.leave_date) bump(memberByStore, sid); // 在籍
     if (inThisMonth(fm.join_date)) bump(joinByStore, sid); // 今月入会
     if (inThisMonth(fm.leave_date)) bump(leaveCoreByStore, sid); // 今月退会

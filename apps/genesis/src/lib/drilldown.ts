@@ -2,6 +2,7 @@ import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { storeIdForMemberStoreName, storeInValues } from "@/lib/kernel";
 import { isStaffMember, isTrialMember, PLACEHOLDER_LEAVE_REASONS, inDateWindow } from "@yozan/core/members";
+import { isBillableMember, planLookup } from "@yozan/core/frank-billable";
 import { MEMBER_OS_URL, MONEY_OS_URL, SHIFT_CLOUD_URL } from "@/lib/store-links";
 import { jstYmd } from "@/lib/jst";
 
@@ -124,7 +125,8 @@ async function membersDrill(
   crumbs: DrillLevel["crumbs"],
   metric: DrillMetric
 ): Promise<DrillLevel> {
-  const source = "GOLF WING＝会員名簿（Smart Hello取込・スタッフとトライアルを除く）／FRANK GOLF＝入会フォームの会員台帳（在籍のみ）";
+  const source =
+    "GOLF WING＝会員名簿（Smart Hello取込・スタッフとトライアルを除く）／FRANK GOLF＝入会フォームの会員台帳（在籍かつ課金対象。スタッフ・モニター・法人のご利用者は除く）";
   const frankIds = stores.filter(isFrank).map((s) => s.id);
 
   const [gwRes, frRes, planRes] = await Promise.all([
@@ -138,9 +140,13 @@ async function membersDrill(
           .in("status", ["active", "suspended"])
           .in("store_id", storeInValues(new Set(frankIds)))
       : Promise.resolve({ data: [] as Record<string, unknown>[] }),
-    admin.from("frunk_plans").select("id, name").eq("company_id", companyId),
+    admin.from("frunk_plans").select("id, name, billable, monthly_price").eq("company_id", companyId),
   ]);
-  const planName = new Map<string, string>(((planRes.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+  const frPlans = (planRes.data ?? []) as { id: string; name: string; billable?: boolean | null; monthly_price?: number | null }[];
+  const planName = new Map<string, string>(frPlans.map((p) => [p.id, p.name]));
+  // 会員数は「月会費の請求が立つ人」だけ（#273・判定は @yozan/core/frank-billable）。
+  // スタッフ6名・モニター1名・法人のご利用者23名まで足していたので、実勢の倍くらいに見えていた。
+  const frPlanById = planLookup(frPlans);
 
   type GW = { id: string; name: string | null; member_no: string; store_name: string | null; member_type: string | null; leave_date: string | null; join_date: string | null; sid: string | null };
   const gw: GW[] = ((gwRes.data ?? []) as Omit<GW, "sid">[])
@@ -148,7 +154,7 @@ async function membersDrill(
     .map((m) => ({ ...m, sid: storeIdForMemberStoreName(m.store_name, allStores) }))
     .filter((m) => m.sid && !frankIds.includes(m.sid) && stores.some((s) => s.id === m.sid));
   type FR = { id: string; name: string; member_no: string | null; store_id: string; status: string; plan_id: string | null; join_date: string | null };
-  const fr = (frRes.data ?? []) as FR[];
+  const fr = ((frRes.data ?? []) as FR[]).filter((m) => isBillableMember(m as never, frPlanById));
   const frKind = (m: FR) => (m.status === "suspended" ? "休会中" : planName.get(m.plan_id ?? "") ?? "プラン未設定");
 
   // 1段目: 店舗ごと
