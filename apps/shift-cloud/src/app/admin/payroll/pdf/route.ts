@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   const staffIds = items.map((i) => i.staff_id);
   const [{ data: days }, { data: shifts }, { data: company }] = await Promise.all([
     admin.from("attendance_days")
-      .select("staff_id, date, clock_in, clock_out, break_minutes, break_override_minutes, work_minutes, late_minutes, early_leave_minutes, overtime_minutes, is_missing_clock, status")
+      .select("staff_id, date, clock_in, clock_out, rounded_clock_in, rounded_clock_out, break_minutes, break_override_minutes, work_minutes, late_minutes, early_leave_minutes, overtime_minutes, is_missing_clock, status")
       .eq("company_id", actor.companyId)
       .in("staff_id", staffIds)
       .gte("date", range.from).lte("date", range.to),

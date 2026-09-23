@@ -53,6 +53,56 @@ export function calcOvertimeMinutes(
   return Math.max(0, Math.round((effectiveOut - shiftEndMs) / 60000));
 }
 
+/* ============================================================
+   打刻の丸め（2026-09-23 ユーザー依頼）
+
+   ルール:
+     出勤 = 15分単位に**切り上げ**（9:07 → 9:15 / 9:00・9:15 はそのまま）
+     退勤 = 15分単位に**切り下げ**（18:53 → 18:45 / 18:45 はそのまま）
+
+   なぜ絶対時刻(epochミリ秒)で丸めてよいか:
+     15分は JST のオフセット(9時間)を割り切るので、UTCの格子とJSTの :00/:15/:30/:45 が一致する。
+     日をまたぐ勤務でも打刻は絶対時刻なので、同じ計算でそのまま扱える。
+
+   ★ 元の打刻は絶対に書き換えない。丸めた時刻は「計算用」として別に持ち、画面では両方出す。
+   ============================================================ */
+
+/** 出勤打刻を丸め単位に切り上げる（unit<=0 なら丸めなし） */
+export function roundClockInMs(ms: number, unit: number): number {
+  const grid = unit > 0 ? unit * 60000 : 0;
+  return grid > 0 ? Math.ceil(ms / grid) * grid : ms;
+}
+
+/** 退勤打刻を丸め単位に切り下げる（unit<=0 なら丸めなし） */
+export function roundClockOutMs(ms: number, unit: number): number {
+  const grid = unit > 0 ? unit * 60000 : 0;
+  return grid > 0 ? Math.floor(ms / grid) * grid : ms;
+}
+
+export type RoundedSpan = {
+  /** 計算に使う出勤（切り上げ後） */
+  inMs: number;
+  /** 計算に使う退勤（切り下げ後） */
+  outMs: number;
+  /** 丸めたあとの拘束時間（分）。退勤が出勤以前になったら0 */
+  spanMinutes: number;
+  /** 丸めた結果、勤務時間が消えた（15分未満の勤務など） */
+  collapsed: boolean;
+};
+
+/**
+ * 出勤を切り上げ・退勤を切り下げた「計算用の勤務時間」。
+ *
+ * 短時間勤務（例: 9:07〜9:20）は 9:15〜9:15 になって0分。マイナスにはしない＝
+ * 丸めで勤務時間が伸びたり、負の時間が集計に混ざったりしない。
+ */
+export function roundedWorkSpan(inMs: number, outMs: number, unit: number): RoundedSpan {
+  const rIn = roundClockInMs(inMs, unit);
+  const rOut = roundClockOutMs(outMs, unit);
+  const spanMinutes = Math.max(0, Math.round((rOut - rIn) / 60000));
+  return { inMs: rIn, outMs: rOut, spanMinutes, collapsed: spanMinutes === 0 && outMs > inMs };
+}
+
 export type DayAttendance = {
   staff_id: string;
   work_minutes: number;

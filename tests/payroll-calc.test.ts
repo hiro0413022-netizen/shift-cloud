@@ -179,3 +179,53 @@ test("calcMonthlyPayroll: 賃金未登録スタッフは0円（実働は記録�
   assert.equal(r.total_amount, 0);
   assert.equal(r.work, 480);
 });
+
+/* ------------------------------------------------------------------
+   打刻の丸め（2026-09-23 ユーザー依頼）
+   出勤=15分切り上げ / 退勤=15分切り下げ / ちょうどはそのまま
+   ------------------------------------------------------------------ */
+import { roundClockInMs, roundClockOutMs, roundedWorkSpan } from "../apps/shift-cloud/src/lib/payroll-calc.ts";
+
+const at = (t: string) => new Date(`2026-09-23T${t}:00+09:00`).getTime();
+const hhmm = (ms: number) => new Date(ms + 9 * 3600_000).toISOString().slice(11, 16);
+
+test("出勤は15分切り上げ・ちょうどはそのまま", () => {
+  assert.equal(hhmm(roundClockInMs(at("09:00"), 15)), "09:00");
+  assert.equal(hhmm(roundClockInMs(at("09:07"), 15)), "09:15");
+  assert.equal(hhmm(roundClockInMs(at("09:15"), 15)), "09:15");
+  assert.equal(hhmm(roundClockInMs(at("09:16"), 15)), "09:30");
+});
+
+test("退勤は15分切り下げ・ちょうどはそのまま", () => {
+  assert.equal(hhmm(roundClockOutMs(at("18:53"), 15)), "18:45");
+  assert.equal(hhmm(roundClockOutMs(at("18:45"), 15)), "18:45");
+  assert.equal(hhmm(roundClockOutMs(at("18:44"), 15)), "18:30");
+});
+
+test("丸め幅0なら打刻そのまま", () => {
+  assert.equal(roundClockInMs(at("09:07"), 0), at("09:07"));
+  assert.equal(roundClockOutMs(at("18:53"), 0), at("18:53"));
+});
+
+test("9:07〜18:53 は 9:15〜18:45＝570分", () => {
+  const r = roundedWorkSpan(at("09:07"), at("18:53"), 15);
+  assert.equal(hhmm(r.inMs), "09:15");
+  assert.equal(hhmm(r.outMs), "18:45");
+  assert.equal(r.spanMinutes, 570);
+  assert.equal(r.collapsed, false);
+});
+
+test("15分に満たない勤務は0分（マイナスにしない）", () => {
+  const r = roundedWorkSpan(at("09:07"), at("09:20"), 15);
+  assert.equal(hhmm(r.inMs), "09:15");
+  assert.equal(hhmm(r.outMs), "09:15");
+  assert.equal(r.spanMinutes, 0);
+  assert.equal(r.collapsed, true);
+});
+
+test("日をまたぐ勤務も同じ計算でよい（22:07〜翌1:53＝22:15〜1:45）", () => {
+  const start = new Date("2026-09-23T22:07:00+09:00").getTime();
+  const end = new Date("2026-09-24T01:53:00+09:00").getTime();
+  const r = roundedWorkSpan(start, end, 15);
+  assert.equal(r.spanMinutes, 210); // 22:15〜25:45
+});

@@ -65,6 +65,7 @@ const SYSTEM = [
   "- 雑談・世間話・料金や予約の話は入れない。スイングとレッスンの中身だけ。",
   "- 個人の健康状態・家族の事情など、レッスンに関係のない私的な話は書き起こしにも要約にも入れない。",
   "- 話し手が コーチ か 生徒 か分かる範囲で書き分ける。分からなければ書き分けない。",
+  "- **同じ文を何度も繰り返さない。** 聞き取れない箇所は（聞き取れず）と1回だけ書いて先に進む。",
   "",
   "本文は2つ作る。**どちらも今日の会話に出たことだけ**で書く（新しい助言を足さない）:",
   "  body   = 先生がカルテで読む記録。先生の言い回しのまま。専門用語はそのまま使ってよい。",
@@ -93,6 +94,58 @@ const strArr = (v: unknown, max = 8): string[] =>
   Array.isArray(v)
     ? v.filter((x): x is string => typeof x === "string").map((x) => x.trim().slice(0, 200)).filter(Boolean).slice(0, max)
     : [];
+
+
+/* ------------------------------------------------------------------
+   AIの返事が途中で切れたときの救済（2026-09-23）
+
+   実例: 同じ言い回しを延々と繰り返してしまい、出力の上限で JSON が閉じないまま切れた。
+   これまでは JSON.parse に失敗した時点で全部捨てていたので、**聞き取れていた会話まで消えていた**。
+   ここでは切れた JSON から transcript だけでも拾い、繰り返しを畳んでから要約をやり直す。
+   ------------------------------------------------------------------ */
+
+/** 途中で切れた JSON から "transcript" の文字列だけを取り出す（エスケープを正しく解く） */
+export function salvageTranscript(text: string): string {
+  const key = '"transcript"';
+  const k = text.indexOf(key);
+  if (k < 0) return "";
+  const q = text.indexOf('"', k + key.length + 1);
+  if (q < 0) return "";
+  let out = "";
+  for (let i = q + 1; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "\\") {
+      const n = text[i + 1];
+      if (n === undefined) break;
+      out += n === "n" ? "\n" : n === "t" ? "\t" : n === "u" ? String.fromCharCode(parseInt(text.slice(i + 2, i + 6), 16) || 32) : n;
+      i += n === "u" ? 5 : 1;
+      continue;
+    }
+    if (ch === '"') break; // ここで文字列が閉じた
+    out += ch;
+  }
+  return out.trim();
+}
+
+/** 同じ行の繰り返し（AIのループ）を畳む。3回以上続いたら2回だけ残して注記を入れる */
+export function collapseRepeats(transcript: string): string {
+  const lines = transcript.split("\n");
+  const out: string[] = [];
+  let run = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const cur = lines[i].trim();
+    const prev = i > 0 ? lines[i - 1].trim() : null;
+    if (cur && cur === prev) {
+      run += 1;
+      if (run === 2) out.push("（同じ言葉の繰り返しを省略）");
+      if (run >= 2) continue;
+    } else {
+      run = 0;
+    }
+    out.push(lines[i]);
+  }
+  return out.join("\n");
+}
 
 /**
  * @param audio 音声の生バイト（webm / mp4 / m4a など）
@@ -168,7 +221,22 @@ export async function readLessonAudio(
     try {
       parsed = JSON.parse(text) as Record<string, unknown>;
     } catch {
-      return { transcript: "", summary: EMPTY, body: "", client: "", raw: text, warning: "AIの返事を読み取れませんでした" };
+      // 返事が途中で切れた（繰り返しループ→上限）。会話だけでも拾って、要約はテキストからやり直す
+      const salvaged = collapseRepeats(salvageTranscript(text));
+      if (!salvaged) {
+        return { transcript: "", summary: EMPTY, body: "", client: "", raw: text, warning: "AIの返事を読み取れませんでした" };
+      }
+      const again = await summarizeTranscript(salvaged, style);
+      return {
+        transcript: salvaged.slice(0, 40000),
+        summary: again?.summary ?? EMPTY,
+        body: again?.body ?? "",
+        client: again?.client ?? "",
+        raw: text,
+        warning: again
+          ? "AIの返事が途中で切れたため、会話から作り直しました。内容をご確認ください"
+          : "AIの返事が途中で切れました。会話だけ取り込みました",
+      };
     }
 
     const s = (parsed.summary ?? {}) as Record<string, unknown>;
@@ -190,6 +258,73 @@ export async function readLessonAudio(
       client,
       raw: parsed,
       warning: empty ? "会話を聞き取れませんでした。マイクが遠い可能性があります" : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 文字起こし（テキスト）だけから要約と本文を作り直す。音声は送らないので速い。
+ * 音声1回目の返事が途中で切れたときの作り直しに使う（2026-09-23）。
+ */
+async function summarizeTranscript(
+  transcript: string,
+  style: string[]
+): Promise<{ summary: LessonSummary; body: string; client: string } | null> {
+  const apiKey = geminiKey();
+  if (!apiKey) return null;
+  const model = process.env.LESSON_NOTE_MODEL || process.env.CORTEX_GEMINI_MODEL || DEFAULT_MODEL;
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM }] },
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text: [
+                    "次はレッスン中の会話の文字起こしです。**transcript は空文字**にして、summary・body・client だけ作ってください。",
+                    style.length ? ["", "このコーチの普段のコメント（言い回しの見本）:", ...style.map((x) => `---\n${x}`)].join("\n") : "",
+                    "",
+                    "---- 文字起こし ----",
+                    transcript.slice(0, 30000),
+                  ].join("\n"),
+                },
+              ],
+            },
+          ],
+          generationConfig: { maxOutputTokens: 4000, temperature: 0.2, responseMimeType: "application/json" },
+        }),
+        signal: AbortSignal.timeout(120000),
+      }
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] } }[] };
+    const text = (json.candidates ?? [])
+      .flatMap((c) => c.content?.parts ?? [])
+      .filter((p) => !p.thought)
+      .map((p) => p.text ?? "")
+      .join("")
+      .trim();
+    if (!text) return null;
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    const s = (parsed.summary ?? {}) as Record<string, unknown>;
+    return {
+      summary: {
+        today: strArr(s.today),
+        homework: strArr(s.homework),
+        studentWords: strArr(s.studentWords),
+        clubs: strArr(s.clubs, 6),
+        next: strArr(s.next),
+      },
+      body: typeof parsed.body === "string" ? parsed.body.trim().slice(0, 2000) : "",
+      client: typeof parsed.client === "string" ? parsed.client.trim().slice(0, 2000) : "",
     };
   } catch {
     return null;

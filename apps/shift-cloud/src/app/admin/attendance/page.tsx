@@ -6,6 +6,25 @@ import { currentYM, addMonths, timeJST, fmtMinutes, dowJP, todayJST } from "@/li
 import { monthRange } from "@/lib/payroll-calc";
 import { CorrectionForm } from "./correction-form";
 
+/**
+ * 打刻の欄（2026-09-23 ユーザー依頼）
+ * 計算に使う時刻（出勤=15分切り上げ／退勤=15分切り下げ）を大きく、元の打刻を下に小さく出す。
+ * 丸めで動いていない日は1行だけ（同じ時刻を2回出さない）。
+ */
+function PunchCell({ raw, rounded }: { raw: string | null; rounded: string | null }) {
+  const rawText = timeJST(raw);
+  const roundedText = rounded ? timeJST(rounded) : rawText;
+  if (!raw) return <span className="text-zinc-400">—</span>;
+  return (
+    <div className="whitespace-nowrap leading-tight">
+      <div className="font-medium">{roundedText}</div>
+      {roundedText !== rawText ? (
+        <div className="text-[10px] text-zinc-400">打刻 {rawText}</div>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function AttendancePage({ searchParams }: { searchParams: Promise<{ store?: string; ym?: string }> }) {
   const actor = await requireActor("edit_attendance");
   const admin = createAdmin();
@@ -75,6 +94,11 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
       {!rows.length ? (
         <Empty>この月の勤怠記録はありません</Empty>
       ) : (
+        <>
+        <p className="mb-2 text-xs text-zinc-500">
+          出勤は15分単位で切り上げ、退勤は15分単位で切り下げた時刻で計算します（ちょうどの時刻はそのまま）。
+          小さい字は実際の打刻です。
+        </p>
         <Table headers={["日付", "スタッフ", "出勤", "退勤", "休憩", "実働", "差異", "状態", ""]}>
           {rows.map((row) => {
             if (row.kind === "missing") {
@@ -98,15 +122,20 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
             <tr key={d.id} className="hover:bg-zinc-50">
               <Td className="whitespace-nowrap">{d.date.slice(5)}（{dowJP(d.date)}）</Td>
               <Td className="font-medium">{(d.staff as unknown as { name: string } | null)?.name}</Td>
-              <Td>{timeJST(d.clock_in)}</Td>
-              <Td>{timeJST(d.clock_out)}</Td>
+              <Td><PunchCell raw={d.clock_in} rounded={d.rounded_clock_in} /></Td>
+              <Td><PunchCell raw={d.clock_out} rounded={d.rounded_clock_out} /></Td>
               <Td>
                 <span className="whitespace-nowrap">{d.break_minutes}分</span>
                 {d.break_override_minutes != null
                   ? <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-700">手動</span>
                   : <span className="ml-1 text-[10px] text-zinc-400">自動</span>}
               </Td>
-              <Td className="font-medium">{fmtMinutes(d.work_minutes)}</Td>
+              <Td className="whitespace-nowrap leading-tight">
+                <div className="font-medium">{fmtMinutes(d.work_minutes)}</div>
+                {d.raw_work_minutes != null && d.raw_work_minutes !== d.work_minutes ? (
+                  <div className="text-[10px] text-zinc-400">打刻どおり {fmtMinutes(d.raw_work_minutes)}</div>
+                ) : null}
+              </Td>
               <Td>
                 <div className="flex flex-wrap gap-1">
                   {d.is_missing_clock && <Badge color="red">打刻漏れ</Badge>}
@@ -122,6 +151,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: P
             );
           })}
         </Table>
+        </>
       )}
     </>
   );

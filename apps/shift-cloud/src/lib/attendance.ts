@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { jstDateTime } from "@/lib/util";
-import { autoBreakMinutes, calcOvertimeMinutes } from "@/lib/payroll-calc";
+import { autoBreakMinutes, calcOvertimeMinutes, roundedWorkSpan } from "@/lib/payroll-calc";
 
 // 純粋ロジックは payroll-calc.ts へ集約（テスト対象）。既存importの互換のため再export。
 export { autoBreakMinutes };
@@ -116,18 +116,32 @@ export async function recalcAttendance(
     return;
   }
 
-  // 拘束時間（出退勤の差）
-  const spanMinutes =
+  /* 打刻の丸め（2026-09-23 ユーザー依頼）
+     出勤=15分切り上げ / 退勤=15分切り下げ。ちょうどの時刻はそのまま。
+     元の打刻（clock_in / clock_out）は書き換えず、丸めた時刻を別の列に残して画面で両方出す。
+     自動休憩（6時間超45分・8時間超60分）は元の打刻の拘束時間で判断する。 */
+  const rawSpanMinutes =
     clockIn && clockOut
       ? Math.max(0, Math.round((new Date(clockOut).getTime() - new Date(clockIn).getTime()) / 60000))
       : 0;
+  const rounded =
+    clockIn && clockOut
+      ? roundedWorkSpan(new Date(clockIn).getTime(), new Date(clockOut).getTime(), roundingMinutes)
+      : null;
+  const roundedIn = rounded ? new Date(rounded.inMs).toISOString() : null;
+  const roundedOut = rounded ? new Date(rounded.outMs).toISOString() : null;
+  const spanMinutes = rounded ? rounded.spanMinutes : 0;
 
   // 実効休憩：手動上書き＞休憩打刻＞段階式自動
-  const autoBreak = autoBreakMinutes(spanMinutes);
+  // 自動休憩は **元の打刻の拘束時間** で判断する（実際に8時間超いた日の休憩が、丸めで45分に減らない）
+  const autoBreak = autoBreakMinutes(rawSpanMinutes);
   const breakMinutes =
     override != null ? override : punchedBreak > 0 ? punchedBreak : autoBreak;
 
-  const workMinutes = clockIn && clockOut ? Math.max(0, spanMinutes - breakMinutes) : 0;
+  // 休憩は拘束時間を超えて引かない（丸めで短くなった日に負の実働を作らない）
+  const workMinutes = clockIn && clockOut ? Math.max(0, spanMinutes - Math.min(breakMinutes, spanMinutes)) : 0;
+  const rawWorkMinutes =
+    clockIn && clockOut ? Math.max(0, rawSpanMinutes - Math.min(breakMinutes, rawSpanMinutes)) : 0;
 
   let late = 0, early = 0, overtime = 0;
   if (hasWorkShift && shift) {
@@ -136,7 +150,7 @@ export async function recalcAttendance(
     if (clockIn) late = Math.max(0, Math.round((new Date(clockIn).getTime() - s.getTime()) / 60000));
     if (clockOut) {
       early = Math.max(0, Math.round((e.getTime() - new Date(clockOut).getTime()) / 60000));
-      // 残業は退勤を丸め単位に切り下げてから判定（遅刻・早退・実働は生打刻のまま）DECISIONS #60
+      // 残業は切り下げた退勤で判定（遅刻・早退は元の打刻のまま＝実際に遅れた分を見せる）DECISIONS #60
       overtime = calcOvertimeMinutes(new Date(clockOut).getTime(), e.getTime(), roundingMinutes);
     }
   }
@@ -155,6 +169,10 @@ export async function recalcAttendance(
       shift_id: shift?.id ?? null,
       clock_in: clockIn,
       clock_out: clockOut,
+      // 計算に使った時刻（丸め後）。元の打刻は上の2つに残したまま
+      rounded_clock_in: roundedIn,
+      rounded_clock_out: roundedOut,
+      raw_work_minutes: rawWorkMinutes,
       break_minutes: breakMinutes,
       break_override_minutes: override,
       work_minutes: workMinutes,

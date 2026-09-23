@@ -13,7 +13,10 @@ import { timeJST, hm, dowJP } from "./util.ts";
 export type SheetAttendanceDay = {
   staff_id: string;
   date: string; // YYYY-MM-DD
-  clock_in: string | null; // timestamptz
+  clock_in: string | null; // timestamptz（打刻そのもの）
+  /** 計算用の出勤・退勤（丸め後・2026-09-23）。無い日は打刻をそのまま使う */
+  rounded_clock_in?: string | null;
+  rounded_clock_out?: string | null;
   clock_out: string | null;
   break_minutes: number;
   break_override_minutes: number | null;
@@ -94,8 +97,8 @@ export function buildSheetDays(
       date: d.date,
       dateLabel: dateLabelOf(d.date),
       shiftLabel: shiftLabelOf(shiftByDate.get(d.date)),
-      clockIn: timeJST(d.clock_in),
-      clockOut: timeJST(d.clock_out),
+      clockIn: timeJST(d.rounded_clock_in ?? d.clock_in),
+      clockOut: timeJST(d.rounded_clock_out ?? d.clock_out),
       breakLabel: `${d.break_minutes}分${d.break_override_minutes != null ? "＊" : ""}`,
       workMinutes: d.work_minutes,
       overtimeMinutes: d.overtime_minutes,
