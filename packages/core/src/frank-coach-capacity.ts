@@ -32,17 +32,24 @@ export function coachCapacity(cover: Span[] | null, s: number, e: number): numbe
   return cover.filter((c) => c.s <= s && c.e >= e).length;
 }
 
-/** その時間帯に重なっている体験の件数（すでに入っている予約は動かさない＝数えるだけ） */
-export function trialsAt(trials: Span[], s: number, e: number): number {
-  return trials.filter((t) => s < t.e && e > t.s).length;
+/** その時間帯に重なっている「コーチの用事」の件数（すでに入っている予約は動かさない＝数えるだけ）。
+ *
+ *  ★ 2026-09-21 ユーザー指摘「スタッフが1人のときに体験とパーソナルレッスンがかぶると対応できない」:
+ *    体験とレッスンは同じコーチを使うのに、別々に数えていたので、コーチ1人の時間に
+ *    「体験1件」と「レッスン1件」が両方通っていた（実例 2026-09-23）。
+ *    渡す配列を **体験＋レッスンの合算** にして、どちらの判定でも同じ数を見る。 */
+export function trialsAt(busy: Span[], s: number, e: number): number {
+  return busy.filter((t) => s < t.e && e > t.s).length;
 }
 
 /**
  * その時間帯にもう1件、体験を受けられるか。
  * すでに上限を超えている時間帯（先に入っていた予約）は増やさないだけで、消しはしない。
+ *
+ * @param busy 体験 **と** パーソナルレッスンの時間帯（合算）。どちらも同じコーチを使う。
  */
-export function canTakeTrial(cover: Span[] | null, trials: Span[], s: number, e: number): boolean {
-  return trialsAt(trials, s, e) < coachCapacity(cover, s, e);
+export function canTakeTrial(cover: Span[] | null, busy: Span[], s: number, e: number): boolean {
+  return trialsAt(busy, s, e) < coachCapacity(cover, s, e);
 }
 
 /**
@@ -66,9 +73,9 @@ export function coachesForLesson<T extends Span>(coaches: T[], s: number, e: num
  * パーソナルレッスン（25分）を、その時間にもう1件受けられるか（#225）
  *
  * ユーザー依頼「パーソナル シフト変動制 予約件数上限」＝**上限をシフトのコーチ人数に連動**させる。
- * 体験（#212）と同じ考え方だが、数えるものが違う:
+ * 体験（#212）と同じ考え方:
  *   ・受入数 = その時間に25分ぶん一緒にいられるコーチの人数
- *   ・使用数 = 同じ時間に重なっている**レッスン付きの打席予約**（ご希望・確定の両方）
+ *   ・使用数 = 同じ時間に重なっている**レッスン付きの打席予約＋体験**（2026-09-21・合算にした）
  *
  * ★ 「おまかせ」も数える。指名なしの申込を数えないと、
  *   コーチ1人の時間に「おまかせ」が3件たまり、店頭で2件断ることになる。
@@ -82,6 +89,7 @@ export function lessonCapacity(coaches: Span[] | null, s: number, e: number, les
   return coachesForLesson(coaches, s, e, lessonMinutes).length;
 }
 
+/** @param taken レッスン付きの打席予約 **と** 体験の時間帯（合算・2026-09-21） */
 export function canTakeLesson(
   coaches: Span[] | null,
   taken: Span[],

@@ -113,3 +113,36 @@ test("シフト未確定の日は2件まで（体験と同じ扱い）", () => {
   assert.equal(lessonCapacity(null, b.s, b.e, 25), NO_SHIFT_CAPACITY);
   assert.equal(canTakeLesson(null, [bay("14:00"), bay("14:00")], b.s, b.e, 25), false);
 });
+
+/* ------------------------------------------------------------------
+   体験とパーソナルレッスンは同じコーチを使う＝合算して数える
+   （2026-09-21 ユーザー指摘「スタッフが1人のときに体験とパーソナルがかぶると対応できない」）
+   ------------------------------------------------------------------ */
+
+test("コーチ1人: 体験が入っていたらレッスンは受けない", () => {
+  const cover = [span("09:45", "18:45")];
+  const t = trial("10:00"); // 10:00〜10:55
+  const bay = span("10:00", "11:00"); // 打席1時間＋レッスン希望
+  // 体験が先に入っている → レッスンは不可
+  assert.equal(canTakeLesson(cover, [t], bay.s, bay.e, 25), false);
+  // レッスン付きの打席が先に入っている → 体験も不可
+  assert.equal(canTakeTrial(cover, [bay], t.s, t.e), false);
+});
+
+test("コーチ2人なら体験1件とレッスン1件は両立し、3件目で止まる", () => {
+  const cover = [span("09:45", "18:45"), span("09:45", "18:45")];
+  const t = trial("10:00");
+  const bay = span("10:00", "11:00");
+  assert.equal(canTakeLesson(cover, [t], bay.s, bay.e, 25), true);
+  assert.equal(canTakeTrial(cover, [bay], t.s, t.e), true);
+  assert.equal(canTakeLesson(cover, [t, bay], bay.s, bay.e, 25), false);
+  assert.equal(canTakeTrial(cover, [t, bay], t.s, t.e), false);
+});
+
+test("時間が重ならなければコーチ1人でも体験とレッスンは両立する", () => {
+  const cover = [span("09:45", "18:45")];
+  const t = trial("10:00"); // 10:00〜10:55
+  const bay = span("11:00", "12:00");
+  assert.equal(canTakeLesson(cover, [t], bay.s, bay.e, 25), true);
+  assert.equal(canTakeTrial(cover, [bay], t.s, t.e), true);
+});

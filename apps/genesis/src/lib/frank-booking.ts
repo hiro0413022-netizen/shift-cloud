@@ -418,18 +418,24 @@ export async function createBooking(input: {
    * 店頭で断ることになる。すでに入っている予約は動かさない（増やさないだけ）。
    */
   if (wantsLesson) {
+    // 数えるのは「レッスン付きの打席予約」＋「体験」。
+    // 2026-09-21 ユーザー指摘: どちらも同じコーチを使うのに別々に数えていたため、
+    // コーチ1人の時間に体験1件とレッスン1件が両方入っていた（実例 2026-09-23）。
     const { data: sameDay } = await admin
       .from("frunk_bookings")
-      .select("start_time, end_time, lesson_option_status")
+      .select("start_time, end_time, customer_kind, lesson_option_status")
       .eq("booked_date", input.date)
       .neq("status", "cancelled")
       .is("deleted_at", null)
-      .in("lesson_option_status", ["requested", "confirmed"])
-      .limit(100);
-    const taken = ((sameDay ?? []) as Array<{ start_time: string; end_time: string }>).map((b) => ({
-      s: toMin(String(b.start_time)),
-      e: toMin(String(b.end_time)),
-    }));
+      .limit(200);
+    type BusyRow = { start_time: string; end_time: string; customer_kind: string | null; lesson_option_status: string | null };
+    const taken = ((sameDay ?? []) as BusyRow[])
+      .filter(
+        (b) =>
+          String(b.customer_kind ?? "") === "trial" ||
+          ["requested", "confirmed"].includes(String(b.lesson_option_status ?? "")),
+      )
+      .map((b) => ({ s: toMin(String(b.start_time)), e: toMin(String(b.end_time)) }));
     const cover = roster && roster.scheduled ? roster.coaches.map((c) => ({ s: c.s, e: c.e })) : null;
     if (!canTakeLesson(cover, taken, startMin, endMin, lesson.minutes)) {
       return {

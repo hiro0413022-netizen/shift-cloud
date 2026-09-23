@@ -99,20 +99,29 @@ async function coachCover(admin: ReturnType<typeof createAdmin>, dateStr: string
   return rosterCover(await loadCoachRoster(admin, dateStr));
 }
 
-/** その日すでに入っている体験の時間帯（キャンセル以外） */
-async function trialSpans(admin: ReturnType<typeof createAdmin>, dateStr: string): Promise<Span[]> {
+/**
+ * その日すでにコーチの手が要る予約の時間帯（キャンセル以外）＝**体験＋パーソナルレッスン**。
+ *
+ * 2026-09-21 ユーザー指摘「スタッフが1人のときに体験とパーソナルレッスンがかぶると対応できない」。
+ * 体験だけを数えていたので、コーチ1人の時間に体験1件とレッスン1件が別々に通っていた。
+ * レッスンは開始時刻が決まるまで打席の予約時間まるごとを占有あつかい（#225と同じ扱い）。
+ */
+async function coachBusySpans(admin: ReturnType<typeof createAdmin>, dateStr: string): Promise<Span[]> {
   const { data } = await admin
     .from("frunk_bookings")
-    .select("start_time, end_time")
+    .select("start_time, end_time, customer_kind, lesson_option_status")
     .eq("booked_date", dateStr)
-    .eq("customer_kind", "trial")
     .neq("status", "cancelled")
     .is("deleted_at", null)
-    .limit(100);
-  return ((data ?? []) as { start_time: string; end_time: string }[]).map((b) => ({
-    s: toMin(String(b.start_time)),
-    e: toMin(String(b.end_time)),
-  }));
+    .limit(200);
+  type Row = { start_time: string; end_time: string; customer_kind: string | null; lesson_option_status: string | null };
+  return ((data ?? []) as Row[])
+    .filter(
+      (b) =>
+        String(b.customer_kind ?? "") === "trial" ||
+        ["requested", "confirmed"].includes(String(b.lesson_option_status ?? "")),
+    )
+    .map((b) => ({ s: toMin(String(b.start_time)), e: toMin(String(b.end_time)) }));
 }
 
 export type TrialSlots = {
@@ -149,11 +158,11 @@ export async function getTrialSlots(dateStr: string): Promise<TrialSlots> {
   };
   if (!hours) return { ...base, closed: true, slots: [], leftySlots: [] };
 
-  const [bays, busy, cover, trials] = await Promise.all([
+  const [bays, busy, cover, coachBusy] = await Promise.all([
     trialBays(admin),
     busyByBay(admin, dateStr),
     coachCover(admin, dateStr),
-    trialSpans(admin, dateStr),
+    coachBusySpans(admin, dateStr),
   ]);
   const open = toMin(hours.open);
   const close = toMin(hours.close);
@@ -169,8 +178,9 @@ export async function getTrialSlots(dateStr: string): Promise<TrialSlots> {
   for (let s = first; s + TRIAL_MINUTES <= close; s += TRIAL_START_STEP) {
     if (s < earliest) continue;
     const e = s + TRIAL_MINUTES;
-    // コーチの人数ぶんまで（#212）。打席が空いていても担当がいなければ出さない
-    if (!canTakeTrial(cover, trials, s, s + TRIAL_LABEL_MINUTES)) continue;
+    // コーチの人数ぶんまで（#212）。打席が空いていても担当がいなければ出さない。
+    // 同じ時間のパーソナルレッスンも同じコーチを使うので合算して数える（2026-09-21）
+    if (!canTakeTrial(cover, coachBusy, s, s + TRIAL_LABEL_MINUTES)) continue;
     if (pickBay(bays, busy, s, e, false)) slots.push(toTime(s));
     if (pickBay(bays, busy, s, e, true)) leftySlots.push(toTime(s));
   }
@@ -265,17 +275,17 @@ export async function createTrialBooking(input: TrialInput): Promise<TrialResult
   }
 
   const lefty = Boolean(input.lefty);
-  const [bays, busy, cover, trials] = await Promise.all([
+  const [bays, busy, cover, coachBusy] = await Promise.all([
     trialBays(admin),
     busyByBay(admin, input.date),
     coachCover(admin, input.date),
-    trialSpans(admin, input.date),
+    coachBusySpans(admin, input.date),
   ]);
   if (bays.length === 0) return { ok: false, error: "ただいま体験のご予約を承れません。お手数ですが店舗までご連絡ください。" };
 
-  // コーチの人数を超える体験は受けない（#212）。画面を経由しない直接POSTもここで止まる。
+  // コーチの人数を超える体験は受けない（#212・レッスンと合算 2026-09-21）。画面を経由しない直接POSTもここで止まる。
   // スタッフの代理登録（member-os）もこのAPIを通るので、同じ判定が効く。
-  if (!canTakeTrial(cover, trials, s, s + TRIAL_LABEL_MINUTES)) {
+  if (!canTakeTrial(cover, coachBusy, s, s + TRIAL_LABEL_MINUTES)) {
     return { ok: false, error: "その時間は体験のご案内がいっぱいです。別の時間をお選びください。" };
   }
 
