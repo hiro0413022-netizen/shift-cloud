@@ -174,6 +174,13 @@ export async function addFreeLine(formData: FormData): Promise<void> {
   revalidatePath(`/q/${id}/quote`);
 }
 
+/** 欄があるときだけ差し替える。空文字で消さない（お名前・担当のように空にできては困るもの用） */
+function txtKeep(formData: FormData, key: string, current: string | null): string | null {
+  if (!formData.has(key)) return current;
+  const v = String(formData.get(key) ?? "").trim();
+  return v === "" ? current : v;
+}
+
 /** 明細の数量・掛け率・仕上げ長さを直す。掛け率を打ち替えたら「誰が・いつ・なぜ」を残す */
 export async function updateItems(formData: FormData): Promise<void> {
   const id = Number(formData.get("quote_id"));
@@ -245,6 +252,11 @@ export async function updateItems(formData: FormData): Promise<void> {
     .update({
       // 帳票の上で直接直せるようにした項目（件名・納期・支払条件・有効期限）
       subject: txt(formData.get("subject")) ?? full.quote.subject,
+      // お客様名と担当も紙の上で直せる（#275・2026-09-24）。
+      //   担当はこれまで作った人のログイン名の焼き付けで、店舗の共有アカウントだと
+      //   全部「GOLF WING宝塚」になっていた。欄が無いフォームから来たときは今の値を残す。
+      customer_name: txtKeep(formData, "customer_name", full.quote.customer_name),
+      staff_name: txtKeep(formData, "staff_name", full.quote.staff_name),
       delivery_note: txt(formData.get("delivery_note")) ?? full.quote.delivery_note,
       payment_terms: txt(formData.get("payment_terms")) ?? full.quote.payment_terms,
       validity_note: txt(formData.get("validity_note")) ?? full.quote.validity_note,

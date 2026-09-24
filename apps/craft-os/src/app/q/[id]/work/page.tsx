@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { countUnorderedItems, getQuote, listPurchaseDrafts, listSalesPostings, PO_STATUS_LABELS } from "@/lib/craft";
+import {
+  countUnorderedItems,
+  getQuote,
+  listPurchaseDrafts,
+  listSalesPostings,
+  listStaffNames,
+  PO_STATUS_LABELS,
+} from "@/lib/craft";
 import { jpDate, md, Money, ORDER_STEPS, OrderBottom, QuotePaper, sumsOf, toPaperItems } from "@/components/paper";
 import { finishInfoOf } from "@/lib/paper-data";
 import { GOLFWING_POOL_URL, golfwingOrderUrl } from "@/lib/links";
@@ -29,10 +36,11 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
   const full = await getQuote(actor, Number(id));
   if (!full) notFound();
   const { quote: q, items, work, specs } = full;
-  const [pos, postings, unordered] = await Promise.all([
+  const [pos, postings, unordered, staffOptions] = await Promise.all([
     listPurchaseDrafts(actor, full.work?.id ?? null),
     listSalesPostings(actor, Number(id)),
     countUnorderedItems(actor, Number(id)),
+    listStaffNames(actor),
   ]);
   const orderable = items.filter((it) => ["product", "grip", "sleeve", "coating", "free"].includes(it.line_kind ?? ""));
 
@@ -85,7 +93,15 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
           <div className="mx-auto min-w-[760px] max-w-[210mm] bg-white p-8 text-black shadow-md">
             <QuotePaper
               doc="order"
-              customerName={q.customer_name}
+              customerName={
+                /* お客様名も注文書の上で直せる（#275・2026-09-24） */
+                <input
+                  name="customer_name"
+                  defaultValue={q.customer_name}
+                  className={`${PIN} text-center text-[14pt] font-bold`}
+                  aria-label="お客様名"
+                />
+              }
               contact={q.customer_contact ?? ""}
               date={jpDate(work.order_date ?? q.quote_date)}
               subject={q.subject}
@@ -97,7 +113,25 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
               }
               payment={q.payment_terms}
               validity={q.validity_note}
-              staffName={q.staff_name ?? ""}
+              staffName={
+                /* 担当（#275）。店舗の共有アカウントで入っていると全部その名前になっていた */
+                <select
+                  name="staff_name"
+                  defaultValue={q.staff_name ?? ""}
+                  key={q.staff_name ?? ""}
+                  className={`${PIN} cursor-pointer`}
+                  aria-label="担当"
+                >
+                  {!staffOptions.includes(q.staff_name ?? "") && (
+                    <option value={q.staff_name ?? ""}>{q.staff_name || "（未設定）"}</option>
+                  )}
+                  {staffOptions.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              }
               total={full.priced.totals.total}
               items={paperItems}
               bottom={

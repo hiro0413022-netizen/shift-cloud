@@ -195,6 +195,14 @@ export async function createFitting(formData: FormData): Promise<void> {
  * 伝票を1件つくる。fitting_id は任意。
  * 表紙から呼ぶときは、お客様情報を表紙から引き継ぐ（毎回書かせない）。
  */
+/** ログインしているのが店舗の共有アカウントか（staff に店舗名そのものの行がある・#275） */
+async function isStoreAccount(companyId: string, name: string): Promise<boolean> {
+  const { data } = await admin().from("stores").select("name").eq("company_id", companyId).is("deleted_at", null);
+  const key = String(name ?? "").replace(/[\s\u3000]/g, "");
+  if (!key) return false;
+  return ((data ?? []) as { name: string }[]).some((s) => s.name.replace(/[\s\u3000]/g, "") === key);
+}
+
 export async function createQuoteRow(
   actor: { companyId: string; staffId: string | null; name: string },
   input: {
@@ -228,7 +236,9 @@ export async function createQuoteRow(
       member_kind: input.memberKind ?? "ビジター",
       segment: input.segment ?? "visitor_no_fitting",
       quote_date: quoteDate,
-      staff_name: actor.name,
+      // 担当（#275・2026-09-24）。店舗の共有アカウント（「GOLF WING宝塚」など）で入っているときは
+      // 空で始める＝紙に店名が載るより「未設定」で目に付くほうがよい。伝票の紙の上で選べる
+      staff_name: (await isStoreAccount(actor.companyId, actor.name)) ? null : actor.name,
       created_by: actor.staffId,
     })
     .select("id")

@@ -1044,3 +1044,50 @@ export async function listWorkBoard(actor: Actor): Promise<WorkBoardCard[]> {
   }
   return out;
 }
+
+/**
+ * 見積・注文書の「担当」に出すスタッフ名（#275・2026-09-24）
+ *
+ * ★ なぜ要るか
+ *   担当はこれまでログインしている人の名前を伝票に焼き付けるだけだった。
+ *   店頭は店舗の共有アカウント（「GOLF WING宝塚」など）で入っているので、
+ *   どの伝票も担当が「ゴルフウィング」になり、誰が出した見積か分からなかった（ユーザー指摘）。
+ *
+ * ★ 店舗アカウントは候補に出さない
+ *   staff には店舗名そのものの行（共有アカウント）が混ざっている。
+ *   店舗マスタの名前と一致する行を外す＝名前をコードに書かずに落とせる。
+ */
+export async function listStaffNames(actor: Actor): Promise<string[]> {
+  const admin = createAdmin();
+  const [{ data: staff }, { data: stores }] = await Promise.all([
+    admin
+      .from("staff")
+      .select("name, staff_store_assignments(store_id, deleted_at)")
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .order("name"),
+    admin.from("stores").select("name").eq("company_id", actor.companyId).is("deleted_at", null),
+  ]);
+  const storeNames = new Set(
+    ((stores ?? []) as { name: string }[]).map((s) => s.name.replace(/[\s　]/g, "")),
+  );
+  const rows = (staff ?? []) as Array<{
+    name: string;
+    staff_store_assignments: Array<{ store_id: string; deleted_at: string | null }> | null;
+  }>;
+  const out = rows
+    .filter((s) => {
+      const key = String(s.name ?? "").replace(/[\s　]/g, "");
+      if (!key) return false;
+      if (storeNames.has(key)) return false; // 店舗の共有アカウント
+      if (/デモ|サンプル|テスト/.test(key)) return false;
+      // 自分の店舗に所属している人だけ（オーナーは全員）
+      if (actor.isOwner) return true;
+      const assigns = (s.staff_store_assignments ?? []).filter((a) => a.deleted_at == null);
+      return assigns.some((a) => actor.storeIds.includes(a.store_id));
+    })
+    .map((s) => String(s.name));
+  // 自分は必ず候補に入れる（所属の設定漏れで自分が選べないのがいちばん困る）
+  if (actor.name && !out.includes(actor.name)) out.unshift(actor.name);
+  return out;
+}

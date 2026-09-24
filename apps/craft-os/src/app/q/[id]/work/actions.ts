@@ -65,6 +65,23 @@ export async function saveWork(formData: FormData): Promise<void> {
 
   await admin().from("gw_work_orders").update(patch).eq("id", full.work.id).eq("company_id", actor.companyId);
 
+  // 注文書の紙の上で直したお客様名・担当（#275・2026-09-24）。伝票側に持っているので別で保存する。
+  // 欄が無いフォームや空欄で来たときは今の値を残す（お名前を空にできては困る）
+  const keep = (key: string, current: string | null) => {
+    if (!formData.has(key)) return current;
+    const v = String(formData.get(key) ?? "").trim();
+    return v === "" ? current : v;
+  };
+  const customerName = keep("customer_name", full.quote.customer_name);
+  const staffName = keep("staff_name", full.quote.staff_name);
+  if (customerName !== full.quote.customer_name || staffName !== full.quote.staff_name) {
+    await admin()
+      .from("gw_quotes")
+      .update({ customer_name: customerName, staff_name: staffName, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("company_id", actor.companyId);
+  }
+
   // お渡しが入ったら、その場で Money OS へ売上を計上する（二重計上は関数側で防ぐ）
   if (patch.delivered_on) await postSales(actor, id);
 

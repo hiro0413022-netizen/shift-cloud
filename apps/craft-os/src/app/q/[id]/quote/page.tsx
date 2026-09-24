@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireActor } from "@/lib/auth";
-import { getFitting, getLaborRates, getQuote, listSalesPostings, refundBreakdown, QUOTE_STATUS_LABELS } from "@/lib/craft";
+import {
+  getFitting,
+  getLaborRates,
+  getQuote,
+  listSalesPostings,
+  listStaffNames,
+  refundBreakdown,
+  QUOTE_STATUS_LABELS,
+} from "@/lib/craft";
 import { jpDate } from "@/components/paper";
 import { btnCls, btnGhostCls, cardCls, inputCls, SectionTitle } from "@/components/ui";
 import { QuoteNav } from "@/components/nav";
@@ -17,10 +25,11 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
   if (!full) notFound();
   const { quote: q, items, priced } = full;
 
-  const [labor, cover, postings] = await Promise.all([
+  const [labor, cover, postings, staffOptions] = await Promise.all([
     getLaborRates(actor),
     full.fitting ? getFitting(actor, full.fitting.id, { withQuotes: false }) : Promise.resolve(null),
     listSalesPostings(actor, Number(id)),
+    listStaffNames(actor),
   ]);
   const refund = refundBreakdown(full);
   const isOwnQuote = q.created_by === actor.staffId;
@@ -77,6 +86,7 @@ export default async function QuotePage({ params }: { params: Promise<{ id: stri
         customerContact={q.customer_contact ?? ""}
         quoteDate={jpDate(q.quote_date)}
         staffName={q.staff_name ?? ""}
+        staffOptions={staffOptions}
         subject={q.subject}
         deliveryNote={q.delivery_note}
         paymentTerms={q.payment_terms}

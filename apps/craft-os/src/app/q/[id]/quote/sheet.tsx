@@ -86,6 +86,7 @@ const CATEGORIES = [
   "シャフト",
   "クラブ",
   "グリップ",
+  "パターグリップ",
   "スリーブ",
   "ウッド用 ソケット",
   "アイアン用 ソケット",
@@ -113,6 +114,7 @@ export function QuoteSheet({
   customerContact,
   quoteDate,
   staffName,
+  staffOptions,
   subject,
   deliveryNote,
   paymentTerms,
@@ -138,6 +140,8 @@ export function QuoteSheet({
   customerContact: string;
   quoteDate: string;
   staffName: string;
+  /** 担当に出すスタッフ（#275）。店舗の共有アカウントは除いてある */
+  staffOptions: string[];
   subject: string;
   deliveryNote: string;
   paymentTerms: string;
@@ -352,14 +356,38 @@ export function QuoteSheet({
           <div className="mx-auto min-w-[760px] max-w-[210mm] bg-white p-8 text-black shadow-md">
             <QuotePaper
               doc="quote"
-              customerName={customerName}
+              customerName={
+                <input
+                  name="customer_name"
+                  defaultValue={customerName}
+                  className={`${pin} text-center text-[14pt] font-bold`}
+                  aria-label="お客様名"
+                />
+              }
               contact={<input name="customer_contact" defaultValue={customerContact} placeholder="お電話・メール" className={pin} />}
               date={quoteDate}
               subject={<input name="subject" defaultValue={subject} className={`${pin} font-bold`} />}
               delivery={<input name="delivery_note" defaultValue={deliveryNote} className={pin} />}
               payment={<input name="payment_terms" defaultValue={paymentTerms} className={pin} />}
               validity={<input name="validity_note" defaultValue={validityNote} className={pin} />}
-              staffName={staffName}
+              staffName={
+                /* 担当（#275・2026-09-24）。これまではログイン名の焼き付けで、
+                   店舗の共有アカウントだと全部「GOLF WING宝塚」になっていた */
+                <select
+                  name="staff_name"
+                  defaultValue={staffName}
+                  key={staffName}
+                  className={`${pin} cursor-pointer`}
+                  aria-label="担当"
+                >
+                  {!staffOptions.includes(staffName) && <option value={staffName}>{staffName || "（未設定）"}</option>}
+                  {staffOptions.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              }
               total={totals.total}
               items={items}
               onEmptyDemo={
@@ -653,7 +681,16 @@ export function QuoteSheet({
             {adding === "free" && (
               <div className="flex flex-wrap items-end gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) p-3">
                 <input id="free_name" placeholder="商品名" className="w-56 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm" />
-                <input id="free_category" placeholder="区分（シャフト など）" className="w-40 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm" />
+                {/* 区分は打たせない（#275）。掛け率は区分で決まるので、打ち間違えると値段がずれる */}
+                <select id="free_category" defaultValue="" className="w-40 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm">
+                  <option value="">区分を選ぶ</option>
+                  {CATEGORIES.filter(Boolean).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                  <option value="工賃">工賃</option>
+                </select>
                 <input id="free_maker" placeholder="メーカー" className="w-32 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm" />
                 <select id="free_club_type" defaultValue="" className="w-20 rounded-lg border border-(--color-line) bg-white px-2 py-1.5 text-sm">
                   <option value="">—</option>
