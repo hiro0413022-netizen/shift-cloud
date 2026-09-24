@@ -120,6 +120,11 @@ export async function saveSpecs(formData: FormData): Promise<void> {
       .eq("company_id", actor.companyId);
   }
   revalidatePath(`/q/${id}/work`);
+  revalidatePath("/w");
+  // 【保存して組立指示書を印刷】から来たら印刷画面へ（2026-09-24）。
+  // これが無いと、指示書を打った本人は上の注文書側のボタンを押すしかなく、
+  // そちらは saveWork なので打った内容が保存されないまま印刷されていた。
+  afterSave(formData, id);
 }
 
 /** 指示書の行を足す（持ち込みクラブなど、見積の明細に無いもの） */

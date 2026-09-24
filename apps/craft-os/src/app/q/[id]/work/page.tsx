@@ -326,11 +326,18 @@ export default async function WorkPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-3">
+          {/* 2026-09-24 ユーザー依頼「組み立て指示書を印刷できるように」。
+              印刷ボタンは上の注文書の側にしか無く、しかもそれは saveWork のフォームなので、
+              ここで打った指示書の内容は保存されないまま古い紙が出ていた。
+              このフォーム（saveSpecs）から刷れるようにして、保存してから印刷画面へ行く。 */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
             <button className={btnCls}>組立仕様を保存</button>
             <button formAction={addSpecLine} className={btnGhostCls}>
               行を足す
             </button>
+            {specs.length > 0 && (
+              <PrintButtons items={[{ doc: "spec", label: "保存して組立指示書を印刷", primary: true }]} />
+            )}
           </div>
         </section>
       </form>

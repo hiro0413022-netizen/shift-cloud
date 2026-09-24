@@ -47,37 +47,18 @@ var compose = (middleware, onError, onNotFound) => {
 // node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
 
-// node_modules/hono/dist/utils/buffer.js
-var bufferToFormData = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      // Normalize the media type (case-insensitive) while keeping parameters like the boundary
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
-};
-
 // node_modules/hono/dist/utils/body.js
-var isRawRequest = (request) => "headers" in request;
 var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
   const { all = false, dot = false } = options;
-  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
+  const headers = request instanceof HonoRequest ? request.raw.headers : request.headers;
   const contentType = headers.get("Content-Type");
-  const mediaType = contentType?.split(";")[0].trim().toLowerCase();
-  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded") {
+  if (contentType?.startsWith("multipart/form-data") || contentType?.startsWith("application/x-www-form-urlencoded")) {
     return parseFormData(request, { all, dot });
   }
   return {};
 };
 async function parseFormData(request, options) {
-  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
-  const arrayBuffer = await request.arrayBuffer();
-  const formDataPromise = bufferToFormData(arrayBuffer, headers.get("Content-Type") || "");
-  if (!isRawRequest(request)) {
-    request.bodyCache.formData = formDataPromise;
-  }
-  const formData = await formDataPromise;
+  const formData = await request.formData();
   if (formData) {
     return convertFormDataToBodyData(formData, options);
   }
@@ -486,21 +467,6 @@ var HonoRequest = class {
    */
   arrayBuffer() {
     return this.#cachedBody("arrayBuffer");
-  }
-  /**
-   * `.bytes()` parses the request body as a `Uint8Array`.
-   *
-   * @see {@link https://hono.dev/docs/api/request#bytes}
-   *
-   * @example
-   * ```ts
-   * app.post('/entry', async (c) => {
-   *   const body = await c.req.bytes()
-   * })
-   * ```
-   */
-  bytes() {
-    return this.#cachedBody("arrayBuffer").then((buffer2) => new Uint8Array(buffer2));
   }
   /**
    * Parses the request body as a `Blob`.
@@ -1200,7 +1166,7 @@ var Hono = class _Hono {
         handler2 = async (c, next) => (await compose([], app4.errorHandler)(c, () => r.handler(c, next))).res;
         handler2[COMPOSED_HANDLER] = r.handler;
       }
-      subApp.#addRoute(r.method, r.path, handler2, r.basePath);
+      subApp.#addRoute(r.method, r.path, handler2);
     });
     return this;
   }
@@ -1324,7 +1290,7 @@ var Hono = class _Hono {
       const pathPrefixLength = mergedPath === "/" ? 0 : mergedPath.length;
       return (request) => {
         const url = new URL(request.url);
-        url.pathname = this.getPath(request).slice(pathPrefixLength) || "/";
+        url.pathname = url.pathname.slice(pathPrefixLength) || "/";
         return new Request(url, request);
       };
     })();
@@ -1338,15 +1304,10 @@ var Hono = class _Hono {
     this.#addRoute(METHOD_NAME_ALL, mergePath(path, "*"), handler2);
     return this;
   }
-  #addRoute(method, path, handler2, baseRoutePath) {
+  #addRoute(method, path, handler2) {
     method = method.toUpperCase();
     path = mergePath(this._basePath, path);
-    const r = {
-      basePath: baseRoutePath !== void 0 ? mergePath(this._basePath, baseRoutePath) : this._basePath,
-      path,
-      method,
-      handler: handler2
-    };
+    const r = { basePath: this._basePath, path, method, handler: handler2 };
     this.router.add(method, path, [handler2, r]);
     this.routes.push(r);
   }
@@ -2014,15 +1975,6 @@ var Node2 = class _Node2 {
             if (m) {
               params[name] = m[0];
               this.#pushHandlerSets(handlerSets, child, method, node.#params, params);
-              if (m[0].length === restPathString.length && child.#children["*"]) {
-                this.#pushHandlerSets(
-                  handlerSets,
-                  child.#children["*"],
-                  method,
-                  node.#params,
-                  params
-                );
-              }
               if (hasChildren(child.#children)) {
                 child.#params = params;
                 const componentCount = m[0].match(/\//)?.length ?? 0;
@@ -2103,16 +2055,22 @@ var Hono2 = class extends Hono {
 
 // node_modules/hono/dist/middleware/cors/index.js
 var cors = (options) => {
-  const opts = {
+  const defaults = {
     origin: "*",
     allowMethods: ["GET", "HEAD", "PUT", "POST", "DELETE", "PATCH"],
     allowHeaders: [],
-    exposeHeaders: [],
+    exposeHeaders: []
+  };
+  const opts = {
+    ...defaults,
     ...options
   };
   const findAllowOrigin = ((optsOrigin) => {
     if (typeof optsOrigin === "string") {
       if (optsOrigin === "*") {
+        if (opts.credentials) {
+          return (origin) => origin || null;
+        }
         return () => optsOrigin;
       } else {
         return (origin) => optsOrigin === origin ? origin : null;
@@ -2147,7 +2105,7 @@ var cors = (options) => {
       set("Access-Control-Expose-Headers", opts.exposeHeaders.join(","));
     }
     if (c.req.method === "OPTIONS") {
-      if (opts.origin !== "*") {
+      if (opts.origin !== "*" || opts.credentials) {
         set("Vary", "Origin");
       }
       if (opts.maxAge != null) {
@@ -2177,14 +2135,14 @@ var cors = (options) => {
       });
     }
     await next();
-    if (opts.origin !== "*") {
+    if (opts.origin !== "*" || opts.credentials) {
       c.header("Vary", "Origin", { append: true });
     }
   };
 };
 
 // node_modules/hono/dist/utils/compress.js
-var COMPRESSIBLE_CONTENT_TYPE_REGEX = /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|msgpack|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|vnd\.msgpack|wasm|x-httpd-php|x-javascript|x-msgpack|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml|msgpack))(?:[;\s]|$)/i;
+var COMPRESSIBLE_CONTENT_TYPE_REGEX = /^\s*(?:text\/(?!event-stream(?:[;\s]|$))[^;\s]+|application\/(?:javascript|json|xml|xml-dtd|ecmascript|dart|postscript|rtf|tar|toml|vnd\.dart|vnd\.ms-fontobject|vnd\.ms-opentype|wasm|x-httpd-php|x-javascript|x-ns-proxy-autoconfig|x-sh|x-tar|x-virtualbox-hdd|x-virtualbox-ova|x-virtualbox-ovf|x-virtualbox-vbox|x-virtualbox-vdi|x-virtualbox-vhd|x-virtualbox-vmdk|x-www-form-urlencoded)|font\/(?:otf|ttf)|image\/(?:bmp|vnd\.adobe\.photoshop|vnd\.microsoft\.icon|vnd\.ms-dds|x-icon|x-ms-bmp)|message\/rfc822|model\/gltf-binary|x-shader\/x-fragment|x-shader\/x-vertex|[^;\s]+?\+(?:json|text|xml|yaml))(?:[;\s]|$)/i;
 
 // node_modules/hono/dist/utils/mime.js
 var getMimeType = (filename, mimes = baseMimes) => {
@@ -2193,7 +2151,11 @@ var getMimeType = (filename, mimes = baseMimes) => {
   if (!match2) {
     return;
   }
-  return mimes[match2[1].toLowerCase()];
+  let mimeType = mimes[match2[1].toLowerCase()];
+  if (mimeType && mimeType.startsWith("text")) {
+    mimeType += "; charset=utf-8";
+  }
+  return mimeType;
 };
 var _baseMimes = {
   aac: "audio/aac",
@@ -2202,25 +2164,25 @@ var _baseMimes = {
   av1: "video/av1",
   bin: "application/octet-stream",
   bmp: "image/bmp",
-  css: "text/css; charset=utf-8",
-  csv: "text/csv; charset=utf-8",
+  css: "text/css",
+  csv: "text/csv",
   eot: "application/vnd.ms-fontobject",
   epub: "application/epub+zip",
   gif: "image/gif",
   gz: "application/gzip",
-  htm: "text/html; charset=utf-8",
-  html: "text/html; charset=utf-8",
+  htm: "text/html",
+  html: "text/html",
   ico: "image/x-icon",
-  ics: "text/calendar; charset=utf-8",
+  ics: "text/calendar",
   jpeg: "image/jpeg",
   jpg: "image/jpeg",
-  js: "text/javascript; charset=utf-8",
+  js: "text/javascript",
   json: "application/json",
   jsonld: "application/ld+json",
   map: "application/json",
   mid: "audio/x-midi",
   midi: "audio/x-midi",
-  mjs: "text/javascript; charset=utf-8",
+  mjs: "text/javascript",
   mp3: "audio/mpeg",
   mp4: "video/mp4",
   mpeg: "video/mpeg",
@@ -2232,12 +2194,12 @@ var _baseMimes = {
   pdf: "application/pdf",
   png: "image/png",
   rtf: "application/rtf",
-  svg: "image/svg+xml; charset=utf-8",
+  svg: "image/svg+xml",
   tif: "image/tiff",
   tiff: "image/tiff",
   ts: "video/mp2t",
   ttf: "font/ttf",
-  txt: "text/plain; charset=utf-8",
+  txt: "text/plain",
   wasm: "application/wasm",
   webm: "video/webm",
   weba: "audio/webm",
@@ -2245,8 +2207,8 @@ var _baseMimes = {
   webp: "image/webp",
   woff: "font/woff",
   woff2: "font/woff2",
-  xhtml: "application/xhtml+xml; charset=utf-8",
-  xml: "application/xml; charset=utf-8",
+  xhtml: "application/xhtml+xml",
+  xml: "application/xml",
   zip: "application/zip",
   "3gp": "video/3gpp",
   "3g2": "video/3gpp2",
@@ -2293,7 +2255,7 @@ var serveStatic = (options) => {
     } else {
       try {
         filename = tryDecodeURI(c.req.path);
-        if (/(?:^|[\/\\])\.{1,2}(?:$|[\/\\])|[\/\\]{2,}|\\/.test(filename)) {
+        if (/(?:^|[\/\\])\.{1,2}(?:$|[\/\\])|[\/\\]{2,}/.test(filename)) {
           throw new Error();
         }
       } catch {
@@ -2313,7 +2275,7 @@ var serveStatic = (options) => {
     if (content instanceof Response) {
       return c.newResponse(content.body, content);
     }
-    if (content != null) {
+    if (content) {
       const mimeType = options.mimes && getMimeType(path, options.mimes) || getMimeType(path);
       c.header("Content-Type", mimeType || "application/octet-stream");
       if (options.precompressed && (!mimeType || COMPRESSIBLE_CONTENT_TYPE_REGEX.test(mimeType))) {
@@ -2376,7 +2338,7 @@ var getContentFromKVAsset = async (path, options) => {
 };
 
 // node_modules/hono/dist/adapter/cloudflare-workers/serve-static.js
-var serveStatic2 = (options = {}) => {
+var serveStatic2 = (options) => {
   return async function serveStatic22(c, next) {
     const getContent = async (path) => {
       return getContentFromKVAsset(path, {
@@ -3311,14 +3273,18 @@ app.put("/items/:poi_id", async (c) => {
     poiId
   ).run();
   const orderId = Number(poi["purchase_order_id"]);
-  const [order, supplier, allItems] = await Promise.all([
-    db2.prepare("SELECT * FROM purchase_orders WHERE id=?").bind(orderId).first(),
-    db2.prepare("SELECT * FROM suppliers WHERE id=?").bind(poi["supplier_id"]).first(),
+  const order = await db2.prepare("SELECT * FROM purchase_orders WHERE id=?").bind(orderId).first();
+  const [supplier, allItems] = await Promise.all([
+    order?.["supplier_id"] != null ? db2.prepare("SELECT * FROM suppliers WHERE id=?").bind(order["supplier_id"]).first() : Promise.resolve(null),
     db2.prepare("SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id").bind(orderId).all()
   ]);
-  if (order && supplier) {
-    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env));
-    await db2.prepare("UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?").bind(subject, mailBody, orderId).run();
+  try {
+    if (order && supplier) {
+      const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env));
+      await db2.prepare("UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?").bind(subject, mailBody, orderId).run();
+    }
+  } catch (e) {
+    console.error("\u660E\u7D30\u4FDD\u5B58\u5F8C\u306E\u30E1\u30FC\u30EB\u518D\u751F\u6210\u306B\u5931\u6557", e);
   }
   return c.json({ ok: true, amount });
 });
@@ -3342,14 +3308,18 @@ app.delete("/items/:poi_id", async (c) => {
   }
   await db2.prepare("DELETE FROM purchase_order_items WHERE id=?").bind(poiId).run();
   const orderId = Number(poi["purchase_order_id"]);
-  const [order, supplier, allItems] = await Promise.all([
-    db2.prepare("SELECT * FROM purchase_orders WHERE id=?").bind(orderId).first(),
-    db2.prepare("SELECT * FROM suppliers WHERE id=?").bind(poi["supplier_id"]).first(),
+  const order = await db2.prepare("SELECT * FROM purchase_orders WHERE id=?").bind(orderId).first();
+  const [supplier, allItems] = await Promise.all([
+    order?.["supplier_id"] != null ? db2.prepare("SELECT * FROM suppliers WHERE id=?").bind(order["supplier_id"]).first() : Promise.resolve(null),
     db2.prepare("SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id").bind(orderId).all()
   ]);
-  if (order && supplier && allItems.results.length > 0) {
-    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env));
-    await db2.prepare("UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?").bind(subject, mailBody, orderId).run();
+  try {
+    if (order && supplier && allItems.results.length > 0) {
+      const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env));
+      await db2.prepare("UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?").bind(subject, mailBody, orderId).run();
+    }
+  } catch (e) {
+    console.error("\u660E\u7D30\u524A\u9664\u5F8C\u306E\u30E1\u30FC\u30EB\u518D\u751F\u6210\u306B\u5931\u6557", e);
   }
   return c.json({ ok: true });
 });
@@ -4898,13 +4868,13 @@ app.get("/dashboard/pending-inspection", async (c) => {
       poi.color,
       poi.club_type,
       poi.quantity,
-      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty,
-      poi.is_free
+      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+      -- poi.is_free \u306F Postgres \u5074\u306B\u7121\u3044\u5217\uFF08D1 \u6642\u4EE3\u306E\u540D\u6B8B\uFF09\u3002\u9078\u3076\u3068 42703 \u3067\u843D\u3061\u308B\u306E\u3067\u5916\u3057\u305F
     FROM purchase_order_items poi
     JOIN purchase_orders po ON po.id = poi.purchase_order_id
     JOIN suppliers s ON s.id = po.supplier_id
     WHERE po.status IN ('ordered','partial')
-      AND poi.inspected = 0
+      AND poi.inspected = false
       AND po.tenant_id = ?
     ORDER BY po.order_date ASC, po.id ASC, poi.id ASC
     LIMIT 200
@@ -4928,10 +4898,10 @@ app.patch("/orders/:id/items/:poi_id/inspect", async (c) => {
     return c.json({ error: "\u660E\u7D30\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093" }, 404);
   }
   await db2.prepare(
-    "UPDATE purchase_order_items SET inspected=1 WHERE id=?"
+    "UPDATE purchase_order_items SET inspected=true WHERE id=?"
   ).bind(poiId).run();
   const remain = await db2.prepare(
-    "SELECT COUNT(*) AS c FROM purchase_order_items WHERE purchase_order_id=? AND inspected=0"
+    "SELECT COUNT(*) AS c FROM purchase_order_items WHERE purchase_order_id=? AND inspected=false"
   ).bind(orderId).first();
   const allInspected = (remain?.c ?? 0) === 0;
   return c.json({ ok: true, all_inspected: allInspected });
@@ -5240,6 +5210,19 @@ function showFlash(message, type) {
   el.appendChild(div);
   setTimeout(function(){ div.remove(); }, 5000);
 }
+/**
+ * fetch \u306E\u5FDC\u7B54\u3092\u5B89\u5168\u306B\u8AAD\u3080\uFF082026-09-24\u30FB#274\uFF09\u3002
+ * \u30B5\u30FC\u30D0\u30FC\u304C500\u3092\u8FD4\u3059\u3068\u304D\u672C\u6587\u306FVercel\u306EHTML\u306A\u306E\u3067\u3001\u3053\u308C\u307E\u3067\u306F r.json() \u304C\u4F8B\u5916\u306B\u306A\u308A
+ * \u753B\u9762\u306B\u306F\u7406\u7531\u306E\u5206\u304B\u3089\u306A\u3044\u300C\u901A\u4FE1\u30A8\u30E9\u30FC\u304C\u767A\u751F\u3057\u307E\u3057\u305F\u300D\u3057\u304B\u51FA\u306A\u304B\u3063\u305F\u3002
+ * JSON\u3067\u7121\u3051\u308C\u3070\u672C\u6587\u306E\u982D\u3092\u7406\u7531\u3068\u3057\u3066\u8FD4\u3059\uFF1D\u6B21\u306B\u540C\u3058\u3053\u3068\u304C\u8D77\u304D\u305F\u3068\u304D\u539F\u56E0\u304C\u753B\u9762\u3067\u5206\u304B\u308B\u3002
+ */
+async function gwRead(r) {
+  var text = '';
+  try { text = await r.text(); } catch (e) { text = ''; }
+  try { return { ok: r.ok, data: JSON.parse(text) }; } catch (e) {}
+  var plain = text.replace(/<[^>]*>/g, ' ').replace(/s+/g, ' ').trim().slice(0, 160);
+  return { ok: r.ok, data: { error: '\u30B5\u30FC\u30D0\u30FC\u30A8\u30E9\u30FC\uFF08' + r.status + '\uFF09' + (plain ? '\uFF1A' + plain : '') } };
+}
 </script>
 ${extraScripts}
 </body>
@@ -5297,6 +5280,7 @@ app2.get("/dashboard", async (c) => {
       WHERE po.tenant_id=?
         AND po.status IN ('partial','received')
         AND ri2.id IS NOT NULL
+        AND poi.inspected = false
       GROUP BY poi.id, po.id, s.id
       ORDER BY po.order_date ASC, po.id ASC
       LIMIT 100
@@ -5532,9 +5516,9 @@ app2.get("/dashboard", async (c) => {
       try {
         var r = await fetch('/api/orders/'+orderId+'/items/'+poiId+'/inspect',{
           method:'PATCH', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({inspected:1})
+          body: JSON.stringify({inspected:true})
         })
-        var d = await r.json()
+        var res = await gwRead(r); var d = res.data
         if(r.ok){
           card.style.transition = 'opacity 0.35s'
           card.style.opacity = '0'
@@ -6966,7 +6950,9 @@ app2.get("/orders", async (c) => {
     s.name AS supplier_name,
     COUNT(DISTINCT poi.id) AS line_count,
     COALESCE(SUM(poi.amount),0) AS total_amount,
-    COALESCE(SUM(poi.quantity),0) AS total_qty
+    COALESCE(SUM(poi.quantity),0) AS total_qty,
+    (SELECT string_agg(DISTINCT TRIM(COALESCE(x.manufacturer,'') || ' ' || x.product_name), chr(31))
+       FROM purchase_order_items x WHERE x.purchase_order_id = po.id) AS item_names
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id=s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
@@ -6981,9 +6967,12 @@ app2.get("/orders", async (c) => {
     params.push(`%${supplier}%`);
   }
   if (q) {
-    sql += " AND (po.order_no LIKE ? OR po.customer_name LIKE ? OR po.ordered_by LIKE ?)";
+    sql += ` AND (po.order_no LIKE ? OR po.customer_name LIKE ? OR po.ordered_by LIKE ?
+      OR EXISTS (SELECT 1 FROM purchase_order_items x
+                 WHERE x.purchase_order_id = po.id
+                   AND (x.product_name LIKE ? OR x.manufacturer LIKE ?)))`;
     const like = `%${q}%`;
-    params.push(like, like, like);
+    params.push(like, like, like, like, like);
   }
   sql += " GROUP BY po.id, s.id ORDER BY po.id DESC";
   const stmt = db2.prepare(sql);
@@ -6996,11 +6985,19 @@ app2.get("/orders", async (c) => {
     completed: "\u5B8C\u7D0D",
     cancelled: "\u30AD\u30E3\u30F3\u30BB\u30EB"
   };
+  const itemsCell = (r) => {
+    const all = String(r["item_names"] ?? "").split("").map((x) => x.trim()).filter(Boolean);
+    if (all.length === 0) return '<span class="text-muted">\u2014</span>';
+    const head = all.slice(0, 3).join("\u3001");
+    const rest = all.length > 3 ? `<span class="text-muted"> \u4ED6${all.length - 3}\u4EF6</span>` : "";
+    return `<span title="${esc(all.join("\n"))}">${esc(head)}</span>${rest}`;
+  };
   const rows = res.results.map((r) => `<tr>
     <td><a href="/orders/${r["id"]}">${esc(r["order_no"])}</a></td>
     <td>${esc(r["order_date"])}</td>
     <td>${esc(r["supplier_name"])}</td>
     <td>${esc(r["customer_name"])}</td>
+    <td class="gw-item-names">${itemsCell(r)}</td>
     <td>${esc(r["usage_type"])}</td>
     <td class="text-center">${r["line_count"]}</td>
     <td class="text-center">${r["total_qty"]}</td>
@@ -7057,7 +7054,7 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
         </select>
       </div>
       <div class="col-md-2"><input class="form-control form-control-sm" name="supplier" value="${esc(supplier)}" placeholder="\u4ED5\u5165\u5148\u3067\u7D5E\u308A\u8FBC\u307F"></div>
-      <div class="col-md-3"><input class="form-control form-control-sm" name="q" value="${esc(q)}" placeholder="\u767A\u6CE8\u756A\u53F7\u30FB\u9867\u5BA2\u540D\u30FB\u767A\u6CE8\u8005"></div>
+      <div class="col-md-3"><input class="form-control form-control-sm" name="q" value="${esc(q)}" placeholder="\u767A\u6CE8\u756A\u53F7\u30FB\u9867\u5BA2\u540D\u30FB\u767A\u6CE8\u8005\u30FB\u5546\u54C1\u540D"></div>
       <div class="col-auto"><button class="btn btn-sm btn-primary"><i class="fas fa-search me-1"></i>\u691C\u7D22</button></div>
       ${status || supplier || q ? '<div class="col-auto"><a href="/orders" class="btn btn-sm btn-outline-secondary"><i class="fas fa-times me-1"></i>\u30AF\u30EA\u30A2</a></div>' : ""}
     </form>
@@ -7067,11 +7064,11 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead><tr>
-        <th>\u767A\u6CE8\u756A\u53F7</th><th>\u767A\u6CE8\u65E5</th><th>\u4ED5\u5165\u5148</th><th>\u9867\u5BA2\u540D</th><th>\u7528\u9014</th>
+        <th>\u767A\u6CE8\u756A\u53F7</th><th>\u767A\u6CE8\u65E5</th><th>\u4ED5\u5165\u5148</th><th>\u9867\u5BA2\u540D</th><th>\u5546\u54C1</th><th>\u7528\u9014</th>
         <th class="text-center">\u660E\u7D30</th><th class="text-center">\u6570\u91CF</th>
         <th class="text-end">\u91D1\u984D</th><th>\u72B6\u614B</th><th></th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="10" class="text-center text-muted py-4">\u5BFE\u8C61\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093\u3002</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="11" class="text-center text-muted py-4">\u5BFE\u8C61\u30C7\u30FC\u30BF\u304C\u3042\u308A\u307E\u305B\u3093\u3002</td></tr>'}</tbody>
     </table>
   </div>
   <div class="card-footer text-muted small">${res.results.length}\u4EF6</div>
@@ -8760,7 +8757,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
         credentials: 'include',
         body: JSON.stringify(payload),
       });
-      var d = await r.json();
+      var d = (await gwRead(r)).data;
       if (r.ok) {
         bsEdit.hide();
         showFlash('\u660E\u7D30\u3092\u4FDD\u5B58\u3057\u307E\u3057\u305F', 'success');
@@ -8790,7 +8787,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
           method: 'DELETE',
           credentials: 'include',
         });
-        var d = await r.json();
+        var d = (await gwRead(r)).data;
         if (r.ok) {
           showFlash('\u660E\u7D30\u3092\u524A\u9664\u3057\u307E\u3057\u305F', 'success');
           setTimeout(function(){ location.reload(); }, 700);
@@ -12528,7 +12525,6 @@ var errorFields = {
 };
 function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose = noop } = {}) {
   const {
-    sslnegotiation,
     ssl,
     max,
     user,
@@ -12546,12 +12542,12 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     target_session_attrs
   } = options;
   const sent = queue_default(), id = uid++, backend = { pid: null, secret: null }, idleTimer = timer(end, options.idle_timeout), lifeTimer = timer(end, options.max_lifetime), connectTimer = timer(connectTimedOut, options.connect_timeout);
-  let socket = null, cancelMessage, errorResponse = null, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedTime = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream = null, chunk = null, ended = null, nonce = null, query = null, final = null;
+  let socket = null, cancelMessage, result = new Result(), incoming = Buffer.alloc(0), needsTypes = options.fetch_types, backendParameters = {}, statements = {}, statementId = Math.random().toString(36).slice(2), statementCount = 1, closedDate = 0, remaining = 0, hostIndex = 0, retries = 0, length = 0, delay = 0, rows = 0, serverSignature = null, nextWriteTimer = null, terminated = false, incomings = null, results = null, initial = null, ending = null, stream = null, chunk = null, ended = null, nonce = null, query = null, final = null;
   const connection2 = {
     queue: queues.closed,
     idleTimer,
     connect(query2) {
-      initial = query2;
+      initial = query2 || true;
       reconnect();
     },
     terminate,
@@ -12589,8 +12585,6 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
   function execute(q) {
     if (terminated)
       return queryError(q, Errors.connection("CONNECTION_DESTROYED", options));
-    if (stream)
-      return queryError(q, Errors.generic("COPY_IN_PROGRESS", "You cannot execute queries during copy"));
     if (q.cancelled)
       return;
     try {
@@ -12660,24 +12654,16 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     socket.destroy();
   }
   async function secure() {
-    if (sslnegotiation !== "direct") {
-      write(SSLRequest);
-      const canSSL = await new Promise((r) => socket.once("data", (x) => r(x[0] === 83)));
-      if (!canSSL && ssl === "prefer")
-        return connected();
-    }
-    const options2 = {
-      socket,
-      servername: net.isIP(socket.host) ? void 0 : socket.host
-    };
-    if (sslnegotiation === "direct")
-      options2.ALPNProtocols = ["postgresql"];
-    if (ssl === "require" || ssl === "allow" || ssl === "prefer")
-      options2.rejectUnauthorized = false;
-    else if (typeof ssl === "object")
-      Object.assign(options2, ssl);
+    write(SSLRequest);
+    const canSSL = await new Promise((r) => socket.once("data", (x) => r(x[0] === 83)));
+    if (!canSSL && ssl === "prefer")
+      return connected();
     socket.removeAllListeners();
-    socket = tls.connect(options2);
+    socket = tls.connect({
+      socket,
+      servername: net.isIP(socket.host) ? void 0 : socket.host,
+      ...ssl === "require" || ssl === "allow" || ssl === "prefer" ? { rejectUnauthorized: false } : ssl === "verify-full" ? {} : typeof ssl === "object" ? ssl : {}
+    });
     socket.on("secureConnect", connected);
     socket.on("error", error);
     socket.on("close", closed);
@@ -12690,7 +12676,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (incomings) {
       incomings.push(x);
       remaining -= x.length;
-      if (remaining > 0)
+      if (remaining >= 0)
         return;
     }
     incoming = incomings ? Buffer.concat(incomings, length - remaining) : incoming.length === 0 ? x : Buffer.concat([incoming, x], incoming.length + x.length);
@@ -12731,7 +12717,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     hostIndex = (hostIndex + 1) % port.length;
   }
   function reconnect() {
-    setTimeout(connect, closedTime ? Math.max(0, closedTime + delay - performance.now()) : 0);
+    setTimeout(connect, closedDate ? closedDate + delay - performance.now() : 0);
   }
   function connected() {
     try {
@@ -12761,11 +12747,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     initial && (queryError(initial, err), initial = null);
   }
   function queryError(query2, err) {
-    if (query2.reserve)
-      return query2.reject(err);
-    if (!err || typeof err !== "object")
-      err = new Error(err);
-    "query" in err || "parameters" in err || Object.defineProperties(err, {
+    Object.defineProperties(err, {
       stack: { value: err.stack + query2.origin.replace(/.*\n/, "\n"), enumerable: options.debug },
       query: { value: query2.string, enumerable: options.debug },
       parameters: { value: query2.parameters, enumerable: options.debug },
@@ -12804,7 +12786,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     if (initial)
       return reconnect();
     !hadError && (query || sent.length) && error(Errors.connection("CONNECTION_CLOSED", options, socket));
-    closedTime = performance.now();
+    closedDate = performance.now();
     hadError && options.shared.retries++;
     delay = (typeof backoff2 === "function" ? backoff2(options.shared.retries) : backoff2) * 1e3;
     onclose(connection2, Errors.connection("CONNECTION_CLOSED", options, socket));
@@ -12909,16 +12891,8 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     }
   }
   function ReadyForQuery(x) {
-    if (query) {
-      if (errorResponse) {
-        query.retried ? errored(query.retried) : query.prepared && retryRoutines.has(errorResponse.routine) ? retry(query, errorResponse) : errored(errorResponse);
-      } else {
-        query.resolve(results || result);
-      }
-    } else if (errorResponse) {
-      errored(errorResponse);
-    }
-    query = results = errorResponse = null;
+    query && query.options.simple && query.resolve(results || result);
+    query = results = null;
     result = new Result();
     connectTimer.cancel();
     if (initial) {
@@ -12929,10 +12903,10 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
           return terminate();
       }
       if (needsTypes) {
-        initial.reserve && (initial = null);
+        initial === true && (initial = null);
         return fetchArrayTypes();
       }
-      initial && !initial.reserve && execute(initial);
+      initial !== true && execute(initial);
       options.shared.retries = retries = 0;
       initial = null;
       return;
@@ -12963,6 +12937,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       result.count && query.cursorFn(result);
       write(Sync);
     }
+    query.resolve(result);
   }
   function ParseComplete() {
     query.parsing = false;
@@ -13048,7 +13023,7 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     serverSignature = (await hmac(await hmac(saltedPassword, "Server Key"), auth)).toString("base64");
     const payload = "c=biws,r=" + res.r + ",p=" + xor(
       clientKey,
-      Buffer.from(await hmac(await sha2562(clientKey), auth))
+      Buffer.from(await hmac(await sha256(clientKey), auth))
     ).toString("base64");
     write(
       bytes_default().p().str(payload).end()
@@ -13110,12 +13085,9 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
     query2.execute();
   }
   function ErrorResponse(x) {
-    if (query) {
-      (query.cursorFn || query.describeFirst) && write(Sync);
-      errorResponse = Errors.postgres(parseError(x));
-    } else {
-      errored(Errors.postgres(parseError(x)));
-    }
+    query && (query.cursorFn || query.describeFirst) && write(Sync);
+    const error2 = Errors.postgres(parseError(x));
+    query && query.retried ? errored(query.retried) : query && query.prepared && retryRoutines.has(error2.routine) ? retry(query, error2) : errored(error2);
   }
   function retry(q, error2) {
     delete statements[q.signature];
@@ -13160,7 +13132,6 @@ function Connection(options, queues = {}, { onopen = noop, onend = noop, onclose
       final(callback) {
         socket.write(bytes_default().c().end());
         final = callback;
-        stream = null;
       }
     });
     query.resolve(stream);
@@ -13283,7 +13254,7 @@ function md5(x) {
 function hmac(key, x) {
   return crypto2.createHmac("sha256", key).update(x).digest();
 }
-function sha2562(x) {
+function sha256(x) {
   return crypto2.createHash("sha256").update(x).digest();
 }
 function xor(a, b2) {
@@ -13728,10 +13699,9 @@ function Postgres(a, b2) {
   }
   async function reserve() {
     const queue = queue_default();
-    const c = open.length ? open.shift() : await new Promise((resolve, reject) => {
-      const query = { reserve: resolve, reject };
-      queries.push(query);
-      closed.length && connect(closed.shift(), query);
+    const c = open.length ? open.shift() : await new Promise((r) => {
+      queries.push({ reserve: r });
+      closed.length && connect(closed.shift());
     });
     move(c, reserved);
     c.reserved = () => queue.length ? c.execute(queue.shift()) : move(c, reserved);
@@ -13889,9 +13859,8 @@ function parseOptions(a, b2) {
   query.sslrootcert === "system" && (query.ssl = "verify-full");
   const ints = ["idle_timeout", "connect_timeout", "max_lifetime", "max_pipeline", "backoff", "keep_alive"];
   const defaults = {
-    max: globalThis.Cloudflare ? 3 : 10,
+    max: 10,
     ssl: false,
-    sslnegotiation: null,
     idle_timeout: null,
     connect_timeout: 30,
     max_lifetime,
@@ -13920,7 +13889,7 @@ function parseOptions(a, b2) {
       {}
     ),
     connection: {
-      application_name: env.PGAPPNAME || "postgres.js",
+      application_name: "postgres.js",
       ...o.connection,
       ...Object.entries(query).reduce((acc, [k, v]) => (k in defaults || (acc[k] = v), acc), {})
     },
@@ -13995,7 +13964,7 @@ function osUsername() {
 }
 
 // src/lib/pgdb.ts
-var BOOL_COLS = "is_active|is_default|is_admin|is_demo|slip_verified|no_slip";
+var BOOL_COLS = "is_active|is_default|is_admin|is_demo|slip_verified|no_slip|inspected";
 function translateSql(sql) {
   let s = sql;
   s = s.replace(new RegExp(`\\b(${BOOL_COLS})\\s*=\\s*1\\b`, "g"), "$1 = true");

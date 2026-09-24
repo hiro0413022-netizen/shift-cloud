@@ -839,15 +839,26 @@ app.put('/items/:poi_id', async (c) => {
 
   // 発注ヘッダーのメール本文を再生成
   const orderId = Number(poi['purchase_order_id'])
-  const [order, supplier, allItems] = await Promise.all([
-    db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(orderId).first<Record<string,unknown>>(),
-    db.prepare('SELECT * FROM suppliers WHERE id=?').bind(poi['supplier_id']).first<Record<string,unknown>>(),
+  // 2026-09-24 修正: 仕入先は **発注ヘッダー（purchase_orders.supplier_id）** が持っている。
+  //   purchase_order_items に supplier_id 列は無いので poi['supplier_id'] は常に undefined になり、
+  //   postgres.js が UNDEFINED_VALUE を投げて 500 →「通信エラー」になっていた（明細の削除・更新の両方）。
+  //   発注を先に引いてから、その supplier_id で仕入先を引く。
+  const order = await db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(orderId).first<Record<string,unknown>>()
+  const [supplier, allItems] = await Promise.all([
+    order?.['supplier_id'] != null
+      ? db.prepare('SELECT * FROM suppliers WHERE id=?').bind(order['supplier_id']).first<Record<string,unknown>>()
+      : Promise.resolve(null),
     db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(orderId).all<Record<string,unknown>>(),
   ])
-  if (order && supplier) {
-    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
-    await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
-      .bind(subject, mailBody, orderId).run()
+  // メールの作り直しで落ちても、明細の保存は成立させる（本体の処理は済んでいる）
+  try {
+    if (order && supplier) {
+      const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
+      await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+        .bind(subject, mailBody, orderId).run()
+    }
+  } catch (e) {
+    console.error('明細保存後のメール再生成に失敗', e)
   }
 
   return c.json({ ok: true, amount })
@@ -883,15 +894,26 @@ app.delete('/items/:poi_id', async (c) => {
 
   // メール再生成
   const orderId = Number(poi['purchase_order_id'])
-  const [order, supplier, allItems] = await Promise.all([
-    db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(orderId).first<Record<string,unknown>>(),
-    db.prepare('SELECT * FROM suppliers WHERE id=?').bind(poi['supplier_id']).first<Record<string,unknown>>(),
+  // 2026-09-24 修正: 仕入先は **発注ヘッダー（purchase_orders.supplier_id）** が持っている。
+  //   purchase_order_items に supplier_id 列は無いので poi['supplier_id'] は常に undefined になり、
+  //   postgres.js が UNDEFINED_VALUE を投げて 500 →「通信エラー」になっていた（明細の削除・更新の両方）。
+  //   発注を先に引いてから、その supplier_id で仕入先を引く。
+  const order = await db.prepare('SELECT * FROM purchase_orders WHERE id=?').bind(orderId).first<Record<string,unknown>>()
+  const [supplier, allItems] = await Promise.all([
+    order?.['supplier_id'] != null
+      ? db.prepare('SELECT * FROM suppliers WHERE id=?').bind(order['supplier_id']).first<Record<string,unknown>>()
+      : Promise.resolve(null),
     db.prepare('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id').bind(orderId).all<Record<string,unknown>>(),
   ])
-  if (order && supplier && allItems.results.length > 0) {
-    const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
-    await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
-      .bind(subject, mailBody, orderId).run()
+  // 明細はもう消えている。メールの作り直しで落ちても「削除できなかった」と見せない
+  try {
+    if (order && supplier && allItems.results.length > 0) {
+      const { subject, body: mailBody } = composeMail(order, allItems.results, supplier, senderInfoFromEnv(c.env))
+      await db.prepare('UPDATE purchase_orders SET email_subject=?, email_body=? WHERE id=?')
+        .bind(subject, mailBody, orderId).run()
+    }
+  } catch (e) {
+    console.error('明細削除後のメール再生成に失敗', e)
   }
 
   return c.json({ ok: true })
@@ -2611,13 +2633,13 @@ app.get('/dashboard/pending-inspection', async (c) => {
       poi.color,
       poi.club_type,
       poi.quantity,
-      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty,
-      poi.is_free
+      COALESCE((SELECT SUM(ri.received_quantity) FROM receipt_items ri WHERE ri.purchase_order_item_id=poi.id),0) AS received_qty
+      -- poi.is_free は Postgres 側に無い列（D1 時代の名残）。選ぶと 42703 で落ちるので外した
     FROM purchase_order_items poi
     JOIN purchase_orders po ON po.id = poi.purchase_order_id
     JOIN suppliers s ON s.id = po.supplier_id
     WHERE po.status IN ('ordered','partial')
-      AND poi.inspected = 0
+      AND poi.inspected = false
       AND po.tenant_id = ?
     ORDER BY po.order_date ASC, po.id ASC, poi.id ASC
     LIMIT 200
@@ -2645,20 +2667,22 @@ app.patch('/orders/:id/items/:poi_id/inspect', async (c) => {
     `SELECT poi.id, poi.inspected FROM purchase_order_items poi
      JOIN purchase_orders po ON po.id = poi.purchase_order_id
      WHERE poi.id=? AND poi.purchase_order_id=? AND po.tenant_id=?`
-  ).bind(poiId, orderId, tenantId).first<{ id: number; inspected: number }>()
+  ).bind(poiId, orderId, tenantId).first<{ id: number; inspected: boolean }>()
 
   if (!poi) {
     return c.json({ error: '明細が見つかりません' }, 404)
   }
 
-  // inspected = 1 に更新
+  // 検品済みにする。
+  // ⚠ inspected は Postgres では boolean（migration 0200）。D1 時代の 1/0 を書くと
+  //   「column is of type boolean but expression is of type integer」で 500 になる。
   await db.prepare(
-    'UPDATE purchase_order_items SET inspected=1 WHERE id=?'
+    'UPDATE purchase_order_items SET inspected=true WHERE id=?'
   ).bind(poiId).run()
 
   // 同一発注の未検品明細が残っているか確認
   const remain = await db.prepare(
-    'SELECT COUNT(*) AS c FROM purchase_order_items WHERE purchase_order_id=? AND inspected=0'
+    'SELECT COUNT(*) AS c FROM purchase_order_items WHERE purchase_order_id=? AND inspected=false'
   ).bind(orderId).first<{ c: number }>()
 
   const allInspected = (remain?.c ?? 0) === 0

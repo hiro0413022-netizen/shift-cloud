@@ -242,6 +242,19 @@ function showFlash(message, type) {
   el.appendChild(div);
   setTimeout(function(){ div.remove(); }, 5000);
 }
+/**
+ * fetch の応答を安全に読む（2026-09-24・#274）。
+ * サーバーが500を返すとき本文はVercelのHTMLなので、これまでは r.json() が例外になり
+ * 画面には理由の分からない「通信エラーが発生しました」しか出なかった。
+ * JSONで無ければ本文の頭を理由として返す＝次に同じことが起きたとき原因が画面で分かる。
+ */
+async function gwRead(r) {
+  var text = '';
+  try { text = await r.text(); } catch (e) { text = ''; }
+  try { return { ok: r.ok, data: JSON.parse(text) }; } catch (e) {}
+  var plain = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  return { ok: r.ok, data: { error: 'サーバーエラー（' + r.status + '）' + (plain ? '：' + plain : '') } };
+}
 </script>
 ${extraScripts}
 </body>
@@ -310,6 +323,7 @@ app.get('/dashboard', async (c) => {
       WHERE po.tenant_id=?
         AND po.status IN ('partial','received')
         AND ri2.id IS NOT NULL
+        AND poi.inspected = false
       GROUP BY poi.id, po.id, s.id
       ORDER BY po.order_date ASC, po.id ASC
       LIMIT 100
@@ -562,9 +576,9 @@ app.get('/dashboard', async (c) => {
       try {
         var r = await fetch('/api/orders/'+orderId+'/items/'+poiId+'/inspect',{
           method:'PATCH', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({inspected:1})
+          body: JSON.stringify({inspected:true})
         })
-        var d = await r.json()
+        var res = await gwRead(r); var d = res.data
         if(r.ok){
           card.style.transition = 'opacity 0.35s'
           card.style.opacity = '0'
@@ -2098,11 +2112,17 @@ app.get('/orders', async (c) => {
   const supplier = (c.req.query('supplier') || '').trim()
   const q = (c.req.query('q') || '').trim()
 
+  // 2026-09-24 ユーザー依頼「受注一覧でも商品名が一覧に表示されるように」。
+  //   これまでは明細の「件数」しか出ておらず、何を頼んだ発注なのかは1件ずつ開かないと分からなかった。
+  //   商品名は相関サブクエリでまとめる。GROUP_CONCAT を書かないのは、pgdb の変換が
+  //   単純な列名しか受け付けず（[^,()]+）、TRIM/COALESCE を挟んだ式では変換されずに落ちるため。
   let sql = `SELECT po.id, po.order_no, po.order_date, po.status, po.customer_name, po.usage_type,
     s.name AS supplier_name,
     COUNT(DISTINCT poi.id) AS line_count,
     COALESCE(SUM(poi.amount),0) AS total_amount,
-    COALESCE(SUM(poi.quantity),0) AS total_qty
+    COALESCE(SUM(poi.quantity),0) AS total_qty,
+    (SELECT string_agg(DISTINCT TRIM(COALESCE(x.manufacturer,'') || ' ' || x.product_name), chr(31))
+       FROM purchase_order_items x WHERE x.purchase_order_id = po.id) AS item_names
     FROM purchase_orders po
     JOIN suppliers s ON po.supplier_id=s.id
     LEFT JOIN purchase_order_items poi ON poi.purchase_order_id=po.id
@@ -2111,8 +2131,12 @@ app.get('/orders', async (c) => {
   if (status) { sql += ' AND po.status=?'; params.push(status) }
   if (supplier) { sql += ' AND s.name LIKE ?'; params.push(`%${supplier}%`) }
   if (q) {
-    sql += ' AND (po.order_no LIKE ? OR po.customer_name LIKE ? OR po.ordered_by LIKE ?)'
-    const like = `%${q}%`; params.push(like, like, like)
+    // 商品名でも探せるようにする（「ベンタス」と打って発注を見つけたい・2026-09-24）
+    sql += ` AND (po.order_no LIKE ? OR po.customer_name LIKE ? OR po.ordered_by LIKE ?
+      OR EXISTS (SELECT 1 FROM purchase_order_items x
+                 WHERE x.purchase_order_id = po.id
+                   AND (x.product_name LIKE ? OR x.manufacturer LIKE ?)))`
+    const like = `%${q}%`; params.push(like, like, like, like, like)
   }
   sql += ' GROUP BY po.id, s.id ORDER BY po.id DESC'
 
@@ -2124,11 +2148,23 @@ app.get('/orders', async (c) => {
     draft_created:'下書き作成済', ordered:'発注済', partial:'一部入荷', completed:'完納', cancelled:'キャンセル'
   }
 
+  // 商品名は長くなるので、一覧では先頭3件＋「他◯件」。全部は title= で出す（マウスを置けば読める）
+  const itemsCell = (r: Record<string, unknown>) => {
+    // 区切りは chr(31)。商品名そのものに「 / 」が入る（例「STM DARK STELLA / BL無」）ので、
+    // 見た目の記号で区切ると1商品が2つに割れる
+    const all = String(r['item_names'] ?? '').split('\u001f').map(x => x.trim()).filter(Boolean)
+    if (all.length === 0) return '<span class="text-muted">—</span>'
+    const head = all.slice(0, 3).join('、')
+    const rest = all.length > 3 ? `<span class="text-muted"> 他${all.length - 3}件</span>` : ''
+    return `<span title="${esc(all.join('\n'))}">${esc(head)}</span>${rest}`
+  }
+
   const rows = res.results.map(r => `<tr>
     <td><a href="/orders/${r['id']}">${esc(r['order_no'])}</a></td>
     <td>${esc(r['order_date'])}</td>
     <td>${esc(r['supplier_name'])}</td>
     <td>${esc(r['customer_name'])}</td>
+    <td class="gw-item-names">${itemsCell(r)}</td>
     <td>${esc(r['usage_type'])}</td>
     <td class="text-center">${r['line_count']}</td>
     <td class="text-center">${r['total_qty']}</td>
@@ -2187,7 +2223,7 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
         </select>
       </div>
       <div class="col-md-2"><input class="form-control form-control-sm" name="supplier" value="${esc(supplier)}" placeholder="仕入先で絞り込み"></div>
-      <div class="col-md-3"><input class="form-control form-control-sm" name="q" value="${esc(q)}" placeholder="発注番号・顧客名・発注者"></div>
+      <div class="col-md-3"><input class="form-control form-control-sm" name="q" value="${esc(q)}" placeholder="発注番号・顧客名・発注者・商品名"></div>
       <div class="col-auto"><button class="btn btn-sm btn-primary"><i class="fas fa-search me-1"></i>検索</button></div>
       ${(status||supplier||q) ? '<div class="col-auto"><a href="/orders" class="btn btn-sm btn-outline-secondary"><i class="fas fa-times me-1"></i>クリア</a></div>' : ''}
     </form>
@@ -2197,11 +2233,11 @@ document.querySelectorAll('.btn-delete-order').forEach(function(btn){
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead><tr>
-        <th>発注番号</th><th>発注日</th><th>仕入先</th><th>顧客名</th><th>用途</th>
+        <th>発注番号</th><th>発注日</th><th>仕入先</th><th>顧客名</th><th>商品</th><th>用途</th>
         <th class="text-center">明細</th><th class="text-center">数量</th>
         <th class="text-end">金額</th><th>状態</th><th></th>
       </tr></thead>
-      <tbody>${rows || '<tr><td colspan="10" class="text-center text-muted py-4">対象データがありません。</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="11" class="text-center text-muted py-4">対象データがありません。</td></tr>'}</tbody>
     </table>
   </div>
   <div class="card-footer text-muted small">${res.results.length}件</div>
@@ -3993,7 +4029,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
         credentials: 'include',
         body: JSON.stringify(payload),
       });
-      var d = await r.json();
+      var d = (await gwRead(r)).data;
       if (r.ok) {
         bsEdit.hide();
         showFlash('明細を保存しました', 'success');
@@ -4023,7 +4059,7 @@ document.getElementById('btn-delete-order').addEventListener('click', async func
           method: 'DELETE',
           credentials: 'include',
         });
-        var d = await r.json();
+        var d = (await gwRead(r)).data;
         if (r.ok) {
           showFlash('明細を削除しました', 'success');
           setTimeout(function(){ location.reload(); }, 700);

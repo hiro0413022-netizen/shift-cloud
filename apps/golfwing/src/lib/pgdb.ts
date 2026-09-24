@@ -12,7 +12,7 @@ export interface D1Result<T = Row> {
 }
 
 // ── SQLite → Postgres 方言変換 ──────────────────────────
-const BOOL_COLS = 'is_active|is_default|is_admin|is_demo|slip_verified|no_slip'
+const BOOL_COLS = 'is_active|is_default|is_admin|is_demo|slip_verified|no_slip|inspected'
 
 export function translateSql(sql: string): string {
   let s = sql
