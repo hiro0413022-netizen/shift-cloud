@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { rebalanceCashLedger as coreRebalanceCashLedger } from "@yozan/core/cash-ledger";
 import { createAdmin } from "@/lib/supabase/admin";
 import type { MoneyActor, AccessibleStore } from "@/lib/auth";
 
@@ -44,26 +45,10 @@ export async function latestCashBalance(companyId: string, storeId: string): Pro
 
 /**
  * 現金出納の残高を先頭から積み直す（編集・削除後の整合用）。
- * balance列は表示用スナップショットのため、途中行を変えたら以降が全部ずれる。
- * 変わった行だけUPDATEする（通常は末尾付近の数行）。
+ * 実体は `@yozan/core/cash-ledger`（#278 で member-os からも使うようになったため core へ移した）。
  */
 export async function rebalanceCashLedger(companyId: string, storeId: string): Promise<void> {
-  const admin = createAdmin();
-  const { data } = await admin
-    .from("mon_cash_ledger")
-    .select("id, in_amount, out_amount, balance")
-    .eq("company_id", companyId)
-    .eq("store_id", storeId)
-    .is("deleted_at", null)
-    .order("entry_date", { ascending: true })
-    .order("created_at", { ascending: true });
-  let bal = 0;
-  for (const row of data ?? []) {
-    bal += Number(row.in_amount ?? 0) - Number(row.out_amount ?? 0);
-    if (Number(row.balance) !== bal) {
-      await admin.from("mon_cash_ledger").update({ balance: bal }).eq("id", row.id);
-    }
-  }
+  await coreRebalanceCashLedger(createAdmin(), companyId, storeId);
 }
 
 // 純粋ユーティリティは money-util.ts へ集約（テスト対象）。既存importの互換のため再export。

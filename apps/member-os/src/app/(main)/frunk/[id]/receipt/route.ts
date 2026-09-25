@@ -45,7 +45,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
   const planName = (m as { frunk_plans?: { name?: string } | null }).frunk_plans?.name ?? null;
   const defaultTo = String((m as { company_name?: string | null }).company_name || m.name || "").trim();
   const toName = (sp.get("to_name") || `${defaultTo} 様`).slice(0, 80);
-  const note = (sp.get("note") || (sales.every((s) => s.category === "月会費") ? "月会費として" : "会費として")).slice(0, 80);
+  // 但し書きの既定（#278）。選んだ入金の科目が1つなら「◯◯として」。
+  //   混ざっているときだけ「ご利用料金として」。現金の受領（利用料・レッスン等）も
+  //   記録できるようになったので、「会費として」で決め打ちしない。
+  const kinds = Array.from(new Set(sales.map((s) => (s.category || "").trim()).filter(Boolean)));
+  const defaultNote = kinds.length === 1 ? `${kinds[0]}として` : "ご利用料金として";
+  const note = (sp.get("note") || defaultNote).slice(0, 80);
 
   const payload = JSON.stringify({
     toName,

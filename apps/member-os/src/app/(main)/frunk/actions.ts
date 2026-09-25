@@ -26,6 +26,8 @@ import { nextMemberNo } from "@/lib/frank-member-no";
 import { corporateSpec, corporateSeats, corporateSeatFullMessage } from "@yozan/core/frank-corporate";
 import { grantJoinCampaignTickets, JOIN_TICKET_CAMPAIGN, ticketBalance } from "@yozan/core/frank-lesson-tickets";
 import { receiveTicketPayment, useTicket } from "@/lib/frank-tickets";
+import { parseManualSale, type ManualSale } from "@yozan/core/frank-manual-sale";
+import { recordManualSale, voidManualSale } from "@/lib/frank-manual-sale";
 import {
   canLeaveOn,
   canSuspendFrom,
@@ -1452,4 +1454,87 @@ export async function changeUsageStart(formData: FormData) {
       `${monthLabel(sch.freeMonthYmd)}分は無料${prepaidText ? `・${prepaidText}分は入会時にお支払い済み` : ""}。${squareLine}` +
       (m.join_campaign ? `6か月継続は ${sch.minTermUntilYmd.replaceAll("-", "/")} までです。` : ""),
   ));
+}
+
+/**
+ * 現金・振込でお受けした分を記録する（#278・2026-09-25 ユーザー依頼）
+ *
+ * 領収書は「記録された入金」からしか作れない（#222）ので、現金でお受けした方には
+ * 領収書のパネルに何も出ず、宛名の欄にもたどり着けなかった。ここで記録を作れば
+ * そのまま領収書（宛名・但し書き指定あり）を出せる。
+ */
+export async function recordManualPayment(formData: FormData): Promise<void> {
+  const actor = await requireReceptionActor();
+  await requireStoreAccess(actor, FRANK_STORE_ID);
+  const id = String(formData.get("member_id") ?? "");
+  if (!id) redirect("/frunk");
+
+  const parsed = parseManualSale(
+    {
+      amountIncTax: formData.get("amount"),
+      soldOn: formData.get("sold_on"),
+      category: formData.get("category"),
+      payMethod: formData.get("pay_method"),
+      memo: formData.get("memo"),
+      months: formData.get("months"),
+    },
+    jstYmd(),
+  );
+  if (!parsed.ok) redirect(`/frunk/${id}?err=` + encodeURIComponent(parsed.message) + "#receipt");
+
+  const admin = createAdmin();
+  const { data: m } = await admin
+    .from("frunk_members")
+    .select("id, name, member_no, company_name")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!m) redirect("/frunk?err=" + encodeURIComponent("会員が見つかりません"));
+
+  const sale = (parsed as { ok: true; sale: ManualSale }).sale;
+  const r = await recordManualSale({
+    companyId: actor.companyId,
+    memberId: id,
+    memberName: String((m as { company_name?: string | null; name?: string }).company_name || m.name || ""),
+    memberNo: (m.member_no as string | null) ?? null,
+    memberKind: "会員",
+    staffName: actor.name,
+    staffId: actor.staffId,
+    sale,
+  });
+  if (!r.ok) redirect(`/frunk/${id}?err=` + encodeURIComponent(r.message) + "#receipt");
+
+  await logAudit(actor, "frank.sale.manual", "mon_sales", r.saleId, null, {
+    member_id: id,
+    amount: sale.amountIncTax,
+    category: sale.category,
+    pay_method: sale.payMethod,
+    sold_on: sale.soldOn,
+  });
+  revalidatePath(`/frunk/${id}`);
+  redirect(
+    `/frunk/${id}?msg=` +
+      encodeURIComponent(
+        `${sale.soldOn.replaceAll("-", "/")} ${sale.category} ¥${sale.amountIncTax.toLocaleString("ja-JP")}（${sale.payMethod}）を記録しました。領収書を出せます`,
+      ) +
+      "#receipt",
+  );
+}
+
+/** 手で記録した入金を取り消す（打ち間違いの救済）。カード決済の行は取り消せない */
+export async function voidManualPayment(saleId: string, formData: FormData): Promise<void> {
+  const actor = await requireReceptionActor();
+  await requireStoreAccess(actor, FRANK_STORE_ID);
+  const id = String(formData.get("member_id") ?? "");
+  // ⚠ 取り消す行のIDは bind で渡す。ボタンに name/value を付けても React に上書きされて届かない
+  if (!id || !saleId) redirect("/frunk");
+
+  const r = await voidManualSale(actor.companyId, saleId);
+  if (!r.ok) redirect(`/frunk/${id}?err=` + encodeURIComponent(r.message) + "#receipt");
+
+  await logAudit(actor, "frank.sale.manual_void", "mon_sales", saleId, null, { member_id: id });
+  revalidatePath(`/frunk/${id}`);
+  redirect(`/frunk/${id}?msg=` + encodeURIComponent("記録を取り消しました") + "#receipt");
 }

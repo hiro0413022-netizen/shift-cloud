@@ -43,6 +43,8 @@ export async function loadMemberSales(memberId: string, companyId: string): Prom
     amount_inc_tax: Number(r.tax_included ?? 0) || Math.round(Number(r.amount ?? 0) * 1.1),
     pay_method: r.pay_method ? (PAY_LABEL[r.pay_method] ?? r.pay_method) : null,
     months: Number((r.detail as { months?: number } | null)?.months ?? 0) || null,
+    // 手で記録した入金（#278）。Square の入金は画面から取り消させない
+    manual: (r.detail as { manual?: boolean } | null)?.manual === true,
   }));
 }
 

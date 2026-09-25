@@ -50,9 +50,15 @@ import {
   openJoinCheckout,
   changeUsageStart,
   rebaseBillingDayOne,
+  recordManualPayment,
+  voidManualPayment,
 } from "../actions";
+import { MANUAL_SALE_CATEGORIES, MANUAL_PAY_METHODS } from "@yozan/core/frank-manual-sale";
 
 export const dynamic = "force-dynamic";
+
+/** 入金の一覧はフォームの外に出すので、チェックボックスを form 属性でこのIDに結びつける（#278） */
+const RECEIPT_FORM_ID = "frank-receipt-form";
 // 10日払いへの作り直し（#235）で Square を数回呼ぶため
 export const maxDuration = 60;
 type Row = Record<string, unknown>;
@@ -721,26 +727,97 @@ export default async function FrunkMemberPage({
       </div>
 
       {/* 領収書（#222）。5万円以上でも電子交付なら収入印紙が要らない＝紙で出さない */}
-      <Panel id="receipt" title="🧾 領収書（月会費・入会金）" className="d2">
+      <Panel id="receipt" title="🧾 領収書" className="d2">
+        {/* 現金・振込でお受けした分を記録する（#278・2026-09-25）。
+            領収書は「記録された入金」からしか作れない（受け取っていない金額の領収書を作らないため）。
+            Square の Webhook しか台帳に書けなかったので、現金の方には何も出せなかった。 */}
+        <details className="mb-3 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2">
+          <summary className="cursor-pointer text-sm font-medium">＋ 現金・振込でお受けした分を記録する</summary>
+          <form action={recordManualPayment} className="mt-3 space-y-2">
+            <input type="hidden" name="member_id" value={id} />
+            <div className="grid gap-2 sm:grid-cols-5">
+              <Field label="お受けした日">
+                <input type="date" name="sold_on" defaultValue={today} max={today} required className={inputCls} />
+              </Field>
+              <Field label="科目">
+                <select name="category" defaultValue="月会費" className={inputCls}>
+                  {MANUAL_SALE_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="お支払い方法">
+                <select name="pay_method" defaultValue="現金" className={inputCls}>
+                  {MANUAL_PAY_METHODS.map((m2) => (
+                    <option key={m2} value={m2}>
+                      {m2}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="金額（税込）">
+                <input name="amount" inputMode="numeric" placeholder="13800" required className={inputCls} />
+              </Field>
+              <Field label="何ヶ月分（月会費のみ）">
+                <input name="months" inputMode="numeric" placeholder="1" className={inputCls} />
+              </Field>
+            </div>
+            <Field label="メモ（任意・台帳に残ります）">
+              <input name="memo" placeholder="例: 10月分を店頭で現金にてお預かり" className={inputCls} maxLength={200} />
+            </Field>
+            <div className="flex flex-wrap items-center gap-3">
+              <button className={btnGhostCls}>この入金を記録する</button>
+              <span className="text-xs text-(--color-dim)">
+                記録すると下の一覧に出て、領収書を出せます。売上としても計上されます（現金は現金出納にも入ります）。
+              </span>
+            </div>
+          </form>
+        </details>
+
         {sales.length === 0 ? (
           <p className="text-sm text-(--color-dim)">
-            カードでの入金がまだ記録されていません。現金・振込でお受けした分はここには出ません。
+            入金がまだ記録されていません。カードでのお支払いは自動で入ります。
+            現金・振込でお受けした分は、上の【＋ 現金・振込でお受けした分を記録する】から入れてください。
           </p>
         ) : (
-          <form action={`/frunk/${id}/receipt`} method="get" target="_blank" className="space-y-3">
-            <div className="space-y-1.5">
+          <>
+            {/* 入金の一覧はフォームの外に出す（取消ボタンが別フォームなので、入れ子にできない）。
+                チェックボックスは form 属性で下の領収書フォームに属させる */}
+            <div className="mb-3 space-y-1.5">
               {sales.map((sale, i) => (
-                <label
+                <div
                   key={sale.id}
                   className="flex items-center gap-2 rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm"
                 >
-                  <input type="checkbox" name="sale" value={sale.id} defaultChecked={i === 0} />
-                  <span className="tabular-nums text-(--color-dim)">{sale.sold_on.replaceAll("-", "/")}</span>
-                  <span className="flex-1">{saleLabel(sale, plan?.name ? String(plan.name) : null)}</span>
-                  <span className="font-semibold tabular-nums">{yen(sale.amount_inc_tax)}</span>
-                </label>
+                  <label className="flex flex-1 cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      form={RECEIPT_FORM_ID}
+                      name="sale"
+                      value={sale.id}
+                      defaultChecked={i === 0}
+                    />
+                    <span className="tabular-nums text-(--color-dim)">{sale.sold_on.replaceAll("-", "/")}</span>
+                    <span className="flex-1">{saleLabel(sale, plan?.name ? String(plan.name) : null)}</span>
+                    {sale.pay_method ? <span className="shrink-0 text-xs text-(--color-dim)">{sale.pay_method}</span> : null}
+                    <span className="font-semibold tabular-nums">{yen(sale.amount_inc_tax)}</span>
+                  </label>
+                  {/* 取り消せるのは手で記録した行だけ。カード決済は消せない（Squareの入金とずれるため）。
+                      ⚠ IDは bind で渡す。ボタンに name/value を付けても React に上書きされて届かない */}
+                  {sale.manual ? (
+                    <form action={voidManualPayment.bind(null, sale.id)}>
+                      <input type="hidden" name="member_id" value={id} />
+                      <button className="shrink-0 text-xs text-rose-600 underline" title="この記録を取り消す">
+                        取消
+                      </button>
+                    </form>
+                  ) : null}
+                </div>
               ))}
             </div>
+            <form id={RECEIPT_FORM_ID} action={`/frunk/${id}/receipt`} method="get" target="_blank" className="space-y-3">
             <div className="grid gap-2 sm:grid-cols-2">
               <Field label="宛名（空欄ならお名前）">
                 <input
@@ -761,7 +838,8 @@ export default async function FrunkMemberPage({
                 電子交付のため収入印紙は不要です。
               </span>
             </div>
-          </form>
+            </form>
+          </>
         )}
       </Panel>
 

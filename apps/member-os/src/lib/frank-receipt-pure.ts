@@ -9,6 +9,8 @@ export type SaleRow = {
   amount_inc_tax: number;
   pay_method: string | null;
   months: number | null;
+  /** 手で記録した入金か（#278）。true のときだけ画面から取り消せる */
+  manual?: boolean;
 };
 
 /** 明細1行の名前。「月会費（2ヶ月分）」のように、何のお金かが領収書だけで分かるようにする */
