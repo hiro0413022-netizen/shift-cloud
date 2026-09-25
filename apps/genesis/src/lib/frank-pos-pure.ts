@@ -195,3 +195,50 @@ export function mapSquareRefund(r: SquareRefund): MappedRefund | null {
     square_refund_id: r.id,
   };
 }
+
+// ------------------------------------------------------------------
+// Squareの注文明細（#277）
+// ------------------------------------------------------------------
+
+/** Square Orders API の line_items の必要な所だけ */
+export type SquareLineItem = {
+  name?: string | null;
+  variation_name?: string | null;
+  quantity?: string | number | null;
+  total_money?: { amount?: number | null } | null;
+  base_price_money?: { amount?: number | null } | null;
+};
+
+/** mon_sales.detail.items の1行（モバイルオーダーと同じ形。amount は税込・円） */
+export type SaleItem = { name: string; qty: number; amount: number };
+
+/**
+ * Squareの注文明細 → 売上の品目リスト。
+ * 店頭のレジ打ちは「打席利用 1時間」「レッスン25分」などの商品名で入るので、
+ * これを残しておけば Money OS の売上分析で「何が売れたか」まで分かる。
+ * 名前の無い明細（金額だけ打ったカスタム入力）は「金額入力（品名なし）」にまとめる。
+ * バリエーション名が既定の "Regular" / "通常" のときは付けない（ノイズになるだけ）。
+ */
+export function squareLineItems(lineItems: SquareLineItem[] | null | undefined): SaleItem[] {
+  const out: SaleItem[] = [];
+  for (const li of lineItems ?? []) {
+    const base = String(li?.name ?? "").trim();
+    const v = String(li?.variation_name ?? "").trim();
+    const showVar = v && !/^(regular|通常|デフォルト)$/i.test(v) && v !== base;
+    const name = [base || "金額入力（品名なし）", showVar ? v : ""].filter(Boolean).join(" ");
+    const qtyNum = Number(li?.quantity ?? 1);
+    const qty = Number.isFinite(qtyNum) && qtyNum > 0 ? qtyNum : 1;
+    const total = li?.total_money?.amount;
+    const unit = li?.base_price_money?.amount;
+    const amount =
+      typeof total === "number" && Number.isFinite(total) ? total : typeof unit === "number" && Number.isFinite(unit) ? unit * qty : 0;
+    out.push({ name, qty, amount });
+  }
+  return out;
+}
+
+/** 品目リスト → 売上メモ（例「打席利用 1時間 x2・ウーロン茶 x1」）。空なら null */
+export function itemsMemo(items: SaleItem[]): string | null {
+  if (!items.length) return null;
+  return items.map((i) => `${i.name} x${i.qty}`).join("・").slice(0, 200);
+}

@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { monthRange } from "@/lib/money-util";
+import { ledgerCategory, nameFromMemo, NO_NAME, type SaleFact, type SaleItem } from "@/lib/sales-drill";
 
 /* ============================================================
    売上分析（Money OS /analysis・DECISIONS #58）
@@ -312,4 +313,199 @@ export async function ledgerBreakdown(companyId: string, storeId: string | null,
 
   const top = (m: Map<string, BreakdownRow>) => [...m.values()].sort((a, b) => b.amount - a.amount);
   return { retail: top(retail), usage: top(usage), pay: top(pay), lineCount: lines.length };
+}
+
+/* ------------------------------------------------------------
+   カテゴリ詳細（#277）: 「月会費」「利用料」などをタップした先
+   何が売れたか（品目）・日別・会員区分・支払方法・取引一覧まで出す。
+   集計そのものは sales-drill.ts（純粋関数・テストで固定）。ここは読むだけ。
+   ------------------------------------------------------------ */
+
+/** PostgREST は1回1000行まで。月の明細はそれを超えることがあるので分けて取る */
+async function fetchAllRows<T>(build: (from: number, to: number) => PromiseLike<{ data: unknown; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 0; page < 20; page++) {
+    const from = page * 1000;
+    const { data, error } = await build(from, from + 999);
+    if (error) throw new Error(`売上の読み込みに失敗しました: ${JSON.stringify(error)}`);
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+
+const str = (v: unknown) => (v == null ? "" : String(v)).trim();
+
+/** カテゴリ1つ・1か月分の売上を SaleFact に揃えて返す */
+export async function categoryFacts(
+  companyId: string,
+  storeId: string | null,
+  month: string,
+  category: string,
+): Promise<{ facts: SaleFact[]; ledgerRollup: number }> {
+  const admin = createAdmin();
+  const { from, to } = monthRange(month);
+
+  type S = {
+    id: string; sold_on: string; category: string; amount: number | string; customer_name: string | null;
+    member_kind: string | null; pay_method: string | null; memo: string | null; source: string | null;
+    detail: Record<string, unknown> | null;
+  };
+  type L = {
+    id: string; sold_on: string; item_category: string | null; item_type: string | null; maker: string | null;
+    product_name: string | null; qty: number | string | null; amount: number | string; customer_name: string | null;
+    member_kind: string | null; pay_method: string | null; pro: string | null; memo: string | null;
+  };
+
+  const [sales, lines] = await Promise.all([
+    fetchAllRows<S>((a, b) => {
+      let q = admin
+        .from("mon_sales")
+        .select("id, sold_on, category, amount, customer_name, member_kind, pay_method, memo, source, detail")
+        .eq("company_id", companyId)
+        .eq("category", category)
+        .is("deleted_at", null)
+        .gte("sold_on", from)
+        .lt("sold_on", to)
+        .order("id")
+        .range(a, b);
+      if (storeId) q = q.eq("store_id", storeId);
+      return q;
+    }),
+    fetchAllRows<L>((a, b) => {
+      let q = admin
+        .from("mon_sales_lines")
+        .select("id, sold_on, item_category, item_type, maker, product_name, qty, amount, customer_name, member_kind, pay_method, pro, memo")
+        .eq("company_id", companyId)
+        .is("deleted_at", null)
+        .gte("sold_on", from)
+        .lt("sold_on", to)
+        .order("id")
+        .range(a, b);
+      if (storeId) q = q.eq("store_id", storeId);
+      return q;
+    }),
+  ]);
+
+  // FRANK の月会費は「どのプランか」を品目にする（会員→プラン名）
+  const memberIds = [...new Set(sales.map((s) => str(s.detail?.frunk_member_id)).filter(Boolean))];
+  const planOf = new Map<string, string>();
+  if (memberIds.length) {
+    const { data: mem } = await admin.from("frunk_members").select("id, plan_id").in("id", memberIds);
+    const planIds = [...new Set(((mem ?? []) as { plan_id: string | null }[]).map((m) => m.plan_id).filter(Boolean))] as string[];
+    const { data: plans } = planIds.length
+      ? await admin.from("frunk_plans").select("id, name").in("id", planIds)
+      : { data: [] };
+    const planName = new Map(((plans ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
+    for (const m of (mem ?? []) as { id: string; plan_id: string | null }[]) {
+      const n = m.plan_id ? planName.get(m.plan_id) : undefined;
+      if (n) planOf.set(m.id, n);
+    }
+  }
+
+  const facts: SaleFact[] = [];
+  let ledgerRollup = 0;
+
+  for (const s of sales) {
+    const amount = Number(s.amount) || 0;
+    if (s.source === "ledger") {
+      ledgerRollup += amount; // 台帳のロールアップ。中身は lines から出すので、ここでは合計だけ控える
+      continue;
+    }
+    const d = s.detail ?? {};
+    const rawItems = Array.isArray(d.items) ? (d.items as Array<Record<string, unknown>>) : [];
+    let items: SaleItem[] = rawItems
+      .map((i) => ({ name: str(i.name) || NO_NAME, qty: Number(i.qty) || 1, amount: Number(i.amount) || 0 }));
+    let type = str(d.item_type);
+    const plan = planOf.get(str(d.frunk_member_id));
+    if (!items.length) {
+      const product = str(d.product_name);
+      const name =
+        product ||
+        (s.category.startsWith("月会費") && plan) ||
+        type ||
+        nameFromMemo(s.memo) ||
+        NO_NAME;
+      items = [{ name, qty: Number(d.qty) || 1, amount }];
+      if (!type && plan && s.category.startsWith("月会費")) type = nameFromMemo(s.memo);
+    }
+    facts.push({
+      id: s.id,
+      date: String(s.sold_on).slice(0, 10),
+      category: s.category,
+      amount,
+      items,
+      type,
+      maker: str(d.maker),
+      customer: str(s.customer_name),
+      memberKind: str(s.member_kind) || (plan ? "会員" : ""),
+      pay: str(s.pay_method),
+      pro: normalizePro(str(d.pro) || str(d.seller)),
+      memo: str(s.memo),
+      source: str(s.source),
+    });
+  }
+
+  for (const l of lines) {
+    if (ledgerCategory(l.item_category) !== category) continue;
+    const amount = Number(l.amount) || 0;
+    const name = str(l.product_name) || str(l.item_type) || NO_NAME;
+    facts.push({
+      id: l.id,
+      date: String(l.sold_on).slice(0, 10),
+      category,
+      amount,
+      items: [{ name, qty: Number(l.qty) || 1, amount }],
+      type: str(l.item_type),
+      maker: str(l.maker),
+      customer: str(l.customer_name),
+      memberKind: str(l.member_kind),
+      pay: str(l.pay_method),
+      pro: normalizePro(l.pro),
+      memo: str(l.memo),
+      source: "ledger_line",
+    });
+  }
+
+  facts.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  return { facts, ledgerRollup };
+}
+
+/** カテゴリ1つの月次推移（上段カードと同じ mon_sales の合計） */
+export async function categoryTrend(
+  companyId: string,
+  storeId: string | null,
+  month: string,
+  category: string,
+  months = 6,
+): Promise<MonthValue[]> {
+  const admin = createAdmin();
+  const since = `${prevMonth(month, months - 1)}-01`;
+  const until = monthRange(month).to;
+  const rows = await fetchAllRows<{ sold_on: string; amount: number | string }>((a, b) => {
+    let q = admin
+      .from("mon_sales")
+      .select("sold_on, amount")
+      .eq("company_id", companyId)
+      .eq("category", category)
+      .is("deleted_at", null)
+      .gte("sold_on", since)
+      .lt("sold_on", until)
+      .order("id")
+      .range(a, b);
+    if (storeId) q = q.eq("store_id", storeId);
+    return q;
+  });
+  const by = new Map<string, number>();
+  for (const r of rows) {
+    const m = String(r.sold_on).slice(0, 7);
+    by.set(m, (by.get(m) ?? 0) + (Number(r.amount) || 0));
+  }
+  const out: MonthValue[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const m = prevMonth(month, i);
+    out.push({ month: m, amount: by.get(m) ?? 0 });
+  }
+  return out;
 }

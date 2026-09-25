@@ -166,21 +166,28 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
             <ul className="space-y-3">
               {cats.map((c) => (
                 <li key={c.name}>
-                  <div className="mb-1 flex items-baseline justify-between gap-2">
-                    <span className="text-sm">{c.name}</span>
-                    <span className="tabular-nums text-sm">
-                      {yen(c.amount)}円
-                      <span className="ml-2 text-xs text-(--color-dim)">{catTotal ? Math.round((c.amount / catTotal) * 100) : 0}%</span>
-                    </span>
-                  </div>
-                  <Bar value={c.amount} max={catMax} tone={c.amount < 0 ? "dim" : "gold"} />
-                  <div className="mt-1">
-                    <Delta cur={c.amount} prev={c.prev} />
-                  </div>
+                  {/* タップで品目・日別・取引一覧まで（#277） */}
+                  <Link
+                    href={`/analysis/category?month=${month}&cat=${encodeURIComponent(c.name)}`}
+                    className="-mx-2 block rounded-lg px-2 py-1 hover:bg-(--color-bg) active:bg-(--color-bg)"
+                  >
+                    <div className="mb-1 flex items-baseline justify-between gap-2">
+                      <span className="text-sm">{c.name} <span className="text-xs text-(--color-dim)">›</span></span>
+                      <span className="tabular-nums text-sm">
+                        {yen(c.amount)}円
+                        <span className="ml-2 text-xs text-(--color-dim)">{catTotal ? Math.round((c.amount / catTotal) * 100) : 0}%</span>
+                      </span>
+                    </div>
+                    <Bar value={c.amount} max={catMax} tone={c.amount < 0 ? "dim" : "gold"} />
+                    <div className="mt-1">
+                      <Delta cur={c.amount} prev={c.prev} />
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>
             <p className="mt-4 text-xs text-(--color-dim)">
+              各カテゴリをタップすると、何が売れたか（品目）・日別・取引一覧が見られます。
               「月会費(窓口)」は窓口決済の会費・入会金です。口座振替の月会費は事業別の「月会費」に入ります。
             </p>
           </>

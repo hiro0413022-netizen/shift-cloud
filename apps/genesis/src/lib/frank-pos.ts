@@ -9,6 +9,7 @@ import {
   classifySquareMonthlyPayment,
   exTax,
   isJoiningFeeNote,
+  itemsMemo,
   mapSquarePayment,
   mapSquareRefund,
   monthlyFeeTaxIncluded,
@@ -20,6 +21,7 @@ import { chargeCardOnFile, getSquareCustomerEmail } from "@/lib/frank-square-bil
 import { activateWebJoin } from "@/lib/frank-join";
 import { JOIN_PREPAID_MONTHS, joinInitialTotal } from "@/lib/frank-join-pure";
 import { rebaseToBillingDay } from "@/lib/frank-billing-day";
+import { fetchOrderItems } from "@/lib/frank-square-items";
 
 export { verifySquareSignature };
 
@@ -640,9 +642,12 @@ export async function handleSquareEvent(payload: string): Promise<void> {
       await admin.rpc("refresh_money_to_finance", { p_company_id: ctx.companyId });
       return;
     }
+    // 店頭のレジ打ち: 注文明細（何を売ったか）も残す（#277）。聞けなければ従来どおり記帳だけ
+    const items = await fetchOrderItems(raw.order_id).catch(() => []);
     await insertSale(admin, ctx, {
       ...mapped,
-      detail: { square_payment_id: mapped.square_payment_id },
+      memo: mapped.memo === "Square店頭決済" ? (itemsMemo(items) ?? mapped.memo) : mapped.memo,
+      detail: { square_payment_id: mapped.square_payment_id, ...(items.length ? { items } : {}) },
     });
   } else {
     const mapped = mapSquareRefund((obj.refund ?? obj) as SquareRefund);

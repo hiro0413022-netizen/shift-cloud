@@ -10,6 +10,7 @@ import { runContentLoop, refreshContentMetrics } from "@/lib/content-loop";
 import { runFrankReminders } from "@/lib/frank-mail";
 import { runFrankMembershipSchedule } from "@/lib/frank-membership-cron";
 import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cron";
+import { runFrankSquareItemsBackfill } from "@/lib/frank-square-items";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
 
 export const dynamic = "force-dynamic";
@@ -80,5 +81,7 @@ export async function GET(req: NextRequest) {
   const frankVisited = await runFrankAutoVisited().catch((e) => ({ error: String(e) }));
   // FRANK 前日以前の在店を退店に（#220・10分cronが止まっていても翌朝には必ず閉じる）
   const frankCheckout = await runFrankAutoCheckout().catch((e) => ({ error: String(e) }));
-  return NextResponse.json({ ok: true, results, frankReminders, frankMembership, frankVisited, frankCheckout });
+  // Square店頭決済に品目（何を売ったか）を付ける。売上の金額は変えない（#277）
+  const frankSquareItems = await runFrankSquareItemsBackfill().catch((e) => ({ error: String(e) }));
+  return NextResponse.json({ ok: true, results, frankReminders, frankMembership, frankVisited, frankCheckout, frankSquareItems });
 }
