@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdmin } from "@/lib/supabase/admin";
 import { logEvent } from "@/lib/kernel";
+import { refundTicket } from "@/lib/frank-tickets";
 import {
   createMemberSession, clearMemberSession, requireMember,
 } from "@/lib/member";
@@ -81,17 +82,30 @@ export async function cancelMyBooking(formData: FormData) {
     .eq("company_id", member.companyId).eq("member_no", member.memberNo)
     .is("deleted_at", null).maybeSingle();
   if (!me) redirect("/member");
-  await admin
+  const { data: updated } = await admin
     .from("frunk_bookings")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("member_id", me.id)
-    .is("deleted_at", null);
+    .is("deleted_at", null)
+    .select("id, lesson_option_status")
+    .maybeSingle();
+  if (!updated) redirect("/member"); // 他人の予約・取り消し済み
+
+  /* パーソナルレッスンのチケットを戻す（2026-09-25 ユーザー確定・#279）
+     スタッフが取り消すとき（reservations/actions.ts の decline / clear）は戻していたのに、
+     会員が自分でキャンセルしたときだけ戻っておらず、1枚が黙って消えていた。
+     refundTicket はこの予約に紐づく「使った1枚」だけを void にする＝二重に戻らない。 */
+  let ticketBack = false;
+  if (String((updated as { lesson_option_status?: string | null }).lesson_option_status ?? "") === "confirmed") {
+    ticketBack = await refundTicket(id);
+  }
+
   await logEvent(member.companyId, {
     event_type: "reservation.member_canceled",
-    title: `会員がWeb予約をキャンセル: ${member.name} 様`,
+    title: `会員がWeb予約をキャンセル: ${member.name} 様${ticketBack ? "（レッスンチケット1枚を返却）" : ""}`,
     source: "web", source_type: "external", severity: "info",
   });
   revalidatePath("/member");
-  redirect("/member?canceled=1");
+  redirect(ticketBack ? "/member?canceled=ticket" : "/member?canceled=1");
 }

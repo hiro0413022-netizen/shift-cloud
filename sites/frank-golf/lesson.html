@@ -125,6 +125,10 @@
       <h2 class="h-en">YOUR PRO</h2>
       <p class="h-jp">常駐コーチのご紹介</p>
     </div>
+    <!-- コーチ紹介（#279）。中身は管理画面（Member OS > その他 > コーチ紹介）で直す。
+         assets/site.js が window.FRANK.coaches で丸ごと描き替える。
+         下の静的な内容は、APIが落ちているときにそのまま出る控え（いまの内容と同じ）。 -->
+    <div id="coachList" data-frank-coaches>
     <div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">
       <div class="media-frame media-tall">
         <img src="assets/img/coach-rara.jpg" alt="FRANK GOLF 姫路の所属レッスンプロ 小川うらら（らら）" loading="lazy" width="1000" height="1250">
@@ -148,6 +152,7 @@
         </ul>
         <p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="https://www.youtube.com/channel/UC4QTQjrDLsx4WF3fdYuLHZQ" target="_blank" rel="noopener">無料レッスン動画を見る（YouTube） ↗</a></p>
       </div>
+    </div>
     </div>
   </div>
 </section>

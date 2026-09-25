@@ -30,6 +30,8 @@ const PRIMARY: NavLink[] = [
 /** 「その他 ▾」に畳むタブ（確認するときだけ開く） */
 const SECONDARY: NavLink[] = [
   { href: "/trials", label: "体験申込", scope: "frank" },
+  // コーチが入れ替わったときだけ開く画面（#279）。毎日触るものではないので「その他」に置く
+  { href: "/frunk/coaches", label: "コーチ紹介", scope: "frank" },
   { href: "/follow", label: "体験フォロー", scope: "all" },
   { href: "/search", label: "来店検索", scope: "all" },
   { href: "/import", label: "データ取込", scope: "gw" },

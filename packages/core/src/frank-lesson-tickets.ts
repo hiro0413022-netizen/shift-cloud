@@ -213,15 +213,29 @@ export async function grantJoinCampaignTickets(
  * 束の値段が単価×枚数より高い設定は使わない（お客様が損をしない）。
  */
 export function ticketAmountExTax(qty: number, unitExTax: number, packs: { qty: number; price: number }[] = []): number {
-  let rest = Math.max(0, Math.floor(qty));
-  let total = 0;
+  const want = Math.max(0, Math.floor(qty));
   const usable = packs
     .filter((p) => p.qty > 1 && p.price > 0 && p.price < unitExTax * p.qty)
     .sort((a, b) => b.qty - a.qty);
-  for (const p of usable) {
-    const n = Math.floor(rest / p.qty);
-    total += n * p.price;
-    rest -= n * p.qty;
-  }
-  return total + rest * unitExTax;
+
+  /** 大きい束から当てる素直な計算 */
+  const greedy = (n: number): number => {
+    let rest = n;
+    let total = 0;
+    for (const p of usable) {
+      const k = Math.floor(rest / p.qty);
+      total += k * p.price;
+      rest -= k * p.qty;
+    }
+    return total + rest * unitExTax;
+  };
+
+  // 「多く買うほうが安い」を起こさない（2026-09-25・8枚セットを足して発覚）。
+  //   例 1枚2,500／4枚9,000／8枚16,000 のとき、素直に計算すると
+  //   7枚＝9,000+2,500×3＝16,500 で、8枚の16,000より高くなる。
+  //   束1つぶん先まで見て、いちばん安い買い方の金額にする（それ以上先は束が増えるだけなので見なくてよい）。
+  const maxPack = usable.length > 0 ? usable[0].qty : 0;
+  let best = greedy(want);
+  for (let n = want + 1; n <= want + maxPack; n++) best = Math.min(best, greedy(n));
+  return best;
 }

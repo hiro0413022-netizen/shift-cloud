@@ -8,6 +8,7 @@ import { ensureCheckinToken, currentVisit, karteHasContent, karteHasNew } from "
 import { ticketBalance, pendingTicketCount } from "@yozan/core/frank-lesson-tickets";
 import { openSlots, slotUsageLabel } from "@yozan/core/frank-corporate";
 import { loadCoachShifts } from "@/lib/frank-coach-shifts";
+import { loadPublicCoaches } from "@/lib/frank-coaches";
 import { memberLogout, cancelMyBooking } from "./actions";
 import { VisitPanel } from "./visit-panel";
 import { AddToHome } from "./add-to-home";
@@ -26,6 +27,8 @@ type Row = Record<string, unknown>;
 const notices: Record<string, { text: string; ok?: boolean }> = {
   booked: { text: "ご予約を受け付けました。", ok: true },
   canceled: { text: "予約をキャンセルしました。", ok: true },
+  // パーソナルレッスンが確定していた予約のキャンセル（#279）。チケットを戻したことをその場で伝える
+  canceledTicket: { text: "予約をキャンセルしました。パーソナルレッスンのチケット1枚はお戻ししています。", ok: true },
   registered: { text: "会員登録が完了しました。さっそくWeb予約をご利用ください。", ok: true },
   reissued: { text: "会員証を再発行しました。古いQRコードは使えなくなります。", ok: true },
 };
@@ -76,6 +79,8 @@ export default async function MemberHomePage({
 
   // コーチの出勤（#209）: 本日いる人はホームに名前まで出す（開かないと分からない、を作らない）
   const coachDays = await loadCoachShifts(1);
+  // コーチ紹介（#279）: 管理画面で直したものがそのまま出る。公式サイトと同じ行を読む
+  const coaches = member.isProvisional ? [] : await loadPublicCoaches(store?.companyId ?? member.companyId);
   const todayCoaches = (coachDays[0]?.people ?? []).map((p) => p.name);
 
   // レッスンチケット（#199）: 残枚数はホームに出す（開かないと分からない、を作らない）
@@ -134,7 +139,17 @@ export default async function MemberHomePage({
   const upcoming = all.filter((b) => String(b.booked_date) >= t && b.status !== "cancelled");
 
   const lineUrl = process.env.NEXT_PUBLIC_FRANK_LINE_URL || "";
-  const notice = sp.reissued ? notices.reissued : sp.booked ? notices.booked : sp.canceled ? notices.canceled : sp.registered ? notices.registered : null;
+  const notice = sp.reissued
+    ? notices.reissued
+    : sp.booked
+      ? notices.booked
+      : sp.canceled
+        ? sp.canceled === "ticket"
+          ? notices.canceledTicket
+          : notices.canceled
+        : sp.registered
+          ? notices.registered
+          : null;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-8">
@@ -261,6 +276,58 @@ export default async function MemberHomePage({
             {todayCoaches.length > 0 ? `本日 ${todayCoaches.join("・")}` : "本日は未定"}
           </span>
         </Link>
+      )}
+
+      {/* ④-3 コーチ紹介（#279）。管理画面 > コーチ紹介 で店舗スタッフが直せる */}
+      {coaches.length > 0 && (
+        <section className="mb-3 rounded-xl border border-(--color-line) bg-(--color-panel) p-4">
+          <h2 className="mb-3 font-semibold text-(--color-txt)">コーチ紹介</h2>
+          <div className="space-y-4">
+            {coaches.map((c) => (
+              <div key={c.id} className="flex gap-3">
+                {c.photoUrl ? (
+                  // Storage/公式サイトの画像をそのまま出す（公式サイトと同じURL）
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={c.photoUrl}
+                    alt={c.name}
+                    className="size-20 shrink-0 rounded-xl border border-(--color-line) object-cover"
+                  />
+                ) : null}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-semibold text-(--color-txt)">{c.name}</span>
+                    {c.title ? <span className="text-xs text-(--color-dim)">{c.title}</span> : null}
+                  </div>
+                  {c.bio.map((line, i) => (
+                    <p key={i} className="mt-1 text-sm leading-relaxed text-(--color-dim)">
+                      {line}
+                    </p>
+                  ))}
+                  {c.quals.length > 0 && (
+                    <ul className="mt-2 flex flex-wrap gap-1">
+                      {c.quals.map((q, i) => (
+                        <li key={i} className="rounded-full border border-(--color-line) px-2 py-0.5 text-[11px] text-(--color-dim)">
+                          {q}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {c.linkUrl ? (
+                    <a
+                      href={c.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-block text-xs text-(--color-gold) underline underline-offset-4"
+                    >
+                      {c.linkLabel} ↗
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* ⑤ 公式LINE */}

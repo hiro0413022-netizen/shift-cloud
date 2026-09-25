@@ -104,9 +104,56 @@ export default async function MemberSettingsPage({
           連絡先の変更・休会・退会・プラン変更・お支払い方法の変更は、受付またはお電話で承っています。
           Webからのお手続きは順次ご用意します。
         </p>
+
+        {/* 休会・退会・キャンセルのご案内（#279・2026-09-25 ユーザー指定）。
+            休会と退会の締切は「前々月の末日」＝ユーザー指定の文言をそのまま載せる。
+            キャンセルは実装どおり（会員ページから開始時刻まで・キャンセル料なし）。 */}
+        <div className="mt-4 space-y-4 border-t border-(--color-line) pt-4">
+          <div>
+            <h3 className="text-xs font-semibold text-(--color-txt)">休会について</h3>
+            <p className="mt-1 text-xs leading-relaxed text-(--color-dim)">
+              休会をご希望の場合は、休会したい月の<b className="text-(--color-txt)">前々月の末日まで</b>に、店頭またはお電話でお申し出ください。
+              <br />
+              例：1月から休会したい場合は、11月末までにお申し出ください。
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-(--color-txt)">退会について</h3>
+            <p className="mt-1 text-xs leading-relaxed text-(--color-dim)">
+              退会をご希望の場合は、退会したい月の<b className="text-(--color-txt)">前々月の末日まで</b>に、店頭またはお電話でお申し出ください。
+              <br />
+              例：1月に退会したい場合は、11月末までにお申し出ください。
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-(--color-txt)">ご予約のキャンセルについて</h3>
+            <ul className="mt-1 list-disc space-y-1 pl-4 text-xs leading-relaxed text-(--color-dim)">
+              <li>
+                打席のご予約は、<b className="text-(--color-txt)">ご利用開始時刻まで</b>、会員ページの「これからのご予約」から
+                ご自身でキャンセルいただけます。<b className="text-(--color-txt)">キャンセル料はいただいておりません。</b>
+              </li>
+              <li>
+                ご来店の受付が済んだご予約は、会員ページからは取り消せません。受付までお申し付けください。
+              </li>
+              <li>
+                パーソナルレッスンをご一緒にご予約いただいていた場合、キャンセルすると
+                <b className="text-(--color-txt)">レッスンチケットは自動でお戻しします</b>（残数に戻ります）。
+              </li>
+              <li>
+                体験レッスンのご予約は会員ページには表示されません。変更・キャンセルは店頭またはお電話でお願いいたします。
+              </li>
+              <li>
+                ご都合が悪くなった場合は、次の方にお席をお譲りできますので、お早めのご連絡にご協力ください。
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <a
           href={frankSiteUrl("faq.html", null)}
-          className="mt-3 block rounded-xl border border-(--color-line) bg-white py-3 text-center text-sm text-(--color-txt) transition-colors hover:bg-(--color-panel-2)"
+          className="mt-4 block rounded-xl border border-(--color-line) bg-white py-3 text-center text-sm text-(--color-txt) transition-colors hover:bg-(--color-panel-2)"
         >
           よくあるご質問
         </a>

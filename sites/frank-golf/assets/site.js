@@ -537,6 +537,68 @@
       .join("");
   }
 
+  /* ---------- コーチ紹介（#279・2026-09-25） ----------
+     中身は Member OS の「コーチ紹介」で店舗スタッフが直す。ここでは
+     window.FRANK.coaches（公開APIが入れる）があれば、静的なHTMLを丸ごと置き換える。
+
+     ★ APIが落ちている・まだ読み込めていないときは何もしない。
+       置き換えないので、ビルド時のHTML（いまの内容）がそのまま出る。
+     ★ 文字は必ず esc() を通す。管理画面から入る文なので、そのまま innerHTML に入れない。 */
+  function coaches() {
+    var box = document.querySelector("[data-frank-coaches]");
+    if (!box) return;
+    var list = pick("coaches");
+    if (!Array.isArray(list) || list.length === 0) return;
+
+    box.innerHTML = list
+      .map(function (c) {
+        var photo = c.photoUrl
+          ? '<div class="media-frame media-tall">' +
+            '<img src="' + esc(c.photoUrl) + '" alt="' + esc(c.name) + '" loading="lazy" width="1000" height="1250">' +
+            (c.nameEn ? '<span class="media-cap">' + esc(c.nameEn) + "</span>" : "") +
+            "</div>"
+          : "<div></div>";
+
+        var bio = (c.bio || [])
+          .map(function (line) {
+            return '<p class="card__b" style="margin-bottom:14px">' + esc(line) + "</p>";
+          })
+          .join("");
+
+        var quals = (c.quals || []).length
+          ? '<ul class="plan__f" style="font-size:13.5px">' +
+            c.quals
+              .map(function (q) {
+                return "<li>" + esc(q) + "</li>";
+              })
+              .join("") +
+            "</ul>"
+          : "";
+
+        var link = c.linkUrl
+          ? '<p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="' +
+            esc(c.linkUrl) +
+            '" target="_blank" rel="noopener">' +
+            esc(c.linkLabel || "くわしく見る") +
+            " \u2197</a></p>"
+          : "";
+
+        return (
+          '<div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">' +
+          photo +
+          "<div>" +
+          (c.title ? '<p class="card__no">' + esc(c.title) + "</p>" : "") +
+          '<h3 class="card__t" style="font-size:2rem">' + esc(c.name) + "</h3>" +
+          (c.nameEn ? '<p class="card__t-jp" style="margin-bottom:14px">' + esc(c.nameEn) + "</p>" : "") +
+          bio +
+          quals +
+          link +
+          "</div></div>"
+        );
+      })
+      .join("");
+  }
+
   /* init() は2回走る（DOMContentLoaded で1回 → cms.js が CMS を取得したあと
      FRANK_RENDER() でもう1回）。addEventListener を含む処理を毎回呼ぶと
      ハンドラが二重登録され、バーガーメニューが「開く→即閉じる」で無反応に見える。
@@ -549,6 +611,7 @@
     wireLinks();
     media();
     news();
+    coaches();
     notice();
     trialSteps();
     reveal();         // 要素ごとに二重登録を防ぐ（後から増えた .rv も拾う）

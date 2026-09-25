@@ -63,7 +63,9 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   max_minutes_options: [30, 60, 90, 120],
   member_start_step: 60, // 毎時00分スタートのみ
   member_minutes_options: [60, 120],
-  lesson_option: { enabled: true, minutes: 25, price: 2500, packs: [{ qty: 4, price: 9000 }] },
+  // まとめ買い（税抜）。4枚 9,000（税込9,900）／8枚 16,000（税込17,600・2026-09-25 ユーザー指定）。
+  // 金額は gn_site_content の booking.lesson_option で上書きできる（デプロイ不要）
+  lesson_option: { enabled: true, minutes: 25, price: 2500, packs: [{ qty: 4, price: 9000 }, { qty: 8, price: 16000 }] },
   holiday_dates: [],
   auto_holidays: true,
   closed_dates: [],
