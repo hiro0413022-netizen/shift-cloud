@@ -537,6 +537,162 @@
       .join("");
   }
 
+  /* ---------- キャンペーン（#280・2026-09-26 ユーザー依頼） ----------
+     ★ 期限（campaign.until）を過ぎたら、帯も告知バーも自動で元に戻す。
+       人が消しに来る前提のバナーは必ず消し忘れる。11月に「10月キャンペーン」が
+       出ていると、来た方は「情報が古い店」と受け取る＝体験を増やすために出したもので
+       逆に信用を削る。so 判定はコードでやる。
+     ★ JSTの暦日で判定する。日付だけの文字列は必ず "T00:00:00Z" で読む
+       （"+09:00" を付けると getUTC系が1日前を返す・#200 で踏んだ）。
+       お客様の端末の時計は現地時間なので、UTCに+9時間して「日本の今日」を作る。
+     ★ 文字は必ず esc() を通す。bar と headline だけは <b>/<em> を使いたいので
+       **サイト側のデータに限って** そのまま入れる（HP管理から入る値も同じ枠なので、
+       入れてよいタグを絞るために sanitizeInline() を通す）。 */
+  function jstToday() {
+    var d = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + d.getUTCDate()).slice(-2);
+  }
+
+  /* <b> <em> <br> <small> だけ残して、他のタグは文字として出す。
+     管理画面から入った文字列をそのまま innerHTML に入れないため。 */
+  function sanitizeInline(html) {
+    var ok = { b: 1, em: 1, br: 1, small: 1, strong: 1, del: 1, s: 1, wbr: 1 };
+    return String(html == null ? "" : html).replace(/<\/?([a-zA-Z0-9]+)[^>]*>/g, function (tag, name) {
+      return ok[String(name).toLowerCase()] ? (tag.charAt(1) === "/" ? "</" + name.toLowerCase() + ">" : "<" + name.toLowerCase() + ">") : esc(tag);
+    });
+  }
+
+  /* すでに記録されている流入元（無ければ ""）。プライベートモードでも落ちない */
+  function storedSrc() {
+    try { return sessionStorage.getItem("frank_src") || ""; } catch (e) { return ""; }
+  }
+
+  function daysLeft(todayYmd, untilYmd) {
+    var a = Date.parse(todayYmd + "T00:00:00Z");
+    var b = Date.parse(untilYmd + "T00:00:00Z");
+    if (isNaN(a) || isNaN(b)) return -1;
+    return Math.round((b - a) / 86400000);
+  }
+
+  /* 「{m}」を今月、「{m1}」を翌月に置き換える（JSTの今日を基準） */
+  function fillMonths(text, todayYmd) {
+    var mo = Number(todayYmd.slice(5, 7));
+    return String(text == null ? "" : text)
+      .replace(/\{m1\}/g, ((mo % 12) + 1) + "月")
+      .replace(/\{m\}/g, mo + "月");
+  }
+
+  function campaign() {
+    var base = pick("campaign") || {};
+    var YMD = /^\d{4}-\d{2}-\d{2}$/;
+    var until = String(base.until == null ? "" : base.until).trim();
+    var today = jstToday();
+    /* until が無い・読めない設定は「出さない」（事故のときに出しっぱなしにしない） */
+    var active = base.enabled !== false && YMD.test(until) && today <= until;
+    var left = active ? daysLeft(today, until) : -1;
+
+    /* ★ 20日を境に文言を入れ替える（ユーザー指示・2026-09-26）
+         1〜20日 … そのまま（当月分が無料）
+         21日〜  … late の内容（当月分＋翌月分が無料）
+       ここは「請求側が何か月無料にするか」と必ず同じ境目にしておくこと
+       （packages/core/src/frank-billing-start.ts の CAMPAIGN_BONUS_DAY）。
+       ★「20日で切り替わる」ことそのものは画面に書かない（ユーザー指示）。 */
+    var bonusDay = Number(base.bonusDay) > 0 ? Number(base.bonusDay) : 20;
+    var isLate = Number(today.slice(8, 10)) > bonusDay;
+    var c = base;
+    if (isLate && base.late && typeof base.late === "object") {
+      c = {};
+      Object.keys(base).forEach(function (k) { c[k] = base[k]; });
+      Object.keys(base.late).forEach(function (k) { c[k] = base.late[k]; });
+    }
+
+    /* 告知バー（全ページ）。終わっていればビルド時の控え（OPENの文）をそのまま残す */
+    var bar = document.querySelector("[data-notice-bar]");
+    if (bar && active && c.bar) {
+      var tag = bar.querySelector("[data-notice-tag]");
+      var txt = bar.querySelector("[data-notice-text]");
+      if (tag) tag.textContent = "CAMPAIGN";
+      if (txt) txt.innerHTML = sanitizeInline(fillMonths(c.bar, today));
+      bar.classList.add("is-camp");
+    }
+
+    /* 大きな帯（トップ・料金・体験）。終わっていれば hidden のまま＝何も出ない */
+    var box = document.querySelector("[data-campaign]");
+    if (!box) return;
+    if (!active) { box.hidden = true; return; }
+
+    var set = function (sel, val, asHtml) {
+      var el = box.querySelector(sel);
+      if (!el) return;
+      if (asHtml) el.innerHTML = sanitizeInline(fillMonths(val, today));
+      else el.textContent = fillMonths(val, today);
+    };
+    set("[data-camp-tag]", c.tag || "CAMPAIGN");
+    set("[data-camp-h]", c.headline || "", true);
+    set("[data-camp-sub]", c.sub || "");
+    set("[data-camp-total]", c.totalLabel || "");
+
+    var leftEl = box.querySelector("[data-camp-left]");
+    if (leftEl) {
+      /* 期限が遠いうちは「あと96日」と出さない（急ぐ理由にならず、かえって間延びする）。
+         残り45日を切ってから日数を出す。期限日はどちらの場合も必ず書く。 */
+      var label = left >= 0 && left <= 45 ? deadline(left) : "";
+      leftEl.textContent = label ? label + "（" + jaDate(until) + "まで）" : jaDate(until) + "まで";
+      leftEl.hidden = false;
+    }
+
+    var items = box.querySelector("[data-camp-items]");
+    if (items) {
+      items.innerHTML = (c.items || [])
+        .map(function (i) {
+          return (
+            '<li class="camp__i">' +
+            '<p class="camp__k">' + esc(fillMonths(i.k, today)) + "</p>" +
+            '<p class="camp__v">' + esc(i.v) + "</p>" +
+            (i.was ? '<p class="camp__was">' + esc(i.was) + "</p>" : "") +
+            "</li>"
+          );
+        })
+        .join("");
+    }
+
+    /* 条件は消さない。0円だけ大きく出して条件を隠すと、店頭で「話が違う」になる */
+    var note = box.querySelector("[data-camp-note]");
+    if (note) {
+      note.innerHTML = (c.conditions || [])
+        .map(function (t) { return "<li>" + esc(t) + "</li>"; })
+        .join("");
+    }
+    var cta = box.querySelector("[data-camp-cta]");
+    if (cta && c.ctaLabel) cta.textContent = c.ctaLabel;
+    /* この帯から来た体験申込に印を付ける（効果測定）。
+       ★ すでに流入元が記録されている方（広告・SNSから来た方）には足さない。
+         足すと「Google広告で来た方」が「キャンペーン帯で来た方」に化けて、広告の成果が消える。
+       ★ wireLinks が href を入れたあとに呼ばれる前提（init の順番）。 */
+    if (cta && c.srcTag && /^[A-Za-z0-9_-]{1,32}$/.test(c.srcTag) && !storedSrc()) {
+      var href = cta.getAttribute("href") || "";
+      if (href && href.charAt(0) !== "#" && href.indexOf("src=") === -1) {
+        cta.setAttribute("href", href + (href.indexOf("?") === -1 ? "?" : "&") + "src=" + c.srcTag);
+      }
+    }
+
+    box.hidden = false;
+  }
+
+  /* 「あと0日」を作らない */
+  function deadline(n) {
+    if (n < 0) return "";
+    if (n === 0) return "本日まで";
+    if (n === 1) return "明日まで";
+    return "あと" + n + "日";
+  }
+
+  /* "2026-10-31" → "10月31日" */
+  function jaDate(ymd) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return "";
+    return Number(ymd.slice(5, 7)) + "月" + Number(ymd.slice(8, 10)) + "日";
+  }
+
   /* ---------- コーチ紹介（#279・2026-09-25） ----------
      中身は Member OS の「コーチ紹介」で店舗スタッフが直す。ここでは
      window.FRANK.coaches（公開APIが入れる）があれば、静的なHTMLを丸ごと置き換える。
@@ -612,6 +768,7 @@
     media();
     news();
     coaches();
+    campaign();
     notice();
     trialSteps();
     reveal();         // 要素ごとに二重登録を防ぐ（後から増えた .rv も拾う）

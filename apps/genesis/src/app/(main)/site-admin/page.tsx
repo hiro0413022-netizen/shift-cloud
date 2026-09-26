@@ -1,6 +1,9 @@
 import { createAdmin } from "@/lib/supabase/admin";
 import { DEFAULT_BOOKING_CFG, type BookingCfg } from "@/lib/frank-booking";
-import { saveBasics, saveBookingCfg, addNews, deleteNews, saveRawJson } from "./actions";
+import { saveBasics, saveBookingCfg, addNews, deleteNews, saveRawJson, saveCampaign } from "./actions";
+import { campaignActive, campaignDaysLeft, deadlineLabel, ymdLabelJa } from "@yozan/core/frank-campaign";
+import { CAMPAIGN_BONUS_DAY } from "@yozan/core/frank-billing-start";
+import { jstYmd } from "@/lib/jst";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +15,11 @@ export const dynamic = "force-dynamic";
 export default async function SiteAdminPage() {
   const admin = createAdmin();
   const { data: row } = await admin.from("gn_site_content").select("data, news, updated_at").eq("site", "frank-golf").maybeSingle();
-  const d = (row?.data ?? {}) as { store?: Record<string, string>; preopen?: { benefits?: string[] } };
+  const d = (row?.data ?? {}) as {
+    store?: Record<string, string>;
+    preopen?: { benefits?: string[] };
+    campaign?: Record<string, unknown>;
+  };
   const news = (Array.isArray(row?.news) ? row?.news : []) as { date?: string; tag?: string; title?: string; url?: string | null }[];
 
   const input = "w-full rounded-lg border border-(--color-line) bg-(--color-panel-2) px-3 py-2 text-sm";
@@ -57,6 +64,8 @@ export default async function SiteAdminPage() {
       </form>
 
       <BookingSection d={d as Record<string, unknown>} input={input} label={label} btn={btn} />
+
+      <CampaignSection cfg={d.campaign ?? {}} input={input} label={label} btn={btn} />
 
       <div className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
         <h2 className="text-sm font-semibold">お知らせ（サイトのNEWS欄）</h2>
@@ -160,6 +169,95 @@ function BookingSection({ d, input, label, btn }: { d: Record<string, unknown>; 
         </div>
       </div>
       <button type="submit" className={btn}>予約設定を保存</button>
+    </form>
+  );
+}
+
+/**
+ * キャンペーン設定（#280・2026-09-26）
+ *
+ * ★ 空欄で保存＝サイト内蔵の既定値（site-data.js の campaign）に戻る。
+ *   だから「文言はサイト既定のまま、期限だけ延ばす」ができる。
+ * ★ いま実際にサイトに出ているかを、判定と同じ関数（@yozan/core/frank-campaign）で表示する。
+ *   画面の説明文とサイトの挙動が食い違うと、止めたつもりで出ている事故になる。
+ */
+function CampaignSection({
+  cfg,
+  input,
+  label,
+  btn,
+}: {
+  cfg: Record<string, unknown>;
+  input: string;
+  label: string;
+  btn: string;
+}) {
+  const s = (k: string) => (typeof cfg[k] === "string" ? (cfg[k] as string) : "");
+  const until = s("until");
+  const today = jstYmd();
+  // enabled の既定は true（site-data.js 側が true なので、未設定なら出ている扱いが正しい）
+  const enabled = cfg.enabled !== false;
+  const live = campaignActive(today, { enabled, until });
+  const left = campaignDaysLeft(today, until);
+
+  return (
+    <form action={saveCampaign} className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">キャンペーン（告知バー・トップの大きな帯）</h2>
+        <span
+          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+            live ? "bg-emerald-900/40 text-emerald-300" : "bg-(--color-panel-2) text-(--color-dim)"
+          }`}
+        >
+          {live ? `サイトに掲載中（${deadlineLabel(left)}）` : "サイトには出ていません"}
+        </span>
+      </div>
+      <div className="space-y-1 text-[11px] text-(--color-dim)">
+        <p>
+          最終日を過ぎると公式サイトから<span className="font-semibold">自動で消えます</span>（消しに行く必要はありません）。
+          途中でやめたいときは「掲載する」のチェックを外してください。空欄で保存した項目はサイト既定の文言に戻ります。
+        </p>
+        <p>
+          ★ 下の文言は<span className="font-semibold">毎月1日〜{CAMPAIGN_BONUS_DAY}日に出る分</span>です。
+          {CAMPAIGN_BONUS_DAY + 1}日以降は「当月分＋翌月分が無料」の文言に
+          <span className="font-semibold">自動で切り替わります</span>（切り替え後の文言とお値引きの月数は
+          サイト側・請求側のコードで持っています）。月の名前は自動で入ります。
+        </p>
+        <p>特典の内訳と注意書きも site-data.js 側です。</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="enabled" defaultChecked={enabled} className="size-4" />
+          <span>掲載する</span>
+        </label>
+        <div>
+          <label className={label}>最終日（この日いっぱいまで掲載）</label>
+          <input name="until" type="date" defaultValue={until} className={input} />
+          {until ? <p className="mt-1 text-[11px] text-(--color-dim)">{ymdLabelJa(until)}まで</p> : null}
+        </div>
+        <div>
+          <label className={label}>ラベル</label>
+          <input name="tag" defaultValue={s("tag")} placeholder="入会キャンペーン" className={input} />
+        </div>
+        <div>
+          <label className={label}>合計の見せ方</label>
+          <input name="total_label" defaultValue={s("totalLabel")} placeholder="最大 30,580円分が0円" className={input} />
+        </div>
+      </div>
+      <div>
+        <label className={label}>告知バーの1行（全ページ最上部・&lt;b&gt;で太字にできます）</label>
+        <input name="bar" defaultValue={s("bar")} placeholder="10月ご入会で <b>10月分の月会費が0円</b>" className={input} />
+      </div>
+      <div>
+        <label className={label}>大きな見出し（&lt;em&gt;で囲んだ部分が白抜きになります）</label>
+        <input name="headline" defaultValue={s("headline")} placeholder="10月ご入会で、<em>10月分の月会費0円</em>" className={input} />
+      </div>
+      <div>
+        <label className={label}>見出しの下の説明</label>
+        <input name="sub" defaultValue={s("sub")} placeholder="体験レッスンも入会金も0円。" className={input} />
+      </div>
+      <button type="submit" className={btn}>キャンペーン設定を保存</button>
     </form>
   );
 }

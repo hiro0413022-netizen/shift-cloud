@@ -324,7 +324,10 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
           prepaidMonths: est.prepaidMonths,
           minMonths: JOIN_CAMPAIGN.minMonths,
         });
-        const freeLabel = monthLabel(sch.freeMonthYmd);
+        // 無料月は複数になりうる（#280「10月末まで0円」）。「9月・10月」のように全部出す
+        const freeLabels = sch.freeMonthYmds.map(monthLabel);
+        const freeLabel = freeLabels.join("・");
+        const freeMonths = sch.freeMonthYmds.length;
         const prepaidLabels = sch.prepaidMonthYmds.map(monthLabel);
         const joinMonthLabel = monthLabel(todayYmd);
         // ご利用開始月より前の月（例 9/11入会・11/2開始 → 「9月〜10月」）
@@ -364,9 +367,13 @@ export function WebJoinForm({ plans }: { plans: Plan[] }) {
               )}
               {est.campaign && (
                 <div className={row}>
-                  <span>月会費（{freeLabel}分・{sch.deferredMonths > 0 ? "ご利用開始月" : "入会月"}）</span>
                   <span>
-                    <s className="text-(--color-dim)">{est.monthlyTaxIncluded.toLocaleString()}円</s>
+                    月会費（{freeLabel}分
+                    {freeMonths > 1 ? `の${freeMonths}か月` : `・${sch.deferredMonths > 0 ? "ご利用開始月" : "入会月"}`}）
+                  </span>
+                  <span>
+                    {/* 2か月無料のときは「2か月ぶんの定価」に線を引く＝いくら得したかが分かる */}
+                    <s className="text-(--color-dim)">{(est.monthlyTaxIncluded * freeMonths).toLocaleString()}円</s>
                     <span className="ml-2 font-bold text-emerald-500">→ 0円（キャンペーン）</span>
                   </span>
                 </div>

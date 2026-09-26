@@ -20,6 +20,9 @@
       if (Array.isArray(j.news) && j.news.length > 0) window.FRANK.news = j.news;
       /* コーチ紹介（#279）: 管理画面で直したものをそのまま描く。空配列なら静的HTMLのまま */
       if (Array.isArray(j.coaches) && j.coaches.length > 0) window.FRANK.coaches = j.coaches;
+      /* キャンペーン（#280）は j.data.campaign として merge 済み。
+         ★ enabled:false / until の書き換えで「止める・延ばす」ができる＝デプロイ不要。
+           merge は既定で上書きなので、HP管理側で一部だけ直しても残りは site-data.js の値が残る。 */
       if (typeof window.FRANK_RENDER === "function") window.FRANK_RENDER();
     }).catch(function () {});
   } catch (e) {}

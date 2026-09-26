@@ -12,6 +12,7 @@ import {
   nextBillingDateAfterPrepay,
   resolveBillingStartDate,
   usageStartSchedule,
+  campaignFreeMonths,
   usageStartError,
   usageStartMaxYmd,
   rebaseStartDate,
@@ -64,9 +65,14 @@ test("9/11入会（開始日空欄）→ 9月無料・10月11月前取り・12�
   assert.equal(s.minTermUntilYmd, "2027-03-11");
 });
 
-test("入会日が月の前半でも後半でも、次回は同じ11/10（全員同じ日）", () => {
-  for (const d of ["2026-09-01", "2026-09-10", "2026-09-11", "2026-09-30"]) {
+test("入会日が月の前半でも後半でも、次回は同じ日（同じ条件で入った人は揃う）", () => {
+  // キャンペーン前（〜9/25）に入会した方: 9月無料・10月11月前取り → 12月分を11/10
+  for (const d of ["2026-09-01", "2026-09-10", "2026-09-11", "2026-09-25"]) {
     assert.equal(nextBillingDateAfterPrepay({ startDateYmd: d, prepaidMonths: 2 }), "2026-11-10", d);
+  }
+  // キャンペーン（9/26〜）で入会した方: 9月10月無料・11月12月前取り → 1月分を12/10
+  for (const d of ["2026-09-26", "2026-09-30"]) {
+    assert.equal(nextBillingDateAfterPrepay({ startDateYmd: d, prepaidMonths: 2 }), "2026-12-10", d);
   }
 });
 
@@ -163,4 +169,86 @@ test("既存会員の作り直し: 開始日が今日以前になるなら止め
   const r = rebaseStartDate({ joinDateYmd: "2026-07-01", prepaidMonths: 2, todayYmd: "2026-09-11" });
   assert.equal(r.ok, false);
   assert.equal(!r.ok && r.date, "2026-09-10");
+});
+
+/* ============================================================
+   月会費無料キャンペーン（#280・年内まで／20日で自動切り替え）
+   ユーザー指示:「毎月20日以降は当月＋翌月無料、20日までなら当月無料。
+   この内容が20日を超えると自動で切り替わるように」
+   ============================================================ */
+
+test("20日までのご利用開始は1か月無料・21日以降は2か月無料", () => {
+  // 20日は「20日まで」に入れる
+  assert.equal(campaignFreeMonths("2026-10-20", "2026-10-20"), 1);
+  assert.equal(campaignFreeMonths("2026-10-21", "2026-10-21"), 2);
+  assert.equal(campaignFreeMonths("2026-10-01", "2026-10-01"), 1);
+  assert.equal(campaignFreeMonths("2026-10-31", "2026-10-31"), 2);
+});
+
+test("月の前半に入会 → その月だけ無料・前取り2か月", () => {
+  const s = usageStartSchedule({ applyDateYmd: "2026-10-05", prepaidMonths: 2 });
+  assert.deepEqual(s.freeMonthYmds, ["2026-10-01"]);
+  assert.deepEqual(s.prepaidMonthYmds, ["2026-11-01", "2026-12-01"]);
+  assert.equal(s.nextBillingYmd, "2026-12-10"); // 1月分
+});
+
+test("月の後半に入会 → その月＋翌月が無料（残りが短いぶんを翌月で埋める）", () => {
+  const s = usageStartSchedule({ applyDateYmd: "2026-10-25", prepaidMonths: 2 });
+  assert.deepEqual(s.freeMonthYmds, ["2026-10-01", "2026-11-01"]);
+  assert.deepEqual(s.prepaidMonthYmds, ["2026-12-01", "2027-01-01"]);
+  assert.equal(s.nextBillingYmd, "2027-01-10"); // 2月分
+});
+
+test("9月下旬の入会は9月＋10月が無料（ユーザーの当初のご要望どおり）", () => {
+  const s = usageStartSchedule({ applyDateYmd: "2026-09-26", prepaidMonths: 2 });
+  assert.deepEqual(s.freeMonthYmds, ["2026-09-01", "2026-10-01"]);
+  assert.equal(s.nextBillingYmd, "2026-12-10");
+});
+
+test("月をまたぐ境目で得の大きさが逆転しない（20日→21日→翌月1日）", () => {
+  // 10/20は1か月（10月をあと11日使える）／10/21は2か月／11/1は1か月（11月を丸ごと）
+  assert.equal(usageStartSchedule({ applyDateYmd: "2026-10-20", prepaidMonths: 2 }).freeMonthYmds.length, 1);
+  assert.equal(usageStartSchedule({ applyDateYmd: "2026-10-21", prepaidMonths: 2 }).freeMonthYmds.length, 2);
+  assert.equal(usageStartSchedule({ applyDateYmd: "2026-11-01", prepaidMonths: 2 }).freeMonthYmds.length, 1);
+});
+
+test("★ すでに入会済みの方に遡らない（設定済みのSquare課金とズレない）", () => {
+  // 9月前半に入会された約40名。サブスクは「9月だけ無料」でもう立っている
+  for (const d of ["2026-08-26", "2026-09-10", "2026-09-11", "2026-09-25"]) {
+    const s = usageStartSchedule({ applyDateYmd: d, prepaidMonths: 2 });
+    assert.equal(s.freeMonthYmds.length, 1, `${d} は無料1か月のまま`);
+  }
+  // 8/26 は日にちが26日だが、キャンペーン開始前なので2か月にならない
+  assert.equal(campaignFreeMonths("2026-08-26", "2026-08-26"), 1);
+});
+
+test("年内までで終わる（年明けの入会は従来どおり1か月）", () => {
+  assert.equal(campaignFreeMonths("2026-12-25", "2026-12-25"), 2);
+  assert.equal(campaignFreeMonths("2026-12-31", "2026-12-31"), 2);
+  assert.equal(campaignFreeMonths("2027-01-05", "2027-01-05"), 1);
+  assert.equal(campaignFreeMonths("2027-01-25", "2027-01-25"), 1); // 25日でも付かない
+  const s = usageStartSchedule({ applyDateYmd: "2027-01-25", prepaidMonths: 2 });
+  assert.deepEqual(s.freeMonthYmds, ["2027-01-01"]);
+});
+
+test("判定はご利用開始日の日にち（先の月から使う方に翌月まで付けない）", () => {
+  // 9/26入会でも、11/2から使うなら11月を丸ごと使えるので無料は11月だけ
+  const s = usageStartSchedule({ applyDateYmd: "2026-09-26", usageStartYmd: "2026-11-02", prepaidMonths: 2 });
+  assert.deepEqual(s.freeMonthYmds, ["2026-11-01"]);
+  assert.deepEqual(s.prepaidMonthYmds, ["2026-12-01", "2027-01-01"]);
+  // 逆に、ご利用開始日が21日以降なら翌月も付く
+  const t = usageStartSchedule({ applyDateYmd: "2026-10-01", usageStartYmd: "2026-11-25", prepaidMonths: 2 });
+  assert.deepEqual(t.freeMonthYmds, ["2026-11-01", "2026-12-01"]);
+});
+
+test("freeMonths を明示すれば従来の1か月に固定できる", () => {
+  const s = usageStartSchedule({ applyDateYmd: "2026-10-25", prepaidMonths: 2, freeMonths: 1 });
+  assert.deepEqual(s.freeMonthYmds, ["2026-10-01"]);
+  assert.equal(s.nextBillingYmd, "2026-12-10");
+});
+
+test("freeMonthYmd は最初の無料月（既存の呼び出しが壊れない）", () => {
+  const s = usageStartSchedule({ applyDateYmd: "2026-10-25", prepaidMonths: 2 });
+  assert.equal(s.freeMonthYmd, "2026-10-01");
+  assert.equal(s.freeMonthYmd, s.freeMonthYmds[0]);
 });

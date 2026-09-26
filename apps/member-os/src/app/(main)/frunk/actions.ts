@@ -1451,7 +1451,7 @@ export async function changeUsageStart(formData: FormData) {
   const prepaidText = sch.prepaidMonthYmds.map(monthLabel).join("・");
   redirect(`${dest}?msg=` + encodeURIComponent(
     `${String(m.name ?? "")}様のご利用開始日を ${sch.usageStartYmd.replaceAll("-", "/")} にしました。` +
-      `${monthLabel(sch.freeMonthYmd)}分は無料${prepaidText ? `・${prepaidText}分は入会時にお支払い済み` : ""}。${squareLine}` +
+      `${sch.freeMonthYmds.map(monthLabel).join("・")}分は無料${prepaidText ? `・${prepaidText}分は入会時にお支払い済み` : ""}。${squareLine}` +
       (m.join_campaign ? `6か月継続は ${sch.minTermUntilYmd.replaceAll("-", "/")} までです。` : ""),
   ));
 }

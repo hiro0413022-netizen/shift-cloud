@@ -16,6 +16,57 @@
 /** 毎月の引き落とし日（この日に「翌月分」を引き落とす） */
 export const BILLING_DAY = 10;
 
+/**
+ * 月会費無料キャンペーン（#280・2026-09-26 → 2026-09-26 ユーザー変更で「年内まで・20日で切り替え」に）
+ *
+ * ユーザー指示:「年内までキャンペーンを実施します。毎月20日以降は当月＋翌月月会費無料、
+ *   毎月20日までなら当月会費無料。この内容が20日を超えると自動で切り替わるように」
+ *
+ * ★ ルール
+ *   ご利用開始日が **その月の20日まで** → 無料は**その月の1か月**
+ *   ご利用開始日が **21日以降**       → 無料は**その月＋翌月の2か月**
+ *
+ * ★ なぜ20日で分けるのか（この設計の芯）
+ *   無料になるのは「暦の月」まるごとではなく、入った月の**残り**でしかない。
+ *   25日に入った方の「当月無料」は実質5日分で、5日に入った方の26日分と比べて割に合わない。
+ *   月の後半に入った方へ翌月も付けることで、**いつ入っても得の大きさがほぼ揃う**。
+ *   これは「月末に駆け込まないと損」「月初まで待つほうが得」のどちらも起こさないための線。
+ *
+ * ★ 判定は「ご利用開始日」の日にち（入会日ではない）
+ *   無料になるのは元からご利用開始月（#234）。割に合うかどうかを決めるのは
+ *   「その月を何日使えるか」なので、見るべきはご利用開始日。
+ *   ふつうは入会日＝ご利用開始日なので違いは出ない。ご利用開始を先の月にされた方は
+ *   その月を1日から丸ごと使えるので、翌月まで無料にする理由がない（過剰な値引きを作らない）。
+ *
+ * ★ 20日の扱い: 20日は「20日まで」に入れる（1か月）。21日から2か月。
+ */
+export const CAMPAIGN_BONUS_DAY = 20;
+
+/** キャンペーンの受付期限（この日までの入会が対象・JST）。ユーザー指示「年内まで」 */
+export const CAMPAIGN_UNTIL_APPLY = "2026-12-31";
+
+/**
+ * キャンペーンを適用し始める入会日（#280・2026-09-26）
+ *
+ * ★ これが無いと、**すでに9月に入会された方（約40名）まで遡って**無料月が増える。
+ *   その方々のSquareのサブスクは「9月だけ無料」で**もう立っている**ので、
+ *   画面とメールだけが変わり、実際には請求される＝お客様に見せた約束と請求が食い違う。
+ *   いちばんやってはいけない壊れ方。判定は入会日。
+ */
+export const CAMPAIGN_FREE_FROM_APPLY = "2026-09-26";
+
+/**
+ * 無料になる月数。キャンペーン対象外なら常に1（従来どおりご利用開始月だけ）。
+ * @param applyDateYmd  入会日（キャンペーン期間の判定に使う）
+ * @param usageStartYmd ご利用開始日（20日ルールの判定に使う）
+ */
+export function campaignFreeMonths(applyDateYmd: string, usageStartYmd: string): number {
+  if (!YMD_RE.test(applyDateYmd) || !YMD_RE.test(usageStartYmd)) return 1;
+  // 受付期間の外（過去の入会・年明けの入会）は従来どおり1か月
+  if (applyDateYmd < CAMPAIGN_FREE_FROM_APPLY || applyDateYmd > CAMPAIGN_UNTIL_APPLY) return 1;
+  return Number(usageStartYmd.slice(8, 10)) > CAMPAIGN_BONUS_DAY ? 2 : 1;
+}
+
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -106,8 +157,12 @@ export type UsageStartSchedule = {
   deferredMonths: number;
   /** 前取り月数 */
   prepaidMonths: number;
-  /** 無料になる月（ご利用開始月）の1日 */
+  /** 無料になる月（ご利用開始月）の1日。無料が複数月のときは**最初の月** */
   freeMonthYmd: string;
+  /** 無料になる月すべての1日（ご利用開始月から順に。必ず1件以上・#280） */
+  freeMonthYmds: string[];
+  /** 無料になる最後の月の1日。前取りはこの翌月から始まる（#280） */
+  lastFreeMonthYmd: string;
   /** 前取りする月の1日（前取り月数ぶん） */
   prepaidMonthYmds: string[];
   /** 最初に自動で引き落とす月（◯月分）の1日 */
@@ -126,6 +181,11 @@ export function usageStartSchedule(i: {
   usageStartYmd?: string | null;
   prepaidMonths: number;
   minMonths?: number;
+  /**
+   * 無料になる月数を明示する（1以上）。
+   * 省略すると campaignFreeMonths（20日ルール）で決める。1 を渡せばキャンペーン前の挙動。
+   */
+  freeMonths?: number | null;
 }): UsageStartSchedule {
   const prepaidMonths = Number.isFinite(i.prepaidMonths) ? Math.max(0, Math.trunc(i.prepaidMonths)) : 0;
   const raw = (i.usageStartYmd ?? "").trim();
@@ -134,7 +194,23 @@ export function usageStartSchedule(i: {
   if (usageStartYmd > max) usageStartYmd = max;
   const deferredMonths = Math.max(0, calendarMonthsBetween(i.applyDateYmd, usageStartYmd));
   const free = monthStartYmd(usageStartYmd);
-  const firstBilled = addMonthsYmd(free, prepaidMonths + 1);
+
+  /* 無料になる月数は 20日ルール（#280）。呼び出し側が freeMonths を渡したらそれに従う。
+     必ず1か月以上（ご利用開始月は元から無料）。上限は事故防止に3か月。 */
+  const freeMonths = Math.min(
+    3,
+    Math.max(
+      1,
+      Number.isFinite(i.freeMonths as number) && (i.freeMonths as number) >= 1
+        ? Math.trunc(i.freeMonths as number)
+        : campaignFreeMonths(i.applyDateYmd, usageStartYmd),
+    ),
+  );
+  const freeMonthYmds = Array.from({ length: freeMonths }, (_, k) => addMonthsYmd(free, k));
+  const lastFree = freeMonthYmds[freeMonthYmds.length - 1];
+
+  // 前取りは「無料が終わった翌月」から。無料月を数え忘れると課金が早まる（＝二重取り）
+  const firstBilled = addMonthsYmd(lastFree, prepaidMonths + 1);
   const minMonths = Number.isFinite(i.minMonths) ? Math.max(0, Math.trunc(i.minMonths as number)) : 6;
   return {
     applyDateYmd: i.applyDateYmd,
@@ -142,7 +218,9 @@ export function usageStartSchedule(i: {
     deferredMonths,
     prepaidMonths,
     freeMonthYmd: free,
-    prepaidMonthYmds: Array.from({ length: prepaidMonths }, (_, k) => addMonthsYmd(free, k + 1)),
+    freeMonthYmds,
+    lastFreeMonthYmd: lastFree,
+    prepaidMonthYmds: Array.from({ length: prepaidMonths }, (_, k) => addMonthsYmd(lastFree, k + 1)),
     firstBilledMonthYmd: firstBilled,
     nextBillingYmd: chargeDateForMonth(firstBilled),
     minTermUntilYmd: addMonthsYmd(usageStartYmd, minMonths),

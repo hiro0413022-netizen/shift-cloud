@@ -287,10 +287,10 @@ def head(title, desc, page, jsonld="", noindex=False, og_type="website"):
 
 <a class="skip" href="#main">本文へスキップ</a>
 
-<!-- 1. プレオープン告知バー -->
-<div class="notice-bar" role="status">
-  <span class="notice-bar__tag">OPEN</span>
-  <span>姫路・土山に<b>オープンしました</b>。いま<b>体験レッスン無料</b>（通常3,300円）</span>
+<!-- 1. 告知バー（キャンペーン中はキャンペーン・終われば自動でこの控えに戻る・#280） -->
+<div class="notice-bar" role="status" data-notice-bar>
+  <span class="notice-bar__tag" data-notice-tag>OPEN</span>
+  <span data-notice-text>姫路・土山に<b>オープンしました</b>。いま<b>体験レッスン無料</b>（通常3,300円）</span>
 </div>
 
 <!-- 2. ヘッダー -->
@@ -355,6 +355,37 @@ def offer_badge():
       <span class="offer__t">体験レッスン <b data-frank="trial.fee" data-frank-fallback="無料">無料</b></span>
       <span class="offer__s"><del>通常 3,300円 税込</del> ／ <span data-frank="trial.duration" data-frank-fallback="約55分">約55分</span>・手ぶらでOK</span>
     </div>"""
+
+
+def campaign_band():
+    """期間限定キャンペーンの大きな帯（#280・2026-09-26 ユーザー依頼「ドーンとでかく」）
+
+    ★ 中身は site.js が site-data.js の campaign から描きます。ここに書くのは器だけ。
+      金額や文言を直したいときは assets/site-data.js の campaign（またはHP管理）を触る＝
+      このファイルとビルドには触らなくてよい。
+    ★ 期限（campaign.until）を過ぎると site.js がこの section ごと消します。
+      だから「消し忘れて11月に10月のキャンペーンが出ている」が起きない。
+    ★ 既定は hidden。データが無い／期限切れのときに空の黄色い帯が出るのを防ぐ。
+    """
+    return """
+<!-- 期間限定キャンペーン（#280）。中身と表示可否は assets/site.js が決める -->
+<section class="camp" data-campaign hidden aria-labelledby="camp-h">
+  <div class="camp__in">
+    <div class="camp__top">
+      <span class="camp__tag" data-camp-tag></span>
+      <span class="camp__left" data-camp-left hidden></span>
+    </div>
+    <h2 class="camp__h" id="camp-h" data-camp-h></h2>
+    <p class="camp__sub" data-camp-sub></p>
+    <ul class="camp__items" data-camp-items></ul>
+    <p><span class="camp__total" data-camp-total></span></p>
+    <div class="camp__cta">
+      <a class="camp__btn" href="#" data-cta="trial" data-camp-cta>無料体験を予約する</a>
+    </div>
+    <ul class="camp__note" data-camp-note></ul>
+  </div>
+</section>
+"""
 
 
 def sticky_cta():
@@ -687,6 +718,9 @@ def build_index():
   </div>
 </section>
 
+"""
+    b += campaign_band()
+    b += f"""
 <!-- 2. キャンペーン -->
 <section class="sec" style="padding-top:clamp(36px,5vw,56px)">
   <div class="wrap">
@@ -1511,6 +1545,8 @@ def build_plan():
              "plan")
     b += page_head("料金・会員プラン", "PLAN &amp; PRICE", "会員プラン",
                    "料金・プラン内容は現在準備中です。決まり次第、本ページと公式LINEでお知らせいたします。")
+    # 料金を見ている人がいちばん動きやすいので、プラン表のすぐ上に出す（#280）
+    b += campaign_band()
     b += """
 <section class="sec">
   <div class="wrap">
@@ -1917,6 +1953,7 @@ def build_trial():
              "trial")
     b += page_head("体験のご予約", "TRIAL", "まずは、一度打ちに来てください。",
                    "体験レッスンは約55分。通常3,300円（税込）のところ、いまなら無料です。")
+    b += campaign_band()
     b += f"""
 <section class="sec">
   <div class="wrap" style="max-width:820px">

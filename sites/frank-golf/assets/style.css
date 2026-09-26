@@ -1598,3 +1598,93 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
 .hp-fig img { display: block; width: 100%; height: auto; border-radius: 14px; }
 .hp-fig figcaption { font-size: 12px; color: var(--txt-mute, #777); margin-top: 6px; text-align: center; }
 [data-hp-blog-index][hidden], [data-hp-blog-wrap][hidden] { display: none !important; }
+
+/* ============================ キャンペーン（#280・2026-09-26） ============================
+   ユーザー依頼「キャンペーンをドーンとでかく打ちたい」。
+   ★ 主役の黄（--brass）の面に濃い文字。店のトーンを壊さずに、いちばん目立つ塊にする。
+   ★ 期限が切れると site.js が要素ごと消す（CSSでは何もしない）。
+   ★ 条件（前取り・継続）は薄くしても消さない。読める大きさを下限にしている。 */
+.camp {
+  background: linear-gradient(135deg, var(--brass) 0%, var(--brass-d) 100%);
+  color: var(--txt-str);
+  padding: clamp(32px, 6vw, 60px) 0;
+  overflow: hidden;
+}
+.camp__in { width: min(100% - 32px, var(--wrap)); margin-inline: auto; }
+.camp__top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.camp__tag {
+  font-family: var(--f-en); font-size: 12px; font-weight: 700; letter-spacing: 0.14em;
+  background: var(--txt-str); color: #FFF;
+  border-radius: 999px; padding: 5px 14px;
+}
+/* 残り日数。数字が主役なので少し大きく */
+.camp__left {
+  font-size: 13px; font-weight: 800; letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 999px; padding: 5px 14px;
+}
+.camp__h {
+  font-size: clamp(26px, 6.2vw, 52px);
+  font-weight: 800; line-height: 1.3; letter-spacing: 0.01em;
+  margin-bottom: 12px;
+}
+/* 「10月分の月会費0円」の部分だけ白抜きで抜く＝1行しか読まれなくても数字が残る */
+.camp__h em {
+  font-style: normal;
+  background: var(--txt-str); color: #FFF;
+  border-radius: 10px;
+  padding: 0.06em 0.34em;
+  /* 折り返しても背景が切れないように */
+  box-decoration-break: clone; -webkit-box-decoration-break: clone;
+}
+.camp__sub { font-size: clamp(14.5px, 1.6vw, 17px); line-height: 1.9; max-width: 60ch; }
+
+/* 特典の内訳。3つ横並び → スマホで縦 */
+.camp__items {
+  list-style: none; margin: 26px 0 0; padding: 0;
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.camp__i {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 16px; padding: 16px 18px;
+}
+.camp__k { font-size: 13.5px; font-weight: 700; color: var(--dim); }
+.camp__v { font-size: clamp(30px, 4.6vw, 40px); font-weight: 800; line-height: 1.2; color: var(--txt-str); }
+.camp__was { font-size: 12.5px; color: var(--dim-soft); text-decoration: line-through; }
+
+.camp__total {
+  margin-top: 18px;
+  display: inline-block;
+  background: var(--txt-str); color: #FFF;
+  border-radius: 12px; padding: 10px 20px;
+  font-size: clamp(16px, 2.4vw, 22px); font-weight: 800; letter-spacing: 0.02em;
+}
+.camp__cta { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+/* 黄の面の上なので、CTAは黒地の方が押せると分かる */
+.camp__btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--txt-str); color: #FFF;
+  border-radius: 999px; padding: 15px 30px;
+  font-size: 16px; font-weight: 800; letter-spacing: 0.02em;
+  transition: transform .25s var(--ease), opacity .25s var(--ease);
+}
+.camp__btn:hover { transform: translateY(-2px); opacity: .92; }
+.camp__note { list-style: none; margin: 22px 0 0; padding: 0; max-width: 72ch; }
+.camp__note li {
+  font-size: 12.5px; line-height: 1.85; color: rgba(27, 36, 29, 0.78);
+  padding-left: 1.1em; position: relative;
+}
+.camp__note li::before { content: "※"; position: absolute; left: 0; }
+
+/* 告知バーがキャンペーン中だけ色を変える（通常はグリーン） */
+.notice-bar.is-camp { background: var(--txt-str); }
+.notice-bar.is-camp .notice-bar__tag { border-color: var(--brass); color: var(--brass); }
+
+/* 料金カードに乗せる「10月分0円」の札 */
+.camp-flag {
+  display: inline-block; margin-bottom: 10px;
+  background: var(--brass); color: var(--txt-str);
+  border-radius: 999px; padding: 4px 12px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
+}

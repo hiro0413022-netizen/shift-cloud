@@ -15,6 +15,7 @@
     "./frank-billable": "./src/frank-billable.ts",
     "./frank-billing-start": "./src/frank-billing-start.ts",
     "./frank-booking": "./src/frank-booking.ts",
+    "./frank-campaign": "./src/frank-campaign.ts",
     "./frank-coach-capacity": "./src/frank-coach-capacity.ts",
     "./frank-coach-profile": "./src/frank-coach-profile.ts",
     "./frank-corporate": "./src/frank-corporate.ts",

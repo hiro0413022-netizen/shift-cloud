@@ -574,7 +574,7 @@ export default async function FrunkMemberPage({
               <div>
                 <span className="font-medium">{usageSch.usageStartYmd.replaceAll("-", "/")}</span>
                 <span className="ml-2 text-xs text-(--color-dim)">
-                  無料 {monthLabel(usageSch.freeMonthYmd)}分／前取り {usageSch.prepaidMonthYmds.map(monthLabel).join("・")}分／
+                  無料 {usageSch.freeMonthYmds.map(monthLabel).join("・")}分／前取り {usageSch.prepaidMonthYmds.map(monthLabel).join("・")}分／
                   自動引き落とし {usageSch.nextBillingYmd.replaceAll("-", "/")} に{monthLabel(usageSch.firstBilledMonthYmd)}分から（予定）
                 </span>
               </div>

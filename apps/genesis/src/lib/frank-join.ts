@@ -278,7 +278,10 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
   if (m.email) {
     // 実際に決済した内訳（est）と必ず一致させる。ここで独自計算しない（#136）
     const joinFee = est.joiningFee;
-    const m0 = monthLabel(sch.freeMonthYmd);
+    // 無料月は複数になりうる（#280「10月末まで0円」）。控えPDF・メールとも全部出す
+    const freeLabels = sch.freeMonthYmds.map(monthLabel);
+    const m0 = freeLabels.join("・");
+    const freeMonths = sch.freeMonthYmds.length;
     const [m1, m2] = sch.prepaidMonthYmds.map(monthLabel);
     const deferred = sch.deferredMonths > 0;
     const startSlash = sch.usageStartYmd.replaceAll("-", "/");
@@ -288,7 +291,10 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
       ? [
           [`月会費 前取り（${m1}分）`, `${monthly.toLocaleString()}円（税込）`],
           [`月会費 前取り（${m2}分）`, `${monthly.toLocaleString()}円（税込）`],
-          [`月会費（${m0}分・${deferred ? "ご利用開始月" : "入会月"}）キャンペーン`, "0円"],
+          [
+            `月会費（${m0}分${freeMonths > 1 ? `の${freeMonths}か月` : `・${deferred ? "ご利用開始月" : "入会月"}`}）キャンペーン`,
+            "0円",
+          ],
           ["入会金（年内入会キャンペーン）", "0円"],
         ]
       : [
@@ -380,7 +386,9 @@ export async function activateWebJoin(admin: Admin, memberId: string): Promise<s
       ...(campaign
         ? [
             ...(deferred ? [`ご利用開始日は ${startSlash} です。それより前の月の月会費はかかりません。`] : []),
-            `年内入会キャンペーンの適用で、入会金（5,500円税込）と${deferred ? "ご利用開始月" : "入会月"}（${m0}分）の月会費は無料です。`,
+            freeMonths > 1
+              ? `キャンペーンの適用で、入会金（5,500円税込）と ${m0}分（${freeMonths}か月ぶん・${(monthly * freeMonths).toLocaleString()}円税込）の月会費は無料です。`
+              : `年内入会キャンペーンの適用で、入会金（5,500円税込）と${deferred ? "ご利用開始月" : "入会月"}（${m0}分）の月会費は無料です。`,
             `本日、${m1}分・${m2}分の月会費2か月分（${(monthly * 2).toLocaleString()}円税込）を1回でお支払いいただきました。`,
             // 前取りした月の自動課金はスキップするため、次回の請求は「前取り最終月の翌月」（#137・#234）
             // 毎月10日に翌月分（#235）。次回＝前取りの次の月の分

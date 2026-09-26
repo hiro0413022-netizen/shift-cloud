@@ -141,3 +141,47 @@ export async function saveRawJson(formData: FormData): Promise<void> {
   await admin.from("gn_site_content").update({ data: parsed, updated_at: new Date().toISOString() }).eq("id", row.id);
   revalidatePath("/site-admin");
 }
+
+/**
+ * 期間限定キャンペーン（#280・2026-09-26）
+ *
+ * ★ ここで「止める・延ばす」ができる＝開発を待たずに現場で終われる。
+ *   期限（until）を過ぎたら公式サイト側が自動で消すので、ふつうは何もしなくてよい。
+ *   途中でやめたいときだけ「掲載する」のチェックを外す。
+ * ★ このフォームに無いキー（特典の内訳 items・条件 conditions・計測タグ srcTag）は消さない。
+ *   消すと、サイト側は site-data.js の既定に戻るのではなく「空の帯」になりかねない（#118 と同じ轍）。
+ */
+export async function saveCampaign(formData: FormData): Promise<void> {
+  const admin = createAdmin();
+  const row = await getRow(admin);
+  const data = (row.data ?? {}) as Record<string, unknown>;
+  const t = (k: string) => String(formData.get(k) ?? "").trim();
+
+  const until = t("until");
+  const next: Record<string, unknown> = {
+    ...((data.campaign as Record<string, unknown> | undefined) ?? {}),
+    enabled: t("enabled") === "on",
+  };
+  // 空欄で保存＝サイト内蔵の既定値に戻す（他のフォームと同じ約束）
+  const put = (key: string, v: string) => {
+    if (v === "") delete next[key];
+    else next[key] = v;
+  };
+  // 日付として読めないものは入れない（読めない until はサイト側で「出さない」判定になる）
+  put("until", /^\d{4}-\d{2}-\d{2}$/.test(until) ? until : "");
+  put("tag", t("tag"));
+  put("bar", t("bar"));
+  put("headline", t("headline"));
+  put("sub", t("sub"));
+  put("totalLabel", t("total_label"));
+  data.campaign = next;
+
+  await admin.from("gn_site_content").update({ data, updated_at: new Date().toISOString() }).eq("id", row.id);
+  await logEvent(String(row.company_id), {
+    event_type: "site.updated",
+    title: `FRANK GOLF キャンペーン設定を更新（${next.enabled ? `掲載中・${String(next.until ?? "期限未設定")}まで` : "掲載を止めた"}）`,
+    source: "site_admin",
+    source_type: "human",
+  });
+  revalidatePath("/site-admin");
+}
