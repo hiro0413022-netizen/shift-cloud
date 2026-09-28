@@ -113,3 +113,17 @@ test("期間: to はその日を含む。from=to の1日指定で 0 件になら
   assert.deepEqual(inclusiveRange(undefined, undefined, 1, "2026-09-28"), { from: "2026-09-28", to: "2026-09-29" });
   assert.deepEqual(inclusiveRange("2026-09-30", "2026-09-01", 3, "2026-09-28"), { from: "2026-09-30", to: "2026-10-03" });
 });
+
+test("askScope: 本部（hq）は Focus が無ければ店舗を渡さない（オーナーの主所属に絞られて GOLF WING が消えた実機バグ）", async () => {
+  const { askScope, storeLike } = await import("../packages/genesis-core/src/tools/_shared.ts");
+  const { baseContext } = await import("../packages/genesis-core/src/context.ts");
+  const owner = { staffId: "s", name: "o", kind: "human" as const, isOwner: true, permissions: ["manage_company"], storeIds: ["frank", "gw"], primaryStoreId: "frank" };
+  const company = { id: "c", name: "Y", kind: "operating" as const };
+  assert.deepEqual(askScope(baseContext({ actor: owner, company, surface: "web" })), { scope: "hq", storeId: null });
+  assert.deepEqual(askScope(baseContext({ actor: owner, company, surface: "web", store: { id: "gw", name: "GW" } })), { scope: "hq", storeId: "gw" });
+  const staff = { ...owner, isOwner: false, permissions: ["use_reception"], storeIds: ["frank"] };
+  assert.deepEqual(askScope(baseContext({ actor: staff, company, surface: "web" })), { scope: "store", storeId: "frank" });
+  assert.equal(storeLike("ゴルフウィング"), "%GOLF WING%");
+  assert.equal(storeLike("姫路"), "%FRANK%");
+  assert.equal(storeLike(undefined), null);
+});

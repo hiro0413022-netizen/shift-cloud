@@ -15,8 +15,20 @@ export type Row = Record<string, unknown>;
 export function askScope(ctx: GenesisContext): { scope: "hq" | "store"; storeId: string | null } {
   const a = effectiveActor(ctx.actor);
   const hq = a.isOwner || a.permissions.includes("view_hq");
-  const storeId = ctx.store?.id ?? a.primaryStoreId;
+  // hq は全店。gn_chat_query は p_store_id が入ると hq でもその店舗に絞るので、
+  // 本部の人には Focus（ctx.store）が明示されたときだけ渡す（2026-09-28 実機: オーナーの主所属=FRANK に絞られ GOLF WING が出なかった）
+  const focusStore = ctx.store?.id ?? ctx.focus?.stores?.[0] ?? null;
+  const storeId = hq ? focusStore : (ctx.store?.id ?? a.primaryStoreId);
   return { scope: hq ? "hq" : "store", storeId };
+}
+
+/** 店舗名の絞り込み（LLM が「ゴルフウィング」「姫路」と言ったとき用）。gnv_* の store_name に like で当てる */
+export function storeLike(v: unknown): string | null {
+  if (typeof v !== "string" || !v.trim()) return null;
+  const t = v.trim().toLowerCase();
+  if (/frank|フランク|姫路|himeji/.test(t)) return "%FRANK%";
+  if (/golf ?wing|ゴルフウィング|ゴルフウイング|宝塚|takarazuka|gw\b/.test(t)) return "%GOLF WING%";
+  return `%${v.trim().replace(/'/g, "''")}%`;
 }
 
 /** gnv_* ビューに SELECT 1本（DB 側で company/store を強制・LIMIT 強制） */

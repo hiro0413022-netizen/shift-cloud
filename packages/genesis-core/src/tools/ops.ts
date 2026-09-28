@@ -6,7 +6,7 @@
  * ai-execution 側は P0 からこの Tool に委譲する。
  */
 import { defineTool, type ToolContract } from "../tool.ts";
-import { FRANK_STORE_ID, viewQuery, lit, isYmd, src, rows, addDays, inclusiveRange, STORE_IN } from "./_shared.ts";
+import { FRANK_STORE_ID, viewQuery, lit, isYmd, src, rows, addDays, inclusiveRange, storeLike, STORE_IN } from "./_shared.ts";
 import { effectiveActor } from "../context.ts";
 
 const BOOKED = "frunk_bookings";
@@ -245,8 +245,8 @@ export const shiftView = defineTool({
   name: "shift.view",
   version: 1,
   domain: "ops",
-  description: "期間のシフト（予定）を見る。店舗・スタッフ・時間。1日だけなら from と to に同じ日を入れる",
-  input: { type: "object", properties: { from: { type: "string", format: "date", description: "開始日（省略時は今日）" }, to: { type: "string", format: "date", description: "終了日（この日を含む）" }, days: { type: "integer", minimum: 1, maximum: 31, default: 7, description: "to が無いときの日数" } } },
+  description: "期間のシフト（出勤予定）を見る。店舗・スタッフ・時間。1日だけなら from と to に同じ日。store で店舗を絞れる（'GOLF WING' / 'FRANK'。無指定は全店）",
+  input: { type: "object", properties: { from: { type: "string", format: "date", description: "開始日（省略時は今日）" }, to: { type: "string", format: "date", description: "終了日（この日を含む）" }, days: { type: "integer", minimum: 1, maximum: 31, default: 7, description: "to が無いときの日数" }, store: { type: "string", description: "店舗名で絞る（GOLF WING / FRANK / 宝塚 / 姫路）。無指定は全店" } } },
   output: { type: "object", required: ["rows", "count"], properties: { rows: { type: "array" }, count: { type: "integer" }, from: { type: "string" }, to: { type: "string" } } },
   permission: [],
   scope: "company",
@@ -257,7 +257,8 @@ export const shiftView = defineTool({
   renders: "ShiftGrid",
   impl: async (input, ctx) => {
     const { from, to } = inclusiveRange(input.from, input.to, Number(input.days ?? 7), ctx.context.time.jstDate);
-    const data = await viewQuery(ctx.admin, ctx.context, `select date, staff_name, store_name, start_time, end_time, is_day_off, status from gnv_shifts where date >= ${lit(from)} and date < ${lit(to)} order by date, store_name, start_time`, 500);
+    const st = storeLike(input.store);
+    const data = await viewQuery(ctx.admin, ctx.context, `select date, staff_name, store_name, start_time, end_time, is_day_off, status from gnv_shifts where date >= ${lit(from)} and date < ${lit(to)}${st ? ` and store_name like ${lit(st)}` : ""} order by date, store_name, start_time`, 500);
     return rows(data, "gnv_shifts", { data: { from, to } });
   },
 });
@@ -267,7 +268,7 @@ export const attendanceSummary = defineTool({
   version: 1,
   domain: "ops",
   description: "期間の勤怠実績をスタッフ別に集計（労働分・残業分・打刻漏れ）。to はその日を含む",
-  input: { type: "object", properties: { from: { type: "string", format: "date" }, to: { type: "string", format: "date", description: "終了日（この日を含む）" } } },
+  input: { type: "object", properties: { from: { type: "string", format: "date" }, to: { type: "string", format: "date", description: "終了日（この日を含む）" }, store: { type: "string", description: "店舗名で絞る（無指定は全店）" } } },
   output: { type: "object", required: ["rows", "count"], properties: { rows: { type: "array" }, count: { type: "integer" } } },
   permission: ["view_hq", "manage_shifts", "manage_attendance"],
   scope: "company",
@@ -282,7 +283,7 @@ export const attendanceSummary = defineTool({
     const data = await viewQuery(
       ctx.admin,
       ctx.context,
-      `select staff_name, store_name, count(*) as days, sum(work_minutes) as work_minutes, sum(overtime_minutes) as overtime_minutes, sum(case when is_missing_clock then 1 else 0 end) as missing_clock from gnv_attendance where date >= ${lit(from)} and date < ${lit(to)} group by staff_name, store_name order by store_name, staff_name`
+      `select staff_name, store_name, count(*) as days, sum(work_minutes) as work_minutes, sum(overtime_minutes) as overtime_minutes, sum(case when is_missing_clock then 1 else 0 end) as missing_clock from gnv_attendance where date >= ${lit(from)} and date < ${lit(to)}${storeLike(input.store) ? ` and store_name like ${lit(storeLike(input.store)!)}` : ""} group by staff_name, store_name order by store_name, staff_name`
     );
     return rows(data, "gnv_attendance", { data: { from, to } });
   },
