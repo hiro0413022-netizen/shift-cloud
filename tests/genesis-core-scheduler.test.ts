@@ -45,17 +45,54 @@ test("ルール: daily は JST 6時前には走らない・having 型は件数�
   assert.deepEqual(r.fired, [{ code: "members_stale_90d", count: 7 }]);
 });
 
-test("イベント処理: inquiry.replied で返事待ちが立ち、inquiry.received で閉じる。処理済みが付く", async () => {
+test("イベント処理: inquiry.replied は Workflow（waiting.create）で返事待ちが立ち、inquiry.received の handler で閉じる。処理済みが付く（#298）", async () => {
   const admin = createFakeAdmin({ gn_events: [
-    { id: "e1", company_id: C, type: "inquiry.replied", entity_kind: "inquiry", entity_id: "i1", payload: { from: "山田" }, occurred_at: "2026-09-28T00:00:00Z", processed_at: null, attempts: 0 },
+    { id: "e1", company_id: C, store_id: null, type: "inquiry.replied", schema_version: 1, entity_kind: "inquiry", entity_id: "i1", payload: { from: "山田" }, occurred_at: "2026-09-28T00:00:00Z", processed_at: null, attempts: 0 },
   ] });
-  const r = await processEvents(admin, C);
+  const ran: string[] = [];
+  const r = await processEvents(admin, C, 200, {
+    runWorkflow: async (wf, ev) => {
+      ran.push(`${wf.name}:${ev.id}`);
+      // 実物は waiting.create@1 を Core 経由で呼ぶ。ここでは Tool が書く行を模す
+      const st = wf.steps(ev)[0];
+      admin.tables.gn_waiting ??= [];
+      admin.tables.gn_waiting.push({ id: "w1", company_id: C, status: "open", entity_kind: st.input?.entity_kind, entity_id: st.input?.entity_id, entity_label: st.input?.who, what: st.input?.what });
+      return { status: "ok" };
+    },
+  });
   assert.equal(r.handled, 1);
+  assert.equal(r.workflows, 1);
+  assert.deepEqual(ran, ["wf.inquiry_replied_waiting:e1"]);
   assert.equal(admin.tables.gn_waiting.length, 1);
+  assert.equal(admin.tables.gn_waiting[0].entity_kind, "inquiry");
   assert.ok(admin.tables.gn_events[0].processed_at);
-  admin.tables.gn_events.push({ id: "e2", company_id: C, type: "inquiry.received", entity_kind: "inquiry", entity_id: "i2", payload: { from: "山田" }, occurred_at: "2026-09-29T00:00:00Z", processed_at: null, attempts: 0 });
+  admin.tables.gn_events.push({ id: "e2", company_id: C, type: "inquiry.received", schema_version: 1, entity_kind: "inquiry", entity_id: "i2", payload: { from: "山田" }, occurred_at: "2026-09-29T00:00:00Z", processed_at: null, attempts: 0 });
   await processEvents(admin, C);
   assert.equal(admin.tables.gn_waiting[0].status, "done");
+});
+
+test("Workflow（#298）: 条件付き trigger・失敗は attempts を上げて次回へ・宣言の静的検証", async () => {
+  const { matchWorkflows, validateWorkflows, WORKFLOWS } = await import("../packages/genesis-core/src/workflow.ts");
+  const { createGenesisCore } = await import("../packages/genesis-core/src/tools/all.ts");
+  const ev = (over: Record<string, unknown>) => ({ id: "e", company_id: C, store_id: null, type: "visit.recorded", schema_version: 1, entity_kind: "person", entity_id: "p1", payload: {}, occurred_at: "2026-09-28T00:00:00Z", ...over });
+  assert.deepEqual(matchWorkflows(ev({ payload: { visit_type: "trial", guest: "田中" } }) as never).map((w) => w.name), ["wf.trial_followup_waiting"]);
+  assert.deepEqual(matchWorkflows(ev({ payload: { visit_type: "visit" } }) as never), []);
+  assert.deepEqual(matchWorkflows(ev({ schema_version: 2, payload: { visit_type: "trial" } }) as never), []); // 版が違えば走らない
+  const { registry } = createGenesisCore();
+  assert.deepEqual(validateWorkflows(WORKFLOWS, (ref) => registry.has(ref)), []);
+  assert.ok(validateWorkflows([{ name: "bad", version: 1, description: "", trigger: { type: "x.y", version: 1 }, steps: () => [{ key: "a", tool: "nope.tool" }], enabled: true }], () => false).length >= 2);
+
+  // 失敗 → processed_at は付かず attempts+1・last_error
+  const admin = createFakeAdmin({ gn_events: [ev({ payload: { visit_type: "trial", guest: "田中" }, processed_at: null, attempts: 0 })] });
+  const r = await processEvents(admin, C, 200, { runWorkflow: async () => ({ status: "failed", error: "boom" }) });
+  assert.equal(r.failed, 1);
+  assert.equal(admin.tables.gn_events[0].processed_at ?? null, null);
+  assert.equal(admin.tables.gn_events[0].attempts, 1);
+  assert.match(String(admin.tables.gn_events[0].last_error), /wf.trial_followup_waiting: boom/);
+  // 承認待ちは成功扱い（承認カードが出ている）
+  const admin2 = createFakeAdmin({ gn_events: [ev({ payload: { visit_type: "trial" }, processed_at: null, attempts: 0 })] });
+  const r2 = await processEvents(admin2, C, 200, { runWorkflow: async () => ({ status: "needs_approval" }) });
+  assert.equal(r2.handled, 1);
 });
 
 test("Waiting: 期限切れは1日1回だけ「そろそろフォロー」を起票", async () => {

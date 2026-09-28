@@ -46,6 +46,10 @@ Skill ＝ Tool を Plan(DAG) で束ねた手順。`packages/genesis-core/src/ski
 
 cron は各アプリが持つが、記録は `gn_job_runs` 1つ（`withJobRun(admin, "cron:xxx", null, fn)`）。期待は `JOB_EXPECTATIONS`。新しい cron を足したら (1) withJobRun で包む (2) JOB_EXPECTATIONS に1行 (3) 必要なら 0212 のルール SQL の values に1行。
 
+## Workflow（P3-c・#298）
+
+`packages/genesis-core/src/workflow.ts` の `WORKFLOWS` に `defineWorkflow({ trigger: { type, version, when? }, steps: (event) => [...] })`。cron:execute の processEvents が拾う。Step の Tool は固定版（`waiting.create@1`）で書く。risk>=2 は承認カードになる。
+
 ## 次（P1）
 
 Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

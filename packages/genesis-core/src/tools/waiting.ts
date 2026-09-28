@@ -10,7 +10,7 @@ export const waitingCreate = defineTool({
   version: 1,
   domain: "ops",
   description: "「〇〇さんの△△待ち」を台帳に登録する。期限（既定3日）を過ぎたら Inbox に「そろそろフォローしますか？」が出る",
-  input: { type: "object", required: ["what"], properties: { who: { type: "string", description: "相手（人・会社）" }, what: { type: "string", minLength: 1, description: "何を待っているか（見積の返事・入金・商品到着）" }, days: { type: "integer", minimum: 1, maximum: 90, default: 3 }, note: { type: "string" } } },
+  input: { type: "object", required: ["what"], properties: { who: { type: "string", description: "相手（人・会社）" }, what: { type: "string", minLength: 1, description: "何を待っているか（見積の返事・入金・商品到着）" }, days: { type: "integer", minimum: 1, maximum: 90, default: 3 }, note: { type: "string" }, entity_kind: { type: "string", description: "紐づく Entity の種類（inquiry / reservation / person）。Workflow から使う" }, entity_id: { type: "string" } } },
   output: { type: "object", required: ["waiting_id"], properties: { waiting_id: { type: "string" }, expected_by: { type: "string" } } },
   permission: [],
   scope: "company",
@@ -22,7 +22,7 @@ export const waitingCreate = defineTool({
   impl: async (input, ctx) => {
     const a = effectiveActor(ctx.context.actor);
     const expected = new Date(Date.now() + Number(input.days ?? 3) * 86_400_000).toISOString();
-    const { data, error } = await ctx.admin.from("gn_waiting").insert({ company_id: ctx.context.company.id, entity_kind: input.who ? "partner" : null, entity_label: input.who ?? null, what: String(input.what), expected_by: expected, followup_note: input.note ?? null, created_by: a.staffId, source: ctx.context.surface }).select("id").single();
+    const { data, error } = await ctx.admin.from("gn_waiting").insert({ company_id: ctx.context.company.id, entity_kind: input.entity_kind ?? (input.who ? "partner" : null), entity_id: input.entity_id ?? null, entity_label: input.who ?? null, what: String(input.what), expected_by: expected, followup_note: input.note ?? null, created_by: a.staffId, source: ctx.context.surface }).select("id").single();
     if (error) throw new Error(error.message);
     return { data: { waiting_id: String(data.id), expected_by: expected }, sources: [src("gn_waiting")] };
   },

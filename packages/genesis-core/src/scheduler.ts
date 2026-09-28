@@ -1,7 +1,7 @@
 /**
  * Scheduler（P2-a・#292）— cron 1本から呼ぶ Core のジョブ群。
  *
- *   processEvents()  … gn_events の未処理を拾い、処理済みにする（P3 で Workflow trigger をここに挿す）
+ *   processEvents()  … gn_events の未処理を拾い、handler と Workflow（workflow.ts・#298）を走らせ、処理済みにする
  *   evaluateRules()  … gn_rules を gnv_* ビューで評価し、行が返れば ai_suggestions（判断フィード）へ起票。action_tool があれば Act（#294）
  *   nudgeWaiting()   … gn_waiting の期限切れに「そろそろフォローしますか？」を起票
  *   withJobRun()     … 実行記録（gn_job_runs）。Self Healing はこれを見る
@@ -9,6 +9,7 @@
  * 数字はすべて Postgres が計算（gn_chat_query・hq スコープ）。LLM は使わない＝毎 tick 走っても課金ゼロ。
  */
 import type { AdminLike } from "./tool.ts";
+import { matchWorkflows, type WorkflowContract, type EventRow } from "./workflow.ts";
 
 type Row = Record<string, unknown>;
 
@@ -63,13 +64,12 @@ export type EventHandler = (admin: AdminLike, event: Row) => Promise<void>;
 
 /** type → ハンドラ。P2-a は Waiting の自動クローズだけ。P3 で gn_workflows の trigger をここへ */
 export const EVENT_HANDLERS: Record<string, EventHandler[]> = {
-  "inquiry.replied": [
+  // inquiry.replied →「返事待ち」は Workflow wf.inquiry_replied_waiting（waiting.create@1・#298）へ移した
+  "trial.converted": [
     async (admin, e) => {
-      // 返信したら「返事待ち」を立てる（3日）
-      await admin.from("gn_waiting").insert({
-        company_id: e.company_id, entity_kind: "inquiry", entity_id: e.entity_id, entity_label: String((e.payload as Row)?.from ?? "お客様"),
-        what: "返信への返事", status: "open", expected_by: new Date(Date.now() + 3 * 86_400_000).toISOString(), source: `event:${e.type}`,
-      });
+      // 入会したら「体験後のフォロー」待ち（wf.trial_followup_waiting）を閉じる
+      await admin.from("gn_waiting").update({ status: "done", closed_at: new Date().toISOString(), closed_reason: `event:${e.type}` })
+        .eq("company_id", e.company_id).eq("status", "open").eq("entity_kind", "person").eq("entity_id", e.entity_id).eq("what", "体験後のフォロー");
     },
   ],
   "inquiry.received": [
@@ -89,15 +89,27 @@ export const EVENT_HANDLERS: Record<string, EventHandler[]> = {
   ],
 };
 
-export async function processEvents(admin: AdminLike, companyId: string, limit = 200): Promise<{ picked: number; handled: number; failed: number }> {
+/** Workflow の実行器（apps 側が Core の executeTool で組む）。戻りの status が failed なら attempts を上げて次回に回す */
+export type WorkflowRunner = (wf: WorkflowContract, event: EventRow) => Promise<{ status: string; error?: string | null }>;
+
+export async function processEvents(admin: AdminLike, companyId: string, limit = 200, opts: { runWorkflow?: WorkflowRunner; workflows?: WorkflowContract[] } = {}): Promise<{ picked: number; handled: number; failed: number; workflows: number }> {
   const { data } = await admin.from("gn_events").select("*").eq("company_id", companyId).is("processed_at", null).lt("attempts", 5).order("occurred_at", { ascending: true }).limit(limit);
   const events = (data ?? []) as Row[];
   let handled = 0;
   let failed = 0;
+  let workflows = 0;
   for (const e of events) {
     const hs = EVENT_HANDLERS[String(e.type)] ?? [];
     try {
       for (const h of hs) await h(admin, e);
+      // Workflow（#298）: 宣言に合うものを Core 経由で実行。承認待ちは「成功」（承認カードが出ている）
+      if (opts.runWorkflow) {
+        for (const wf of matchWorkflows(e as unknown as EventRow, opts.workflows)) {
+          const r = await opts.runWorkflow(wf, e as unknown as EventRow);
+          workflows += 1;
+          if (r.status === "failed") throw new Error(`${wf.name}: ${r.error ?? "failed"}`);
+        }
+      }
       await admin.from("gn_events").update({ processed_at: new Date().toISOString() }).eq("id", e.id);
       handled += 1;
     } catch (err) {
@@ -106,7 +118,7 @@ export async function processEvents(admin: AdminLike, companyId: string, limit =
       await admin.from("gn_events").update({ attempts: Number(e.attempts ?? 0) + 1, last_error: err instanceof Error ? err.message : String(err) }).eq("id", e.id);
     }
   }
-  return { picked: events.length, handled, failed };
+  return { picked: events.length, handled, failed, workflows };
 }
 
 /* ---------- Proactive ルール ---------- */
@@ -230,8 +242,8 @@ function daysSince(iso: string, now: Date): number {
 }
 
 /** cron:execute（10分ごと）から呼ぶ1本 */
-export async function runSchedulerTick(admin: AdminLike, companyId: string, opts: { act?: RuleAct } = {}): Promise<Row> {
-  const events = await withJobRun(admin, "events:process", companyId, () => processEvents(admin, companyId));
+export async function runSchedulerTick(admin: AdminLike, companyId: string, opts: { act?: RuleAct; runWorkflow?: WorkflowRunner } = {}): Promise<Row> {
+  const events = await withJobRun(admin, "events:process", companyId, () => processEvents(admin, companyId, 200, { runWorkflow: opts.runWorkflow }));
   const rules = await withJobRun(admin, "rules:evaluate", companyId, () => evaluateRules(admin, companyId, new Date(), opts.act));
   const waiting = await withJobRun(admin, "waiting:nudge", companyId, () => nudgeWaiting(admin, companyId));
   return { events, rules, waiting };

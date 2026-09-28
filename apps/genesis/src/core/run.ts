@@ -3,6 +3,10 @@ import { createAdmin } from "@/lib/supabase/admin";
 import type { GenesisActor } from "@/lib/auth";
 import { executeTool, type ExecutionResult } from "@yozan/genesis-core/execute";
 import { loadPolicySet } from "@yozan/genesis-core/policy";
+import { runPlan } from "@yozan/genesis-core/skill";
+import { newStep, type Plan } from "@yozan/genesis-core/plan";
+import type { WorkflowContract, EventRow } from "@yozan/genesis-core/workflow";
+import type { ToolCtx } from "@yozan/genesis-core/tool";
 import type { CoreActor, GenesisContext, Surface } from "@yozan/genesis-core/context";
 import { getCore } from "./registry";
 import { toCoreActor, coreActorFromStaffId, buildGenesisContext } from "./actor";
@@ -78,6 +82,29 @@ export async function runRuleAct(admin: Admin, args: { companyId: string; tool: 
   const context = await buildGenesisContext(admin, actor, args.companyId, { surface: "cron", enrich: false });
   const r = await runWithContext({ admin, context, ref: args.tool, input: args.input, origin: "rule", title: args.title, createdBy: null, dedupeKey: args.dedupeKey });
   return { status: r.status, queuedId: r.queued?.id ?? null, error: r.error };
+}
+
+/** Workflow（#298）: gn_events に合う宣言を Plan として実行。Step は runWithContext を通る＝承認が要る Step は承認キューへ。
+ *  起点が人でない＝AI Actor（代理元なし）。Skill と違い「承認待ち」は成功扱い（承認カードが出ている） */
+export async function runWorkflowForEvent(admin: Admin, wf: WorkflowContract, event: EventRow): Promise<{ status: string; error?: string | null }> {
+  const actor = await coreActorFromStaffId(admin, event.company_id, null);
+  const context = await buildGenesisContext(admin, actor, event.company_id, { surface: "cron", storeId: event.store_id ?? null, enrich: false });
+  const defs = wf.steps(event);
+  const plan: Plan = { id: null, goal: wf.description, status: "draft", steps: defs.map((d) => newStep({ ...d, input: d.input ?? {}, dependsOn: d.dependsOn ?? [] })) };
+  const ctx: ToolCtx = {
+    admin,
+    context,
+    call: async (ref, input) => {
+      const r = await runWithContext({ admin, context, ref, input, origin: `workflow:${wf.name}`, title: `${wf.description}（${event.type}）`, createdBy: null, dedupeKey: `wf:${wf.name}:${event.id}:${ref}` });
+      return { status: r.status, output: r.output, error: r.error, executionId: r.executionId, tool: r.tool, renders: r.renders, sources: r.sources, kind: r.kind, rowCount: r.rowCount, policy: r.policy ? { decision: r.policy.decision, reason: r.policy.reason } : null };
+    },
+    emit: async () => {},
+    log: () => {},
+  };
+  const { plan: done } = await runPlan(plan, ctx);
+  const failed = done.steps.filter((st) => st.status === "failed");
+  if (failed.length) return { status: "failed", error: failed.map((st) => `${st.key}: ${st.error ?? ""}`).join(" / ") };
+  return { status: done.status === "waiting_approval" ? "needs_approval" : "ok" };
 }
 
 /** ai_action_queue の行（__core 付き、または Tool 名の action_type）を Tool として実行する（承認済み・取消枠経過後） */

@@ -6,7 +6,7 @@ import { listOperatingCompanyIds } from "@/lib/operating-companies";
 import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cron";
 import { runBillingDaySweep } from "@/lib/frank-billing-day";
 import { runSchedulerTick, withJobRun } from "@yozan/genesis-core/scheduler";
-import { runRuleAct } from "@/core/run";
+import { runRuleAct, runWorkflowForEvent } from "@/core/run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
       const core = await runSchedulerTick(admin, String(c.id), {
         // ルールの Act（#294）: Core を通す＝AI Actor の Policy で risk>=2 は承認カードになる
         act: (a) => runRuleAct(admin, { companyId: a.companyId, tool: a.tool, input: a.input, title: String(a.rule.name ?? a.tool), dedupeKey: `${a.dedupeKey}:act` }),
+        // Workflow（#298）: イベント → 宣言された手順を Core 経由で
+        runWorkflow: (wf, ev) => runWorkflowForEvent(admin, wf, ev),
       }).catch((e) => ({ error: String(e) }));
       results.push({ company: c.id, ...r, sns, core });
     } catch (e) {

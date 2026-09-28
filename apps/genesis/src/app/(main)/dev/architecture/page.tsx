@@ -4,6 +4,7 @@ import { Panel, Badge, Empty } from "@/components/ui";
 import { getCore } from "@/core/registry";
 import { dashboardMetrics } from "@yozan/genesis-core/metrics";
 import { JOB_EXPECTATIONS, staleJobs } from "@yozan/genesis-core/scheduler";
+import { WORKFLOWS } from "@yozan/genesis-core/workflow";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,7 @@ export default async function ArchitecturePage({ searchParams }: { searchParams:
             </tbody>
           </table>
           <p className="mt-2 text-[11px] text-(--color-dim)">
-            Block {core.blocks.list().length} 種 · Event {core.catalog.list().length} 種 · MCP manifest: <code>/api/core/mcp</code> · 一覧: <code>/api/core/tools</code>
+            Block {core.blocks.list().length} 種 · Event {core.catalog.list().length} 種 · Workflow {WORKFLOWS.filter((w) => w.enabled).length} 本（{WORKFLOWS.map((w) => `${w.trigger.type} → ${w.name}`).join(" / ")}） · MCP manifest: <code>/api/core/mcp</code> · 一覧: <code>/api/core/tools</code>
           </p>
         </Panel>
 
