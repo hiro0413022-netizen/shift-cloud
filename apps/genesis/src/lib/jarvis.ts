@@ -27,6 +27,7 @@ import {
 } from "@/lib/jarvis-pure";
 import { enqueueAction } from "@/lib/ai-execution";
 import type { BlockInstance } from "@yozan/genesis-core/blocks";
+import { loadMemory, memoryPromptLines } from "@yozan/genesis-core/memory";
 
 // 純粋な部分は jarvis-pure.ts（テスト tests/jarvis.test.ts で固定）。画面からはここ経由で使う。
 export { toBriefing, openingLine, jstHour, NAV_MAP, alertTag };
@@ -108,7 +109,26 @@ export type JarvisReply = {
   blocks: BlockInstance[];
 };
 
-function systemPrompt(b: JarvisBriefing, toolCatalog: string): string {
+/** Memory（#299）: 会社・店舗・本人の記憶を system prompt に。confidence<1 は「推定」と明示（AI推測と事実を分ける） */
+async function loadMemoryLines(admin: ReturnType<typeof createAdmin>, actor: GenesisActor): Promise<string[]> {
+  try {
+    const { toCoreActor, buildGenesisContext } = await import("@/core/actor");
+    const ctx = await buildGenesisContext(admin, await toCoreActor(admin, actor), actor.companyId, { surface: "web", enrich: false });
+    const list = await loadMemory(admin, ctx, { limit: 40 });
+    if (!list.length) return [];
+    const ids = [...new Set(list.filter((m) => m.scope === "store" && m.scopeId).map((m) => m.scopeId as string))];
+    const names: Record<string, string> = {};
+    if (ids.length) {
+      const { data } = await admin.from("stores").select("id, name").in("id", ids);
+      for (const r of (data ?? []) as Array<{ id: string; name: string }>) names[r.id] = r.name;
+    }
+    return memoryPromptLines(list, { storeNames: names });
+  } catch {
+    return [];
+  }
+}
+
+function systemPrompt(b: JarvisBriefing, toolCatalog: string, memoryLines: string[] = []): string {
   return [
     "あなたは株式会社YOZANの統合AI「GENESIS」です。社長（古川博庸）の分身として、全社の状況を常に見ています。",
     "話し方: 落ち着いた執事。**声で読み上げる前提の話し言葉**で、1〜2文・40字以内を基本にする（長い説明を求められたときだけ3〜4文）。",
@@ -125,6 +145,10 @@ function systemPrompt(b: JarvisBriefing, toolCatalog: string): string {
     ...b.kpis.map((k) => `  - ${k.name}: ${k.value ?? "未取得"}${k.unit}${k.target != null ? `（目標 ${k.target}${k.unit}）` : ""}`),
     "- AIの直近の動き:",
     ...b.recent.map((r) => `  - ${r}`),
+    "",
+    "## 覚えていること（会社のルール・店舗の事情・本人の好み。「推定」付きは AI の推測で未確認）",
+    ...(memoryLines.length ? memoryLines : ["- （まだ無い）"]),
+    "   「覚えておいて」「今後は〜にして」と言われたら tool の memory.remember（value に1文、scope は company/store/customer/user）。会話から推測して覚えるときは inferred:true。",
     "",
     "## あなたができること（必ず次のどれか1つを選ぶ）",
     "1. talk — 上のブリーフィングと会話の流れだけで答えられる。所感・要約・段取りの相談もここ。",
@@ -195,7 +219,8 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
 
   const { getCore } = await import("@/core/registry");
   const toolCatalog = getCore().registry.catalogText({ maxRisk: 1 });
-  const raw = await callClaude(systemPrompt(briefing, toolCatalog), messages, 900, { admin, companyId: input.actor.companyId, task: "plan" });
+  const memoryLines = await loadMemoryLines(admin, input.actor);
+  const raw = await callClaude(systemPrompt(briefing, toolCatalog, memoryLines), messages, 900, { admin, companyId: input.actor.companyId, task: "plan" });
   if (!raw) {
     const out = {
       ...base,

@@ -24,6 +24,8 @@
     "./render": "./src/render.ts",
     "./skill": "./src/skill.ts",
     "./workflow": "./src/workflow.ts",
+    "./memory": "./src/memory.ts",
+    "./tools/memory": "./src/tools/memory.ts",
     "./skills": "./src/skills/index.ts",
     "./scheduler": "./src/scheduler.ts",
     "./tools/waiting": "./src/tools/waiting.ts"

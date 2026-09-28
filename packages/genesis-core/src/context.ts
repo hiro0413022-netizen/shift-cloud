@@ -112,5 +112,12 @@ export async function enrichContext(admin: import("./tool.ts").AdminLike, ctx: G
   } catch {
     /* gn_events 未適用でも動く */
   }
+  // Memory（#299）: company ＋ 見える店舗 ＋ 本人 ＋（あれば）今の customer / project
+  try {
+    const { loadMemory, toContextMemory } = await import("./memory.ts");
+    out.memory = toContextMemory(await loadMemory(admin, out));
+  } catch {
+    /* gn_memories 未適用でも動く */
+  }
   return out;
 }

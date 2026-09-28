@@ -50,6 +50,10 @@ cron は各アプリが持つが、記録は `gn_job_runs` 1つ（`withJobRun(ad
 
 `packages/genesis-core/src/workflow.ts` の `WORKFLOWS` に `defineWorkflow({ trigger: { type, version, when? }, steps: (event) => [...] })`。cron:execute の processEvents が拾う。Step の Tool は固定版（`waiting.create@1`）で書く。risk>=2 は承認カードになる。
 
+## Memory（P4-a・#299）
+
+`gn_memories` 5スコープ（user / company / store / customer / project）。読むのは `enrichContext`（Tool は `ctx.context.memory` を見る）。書くのは `memory.remember@1`（人=1.0・AI=0.6 推定）。人が `memory.confirm` で確定。JARVIS の system prompt「覚えていること」に入る（推定は明示）。画面は /memories。
+
 ## 次（P1）
 
 Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

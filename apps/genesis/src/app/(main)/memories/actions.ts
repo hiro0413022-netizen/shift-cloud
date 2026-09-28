@@ -38,3 +38,34 @@ export async function createMemory(formData: FormData) {
   });
   revalidatePath("/memories");
 }
+
+/* ---------- Genesis Memory（5スコープ・#299）: 書く・確定・忘れる。すべて Core の Tool を通す（記録・Policy・取消） ---------- */
+export async function rememberMemory(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const value = String(formData.get("value") ?? "").trim();
+  if (!value) return;
+  const scope = String(formData.get("scope") ?? "company");
+  const scope_id = String(formData.get("scope_id") ?? "").trim() || undefined;
+  const { runTool } = await import("@/core/run");
+  await runTool({ actor, ref: "memory.remember", input: { value, scope, ...(scope_id ? { scope_id } : {}) }, origin: "memories" });
+  revalidatePath("/memories");
+}
+
+export async function confirmMemory(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const { runTool } = await import("@/core/run");
+  await runTool({ actor, ref: "memory.confirm", input: { memory_id: id }, origin: "memories" });
+  revalidatePath("/memories");
+}
+
+export async function forgetMemory(formData: FormData) {
+  const actor = await requireGenesisActor();
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const { runTool } = await import("@/core/run");
+  // soft delete（risk 1・即時）。戻すときは同じ内容をもう一度「覚える」
+  await runTool({ actor, ref: "memory.forget", input: { memory_id: id }, origin: "memories", title: "記憶を忘れる" });
+  revalidatePath("/memories");
+}
