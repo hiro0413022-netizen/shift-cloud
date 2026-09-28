@@ -13,7 +13,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // /lp は集客LP（PGA NOTE / SWING CORTEX #101）、/api/track は閲覧計測ビーコン（@yozan/track・#90の教訓）。
 // /api/dev-queue は古川さんのPCの apply-dev-queue.ps1 が叩く（#183）。
 // ログインCookieを持てないので、認証は lib/dev-queue-auth.ts の Bearer で行う。
-const PUBLIC_PREFIXES = ["/login", "/api/webhooks", "/api/cron", "/api/public", "/api/track", "/api/dev-queue", "/manual", "/lp"];
+// /api/core/mcp は Genesis Core の MCP 口（#290）。認証は core/api-auth.ts の Bearer（代理元 staff 必須）。
+const PUBLIC_PREFIXES = ["/login", "/api/webhooks", "/api/cron", "/api/public", "/api/track", "/api/dev-queue", "/api/core/mcp", "/manual", "/lp"];
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 

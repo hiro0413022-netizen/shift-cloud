@@ -156,23 +156,16 @@ function systemPrompt(b: JarvisBriefing): string {
   ].join("\n");
 }
 
-async function callClaude(system: string, messages: { role: "user" | "assistant"; content: string }[], maxTokens: number): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, messages }),
-      signal: AbortSignal.timeout(45000),
-    });
-    if (!res.ok) return null;
-    const json = (await res.json()) as { content?: { type: string; text?: string }[] };
-    const text = (json.content ?? []).filter((c) => c.type === "text").map((c) => c.text ?? "").join("").trim();
-    return text || null;
-  } catch {
-    return null;
-  }
+/** Genesis Core の Model Router 経由（#290）。モデルは JARVIS_MODEL で固定でき、呼び出しは gn_llm_calls に残る */
+async function callClaude(
+  system: string,
+  messages: { role: "user" | "assistant"; content: string }[],
+  maxTokens: number,
+  meta?: { admin: ReturnType<typeof createAdmin>; companyId: string; task?: "plan" | "draft" | "classify" }
+): Promise<string | null> {
+  const { llmCall } = await import("@yozan/genesis-core/llm");
+  const r = await llmCall({ task: meta?.task ?? "plan", model: MODEL, system, messages, maxTokens, timeoutMs: 45000, admin: meta?.admin, companyId: meta?.companyId ?? null, tool: "jarvis" });
+  return r.text;
 }
 
 export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
@@ -193,7 +186,7 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
     { role: "user" as const, content: said },
   ];
 
-  const raw = await callClaude(systemPrompt(briefing), messages, 700);
+  const raw = await callClaude(systemPrompt(briefing), messages, 700, { admin, companyId: input.actor.companyId, task: "plan" });
   if (!raw) {
     const out = {
       ...base,
@@ -400,7 +393,8 @@ async function createDevRequest(args: {
   const ai = await callClaude(
     SPEC_SYSTEM,
     [{ role: "user", content: `社長の依頼（原文）:\n${args.said}\n\n一行要件: ${args.title}\n想定アプリ: ${args.app ?? "不明"}\n本日: ${args.briefing.today}` }],
-    1200
+    1200,
+    { admin: args.admin, companyId: args.actor.companyId, task: "draft" }
   );
 
   const spec = [

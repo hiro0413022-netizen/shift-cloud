@@ -1,0 +1,37 @@
+# Genesis Core（#289・2026-09-28）— 正典の所在と P0 の使い方
+
+正典（設計）: Claude Docs「Genesis Transformation Proposal」「Genesis Core Final Architecture」。この文書はコード側の入口。
+
+## 何が入口か
+
+- **Tool Registry が中核 Contract**。画面・JARVIS・Workflow・MCP・LINE はすべて `executeTool()` を通る。UI が DB を直接操作する経路は Tool が揃うアプリから順に閉じる。
+- 承認が要る decision（auto_undo / approval / two_step）は Core では実行しない。既存 `ai_action_queue`（#61/#186）に積み、承認・取消枠のあと `runQueuedTool()` が `force:true` で実行する。承認UI・取消UI・監査ログは従来のまま。
+- 記録は `gn_tool_executions`（正典）。`/dev/architecture` がそれを見る。
+
+## Tool の足し方（4点セットは1ファイルになった）
+
+```ts
+export const x = defineTool({ name: "shift.publish", version: 1, domain: "ops", description: "…",
+  input: {...JSON Schema...}, output: {...}, permission: ["manage_shifts"], scope: "store", risk: 2,
+  idempotency: (i, ctx) => `${ctx.company.id}:${i.from}:${i.to}`, rateLimit: { perMinute: 10 },
+  undo: async (out, ctx) => {...}, verify: async (out, ctx) => true, emits: ["shift.updated@1"], renders: "ShiftGrid",
+  impl: async (input, ctx) => ({ data: {...}, sources: [{ table: "shifts" }], kind: "fact" }) });
+```
+`packages/genesis-core/src/tools/*.ts` に置いて `all.ts` の配列へ。emits のイベントは `events.ts` の `BASE_EVENTS` にも足す（無いと登録で落ちる）。
+
+## API
+
+| 口 | 用途 | 認証 |
+|---|---|---|
+| `GET /api/core/tools` | Tool / Block / Event の一覧 | 画面セッション or Bearer |
+| `POST /api/core/tools/<name@version>` `{input, store_id?}` | 実行（承認が要れば queued を返す） | 同上 |
+| `GET/POST /api/core/mcp` | MCP tools/list・tools/call（Tool 名は `booking.list__v1`） | Bearer `GENESIS_CORE_SECRET`（無ければ CRON_SECRET）＋ `x-genesis-staff-id`（代理元の人・必須） |
+
+## Rollback
+
+- `GENESIS_CORE_TOOLS=off` で JARVIS の予約・受付は旧ハンドラに戻る（コードは両方残している。P1 で旧を消す）。
+- DB は追加のみ。`0208_genesis_core.sql` 末尾の drop で戻る。
+
+## 次（P1）
+
+Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

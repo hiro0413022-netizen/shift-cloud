@@ -64,6 +64,8 @@ export type EnqueueInput = {
   originId?: string | null;
   dedupeKey?: string | null;
   createdBy?: string | null; // null = AI/システム発
+  /** Genesis Core の Policy Engine が決めたモード（#290）。指定時は ai_execution_policies を引かない */
+  modeOverride?: { mode: ExecutionMode; undoMinutes: number } | null;
 };
 
 export type EnqueueResult = {
@@ -76,7 +78,7 @@ export type EnqueueResult = {
 
 /** AIアクションをキューに投入（モードを解決して scheduled_at / status を決める） */
 export async function enqueueAction(admin: Admin, input: EnqueueInput): Promise<EnqueueResult> {
-  const { mode, undoMinutes } = await resolveMode(admin, input.companyId, input.actionType);
+  const { mode, undoMinutes } = input.modeOverride ?? (await resolveMode(admin, input.companyId, input.actionType));
   const now = Date.now();
   const scheduledAt =
     mode === "auto_undo" ? new Date(now + undoMinutes * 60_000).toISOString() : new Date(now).toISOString();
@@ -116,7 +118,7 @@ export async function enqueueAction(admin: Admin, input: EnqueueInput): Promise<
 type HandlerCtx = { admin: Admin; row: QueueRow };
 type Handler = (ctx: HandlerCtx) => Promise<Record<string, unknown>>;
 
-async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string, unknown>> {
+export async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string, unknown>> {
   const body = String(row.payload.body ?? row.payload.message ?? "").trim();
   if (!body) throw new Error("body が空です");
   // 送信先選択（#85・FRANK §3-5）:
@@ -183,7 +185,20 @@ async function sendStaffLine(admin: Admin, row: QueueRow): Promise<Record<string
   return { directive_id: dir?.id ?? null, groups: sentTo };
 }
 
-const HANDLERS: Record<string, Handler> = {
+/* ---- Genesis Core への委譲（P0・#290）----
+   booking_create / booking_cancel / walkin_add は packages/genesis-core/src/tools/ops.ts に移した。
+   ここでは Tool を呼ぶだけ（実行記録は gn_tool_executions に残る）。
+   GENESIS_CORE_TOOLS=off で下の旧ハンドラに戻せる（Rollback Plan）。旧コードは P1 で消す。 */
+const CORE_TOOL_OF: Record<string, string> = { booking_create: "booking.create", booking_cancel: "booking.cancel", walkin_add: "walkin.add" };
+const coreToolsOn = () => process.env.GENESIS_CORE_TOOLS !== "off";
+async function viaCore(ctx: HandlerCtx, legacy: Handler): Promise<Record<string, unknown>> {
+  if (!coreToolsOn()) return legacy(ctx);
+  const { runQueuedTool } = await import("@/core/run");
+  const tool = CORE_TOOL_OF[ctx.row.action_type] ?? ctx.row.action_type;
+  return runQueuedTool(ctx.admin, { ...ctx.row, payload: { ...ctx.row.payload, tool: ctx.row.payload.tool ?? tool } });
+}
+
+const LEGACY_HANDLERS: Record<string, Handler> = {
   // 無害な動作確認用
   test_notify: async ({ row }) => {
     await logEvent(row.company_id, {
@@ -560,8 +575,27 @@ const HANDLERS: Record<string, Handler> = {
   },
 };
 
+const HANDLERS: Record<string, Handler> = {
+  ...LEGACY_HANDLERS,
+  booking_create: (ctx) => viaCore(ctx, LEGACY_HANDLERS.booking_create),
+  booking_cancel: (ctx) => viaCore(ctx, LEGACY_HANDLERS.booking_cancel),
+  walkin_add: (ctx) => viaCore(ctx, LEGACY_HANDLERS.walkin_add),
+};
+
 export function hasHandler(actionType: string): boolean {
   return actionType in HANDLERS;
+}
+
+/** Core が積んだ行（payload.__core）や Tool 名の action_type は Registry 経由で実行する */
+function resolveHandler(row: QueueRow): Handler | undefined {
+  if (HANDLERS[row.action_type]) return HANDLERS[row.action_type];
+  if (row.payload?.__core || /^[a-z]+\.[a-z_]+$/.test(row.action_type)) {
+    return async ({ admin, row }) => {
+      const { runQueuedTool } = await import("@/core/run");
+      return runQueuedTool(admin, row);
+    };
+  }
+  return undefined;
 }
 
 async function writeAudit(
@@ -627,7 +661,7 @@ export async function runDueActions(admin: Admin, companyId: string, limit = 20)
       .maybeSingle();
     if (!locked) continue; // 他プロセスが先に取った
 
-    const handler = HANDLERS[raw.action_type];
+    const handler = resolveHandler(raw);
     try {
       if (!handler) throw new Error(`ハンドラ未登録: ${raw.action_type}`);
       const result = await handler({ admin, row: raw });

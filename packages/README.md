@@ -70,3 +70,24 @@ Vercel Cronルートの共通形（genesis daily / demo-sales prospect の同型
 | `@yozan/cron/server` | `requireCronAuth`（Bearer ${CRON_SECRET}） / `createCronHandler({ listCompanies, run })` — 1社の失敗で他社を巻き込まない |
 
 ⚠ ルート側で `maxDuration` 宣言と middleware 公開プレフィックス登録は引き続き必須（このパッケージでは肩代わりできない）。
+
+## packages/genesis-core（#289・Transformation P0）
+
+Genesis Core。**Tool Registry が中核 Contract**（UI / Agent / Skill / Workflow / MCP / LINE / Voice はすべてここを通る）。Next・zod に依存しない（`node --test` でそのまま走る・MCP へそのまま出せる）。正典は Claude Docs「Genesis Core Final Architecture」と `docs/genesis/GENESIS_CORE.md`。
+
+| モジュール | 内容 |
+|---|---|
+| `@yozan/genesis-core/schema` | JSON Schema サブセットの検証（Tool input/output・Event payload・Block data） |
+| `@yozan/genesis-core/tool` | `defineTool()` / Tool Contract（name@version・permission・scope・risk・undo・verify・emits・renders・rateLimit・idempotency） |
+| `@yozan/genesis-core/registry` | `ToolRegistry`（版の並存・resolve・MCP manifest） |
+| `@yozan/genesis-core/policy` | Policy Engine（Tool×Role×Store×Amount×Context×Risk → allow / auto_undo / approval / two_step / deny） |
+| `@yozan/genesis-core/context` | Genesis Context Protocol（`baseContext` / `enrichContext` / `effectiveActor`） |
+| `@yozan/genesis-core/plan` | Plan（DAG）の型・`validatePlan`・`readySteps`・`bindInput` |
+| `@yozan/genesis-core/events` | Event Catalog（type@version）・`emitEvent` → gn_events |
+| `@yozan/genesis-core/blocks` | Block Registry（初期15種・`register()` で追加） |
+| `@yozan/genesis-core/llm` | `llmCall({task, privacy})` Model Router（haiku / sonnet / local）＋ gn_llm_calls |
+| `@yozan/genesis-core/execute` | `executeTool()` Action Engine（policy→rateLimit→idempotency→impl→output検証→verify→silent zero→記録）・`undoExecution()` |
+| `@yozan/genesis-core/metrics` | Developer Dashboard の集計 |
+| `@yozan/genesis-core/tools/*` | P0 の Tool（ops / customer / finance / growth / dev）と `createGenesisCore()` |
+
+apps 側の組み立ては `apps/genesis/src/core/`（registry / actor / run / api-auth）。Tool を足すときは `defineTool` を書いて `createGenesisCore({ tools })` に渡すだけ（risk>=2 は undo/verify が無いと登録で落ちる）。

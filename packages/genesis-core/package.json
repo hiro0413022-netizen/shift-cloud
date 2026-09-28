@@ -1,0 +1,29 @@
+{
+  "name": "@yozan/genesis-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Genesis Core（Transformation P0・DECISIONS #290）。Tool Registry / Policy Engine / Context Protocol / Plan(DAG) / Event Contract / Block Registry / Model Router / Action Engine。TSソースのまま提供（transpilePackages に追加）。Next・zod に依存しない＝ node --test でそのまま走り、MCP へそのまま出せる",
+  "exports": {
+    "./schema": "./src/schema.ts",
+    "./tool": "./src/tool.ts",
+    "./registry": "./src/registry.ts",
+    "./policy": "./src/policy.ts",
+    "./context": "./src/context.ts",
+    "./plan": "./src/plan.ts",
+    "./events": "./src/events.ts",
+    "./blocks": "./src/blocks.ts",
+    "./llm": "./src/llm.ts",
+    "./execute": "./src/execute.ts",
+    "./metrics": "./src/metrics.ts",
+    "./tools/ops": "./src/tools/ops.ts",
+    "./tools/customer": "./src/tools/customer.ts",
+    "./tools/finance": "./src/tools/finance.ts",
+    "./tools/growth": "./src/tools/growth.ts",
+    "./tools/dev": "./src/tools/dev.ts",
+    "./tools/all": "./src/tools/all.ts"
+  },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.50.0",
+    "@yozan/core": "*"
+  }
+}

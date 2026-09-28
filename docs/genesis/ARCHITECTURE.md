@@ -37,11 +37,18 @@
 
 **`sales-support-saas/`（apps/外・意図的）**: PGA NOTE営業サポートSaaS。外販商材でファイン福原氏が営業管理・YOZAN GENESISの業務システム群とは別物のため apps/ に含めない。正典は同ディレクトリの SPEC.md / SETUP.md。
 
+## Genesis Core（2026-09-28・#289 追記）
+
+上の「独立アプリ量産＋DB共有＋司令室」の上に **Genesis Core（`packages/genesis-core`）** を置いた。
+Surface → Core API（`/api/core/*`・MCP）→ Intent/Planner → **Tool Registry** → Policy Engine → Action Engine → Domain Systems。
+Tool は既存アプリの関数を「権限・リスク・取り消し・検証・イベント・描画」の宣言で包んだもので、UI が DB を直接操作する経路は Tool が揃うアプリから順に閉じる。詳細は `docs/genesis/GENESIS_CORE.md` と Claude Docs「Genesis Core Final Architecture」。
+
 ## リポジトリ構成
 
 ```
 apps/*                    上記11アプリ（npm workspaces）
 packages/core/            共通コア: auth / kernel / supabase / middleware（#35）
+packages/genesis-core/    Genesis Core: Tool Registry / Policy / Plan(DAG) / Events / Blocks / LLM Router / Action Engine（#289）
                           ※新規アプリ用。既存アプリは各 src/lib にコピーが残る（段階移行 B-6）
 templates/app-template/   新アプリ雛形（scripts/new-app.mjs が使用）
 scripts/new-app.mjs       アプリ生成器: npm run new-app -- --name ... --prefix ...

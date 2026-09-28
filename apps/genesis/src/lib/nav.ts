@@ -114,6 +114,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/network", label: "システム相関図", keywords: ["相関", "死活"] },
       { href: "/dev-requests", label: "開発依頼", keywords: ["依頼", "JARVIS"] },
       { href: "/dev", label: "開発状況", keywords: ["進捗"] },
+      { href: "/dev/architecture", label: "Genesis Core（内部）", keywords: ["Tool", "Core", "Architecture", "LLM", "Dashboard"] },
     ],
   },
 ];

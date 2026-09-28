@@ -12,6 +12,7 @@
     "@supabase/supabase-js": "^2.50.0",
     "@yozan/content": "*",
     "@yozan/core": "*",
+    "@yozan/genesis-core": "*",
     "@yozan/track": "*",
     "next": "^15.3.4",
     "pdf-lib": "^1.17.1",
