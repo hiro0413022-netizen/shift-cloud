@@ -231,19 +231,19 @@ from companies c
 cross join (values
   ('members_stale_90d', '90日以上来店なしの会員', '在籍中で最終来店が90日以上前の GOLF WING 会員',
    $$select member_no, member_name, last_visit_date from gnv_members where is_active and last_visit_date is not null and last_visit_date < current_date - 90 order by last_visit_date limit 50$$,
-   'warning', '{count}名の会員が90日以上来店していません', '在籍中なのに90日以上来店が無い会員。退会の前兆になりやすい層です（Evidence: gnv_members.last_visit_date）。フォローの一言で戻る方が一定数います。', '来店していない会員にフォロー文を作る', '/chat', 'weekly', 168),
+   'warning', '{count}名の会員が90日以上来店していません', '在籍中なのに90日以上来店が無い会員。退会の前兆になりやすい層です（Evidence: gnv_members.last_visit_date）。フォローの一言で戻る方が一定数います。', '来店していない会員にフォロー文を作る', '/?ask=90日以上来店していない会員を一覧で', 'weekly', 168),
   ('trials_unfollowed_14d', '体験後14日フォローなし', '体験に来て入会も断りも記録が無く、フォローも入っていない方',
    $$select visited_on, guest_name, store_name from gnv_walkins where visit_type = 'trial' and result is null and follow_up_at is null and visited_on >= current_date - 14 and visited_on < current_date - 2 order by visited_on limit 50$$,
-   'warning', '体験後フォローが無い方が{count}名います', '体験から3日以上経って結果もフォローも入っていない方。入会率に直接効く層です（Evidence: gnv_walkins result/follow_up_at）。', '体験者へのフォローLINEを作る', '/inbox', 'daily', 24),
+   'warning', '体験後フォローが無い方が{count}名います', '体験から3日以上経って結果もフォローも入っていない方。入会率に直接効く層です（Evidence: gnv_walkins result/follow_up_at）。', '体験者へのフォローLINEを作る', '/?ask=体験後にフォローがない方を一覧で', 'daily', 24),
   ('inquiries_unreplied_24h', '24時間返信なしの問い合わせ', '受信から24時間以上、返信も対応済みにもなっていない問い合わせ',
    $$select received_at, source, from_name, subject from gnv_inquiries where reply_sent_at is null and status in ('new', 'pending', 'draft') and received_at < now() - interval '24 hours' order by received_at limit 50$$,
-   'critical', '{count}件の問い合わせが24時間以上返信されていません', '問い合わせの返信が1日を超えると体験申込の取りこぼしになります（Evidence: gnv_inquiries）。', '返信の下書きを承認する', '/inbox', 'every_tick', 6),
+   'critical', '{count}件の問い合わせが24時間以上返信されていません', '問い合わせの返信が1日を超えると体験申込の取りこぼしになります（Evidence: gnv_inquiries）。', '返信の下書きを承認する', '/?ask=未返信の問い合わせを一覧で', 'every_tick', 6),
   ('bookings_tomorrow_no_shift', '明日、予約があるのにシフトが無い', 'FRANK: 明日の有効な予約があるのに、明日の確定シフト（休み以外）が1件も無い',
    $$select count(*) as bookings from gnv_bookings where booked_date = current_date + 1 and status <> 'cancelled' having count(*) > 0 and not exists (select 1 from gnv_shifts where date = current_date + 1 and not is_day_off and status = 'published' and store_name like '%FRANK%')$$,
    'critical', '明日は予約があるのに FRANK のシフトが確定していません', '明日の予約 {count} 件に対して、確定シフト（出勤）が0件です（Evidence: gnv_bookings × gnv_shifts）。', '明日のシフトを確認する', '/?ask=明日の体制', 'daily', 12),
   ('bookings_unpaid_past', '過去の予約で未収', '終わった予約で金額があるのに未入金',
    $$select booked_date, customer_name, amount, payment_status from gnv_bookings where booked_date < current_date and status <> 'cancelled' and coalesce(amount, 0) > 0 and coalesce(payment_status, '') not in ('paid', 'free', 'included') order by booked_date desc limit 50$$,
-   'warning', '未収の予約が{count}件あります', '終了済みで金額が付いているのに入金になっていない予約（Evidence: gnv_bookings.payment_status）。', '未収一覧を確認する', '/?ask=未収の予約', 'daily', 48)
+   'warning', '未収の予約が{count}件あります', '終了済みで金額が付いているのに入金になっていない予約（Evidence: gnv_bookings.payment_status）。', '未収一覧を確認する', '/?ask=未収の予約を一覧で', 'daily', 48)
 ) as v(code, name, description, sql, severity, title, body, action, href, schedule, cooldown)
 where c.name like '%YOZAN%'
 on conflict (company_id, code) do nothing;

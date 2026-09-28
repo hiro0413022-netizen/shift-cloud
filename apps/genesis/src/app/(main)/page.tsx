@@ -68,8 +68,23 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
     ? await getDrill(actor.companyId, storeScope(actor), sp.drill, sp.store ?? (sp.alias ? `alias:${sp.alias}` : null), sp.kind ?? null).catch(() => null)
     : null;
 
+  // Recent Activity（#293）: DB が発火した gn_events（予約・来店・入会・問い合わせ・シフト確定…）を優先。無ければ従来の company_events
+  const { createAdmin } = await import("@/lib/supabase/admin");
+  const recentCore = await createAdmin()
+    .from("gn_events")
+    .select("id, type, occurred_at, payload")
+    .eq("company_id", actor.companyId)
+    .not("type", "in", "(tool.silent_zero,rule.fired)")
+    .order("occurred_at", { ascending: false })
+    .limit(4)
+    .then((r) => (r.data ?? []) as Array<{ id: string; type: string; occurred_at: string; payload: Record<string, unknown> | null }>, () => []);
   const aiEvents = d.recentEvents.filter((e) => String(e.source_type) === "ai").slice(0, 3);
-  const ticker = aiEvents.length > 0 ? aiEvents : d.recentEvents.slice(0, 3);
+  const ticker =
+    recentCore.length > 0
+      ? recentCore.map((e) => ({ id: e.id, occurred_at: e.occurred_at, title: String(e.payload?.summary ?? e.type) }))
+      : aiEvents.length > 0
+        ? aiEvents
+        : d.recentEvents.slice(0, 3);
   const scoreColor = score.grade === "good" ? "text-emerald-300" : score.grade === "watch" ? "text-amber-300" : "text-red-300";
   const dateLabel = new Date().toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric", weekday: "short" });
 
@@ -134,7 +149,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </p>
           )}
           <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-(--color-line) bg-(--color-bg)/60 px-4 py-2.5 text-xs text-(--color-dim) md:px-5">
-            <span className="font-bold text-(--color-txt)">AIの動き</span>
+            <span className="font-bold text-(--color-txt)">最近の動き</span>
             {ticker.length === 0 ? (
               <span>直近の活動なし</span>
             ) : (
@@ -144,7 +159,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
                 </span>
               ))
             )}
-            <Link href="/agents" className="ml-auto text-(--color-accent) hover:underline">すべて見る</Link>
+            <Link href="/events" className="ml-auto text-(--color-accent) hover:underline">すべて見る</Link>
           </div>
         </section>
 

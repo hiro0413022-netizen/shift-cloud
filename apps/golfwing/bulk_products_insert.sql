@@ -1353,12 +1353,12 @@ INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, li
 INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'Arch', 'WH-01- 27', '', 48000.0, 0.45, '本', 1);
 INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'Arch', 'WH-01- 28', '', 48000.0, 0.45, '本', 1);
 INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'Arch', 'WH-01- 29', '', 48000.0, 0.45, '本', 1);
-INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 40R（色確認）', '', 66000.0, 0.6, '本', 1);
-INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 50R（色確認）', '', 66000.0, 0.6, '本', 1);
-INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 50S（色確認）', '', 66000.0, 0.6, '本', 1);
-INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 50X（色確認）', '', 66000.0, 0.6, '本', 1);
-INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 60S（色確認）', '', 66000.0, 0.6, '本', 1);
-INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 60X（色確認）', '', 66000.0, 0.6, '本', 1);
+INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 40R（色確認）', '', 63000.0, 0.6, '本', 1);
+INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 50R（色確認）', '', 63000.0, 0.6, '本', 1);
+INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 50S（色確認）', '', 63000.0, 0.6, '本', 1);
+INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 50X（色確認）', '', 63000.0, 0.6, '本', 1);
+INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 60S（色確認）', '', 63000.0, 0.6, '本', 1);
+INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'RAVER ASSAULT ATTACK 60X（色確認）', '', 63000.0, 0.6, '本', 1);
 INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'TITANIUM BORON BURN Z1（色確認）', '', 66000.0, 0.6, '本', 1);
 INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'TITANIUM BORON BURN Z2（色確認）', '', 66000.0, 0.6, '本', 1);
 INSERT OR IGNORE INTO products (item_category, manufacturer, name, club_type, list_price, default_rate, unit, is_active) VALUES ('シャフト', 'REVE', 'IMPACT BORON R（色確認）', '', 54000.0, 0.6, '本', 1);
