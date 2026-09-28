@@ -28,6 +28,7 @@ import {
 import { enqueueAction } from "@/lib/ai-execution";
 import type { BlockInstance } from "@yozan/genesis-core/blocks";
 import { loadMemory, memoryPromptLines } from "@yozan/genesis-core/memory";
+import { focusPromptLines } from "@/lib/focus-pure";
 
 // 純粋な部分は jarvis-pure.ts（テスト tests/jarvis.test.ts で固定）。画面からはここ経由で使う。
 export { toBriefing, openingLine, jstHour, NAV_MAP, alertTag };
@@ -88,6 +89,8 @@ export async function loadBriefing(actor: GenesisActor, storeIds: string[] | nul
 export type JarvisTurnInput = {
   actor: GenesisActor;
   storeIds: string[] | null;
+  /** Focus / CEO モード（#304） */
+  focus?: { store: string | null; project: string | null; ceo: boolean; storeName?: string | null; projectName?: string | null } | null;
   said: string;
   history: { role: "user" | "assistant"; text: string }[];
   inputMode: "text" | "voice";
@@ -110,10 +113,10 @@ export type JarvisReply = {
 };
 
 /** Memory（#299）: 会社・店舗・本人の記憶を system prompt に。confidence<1 は「推定」と明示（AI推測と事実を分ける） */
-async function loadMemoryLines(admin: ReturnType<typeof createAdmin>, actor: GenesisActor): Promise<string[]> {
+async function loadMemoryLines(admin: ReturnType<typeof createAdmin>, actor: GenesisActor, focus?: JarvisTurnInput["focus"]): Promise<string[]> {
   try {
     const { toCoreActor, buildGenesisContext } = await import("@/core/actor");
-    const ctx = await buildGenesisContext(admin, await toCoreActor(admin, actor), actor.companyId, { surface: "web", enrich: false });
+    const ctx = await buildGenesisContext(admin, await toCoreActor(admin, actor), actor.companyId, { surface: "web", enrich: false, focus: focus ? { store: focus.store, project: focus.project } : null });
     const list = await loadMemory(admin, ctx, { limit: 40 });
     if (!list.length) return [];
     const ids = [...new Set(list.filter((m) => m.scope === "store" && m.scopeId).map((m) => m.scopeId as string))];
@@ -128,7 +131,7 @@ async function loadMemoryLines(admin: ReturnType<typeof createAdmin>, actor: Gen
   }
 }
 
-function systemPrompt(b: JarvisBriefing, toolCatalog: string, memoryLines: string[] = []): string {
+function systemPrompt(b: JarvisBriefing, toolCatalog: string, memoryLines: string[] = [], focusLines: string[] = []): string {
   return [
     "あなたは株式会社YOZANの統合AI「GENESIS」です。社長（古川博庸）の分身として、全社の状況を常に見ています。",
     "話し方: 落ち着いた執事。**声で読み上げる前提の話し言葉**で、1〜2文・40字以内を基本にする（長い説明を求められたときだけ3〜4文）。",
@@ -146,6 +149,7 @@ function systemPrompt(b: JarvisBriefing, toolCatalog: string, memoryLines: strin
     "- AIの直近の動き:",
     ...b.recent.map((r) => `  - ${r}`),
     "",
+    ...(focusLines.length ? [...focusLines, ""] : []),
     "## 覚えていること（会社のルール・店舗の事情・本人の好み。「推定」付きは AI の推測で未確認）",
     ...(memoryLines.length ? memoryLines : ["- （まだ無い）"]),
     "   「覚えておいて」「今後は〜にして」と言われたら tool の memory.remember（value に1文、scope は company/store/customer/user）。会話から推測して覚えるときは inferred:true。",
@@ -219,8 +223,9 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
 
   const { getCore } = await import("@/core/registry");
   const toolCatalog = getCore().registry.catalogText({ maxRisk: 1 });
-  const memoryLines = await loadMemoryLines(admin, input.actor);
-  const raw = await callClaude(systemPrompt(briefing, toolCatalog, memoryLines), messages, 900, { admin, companyId: input.actor.companyId, task: "plan" });
+  const memoryLines = await loadMemoryLines(admin, input.actor, input.focus);
+  const focusLines = input.focus ? focusPromptLines(input.focus, { store: input.focus.storeName, project: input.focus.projectName }) : [];
+  const raw = await callClaude(systemPrompt(briefing, toolCatalog, memoryLines, focusLines), messages, 900, { admin, companyId: input.actor.companyId, task: "plan" });
   if (!raw) {
     const out = {
       ...base,
@@ -275,7 +280,7 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
     if (!tool || tool.risk > 1) {
       out = { ...out, intent: "talk", reply: out.reply || "その確認はまだできません。" };
     } else {
-      const r = await runTool({ actor: input.actor, ref, input: (decision.tool?.args ?? {}) as Record<string, unknown>, surface: input.inputMode === "voice" ? "voice" : "web", origin: "jarvis", said });
+      const r = await runTool({ actor: input.actor, ref, input: (decision.tool?.args ?? {}) as Record<string, unknown>, surface: input.inputMode === "voice" ? "voice" : "web", origin: "jarvis", said, focus: input.focus ? { store: input.focus.store, project: input.focus.project } : null });
       const bl = blocksFromExecution(core.blocks, r);
       const count = r.rowCount ?? (r.output && typeof r.output.count === "number" ? Number(r.output.count) : null);
       out = {

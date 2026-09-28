@@ -16,6 +16,8 @@ import { DrillPanel } from "@/components/home/drill-panel";
 import { TodoHotkeys } from "@/components/home/todo-hotkeys";
 import { SystemCards } from "@/components/home/system-cards";
 import { getSystemCards } from "@/lib/system-links";
+import { readFocus } from "@/lib/focus";
+import { BlockList } from "@/components/blocks";
 import { cancelActionForm } from "./executions/actions";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +35,21 @@ type SP = { panel?: string; next?: string; drill?: string; store?: string; kind?
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireGenesisActor();
   const sp = await searchParams;
-  const [home, systemCards] = await Promise.all([getHomeData(actor, { includeChecks: sp.checks === "1" }), getSystemCards(actor)]);
+  const [home, systemCards, focus] = await Promise.all([getHomeData(actor, { includeChecks: sp.checks === "1" }), getSystemCards(actor), readFocus(actor)]);
+  // CEO モード（#304）: 経営者向けの月次まとめ（skill.executive_report）を最上段に。Tool を通るので出典つき
+  const ceo = focus.ceo
+    ? await (async () => {
+        try {
+          const { runTool } = await import("@/core/run");
+          const { getCore } = await import("@/core/registry");
+          const { blocksFromExecution } = await import("@yozan/genesis-core/render");
+          const r = await runTool({ actor, ref: "skill.executive_report", input: {}, origin: "home:ceo", focus: { store: focus.store, project: focus.project } });
+          return r.status === "ok" ? { summary: String((r.output as { summary?: string } | null)?.summary ?? ""), blocks: blocksFromExecution(getCore().blocks, r) } : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
   const { cockpit: d, score, todos, undo, stalled, checks } = home;
   const showChecksLine = !sp.checks && !isMonthlyCheckDay() && checks.length > 0;
 
@@ -103,6 +119,18 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <Jarvis opening={openingLine(briefing)} name={actor.name} />
         </div>
       </div>
+
+      {/* CEO モード（#304）: 今月の経営の数字を先に */}
+      {ceo ? (
+        <section className="rounded-xl border border-(--color-gold)/40 bg-(--color-panel) p-4">
+          <p className="text-[11px] font-bold tracking-[0.2em] text-(--color-gold)">CEO モード · 今月の状況</p>
+          <p className="mt-1 text-lg font-bold">{ceo.summary}</p>
+          <details className="mt-2">
+            <summary className="cursor-pointer text-sm text-(--color-dim)">内訳（店舗別売上・事業別収支・会員・体験・経費）</summary>
+            <BlockList blocks={ceo.blocks} />
+          </details>
+        </section>
+      ) : null}
 
       {/* ① 止まっているもの */}
       <StalledBand items={stalled} />

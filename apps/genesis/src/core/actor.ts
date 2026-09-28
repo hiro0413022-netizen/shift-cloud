@@ -61,15 +61,21 @@ export async function buildGenesisContext(
   admin: Admin,
   actor: CoreActor,
   companyId: string,
-  opts: { surface?: Surface; storeId?: string | null; enrich?: boolean } = {}
+  opts: { surface?: Surface; storeId?: string | null; enrich?: boolean; focus?: { store?: string | null; project?: string | null } | null } = {}
 ): Promise<GenesisContext> {
   const { data: company } = await admin.from("companies").select("id, name").eq("id", companyId).maybeSingle();
   let store: GenesisContext["store"] = null;
-  const storeId = opts.storeId ?? null;
+  // Focus（#304）: 店舗を明示していなければ Focus の店舗を使う。案件は ctx.project / focus.projectId に
+  const storeId = opts.storeId ?? opts.focus?.store ?? null;
   if (storeId) {
     const { data: s } = await admin.from("stores").select("id, name").eq("id", storeId).maybeSingle();
     if (s) store = { id: String(s.id), name: String(s.name) };
   }
-  const ctx = baseContext({ actor, company: { id: companyId, name: String(company?.name ?? ""), kind: "operating" }, surface: opts.surface ?? "web", store });
+  const focus = opts.focus?.store || opts.focus?.project ? { ...(opts.focus?.store ? { stores: [opts.focus.store] } : {}), ...(opts.focus?.project ? { projectId: opts.focus.project } : {}) } : null;
+  const ctx = baseContext({ actor, company: { id: companyId, name: String(company?.name ?? ""), kind: "operating" }, surface: opts.surface ?? "web", store, focus });
+  if (opts.focus?.project) {
+    const { data: p } = await admin.from("gn_projects").select("id, name").eq("id", opts.focus.project).eq("company_id", companyId).maybeSingle();
+    if (p) ctx.project = { id: String(p.id), name: String(p.name) };
+  }
   return opts.enrich === false ? ctx : enrichContext(admin, ctx);
 }

@@ -33,11 +33,23 @@ export async function runTool(args: {
   title?: string;
   /** JARVIS など、元の発話 */
   said?: string | null;
+  /** Focus（#304）: 省略時は cookie から読む（画面からの呼び出し） */
+  focus?: { store?: string | null; project?: string | null } | null;
 }): Promise<RunResult> {
   const admin = createAdmin();
   const core = getCore();
   const coreActor = await toCoreActor(admin, args.actor);
-  const context = await buildGenesisContext(admin, coreActor, args.actor.companyId, { surface: args.surface ?? "web", storeId: args.storeId ?? null });
+  let focus = args.focus;
+  if (focus === undefined) {
+    try {
+      const { readFocus } = await import("@/lib/focus");
+      const f = await readFocus(args.actor);
+      focus = { store: f.store, project: f.project };
+    } catch {
+      focus = null;
+    }
+  }
+  const context = await buildGenesisContext(admin, coreActor, args.actor.companyId, { surface: args.surface ?? "web", storeId: args.storeId ?? null, focus });
   return runWithContext({ admin, context, ref: args.ref, input: args.input, origin: args.origin ?? "api", title: args.title, said: args.said ?? null, createdBy: args.actor.staffId });
 }
 
