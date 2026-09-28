@@ -7,6 +7,8 @@ import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cro
 import { runBillingDaySweep } from "@/lib/frank-billing-day";
 import { runSchedulerTick, withJobRun } from "@yozan/genesis-core/scheduler";
 import { runRuleAct, runWorkflowForEvent } from "@/core/run";
+import { indexSemantic } from "@yozan/genesis-core/semantic";
+import { embedTexts, hasEmbedKey } from "@yozan/genesis-core/embed";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,7 +42,11 @@ export async function GET(req: NextRequest) {
         // Workflow（#298）: イベント → 宣言された手順を Core 経由で
         runWorkflow: (wf, ev) => runWorkflowForEvent(admin, wf, ev),
       }).catch((e) => ({ error: String(e) }));
-      results.push({ company: c.id, ...r, sns, core });
+      // Semantic Search の増分取り込み（#300）: 1 tick 300 本まで（maxDuration 60秒に収める）。GEMINI_API_KEY が無ければ何もしない
+      const embed = hasEmbedKey()
+        ? await withJobRun(admin, "embed:index", String(c.id), () => indexSemantic(admin, String(c.id), (t, k) => embedTexts(t, k, { admin, companyId: String(c.id) }), { budget: Number(process.env.GENESIS_EMBED_BUDGET ?? 300) })).catch((e) => ({ error: String(e) }))
+        : { skipped: "GEMINI_API_KEY 未設定" };
+      results.push({ company: c.id, ...r, sns, core, embed });
     } catch (e) {
       results.push({ company: c.id, error: String(e) });
     }

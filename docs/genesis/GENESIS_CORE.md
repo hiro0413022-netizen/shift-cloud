@@ -54,6 +54,10 @@ cron は各アプリが持つが、記録は `gn_job_runs` 1つ（`withJobRun(ad
 
 `gn_memories` 5スコープ（user / company / store / customer / project）。読むのは `enrichContext`（Tool は `ctx.context.memory` を見る）。書くのは `memory.remember@1`（人=1.0・AI=0.6 推定）。人が `memory.confirm` で確定。JARVIS の system prompt「覚えていること」に入る（推定は明示）。画面は /memories。
 
+## Semantic Search（P4-b・#300）
+
+`gn_embeddings`（768次元・Gemini）。対象は `packages/genesis-core/src/semantic.ts` の `SOURCES`（L3 は入れない）。取り込みは cron:execute の `embed:index`（増分・(created_at,id) カーソル）。検索は Tool `search.semantic@1`。source を足すときは SOURCES に1行（text / title / entity / at）。
+
 ## 次（P1）
 
 Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

@@ -25,6 +25,8 @@
     "./skill": "./src/skill.ts",
     "./workflow": "./src/workflow.ts",
     "./memory": "./src/memory.ts",
+    "./embed": "./src/embed.ts",
+    "./semantic": "./src/semantic.ts",
     "./tools/memory": "./src/tools/memory.ts",
     "./skills": "./src/skills/index.ts",
     "./scheduler": "./src/scheduler.ts",

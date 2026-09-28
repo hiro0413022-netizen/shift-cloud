@@ -12,7 +12,7 @@ export function createFakeAdmin(seed: Record<string, Row[]> = {}) {
   function builder(table: string) {
     const rows = () => (tables[table] ??= []);
     const filters: Array<(r: Row) => boolean> = [];
-    let mode: "select" | "insert" | "update" = "select";
+    let mode: "select" | "insert" | "update" | "upsert" = "select";
     let payload: Row | Row[] | null = null;
     let countMode = false;
     let head = false;
@@ -44,6 +44,13 @@ export function createFakeAdmin(seed: Record<string, Row[]> = {}) {
         mode = "update";
         payload = p;
       });
+    let conflictCols: string[] = [];
+    api.upsert = (p: Row | Row[], o?: { onConflict?: string }) =>
+      chain(() => {
+        mode = "upsert";
+        payload = p;
+        conflictCols = (o?.onConflict ?? "id").split(",").map((x) => x.trim());
+      });
     api.eq = (k: string, v: unknown) => chain(() => filters.push((r) => r[k] === v));
     api.neq = (k: string, v: unknown) => chain(() => filters.push((r) => r[k] !== v));
     api.in = (k: string, vs: unknown[]) => chain(() => filters.push((r) => vs.includes(r[k])));
@@ -52,6 +59,35 @@ export function createFakeAdmin(seed: Record<string, Row[]> = {}) {
     api.lte = (k: string, v: unknown) => chain(() => filters.push((r) => String(r[k]) <= String(v)));
     api.lt = (k: string, v: unknown) => chain(() => filters.push((r) => String(r[k]) < String(v)));
     api.gt = (k: string, v: unknown) => chain(() => filters.push((r) => String(r[k]) > String(v)));
+    // PostgREST の or 文字列（カーソル用の形だけ）: 'a.gt.X,and(a.eq.X,b.gt.Y)'
+    api.or = (expr: string) =>
+      chain(() => {
+        const cmp = (r: Row, cond: string) => {
+          const m = /^([a-z_]+)\.(gt|gte|lt|lte|eq)\.(.*)$/.exec(cond.trim());
+          if (!m) return false;
+          const [, k, op, v] = m;
+          const a = String(r[k] ?? "");
+          return op === "gt" ? a > v : op === "gte" ? a >= v : op === "lt" ? a < v : op === "lte" ? a <= v : a === v;
+        };
+        const parts: string[] = [];
+        let depth = 0;
+        let cur = "";
+        for (const ch of expr) {
+          if (ch === "(") depth += 1;
+          if (ch === ")") depth -= 1;
+          if (ch === "," && depth === 0) {
+            parts.push(cur);
+            cur = "";
+          } else cur += ch;
+        }
+        if (cur) parts.push(cur);
+        filters.push((r) =>
+          parts.some((p) => {
+            const and = /^and\((.*)\)$/.exec(p.trim());
+            return and ? and[1].split(",").every((c) => cmp(r, c)) : cmp(r, p);
+          })
+        );
+      });
     api.ilike = (k: string, v: string) => chain(() => filters.push((r) => String(r[k] ?? "").toLowerCase().includes(v.replace(/%/g, "").toLowerCase())));
     api.order = (k: string, o?: { ascending?: boolean }) =>
       chain(() => {
@@ -76,6 +112,15 @@ export function createFakeAdmin(seed: Record<string, Row[]> = {}) {
         }
         const data = single ? inserted[0] : inserted;
         return { data, error: null };
+      }
+      if (mode === "upsert") {
+        const list = Array.isArray(payload) ? payload : [payload!];
+        for (const p of list) {
+          const hit = rows().find((r) => conflictCols.every((c) => String(r[c] ?? "") === String(p[c] ?? "")));
+          if (hit) Object.assign(hit, p);
+          else rows().push({ id: nextId(), created_at: new Date().toISOString(), ...p });
+        }
+        return { data: single ? list[0] : list, error: null };
       }
       let matched = rows().filter((r) => filters.every((f) => f(r)));
       if (mode === "update") {

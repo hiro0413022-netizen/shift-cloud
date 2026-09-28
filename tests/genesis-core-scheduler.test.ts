@@ -160,5 +160,5 @@ test("Self Healing（#296）: staleJobs は期待より古い・失敗した・�
   assert.equal(byJob["cron:daily"].ageMin, 36 * 60);
   assert.equal(byJob["cron:outreach"].lastError, "SMTP down");
   assert.equal(byJob["cron:prospect"].ageMin, null); // 記録なし
-  assert.equal(JOB_EXPECTATIONS.length, 4);
+  assert.equal(JOB_EXPECTATIONS.length, 5);
 });

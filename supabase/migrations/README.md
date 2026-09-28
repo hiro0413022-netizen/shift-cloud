@@ -80,3 +80,4 @@
 - ✅ `0212_genesis_job_runs_view_rule.sql` — 適用済（2026-09-28、MCP name=0212_genesis_job_runs_view_rule。gnv_job_runs（hq のみ）とルール jobs_stale（止まっている定期処理 → critical） #296）
 - ✅ `0213_frank_light_plan_note.sql` — 適用済（2026-09-28、MCP name=0212_frank_light_plan_note ※MCP側の名前は番号がずれている。frunk_plans「ライト会員」の note を「月4回まで／平日10:00〜15:00」に #297）
 - ✅ `0213_genesis_memories.sql` — 適用済（2026-09-28、MCP name=0213_genesis_memories。Genesis Memory gn_memories（5スコープ・1表）＋ gnv_memories（hq）。business_memories 3件・decision_logs 18件を company へ取り込み、コード埋め込みルール5件（YOZAN）を seed #299）
+- ✅ `0214_genesis_embeddings.sql` — 適用済（2026-09-28、MCP name=0214_genesis_embeddings。`vector` 拡張を有効化・gn_embeddings（768次元・HNSW）・gn_embed_cursors・RPC gn_semantic_search（service_role のみ）。動作確認: ダミー1行を入れて similarity=1 が返ることを確認後に削除 #300）

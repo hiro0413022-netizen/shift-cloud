@@ -22,6 +22,7 @@ export const JOB_EXPECTATIONS: Array<{ job: string; maxAgeMin: number; label: st
   { job: "cron:daily", maxAgeMin: 26 * 60, label: "毎朝の日次処理（CEOレポート・月会費・KPI）" },
   { job: "cron:prospect", maxAgeMin: 26 * 60, label: "営業先の自動ピックアップ（demo-sales）" },
   { job: "cron:outreach", maxAgeMin: 2 * 60, label: "営業メールの毎時tick（demo-sales）" },
+  { job: "embed:index", maxAgeMin: 60, label: "意味検索の取り込み（レッスンコメント・会話メモ・記憶）" },
 ];
 
 export type StaleJob = { job: string; label: string; ageMin: number | null; maxAgeMin: number; lastOk: boolean | null; lastError: string | null };
