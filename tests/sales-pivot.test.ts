@@ -74,3 +74,12 @@ test("CSVはBOM付きでExcelで開ける形、合計行がある", () => {
   assert.match(csv, /\r\n安東,2,3,12000,4000\r\n/);
   assert.match(csv, /合計,4,5,17000/);
 });
+
+test("並べ替え: 件数の少ない順・名前順・列の金額順（担当なしはいつも最後）", async () => {
+  const { sortPivotRows, defaultSort } = await import("../apps/money-golfwing/src/lib/pivot.ts");
+  const p = buildPivot(filterRows(explode(FACTS), { q: "パーソナル" }), "pro", "month");
+  assert.deepEqual(sortPivotRows(p, "count", "asc").map((r) => r.label), ["古川", "安東", "（担当なし）"]);
+  assert.deepEqual(sortPivotRows(p, "col:2026-08", "desc").map((r) => r.label)[0], "古川");
+  assert.equal(sortPivotRows(p, "label", "desc").at(-1)?.label, "（担当なし）");
+  assert.deepEqual(defaultSort("month"), { sort: "label", dir: "asc" });
+});

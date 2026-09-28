@@ -236,3 +236,44 @@ export function pivotCsv(p: Pivot): string {
   lines.push(tot.map(esc).join(","));
   return "﻿" + lines.join("\r\n") + "\r\n";
 }
+
+/* ------------------------------------------------------------------
+   並べ替え（#287・2026-09-28 ユーザー依頼「もっと直観的にソートかけれるように」）
+   表の見出しを押す／「並び順」ボタンで並べ替える。
+     sort: amount（金額）/ count（件数）/ qty（回数）/ unit（1回あたり）/ label（名前・日付順）
+           / col:<列のkey>（その列の金額）
+     dir : desc（多い順・新しい順）/ asc
+   未設定（担当なし等）は並び順にかかわらず最後。
+   ------------------------------------------------------------------ */
+
+export type SortKey = "amount" | "count" | "qty" | "unit" | "label" | `col:${string}`;
+export type SortDir = "asc" | "desc";
+
+export function isSortKey(v: unknown): v is SortKey {
+  return typeof v === "string" && (["amount", "count", "qty", "unit", "label"].includes(v) || v.startsWith("col:"));
+}
+
+/** その軸の「ふつうの並び」。月・日は古い順、それ以外は金額の多い順 */
+export function defaultSort(rowDim: Dim): { sort: SortKey; dir: SortDir } {
+  return rowDim === "month" || rowDim === "date" ? { sort: "label", dir: "asc" } : { sort: "amount", dir: "desc" };
+}
+
+export function sortPivotRows(p: Pivot, sort: SortKey, dir: SortDir): Pivot["rows"] {
+  const val = (r: Pivot["rows"][number]): number | string => {
+    if (sort === "label") return p.rowDim === "month" || p.rowDim === "date" ? r.key : r.label;
+    if (sort === "count") return r.total.count;
+    if (sort === "qty") return r.total.qty;
+    if (sort === "unit") return unitPrice(r.total);
+    if (sort.startsWith("col:")) return p.cells.get(cellKey(r.key, sort.slice(4)))?.amount ?? 0;
+    return r.total.amount;
+  };
+  const sign = dir === "asc" ? 1 : -1;
+  return [...p.rows].sort((a, b) => {
+    if (!a.key && b.key) return 1;
+    if (a.key && !b.key) return -1;
+    const x = val(a);
+    const y = val(b);
+    const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "ja");
+    return c * sign || a.label.localeCompare(b.label, "ja");
+  });
+}
