@@ -5,6 +5,8 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { searchNav } from "@/lib/nav";
 import { storeInValues } from "@/lib/kernel";
 import { MEMBER_OS_URL, LESSON_OS_URL } from "@/lib/store-links";
+import { semanticSearch } from "@yozan/genesis-core/semantic";
+import { embedTexts, hasEmbedKey } from "@yozan/genesis-core/embed";
 
 /**
  * Ctrl K の横断検索（#244 ⑤）。
@@ -15,6 +17,8 @@ import { MEMBER_OS_URL, LESSON_OS_URL } from "@/lib/store-links";
  */
 export type SearchHit =
   | { kind: "screen"; href: string; label: string; sub: string }
+  /** #301 Universal Search: 文章（レッスンコメント・会話メモ・記憶）の意味検索と、記憶の文字一致 */
+  | { kind: "text"; href: string; label: string; sub: string }
   | {
       kind: "person";
       key: string;
@@ -72,6 +76,36 @@ export async function searchEverything(q: string): Promise<SearchHit[]> {
       return qb.then((r) => (r.error ? [] : ((r.data ?? []) as Record<string, unknown>[])));
     })(),
   ]);
+
+  // #301: Genesis の記憶（文字一致・軽い）と、文章の意味検索（6文字以上・GEMINI_API_KEY があるときだけ。埋め込み1回≒数トークン）
+  const [memories, texts] = await Promise.all([
+    admin
+      .from("gn_memories")
+      .select("id, scope, value, confidence")
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .in("scope", actor.isOwner ? ["company", "store", "project", "user", "customer"] : ["company", "store"])
+      .ilike("value", `%${query.replace(/[%_]/g, "")}%`)
+      .limit(3)
+      .then((r) => (r.error ? [] : ((r.data ?? []) as Record<string, unknown>[])), () => [] as Record<string, unknown>[]),
+    query.length >= 6 && hasEmbedKey()
+      ? (async () => {
+          try {
+            const { toCoreActor, buildGenesisContext } = await import("@/core/actor");
+            const ctx = await buildGenesisContext(admin, await toCoreActor(admin, actor), actor.companyId, { surface: "web", enrich: false });
+            return await semanticSearch(admin, ctx, (t, k) => embedTexts(t, k, { admin, companyId: actor.companyId }), query, { limit: 4 });
+          } catch {
+            return [];
+          }
+        })()
+      : Promise.resolve([]),
+  ]);
+  for (const m of memories) {
+    hits.push({ kind: "text", href: "/memories", label: String(m.value).slice(0, 60), sub: `記憶（${String(m.scope)}）${Number(m.confidence) < 1 ? "・推定" : ""}` });
+  }
+  for (const t of texts.filter((x) => x.similarity >= 0.55)) {
+    hits.push({ kind: "text", href: `/?ask=${encodeURIComponent(`「${query}」に近い過去のコメントや会話メモを探して`)}`, label: t.chunk.replace(/\s+/g, " ").slice(0, 70), sub: `${t.label}${t.at ? "・" + t.at : ""}・${t.title}` });
+  }
 
   for (const m of frank) {
     const name = String(m.name ?? "");

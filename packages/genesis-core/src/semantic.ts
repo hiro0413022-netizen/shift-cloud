@@ -34,15 +34,6 @@ const s = (v: unknown): string => (v == null ? "" : String(v)).trim();
 
 export const SOURCES: SemanticSource[] = [
   {
-    name: "sc_comments", table: "sc_comments", label: "レッスンコメント",
-    select: "id, coach_name, student_ref, course, body, symptom_key, created_at",
-    text: (r) => s(r.body),
-    title: (r) => [s(r.created_at).slice(0, 10), s(r.coach_name), s(r.student_ref) ? `生徒 ${s(r.student_ref)}` : "", s(r.course)].filter(Boolean).join(" · "),
-    entity: (r) => (s(r.student_ref) ? { kind: "person", id: s(r.student_ref) } : null),
-    at: (r) => s(r.created_at),
-    companyCol: "company_id",
-  },
-  {
     name: "lsn_lesson_notes", table: "lsn_lesson_notes", label: "会話メモ（レッスンノート）",
     select: "id, student_id, lesson_date, body, share_body, created_at, deleted_at",
     text: (r) => s(r.body) || s(r.share_body),
@@ -71,6 +62,16 @@ export const SOURCES: SemanticSource[] = [
     at: (r) => s(r.created_at),
     companyCol: "company_id",
     softDelete: true,
+  },
+  // 4万件の大物は最後（小さい source が先に終わるように）
+  {
+    name: "sc_comments", table: "sc_comments", label: "レッスンコメント",
+    select: "id, coach_name, student_ref, course, body, symptom_key, created_at",
+    text: (r) => s(r.body),
+    title: (r) => [s(r.created_at).slice(0, 10), s(r.coach_name), s(r.student_ref) ? `生徒 ${s(r.student_ref)}` : "", s(r.course)].filter(Boolean).join(" · "),
+    entity: (r) => (s(r.student_ref) ? { kind: "person", id: s(r.student_ref) } : null),
+    at: (r) => s(r.created_at),
+    companyCol: "company_id",
   },
 ];
 

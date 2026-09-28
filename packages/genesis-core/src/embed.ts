@@ -11,8 +11,10 @@ export const EMBED_MODEL = process.env.GENESIS_EMBED_MODEL || "gemini-embedding-
 export type EmbedKind = "document" | "query";
 export type EmbedFn = (texts: string[], kind: EmbedKind) => Promise<number[][]>;
 
-/** 1リクエスト最大 100 本（Gemini batchEmbedContents の上限） */
-const BATCH = 100;
+/** 1リクエストの本数。上限は 100 だが、無料枠の分あたりトークン制限（429 Resource exhausted）に当たったので小さく刻む */
+const BATCH = Number(process.env.GENESIS_EMBED_BATCH ?? 25);
+const RETRY = 3;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function hasEmbedKey(): boolean {
   return !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
@@ -28,21 +30,35 @@ export async function embedTexts(texts: string[], kind: EmbedKind = "document", 
   for (let i = 0; i < texts.length; i += BATCH) {
     const slice = texts.slice(i, i + BATCH);
     chars += slice.reduce((s, t) => s + t.length, 0);
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:batchEmbedContents?key=${encodeURIComponent(key)}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        requests: slice.map((t) => ({
-          model: `models/${EMBED_MODEL}`,
-          content: { parts: [{ text: t.slice(0, 6000) }] },
-          taskType: kind === "query" ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT",
-          outputDimensionality: EMBED_DIM,
-        })),
-      }),
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
+    const body = JSON.stringify({
+      requests: slice.map((t) => ({
+        model: `models/${EMBED_MODEL}`,
+        content: { parts: [{ text: t.slice(0, 6000) }] },
+        taskType: kind === "query" ? "RETRIEVAL_QUERY" : "RETRIEVAL_DOCUMENT",
+        outputDimensionality: EMBED_DIM,
+      })),
     });
-    if (!res.ok) throw new Error(`Gemini embed HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const json = (await res.json()) as { embeddings?: Array<{ values?: number[] }> };
+    let json: { embeddings?: Array<{ values?: number[] }> } | null = null;
+    for (let attempt = 0; attempt <= RETRY; attempt += 1) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${EMBED_MODEL}:batchEmbedContents?key=${encodeURIComponent(key)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000),
+      });
+      if (res.ok) {
+        json = (await res.json()) as { embeddings?: Array<{ values?: number[] }> };
+        break;
+      }
+      const text = (await res.text()).replace(/\s+/g, " ").slice(0, 160);
+      // 429 / 503 は少し待って再試行（無料枠の分あたり制限）。それ以外は即失敗
+      if ((res.status === 429 || res.status === 503) && attempt < RETRY) {
+        await sleep(2_000 * (attempt + 1));
+        continue;
+      }
+      throw new Error(`Gemini embed HTTP ${res.status}: ${text}`);
+    }
+    if (!json) throw new Error("Gemini embed: 応答なし");
     const vecs = (json.embeddings ?? []).map((e) => e.values ?? []);
     if (vecs.length !== slice.length) throw new Error(`Gemini embed: 返った本数が違う（${vecs.length}/${slice.length}）`);
     for (const v of vecs) {

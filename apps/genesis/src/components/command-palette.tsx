@@ -16,12 +16,13 @@ export function openPalette(q = "") {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { q } }));
 }
 
-type Row = { kind: "screen" | "person" | "action" | "ask"; label: string; sub: string; href: string; external: boolean };
+type Row = { kind: "screen" | "person" | "action" | "ask" | "text"; label: string; sub: string; href: string; external: boolean };
 
 function flatten(hits: SearchHit[]): Row[] {
   const rows: Row[] = [];
   for (const h of hits) {
     if (h.kind === "screen") rows.push({ kind: "screen", label: h.label, sub: h.sub, href: h.href, external: false });
+    else if (h.kind === "text") rows.push({ kind: "text", label: h.label, sub: h.sub, href: h.href, external: false });
     else {
       const [first, ...rest] = h.actions;
       rows.push({ kind: "person", label: h.name, sub: h.sub, href: first?.href ?? "#", external: first?.external ?? true });
@@ -149,11 +150,11 @@ export function CommandPalette() {
               }`}
             >
               <Icon
-                name={r.kind === "screen" ? "arrow" : r.kind === "person" ? "user" : r.kind === "ask" ? "search" : "send"}
+                name={r.kind === "screen" ? "arrow" : r.kind === "person" ? "user" : r.kind === "ask" || r.kind === "text" ? "search" : "send"}
                 size={18}
                 className={i === sel ? "text-(--color-accent)" : "text-(--color-dim)"}
               />
-              <span className={`text-[15px] ${r.kind === "action" ? "text-(--color-dim)" : r.kind === "ask" ? "text-(--color-accent)" : "font-bold"}`}>{r.label}</span>
+              <span className={`text-[15px] ${r.kind === "action" ? "text-(--color-dim)" : r.kind === "ask" ? "text-(--color-accent)" : r.kind === "text" ? "" : "font-bold"}`}>{r.label}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-(--color-faint)">{r.sub}</span>
               {r.external && <span className="text-[11px] text-(--color-faint)">別タブ</span>}
             </button>

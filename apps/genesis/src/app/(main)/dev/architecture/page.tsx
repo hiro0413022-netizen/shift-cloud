@@ -32,6 +32,9 @@ export default async function ArchitecturePage({ searchParams }: { searchParams:
   const jobRuns = await admin.from("gn_job_runs").select("job, started_at, ok, error").order("started_at", { ascending: false }).limit(200);
   const lastByJob = new Map<string, { started_at: string; ok: boolean | null; error: string | null }>();
   for (const r of (jobRuns.data ?? []) as Array<{ job: string; started_at: string; ok: boolean | null; error: string | null }>) if (!lastByJob.has(r.job)) lastByJob.set(r.job, r);
+  // 意味検索の取り込み進捗（#300）
+  const cursors = await admin.from("gn_embed_cursors").select("source, indexed, cursor_at, last_error, updated_at").eq("company_id", actor.companyId).then((r) => (r.data ?? []) as Array<{ source: string; indexed: number; cursor_at: string | null; last_error: string | null; updated_at: string }>, () => []);
+  const embCount = await admin.from("gn_embeddings").select("id", { count: "exact", head: true }).eq("company_id", actor.companyId).then((r) => r.count ?? 0, () => 0);
 
   const kpi = (label: string, value: string | number, sub?: string, tone?: "ok" | "warn" | "danger") => (
     <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-3">
@@ -169,7 +172,10 @@ export default async function ArchitecturePage({ searchParams }: { searchParams:
             })}
           </tbody>
         </table>
-        <p className="mt-2 text-[11px] text-(--color-dim)">記録は gn_job_runs（withJobRun）。Ask Data では gnv_job_runs。止まると Inbox にルール jobs_stale が出る（cron:execute 自身が止まるとルールも走らないので、この画面と health.check で見る）。</p>
+        <p className="mt-2 text-[11px] text-(--color-dim)">
+          意味検索の取り込み（gn_embeddings {embCount.toLocaleString("ja-JP")} 本）: {cursors.length ? cursors.map((c) => `${c.source} ${Number(c.indexed).toLocaleString("ja-JP")}${c.last_error ? "（エラー: " + c.last_error.slice(0, 40) + "）" : ""}`).join(" · ") : "未開始（GEMINI_API_KEY があれば 10 分ごとに 300 本ずつ）"}
+        </p>
+        <p className="mt-1 text-[11px] text-(--color-dim)">記録は gn_job_runs（withJobRun）。Ask Data では gnv_job_runs。止まると Inbox にルール jobs_stale が出る（cron:execute 自身が止まるとルールも走らないので、この画面と health.check で見る）。</p>
       </Panel>
 
       <Panel title="直近の実行（30件）">
