@@ -22,6 +22,7 @@ export const CADDY_OS_URL = "https://caddy-os-omega.vercel.app";
 export const SURVEY_OS_URL = "https://survey-os-mu.vercel.app";
 export const DEMO_SALES_URL = "https://demo-sales-delta.vercel.app";
 export const HP_ADMIN_URL = "https://yozan-hp-admin.vercel.app";
+export const MINUTES_URL = "https://minutes-eta-gray.vercel.app";
 
 export type LauncherLink = { label: string; href: string; /** 状態つきの入口（今日の件数など）か */ status?: boolean };
 export type LauncherCard = {
@@ -180,6 +181,7 @@ export const SYSTEM_CARDS: SystemCard[] = [
   { key: "sales", name: "AI DEMO SALES", note: "HP制作営業・デモ", href: DEMO_SALES_URL, icon: "spark" },
   { key: "survey", name: "Survey OS", note: "アンケート・集計", href: SURVEY_OS_URL, icon: "check" },
   { key: "legal", name: "Legal OS", note: "契約書・法務", href: LEGAL_OS_URL, icon: "check" },
+  { key: "minutes", name: "議事録", note: "会議の録音・文字起こし・場面別の要約", href: MINUTES_URL, icon: "doc" },
 ];
 
 export type RawLink = { id: string; label: string; url: string; note: string | null; store?: string | null };

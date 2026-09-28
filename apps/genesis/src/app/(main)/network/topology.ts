@@ -267,6 +267,21 @@ export const NODES: SystemNode[] = [
     iy: 700,
   },
   {
+    id: "minutes",
+    name: "議事録",
+    kind: "app",
+    status: "prod",
+    url: "https://minutes-eta-gray.vercel.app",
+    healthUrl: "https://minutes-eta-gray.vercel.app/login",
+    schema: "mtg_（meetings / segments）＋ minutes-audio",
+    description:
+      "会議の録音→文字起こし→場面別の要約（社内定例・契約・開発・営業・ヒアリング・法務・弁護士・1on1）→人が確認して確定。機密レベルL1/L2/L3は作成時に固定し、AIの行き先は levels.ts の1か所で決める。L3（秘匿）は外部AIに流さず、フェーズ3のYOZAN専用LLMサーバーで処理する。音声は文字起こし後に即削除。",
+    flow: "minutes.svg",
+    aliases: ["minutes", "議事録", "文字起こし", "会議"],
+    ix: 1170,
+    iy: 340,
+  },
+  {
     id: "report-os",
     name: "Report OS",
     kind: "script",
@@ -430,6 +445,18 @@ export const NODES: SystemNode[] = [
     ix: 520,
     iy: 1000,
   },
+  {
+    id: "ext-gemini",
+    name: "Google Gemini（AI）",
+    kind: "external",
+    status: "external",
+    description:
+      "音声の文字起こしと要約（lesson-os 会話メモ・AIカルテナレッジ・議事録L1/L2）。議事録のL3（秘匿）は使わない。",
+    flow: "minutes.svg",
+    aliases: ["gemini", "google ai"],
+    ix: 1170,
+    iy: 180,
+  },
 ];
 
 export const EDGES: SystemEdge[] = [
@@ -467,6 +494,9 @@ export const EDGES: SystemEdge[] = [
   { from: "inventory-os", to: "money-golfwing", label: "棚卸資産・売上原価(inv_monthly_valuation)", type: "kpi" },
   { from: "inventory-os", to: "report-os", label: "物販の在庫回転・粗利", type: "kpi" },
   { from: "reserve-os", to: "supabase", label: "res_", type: "data" },
+  // 議事録（#282）: L1/L2 は Gemini、L3 はフェーズ3のYOZAN専用LLMサーバーだけ（外部AIに流さない）
+  { from: "minutes", to: "supabase", label: "mtg_（L3の中身は置かない）", type: "data" },
+  { from: "minutes", to: "ext-gemini", label: "文字起こし・要約（L1/L2のみ）", type: "external" },
   // 申込 → スタッフの「やること」(sp_tasks 店舗共通タスク)。DECISIONS #55
   { from: "reserve-os", to: "shift-cloud", label: "申込→やること(sp_tasks)", type: "data" },
   { from: "caddy-os", to: "supabase", label: "cad_", type: "data" },
@@ -516,6 +546,7 @@ export const FLOW_LIST: { file: string; title: string }[] = [
   { file: "report-os.svg", title: "Report OS（月次資料）" },
   { file: "genesis-secretary.svg", title: "GENESIS — CEO AI秘書 / Inbox" },
   { file: "sales-os.svg", title: "Sales OS（営業サポート）" },
+  { file: "minutes.svg", title: "議事録（録音・文字起こし・要約）" },
   { file: "frank-golf.svg", title: "FRANK GOLF 公式サイト（姫路）" },
 ];
 

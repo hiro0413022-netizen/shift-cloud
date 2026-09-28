@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // @yozan/core はTSソースのまま提供されるため必須（#278で cash-ledger を core に移したのに入れ忘れ、以降ビルドが全部失敗していた）
+  transpilePackages: ["@yozan/core"],
   // exceljs はCJS＋Node依存。バンドルさせずNode側でrequireする（/api/sales/export）
   serverExternalPackages: ["exceljs"],
   experimental: {
