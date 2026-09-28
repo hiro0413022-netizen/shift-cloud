@@ -35,7 +35,8 @@ type SP = { panel?: string; next?: string; drill?: string; store?: string; kind?
 export default async function HomePage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireGenesisActor();
   const sp = await searchParams;
-  const [home, systemCards, focus] = await Promise.all([getHomeData(actor, { includeChecks: sp.checks === "1" }), getSystemCards(actor), readFocus(actor)]);
+  const focus = await readFocus(actor);
+  const [home, systemCards] = await Promise.all([getHomeData(actor, { includeChecks: sp.checks === "1", storeIds: focus.store ? [focus.store] : null }), getSystemCards(actor)]);
   // CEO モード（#304）: 経営者向けの月次まとめ（skill.executive_report）を最上段に。Tool を通るので出典つき
   const ceo = focus.ceo
     ? await (async () => {

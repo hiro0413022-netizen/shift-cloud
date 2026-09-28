@@ -11,7 +11,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function TodoPage() {
   const actor = await requireGenesisActor();
-  const { todos, stalled } = await getHomeData(actor);
+  const { readFocus } = await import("@/lib/focus");
+  const focus = await readFocus(actor);
+  const { todos, stalled } = await getHomeData(actor, { storeIds: focus.store ? [focus.store] : null });
   return (
     <div className="space-y-4">
       <div className="flex items-baseline gap-3">

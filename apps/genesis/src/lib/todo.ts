@@ -61,8 +61,10 @@ export type HomeData = {
   alerts: AlertItem[];
 };
 
-export async function getHomeData(actor: GenesisActor, opts: { includeChecks?: boolean } = {}): Promise<HomeData> {
-  const scope = storeScope(actor);
+export async function getHomeData(actor: GenesisActor, opts: { includeChecks?: boolean; storeIds?: string[] | null } = {}): Promise<HomeData> {
+  // Focus（#305）: 店舗に絞っていれば KPI・承認・判断フィードもその店だけ。権限の範囲（storeScope）を超えない
+  const base = storeScope(actor);
+  const scope = opts.storeIds && opts.storeIds.length ? opts.storeIds.filter((id) => !base || base.includes(id)) : base;
   const [d, suggestions, feed, ackedKeys, stalledAll] = await Promise.all([
     getCockpitData(actor.companyId, scope),
     getOpenSuggestions(actor.companyId, 3).catch(() => []),

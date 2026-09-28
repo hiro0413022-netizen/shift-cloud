@@ -29,7 +29,7 @@ export const x = defineTool({ name: "shift.publish", version: 1, domain: "ops", 
 
 ## Rollback
 
-- `GENESIS_CORE_TOOLS=off` で JARVIS の予約・受付は旧ハンドラに戻る（コードは両方残している。P1 で旧を消す）。
+- 旧ハンドラ（booking_create / booking_cancel / walkin_add の直書き）は #305 で削除済み。戻すなら git の #304 以前へ。
 - DB は追加のみ。`0208_genesis_core.sql` 末尾の drop で戻る。
 
 ## Skill（P3-a・#294）
