@@ -106,3 +106,22 @@ test("ルールの Act（#294）: action_tool があれば act を呼ぶ。{coun
   await evaluateRules(admin3, C, new Date("2026-09-28T03:00:00Z"), async () => { called += 1; return { status: "ok" }; });
   assert.equal(called, 0);
 });
+
+test("Self Healing（#296）: staleJobs は期待より古い・失敗した・記録の無い定期処理を返す", async () => {
+  const { staleJobs, JOB_EXPECTATIONS } = await import("../packages/genesis-core/src/scheduler.ts");
+  const now = new Date("2026-09-28T09:00:00Z");
+  const admin = createFakeAdmin({
+    gn_job_runs: [
+      { id: "1", job: "cron:execute", started_at: "2026-09-28T08:55:00Z", ok: true },
+      { id: "2", job: "cron:daily", started_at: "2026-09-26T21:00:00Z", ok: true }, // 36時間前 → stale
+      { id: "3", job: "cron:outreach", started_at: "2026-09-28T08:30:00Z", ok: false, error: "SMTP down" }, // 新しいが失敗
+    ],
+  });
+  const stale = await staleJobs(admin, now);
+  const byJob = Object.fromEntries(stale.map((s) => [s.job, s]));
+  assert.equal(byJob["cron:execute"], undefined);
+  assert.equal(byJob["cron:daily"].ageMin, 36 * 60);
+  assert.equal(byJob["cron:outreach"].lastError, "SMTP down");
+  assert.equal(byJob["cron:prospect"].ageMin, null); // 記録なし
+  assert.equal(JOB_EXPECTATIONS.length, 4);
+});

@@ -21,7 +21,14 @@ const ADAPTERS: Record<string, (o: Row, ref: string) => Row> = {
   ShiftGrid: (o) => ({ from: String(o.from ?? ""), to: prevDay(String(o.to ?? "")), rows: asRows(o) }),
   Summary: (o) => ({ title: String(o.title ?? ""), items: asRows(o) }),
   Timeline: (o) => ({ entity: String(o.entity ?? ""), items: asRows(o) }),
-  Health: (o) => ({ items: asRows(o), ok: !!o.ok }),
+  Health: (o) => ({
+    items: [
+      ...asRows(o),
+      // 止まっている定期処理は1行ずつ（#296）
+      ...(Array.isArray(o.stale_jobs) ? (o.stale_jobs as Row[]) : []).map((j) => ({ key: `job:${j.job}`, label: `${j.label}（${j.job}）${j.lastOk === false ? " 失敗" : ""}`, value: j.ageMin == null ? -1 : Number(j.ageMin), note: j.ageMin == null ? "記録なし" : `${j.ageMin}分前（上限 ${j.maxAgeMin}分）${j.lastError ? " " + j.lastError : ""}` })),
+    ],
+    ok: !!o.ok,
+  }),
   KPI: (o, ref) => {
     if (ref.startsWith("sales.daily")) return { label: `${o.date} の売上`, value: Number(o.total ?? 0), unit: "円", target: null, delta: o.prev_total == null ? null : Number(o.total ?? 0) - Number(o.prev_total), drill: "/finance" };
     if (ref.startsWith("sales.month")) return { label: `${String(o.from ?? "").slice(0, 7)} の売上`, value: Number(o.total ?? 0), unit: "円", target: o.target == null ? null : Number(o.target), delta: null, drill: "/finance" };

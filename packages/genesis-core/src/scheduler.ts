@@ -12,6 +12,38 @@ import type { AdminLike } from "./tool.ts";
 
 type Row = Record<string, unknown>;
 
+/**
+ * 定期処理の「期待」（Self Healing の物差し・#296）。job ごとに「この分数を超えて走っていなければ止まっている」。
+ * 記録は withJobRun が gn_job_runs に残す。demo-sales の cron もここに書く（実行は各アプリ・記録は1つの台帳）。
+ */
+export const JOB_EXPECTATIONS: Array<{ job: string; maxAgeMin: number; label: string }> = [
+  { job: "cron:execute", maxAgeMin: 30, label: "10分ごとの実行キュー・イベント・ルール" },
+  { job: "cron:daily", maxAgeMin: 26 * 60, label: "毎朝の日次処理（CEOレポート・月会費・KPI）" },
+  { job: "cron:prospect", maxAgeMin: 26 * 60, label: "営業先の自動ピックアップ（demo-sales）" },
+  { job: "cron:outreach", maxAgeMin: 2 * 60, label: "営業メールの毎時tick（demo-sales）" },
+];
+
+export type StaleJob = { job: string; label: string; ageMin: number | null; maxAgeMin: number; lastOk: boolean | null; lastError: string | null };
+
+/** 止まっている定期処理（gn_job_runs を JOB_EXPECTATIONS と突き合わせる）。health.check と Dev Dashboard が使う */
+export async function staleJobs(admin: AdminLike, now = new Date()): Promise<StaleJob[]> {
+  const out: StaleJob[] = [];
+  for (const e of JOB_EXPECTATIONS) {
+    let last: Row | null = null;
+    try {
+      const { data } = await admin.from("gn_job_runs").select("started_at, ok, error").eq("job", e.job).order("started_at", { ascending: false }).limit(1).maybeSingle();
+      last = (data ?? null) as Row | null;
+    } catch {
+      /* 未適用 */
+    }
+    const ageMin = last?.started_at ? Math.round((now.getTime() - Date.parse(String(last.started_at))) / 60_000) : null;
+    const stale = ageMin === null || ageMin > e.maxAgeMin;
+    const failing = last?.ok === false;
+    if (stale || failing) out.push({ job: e.job, label: e.label, ageMin, maxAgeMin: e.maxAgeMin, lastOk: last?.ok == null ? null : Boolean(last.ok), lastError: last?.error ? String(last.error) : null });
+  }
+  return out;
+}
+
 export async function withJobRun<T>(admin: AdminLike, job: string, companyId: string | null, fn: () => Promise<T>): Promise<{ ok: boolean; result?: T; error?: string }> {
   const { data: run } = await admin.from("gn_job_runs").insert({ job, company_id: companyId }).select("id").single().then((r: { data: Row | null }) => r, () => ({ data: null }));
   const id = run?.id ? String(run.id) : null;

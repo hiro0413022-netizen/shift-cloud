@@ -3,6 +3,7 @@ import { createAdmin } from "@/lib/supabase/admin";
 import { Panel, Badge, Empty } from "@/components/ui";
 import { getCore } from "@/core/registry";
 import { dashboardMetrics } from "@yozan/genesis-core/metrics";
+import { JOB_EXPECTATIONS, staleJobs } from "@yozan/genesis-core/scheduler";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,11 @@ export default async function ArchitecturePage({ searchParams }: { searchParams:
     .order("created_at", { ascending: false })
     .limit(30);
   const rows = (recent.data ?? []) as Array<Record<string, unknown>>;
+  // 定期処理の台帳（#296）: genesis と demo-sales の cron が同じ gn_job_runs に記録する
+  const stale = await staleJobs(admin);
+  const jobRuns = await admin.from("gn_job_runs").select("job, started_at, ok, error").order("started_at", { ascending: false }).limit(200);
+  const lastByJob = new Map<string, { started_at: string; ok: boolean | null; error: string | null }>();
+  for (const r of (jobRuns.data ?? []) as Array<{ job: string; started_at: string; ok: boolean | null; error: string | null }>) if (!lastByJob.has(r.job)) lastByJob.set(r.job, r);
 
   const kpi = (label: string, value: string | number, sub?: string, tone?: "ok" | "warn" | "danger") => (
     <div className="rounded-xl border border-(--color-line) bg-(--color-panel) p-3">
@@ -134,6 +140,36 @@ export default async function ArchitecturePage({ searchParams }: { searchParams:
           </div>
         </Panel>
       </div>
+
+      <Panel title={`定期処理（${stale.length ? `${stale.length} 本に問題` : "すべて期待どおり"}）`}>
+        <table className="w-full text-xs">
+          <thead className="text-(--color-dim)">
+            <tr>
+              <th className="text-left py-1">job</th>
+              <th className="text-left">内容</th>
+              <th className="text-right">最終実行</th>
+              <th className="text-right">上限</th>
+              <th className="text-left pl-3">状態</th>
+            </tr>
+          </thead>
+          <tbody>
+            {JOB_EXPECTATIONS.map((e) => {
+              const last = lastByJob.get(e.job);
+              const bad = stale.find((s) => s.job === e.job);
+              return (
+                <tr key={e.job} className="border-t border-(--color-line)">
+                  <td className="py-1 font-mono">{e.job}</td>
+                  <td className="text-(--color-dim)">{e.label}</td>
+                  <td className="text-right">{last ? String(last.started_at).slice(0, 16).replace("T", " ") : "記録なし"}</td>
+                  <td className="text-right">{e.maxAgeMin}分</td>
+                  <td className={`pl-3 ${bad ? "text-red-400" : "text-emerald-400"}`}>{bad ? (bad.ageMin == null ? "未記録" : bad.lastOk === false ? `失敗: ${bad.lastError ?? ""}` : `${bad.ageMin}分前で停止`) : "OK"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <p className="mt-2 text-[11px] text-(--color-dim)">記録は gn_job_runs（withJobRun）。Ask Data では gnv_job_runs。止まると Inbox にルール jobs_stale が出る（cron:execute 自身が止まるとルールも走らないので、この画面と health.check で見る）。</p>
+      </Panel>
 
       <Panel title="直近の実行（30件）">
         {rows.length === 0 ? (

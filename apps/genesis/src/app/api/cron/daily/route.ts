@@ -10,6 +10,7 @@ import { runContentLoop, refreshContentMetrics } from "@/lib/content-loop";
 import { runFrankReminders } from "@/lib/frank-mail";
 import { runFrankMembershipSchedule } from "@/lib/frank-membership-cron";
 import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cron";
+import { withJobRun } from "@yozan/genesis-core/scheduler";
 import { runFrankSquareItemsBackfill } from "@/lib/frank-square-items";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
   // 店舗を持つ会社だけ回す（#134c）。SWING CORTEX の外販テナントは店舗を持たないので、
   // 中身の無い日次レポート・AIループを毎朝作らない。
   const companyIds = await listOperatingCompanyIds(admin);
-  const results = [];
+  const results: Array<Record<string, unknown>> = [];
   for (const id of companyIds) {
     const c = { id };
     try {
@@ -83,5 +84,7 @@ export async function GET(req: NextRequest) {
   const frankCheckout = await runFrankAutoCheckout().catch((e) => ({ error: String(e) }));
   // Square店頭決済に品目（何を売ったか）を付ける。売上の金額は変えない（#277）
   const frankSquareItems = await runFrankSquareItemsBackfill().catch((e) => ({ error: String(e) }));
+  // 日次 tick の記録（#296・gn_job_runs）。止まれば health.check / ルール jobs_stale が Inbox に出す
+  await withJobRun(admin, "cron:daily", null, async () => ({ companies: companyIds.length, errors: results.filter((r) => "error" in r).length })).catch(() => null);
   return NextResponse.json({ ok: true, results, frankReminders, frankMembership, frankVisited, frankCheckout, frankSquareItems });
 }

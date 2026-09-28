@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { runOutreach } from "@yozan/outreach/server";
+import { withJobRun } from "@yozan/genesis-core/scheduler";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   const hourJst = Number(new Date(Date.now() + 9 * 3600_000).toISOString().slice(11, 13));
   const { data: companies } = await admin.from("companies").select("id").is("deleted_at", null);
 
-  const results = [];
+  const results: Array<Record<string, unknown>> = [];
   for (const c of companies ?? []) {
     const companyId = String(c.id);
     try {
@@ -49,5 +50,6 @@ export async function GET(req: NextRequest) {
       results.push({ company: companyId, error: String(e) });
     }
   }
+  await withJobRun(admin, "cron:outreach", null, async () => ({ hourJst, companies: results.length, errors: results.filter((r) => "error" in r).length })).catch(() => null);
   return NextResponse.json({ ok: true, hourJst, results });
 }

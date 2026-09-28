@@ -216,7 +216,7 @@ function Health({ b }: { b: BlockInstance }) {
         {items.map((it, i) => (
           <li key={i} className="flex justify-between">
             <span className="text-(--color-dim)">{fmt(it.label)}</span>
-            <span className={Number(it.value) > 0 && !["events_unprocessed", "denied"].includes(String(it.key)) ? "text-red-300" : ""}>{fmt(it.value)}</span>
+            <span className={(Number(it.value) > 0 || String(it.key).startsWith("job:")) && !["events_unprocessed", "denied"].includes(String(it.key)) ? "text-red-300" : ""}>{it.note ? fmt(it.note) : fmt(it.value)}</span>
           </li>
         ))}
       </ul>

@@ -77,3 +77,5 @@
 - ✅ `0209_jarvis_turns_intents.sql` — 適用済（2026-09-28、MCP name=0209_jarvis_turns_intents。gn_jarvis_turns.intent の CHECK に act / tool を追加。act が #186 から記録されていなかった不具合の修正 #290）
 - ✅ `0210_genesis_events_waiting_rules.sql` — 適用済（2026-09-28、MCP name=0210_genesis_events_waiting_rules。gn_emit()＋トリガー7表12イベント / gn_waiting / gn_rules（初期5本・inquiries は status new/pending/draft に限定して適用後に修正） / gn_job_runs #292）
 - ✅ `0211_genesis_rules_act.sql` — 適用済（2026-09-28、MCP name=0211_genesis_rules_act。gn_rules.action_input 追加・「明日の予約にシフト無し」「24時間返信なし」の2ルールに message.send@1 を設定（AI Actor なので承認待ち） #294）
+- ✅ `0212_genesis_job_runs_view_rule.sql` — 適用済（2026-09-28、MCP name=0212_genesis_job_runs_view_rule。gnv_job_runs（hq のみ）とルール jobs_stale（止まっている定期処理 → critical） #296）
+- ✅ `0213_frank_light_plan_note.sql` — 適用済（2026-09-28、MCP name=0212_frank_light_plan_note ※MCP側の名前は番号がずれている。frunk_plans「ライト会員」の note を「月4回まで／平日10:00〜15:00」に #297）

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { runProspectPickup } from "@yozan/prospect/server";
 import { createAutoDemo } from "@/lib/auto-demo";
+import { withJobRun } from "@yozan/genesis-core/scheduler";
 
 export const dynamic = "force-dynamic";
 // 外部サイトの取得は遅い。1回で終わらせる前提を置かず、予算内で進めて次のcronに続きを渡す。
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdmin();
   const { data: companies } = await admin.from("companies").select("id").is("deleted_at", null);
 
-  const results = [];
+  const results: Array<Record<string, unknown>> = [];
   for (const c of companies ?? []) {
     const companyId = String(c.id);
     try {
@@ -42,5 +43,7 @@ export async function GET(req: NextRequest) {
       results.push({ company: companyId, error: String(e) });
     }
   }
+  // Genesis の定期処理台帳（gn_job_runs・#296）に記録。止まれば Genesis の Inbox に出る
+  await withJobRun(admin, "cron:prospect", null, async () => ({ companies: results.length, errors: results.filter((r) => "error" in r).length })).catch(() => null);
   return NextResponse.json({ ok: true, results });
 }

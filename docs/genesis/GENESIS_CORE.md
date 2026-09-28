@@ -42,6 +42,10 @@ Skill ＝ Tool を Plan(DAG) で束ねた手順。`packages/genesis-core/src/ski
 
 `gn_rules.action_tool` に Tool、`action_input` に引数（`{count}` `{date}` `{title}` を埋める）。発火時に `api/cron/execute` が `runRuleAct` で Core を通す。AI Actor なので risk>=2 は承認待ち（判断フィードの承認カード）。承認キューの dedupe は `rule:<code>:<日付>:act`。
 
+## 定期処理の台帳（P3-b・#296）
+
+cron は各アプリが持つが、記録は `gn_job_runs` 1つ（`withJobRun(admin, "cron:xxx", null, fn)`）。期待は `JOB_EXPECTATIONS`。新しい cron を足したら (1) withJobRun で包む (2) JOB_EXPECTATIONS に1行 (3) 必要なら 0212 のルール SQL の values に1行。
+
 ## 次（P1）
 
 Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

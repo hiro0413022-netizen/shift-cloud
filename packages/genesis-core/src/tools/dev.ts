@@ -13,7 +13,7 @@ export const healthCheck = defineTool({
   domain: "dev",
   description: "Genesis 内部の健全性: 止まっている実行キュー・失敗した Tool・黙って0件・未処理イベント",
   input: { type: "object", properties: { hours: { type: "integer", minimum: 1, maximum: 168, default: 24 } } },
-  output: { type: "object", required: ["items", "ok"], properties: { items: { type: "array" }, ok: { type: "boolean" } } },
+  output: { type: "object", required: ["items", "ok"], properties: { items: { type: "array" }, ok: { type: "boolean" }, stale_jobs: { type: "array" } } },
   permission: ["view_hq"],
   scope: "company",
   risk: 0,
@@ -42,17 +42,12 @@ export const healthCheck = defineTool({
       { key: "events_unprocessed", label: "未処理イベント", value: await count("gn_events", (q) => (q as { is: Function }).is("processed_at", null)) },
       { key: "denied", label: "権限拒否", value: await count("gn_tool_executions", (q) => (q as { eq: Function; gte: Function }).eq("status", "denied").gte("created_at", since)) },
     ];
-    // cron が動いているか（gn_job_runs）: 直近 30 分に cron:execute が無ければ止まっている
-    let cronAgeMin = -1;
-    try {
-      const { data: last } = await admin.from("gn_job_runs").select("started_at").eq("job", "cron:execute").order("started_at", { ascending: false }).limit(1).maybeSingle();
-      cronAgeMin = last?.started_at ? Math.round((Date.now() - Date.parse(String(last.started_at))) / 60_000) : 9999;
-    } catch {
-      /* 未適用 */
-    }
-    items.push({ key: "cron_stale", label: "cron:execute が最後に走ってからの分数（30分超で異常）", value: cronAgeMin > 30 ? cronAgeMin : 0 });
+    // 定期処理が止まっていないか（gn_job_runs × JOB_EXPECTATIONS・#296）。genesis の cron も demo-sales の cron も同じ台帳
+    const { staleJobs } = await import("../scheduler.ts");
+    const stale = await staleJobs(admin);
+    items.push({ key: "jobs_stale", label: "止まっている/失敗した定期処理", value: stale.length });
     const ok = items.every((i) => i.value <= 0 || i.key === "events_unprocessed" || i.key === "denied");
-    return { data: { items, ok }, sources: [src("ai_action_queue"), src("gn_tool_executions"), src("gn_events")], kind: "fact", rowCount: items.length };
+    return { data: { items, ok, stale_jobs: stale }, sources: [src("ai_action_queue"), src("gn_tool_executions"), src("gn_events"), src("gn_job_runs")], kind: "fact", rowCount: items.length };
   },
 });
 
