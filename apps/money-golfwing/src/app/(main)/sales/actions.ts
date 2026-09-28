@@ -48,10 +48,17 @@ function optNum(v: unknown): number | null {
   return Number.isFinite(n) && n !== 0 ? n : null;
 }
 
+/** 画面入力の売上カテゴリ。「月会費」は予約語なので「月会費(窓口)」へ寄せる。 */
+function toSalesCategory(c: string): string {
+  return c === "月会費" ? "月会費(窓口)" : c;
+}
+
 function normalizeInput(input: SaleInput) {
   return {
     soldOn: String(input.soldOn ?? "").trim(),
-    category: String(input.category ?? "").trim(),
+    // 「月会費」はファイン実績（口座振替）の予約語。画面から入る窓口分は必ず「月会費(窓口)」に寄せる
+    // （「月会費」で入ると月会費予測が自動停止して売上から約370万円消える・2026-09-29 8/9月の実障害）
+    category: toSalesCategory(String(input.category ?? "").trim()),
     listPrice: optNum(input.listPrice),
     discount: optNum(input.discount),
     amount: Number(input.amount) || 0,

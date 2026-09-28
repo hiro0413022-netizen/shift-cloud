@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
 /** 定番ボタンの最大数。増やすと押し間違いが増え、探すのに一覧を目で追うことになる */
 const PRESET_LIMIT = 10;
 
-const CATEGORIES = ["利用料", "月会費", "販売", "その他"];
+// 「月会費」はファイン実績の予約語。窓口で受けた月会費は「月会費(窓口)」（actions.ts toSalesCategory でも寄せる）
+const CATEGORIES = ["利用料", "月会費(窓口)", "販売", "その他"];
 const MEMBER_KINDS = ["会員", "ビジター", "スタッフ"];
 // 売上台帳Excelで実際に使われている決済手段に合わせる（Square 369件・金券3件の実績あり）
 const PAY_METHODS = ["現金", "Airペイ", "Square", "SBペイメント", "振込", "金券", "楽天ペイ", "その他"];
