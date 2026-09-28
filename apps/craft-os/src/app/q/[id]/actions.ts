@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import { requireActor } from "@/lib/auth";
-import { getLaborRates, getQuote, lookupDemoShafts, searchProducts, type ProductRow } from "@/lib/craft";
+import { getLaborRates, getQuote, lookupDemoShafts, searchProductsMore, type ProductRow } from "@/lib/craft";
 import { postSales } from "@/lib/sales";
 import { afterSave } from "@/lib/after-save";
 
@@ -319,14 +319,14 @@ export async function setStatus(formData: FormData): Promise<void> {
 }
 
 export async function findProducts(
-  _prev: { rows?: ProductRow[]; error?: string },
+  _prev: { rows?: ProductRow[]; more?: boolean; error?: string },
   formData: FormData
-): Promise<{ rows?: ProductRow[]; error?: string }> {
+): Promise<{ rows?: ProductRow[]; more?: boolean; error?: string }> {
   const actor = await requireActor();
   const q = String(formData.get("pq") ?? "");
   const category = String(formData.get("pcat") ?? "") || null;
   try {
-    return { rows: await searchProducts(actor, q, { category }) };
+    return await searchProductsMore(actor, q, { category });
   } catch {
     return { error: "検索できませんでした" };
   }

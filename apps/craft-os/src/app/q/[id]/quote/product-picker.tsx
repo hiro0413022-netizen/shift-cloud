@@ -38,7 +38,7 @@ export function ProductPicker({ quoteId }: { quoteId: number }) {
             </option>
           ))}
         </select>
-        <input name="pq" placeholder="商品名・メーカーで探す（例: VENTUS 6S）" className={`${inputCls} flex-1 min-w-48`} />
+        <input name="pq" placeholder="商品名・メーカーで探す（例: VENTUS 6S／全角でもOK）" className={`${inputCls} flex-1 min-w-48`} />
         <button formAction={search} disabled={pending} className={btnGhostCls}>
           {pending ? "検索中..." : "探す"}
         </button>
@@ -65,6 +65,11 @@ export function ProductPicker({ quoteId }: { quoteId: number }) {
             </li>
           ))}
         </ul>
+      )}
+      {state.rows && state.rows.length > 0 && (
+        <p className="text-xs text-(--color-dim)">
+          {state.rows.length}件{state.more ? "以上あります。先頭の分だけ出しています。言葉を足すと絞れます（例: reve 50s）" : ""}
+        </p>
       )}
       {state.rows && state.rows.length === 0 && (
         <p className="text-xs text-(--color-dim)">

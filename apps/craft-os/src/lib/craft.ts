@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createAdmin } from "@yozan/core/supabase/admin";
 import type { Actor } from "@/lib/auth";
+import { rankProducts, searchWords, toFullWidth } from "@/lib/product-search";
 import {
   countClubs,
   computeFittingRefund,
@@ -328,27 +329,47 @@ export async function getProducts(actor: Actor, ids: number[]): Promise<Map<numb
  * キーワードが無いときは、その区分の頭から並べて返す（棚を覗く感覚）。
  */
 export const PRODUCT_BROWSE_LIMIT = 80;
+/** 言葉で探したときに画面へ出す上限（#288: 30 → 100） */
+export const PRODUCT_SEARCH_LIMIT = 100;
+
+/**
+ * 2026-09-28 ユーザー報告「reve で探してもリボルバーしか出てこない」への対応（詳しくは lib/product-search.ts）。
+ *   ・全角で打っても当たる（言葉は NFKC で半角に。マスタ側の全角登録にも当てる）
+ *   ・DBからは多めに取り、商品名に当たったものを上に並べてから上限で切る
+ *   ・切ったときは more=true（画面で「言葉を足して絞って」と出す）
+ */
+export async function searchProductsMore(
+  actor: Actor,
+  q: string,
+  opts: { category?: string | null; limit?: number } = {}
+): Promise<{ rows: ProductRow[]; more: boolean }> {
+  const words = searchWords(q);
+  const limit = opts.limit ?? (words.length === 0 ? PRODUCT_BROWSE_LIMIT : PRODUCT_SEARCH_LIMIT);
+  let query = db()
+    .from("gw_products")
+    .select("id, item_category, manufacturer, name, spec, club_type, list_price, default_rate, unit")
+    .eq("company_id", actor.companyId)
+    .eq("is_active", true)
+    // 言葉があるときは並べ替え前に多めに取る（マスタは約3,000件。1語でも400件あれば十分に広い）
+    .limit(words.length === 0 ? limit + 1 : 400);
+  if (opts.category) query = query.eq("item_category", opts.category);
+  // 空白区切りのすべてを含む、で絞る（「ベンタス 6S」のような引き方）。半角・全角の両方で当てる
+  for (const w of words) {
+    const variants = [...new Set([w, toFullWidth(w)])];
+    query = query.or(variants.flatMap((v) => [`name.ilike.%${v}%`, `manufacturer.ilike.%${v}%`, `spec.ilike.%${v}%`]).join(","));
+  }
+  const { data } = await query.order("manufacturer").order("name");
+  const all = ((data ?? []) as ProductRow[]).map((p) => ({ ...p, list_price: p.list_price == null ? null : Number(p.list_price) }));
+  const ranked = rankProducts(all, words);
+  return { rows: ranked.slice(0, limit), more: ranked.length > limit || (words.length > 0 && all.length >= 400) };
+}
 
 export async function searchProducts(
   actor: Actor,
   q: string,
   opts: { category?: string | null; limit?: number } = {}
 ): Promise<ProductRow[]> {
-  const term = q.trim();
-  const words = term.split(/[\s　]+/).filter(Boolean).slice(0, 4);
-  let query = db()
-    .from("gw_products")
-    .select("id, item_category, manufacturer, name, spec, club_type, list_price, default_rate, unit")
-    .eq("company_id", actor.companyId)
-    .eq("is_active", true)
-    .limit(opts.limit ?? (words.length === 0 ? PRODUCT_BROWSE_LIMIT : 30));
-  if (opts.category) query = query.eq("item_category", opts.category);
-  // 空白区切りのすべてを含む、で絞る（「ベンタス 6S」のような引き方）
-  for (const word of words) {
-    query = query.or(`name.ilike.%${word}%,manufacturer.ilike.%${word}%,spec.ilike.%${word}%`);
-  }
-  const { data } = await query.order("manufacturer").order("name");
-  return ((data ?? []) as ProductRow[]).map((p) => ({ ...p, list_price: p.list_price == null ? null : Number(p.list_price) }));
+  return (await searchProductsMore(actor, q, opts)).rows;
 }
 
 export type DemoShaftStats = {
@@ -395,9 +416,10 @@ export async function listDemoShafts(
   if (opts.status) query = query.eq("match_status", opts.status);
   if (opts.shelf) query = query.eq("shelf", opts.shelf);
   if (opts.q) {
-    const t = opts.q.trim();
+    // 全角で打っても当たるように（#288）。or() を壊す記号は落とす
+    const t = opts.q.normalize("NFKC").replace(/[,()%*\\"']/g, " ").trim();
     if (/^\d+$/.test(t)) query = query.eq("demo_no", Number(t));
-    else query = query.or(`import_name.ilike.%${t}%,import_maker.ilike.%${t}%`);
+    else if (t) query = query.or(`import_name.ilike.%${t}%,import_maker.ilike.%${t}%`);
   }
   const { data } = await query;
   const rows = (data ?? []) as DemoShaftRow[];
