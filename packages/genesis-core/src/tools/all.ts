@@ -6,6 +6,7 @@ import type { ToolContract } from "../tool.ts";
 import { ToolRegistry } from "../registry.ts";
 import { createBlockRegistry, type BlockContract } from "../blocks.ts";
 import { createEventCatalog, type EventContract } from "../events.ts";
+import type { Pack } from "../pack.ts";
 import { OPS_TOOLS } from "./ops.ts";
 import { CUSTOMER_TOOLS } from "./customer.ts";
 import { FINANCE_TOOLS } from "./finance.ts";
@@ -19,9 +20,9 @@ import { PROJECT_TOOLS } from "./project.ts";
 
 export const CORE_TOOLS: ToolContract[] = [...OPS_TOOLS, ...CUSTOMER_TOOLS, ...FINANCE_TOOLS, ...GROWTH_TOOLS, ...DEV_TOOLS, ...WAITING_TOOLS, ...MEMORY_TOOLS, ...SEARCH_TOOLS, ...PROJECT_TOOLS, ...SKILL_TOOLS];
 
-export function createGenesisCore(opts: { tools?: ToolContract[]; blocks?: BlockContract[]; events?: EventContract[] } = {}) {
+export function createGenesisCore(opts: { tools?: ToolContract[]; blocks?: BlockContract[]; events?: EventContract[]; pack?: Pack } = {}) {
   const blocks = createBlockRegistry(opts.blocks ?? []);
   const catalog = createEventCatalog(opts.events ?? []);
-  const registry = new ToolRegistry({ blocks }).registerAll(CORE_TOOLS).registerAll(opts.tools ?? []);
+  const registry = new ToolRegistry({ blocks, pack: opts.pack }).registerAll(CORE_TOOLS).registerAll(opts.tools ?? []);
   return { registry, blocks, catalog };
 }

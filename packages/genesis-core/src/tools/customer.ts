@@ -6,6 +6,7 @@
  * P0 は横断ヒットをそのまま返す（入口を Genesis に作ることが目的）。
  */
 import { defineTool, type ToolContract } from "../tool.ts";
+import { membersCountSql } from "../pack.ts";
 import { viewQuery, lit, src, rows, monthRange, isYmd, addDays } from "./_shared.ts";
 import { effectiveActor, visibleStoreIds } from "../context.ts";
 
@@ -153,9 +154,9 @@ export const membersCount = defineTool({
     const data = await viewQuery(
       ctx.admin,
       ctx.context,
-      `select 'FRANK GOLF' as store, count(*) as members from gnv_frank_members where status = 'active' and plan_type <> 'テスト' union all select 'GOLF WING' as store, count(*) as members from gnv_members where is_active`
+      membersCountSql(ctx.pack)
     );
-    return rows(data, "gnv_frank_members / gnv_members");
+    return rows(data, ctx.pack.memberSources.map((m) => m.view).join(" / "));
   },
 });
 
@@ -183,7 +184,7 @@ export const personCard = defineTool({
     const idx = Math.max(0, Number(input.pick ?? 1) - 1);
     const p = people[idx];
     if (!p) return { data: { found: false, candidates: people.length, person: null, timeline: [], others: [] }, sources: [src("search_visitors")], kind: "fact", rowCount: 0 };
-    const kinds = { guest: "受付台帳", member: "GOLF WING会員", frank: "FRANK会員", frank_guest: "FRANKビジター" } as Record<string, string>;
+    const kinds = ctx.pack.kindLabels;
     const person = {
       name: p.name, kana: p.nameKana, phone: p.phone, email: p.email, birth_date: p.birthDate, gender: p.gender,
       sources: p.hits.map((h) => `${kinds[h.kind] ?? h.kind}${h.member_no ? " " + h.member_no : ""}${h.member_type || h.plan ? " " + (h.member_type ?? h.plan) : ""}${h.status ? " " + h.status : ""}`),

@@ -62,6 +62,10 @@ cron は各アプリが持つが、記録は `gn_job_runs` 1つ（`withJobRun(ad
 
 `gn_projects` ＋ `gn_project_items`。Tool `project.list / card / create / link`。案件の記憶は `memory.remember` の scope=project・scope_id=案件 id。画面 /projects。
 
+## Core / Pack（#306）
+
+会社固有の構造は `packs/<company>.ts`（YOZAN: `packs/yozan.ts`）。Core は `ctx.pack` を読むだけ。新しい会社は Pack を1つ書いて `createGenesisCore({ pack })`。ルールは Pack ではなく Memory。
+
 ## 次（P1）
 
 Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

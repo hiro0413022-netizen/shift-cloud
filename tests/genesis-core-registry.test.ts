@@ -123,7 +123,33 @@ test("askScope: 本部（hq）は Focus が無ければ店舗を渡さない（�
   assert.deepEqual(askScope(baseContext({ actor: owner, company, surface: "web", store: { id: "gw", name: "GW" } })), { scope: "hq", storeId: "gw" });
   const staff = { ...owner, isOwner: false, permissions: ["use_reception"], storeIds: ["frank"] };
   assert.deepEqual(askScope(baseContext({ actor: staff, company, surface: "web" })), { scope: "store", storeId: "frank" });
-  assert.equal(storeLike("ゴルフウィング"), "%GOLF WING%");
-  assert.equal(storeLike("姫路"), "%FRANK%");
+  const { YOZAN_PACK } = await import("../packages/genesis-core/src/packs/yozan.ts");
+  assert.equal(storeLike("ゴルフウィング", YOZAN_PACK), "%GOLF WING%");
+  assert.equal(storeLike("姫路", YOZAN_PACK), "%FRANK%");
+  assert.equal(storeLike("ゴルフウィング"), "%ゴルフウィング%"); // 汎用 Pack は言い換えを知らない＝部分一致
   assert.equal(storeLike(undefined), null);
+});
+
+test("Pack（#306）: Core は会社を知らない。汎用 Pack では booking.create が明示エラー、YOZAN Pack では FRANK に入る。members.count の SQL は Pack から", async () => {
+  const { createGenesisCore } = await import("../packages/genesis-core/src/tools/all.ts");
+  const { YOZAN_PACK } = await import("../packages/genesis-core/src/packs/yozan.ts");
+  const { DEFAULT_PACK, membersCountSql } = await import("../packages/genesis-core/src/pack.ts");
+  const { executeTool } = await import("../packages/genesis-core/src/execute.ts");
+  const { baseContext } = await import("../packages/genesis-core/src/context.ts");
+  const { createFakeAdmin } = await import("./fixtures/fake-admin.ts");
+  const owner = { staffId: "s", name: "o", kind: "human" as const, isOwner: true, permissions: ["manage_company", "use_reception"], storeIds: ["x"], primaryStoreId: "x" };
+  const company = { id: "c", name: "Y", kind: "operating" as const };
+  const generic = createGenesisCore();
+  assert.equal(generic.registry.pack.name, "generic");
+  const r = await executeTool({ registry: generic.registry, admin: createFakeAdmin(), context: baseContext({ actor: owner, company, surface: "web" }), ref: "booking.create", input: { date: "2026-10-01", start: "10:00", guest_name: "田中" }, catalog: generic.catalog, force: true });
+  assert.equal(r.status, "failed");
+  assert.match(String(r.error), /打席予約 Tool が設定されていません/);
+  const yozan = createGenesisCore({ pack: YOZAN_PACK });
+  assert.equal(yozan.registry.pack.bookingStoreId, "b54afb9f-22aa-4f4e-b758-bc2157acfdd5");
+  assert.match(membersCountSql(YOZAN_PACK), /gnv_frank_members.*union all.*gnv_members/);
+  assert.equal(membersCountSql(DEFAULT_PACK), "select '会員' as store, count(*) as members from gnv_members where is_active");
+  // Core のコードに YOZAN の店舗 ID が残っていない
+  const fs = await import("node:fs");
+  const core = ["tool", "registry", "execute", "policy", "context", "plan", "events", "blocks", "render", "scheduler", "skill", "workflow", "memory", "semantic", "pack", "tools/_shared", "tools/ops", "tools/customer", "tools/finance", "tools/growth", "tools/dev", "tools/waiting", "tools/memory", "tools/search", "tools/project", "skills/index"];
+  for (const f of core) assert.ok(!fs.readFileSync(`packages/genesis-core/src/${f}.ts`, "utf8").includes("b54afb9f"), `${f}.ts に店舗 ID が残っている`);
 });

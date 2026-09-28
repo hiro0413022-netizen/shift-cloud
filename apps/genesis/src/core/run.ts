@@ -106,6 +106,7 @@ export async function runWorkflowForEvent(admin: Admin, wf: WorkflowContract, ev
   const ctx: ToolCtx = {
     admin,
     context,
+    pack: getCore().registry.pack,
     call: async (ref, input) => {
       const r = await runWithContext({ admin, context, ref, input, origin: `workflow:${wf.name}`, title: `${wf.description}（${event.type}）`, createdBy: null, dedupeKey: `wf:${wf.name}:${event.id}:${ref}` });
       return { status: r.status, output: r.output, error: r.error, executionId: r.executionId, tool: r.tool, renders: r.renders, sources: r.sources, kind: r.kind, rowCount: r.rowCount, policy: r.policy ? { decision: r.policy.decision, reason: r.policy.reason } : null };

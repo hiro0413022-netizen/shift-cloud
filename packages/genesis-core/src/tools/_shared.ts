@@ -6,8 +6,8 @@
 import type { AdminLike, SourceRef, ToolOutput } from "../tool.ts";
 import type { GenesisContext } from "../context.ts";
 import { effectiveActor } from "../context.ts";
+import { DEFAULT_PACK, storeLikeOf, type Pack } from "../pack.ts";
 
-export const FRANK_STORE_ID = "b54afb9f-22aa-4f4e-b758-bc2157acfdd5";
 
 export type Row = Record<string, unknown>;
 
@@ -22,13 +22,9 @@ export function askScope(ctx: GenesisContext): { scope: "hq" | "store"; storeId:
   return { scope: hq ? "hq" : "store", storeId };
 }
 
-/** 店舗名の絞り込み（LLM が「ゴルフウィング」「姫路」と言ったとき用）。gnv_* の store_name に like で当てる */
-export function storeLike(v: unknown): string | null {
-  if (typeof v !== "string" || !v.trim()) return null;
-  const t = v.trim().toLowerCase();
-  if (/frank|フランク|姫路|himeji/.test(t)) return "%FRANK%";
-  if (/golf ?wing|ゴルフウィング|ゴルフウイング|宝塚|takarazuka|gw\b/.test(t)) return "%GOLF WING%";
-  return `%${v.trim().replace(/'/g, "''")}%`;
+/** 店舗名の絞り込み（LLM が「ゴルフウィング」「姫路」と言ったとき用）。言い換えは Pack（#306）が持つ */
+export function storeLike(v: unknown, pack: Pack = DEFAULT_PACK): string | null {
+  return storeLikeOf(pack, v);
 }
 
 /** gnv_* ビューに SELECT 1本（DB 側で company/store を強制・LIMIT 強制） */

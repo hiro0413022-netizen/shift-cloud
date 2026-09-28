@@ -6,7 +6,7 @@
  * ai-execution 側は P0 からこの Tool に委譲する。
  */
 import { defineTool, type ToolContract } from "../tool.ts";
-import { FRANK_STORE_ID, viewQuery, lit, isYmd, src, rows, addDays, inclusiveRange, storeLike, STORE_IN } from "./_shared.ts";
+import { viewQuery, lit, isYmd, src, rows, addDays, inclusiveRange, storeLike, STORE_IN } from "./_shared.ts";
 import { effectiveActor } from "../context.ts";
 
 const BOOKED = "frunk_bookings";
@@ -77,6 +77,10 @@ export const bookingCreate = defineTool({
   impl: async (p, ctx) => {
     const { admin } = ctx;
     const companyId = ctx.context.company.id;
+    // 打席予約を受ける店舗と会員表は Pack（#306）。無い会社では使えない（黙って別の店に入れない）
+    const storeId = ctx.pack.bookingStoreId;
+    if (!storeId) throw new Error(`この会社（Pack: ${ctx.pack.name}）では打席予約 Tool が設定されていません`);
+    const memberTable = ctx.pack.memberTable;
     const date = String(p.date);
     const start = String(p.start).slice(0, 5);
     const minutes = Number(p.minutes ?? 60);
@@ -92,7 +96,8 @@ export const bookingCreate = defineTool({
     let memberName: string | null = null;
     const memberNo = p.member_no ? String(p.member_no).trim() : "";
     if (memberNo) {
-      const { data: m } = await admin.from("frunk_members").select("id, name").eq("company_id", companyId).eq("store_id", FRANK_STORE_ID).eq("member_no", memberNo).is("deleted_at", null).maybeSingle();
+      if (!memberTable) throw new Error("この会社では会員番号での予約は受けられません（お名前で）");
+      const { data: m } = await admin.from(memberTable.table).select("id, name").eq("company_id", companyId).eq(memberTable.storeCol, storeId).eq(memberTable.noCol, memberNo).is("deleted_at", null).maybeSingle();
       if (!m) throw new Error(`会員番号 ${memberNo} が見つかりません`);
       memberId = String(m.id);
       memberName = String(m.name);
@@ -111,7 +116,7 @@ export const bookingCreate = defineTool({
     if (candidates.length === 0) throw new Error(wantLefty ? "レフティ用の打席が空いていません" : "使える打席がありません");
 
     // 実行の瞬間に重なりを見直す（積んだ時点と5分後で状況が変わる）
-    const { data: sameDay } = await admin.from(BOOKED).select("bay_id, start_time, end_time").eq("company_id", companyId).eq("store_id", FRANK_STORE_ID).eq("booked_date", date).neq("status", "cancelled").is("deleted_at", null);
+    const { data: sameDay } = await admin.from(BOOKED).select("bay_id, start_time, end_time").eq("company_id", companyId).eq("store_id", storeId).eq("booked_date", date).neq("status", "cancelled").is("deleted_at", null);
     const taken = (bayId: string) => ((sameDay ?? []) as Array<{ bay_id: string; start_time: string; end_time: string }>).some((b) => String(b.bay_id) === bayId && s0 < toMin(String(b.end_time)) && e0 > toMin(String(b.start_time)));
     const bay = candidates.find((b) => !taken(String(b.id)));
     if (!bay) throw new Error(`${date} ${start} は空いている打席がありません`);
@@ -120,7 +125,7 @@ export const bookingCreate = defineTool({
       .from(BOOKED)
       .insert({
         company_id: companyId,
-        store_id: FRANK_STORE_ID,
+        store_id: storeId,
         member_id: memberId,
         customer_kind: memberId ? "member" : "dropin",
         guest_name: memberId ? null : guestName,
@@ -257,7 +262,7 @@ export const shiftView = defineTool({
   renders: "ShiftGrid",
   impl: async (input, ctx) => {
     const { from, to } = inclusiveRange(input.from, input.to, Number(input.days ?? 7), ctx.context.time.jstDate);
-    const st = storeLike(input.store);
+    const st = storeLike(input.store, ctx.pack);
     const data = await viewQuery(ctx.admin, ctx.context, `select date, staff_name, store_name, start_time, end_time, is_day_off, status from gnv_shifts where date >= ${lit(from)} and date < ${lit(to)}${st ? ` and store_name like ${lit(st)}` : ""} order by date, store_name, start_time`, 500);
     return rows(data, "gnv_shifts", { data: { from, to } });
   },
@@ -283,7 +288,7 @@ export const attendanceSummary = defineTool({
     const data = await viewQuery(
       ctx.admin,
       ctx.context,
-      `select staff_name, store_name, count(*) as days, sum(work_minutes) as work_minutes, sum(overtime_minutes) as overtime_minutes, sum(case when is_missing_clock then 1 else 0 end) as missing_clock from gnv_attendance where date >= ${lit(from)} and date < ${lit(to)}${storeLike(input.store) ? ` and store_name like ${lit(storeLike(input.store)!)}` : ""} group by staff_name, store_name order by store_name, staff_name`
+      `select staff_name, store_name, count(*) as days, sum(work_minutes) as work_minutes, sum(overtime_minutes) as overtime_minutes, sum(case when is_missing_clock then 1 else 0 end) as missing_clock from gnv_attendance where date >= ${lit(from)} and date < ${lit(to)}${storeLike(input.store, ctx.pack) ? ` and store_name like ${lit(storeLike(input.store, ctx.pack)!)}` : ""} group by staff_name, store_name order by store_name, staff_name`
     );
     return rows(data, "gnv_attendance", { data: { from, to } });
   },

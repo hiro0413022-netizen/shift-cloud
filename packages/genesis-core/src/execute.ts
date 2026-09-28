@@ -200,6 +200,7 @@ export async function executeTool(args: ExecuteArgs): Promise<ExecutionResult> {
   const ctx: ToolCtx = {
     admin,
     context,
+    pack: registry.pack,
     call: async (r, i) => {
       const res = await executeTool({ ...args, ref: r, input: i, depth: depth + 1, origin: `${ref}` });
       return { status: res.status, output: res.output, error: res.error, executionId: res.executionId, tool: res.tool, renders: res.renders, sources: res.sources, kind: res.kind, rowCount: res.rowCount, policy: res.policy ? { decision: res.policy.decision, reason: res.policy.reason } : null };
@@ -294,6 +295,7 @@ export async function undoExecution(args: { registry: ToolRegistry; admin: Admin
   const ctx: ToolCtx = {
     admin,
     context,
+    pack: registry.pack,
     call: async (r, i) => {
       const res = await executeTool({ registry, admin, context, ref: r, input: i, catalog: args.catalog, force: true, origin: `undo:${row.tool_name}@${row.tool_version}` });
       return { status: res.status, output: res.output, error: res.error };

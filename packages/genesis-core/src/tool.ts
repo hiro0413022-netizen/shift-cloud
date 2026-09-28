@@ -7,6 +7,7 @@
  */
 import type { JsonSchema } from "./schema.ts";
 import type { GenesisContext } from "./context.ts";
+import type { Pack } from "./pack.ts";
 
 export type Domain = "ops" | "customer" | "finance" | "growth" | "dev";
 export const DOMAINS: readonly Domain[] = ["ops", "customer", "finance", "growth", "dev"];
@@ -43,6 +44,8 @@ export type CallResult = {
 export type ToolCtx = {
   admin: AdminLike;
   context: GenesisContext;
+  /** 会社ごとの構造の違い（Pack・#306）。Registry が持つものを execute.ts が差し込む */
+  pack: Pack;
   /** 他 Tool を同じ Actor・同じ Policy で呼ぶ（Skill の中で使う）。実装は execute.ts が差し込む */
   call: (ref: string, input: Record<string, unknown>) => Promise<CallResult>;
   /** イベント発行（Event Contract §6）。実装は execute.ts が差し込む */

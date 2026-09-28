@@ -6,6 +6,7 @@
  * - MCP の tools/list 形式をそのまま出せる（P0 は公開しない・形だけ）
  * - Block Registry を渡すと renders の存在も検証する
  */
+import { DEFAULT_PACK, type Pack } from "./pack.ts";
 import { parseToolRef, toolKey, validateContract, type ToolContract, type Domain } from "./tool.ts";
 import { toMcpSchema } from "./schema.ts";
 import type { BlockRegistry } from "./blocks.ts";
@@ -30,8 +31,10 @@ export class ToolRegistry {
   private latest = new Map<string, number>();
   private blocks: BlockRegistry | null;
 
-  constructor(opts: { blocks?: BlockRegistry } = {}) {
+  readonly pack: Pack;
+  constructor(opts: { blocks?: BlockRegistry; pack?: Pack } = {}) {
     this.blocks = opts.blocks ?? null;
+    this.pack = opts.pack ?? DEFAULT_PACK;
   }
 
   register(tool: ToolContract): this {

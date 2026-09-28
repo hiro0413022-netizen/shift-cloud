@@ -1,6 +1,7 @@
 import "server-only";
 import { createGenesisCore } from "@yozan/genesis-core/tools/all";
 import { defineTool, type ToolContract } from "@yozan/genesis-core/tool";
+import { YOZAN_PACK } from "@yozan/genesis-core/packs/yozan";
 
 /* ============================================================
    Genesis の Tool Registry（Final Architecture §2）
@@ -70,6 +71,7 @@ type Core = ReturnType<typeof createGenesisCore>;
 const g = globalThis as unknown as { __genesisCore?: Core };
 
 export function getCore(): Core {
-  if (!g.__genesisCore) g.__genesisCore = createGenesisCore({ tools: APP_TOOLS });
+  // Pack（#306）: YOZAN 固有の構造（予約店舗・店名の言い換え・会員表）。外販テナントは自分の Pack を渡す
+  if (!g.__genesisCore) g.__genesisCore = createGenesisCore({ tools: APP_TOOLS, pack: YOZAN_PACK });
   return g.__genesisCore;
 }
