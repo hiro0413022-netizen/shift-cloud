@@ -15,7 +15,9 @@ export const LESSON_OS_URL = "https://lesson-os.vercel.app";
 export const INVENTORY_OS_URL = "https://inventory-os-seven.vercel.app";
 export const COMPE_OS_URL = "https://compe-os.vercel.app";
 export const SWING_CORTEX_URL = "https://swing-cortex.vercel.app";
+/** #307: Reserve OS の公開フォームは member-os へ移設。管理画面（申込詳細）だけ旧 URL に残る（退役予定） */
 export const RESERVE_OS_URL = "https://shift-cloud-reserve-os.vercel.app";
+/** #307: Legal OS は退役（入口は Genesis /legal）。書類の編集画面だけ旧 URL に残る */
 export const LEGAL_OS_URL = "https://legal-os-peach.vercel.app";
 export const ORDER_URL = "https://shift-cloud-golfwing.vercel.app";
 export const CADDY_OS_URL = "https://caddy-os-omega.vercel.app";
@@ -49,7 +51,8 @@ export function launcherCards(isFrank: boolean): LauncherCard[] {
       links: [
         { label: "今日の予約", href: `${MEMBER_OS_URL}/reservations`, status: true },
         { label: "体験の予約", href: `${MEMBER_OS_URL}/trials` },
-        ...(isFrank ? [] : [{ label: "フィッティング予約申込", href: `${RESERVE_OS_URL}/requests` }]),
+        // #307: 申込フォームは member-os（公開）、受付一覧は Genesis /reserve
+        ...(isFrank ? [] : [{ label: "フィッティング申込フォーム（公開）", href: `${MEMBER_OS_URL}/reserve/shaft-fitting` }, { label: "フィッティング申込の受付一覧", href: "/reserve" }]),
       ],
     },
     {
@@ -173,14 +176,12 @@ export const SYSTEM_CARDS: SystemCard[] = [
   { key: "craft", name: "Craft OS", note: "フィッティング表紙・見積・注文書・工房", href: CRAFT_OS_URL, icon: "doc" },
   { key: "order", name: "発注管理", note: "仕入先への発注・入荷・商品マスタ", href: ORDER_URL, icon: "box" },
   { key: "inventory", name: "Inventory OS", note: "在庫・棚卸・入出庫", href: INVENTORY_OS_URL, icon: "box" },
-  { key: "reserve", name: "Reserve OS", note: "ビジター・フィッティング申込", href: RESERVE_OS_URL, icon: "cal" },
   { key: "cortex", name: "SWING CORTEX", note: "AIカルテナレッジ・診断", href: SWING_CORTEX_URL, icon: "spark" },
   { key: "compe", name: "Compe OS", note: "コンペ・成績表", href: COMPE_OS_URL, icon: "flag" },
   { key: "caddy", name: "Caddy OS", note: "キャディ派遣・台帳", href: CADDY_OS_URL, icon: "user" },
   { key: "hp", name: "HP管理", note: "ホームページ・ブログ・閲覧数", href: HP_ADMIN_URL, icon: "doc" },
   { key: "sales", name: "AI DEMO SALES", note: "HP制作営業・デモ", href: DEMO_SALES_URL, icon: "spark" },
   { key: "survey", name: "Survey OS", note: "アンケート・集計", href: SURVEY_OS_URL, icon: "check" },
-  { key: "legal", name: "Legal OS", note: "契約書・法務", href: LEGAL_OS_URL, icon: "check" },
   { key: "minutes", name: "議事録", note: "会議の録音・文字起こし・場面別の要約", href: MINUTES_URL, icon: "doc" },
 ];
 

@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 // Reserve OSは独立アプリ。Genesisは閲覧のみ（確定・返信はReserve OS / シフトアプリのやることリスト経由）。
 const RESERVE_OS_URL = process.env.NEXT_PUBLIC_RESERVE_OS_URL ?? "https://shift-cloud-reserve-os.vercel.app";
+import { MEMBER_OS_URL } from "@/lib/store-links";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "確認待ち",
@@ -85,18 +86,18 @@ export default async function ReservePage() {
     <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg font-bold tracking-wide">予約申込（Reserve OS）</h1>
+          <h1 className="text-lg font-bold tracking-wide">フィッティング申込（受付一覧）</h1>
           <p className="text-xs text-(--color-dim)">
-            申込は店舗スタッフの「やること」に自動で積まれます。日程確定・返信はReserve OS側で。ここは閲覧専用です。
+            公開フォーム（member-os）からの申込は店舗スタッフの「やること」に自動で積まれます。日程確定・返信は申込詳細（旧 Reserve OS）で。
           </p>
         </div>
         <a
-          href={RESERVE_OS_URL}
+          href={`${MEMBER_OS_URL}/reserve/shaft-fitting`}
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-lg bg-sky-600 px-3 py-2 text-sm text-white transition-colors hover:bg-sky-500"
         >
-          Reserve OSを開く ↗
+          公開フォームを開く ↗
         </a>
       </div>
 

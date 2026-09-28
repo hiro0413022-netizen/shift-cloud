@@ -119,3 +119,42 @@ header.topbar::after {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* ============================================================
+   GOLF WING フィッティング申込フォーム（/reserve/<slug>・#307 で reserve-os から移設）
+   reserve-os の公開サイト用クラスをそのまま持ってきた。member-os の @theme（deep green / gold）に乗せる
+   ============================================================ */
+.eyebrow { font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: var(--color-gold); }
+.hero {
+  background:
+    radial-gradient(120% 90% at 50% -20%, rgba(169, 134, 63, 0.18), transparent 60%),
+    linear-gradient(160deg, #14201b 0%, #0f2a20 55%, #0c1712 100%);
+  color: #f4f2ea;
+}
+.hero-rule { height: 1px; background: linear-gradient(90deg, transparent, rgba(169,134,63,0.7), transparent); }
+.step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; border-radius: 9999px;
+  background: var(--color-accent); color: #fff; font-weight: 700; font-size: 0.9rem;
+  box-shadow: 0 2px 6px -1px rgba(15, 107, 79, 0.4);
+}
+.section-title { font-size: 1.35rem; font-weight: 700; letter-spacing: 0.01em; }
+.field {
+  width: 100%; border-radius: 0.75rem; border: 1px solid var(--color-line); background: #fff;
+  padding: 0.8rem 0.95rem; font-size: 1rem; color: var(--color-txt);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field::placeholder { color: color-mix(in srgb, var(--color-dim) 70%, transparent); }
+.field:focus { outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(15,107,79,0.12); }
+.cta {
+  width: 100%; border-radius: 0.85rem; background: var(--color-accent); color: #fff; font-weight: 700; font-size: 1.05rem;
+  padding: 1rem 1.25rem; transition: background 0.15s ease, transform 0.1s ease; box-shadow: 0 6px 16px -6px rgba(15, 107, 79, 0.5);
+}
+.cta:hover { background: var(--color-accent-2); }
+.cta:active { transform: translateY(1px); }
+.cta:disabled { opacity: 0.55; }
+.faq { border-bottom: 1px solid var(--color-line); }
+.faq summary { cursor: pointer; list-style: none; padding: 1rem 0; font-weight: 600; display: flex; justify-content: space-between; gap: 1rem; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "＋"; color: var(--color-gold); font-weight: 700; }
+.faq[open] summary::after { content: "－"; }
