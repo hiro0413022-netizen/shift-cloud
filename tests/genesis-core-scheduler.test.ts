@@ -75,3 +75,34 @@ test("job run: 成功も失敗も gn_job_runs に残る", async () => {
   assert.equal(admin.tables.gn_job_runs.length, 2);
   assert.equal(admin.tables.gn_job_runs[1].error, "x");
 });
+
+test("ルールの Act（#294）: action_tool があれば act を呼ぶ。{count} が埋まり、承認待ちなら提案の本文にその旨が付く。act が無い/失敗でも提案は出る", async () => {
+  const { fillInput } = await import("../packages/genesis-core/src/scheduler.ts");
+  assert.deepEqual(fillInput({ body: "{count} 件・{date}・{nope}", n: 1 }, { count: 3, date: "2026-09-28" }), { body: "3 件・2026-09-28・{nope}", n: 1 });
+  assert.deepEqual(fillInput(null, { count: 1 }), {});
+
+  const admin = createFakeAdmin({ gn_rules: [rule({ action_tool: "message.send@1", action_input: { body: "未返信 {count} 件", audience: "staff" } })] });
+  admin.rpc = async (name: string) => (name === "gn_chat_query" ? { data: [{ id: 1 }, { id: 2 }], error: null } : { data: null, error: null });
+  const calls: Array<Record<string, unknown>> = [];
+  const r = await evaluateRules(admin, C, new Date("2026-09-28T03:00:00Z"), async (a) => {
+    calls.push({ tool: a.tool, input: a.input, dedupeKey: a.dedupeKey });
+    return { status: "needs_approval", queuedId: "q1" };
+  });
+  assert.deepEqual(r.fired, [{ code: "members_stale_90d", count: 2, act: "needs_approval" }]);
+  assert.deepEqual(calls, [{ tool: "message.send@1", input: { body: "未返信 2 件", audience: "staff" }, dedupeKey: "rule:members_stale_90d:2026-09-28" }]);
+  assert.match(String(admin.tables.ai_suggestions[0].body), /承認待ちに積みました/);
+
+  // act が例外でも提案は起票される（Act は Recommend を壊さない）
+  const admin2 = createFakeAdmin({ gn_rules: [rule({ action_tool: "message.send@1", action_input: {} })] });
+  admin2.rpc = async (name: string) => (name === "gn_chat_query" ? { data: [{ id: 1 }], error: null } : { data: null, error: null });
+  const r2 = await evaluateRules(admin2, C, new Date("2026-09-28T03:00:00Z"), async () => { throw new Error("down"); });
+  assert.equal(r2.fired[0].act, "failed");
+  assert.equal(admin2.tables.ai_suggestions.length, 1);
+  assert.match(String(admin2.tables.ai_suggestions[0].body), /実行に失敗: down/);
+
+  // action_tool 無し＝act を呼ばない
+  const admin3 = adminWithRpc([{ id: 1 }]);
+  let called = 0;
+  await evaluateRules(admin3, C, new Date("2026-09-28T03:00:00Z"), async () => { called += 1; return { status: "ok" }; });
+  assert.equal(called, 0);
+});

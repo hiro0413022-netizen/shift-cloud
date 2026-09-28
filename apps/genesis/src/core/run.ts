@@ -47,6 +47,8 @@ export async function runWithContext(args: {
   said?: string | null;
   createdBy: string | null;
   force?: boolean;
+  /** 承認キューの重複防止キー（ルールの Act など、同じ日に同じ行を2度積まない） */
+  dedupeKey?: string | null;
 }): Promise<RunResult> {
   const core = getCore();
   const policy = await loadPolicySet(args.admin, args.context.company.id);
@@ -64,10 +66,18 @@ export async function runWithContext(args: {
     payload: { __core: 1, tool: r.tool, input: args.input, execution_id: r.executionId, _said: args.said ?? undefined, policy: r.policy },
     originKind: args.origin,
     createdBy: args.createdBy,
-    dedupeKey: null,
+    dedupeKey: args.dedupeKey ?? null,
     modeOverride: { mode, undoMinutes: r.policy.undoMinutes },
   });
   return { ...r, queued: { id: q.id, mode: q.mode, runsAt: q.scheduledAt } };
+}
+
+/** Proactive ルールの Act（#294）: cron から。起点が人でない＝AI Actor なので risk>=2 は Policy で承認待ちになる */
+export async function runRuleAct(admin: Admin, args: { companyId: string; tool: string; input: Record<string, unknown>; title: string; dedupeKey: string }): Promise<{ status: string; queuedId?: string | null; error?: string | null }> {
+  const actor = await coreActorFromStaffId(admin, args.companyId, null);
+  const context = await buildGenesisContext(admin, actor, args.companyId, { surface: "cron", enrich: false });
+  const r = await runWithContext({ admin, context, ref: args.tool, input: args.input, origin: "rule", title: args.title, createdBy: null, dedupeKey: args.dedupeKey });
+  return { status: r.status, queuedId: r.queued?.id ?? null, error: r.error };
 }
 
 /** ai_action_queue の行（__core 付き、または Tool 名の action_type）を Tool として実行する（承認済み・取消枠経過後） */

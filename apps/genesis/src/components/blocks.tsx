@@ -249,6 +249,39 @@ function ApprovalCard({ b }: { b: BlockInstance }) {
   );
 }
 
+const STEP_STATUS: Record<string, { label: string; cls: string }> = {
+  done: { label: "完了", cls: "text-emerald-300" },
+  waiting_approval: { label: "承認が要る", cls: "text-amber-300" },
+  failed: { label: "失敗", cls: "text-rose-300" },
+  skipped: { label: "省略", cls: "text-(--color-faint)" },
+  running: { label: "実行中", cls: "text-sky-300" },
+  pending: { label: "待機", cls: "text-(--color-faint)" },
+};
+
+/** Skill（手順）の結果。各 Step の中身はこの下に続く Block が描く（#294） */
+function PlanCard({ b }: { b: BlockInstance }) {
+  const steps = (b.data.steps as Row[]) ?? [];
+  return (
+    <Frame b={b} title={String(b.data.goal ?? "")}>
+      {b.data.summary ? <p className="mb-2 text-sm">{String(b.data.summary)}</p> : null}
+      <ol className="space-y-1 text-xs">
+        {steps.map((s, i) => {
+          const st = STEP_STATUS[String(s.status)] ?? STEP_STATUS.pending;
+          return (
+            <li key={String(s.key ?? i)} className="flex items-baseline gap-2">
+              <span className="w-4 text-(--color-faint)">{i + 1}.</span>
+              <span>{fmt(s.title)}</span>
+              <span className="text-(--color-faint)">{fmt(s.tool)}</span>
+              <span className={`ml-auto ${st.cls}`}>{st.label}{s.rows != null ? `・${fmt(s.rows)}件` : ""}</span>
+              {s.error ? <span className="text-(--color-dim)">{fmt(s.error)}</span> : null}
+            </li>
+          );
+        })}
+      </ol>
+    </Frame>
+  );
+}
+
 function Generic({ b }: { b: BlockInstance }) {
   return (
     <Frame b={b} title={b.block}>
@@ -258,7 +291,7 @@ function Generic({ b }: { b: BlockInstance }) {
 }
 
 const VIEWS: Record<string, (p: { b: BlockInstance }) => React.ReactElement> = {
-  Table, KPI, Summary, BookingList, BookingCard, ShiftGrid, Timeline, EntityCard, Health, SourceNote, ApprovalCard,
+  Table, KPI, Summary, BookingList, BookingCard, ShiftGrid, Timeline, EntityCard, Health, SourceNote, ApprovalCard, PlanCard,
 };
 
 export function BlockView({ block }: { block: BlockInstance }) {

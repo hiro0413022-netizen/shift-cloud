@@ -65,6 +65,8 @@ export function blocksFromExecution(blocks: BlockRegistry, r: ExecutionResult): 
     return [blocks.make("SourceNote", { title: `${r.tool}: ${r.status}`, body: r.error ?? "" }, { ...meta, kind: "fact" })];
   }
   const out = (r.output ?? {}) as Row;
+  // Skill（Plan）の出力: PlanCard ＋ 各 Step を「その Step の Tool の Block」に展開（#294）
+  if (out.__plan === 1 && Array.isArray(out.steps)) return blocksFromPlan(blocks, r, out);
   const name = r.renders ?? "Table";
   const adapter = ADAPTERS[name];
   const data = adapter ? adapter(out, r.tool) : out;
@@ -81,6 +83,35 @@ export function blocksFromExecution(blocks: BlockRegistry, r: ExecutionResult): 
   // 行が表になる Tool は Table も付けて中身を見せる（KPI / Summary は数字だけなので）
   if ((name === "KPI" || name === "Summary" || name === "BookingList" || name === "Health") && asRows(out).length) {
     list.splice(1, 0, blocks.make("Table", ADAPTERS.Table(out, r.tool), meta));
+  }
+  return list;
+}
+
+type StepRow = { key: string; title: string; tool: string; status: string; output: unknown; error: string | null; renders: string | null; sources?: Array<{ table: string; updatedAt?: string | null }>; kind?: ExecutionResult["kind"]; rowCount?: number | null };
+
+function blocksFromPlan(blocks: BlockRegistry, r: ExecutionResult, out: Row): BlockInstance[] {
+  const steps = out.steps as StepRow[];
+  const meta: BlockMeta = { kind: "fact", sources: r.sources, asOf: r.sources[0]?.updatedAt ?? null, rowCount: null };
+  const card = blocks.make(
+    "PlanCard",
+    {
+      plan_id: r.executionId ?? "",
+      goal: String(out.goal ?? r.tool),
+      status: String(out.status ?? ""),
+      summary: String(out.summary ?? ""),
+      steps: steps.map((s) => ({ key: s.key, title: s.title, tool: s.tool, status: s.status, error: s.error, rows: s.rowCount ?? null })),
+    },
+    meta
+  );
+  const list: BlockInstance[] = [card];
+  for (const s of steps) {
+    if (s.status !== "done") continue;
+    // Step ごとに ExecutionResult の形に戻して通常の描画へ（出典も Step ごとに付く）
+    const sub: ExecutionResult = {
+      status: "ok", executionId: null, tool: s.tool, output: (s.output ?? {}) as Row, sources: (s.sources ?? []) as ExecutionResult["sources"], kind: s.kind ?? "fact",
+      rowCount: s.rowCount ?? null, silentZero: false, policy: null, error: null, durationMs: 0, logs: [], renders: s.renders ?? "Table",
+    };
+    for (const b of blocksFromExecution(blocks, sub)) list.push({ ...b, data: { ...b.data, title: b.data.title ? String(b.data.title) : s.title } });
   }
   return list;
 }

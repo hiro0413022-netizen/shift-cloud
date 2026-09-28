@@ -22,6 +22,8 @@
     "./tools/dev": "./src/tools/dev.ts",
     "./tools/all": "./src/tools/all.ts",
     "./render": "./src/render.ts",
+    "./skill": "./src/skill.ts",
+    "./skills": "./src/skills/index.ts",
     "./scheduler": "./src/scheduler.ts",
     "./tools/waiting": "./src/tools/waiting.ts"
   },

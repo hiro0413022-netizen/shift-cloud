@@ -32,6 +32,16 @@ export const x = defineTool({ name: "shift.publish", version: 1, domain: "ops", 
 - `GENESIS_CORE_TOOLS=off` で JARVIS の予約・受付は旧ハンドラに戻る（コードは両方残している。P1 で旧を消す）。
 - DB は追加のみ。`0208_genesis_core.sql` 末尾の drop で戻る。
 
+## Skill（P3-a・#294）
+
+Skill ＝ Tool を Plan(DAG) で束ねた手順。`packages/genesis-core/src/skills/index.ts` に `defineSkill({ name, steps: (input, ctx) => [...] , summarize })` で書き、`SKILL_TOOLS` に足すだけで Registry に Tool として載る（JARVIS の一覧・MCP・`/api/core/tools/<name>` に自動で出る）。
+- Step の Tool 権限・Policy・記録は Step ごと（Skill が権限を束ねない）。承認が要る Step は実行せず waiting_approval。
+- 結果は PlanCard ＋ 各 Step の Block。要約に LLM は使わない。
+
+## Proactive ルールの Act（#294）
+
+`gn_rules.action_tool` に Tool、`action_input` に引数（`{count}` `{date}` `{title}` を埋める）。発火時に `api/cron/execute` が `runRuleAct` で Core を通す。AI Actor なので risk>=2 は承認待ち（判断フィードの承認カード）。承認キューの dedupe は `rule:<code>:<日付>:act`。
+
 ## 次（P1）
 
 Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

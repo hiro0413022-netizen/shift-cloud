@@ -2,7 +2,7 @@
  * Scheduler（P2-a・#292）— cron 1本から呼ぶ Core のジョブ群。
  *
  *   processEvents()  … gn_events の未処理を拾い、処理済みにする（P3 で Workflow trigger をここに挿す）
- *   evaluateRules()  … gn_rules を gnv_* ビューで評価し、行が返れば ai_suggestions（判断フィード）へ起票
+ *   evaluateRules()  … gn_rules を gnv_* ビューで評価し、行が返れば ai_suggestions（判断フィード）へ起票。action_tool があれば Act（#294）
  *   nudgeWaiting()   … gn_waiting の期限切れに「そろそろフォローしますか？」を起票
  *   withJobRun()     … 実行記録（gn_job_runs）。Self Healing はこれを見る
  *
@@ -94,10 +94,26 @@ function fill(t: string, count: number): string {
   return t.replace(/\{count\}/g, String(count));
 }
 
-export async function evaluateRules(admin: AdminLike, companyId: string, now = new Date()): Promise<{ evaluated: number; fired: Array<{ code: string; count: number }>; errors: Array<{ code: string; error: string }> }> {
+/**
+ * ルールの Act（Detect→Explain→Recommend→**Act**・#294）。
+ * gn_rules.action_tool が入っているルールが発火したら呼ぶ。実行は Core（executeTool）を通すので、
+ * risk>=2 の Tool は AI Actor の Policy で承認待ちになり、Inbox に「承認カード」として出る（勝手に送らない）。
+ * 戻り値の status / queuedId を提案の body に添える。
+ */
+export type RuleAct = (args: { companyId: string; rule: Row; count: number; tool: string; input: Record<string, unknown>; dedupeKey: string }) => Promise<{ status: string; queuedId?: string | null; error?: string | null }>;
+
+/** action_input の {count} / {date} を埋める（文字列の値だけ） */
+export function fillInput(input: unknown, vars: Record<string, string | number>): Record<string, unknown> {
+  const src = input && typeof input === "object" && !Array.isArray(input) ? (input as Row) : {};
+  const out: Row = {};
+  for (const [k, v] of Object.entries(src)) out[k] = typeof v === "string" ? v.replace(/\{(\w+)\}/g, (_, n) => (n in vars ? String(vars[n]) : `{${n}}`)) : v;
+  return out;
+}
+
+export async function evaluateRules(admin: AdminLike, companyId: string, now = new Date(), act?: RuleAct): Promise<{ evaluated: number; fired: Array<{ code: string; count: number; act?: string }>; errors: Array<{ code: string; error: string }> }> {
   const { data } = await admin.from("gn_rules").select("*").eq("company_id", companyId).eq("enabled", true);
   const rules = (data ?? []) as Row[];
-  const fired: Array<{ code: string; count: number }> = [];
+  const fired: Array<{ code: string; count: number; act?: string }> = [];
   const errors: Array<{ code: string; error: string }> = [];
   let evaluated = 0;
   for (const r of rules) {
@@ -113,8 +129,22 @@ export async function evaluateRules(admin: AdminLike, companyId: string, now = n
       await admin.from("gn_rules").update({ last_fired_at: now.toISOString(), last_count: count, last_error: null, updated_at: now.toISOString() }).eq("id", r.id);
       if (count <= 0) continue;
       const title = fill(String(r.title_template), count);
-      const body = [fill(String(r.body_template ?? ""), count), "", "根拠（先頭5件）:", ...list.slice(0, 5).map((x) => "・" + Object.values(x).map((v) => (v == null ? "" : String(v))).join(" / "))].join("\n");
       const dedupe = `rule:${code}:${now.toISOString().slice(0, 10)}`;
+      // Act: action_tool があれば Core を通して実行（承認が要れば承認キューに積まれる）。失敗しても提案は出す
+      let actNote = "";
+      let actStatus: string | undefined;
+      if (act && typeof r.action_tool === "string" && r.action_tool.trim()) {
+        try {
+          const input = fillInput(r.action_input, { count, date: now.toISOString().slice(0, 10), title });
+          const a = await act({ companyId, rule: r, count, tool: r.action_tool.trim(), input, dedupeKey: dedupe });
+          actStatus = a.status;
+          actNote = a.status === "needs_approval" ? `\n\n▶ ${r.action_tool} を承認待ちに積みました（判断フィードで承認すると実行）` : a.status === "ok" || a.status === "idempotent" ? `\n\n▶ ${r.action_tool} を実行しました` : `\n\n▶ ${r.action_tool}: ${a.status}${a.error ? " — " + a.error : ""}`;
+        } catch (e) {
+          actStatus = "failed";
+          actNote = `\n\n▶ ${r.action_tool} の実行に失敗: ${e instanceof Error ? e.message : String(e)}`;
+        }
+      }
+      const body = [fill(String(r.body_template ?? ""), count), "", "根拠（先頭5件）:", ...list.slice(0, 5).map((x) => "・" + Object.values(x).map((v) => (v == null ? "" : String(v))).join(" / "))].join("\n") + actNote;
       const { error: insErr } = await admin.from("ai_suggestions").insert({
         company_id: companyId,
         kind: "proactive",
@@ -132,7 +162,7 @@ export async function evaluateRules(admin: AdminLike, companyId: string, now = n
       });
       if (insErr && insErr.code !== "23505") throw new Error(insErr.message);
       await admin.rpc("gn_emit", { p_company_id: companyId, p_store_id: null, p_type: "rule.fired", p_version: 1, p_entity_kind: "rule", p_entity_id: code, p_payload: { code, count, title, summary: title }, p_source: "scheduler:rules" }).catch(() => null);
-      fired.push({ code, count });
+      fired.push(actStatus ? { code, count, act: actStatus } : { code, count });
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       errors.push({ code, error });
@@ -168,9 +198,9 @@ function daysSince(iso: string, now: Date): number {
 }
 
 /** cron:execute（10分ごと）から呼ぶ1本 */
-export async function runSchedulerTick(admin: AdminLike, companyId: string): Promise<Row> {
+export async function runSchedulerTick(admin: AdminLike, companyId: string, opts: { act?: RuleAct } = {}): Promise<Row> {
   const events = await withJobRun(admin, "events:process", companyId, () => processEvents(admin, companyId));
-  const rules = await withJobRun(admin, "rules:evaluate", companyId, () => evaluateRules(admin, companyId));
+  const rules = await withJobRun(admin, "rules:evaluate", companyId, () => evaluateRules(admin, companyId, new Date(), opts.act));
   const waiting = await withJobRun(admin, "waiting:nudge", companyId, () => nudgeWaiting(admin, companyId));
   return { events, rules, waiting };
 }

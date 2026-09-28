@@ -26,11 +26,25 @@ export type FactKind = "fact" | "calculated" | "inference" | "suggestion";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AdminLike = any;
 
+/** ctx.call の戻り。Skill が Step の結果をそのまま Block にできるよう、描画に要る情報も返す */
+export type CallResult = {
+  status: string;
+  output?: unknown;
+  error?: string | null;
+  executionId?: string | null;
+  tool?: string;
+  renders?: string | null;
+  sources?: SourceRef[];
+  kind?: FactKind;
+  rowCount?: number | null;
+  policy?: { decision: string; reason?: string } | null;
+};
+
 export type ToolCtx = {
   admin: AdminLike;
   context: GenesisContext;
   /** 他 Tool を同じ Actor・同じ Policy で呼ぶ（Skill の中で使う）。実装は execute.ts が差し込む */
-  call: (ref: string, input: Record<string, unknown>) => Promise<{ status: string; output?: unknown; error?: string | null }>;
+  call: (ref: string, input: Record<string, unknown>) => Promise<CallResult>;
   /** イベント発行（Event Contract §6）。実装は execute.ts が差し込む */
   emit: (type: string, version: number, payload: Record<string, unknown>, entity?: { kind: string; id: string }) => Promise<void>;
   /** 実行ログに1行添える（デバッグ・根拠） */

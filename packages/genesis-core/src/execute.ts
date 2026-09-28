@@ -202,7 +202,7 @@ export async function executeTool(args: ExecuteArgs): Promise<ExecutionResult> {
     context,
     call: async (r, i) => {
       const res = await executeTool({ ...args, ref: r, input: i, depth: depth + 1, origin: `${ref}` });
-      return { status: res.status, output: res.output, error: res.error };
+      return { status: res.status, output: res.output, error: res.error, executionId: res.executionId, tool: res.tool, renders: res.renders, sources: res.sources, kind: res.kind, rowCount: res.rowCount, policy: res.policy ? { decision: res.policy.decision, reason: res.policy.reason } : null };
     },
     emit: async (type, version, payload, entity) => {
       await emitEvent(

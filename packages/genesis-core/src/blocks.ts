@@ -89,7 +89,7 @@ export const BASE_BLOCKS: BlockContract[] = [
   { name: "BookingList", version: 1, description: "予約の一覧（日別）", schema: obj({ date: str, items: anyArr }, ["items"]) },
   { name: "ShiftGrid", version: 1, description: "シフト表", schema: obj({ from: str, to: str, rows: anyArr }, ["rows"]) },
   { name: "ApprovalCard", version: 1, description: "承認1件（判断フィードと同型）", schema: obj({ action_id: str, title: str, detail: str, risk: num, mode: str }, ["action_id", "title"]), actions: ["approve", "reject", "revise"] },
-  { name: "PlanCard", version: 1, description: "実行計画（DAG）の進捗", schema: obj({ plan_id: str, goal: str, steps: anyArr, status: str }, ["plan_id", "goal", "steps"]), actions: ["cancel"] },
+  { name: "PlanCard", version: 1, description: "実行計画（DAG）の進捗。Skill の結果はこれ＋各 Step の Block", schema: obj({ plan_id: str, goal: str, steps: anyArr, status: str, summary: str }, ["plan_id", "goal", "steps"]), actions: ["cancel"] },
   { name: "MessageDraft", version: 1, description: "送信前の文面", schema: obj({ to: str, channel: str, body: str, audience: str }, ["body"]), actions: ["message.send@1"] },
   { name: "SourceNote", version: 1, description: "出典・生成SQL・件数・エラー", schema: obj({ title: str, body: str, sql: { type: "string", nullable: true }, rowCount: { type: "number", nullable: true } }, ["title"]) },
   { name: "AppPanel", version: 1, description: "既存アプリの画面を右パネルで開く", schema: obj({ app: str, path: str, title: str }, ["app", "path"]), actions: ["open"] },
