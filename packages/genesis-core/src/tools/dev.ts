@@ -42,6 +42,15 @@ export const healthCheck = defineTool({
       { key: "events_unprocessed", label: "未処理イベント", value: await count("gn_events", (q) => (q as { is: Function }).is("processed_at", null)) },
       { key: "denied", label: "権限拒否", value: await count("gn_tool_executions", (q) => (q as { eq: Function; gte: Function }).eq("status", "denied").gte("created_at", since)) },
     ];
+    // cron が動いているか（gn_job_runs）: 直近 30 分に cron:execute が無ければ止まっている
+    let cronAgeMin = -1;
+    try {
+      const { data: last } = await admin.from("gn_job_runs").select("started_at").eq("job", "cron:execute").order("started_at", { ascending: false }).limit(1).maybeSingle();
+      cronAgeMin = last?.started_at ? Math.round((Date.now() - Date.parse(String(last.started_at))) / 60_000) : 9999;
+    } catch {
+      /* 未適用 */
+    }
+    items.push({ key: "cron_stale", label: "cron:execute が最後に走ってからの分数（30分超で異常）", value: cronAgeMin > 30 ? cronAgeMin : 0 });
     const ok = items.every((i) => i.value <= 0 || i.key === "events_unprocessed" || i.key === "denied");
     return { data: { items, ok }, sources: [src("ai_action_queue"), src("gn_tool_executions"), src("gn_events")], kind: "fact", rowCount: items.length };
   },

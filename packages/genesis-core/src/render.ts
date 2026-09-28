@@ -46,6 +46,8 @@ const ADAPTERS: Record<string, (o: Row, ref: string) => Row> = {
       return { kind: "person", id: String(m.member_no ?? ""), title: String(m.member_name ?? ""), subtitle: `${o.store ?? ""} ${m.plan_name ?? m.member_type ?? ""}`, fields: Object.entries(m).map(([k, v]) => ({ k, v })) };
     }
     if (ref.startsWith("walkin.add")) return { kind: "person", id: String(o.walkin_id ?? ""), title: String(o.guest ?? ""), subtitle: `受付台帳 ${o.visited_on ?? ""}${o.already ? "（登録済み）" : ""}`, fields: [] };
+    if (ref.startsWith("waiting.create")) return { kind: "waiting", id: String(o.waiting_id ?? ""), title: "待ちを登録しました", subtitle: `期限 ${String(o.expected_by ?? "").slice(0, 10)} を過ぎると Inbox に「そろそろフォロー」が出ます`, fields: [] };
+    if (ref.startsWith("waiting.close")) return { kind: "waiting", id: String(o.waiting_id ?? ""), title: "待ちを閉じました", subtitle: "", fields: [] };
     if (ref.startsWith("devreq.create")) return { kind: "devreq", id: String(o.request_id ?? ""), title: String(o.title ?? ""), subtitle: "開発依頼をキューに積みました", fields: [], href: "/dev-requests" };
     return { kind: "entity", id: String(o.id ?? ""), title: String(o.title ?? o.name ?? ref), subtitle: "", fields: [] };
   },

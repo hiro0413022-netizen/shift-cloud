@@ -146,3 +146,24 @@ test("店舗の入口: FRANK には会員一覧、GOLF WING にはフィッテ�
   assert.ok(g.find((c) => c.key === "reservations")?.links.some((l) => /フィッティング/.test(l.label)));
   for (const c of [...f, ...g]) assert.ok(c.links.length >= 1 && /^https:\/\//.test(c.links[0].href));
 });
+
+// Inbox 4分類（#292）: 至急 → 判断が要る → 待ち → お知らせ。元の並びは分類内で保つ
+import { categorizeTodo, sortByInboxCategory } from "../apps/genesis/src/lib/home-pure.ts";
+test("Inbox 4分類: 分類と並び", () => {
+  assert.equal(categorizeTodo({ source: "queue", tag: "AI実行" }), "action");
+  assert.equal(categorizeTodo({ source: "queue", tag: "AI実行", stale: true }), "critical");
+  assert.equal(categorizeTodo({ source: "suggestion", tag: "見つけた", severity: "critical", kind: "proactive" }), "critical");
+  assert.equal(categorizeTodo({ source: "suggestion", tag: "見つけた", severity: "warning", kind: "proactive" }), "info");
+  assert.equal(categorizeTodo({ source: "suggestion", tag: "待ち", severity: "info", kind: "waiting" }), "waiting");
+  assert.equal(categorizeTodo({ source: "alert", tag: "リスク" }), "critical");
+  assert.equal(categorizeTodo({ source: "inquiry", tag: "問い合わせ" }), "action");
+  const sorted = sortByInboxCategory([
+    { source: "suggestion", tag: "見つけた", severity: "warning", kind: "proactive", id: 1 },
+    { source: "inquiry", tag: "問い合わせ", id: 2 },
+    { source: "suggestion", tag: "待ち", kind: "waiting", id: 3 },
+    { source: "alert", tag: "リスク", id: 4 },
+    { source: "join", tag: "入会", id: 5 },
+  ]);
+  assert.deepEqual(sorted.map((s) => s.id), [4, 2, 5, 3, 1]);
+  assert.deepEqual(sorted.map((s) => s.category), ["critical", "action", "action", "waiting", "info"]);
+});

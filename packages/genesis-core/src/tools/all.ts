@@ -11,8 +11,9 @@ import { CUSTOMER_TOOLS } from "./customer.ts";
 import { FINANCE_TOOLS } from "./finance.ts";
 import { GROWTH_TOOLS } from "./growth.ts";
 import { DEV_TOOLS } from "./dev.ts";
+import { WAITING_TOOLS } from "./waiting.ts";
 
-export const CORE_TOOLS: ToolContract[] = [...OPS_TOOLS, ...CUSTOMER_TOOLS, ...FINANCE_TOOLS, ...GROWTH_TOOLS, ...DEV_TOOLS];
+export const CORE_TOOLS: ToolContract[] = [...OPS_TOOLS, ...CUSTOMER_TOOLS, ...FINANCE_TOOLS, ...GROWTH_TOOLS, ...DEV_TOOLS, ...WAITING_TOOLS];
 
 export function createGenesisCore(opts: { tools?: ToolContract[]; blocks?: BlockContract[]; events?: EventContract[] } = {}) {
   const blocks = createBlockRegistry(opts.blocks ?? []);

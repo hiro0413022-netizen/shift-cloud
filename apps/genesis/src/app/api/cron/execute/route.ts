@@ -5,6 +5,7 @@ import { publishDueContent } from "@/lib/content-loop";
 import { listOperatingCompanyIds } from "@/lib/operating-companies";
 import { runFrankAutoVisited, runFrankAutoCheckout } from "@/lib/frank-visit-cron";
 import { runBillingDaySweep } from "@/lib/frank-billing-day";
+import { runSchedulerTick, withJobRun } from "@yozan/genesis-core/scheduler";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -31,7 +32,9 @@ export async function GET(req: NextRequest) {
       const r = await runDueActions(admin, String(c.id));
       // 承認済みSNS投稿の時刻到来分をInstagramへ（#101・IG未設定なら注記のみでスキップ）
       const sns = await publishDueContent(admin, String(c.id)).catch((e) => ({ error: String(e) }));
-      results.push({ company: c.id, ...r, sns });
+      // Genesis Core Scheduler（#292）: イベント処理・Proactive ルール・Waiting の期限。LLM は使わない
+      const core = await runSchedulerTick(admin, String(c.id)).catch((e) => ({ error: String(e) }));
+      results.push({ company: c.id, ...r, sns, core });
     } catch (e) {
       results.push({ company: c.id, error: String(e) });
     }
@@ -47,5 +50,7 @@ export async function GET(req: NextRequest) {
   /* FRANK: 入会したのに「毎月10日に翌月分」に作り直せていない方を拾い直す（#235）。
      入会の Webhook が応答後に走らせる作り直しの取りこぼし用。1回2名まで */
   const frankBillingDay = await runBillingDaySweep(2).catch((e) => ({ error: String(e) }));
+  // tick 自体の記録（Self Healing が「10分ごとに走っているか」を見る）
+  await withJobRun(admin, "cron:execute", null, async () => ({ companies: companyIds.length })).catch(() => null);
   return NextResponse.json({ ok: true, results, frankVisited, frankCheckout, frankBillingDay });
 }

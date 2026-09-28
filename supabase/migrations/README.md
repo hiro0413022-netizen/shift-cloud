@@ -75,3 +75,4 @@
 - ✅ `0207_personal_lesson_from_money_os_app.sql` — 適用済（2026-09-28、MCP name=0207_personal_lesson_from_money_os_app。パーソナル手当の算出元に Money OS の画面入力 mon_sales(app) を追加・personal_lesson_source_rows 新設・unlinked_lines に source 列・外注費の計上先も同じ行から #286）
 - ✅ `0208_genesis_core.sql` — 適用済（2026-09-28、MCP name=0208_genesis_core。Genesis Core P0: gn_tool_executions（Tool実行記録・idempotency 部分一意索引）/ gn_plans / gn_plan_steps（DAG）/ gn_events（type@schema_version の outbox）/ gn_llm_calls / gn_tool_policies（Tool×Role×Store×Amount・初期3件）/ gn_personas。追加のみ・既存表は不変 #289）
 - ✅ `0209_jarvis_turns_intents.sql` — 適用済（2026-09-28、MCP name=0209_jarvis_turns_intents。gn_jarvis_turns.intent の CHECK に act / tool を追加。act が #186 から記録されていなかった不具合の修正 #290）
+- ✅ `0210_genesis_events_waiting_rules.sql` — 適用済（2026-09-28、MCP name=0210_genesis_events_waiting_rules。gn_emit()＋トリガー7表12イベント / gn_waiting / gn_rules（初期5本・inquiries は status new/pending/draft に限定して適用後に修正） / gn_job_runs #292）

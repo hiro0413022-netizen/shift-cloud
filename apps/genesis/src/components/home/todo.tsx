@@ -11,6 +11,7 @@ import { approveInquiry, markInquiryHandled, markInquiriesHandledBulk } from "@/
 import { decideTrialRequest, decideJoinRequest, dismissHotLead, acknowledgeAlert } from "@/app/(main)/feed-actions";
 import { approveJoinRequestsBulk, dismissProspect, clearAiBacklog } from "@/app/(main)/home-actions";
 import { alertKey } from "@/lib/kernel";
+import { categorizeTodo, INBOX_CATEGORY_LABEL } from "@/lib/home-pure";
 
 /**
  * 今日やること（#244 ③）
@@ -136,6 +137,8 @@ const TONE: Record<string, "accent" | "warn" | "danger" | "default"> = {
   ブロッカー: "danger",
   確認: "warn",
   改善提案: "default",
+  見つけた: "warn",
+  待ち: "default",
 };
 
 /** #246 「AIが作ったものを全部消す」。お客様から来た件は消さない */
@@ -196,6 +199,7 @@ export function TodoList({ todos, base = "/" }: { todos: TodoEntry[]; base?: str
     if (todos[i + 1]) p.set("next", todos[i + 1].key);
     return `${base}?${p.toString()}`;
   };
+  const catOf = (e: TodoEntry) => categorizeTodo(e);
   return (
     <ul>
       {todos.map((e, i) => (
@@ -207,6 +211,11 @@ export function TodoList({ todos, base = "/" }: { todos: TodoEntry[]; base?: str
             e.stale ? "bg-amber-400/5" : ""
           }`}
         >
+          {(i === 0 || catOf(todos[i - 1]) !== catOf(e)) && (
+            <span className={`-mx-3 -mt-3 mb-1 block w-[calc(100%+1.5rem)] px-3 pt-2 text-[11px] font-bold tracking-wider md:-mx-5 md:w-[calc(100%+2.5rem)] md:px-5 ${catOf(e) === "critical" ? "text-red-300" : catOf(e) === "action" ? "text-(--color-accent)" : "text-(--color-dim)"}`}>
+              {INBOX_CATEGORY_LABEL[catOf(e)]}
+            </span>
+          )}
           <Link href={panelHref(i)} className="flex min-w-0 flex-1 basis-56 items-center gap-3">
             <Badge tone={TONE[e.tag] ?? "accent"}>{e.tag}</Badge>
             <span className="min-w-0 flex-1">

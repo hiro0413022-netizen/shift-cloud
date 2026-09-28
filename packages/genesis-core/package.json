@@ -21,7 +21,9 @@
     "./tools/growth": "./src/tools/growth.ts",
     "./tools/dev": "./src/tools/dev.ts",
     "./tools/all": "./src/tools/all.ts",
-    "./render": "./src/render.ts"
+    "./render": "./src/render.ts",
+    "./scheduler": "./src/scheduler.ts",
+    "./tools/waiting": "./src/tools/waiting.ts"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.50.0",

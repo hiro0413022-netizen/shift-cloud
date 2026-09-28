@@ -104,3 +104,36 @@ export function parsePanelKey(v: unknown): PanelKey | null {
   if (i <= 0) return null;
   return { source: v.slice(0, i), id: v.slice(i + 1) };
 }
+
+/* ------------------------------------------------------------
+   Inbox 4分類（P2-a・#292・GO条件19/22）
+   Critical → Decision Needed（Action Required）→ Waiting → Information の順で並べる。
+   分類は純関数（テストで固定）。要素の中身は変えない＝件数・キーは従来と同じ。
+------------------------------------------------------------ */
+export type InboxCategory = "critical" | "action" | "waiting" | "info";
+
+export const INBOX_CATEGORY_LABEL: Record<InboxCategory, string> = {
+  critical: "至急",
+  action: "判断が要る",
+  waiting: "待ち",
+  info: "お知らせ",
+};
+
+const ORDER: Record<InboxCategory, number> = { critical: 0, action: 1, waiting: 2, info: 3 };
+
+export function categorizeTodo(e: { source: string; tag: string; stale?: boolean; severity?: string | null; kind?: string | null }): InboxCategory {
+  if (e.severity === "critical" || e.tag === "リスク" || e.tag === "ブロッカー") return "critical";
+  if (e.source === "suggestion" && e.kind === "waiting") return "waiting";
+  if (e.source === "undo") return "waiting";
+  if (e.source === "suggestion" || e.source === "alert" || e.source === "hotlead" || e.source === "prospect") return "info";
+  // approval / queue / inquiry / trial / join / reserve / deliverable = 人の判断が要る
+  if (e.stale) return "critical";
+  return "action";
+}
+
+export function sortByInboxCategory<T extends { source: string; tag: string; stale?: boolean; severity?: string | null; kind?: string | null }>(items: T[]): Array<T & { category: InboxCategory }> {
+  return items
+    .map((it, i) => ({ it, i, category: categorizeTodo(it) }))
+    .sort((a, b) => ORDER[a.category] - ORDER[b.category] || a.i - b.i)
+    .map(({ it, category }) => ({ ...it, category }));
+}
