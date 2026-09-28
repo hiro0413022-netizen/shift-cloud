@@ -1,15 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  /* Money OS パレット（Genesis準拠の黒・濃紺基調＋ゴールド） */
-  --color-bg: #0b0f17;
-  --color-panel: #141a26;
-  --color-line: #263248;
-  --color-txt: #e6edf5;
-  --color-dim: #93a1b8;
-  --color-accent: #f26d5b;
-  --color-gold: #e0b64a;
-  --color-ok: #34d399;
+  /* Money OS パレット（2026-09-28 白基調へ。Member OS・議事録と同じ明るい配色）
+     ※ トークン名は据え置き（--color-gold＝「押せる色」、--color-accent＝注意・マイナス）。
+       画面側は bg-(--color-x) で参照しているので、ここを変えるだけで全画面に効く */
+  --color-bg: #f5f7fa;
+  --color-panel: #ffffff;
+  --color-panel-2: #f1f4f9;
+  --color-line: #e2e7ef;
+  --color-txt: #111827;
+  --color-dim: #5b6576;
+  --color-accent: #dc2626;
+  --color-gold: #2563eb;
+  --color-gold-soft: #eff4ff;
+  --color-brand: #b7791f;
+  --color-ok: #059669;
+  --color-warn: #d97706;
 }
 
 body {
@@ -18,13 +24,18 @@ body {
 }
 
 /* 上部のごく淡いグロー（のっぺり感を軽減） */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(224, 182, 74, 0.06), transparent);
+/* スマホの下タブに最後の行が隠れないように */
+@media (max-width: 767px) {
+  body {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    padding-bottom: 0;
+  }
 }
 
 /* ============================================================

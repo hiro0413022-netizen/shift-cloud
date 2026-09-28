@@ -30,7 +30,7 @@ export function Uploader({ sources }: { sources: { code: string; name: string }[
       {result && (
         <div className="rounded-lg border border-(--color-line) bg-(--color-bg) p-3 text-sm">
           {result.errors.length > 0 && result.ok === 0 ? (
-            <p className="text-red-400">取込失敗: {result.errors.join(" / ")}</p>
+            <p className="text-red-600">取込失敗: {result.errors.join(" / ")}</p>
           ) : (
             <p className="text-(--color-ok)">
               取込 {result.ok} 件 / 重複スキップ {result.skipped} 件

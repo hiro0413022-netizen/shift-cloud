@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
-import { inputCls, btnCls, btnGhostCls } from "@/components/ui";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { inputCls, btnCls, btnGhostCls, Field } from "@/components/ui";
 import { createSale, createSales, type SaleInput, type SaveResult } from "./actions";
 import ProductPicker, { invLabel, masterLabel, type InvPick } from "./ProductPicker";
 import type { MasterProduct } from "./actions";
@@ -322,7 +322,7 @@ export default function SalesEntry({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {pendingDraft && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-(--color-gold) px-3 py-2 text-sm">
           <span>
@@ -335,23 +335,6 @@ export default function SalesEntry({
           <button type="button" onClick={clearDraft} className={btnGhostCls}>捨てる</button>
         </div>
       )}
-      {/* モード切替 */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setMode("single")}
-          className={mode === "single" ? btnCls : btnGhostCls}
-        >連続入力</button>
-        <button
-          type="button"
-          onClick={() => setMode("batch")}
-          className={mode === "batch" ? btnCls : btnGhostCls}
-        >まとめ入力</button>
-        <span className="text-xs text-(--color-dim)">
-          {mode === "single" ? "1件ずつ即保存。お客様・日付・支払は保持されます" : "お客様1人＋商品を複数行まとめて保存（行ごとに担当プロを変えられます）"}
-        </span>
-      </div>
-
       {/* 共通データリスト */}
       <datalist id="item-type-suggestions">
         {itemTypeSuggestions.map((t) => <option key={t} value={t} />)}
@@ -363,146 +346,168 @@ export default function SalesEntry({
         {sellerSuggestions.map((s) => <option key={s} value={s} />)}
       </datalist>
 
-      {/* ヘッダー（保持項目） */}
-      <div className="grid grid-cols-2 items-start gap-2 sm:grid-cols-7">
-        <input type="date" value={soldOn} onChange={(e) => setSoldOn(e.target.value)} className={inputCls} />
-        <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <CustomerPicker
-          value={customerName}
-          onPick={setCustomerName}
-          onMemberKind={setMemberKind}
-          recent={customerSuggestions}
-        />
-        <select value={memberKind} onChange={(e) => setMemberKind(e.target.value)} className={inputCls}>
-          <option value="">会員区分</option>
-          {memberKinds.map((k) => <option key={k} value={k}>{k}</option>)}
-        </select>
-        <select value={payMethod} onChange={(e) => setPayMethod(e.target.value)} className={inputCls}>
-          {payMethods.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select value={pro} onChange={(e) => setPro(e.target.value)} className={inputCls}>
-          <option value="">担当プロ（既定）</option>
-          {pros.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <input list="seller-suggestions" value={seller} onChange={(e) => setSeller(e.target.value)} placeholder="販売者" className={inputCls} aria-label="販売者（Excel Q列。保持されます）" />
-      </div>
-      <p className="text-xs text-(--color-dim)">
-        {pros.length === 0
-          ? "担当プロは「設定」からこの店舗に追加できます"
-          : "ヘッダーの担当プロは既定値です。商品行ごとに別のコーチを選べます"}
-      </p>
-
-      {/* クイックボタン */}
-      {presets.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <span className="self-center text-xs text-(--color-dim)">定番:</span>
-          {presets.map((p, i) => (
-            <button key={i} type="button" onClick={() => applyPreset(p)} className={`${btnGhostCls} py-1 text-xs`}>
-              {p.label}
-            </button>
-          ))}
+      {/* 2026-09-28 作り直し: 上から順に埋めれば終わる並びにした（以前は7列＋11欄が見出しなしで並んでいた）。
+          日付・お客様・払い方・担当は「保持」＝次の1件でもそのまま使う（連続入力のため） */}
+      <Step n={1} title="いつ・どなたに">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Field label="日付">
+            <input type="date" value={soldOn} onChange={(e) => setSoldOn(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="お客様" hint="名前の一部で探せます。空でも保存できます">
+            <CustomerPicker value={customerName} onPick={setCustomerName} onMemberKind={setMemberKind} recent={customerSuggestions} />
+          </Field>
+          <Field label="担当プロ" hint={pros.length === 0 ? "「担当プロの設定」で追加できます" : "レッスン・フィッティングの担当"}>
+            <select value={pro} onChange={(e) => setPro(e.target.value)} className={inputCls}>
+              <option value="">（なし）</option>
+              {pros.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </Field>
         </div>
-      )}
+        <div className="mt-3">
+          <p className="mb-1 text-sm font-medium">会員かどうか</p>
+          <Chips options={memberKinds} value={memberKind} onChange={setMemberKind} allowEmpty />
+        </div>
+      </Step>
+
+      <Step n={2} title="払い方">
+        <Chips options={payMethods} value={payMethod} onChange={setPayMethod} />
+        {payMethod === "現金" && <p className="mt-2 text-xs text-(--color-dim)">現金はレジのお金（出し入れの記録）にも自動で入ります</p>}
+      </Step>
+
+      <Step n={3} title="何を売りましたか">
+        <div className="space-y-3">
+          <div>
+            <p className="mb-1 text-sm font-medium">区分</p>
+            <Chips options={categories} value={category} onChange={setCategory} />
+          </div>
+
+          {presets.length > 0 && (
+            <div>
+              <p className="mb-1 text-sm font-medium">よく売れるもの <span className="font-normal text-(--color-dim)">（押すと商品と金額が入ります）</span></p>
+              <div className="flex flex-wrap gap-2">
+                {presets.map((p, i) => (
+                  <button key={i} type="button" onClick={() => applyPreset(p)} className="rounded-full border border-(--color-line) bg-white px-3 py-2 text-sm hover:border-(--color-gold) hover:bg-(--color-gold-soft)">
+                    {p.label}円
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-(--color-panel-2) p-1 text-sm">
+            <button type="button" onClick={() => setMode("single")} className={`flex-1 rounded-md px-3 py-2 font-semibold ${mode === "single" ? "bg-white shadow-sm" : "text-(--color-dim)"}`}>
+              1つずつ入れる
+            </button>
+            <button type="button" onClick={() => setMode("batch")} className={`flex-1 rounded-md px-3 py-2 font-semibold ${mode === "batch" ? "bg-white shadow-sm" : "text-(--color-dim)"}`}>
+              まとめて入れる（1人が何点も買った）
+            </button>
+          </div>
 
       {/* 商品入力 */}
       {mode === "single" ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
-          <ProductPicker
-            className="sm:col-span-2"
-            value={line.productName}
-            invItemId={line.invItemId}
-            recent={productSuggestions}
-            items={invItems}
-            autoFocusRef={productRef}
-            onChange={(name) => setLine((prev) => ({ ...prev, productName: name, invItemId: null }))}
-            onPick={(it) => onPickAny(it, (f) => setLine((prev) => f(prev)))}
-            onPickMaster={(p) => onPickMasterAny(p, (f) => setLine((prev) => f(prev)))}
-          />
-          <input
-            list="item-type-suggestions"
-            value={line.itemType}
-            onChange={(e) => setLine((prev) => ({ ...prev, itemType: e.target.value }))}
-            placeholder="種類"
-            className={inputCls}
-            aria-label="種類（ボール・グリップ・打席利用など）"
-          />
-          <input
-            list="maker-suggestions"
-            value={line.maker}
-            onChange={(e) => setLine((prev) => ({ ...prev, maker: e.target.value }))}
-            placeholder="メーカー名"
-            className={inputCls}
-            aria-label="メーカー名"
-          />
-          <input
-            inputMode="numeric"
-            value={line.listPrice}
-            onChange={(e) => setLine((prev) => patch(prev, { listPrice: e.target.value, unitManual: false }))}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
-            placeholder="定価(税抜)"
-            className={inputCls}
-            aria-label="定価（税抜）"
-          />
-          <input
-            inputMode="numeric"
-            value={line.discount}
-            onChange={(e) => setLine((prev) => patch(prev, { discount: e.target.value, unitManual: false }))}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
-            placeholder="割引額(-)"
-            className={inputCls}
-            aria-label="割引額（値引きはマイナス）"
-          />
-          <input
-            inputMode="numeric"
-            value={line.unitPrice}
-            onChange={(e) => setLine((prev) => patch(prev, { unitPrice: e.target.value, unitManual: true }))}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
-            placeholder="売価(自動)"
-            className={inputCls}
-            aria-label="売価（税抜・自動）"
-          />
-          <input
-            type="number"
-            min={1}
-            step={1}
-            required
-            value={line.qty}
-            onChange={(e) => setLine((prev) => patch(prev, { qty: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
-            placeholder="個数(必須)"
-            className={inputCls}
-            aria-label="個数（必須）"
-          />
-          <input
-            inputMode="numeric"
-            value={line.amount}
-            onChange={(e) => setLine((prev) => patch(prev, { amount: e.target.value, amountManual: true }))}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
-            placeholder="金額(税抜・自動)"
-            className={inputCls}
-            aria-label="金額（税抜・自動）"
-          />
-          <input
-            inputMode="numeric"
-            value={line.taxIncluded}
-            onChange={(e) => setLine((prev) => ({ ...prev, taxIncluded: e.target.value, taxManual: true }))}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
-            placeholder="決済金額(税込)"
-            className={inputCls}
-            aria-label="決済金額（税込）"
-          />
-          {proSelect(line.pro, (v) => setLine((prev) => ({ ...prev, pro: v })))}
-          <input
-            value={line.memo}
-            onChange={(e) => setLine((prev) => ({ ...prev, memo: e.target.value }))}
-            placeholder="備考(任意)"
-            className={`${inputCls} sm:col-span-2`}
-          />
-          <button type="button" onClick={addSingle} disabled={pending} className={`${btnCls} justify-center`}>
-            {pending ? "..." : "追加"}
+        <div className="space-y-3">
+          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:grid-cols-6">
+            <Field label="商品・内容" className="col-span-2 sm:col-span-3" hint="在庫から選ぶと種類・メーカー・定価も入ります">
+              <ProductPicker
+                value={line.productName}
+                invItemId={line.invItemId}
+                recent={productSuggestions}
+                items={invItems}
+                autoFocusRef={productRef}
+                onChange={(name) => setLine((prev) => ({ ...prev, productName: name, invItemId: null }))}
+                onPick={(it) => onPickAny(it, (f) => setLine((prev) => f(prev)))}
+                onPickMaster={(p) => onPickMasterAny(p, (f) => setLine((prev) => f(prev)))}
+              />
+            </Field>
+            <Field label="定価（税抜・1つ）">
+              <input
+                inputMode="numeric"
+                value={line.listPrice}
+                onChange={(e) => setLine((prev) => patch(prev, { listPrice: e.target.value, unitManual: false }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+                placeholder="例 1500"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="値引き" hint="値引きはマイナス（例 -300）">
+              <input
+                inputMode="numeric"
+                value={line.discount}
+                onChange={(e) => setLine((prev) => patch(prev, { discount: e.target.value, unitManual: false }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+                placeholder="なし"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="個数" required>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                required
+                value={line.qty}
+                onChange={(e) => setLine((prev) => patch(prev, { qty: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          {/* 自動計算の結果。手で直すとそこから先の自動計算は止まる（値引きの端数調整など） */}
+          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 rounded-xl bg-(--color-panel-2) p-3 sm:grid-cols-3">
+            <Field label="1つの売価（自動）">
+              <input
+                inputMode="numeric"
+                value={line.unitPrice}
+                onChange={(e) => setLine((prev) => patch(prev, { unitPrice: e.target.value, unitManual: true }))}
+                className={`${inputCls} bg-white`}
+              />
+            </Field>
+            <Field label="金額（税抜・自動）">
+              <input
+                inputMode="numeric"
+                value={line.amount}
+                onChange={(e) => setLine((prev) => patch(prev, { amount: e.target.value, amountManual: true }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+                className={`${inputCls} bg-white font-semibold`}
+              />
+            </Field>
+            <Field label="お支払い額（税込・自動）" className="col-span-2 sm:col-span-1">
+              <input
+                inputMode="numeric"
+                value={line.taxIncluded}
+                onChange={(e) => setLine((prev) => ({ ...prev, taxIncluded: e.target.value, taxManual: true }))}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSingle(); } }}
+                className={`${inputCls} bg-white text-lg font-bold`}
+              />
+            </Field>
+          </div>
+
+          <details className="rounded-lg border border-(--color-line) px-3 py-2">
+            <summary className="cursor-pointer text-sm font-medium text-(--color-dim)">くわしく入れる（種類・メーカー・販売者・メモ／任意）</summary>
+            <div className="mt-3 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:grid-cols-4">
+              <Field label="種類" hint="ボール・グリップ・打席利用など">
+                <input list="item-type-suggestions" value={line.itemType} onChange={(e) => setLine((prev) => ({ ...prev, itemType: e.target.value }))} className={inputCls} />
+              </Field>
+              <Field label="メーカー">
+                <input list="maker-suggestions" value={line.maker} onChange={(e) => setLine((prev) => ({ ...prev, maker: e.target.value }))} className={inputCls} />
+              </Field>
+              <Field label="販売者" hint="次の1件にも残ります">
+                <input list="seller-suggestions" value={seller} onChange={(e) => setSeller(e.target.value)} className={inputCls} />
+              </Field>
+              <Field label="この商品だけ担当を変える">
+                {proSelect(line.pro, (v) => setLine((prev) => ({ ...prev, pro: v })))}
+              </Field>
+              <Field label="メモ" className="col-span-2 sm:col-span-4">
+                <input value={line.memo} onChange={(e) => setLine((prev) => ({ ...prev, memo: e.target.value }))} className={inputCls} />
+              </Field>
+            </div>
+          </details>
+
+          <button type="button" onClick={addSingle} disabled={pending} className={`${btnCls} w-full py-3.5 text-lg`}>
+            {pending ? "保存しています…" : `この売上を追加${num(line.taxIncluded) ? `（お支払い ${num(line.taxIncluded).toLocaleString("ja-JP")}円）` : ""}`}
           </button>
+          <p className="text-center text-xs text-(--color-dim)">追加すると、日付・お客様・払い方はそのまま残ります。続けて次の商品を入れられます</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -612,15 +617,63 @@ export default function SalesEntry({
           </div>
         </div>
       )}
+        </div>
+      </Step>
 
       {flash && (
         <p role={flashError ? "alert" : "status"}
           className={flashError
             ? "rounded-lg border border-(--color-accent) px-3 py-2 text-sm font-medium text-(--color-accent)"
-            : "text-xs text-(--color-ok)"}>
+            : "rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800"}>
           {flash}
         </p>
       )}
+    </div>
+  );
+}
+
+
+/** 番号つきの区切り（上から順に埋めれば終わる、を見た目で示す） */
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <section className={n > 1 ? "border-t border-(--color-line) pt-5" : ""}>
+      <h3 className="mb-3 flex items-center gap-2 text-base font-bold">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-(--color-gold) text-sm text-white">{n}</span>
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+/** 押して選ぶボタン（プルダウンより速く、何が選べるかが一目で分かる） */
+function Chips({
+  options, value, onChange, allowEmpty = false,
+}: {
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+  allowEmpty?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2" role="radiogroup">
+      {options.map((o) => {
+        const on = value === o;
+        return (
+          <button
+            key={o}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(allowEmpty && on ? "" : o)}
+            className={`min-h-11 rounded-lg border px-4 py-2 text-[15px] font-medium ${
+              on ? "border-(--color-gold) bg-(--color-gold) text-white" : "border-(--color-line) bg-white hover:border-(--color-gold)"
+            }`}
+          >
+            {o}
+          </button>
+        );
+      })}
     </div>
   );
 }

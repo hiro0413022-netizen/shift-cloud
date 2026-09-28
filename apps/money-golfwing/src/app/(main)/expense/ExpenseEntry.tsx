@@ -36,17 +36,17 @@ export function ExpenseEntry({
   const error = expenseInputError({ spentOn, amount: Number(amount || 0), item, method, paidBy });
 
   const chip = (on: boolean) =>
-    `rounded-xl border px-3 py-2 text-sm transition-colors ${
-      on ? "border-(--color-gold) bg-(--color-gold)/15 font-semibold" : "border-(--color-line) hover:border-(--color-gold)"
+    `min-h-11 rounded-xl border px-4 py-2 text-[15px] transition-colors ${
+      on ? "border-(--color-gold) bg-(--color-gold-soft) font-semibold text-(--color-gold) ring-1 ring-(--color-gold)" : "border-(--color-line) bg-white hover:border-(--color-gold)"
     }`;
 
   return (
-    <form action={addExpense} className="space-y-4">
+    <form action={addExpense} className="space-y-6">
       <input type="hidden" name="method" value={method} />
       <input type="hidden" name="category" value={category === "__unknown__" ? "" : category} />
 
       <div>
-        <p className="mb-1.5 text-xs text-(--color-dim)">1. どうやって払いましたか</p>
+        <h3 className="mb-2 flex items-center gap-2 text-base font-bold"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-(--color-gold) text-sm text-white">1</span>どうやって払いましたか</h3>
         <div className="flex flex-wrap gap-2">
           {PAY_METHODS.map((m) => (
             <button key={m.value} type="button" onClick={() => setMethod(m.value)} className={chip(method === m.value)}>
@@ -59,17 +59,17 @@ export function ExpenseEntry({
       </div>
 
       <div>
-        <p className="mb-1.5 text-xs text-(--color-dim)">2. 何を買いましたか</p>
-        <div className="grid gap-2 sm:grid-cols-4">
-          <label className="text-xs text-(--color-dim)">
+        <h3 className="mb-2 flex items-center gap-2 text-base font-bold"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-(--color-gold) text-sm text-white">2</span>何を買いましたか</h3>
+        <div className="grid gap-3 sm:grid-cols-4">
+          <label className="text-sm font-medium text-(--color-txt)">
             日付
             <input type="date" name="spent_on" value={spentOn} onChange={(e) => setSpentOn(e.target.value)} className={inputCls} />
           </label>
-          <label className="text-xs text-(--color-dim) sm:col-span-2">
+          <label className="text-sm font-medium text-(--color-txt) sm:col-span-2">
             品名（何を買ったか）
             <input name="item" value={item} onChange={(e) => setItem(e.target.value)} placeholder="レンジボール 100個" className={inputCls} />
           </label>
-          <label className="text-xs text-(--color-dim)">
+          <label className="text-sm font-medium text-(--color-txt)">
             金額（税込）
             <input
               name="amount"
@@ -80,7 +80,7 @@ export function ExpenseEntry({
               className={`${inputCls} text-right tabular-nums`}
             />
           </label>
-          <label className="text-xs text-(--color-dim) sm:col-span-2">
+          <label className="text-sm font-medium text-(--color-txt) sm:col-span-2">
             支払先（お店・業者）
             <input name="payee" list="recent-payees" placeholder="○○スポーツ" className={inputCls} />
             <datalist id="recent-payees">
@@ -89,12 +89,12 @@ export function ExpenseEntry({
               ))}
             </datalist>
           </label>
-          <label className="text-xs text-(--color-dim)">
+          <label className="text-sm font-medium text-(--color-txt)">
             納品書・伝票番号
             <input name="doc_no" placeholder="No.12345" className={inputCls} />
           </label>
           {method === "advance" && (
-            <label className="text-xs text-(--color-dim)">
+            <label className="text-sm font-medium text-(--color-txt)">
               立替えた人
               <input name="paid_by" value={paidBy} onChange={(e) => setPaidBy(e.target.value)} className={inputCls} />
             </label>
@@ -103,7 +103,7 @@ export function ExpenseEntry({
       </div>
 
       <div>
-        <p className="mb-1.5 text-xs text-(--color-dim)">3. どの科目ですか（迷ったら「わからない」でOK）</p>
+        <h3 className="mb-2 flex items-center gap-2 text-base font-bold"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-(--color-gold) text-sm text-white">3</span>どの科目ですか（迷ったら「わからない」でOK）</h3>
         <div className="flex flex-wrap gap-2">
           {EXPENSE_CATEGORIES.map((c) => (
             <button key={c.value} type="button" onClick={() => setCategory(c.value)} className={chip(category === c.value)}>
@@ -118,13 +118,13 @@ export function ExpenseEntry({
         </div>
       </div>
 
-      <label className="block text-xs text-(--color-dim)">
+      <label className="block text-sm font-medium text-(--color-txt)">
         メモ（任意）
         <input name="memo" placeholder="○月分・△△の補充 など" className={inputCls} />
       </label>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button disabled={!!error} className={btnCls}>
+        <button disabled={!!error} className={`${btnCls} w-full py-3.5 text-lg sm:w-auto`}>
           この内容で登録する
         </button>
         {error && <span className="text-xs text-(--color-dim)">{error}</span>}

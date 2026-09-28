@@ -2,6 +2,7 @@ import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore } from "@/lib/money";
 import { Panel, Empty, Badge, inputCls, btnCls } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { addPro, toggleProActive, updateProOrder, deletePro, updateProPayroll } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -47,14 +48,15 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-xl font-bold">設定 — {store?.name ?? "店舗未選択"}</h1>
-        <p className="text-sm text-(--color-dim)">店舗ごとの担当プロを管理します。売上入力の「担当プロ」の選択肢になります</p>
-      </header>
+      <PageHeader
+        title="担当プロの設定"
+        store={store?.name ?? "店舗未選択"}
+        lead="この店舗のプロ（コーチ）を登録します。売上を入れるときの「担当プロ」に出てきます。辞めた人は消さずに「無効」にしてください（過去の売上の名前が残ります）。"
+      />
 
       <Panel title="担当プロを追加">
         {!store ? (
-          <Empty>店舗が選択されていません。上部の店舗切替で選んでください</Empty>
+          <Empty>店舗が選択されていません。メニューの店舗から選んでください</Empty>
         ) : (
           <form action={addPro} className="flex flex-wrap items-center gap-2">
             <input name="name" placeholder="名前（例: 山田プロ）" required className={`${inputCls} max-w-60`} />

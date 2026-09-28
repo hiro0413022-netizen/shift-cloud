@@ -133,7 +133,7 @@ export default function CashTable({ rows }: { rows: CashRow[] }) {
                   <td className="px-2 py-2 text-right">
                     <form action={deleteCashEntry}>
                       <input type="hidden" name="id" value={r.id} />
-                      <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
+                      <button className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-(--color-accent) hover:bg-red-50">消す</button>
                     </form>
                   </td>
                 </tr>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore, latestCashBalance } from "@/lib/money";
-import { Panel, Empty, yen, inputCls, btnCls, btnGhostCls } from "@/components/ui";
+import { Panel, Empty, yen, inputCls, btnCls, btnGhostCls, PageHeader, SubTabs, CASH_TABS, Field } from "@/components/ui";
 import { addCashEntry } from "./actions";
 import CashTable from "./CashTable";
 import RangePicker from "@/components/RangePicker";
@@ -48,48 +48,64 @@ export default async function CashPage({ searchParams }: {
     return `/cash?${p.toString()}`;
   };
   const balance = store ? await latestCashBalance(actor.companyId, store.id) : 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10); // JST（UTCだと朝9時まで前日になる）
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold">現金出納 — {store?.name ?? "店舗未選択"}</h1>
-          <p className="text-sm text-(--color-dim)">入金・出金を入力すると残高が自動計算されます</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href={qs({ month: shift(month, -1) })} className={btnGhostCls}>← 前月</Link>
-          <span className="min-w-24 text-center font-bold tabular-nums">{month}</span>
-          <Link href={qs({ month: shift(month, 1) })} className={btnGhostCls}>翌月 →</Link>
-        </div>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="レジのお金"
+        store={store?.name ?? "店舗未選択"}
+        lead="レジからお金を出した・入れたときに記録します（経理では「現金出納」と呼びます）。現金の売上は自動で入るので、ここに入れるのはそれ以外です。"
+      />
+      <SubTabs items={CASH_TABS} current="cash" />
 
-      <Panel title="現在の現金残高">
-        <p className="text-3xl font-bold tabular-nums">{yen(balance)} 円</p>
+      <Panel title="いまレジにあるはずの金額" hint="これまでの出し入れから自動で計算しています">
+        <p className="text-3xl font-bold tabular-nums">{yen(balance)} <span className="text-lg">円</span></p>
       </Panel>
 
-      <Panel title="表示する期間">
-        <RangePicker basePath="/cash" month={month} preset={preset} from={sp.from ?? null} to={sp.to ?? null} />
-      </Panel>
-
-      <Panel title="出納を追加">
+      <Panel title="お金の出し入れを記録する" hint="例: 両替・備品を現金で買った・返金した・銀行に預けた">
         {!store ? (
-          <Empty>店舗が選択されていません。上部の店舗切替で選んでください</Empty>
+          <Empty>店舗が選択されていません。メニューの店舗から選んでください</Empty>
         ) : (
-          <form action={addCashEntry} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <input type="date" name="entry_date" defaultValue={today} className={inputCls} required />
-            <input name="summary" placeholder="摘要（利用料/返金/備品…）" className={inputCls} />
-            <input name="description" placeholder="内容" className={inputCls} />
-            <input name="counterpart" placeholder="相手・お客様" className={inputCls} />
-            <input name="in_amount" inputMode="numeric" placeholder="入金" className={inputCls} />
-            <input name="out_amount" inputMode="numeric" placeholder="出金" className={inputCls} />
-            <input name="memo" placeholder="備考" className={inputCls} />
-            <button className={`${btnCls} justify-center`}>追加</button>
+          <form action={addCashEntry} className="space-y-3">
+            <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:grid-cols-4">
+              <Field label="日付">
+                <input type="date" name="entry_date" defaultValue={today} className={inputCls} required />
+              </Field>
+              <Field label="何のお金か" hint="例: 返金・備品・両替">
+                <input name="summary" className={inputCls} />
+              </Field>
+              <Field label="入れたお金（入金）">
+                <input name="in_amount" inputMode="numeric" placeholder="0" className={inputCls} />
+              </Field>
+              <Field label="出したお金（出金）">
+                <input name="out_amount" inputMode="numeric" placeholder="0" className={inputCls} />
+              </Field>
+              <Field label="内容（任意）">
+                <input name="description" className={inputCls} />
+              </Field>
+              <Field label="相手・お客様（任意）">
+                <input name="counterpart" className={inputCls} />
+              </Field>
+              <Field label="メモ（任意）" className="col-span-2">
+                <input name="memo" className={inputCls} />
+              </Field>
+            </div>
+            <button className={`${btnCls} w-full py-3 sm:w-auto`}>記録する</button>
           </form>
         )}
       </Panel>
 
-      <Panel title={`出納帳（${range.label}）`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href={qs({ month: shift(month, -1) })} className={btnGhostCls}>← 前の月</Link>
+        <span className="min-w-28 text-center text-lg font-bold tabular-nums">{Number(month.slice(0, 4))}年{Number(month.slice(5))}月</span>
+        <Link href={qs({ month: shift(month, 1) })} className={btnGhostCls}>次の月 →</Link>
+      </div>
+      <Panel title="見る期間">
+        <RangePicker basePath="/cash" month={month} preset={preset} from={sp.from ?? null} to={sp.to ?? null} />
+      </Panel>
+
+      <Panel title={`これまでの出し入れ（${range.label}）`}>
         {rows.length === 0 ? (
           <Empty>この期間の記録はまだありません</Empty>
         ) : (

@@ -1,7 +1,8 @@
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { getCurrentStore, latestCashBalance, DENOMS } from "@/lib/money";
-import { Panel, Empty, Badge, yen, inputCls, btnCls } from "@/components/ui";
+import { getCurrentStore, latestCashBalance } from "@/lib/money";
+import { Panel, Empty, Badge, yen, PageHeader, SubTabs, CASH_TABS } from "@/components/ui";
+import CountForm from "./CountForm";
 import { addCount, deleteCount } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -23,49 +24,28 @@ export default async function CountPage() {
     : { data: [] };
   const rows = (data ?? []) as Count[];
   const theoretical = store ? await latestCashBalance(actor.companyId, store.id) : 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10); // JST（UTCだと朝9時まで前日になる）
 
   return (
-    <div className="space-y-4">
-      <header>
-        <h1 className="text-xl font-bold">金種棚卸 — {store?.name ?? "店舗未選択"}</h1>
-        <p className="text-sm text-(--color-dim)">レジ・金庫の枚数を入力 → 合計を自動計算し、出納の理論残高と突合します</p>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="レジのお金"
+        store={store?.name ?? "店舗未選択"}
+        lead="閉店のときにレジのお金を数えて、帳簿と合っているかを確かめます（経理では「金種棚卸」と呼びます）。"
+      />
+      <SubTabs items={CASH_TABS} current="count" />
 
-      <Panel title="出納帳の理論残高（現在）">
-        <p className="text-3xl font-bold tabular-nums">{yen(theoretical)} 円</p>
-        <p className="mt-1 text-sm text-(--color-dim)">棚卸の合計がこれと一致すればOK。差があれば差異として表示されます</p>
-      </Panel>
-
-      <Panel title="棚卸を記録">
+      <Panel title="レジ締め（お金を数える）">
         {!store ? (
-          <Empty>店舗が選択されていません。上部の店舗切替で選んでください</Empty>
+          <Empty>店舗が選択されていません。メニューの店舗から選んでください</Empty>
         ) : (
-          <form action={addCount} className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <input type="date" name="counted_at" defaultValue={today} className={inputCls} style={{ maxWidth: 170 }} required />
-              <select name="location" className={inputCls} defaultValue="register" style={{ maxWidth: 140 }}>
-                <option value="register">レジ</option>
-                <option value="safe">金庫</option>
-              </select>
-              <input name="memo" placeholder="備考" className={inputCls} style={{ maxWidth: 240 }} />
-            </div>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-9">
-              {DENOMS.map((d) => (
-                <label key={d} className="text-xs text-(--color-dim)">
-                  {d.toLocaleString()}円
-                  <input name={`d${d}`} inputMode="numeric" placeholder="0" className={`${inputCls} mt-1`} />
-                </label>
-              ))}
-            </div>
-            <button className={btnCls}>棚卸を保存</button>
-          </form>
+          <CountForm action={addCount} today={today} theoretical={theoretical} />
         )}
       </Panel>
 
-      <Panel title="棚卸履歴">
+      <Panel title="これまでのレジ締め">
         {rows.length === 0 ? (
-          <Empty>まだ棚卸の記録がありません</Empty>
+          <Empty>まだレジ締めの記録がありません</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -73,8 +53,8 @@ export default async function CountPage() {
                 <tr className="border-b border-(--color-line) text-xs text-(--color-dim)">
                   <th className="py-2 pr-2 text-left font-medium">日時</th>
                   <th className="px-2 py-2 text-left font-medium">場所</th>
-                  <th className="px-2 py-2 text-right font-medium">カウント合計</th>
-                  <th className="px-2 py-2 text-right font-medium">理論残高</th>
+                  <th className="px-2 py-2 text-right font-medium">数えた合計</th>
+                  <th className="px-2 py-2 text-right font-medium">帳簿の金額</th>
                   <th className="px-2 py-2 text-right font-medium">差異</th>
                   <th className="px-2 py-2"></th>
                 </tr>
@@ -89,12 +69,12 @@ export default async function CountPage() {
                       <td className="px-2 py-2 text-right tabular-nums">{yen(Number(r.total))}</td>
                       <td className="px-2 py-2 text-right tabular-nums text-(--color-dim)">{r.theoretical == null ? "—" : yen(Number(r.theoretical))}</td>
                       <td className="px-2 py-2 text-right">
-                        {diff === 0 ? <Badge tone="ok">一致</Badge> : <Badge tone="accent">{yen(diff)}</Badge>}
+                        {diff === 0 ? <Badge tone="ok">ぴったり</Badge> : <Badge tone="accent">{diff > 0 ? "+" : ""}{yen(diff)}</Badge>}
                       </td>
                       <td className="px-2 py-2 text-right">
                         <form action={deleteCount}>
                           <input type="hidden" name="id" value={r.id} />
-                          <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
+                          <button className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-(--color-accent) hover:bg-red-50">消す</button>
                         </form>
                       </td>
                     </tr>

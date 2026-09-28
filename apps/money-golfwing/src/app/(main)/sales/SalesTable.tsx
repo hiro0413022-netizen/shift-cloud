@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { inputCls, btnCls, btnGhostCls, yen } from "@/components/ui";
+import { inputCls, btnCls, btnGhostCls, yen, Field } from "@/components/ui";
 import { updateSale, deleteSaleById } from "./actions";
 import CustomerHistoryDialog from "./CustomerHistoryDialog";
 import CustomerPicker from "./CustomerPicker";
@@ -460,42 +460,77 @@ export default function SalesTable({
             editingId === r.id && form ? (
               <tr key={r.id} className="border-b border-(--color-line) bg-(--color-bg)">
                 <td colSpan={8} className="p-2">
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-6">
+                  <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:grid-cols-6">
+                    <Field label="日付">
                     <input type="date" value={form.soldOn} onChange={(e) => setForm({ ...form, soldOn: e.target.value })} className={inputCls} />
+                    </Field>
+                    <Field label="区分">
                     <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputCls}>
                       {opts(categories, form.category).map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
+                    </Field>
+                    <Field label="お客様">
                     <CustomerPicker
                       value={form.customerName}
                       onPick={(name) => setForm((f) => (f ? { ...f, customerName: name } : f))}
                       onMemberKind={(kind) => setForm((f) => (f ? { ...f, memberKind: kind } : f))}
                     />
+                    </Field>
+                    <Field label="会員区分">
                     <select value={form.memberKind} onChange={(e) => setForm({ ...form, memberKind: e.target.value })} className={inputCls}>
                       <option value="">会員区分</option>
                       {opts(memberKinds, form.memberKind).map((k) => <option key={k} value={k}>{k}</option>)}
                     </select>
+                    </Field>
+                    <Field label="払い方">
                     <select value={form.payMethod} onChange={(e) => setForm({ ...form, payMethod: e.target.value })} className={inputCls}>
                       <option value="">支払方法</option>
                       {opts(payMethods, form.payMethod).map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
+                    </Field>
+                    <Field label="担当プロ">
                     <select value={form.pro} onChange={(e) => setForm({ ...form, pro: e.target.value })} className={inputCls}>
                       <option value="">担当プロ</option>
                       {opts(pros, form.pro).map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
-                    <input value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} placeholder="品名・内容" className={`${inputCls} sm:col-span-2`} />
+                    </Field>
+                    <Field label="商品・内容" className="sm:col-span-2">
+                    <input value={form.productName} onChange={(e) => setForm({ ...form, productName: e.target.value })} placeholder="品名・内容" className={`${inputCls}`} />
+                    </Field>
+                    <Field label="種類">
                     <input value={form.itemType} onChange={(e) => setForm({ ...form, itemType: e.target.value })} placeholder="種類" aria-label="種類（ボール・グリップ・打席利用など）" className={inputCls} />
+                    </Field>
+                    <Field label="メーカー">
                     <input value={form.maker} onChange={(e) => setForm({ ...form, maker: e.target.value })} placeholder="メーカー名" aria-label="メーカー名" className={inputCls} />
+                    </Field>
+                    <Field label="販売者">
                     <input value={form.seller} onChange={(e) => setForm({ ...form, seller: e.target.value })} placeholder="販売者" aria-label="販売者" className={inputCls} />
+                    </Field>
+                    <Field label="定価（税抜）">
                     <input inputMode="numeric" value={form.listPrice} onChange={(e) => setForm(recalcFrom(form, { listPrice: e.target.value }, "price"))} placeholder="定価(税抜)" aria-label="定価（税抜）" className={inputCls} />
+                    </Field>
+                    <Field label="割引（マイナス）">
                     <input inputMode="numeric" value={form.discount} onChange={(e) => setForm(recalcFrom(form, { discount: e.target.value }, "price"))} placeholder="割引額(-)" aria-label="割引額（値引きはマイナス）" className={inputCls} />
+                    </Field>
+                    <Field label="売価（自動）">
                     <input inputMode="numeric" value={form.unitPrice} onChange={(e) => setForm(recalcFrom(form, { unitPrice: e.target.value }, "unit"))} placeholder="売価(自動)" aria-label="売価（税抜・自動）" className={inputCls} />
+                    </Field>
+                    <Field label="個数">
                     <input type="number" min={1} step={1} required value={form.qty} onChange={(e) => setForm(recalcFrom(form, { qty: e.target.value }, "unit"))} placeholder="個数(必須)" aria-label="個数（必須）" className={inputCls} />
+                    </Field>
+                    <Field label="金額（税抜・自動）">
                     <input inputMode="numeric" value={form.amount} onChange={(e) => setForm(recalcFrom(form, { amount: e.target.value }, "amount"))} placeholder="金額(税抜・自動)" aria-label="金額（税抜・自動）" className={inputCls} />
+                    </Field>
+                    <Field label="お支払い額（税込）">
                     <input inputMode="numeric" value={form.taxIncluded} onChange={(e) => setForm({ ...form, taxIncluded: e.target.value })} placeholder="決済金額(税込)" aria-label="決済金額（税込）" className={inputCls} />
-                    <input value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} placeholder="備考" className={`${inputCls} sm:col-span-4`} />
+                    </Field>
+                    <Field label="メモ" className="sm:col-span-4">
+                    <input value={form.memo} onChange={(e) => setForm({ ...form, memo: e.target.value })} placeholder="備考" className={`${inputCls}`} />
+                  
+                    </Field>
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <button type="button" onClick={() => save(r)} disabled={pending} className={btnCls}>{pending ? "..." : "保存"}</button>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={() => save(r)} disabled={pending} className={btnCls}>{pending ? "保存しています…" : "この内容で保存"}</button>
                     <button type="button" onClick={() => { setEditingId(null); setForm(null); setError(null); }} className={btnGhostCls}>キャンセル</button>
                     <span className="text-xs text-(--color-dim)">
                       定価＋割引額＝売価、売価×個数＝金額、決済金額は税込で自動計算されます。
@@ -545,8 +580,8 @@ export default function SalesTable({
                     <span className="text-xs text-(--color-dim)" title="売上台帳（Excel取込）の明細。修正はExcel再取込で">台帳</span>
                   ) : (
                     <>
-                      <button type="button" onClick={() => startEdit(r)} className="mr-3 text-xs text-(--color-dim) hover:text-(--color-gold)">編集</button>
-                      <button type="button" onClick={() => remove(r)} disabled={pending} className="text-xs text-(--color-dim) hover:text-(--color-accent)">削除</button>
+                      <button type="button" onClick={() => startEdit(r)} className="mr-2 rounded-md border border-(--color-line) px-3 py-1.5 text-sm font-medium hover:border-(--color-gold) hover:text-(--color-gold)">直す</button>
+                      <button type="button" onClick={() => remove(r)} disabled={pending} className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-(--color-accent) hover:bg-red-50">消す</button>
                     </>
                   )}
                 </td>

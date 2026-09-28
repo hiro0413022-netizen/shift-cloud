@@ -1,7 +1,7 @@
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { monthRange } from "@/lib/money-util";
-import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen } from "@/components/ui";
+import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen, PageHeader, SubTabs, EXPENSE_TABS, Field } from "@/components/ui";
 import { uploadReceipt, updateReceipt, deleteReceipt } from "./actions";
 import { matchesQuery } from "@/lib/table-filter";
 
@@ -87,16 +87,15 @@ export default async function ReceiptsPage({
   const total = rows.reduce((s, r) => s + Number(r.amount ?? 0), 0);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="space-y-5">
+      <PageHeader
+        title="経費"
+        lead="レシート・領収書・請求書を写真やPDFで残します（経理では「証憑（しょうひょう）」と呼びます）。法律で保管が決まっている書類です。契約書は Legal OS へ。"
+      />
+      <SubTabs items={EXPENSE_TABS} current="receipts" />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold">証憑（請求書・領収書・レシート）</h1>
-          <p className="text-sm text-(--color-dim)">
-            電子帳簿保存法の保管＋経費突合の土台。契約書はLegal OSへ（こちらは経理系のみ）
-          </p>
-        </div>
         <form className="flex flex-wrap items-center gap-2">
-          <input name="q" defaultValue={keyword} placeholder="検索（発行元・メモ・金額）" aria-label="証憑を検索" className={`${inputCls} min-w-48`} />
+          <input name="q" defaultValue={keyword} placeholder="探す（お店・メモ・金額）" aria-label="書類を探す" className={`${inputCls} min-w-48`} />
           <input type="month" name="ym" defaultValue={ym} className={inputCls} disabled={allPeriod} />
           <label className="flex items-center gap-1 text-sm text-(--color-dim)">
             <input type="checkbox" name="all" value="1" defaultChecked={allPeriod} /> 全期間
@@ -120,22 +119,36 @@ export default async function ReceiptsPage({
         </form>
       </div>
 
-      <Panel title="＋ 証憑を登録（撮影した画像 / PDF）">
+      <Panel title="＋ レシート・書類を残す" hint="スマホならその場で撮影できます（画像・PDF）">
         <form action={uploadReceipt} className="grid gap-3 md:grid-cols-6">
-          <input type="file" name="file" required accept="application/pdf,image/*" className={`${inputCls} md:col-span-2`} />
-          <select name="kind" defaultValue="receipt" className={inputCls}>
-            {Object.entries(KIND_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
-          <input type="date" name="issue_date" className={inputCls} />
-          <input name="counterparty" placeholder="発行元（店名・会社名）" className={inputCls} />
-          <input name="amount" inputMode="numeric" placeholder="金額（税込・円）" className={inputCls} />
-          <input name="memo" placeholder="メモ（任意）" className={`${inputCls} md:col-span-5`} />
-          <button className={btnCls}>登録</button>
+          <Field label="写真・PDF" required className="md:col-span-2">
+            <input type="file" name="file" required accept="application/pdf,image/*" className={inputCls} />
+          </Field>
+          <Field label="書類の種類">
+            <select name="kind" defaultValue="receipt" className={inputCls}>
+              {Object.entries(KIND_LABEL).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="日付（任意）">
+            <input type="date" name="issue_date" className={inputCls} />
+          </Field>
+          <Field label="お店・会社（任意）">
+            <input name="counterparty" className={inputCls} />
+          </Field>
+          <Field label="金額（税込・任意）">
+            <input name="amount" inputMode="numeric" className={inputCls} />
+          </Field>
+          <Field label="メモ（任意）" className="md:col-span-5">
+            <input name="memo" className={inputCls} />
+          </Field>
+          <div className="flex items-end">
+            <button className={`${btnCls} w-full`}>残す</button>
+          </div>
         </form>
         <p className="mt-2 text-xs text-(--color-dim)">
-          日付・金額は後から編集できます。まず撮って登録→あとで整えるでOK（OCR自動読み取りは経理AIフェーズで追加予定）
+          日付や金額はあとから直せます。まずは撮って「残す」だけでOKです。
         </p>
       </Panel>
 

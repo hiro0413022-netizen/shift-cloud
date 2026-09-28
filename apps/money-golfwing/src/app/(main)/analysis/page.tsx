@@ -44,7 +44,7 @@ function Delta({ cur, prev }: { cur: number; prev: number }) {
   const p = pct(cur, prev);
   if (!p) return <span className="text-xs text-(--color-dim)">前月なし</span>;
   return (
-    <span className={`text-xs tabular-nums ${p.up ? "text-(--color-ok)" : "text-rose-400"}`}>
+    <span className={`text-xs tabular-nums ${p.up ? "text-(--color-ok)" : "text-rose-600"}`}>
       {p.text} <span className="text-(--color-dim)">（前月 {yen(prev)}円）</span>
     </span>
   );
@@ -77,14 +77,14 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
     <div className="space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold">売上分析 — {label(month)}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">売上を見る — {label(month)}</h1>
           <p className="text-sm text-(--color-dim)">
-            {actor.canManageAll ? "事業別は財務(fin_entries)、カテゴリ・品目別は売上台帳から集計しています" : `${store?.name ?? "店舗未選択"} の売上内訳`}
+            {actor.canManageAll ? "会社全体（事業ごと）と、この店舗の中身（何が・誰の担当で売れたか）です。項目を押すと、くわしく見られます" : `${store?.name ?? "店舗未選択"} の売上の中身です。項目を押すと、くわしく見られます`}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/analysis?month=${prevMonth(month)}`} className={btnGhostCls}>← 前月</Link>
-          <Link href={`/analysis?month=${nextMonth(month)}`} className={btnGhostCls}>翌月 →</Link>
+          <Link href={`/analysis?month=${prevMonth(month)}`} className={btnGhostCls}>← 前の月</Link>
+          <Link href={`/analysis?month=${nextMonth(month)}`} className={btnGhostCls}>次の月 →</Link>
         </div>
       </header>
 

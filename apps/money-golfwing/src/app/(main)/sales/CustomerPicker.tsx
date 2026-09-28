@@ -120,7 +120,7 @@ export default function CustomerPicker({
                 >
                   <span className="font-medium">{p.name}</span>
                   {p.isMember && (
-                    <span className="rounded bg-(--color-gold) px-1 text-[10px] font-bold text-black">会員</span>
+                    <span className="rounded bg-(--color-gold) px-1 text-[10px] font-bold text-white">会員</span>
                   )}
                   {p.nameKana && <span className="truncate text-xs text-(--color-dim)">{p.nameKana}</span>}
                   <span className="ml-auto shrink-0 text-xs text-(--color-dim)">

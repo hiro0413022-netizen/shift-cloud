@@ -21,9 +21,9 @@ function LoginForm() {
         <form action={action} className="space-y-4 rounded-xl border border-(--color-line) bg-(--color-panel) p-6">
           <input name="id" placeholder="メールアドレス または ログインID" className={inputCls} autoComplete="username" />
           <input name="password" type="password" placeholder="パスワード" className={inputCls} autoComplete="current-password" />
-          {state.error && <p className="text-sm text-red-400">{state.error}</p>}
+          {state.error && <p className="text-sm text-red-600">{state.error}</p>}
           {denied && !state.error && (
-            <p className="text-sm text-amber-400">お金管理へのアクセス権（mon_grants / view_hq）がありません</p>
+            <p className="text-sm text-amber-700">お金管理へのアクセス権（mon_grants / view_hq）がありません</p>
           )}
           <button disabled={pending} className={`${btnCls} w-full justify-center`}>
             {pending ? "確認中..." : "ログイン"}

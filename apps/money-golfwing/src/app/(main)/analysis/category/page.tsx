@@ -105,16 +105,16 @@ export default async function CategoryDetailPage({
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <Link href={`/analysis?month=${month}`} className="text-xs text-(--color-dim) underline-offset-2 hover:underline">
-            ← 売上分析
+            ← 売上を見る
           </Link>
-          <h1 className="text-xl font-bold">{cat} — {label(month)}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{cat} — {label(month)}</h1>
           <p className="text-sm text-(--color-dim)">
             {actor.canManageAll ? "全店" : (store?.name ?? "店舗未選択")} ・ 何が売れたか（税抜）
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href={`/analysis/category?month=${prevMonth(month)}&cat=${encodeURIComponent(cat)}`} className={btnGhostCls}>← 前月</Link>
-          <Link href={`/analysis/category?month=${prevMonth(month, -1)}&cat=${encodeURIComponent(cat)}`} className={btnGhostCls}>翌月 →</Link>
+          <Link href={`/analysis/category?month=${prevMonth(month)}&cat=${encodeURIComponent(cat)}`} className={btnGhostCls}>← 前の月</Link>
+          <Link href={`/analysis/category?month=${prevMonth(month, -1)}&cat=${encodeURIComponent(cat)}`} className={btnGhostCls}>次の月 →</Link>
         </div>
       </header>
 
@@ -125,7 +125,7 @@ export default async function CategoryDetailPage({
           {delta == null ? (
             <span className="text-xs text-(--color-dim)">前月なし</span>
           ) : (
-            <span className={`text-xs tabular-nums ${delta >= 0 ? "text-(--color-ok)" : "text-rose-400"}`}>
+            <span className={`text-xs tabular-nums ${delta >= 0 ? "text-(--color-ok)" : "text-rose-600"}`}>
               {delta >= 0 ? "+" : ""}{delta.toFixed(1)}% <span className="text-(--color-dim)">（前月 {yen(prev)}円）</span>
             </span>
           )}
@@ -162,7 +162,7 @@ export default async function CategoryDetailPage({
           ))}
         </div>
         {mismatch && (
-          <p className="mt-3 text-xs text-amber-400">
+          <p className="mt-3 text-xs text-amber-700">
             売上台帳の明細合計（{yen(drill.total)}円）と、売上分析の数字（{yen(topCardTotal)}円）がずれています。
             台帳の取込後にロールアップが済んでいない可能性があります（npm run import:sales -- --month={month} --apply）。
           </p>
@@ -271,7 +271,7 @@ export default async function CategoryDetailPage({
                       <span className="mr-2 text-xs tabular-nums text-(--color-dim)">{md(f.date)}（{wd(f.date)}）</span>
                       {f.items.map((i) => (i.qty > 1 ? `${i.name} ×${i.qty}` : i.name)).join("・")}
                     </span>
-                    <span className={`shrink-0 tabular-nums ${f.amount < 0 ? "text-rose-400" : ""}`}>{yen(f.amount)}円</span>
+                    <span className={`shrink-0 tabular-nums ${f.amount < 0 ? "text-rose-600" : ""}`}>{yen(f.amount)}円</span>
                   </div>
                   <p className="mt-0.5 truncate text-xs text-(--color-dim)">
                     {[f.customer, f.memberKind, f.pay, f.pro && `担当 ${f.pro}`, f.maker].filter(Boolean).join("・") || "—"}

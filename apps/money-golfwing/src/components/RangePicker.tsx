@@ -20,9 +20,12 @@ const PRESETS: Array<{ value: RangePreset; label: string }> = [
 
 export default function RangePicker({
   basePath = "/sales",
+  extra,
   month, preset, from, to,
 }: {
   basePath?: string;
+  /** 期間を変えても残したいURLの条件（例: 売上の「一覧・直す」タブ view=list） */
+  extra?: Record<string, string>;
   month: string;
   preset: RangePreset;
   from: string | null;
@@ -31,7 +34,7 @@ export default function RangePicker({
   const router = useRouter();
 
   function go(next: Partial<{ preset: RangePreset; month: string; from: string; to: string }>) {
-    const p = new URLSearchParams();
+    const p = new URLSearchParams(extra ?? {});
     const q = { preset, month, from: from ?? "", to: to ?? "", ...next };
     p.set("month", q.month);
     if (q.preset !== "month") p.set("range", q.preset);

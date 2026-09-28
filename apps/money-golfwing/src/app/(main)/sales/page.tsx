@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore, monthRange } from "@/lib/money";
-import { Panel, Empty, yen, btnGhostCls } from "@/components/ui";
+import { Panel, Empty, yen, btnGhostCls, PageHeader, SubTabs, HowTo } from "@/components/ui";
 import SalesEntry, { type Preset } from "./SalesEntry";
 import SalesTable, { type SaleRow } from "./SalesTable";
 import RangePicker from "@/components/RangePicker";
@@ -58,7 +58,7 @@ function uniqTop(items: string[], n: number): string[] {
 const ROW_LIMIT = 4000;
 
 export default async function SalesPage({ searchParams }: {
-  searchParams: Promise<{ month?: string; range?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ month?: string; range?: string; from?: string; to?: string; view?: string }>;
 }) {
   const actor = await requireMoneyActor();
   const admin = createAdmin();
@@ -74,8 +74,11 @@ export default async function SalesPage({ searchParams }: {
   /** 当月の集計（PL計上合計）は従来どおり「表示中の月」で出す */
   const cur = monthRange(month);
   /** 前月/翌月リンクで選んだ期間の条件を落とさない */
-  const qs = (over: { month?: string }) => {
+  /** 2026-09-28: 「入れる」と「一覧・直す」を分けた（1画面に入力と4000行の表が並んで迷っていた） */
+  const view: "entry" | "list" = sp.view === "list" ? "list" : "entry";
+  const qs = (over: { month?: string; view?: "entry" | "list" }) => {
     const p = new URLSearchParams();
+    if ((over.view ?? view) === "list") p.set("view", "list");
     p.set("month", over.month ?? month);
     if (preset !== "month") p.set("range", preset);
     if (preset === "custom") {
@@ -263,76 +266,115 @@ export default async function SalesPage({ searchParams }: {
   /** 明細合計（税抜）: 一覧に出している明細の合計 */
   const detailTotal = saleRows.reduce((a, r) => a + r.amount, 0);
 
+  /** 今日入れた分（入力画面の下に出す＝入れたものがすぐ確かめられる） */
+  const todayRows = saleRows.filter((r) => r.source === "app" && r.soldOn === today);
+  const todayTotal = todayRows.reduce((a, r) => a + r.amount, 0);
+
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold">売上 — {store?.name ?? "店舗未選択"}</h1>
-          <p className="text-sm text-(--color-dim)">日々の売上を入力。現金はそのまま現金出納にも反映されます</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href={qs({ month: shift(month, -1) })} className={btnGhostCls}>← 前月</Link>
-          <span className="min-w-24 text-center font-bold tabular-nums">{month}</span>
-          <Link href={qs({ month: shift(month, 1) })} className={btnGhostCls}>翌月 →</Link>
-          {/* 売上データ.xlsx と同じレイアウトで書き出す（そのまま既存ブックへ貼れる） */}
-          <a href={`/api/sales/export?month=${month}`} className={btnGhostCls} title="この月の明細を売上データ.xlsxと同じ形式で書き出します">
-            Excel出力
-          </a>
-        </div>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="売上"
+        store={store?.name ?? "店舗未選択"}
+        lead="お客様からお金を受け取ったら、ここに入れます。現金で受け取った分は、レジのお金にも自動で入ります。"
+      />
 
-      <Panel title="表示する期間">
-        <RangePicker month={month} preset={preset} from={sp.from ?? null} to={sp.to ?? null} />
-      </Panel>
+      <SubTabs
+        current={view}
+        items={[
+          { key: "entry", href: qs({ view: "entry" }), label: "売上を入れる" },
+          { key: "list", href: qs({ view: "list" }), label: "一覧・直す" },
+        ]}
+      />
 
-      <Panel title={`売上（税抜）・${range.label}`}>
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
-          <div>
-            <p className="text-3xl font-bold tabular-nums">{yen(detailTotal)} 円</p>
-            <p className="mt-1 text-sm text-(--color-dim)">明細合計 {saleRows.length} 件（アプリ入力＋売上台帳）</p>
-          </div>
-          {total > 0 && (
-            <div>
-              <p className="text-xl font-bold tabular-nums text-(--color-dim)">{yen(total)} 円</p>
-              <p className="mt-1 text-xs text-(--color-dim)">{month} の月次計上合計（月会費予測・自動計上を含む）</p>
-            </div>
-          )}
-        </div>
-        {truncated && (
-          <p className="mt-2 text-xs text-(--color-accent)">
-            件数が多いため最新 {ROW_LIMIT.toLocaleString("ja-JP")} 件までを読み込んでいます。期間を短くすると全件見られます
-          </p>
-        )}
-      </Panel>
-
-      <Panel title="売上を追加">
-        {!store ? (
-          <Empty>店舗が選択されていません。上部の店舗切替で選んでください</Empty>
-        ) : (
-          <SalesEntry
-            today={today}
-            categories={CATEGORIES}
-            memberKinds={MEMBER_KINDS}
-            payMethods={PAY_METHODS}
-            pros={pros}
-            invItems={invItems}
-            productSuggestions={productSuggestions}
-            customerSuggestions={customerSuggestions}
-            itemTypeSuggestions={itemTypeSuggestions}
-            makerSuggestions={makerSuggestions}
-            sellerSuggestions={sellerSuggestions}
-            presets={presets}
+      {view === "entry" ? (
+        <>
+          <HowTo
+            steps={[
+              <>日付・お客様・<strong>払い方</strong>を選ぶ</>,
+              <>商品を選ぶ（よく売れる物は<strong>定番ボタン</strong>で1回で入ります）</>,
+              <>個数を確かめて<strong>「追加」</strong>。金額は自動で計算されます</>,
+            ]}
           />
-        )}
-      </Panel>
 
-      <Panel title={`明細（${range.label}）`}>
-        {saleRows.length === 0 ? (
-          <Empty>この期間の売上はまだありません</Empty>
-        ) : (
-          <SalesTable rows={saleRows} categories={CATEGORIES} memberKinds={MEMBER_KINDS} payMethods={PAY_METHODS} pros={pros} />
-        )}
-      </Panel>
+          <Panel>
+            {!store ? (
+              <Empty>店舗が選択されていません。メニューの店舗から選んでください</Empty>
+            ) : (
+              <SalesEntry
+                today={today}
+                categories={CATEGORIES}
+                memberKinds={MEMBER_KINDS}
+                payMethods={PAY_METHODS}
+                pros={pros}
+                invItems={invItems}
+                productSuggestions={productSuggestions}
+                customerSuggestions={customerSuggestions}
+                itemTypeSuggestions={itemTypeSuggestions}
+                makerSuggestions={makerSuggestions}
+                sellerSuggestions={sellerSuggestions}
+                presets={presets}
+              />
+            )}
+          </Panel>
+
+          <Panel
+            title={`今日入れた分　${todayRows.length}件・${yen(todayTotal)}円（税抜）`}
+            hint="間違えたときは、ここで直せます。過去の分は「一覧・直す」から"
+          >
+            {todayRows.length === 0 ? (
+              <Empty>今日はまだ入っていません</Empty>
+            ) : (
+              <SalesTable rows={todayRows} categories={CATEGORIES} memberKinds={MEMBER_KINDS} payMethods={PAY_METHODS} pros={pros} />
+            )}
+          </Panel>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href={qs({ month: shift(month, -1) })} className={btnGhostCls}>← 前の月</Link>
+            <span className="min-w-28 text-center text-lg font-bold tabular-nums">
+              {Number(month.slice(0, 4))}年{Number(month.slice(5))}月
+            </span>
+            <Link href={qs({ month: shift(month, 1) })} className={btnGhostCls}>次の月 →</Link>
+            {/* 売上データ.xlsx と同じレイアウトで書き出す（そのまま既存ブックへ貼れる） */}
+            <a href={`/api/sales/export?month=${month}`} className={`${btnGhostCls} sm:ml-auto`} title="この月の明細を売上データ.xlsxと同じ形式で書き出します">
+              Excelに書き出す
+            </a>
+          </div>
+
+          <Panel title="見る期間">
+            <RangePicker extra={{ view: "list" }} month={month} preset={preset} from={sp.from ?? null} to={sp.to ?? null} />
+          </Panel>
+
+          <Panel title={`売上の合計（税抜）・${range.label}`}>
+            <div className="flex flex-wrap items-end gap-x-8 gap-y-2">
+              <div>
+                <p className="text-3xl font-bold tabular-nums">{yen(detailTotal)} 円</p>
+                <p className="mt-1 text-sm text-(--color-dim)">{saleRows.length} 件（この画面で入れた分＋売上台帳）</p>
+              </div>
+              {total > 0 && (
+                <div>
+                  <p className="text-xl font-bold tabular-nums text-(--color-dim)">{yen(total)} 円</p>
+                  <p className="mt-1 text-xs text-(--color-dim)">{month} の会計上の合計（月会費の見込み・自動計上を含む）</p>
+                </div>
+              )}
+            </div>
+            {truncated && (
+              <p className="mt-2 text-xs text-(--color-accent)">
+                件数が多いため新しい {ROW_LIMIT.toLocaleString("ja-JP")} 件までを表示しています。期間を短くすると全部見られます
+              </p>
+            )}
+          </Panel>
+
+          <Panel title={`明細（${range.label}）`} hint="まちがいは「直す」、取り消しは「消す」を押してください">
+            {saleRows.length === 0 ? (
+              <Empty>この期間の売上はまだありません</Empty>
+            ) : (
+              <SalesTable rows={saleRows} categories={CATEGORIES} memberKinds={MEMBER_KINDS} payMethods={PAY_METHODS} pros={pros} />
+            )}
+          </Panel>
+        </>
+      )}
     </div>
   );
 }

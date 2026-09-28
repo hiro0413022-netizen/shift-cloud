@@ -3,7 +3,7 @@ import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore } from "@/lib/money";
 import { monthRange } from "@/lib/money-util";
-import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen } from "@/components/ui";
+import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen, PageHeader, SubTabs, EXPENSE_TABS, Field, btnDangerCls } from "@/components/ui";
 import { EXPENSE_CATEGORIES, payMethodLabel, isCategoryUnset } from "@/lib/expense";
 import { ExpenseEntry } from "./ExpenseEntry";
 import { updateExpense, deleteExpense, reimburseByCash } from "./actions";
@@ -92,25 +92,18 @@ export default async function ExpensePage({
   };
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold">経費の入力</h1>
-          <p className="text-xs text-(--color-dim)">
-            納品書・レシートを見ながら、買ったものと払い方を入れてください。{store ? `（${store.name}）` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <Link href={`/expense?ym=${shiftMonth(-1)}`} className={btnGhostCls}>← 前の月</Link>
-          <span className="tabular-nums font-semibold">{ym.replace("-", "年")}月</span>
-          <Link href={`/expense?ym=${shiftMonth(1)}`} className={btnGhostCls}>次の月 →</Link>
-        </div>
-      </header>
+    <div className="space-y-5">
+      <PageHeader
+        title="経費"
+        store={store?.name ?? null}
+        lead="お店のために買い物をした・請求書や納品書が来たら、ここに入れます。レシートの写真は「レシート・書類」へ。"
+      />
+      <SubTabs items={EXPENSE_TABS} current="expense" />
 
       {sp.msg && <p className="rounded-lg border border-(--color-ok) bg-(--color-ok)/10 px-3 py-2 text-sm">{sp.msg}</p>}
-      {sp.err && <p className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-400">{sp.err}</p>}
+      {sp.err && <p className="rounded-lg border border-red-500/50 bg-red-500/10 px-3 py-2 text-sm text-red-600">{sp.err}</p>}
 
-      <Panel title="経費を入力する">
+      <Panel title="経費を入れる">
         <ExpenseEntry today={jstToday()} defaultPaidBy={actor.name} recentPayees={recentPayees} />
       </Panel>
 
@@ -147,8 +140,15 @@ export default async function ExpensePage({
         </Panel>
       )}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Link href={`/expense?ym=${shiftMonth(-1)}`} className={btnGhostCls}>← 前の月</Link>
+        <span className="min-w-28 text-center text-lg font-bold tabular-nums">{ym.replace("-", "年")}月</span>
+        <Link href={`/expense?ym=${shiftMonth(1)}`} className={btnGhostCls}>次の月 →</Link>
+      </div>
+
       <Panel
-        title={`${ym.replace("-", "年")}月の入力　${rows.length}件　合計 ${yen(total)}円${unset > 0 ? `　／　科目未設定 ${unset}件` : ""}`}
+        hint="直したら「保存」を押してください"
+        title={`${ym.replace("-", "年")}月に入れた経費　${rows.length}件　合計 ${yen(total)}円${unset > 0 ? `　／　科目未設定 ${unset}件` : ""}`}
       >
         {rows.length === 0 ? (
           <Empty>この月の入力はまだありません</Empty>
@@ -157,11 +157,11 @@ export default async function ExpensePage({
             {rows.map((r) => (
               <form key={r.id} action={updateExpense} className="rounded-lg border border-(--color-line) p-3">
                 <input type="hidden" name="id" value={r.id} />
-                <div className="grid gap-2 sm:grid-cols-6">
-                  <input type="date" name="spent_on" defaultValue={r.spent_on} className={inputCls} />
-                  <input name="item" defaultValue={r.item ?? ""} placeholder="品名" className={`${inputCls} sm:col-span-2`} />
-                  <input name="payee" defaultValue={r.payee ?? ""} placeholder="支払先" className={inputCls} />
-                  <select name="category" defaultValue={r.category ?? ""} className={inputCls}>
+                <div className="grid gap-3 sm:grid-cols-6">
+                  <Field label="日付"><input type="date" name="spent_on" defaultValue={r.spent_on} className={inputCls} /></Field>
+                  <Field label="品名" className="sm:col-span-2"><input name="item" defaultValue={r.item ?? ""} className={inputCls} /></Field>
+                  <Field label="支払先"><input name="payee" defaultValue={r.payee ?? ""} className={inputCls} /></Field>
+                  <Field label="科目"><select name="category" defaultValue={r.category ?? ""} className={inputCls}>
                     <option value="">（未設定・本部が入れる）</option>
                     {EXPENSE_CATEGORIES.map((c) => (
                       <option key={c.value} value={c.value}>{c.value}</option>
@@ -170,18 +170,18 @@ export default async function ExpensePage({
                     {r.category && !EXPENSE_CATEGORIES.some((c) => c.value === r.category) && (
                       <option value={r.category}>{r.category}</option>
                     )}
-                  </select>
-                  <input
+                  </select></Field>
+                  <Field label="金額（税込）"><input
                     name="amount"
                     inputMode="numeric"
                     defaultValue={String(Number(r.amount))}
                     className={`${inputCls} text-right tabular-nums`}
-                  />
-                  <input name="doc_no" defaultValue={r.doc_no ?? ""} placeholder="伝票番号" className={inputCls} />
-                  <input name="memo" defaultValue={r.memo ?? ""} placeholder="メモ" className={`${inputCls} sm:col-span-3`} />
-                  <div className="flex items-center gap-2 sm:col-span-2">
+                  /></Field>
+                  <Field label="伝票番号"><input name="doc_no" defaultValue={r.doc_no ?? ""} className={inputCls} /></Field>
+                  <Field label="メモ" className="sm:col-span-3"><input name="memo" defaultValue={r.memo ?? ""} className={inputCls} /></Field>
+                  <div className="flex items-end gap-2 sm:col-span-2">
                     <button className={btnCls}>保存</button>
-                    <button formAction={deleteExpense} className={btnGhostCls}>削除</button>
+                    <button formAction={deleteExpense} className={btnDangerCls}>消す</button>
                   </div>
                 </div>
                 <p className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-(--color-dim)">

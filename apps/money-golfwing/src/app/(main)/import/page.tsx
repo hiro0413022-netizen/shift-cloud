@@ -1,6 +1,7 @@
 import { requireManageAll } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
-import { Panel, Empty, Badge, yen, inputCls, btnGhostCls } from "@/components/ui";
+import { Panel, Empty, Badge, yen, inputCls, btnGhostCls, btnCls } from "@/components/ui";
+import { PageHeader } from "@/components/ui";
 import { Uploader } from "./uploader";
 import { confirmTxn, ignoreTxn } from "./actions";
 import { proposeCategory } from "@/lib/import/categorize";
@@ -55,18 +56,18 @@ export default async function ImportPage() {
 
   return (
     <div className="space-y-4">
-      <header>
-        <h1 className="text-xl font-bold">カード・口座取込</h1>
-        <p className="text-sm text-(--color-dim)">AMEX・尼崎信金のCSVを取込 → 事業・科目を割当てて確定 → 経費KPIへ自動反映</p>
-      </header>
+      <PageHeader
+        title="カード・口座の取込"
+        lead="法人カード（AMEX）・口座（尼崎信金）の明細ファイル（CSV）を読み込み、1件ずつ「どの事業の・何の費用か」を振り分けて確定します。確定した分は会社の損益に自動で入ります（オーナーのみ）。"
+      />
 
-      <Panel title="CSVアップロード">
+      <Panel title="① 明細ファイルを読み込む" hint="カード会社・銀行のサイトからダウンロードしたCSVを選んでください">
         <Uploader sources={(sources ?? []) as { code: string; name: string }[]} />
       </Panel>
 
       <SettlementPanel expenses={expenses} txns={settleTxns} />
 
-      <Panel title={`未仕分けの明細（${rows.length}件）`}>
+      <Panel title={`② 振り分けが済んでいない明細（${rows.length}件）`} hint="事業と科目を選んで「確定」。会社の経費でないもの（口座間の移動など）は「対象外」">
         {rows.length === 0 ? (
           <Empty>未仕分けの明細はありません。CSVを取込むとここに並びます</Empty>
         ) : (
@@ -99,14 +100,14 @@ export default async function ImportPage() {
                           <select name="category" defaultValue={proposed} className={inputCls} style={{ maxWidth: 150 }}>
                             {cats.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
                           </select>
-                          <button className={btnGhostCls}>確定</button>
+                          <button className={btnCls}>確定</button>
                         </form>
                       </td>
                       <td className="px-2 py-2">
                         {isExpense ? <Badge tone="dim">経費候補</Badge> : <Badge tone="ok">入金</Badge>}
                         <form action={ignoreTxn} className="mt-1">
                           <input type="hidden" name="id" value={t.id} />
-                          <button className="text-xs text-(--color-dim) hover:text-(--color-accent)">除外</button>
+                          <button className="rounded-md border border-(--color-line) px-3 py-1.5 text-sm text-(--color-dim) hover:border-(--color-accent) hover:text-(--color-accent)">対象外</button>
                         </form>
                       </td>
                     </tr>
