@@ -108,44 +108,51 @@ export async function indexSemantic(admin: AdminLike, companyId: string, embed: 
       break;
     }
     try {
-      const { data: cur } = await admin.from("gn_embed_cursors").select("cursor_at, cursor_id, indexed").eq("company_id", companyId).eq("source", src.name).maybeSingle();
-      const cursorAt = cur?.cursor_at ? String(cur.cursor_at) : null;
-      const cursorId = cur?.cursor_id ? String(cur.cursor_id) : null;
-      const pageSize = Math.min(remaining, 200);
-      let q = admin.from(src.table).select(src.select).eq(src.companyCol ?? "company_id", companyId).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(pageSize);
-      // (created_at, id) の組でカーソル。同じ created_at が大量にある（Excel 一括取込）ので created_at だけでは取りこぼす
-      if (cursorAt && cursorId) q = q.or(`created_at.gt.${cursorAt},and(created_at.eq.${cursorAt},id.gt.${cursorId})`);
-      else if (cursorAt) q = q.gt("created_at", cursorAt);
-      const { data, error } = await q;
-      if (error) throw new Error(error.message);
-      const rows = ((data ?? []) as Row[]).filter((r) => !(src.softDelete && r.deleted_at));
-      if (!rows.length) continue;
-      // 本文の無い行はカーソルだけ進める
-      const items: Array<{ row: Row; chunks: string[] }> = rows.map((row) => ({ row, chunks: chunkText(src.text(row)) }));
-      const texts = items.flatMap((it) => it.chunks);
-      const vecs = texts.length ? await embed(texts, "document") : [];
-      let vi = 0;
-      const inserts: Row[] = [];
-      for (const it of items) {
-        it.chunks.forEach((chunk, chunkNo) => {
-          const e = src.entity(it.row);
-          inserts.push({
-            company_id: companyId, source: src.name, source_id: s(it.row.id), chunk_no: chunkNo,
-            entity_kind: e?.kind ?? null, entity_id: e?.id ?? null, title: src.title(it.row).slice(0, 200), chunk,
-            embedding: toVectorLiteral(vecs[vi++]), meta: {}, source_at: src.at(it.row) || null, updated_at: new Date().toISOString(),
+      // 1 tick の予算いっぱいまで、この source のページを続けて取る（#308: 1 source 1 ページだと 200 本で止まっていた）
+      let indexedTotal = Number((await admin.from("gn_embed_cursors").select("indexed").eq("company_id", companyId).eq("source", src.name).maybeSingle()).data?.indexed ?? 0);
+      while (remaining > 0) {
+        const { data: cur } = await admin.from("gn_embed_cursors").select("cursor_at, cursor_id").eq("company_id", companyId).eq("source", src.name).maybeSingle();
+        const cursorAt = cur?.cursor_at ? String(cur.cursor_at) : null;
+        const cursorId = cur?.cursor_id ? String(cur.cursor_id) : null;
+        const pageSize = Math.min(remaining, 200);
+        let q = admin.from(src.table).select(src.select).eq(src.companyCol ?? "company_id", companyId).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(pageSize);
+        // (created_at, id) の組でカーソル。同じ created_at が大量にある（Excel 一括取込）ので created_at だけでは取りこぼす
+        if (cursorAt && cursorId) q = q.or(`created_at.gt.${cursorAt},and(created_at.eq.${cursorAt},id.gt.${cursorId})`);
+        else if (cursorAt) q = q.gt("created_at", cursorAt);
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        const rows = ((data ?? []) as Row[]).filter((r) => !(src.softDelete && r.deleted_at));
+        if (!(data ?? []).length) break;
+        // 本文の無い行はカーソルだけ進める
+        const items: Array<{ row: Row; chunks: string[] }> = rows.map((row) => ({ row, chunks: chunkText(src.text(row)) }));
+        const texts = items.flatMap((it) => it.chunks);
+        const vecs = texts.length ? await embed(texts, "document") : [];
+        let vi = 0;
+        const inserts: Row[] = [];
+        for (const it of items) {
+          it.chunks.forEach((chunk, chunkNo) => {
+            const e = src.entity(it.row);
+            inserts.push({
+              company_id: companyId, source: src.name, source_id: s(it.row.id), chunk_no: chunkNo,
+              entity_kind: e?.kind ?? null, entity_id: e?.id ?? null, title: src.title(it.row).slice(0, 200), chunk,
+              embedding: toVectorLiteral(vecs[vi++]), meta: {}, source_at: src.at(it.row) || null, updated_at: new Date().toISOString(),
+            });
           });
-        });
+        }
+        if (inserts.length) {
+          const { error: upErr } = await admin.from("gn_embeddings").upsert(inserts, { onConflict: "company_id,source,source_id,chunk_no" });
+          if (upErr) throw new Error(upErr.message);
+        }
+        const all = (data ?? []) as Row[];
+        const last = all[all.length - 1];
+        indexedTotal += inserts.length;
+        await admin.from("gn_embed_cursors").upsert({ company_id: companyId, source: src.name, cursor_at: src.at(last), cursor_id: s(last.id), indexed: indexedTotal, last_error: null, updated_at: new Date().toISOString() }, { onConflict: "company_id,source" });
+        bySource[src.name] = (bySource[src.name] ?? 0) + inserts.length;
+        remaining -= all.length;
+        // 取り切れていない（limit いっぱい返った）なら続き（予算が残っていればこのまま次ページ、無ければ次の tick）
+        if (all.length < pageSize) break;
+        done = false;
       }
-      if (inserts.length) {
-        const { error: upErr } = await admin.from("gn_embeddings").upsert(inserts, { onConflict: "company_id,source,source_id,chunk_no" });
-        if (upErr) throw new Error(upErr.message);
-      }
-      const last = rows[rows.length - 1];
-      await admin.from("gn_embed_cursors").upsert({ company_id: companyId, source: src.name, cursor_at: src.at(last), cursor_id: s(last.id), indexed: Number(cur?.indexed ?? 0) + inserts.length, last_error: null, updated_at: new Date().toISOString() }, { onConflict: "company_id,source" });
-      bySource[src.name] = inserts.length;
-      remaining -= rows.length;
-      // 取り切れていない（limit いっぱい返った）なら次の tick へ
-      if ((data ?? []).length >= pageSize) done = false;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`${src.name}: ${msg}`);
