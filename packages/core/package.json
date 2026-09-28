@@ -42,6 +42,7 @@
     "./members": "./src/members.ts",
     "./middleware": "./src/middleware.ts",
     "./night-payroll": "./src/night-payroll.ts",
+    "./person": "./src/person.ts",
     "./supabase/admin": "./src/supabase/admin.ts",
     "./supabase/server": "./src/supabase/server.ts"
   },

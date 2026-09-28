@@ -28,6 +28,18 @@ const ADAPTERS: Record<string, (o: Row, ref: string) => Row> = {
     return { label: ref, value: Number(o.value ?? o.total ?? o.count ?? 0), unit: String(o.unit ?? ""), target: null, delta: null };
   },
   EntityCard: (o, ref) => {
+    if (ref.startsWith("person.card")) {
+      const p = (o.person as Row | null) ?? null;
+      if (!o.found || !p) return { kind: "person", id: "", title: "該当する方が見つかりませんでした", subtitle: "お名前・電話番号・会員番号で探せます", fields: [] };
+      const fields: Row[] = [
+        { k: "電話", v: p.phone }, { k: "カナ", v: p.kana }, { k: "生年月日", v: p.birth_date }, { k: "性別", v: p.gender },
+        { k: "来店回数", v: p.visit_count }, { k: "初回", v: p.first_visit }, { k: "最終来店", v: p.last_visit },
+        { k: "入会", v: p.join_date }, { k: "退会", v: p.leave_date }, { k: "注意", v: p.alert }, { k: "メモ", v: p.note },
+      ];
+      const srcs = Array.isArray(p.sources) ? (p.sources as string[]).join(" / ") : "";
+      const cand = Number(o.candidates ?? 1) > 1 ? `（他 ${Number(o.candidates) - 1} 名の候補あり）` : "";
+      return { kind: "person", id: String(p.phone ?? p.name ?? ""), title: String(p.name ?? ""), subtitle: `${srcs}${p.store ? " · " + p.store : ""}${cand}`, fields };
+    }
     if (ref.startsWith("customer.card")) {
       const m = (o.member as Row | null) ?? null;
       if (!o.found || !m) return { kind: "person", id: "", title: "見つかりませんでした", subtitle: "", fields: [] };
@@ -56,6 +68,10 @@ export function blocksFromExecution(blocks: BlockRegistry, r: ExecutionResult): 
   const data = adapter ? adapter(out, r.tool) : out;
   const main = blocks.make(name, data, meta);
   const list: BlockInstance[] = [main];
+  // 履歴を持つ出力（person.card）は Timeline も添える
+  if (Array.isArray(out.timeline) && (out.timeline as Row[]).length) {
+    list.push(blocks.make("Timeline", { entity: `person:${String((out.person as Row | null)?.name ?? "")}`, items: out.timeline as Row[] }, meta));
+  }
   // Ask Data 以外の読み Tool にも出典を添える（数字の信頼性・GO条件15）
   if (name !== "SourceNote" && r.sources.length) {
     list.push(blocks.make("SourceNote", { title: `出典: ${r.sources.map((s) => s.table).join(", ")}`, body: `${r.tool} · ${r.kind}${r.rowCount != null ? ` · ${r.rowCount}件` : ""}${r.silentZero ? " · ⚠ 期待より少ない" : ""}`, rowCount: r.rowCount }, { ...meta, kind: "fact" }));

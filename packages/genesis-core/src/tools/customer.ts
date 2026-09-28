@@ -34,8 +34,20 @@ export const customerSearch = defineTool({
       p_limit: Number(input.limit ?? 20),
     });
     if (error) throw new Error(`search_visitors 失敗: ${error.message}`);
-    const hits = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
-    const slim = hits.map((h) => ({ kind: h.kind, id: h.id, name: h.name, phone: h.phone, member_no: h.member_no ?? null, member_type: h.member_type ?? h.plan ?? null, store: h.store ?? null, status: h.status ?? null, visit_count: h.visit_count ?? null, last_visit: (h as { last_visit?: unknown }).last_visit ?? null }));
+    const { mergePeople } = await import("@yozan/core/person");
+    // 名寄せ（正典 @yozan/core/person・#130 の「別人をくっつけない」鍵）で人単位に
+    const people = mergePeople(data);
+    const slim = people.map((p) => ({
+      name: p.name,
+      kana: p.nameKana,
+      phone: p.phone,
+      kinds: [...new Set(p.hits.map((h) => h.kind))].join("+"),
+      member_no: p.hits.find((h) => h.member_no)?.member_no ?? null,
+      store: p.hits.find((h) => h.store)?.store ?? null,
+      visit_count: p.visitCount,
+      last_visit: p.lastVisit,
+      alert: p.alertNote,
+    }));
     return rows(slim, "search_visitors", { data: { q: String(input.q) } });
   },
 });
@@ -147,4 +159,52 @@ export const membersCount = defineTool({
   },
 });
 
-export const CUSTOMER_TOOLS: ToolContract[] = [customerSearch, customerCard, customerTimeline, trialList, membersCount] as unknown as ToolContract[];
+export const personCard = defineTool({
+  name: "person.card",
+  version: 1,
+  domain: "customer",
+  description: "お名前・電話・会員番号でその人を1枚のカードに（Person Entity）。GOLF WING会員・FRANK会員・受付台帳・体験を名寄せし、来店・予約・出来事の履歴を時系列で添える。「田中さんの履歴」「田中さんについて」はこれ",
+  input: { type: "object", required: ["q"], properties: { q: { type: "string", minLength: 1, maxLength: 60, description: "お名前・電話・会員番号" }, pick: { type: "integer", minimum: 1, default: 1, description: "候補が複数のとき何番目か" } } },
+  output: { type: "object", required: ["found"], properties: { found: { type: "boolean" }, candidates: { type: "integer" }, person: { type: "object", nullable: true }, timeline: { type: "array" }, others: { type: "array" } } },
+  permission: ["use_reception", "view_hq"],
+  scope: "company",
+  risk: 0,
+  idempotency: () => null,
+  rateLimit: { perMinute: 60 },
+  emits: [],
+  renders: "EntityCard",
+  impl: async (input, ctx) => {
+    const a = effectiveActor(ctx.context.actor);
+    const storeIds = visibleStoreIds(ctx.context);
+    const { data, error } = await ctx.admin.rpc("search_visitors", { p_company_id: ctx.context.company.id, p_q: String(input.q), p_store_ids: a.isOwner ? null : storeIds, p_include_gw: true, p_limit: 40 });
+    if (error) throw new Error(`search_visitors 失敗: ${error.message}`);
+    const { mergePeople } = await import("@yozan/core/person");
+    const people = mergePeople(data);
+    const idx = Math.max(0, Number(input.pick ?? 1) - 1);
+    const p = people[idx];
+    if (!p) return { data: { found: false, candidates: people.length, person: null, timeline: [], others: [] }, sources: [src("search_visitors")], kind: "fact", rowCount: 0 };
+    const kinds = { guest: "受付台帳", member: "GOLF WING会員", frank: "FRANK会員", frank_guest: "FRANKビジター" } as Record<string, string>;
+    const person = {
+      name: p.name, kana: p.nameKana, phone: p.phone, email: p.email, birth_date: p.birthDate, gender: p.gender,
+      sources: p.hits.map((h) => `${kinds[h.kind] ?? h.kind}${h.member_no ? " " + h.member_no : ""}${h.member_type || h.plan ? " " + (h.member_type ?? h.plan) : ""}${h.status ? " " + h.status : ""}`),
+      store: p.hits.find((h) => h.store)?.store ?? null,
+      visit_count: p.visitCount, first_visit: p.firstVisit, last_visit: p.lastVisit,
+      join_date: p.hits.find((h) => h.join_date)?.join_date ?? null,
+      leave_date: p.hits.find((h) => h.leave_date)?.leave_date ?? null,
+      alert: p.alertNote, note: p.note,
+    };
+    // 履歴: 来店（名寄せ済み）＋ 打席予約（名前一致）＋ Core のイベント（名前一致）
+    const visits = p.visits.map((v) => ({ at: v.date ?? "", kind: v.type === "trial" ? "trial" : "visit", summary: `${v.type ?? ""}${v.store ? " " + v.store : ""}${v.result ? " → " + v.result : ""}${v.pro ? " " + v.pro : ""}` }));
+    const like = lit(`%${p.name}%`);
+    const [bk, evRes] = await Promise.all([
+      viewQuery(ctx.admin, ctx.context, `select booked_date as at, 'reservation' as kind, concat(start_time, ' ', bay_name, ' ', status) as summary from gnv_bookings where customer_name like ${like} order by booked_date desc limit 30`, 30).catch(() => [] as Array<Record<string, unknown>>),
+      ctx.admin.from("gn_events").select("occurred_at, type, payload").eq("company_id", ctx.context.company.id).ilike("payload->>summary", `%${p.name}%`).order("occurred_at", { ascending: false }).limit(30),
+    ]);
+    const ev = (((evRes as { data?: Array<Record<string, unknown>> }).data ?? []) as Array<Record<string, unknown>>).map((e) => ({ at: String(e.occurred_at).slice(0, 10), kind: String(e.type), summary: String((e.payload as Record<string, unknown>)?.summary ?? e.type) }));
+    const timeline = [...visits, ...bk, ...ev].filter((t) => t.at).sort((x, y) => String(y.at).localeCompare(String(x.at))).slice(0, 60);
+    const others = people.filter((_, i) => i !== idx).slice(0, 5).map((o) => ({ name: o.name, phone: o.phone, last_visit: o.lastVisit }));
+    return { data: { found: true, candidates: people.length, person, timeline, others }, sources: [src("search_visitors"), src("gnv_bookings"), src("gn_events")], kind: "fact", rowCount: timeline.length };
+  },
+});
+
+export const CUSTOMER_TOOLS: ToolContract[] = [customerSearch, customerCard, customerTimeline, personCard, trialList, membersCount] as unknown as ToolContract[];
