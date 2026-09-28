@@ -149,7 +149,7 @@ function ShiftGrid({ b }: { b: BlockInstance }) {
     byDate.set(d, [...(byDate.get(d) ?? []), r]);
   }
   return (
-    <Frame b={b} title={`シフト ${fmt(b.data.from)} 〜 ${fmt(b.data.to)}`}>
+    <Frame b={b} title={b.data.from === b.data.to ? `${fmt(b.data.from)} のシフト` : `シフト ${fmt(b.data.from)} 〜 ${fmt(b.data.to)}`}>
       {byDate.size === 0 ? <p className="text-(--color-faint)">シフトはありません</p> : (
         <div className="space-y-1 text-xs">
           {[...byDate.entries()].map(([d, list]) => (
@@ -158,7 +158,7 @@ function ShiftGrid({ b }: { b: BlockInstance }) {
               <span className="flex flex-wrap gap-1">
                 {list.map((r, i) => (
                   <span key={i} className={`rounded border px-1.5 py-0.5 ${r.is_day_off ? "border-(--color-line) text-(--color-faint)" : "border-sky-800/60"}`}>
-                    {fmt(r.staff_name)} {r.is_day_off ? "休" : `${String(r.start_time ?? "").slice(0, 5)}–${String(r.end_time ?? "").slice(0, 5)}`}
+                    {fmt(r.staff_name)} {r.is_day_off ? "休" : `${String(r.start_time ?? "").slice(0, 5)}–${String(r.end_time ?? "").slice(0, 5)}`}{r.status === "draft" ? "（下書き）" : ""}
                     <span className="ml-1 text-(--color-faint)">{fmt(r.store_name)}</span>
                   </span>
                 ))}

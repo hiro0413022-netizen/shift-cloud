@@ -6,7 +6,7 @@
  * ai-execution 側は P0 からこの Tool に委譲する。
  */
 import { defineTool, type ToolContract } from "../tool.ts";
-import { FRANK_STORE_ID, viewQuery, lit, isYmd, src, rows, addDays, STORE_IN } from "./_shared.ts";
+import { FRANK_STORE_ID, viewQuery, lit, isYmd, src, rows, addDays, inclusiveRange, STORE_IN } from "./_shared.ts";
 import { effectiveActor } from "../context.ts";
 
 const BOOKED = "frunk_bookings";
@@ -15,8 +15,8 @@ export const bookingList = defineTool({
   name: "booking.list",
   version: 1,
   domain: "ops",
-  description: "指定日の打席予約（FRANK GOLF）を一覧する。キャンセルは除く",
-  input: { type: "object", properties: { date: { type: "string", format: "date", description: "YYYY-MM-DD（省略時は今日）" }, days: { type: "integer", minimum: 1, maximum: 14, default: 1 } } },
+  description: "指定日の打席予約（FRANK GOLF）を一覧する。キャンセルは除く。複数日は date と days（例: 明日から3日 = date=明日, days=3）",
+  input: { type: "object", properties: { date: { type: "string", format: "date", description: "YYYY-MM-DD（省略時は今日）" }, days: { type: "integer", minimum: 1, maximum: 14, default: 1, description: "date からの日数（1=その日だけ）" } } },
   output: { type: "object", properties: { rows: { type: "array" }, count: { type: "integer" }, date: { type: "string" } }, required: ["rows", "count"] },
   permission: ["use_reception", "view_hq"],
   scope: "company",
@@ -245,8 +245,8 @@ export const shiftView = defineTool({
   name: "shift.view",
   version: 1,
   domain: "ops",
-  description: "期間のシフト（予定）を見る。店舗・スタッフ・時間",
-  input: { type: "object", properties: { from: { type: "string", format: "date" }, to: { type: "string", format: "date", description: "この日を含まない" }, days: { type: "integer", minimum: 1, maximum: 31, default: 7 } } },
+  description: "期間のシフト（予定）を見る。店舗・スタッフ・時間。1日だけなら from と to に同じ日を入れる",
+  input: { type: "object", properties: { from: { type: "string", format: "date", description: "開始日（省略時は今日）" }, to: { type: "string", format: "date", description: "終了日（この日を含む）" }, days: { type: "integer", minimum: 1, maximum: 31, default: 7, description: "to が無いときの日数" } } },
   output: { type: "object", required: ["rows", "count"], properties: { rows: { type: "array" }, count: { type: "integer" }, from: { type: "string" }, to: { type: "string" } } },
   permission: [],
   scope: "company",
@@ -256,8 +256,7 @@ export const shiftView = defineTool({
   emits: [],
   renders: "ShiftGrid",
   impl: async (input, ctx) => {
-    const from = isYmd(input.from) ? input.from : ctx.context.time.jstDate;
-    const to = isYmd(input.to) ? input.to : addDays(from, Number(input.days ?? 7));
+    const { from, to } = inclusiveRange(input.from, input.to, Number(input.days ?? 7), ctx.context.time.jstDate);
     const data = await viewQuery(ctx.admin, ctx.context, `select date, staff_name, store_name, start_time, end_time, is_day_off, status from gnv_shifts where date >= ${lit(from)} and date < ${lit(to)} order by date, store_name, start_time`, 500);
     return rows(data, "gnv_shifts", { data: { from, to } });
   },
@@ -267,8 +266,8 @@ export const attendanceSummary = defineTool({
   name: "attendance.summary",
   version: 1,
   domain: "ops",
-  description: "期間の勤怠実績をスタッフ別に集計（労働分・残業分・打刻漏れ）",
-  input: { type: "object", properties: { from: { type: "string", format: "date" }, to: { type: "string", format: "date" } } },
+  description: "期間の勤怠実績をスタッフ別に集計（労働分・残業分・打刻漏れ）。to はその日を含む",
+  input: { type: "object", properties: { from: { type: "string", format: "date" }, to: { type: "string", format: "date", description: "終了日（この日を含む）" } } },
   output: { type: "object", required: ["rows", "count"], properties: { rows: { type: "array" }, count: { type: "integer" } } },
   permission: ["view_hq", "manage_shifts", "manage_attendance"],
   scope: "company",
@@ -278,8 +277,8 @@ export const attendanceSummary = defineTool({
   emits: [],
   renders: "Table",
   impl: async (input, ctx) => {
-    const to = isYmd(input.to) ? input.to : addDays(ctx.context.time.jstDate, 1);
-    const from = isYmd(input.from) ? input.from : addDays(to, -30);
+    const from0 = isYmd(input.from) ? input.from : addDays(ctx.context.time.jstDate, -30);
+    const { from, to } = inclusiveRange(from0, input.to, 31, ctx.context.time.jstDate);
     const data = await viewQuery(
       ctx.admin,
       ctx.context,

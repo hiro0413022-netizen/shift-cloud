@@ -65,4 +65,12 @@ export function addDays(ymd: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** from〜to の期間を「to を含む」形に正規化。LLM は「明後日」を from=to=同じ日 で渡してくるので、
+ *  排他境界のまま使うと 0 件になる（2026-09-28 実機で発見）。to が無ければ from + days */
+export function inclusiveRange(from: unknown, to: unknown, fallbackDays: number, today: string): { from: string; to: string } {
+  const f = isYmd(from) ? from : today;
+  const t = isYmd(to) && to >= f ? addDays(to, 1) : addDays(f, fallbackDays);
+  return { from: f, to: t };
+}
+
 export const STORE_IN = { type: "string", format: "uuid", description: "店舗ID（省略時は主所属）" } as const;

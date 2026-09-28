@@ -105,3 +105,11 @@ test("render: Tool の出力を Block にし、出典（SourceNote）を必ず�
   assert.equal(kpi[0].data.delta, 20000);
   assert.equal(kpi[0].meta.kind, "calculated");
 });
+
+test("期間: to はその日を含む。from=to の1日指定で 0 件にならない（2026-09-28 実機バグ）", async () => {
+  const { inclusiveRange } = await import("../packages/genesis-core/src/tools/_shared.ts");
+  assert.deepEqual(inclusiveRange("2026-09-30", "2026-09-30", 7, "2026-09-28"), { from: "2026-09-30", to: "2026-10-01" });
+  assert.deepEqual(inclusiveRange("2026-09-30", undefined, 7, "2026-09-28"), { from: "2026-09-30", to: "2026-10-07" });
+  assert.deepEqual(inclusiveRange(undefined, undefined, 1, "2026-09-28"), { from: "2026-09-28", to: "2026-09-29" });
+  assert.deepEqual(inclusiveRange("2026-09-30", "2026-09-01", 3, "2026-09-28"), { from: "2026-09-30", to: "2026-10-03" });
+});

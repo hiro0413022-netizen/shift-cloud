@@ -6,7 +6,7 @@
  * P0 は横断ヒットをそのまま返す（入口を Genesis に作ることが目的）。
  */
 import { defineTool, type ToolContract } from "../tool.ts";
-import { viewQuery, lit, src, rows, monthRange, isYmd } from "./_shared.ts";
+import { viewQuery, lit, src, rows, monthRange, isYmd, addDays } from "./_shared.ts";
 import { effectiveActor, visibleStoreIds } from "../context.ts";
 
 export const customerSearch = defineTool({
@@ -103,7 +103,7 @@ export const trialList = defineTool({
   version: 1,
   domain: "customer",
   description: "期間の体験（受付台帳 visit_type='trial'）と入会結果。正典は mbr_walkin_visits（mbr_trial_bookings は空）",
-  input: { type: "object", properties: { from: { type: "string", format: "date" }, to: { type: "string", format: "date" } } },
+  input: { type: "object", properties: { from: { type: "string", format: "date", description: "省略時は今月1日" }, to: { type: "string", format: "date", description: "終了日（この日を含む）。省略時は月末" } } },
   output: { type: "object", required: ["rows", "count"], properties: { rows: { type: "array" }, count: { type: "integer" }, joined: { type: "integer" } } },
   permission: ["use_reception", "view_hq"],
   scope: "company",
@@ -115,7 +115,7 @@ export const trialList = defineTool({
   impl: async (input, ctx) => {
     const m = monthRange(ctx.context.time.jstDate);
     const from = isYmd(input.from) ? input.from : m.from;
-    const to = isYmd(input.to) ? input.to : m.to;
+    const to = isYmd(input.to) && input.to >= from ? addDays(input.to, 1) : m.to;
     const data = await viewQuery(ctx.admin, ctx.context, `select visited_on, guest_name, store_name, result, referral_source, follow_up_at from gnv_walkins where visit_type = 'trial' and visited_on >= ${lit(from)} and visited_on < ${lit(to)} order by visited_on desc`);
     const joined = data.filter((r) => r.result === "join").length;
     return rows(data, "gnv_walkins", { data: { joined, from, to } });

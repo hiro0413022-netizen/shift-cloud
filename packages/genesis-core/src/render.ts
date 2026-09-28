@@ -8,6 +8,7 @@ import type { BlockRegistry, BlockInstance, BlockMeta } from "./blocks.ts";
 import type { ExecutionResult } from "./execute.ts";
 
 type Row = Record<string, unknown>;
+const prevDay = (ymd: string): string => (/^\d{4}-\d{2}-\d{2}$/.test(ymd) ? new Date(Date.parse(`${ymd}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10) : ymd);
 const asRows = (o: Row): Row[] => (Array.isArray(o.rows) ? (o.rows as Row[]) : Array.isArray(o.items) ? (o.items as Row[]) : []);
 
 const ADAPTERS: Record<string, (o: Row, ref: string) => Row> = {
@@ -16,7 +17,8 @@ const ADAPTERS: Record<string, (o: Row, ref: string) => Row> = {
     return { title: String(o.title ?? ""), columns: rows.length ? Object.keys(rows[0]) : [], rows };
   },
   BookingList: (o) => ({ date: String(o.date ?? ""), items: asRows(o) }),
-  ShiftGrid: (o) => ({ from: String(o.from ?? ""), to: String(o.to ?? ""), rows: asRows(o) }),
+  // to は排他境界なので、見せるときは前日（1日分なら from と同じ日）
+  ShiftGrid: (o) => ({ from: String(o.from ?? ""), to: prevDay(String(o.to ?? "")), rows: asRows(o) }),
   Summary: (o) => ({ title: String(o.title ?? ""), items: asRows(o) }),
   Timeline: (o) => ({ entity: String(o.entity ?? ""), items: asRows(o) }),
   Health: (o) => ({ items: asRows(o), ok: !!o.ok }),
