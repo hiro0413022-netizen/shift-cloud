@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
         // Workflow（#298）: イベント → 宣言された手順を Core 経由で
         runWorkflow: (wf, ev) => runWorkflowForEvent(admin, wf, ev),
       }).catch((e) => ({ error: String(e) }));
-      // Semantic Search の増分取り込み（#300）: 1 tick 150 本まで（429 の再試行込みで maxDuration 60秒に収める。4万件は約2日）。GEMINI_API_KEY が無ければ何もしない
+      // Semantic Search の増分取り込み（#300）: 1 tick 400 本まで（実測 150 本 ≒ 7 秒。429 の再試行込みでも maxDuration 60秒に収まる。4万件は約17時間）。GEMINI_API_KEY が無ければ何もしない
       const embed = hasEmbedKey()
-        ? await withJobRun(admin, "embed:index", String(c.id), () => indexSemantic(admin, String(c.id), (t, k) => embedTexts(t, k, { admin, companyId: String(c.id) }), { budget: Number(process.env.GENESIS_EMBED_BUDGET ?? 150) })).catch((e) => ({ error: String(e) }))
+        ? await withJobRun(admin, "embed:index", String(c.id), () => indexSemantic(admin, String(c.id), (t, k) => embedTexts(t, k, { admin, companyId: String(c.id) }), { budget: Number(process.env.GENESIS_EMBED_BUDGET ?? 400) })).catch((e) => ({ error: String(e) }))
         : { skipped: "GEMINI_API_KEY 未設定" };
       results.push({ company: c.id, ...r, sns, core, embed });
     } catch (e) {

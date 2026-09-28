@@ -111,7 +111,8 @@ export async function indexSemantic(admin: AdminLike, companyId: string, embed: 
       const { data: cur } = await admin.from("gn_embed_cursors").select("cursor_at, cursor_id, indexed").eq("company_id", companyId).eq("source", src.name).maybeSingle();
       const cursorAt = cur?.cursor_at ? String(cur.cursor_at) : null;
       const cursorId = cur?.cursor_id ? String(cur.cursor_id) : null;
-      let q = admin.from(src.table).select(src.select).eq(src.companyCol ?? "company_id", companyId).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(Math.min(remaining, 200));
+      const pageSize = Math.min(remaining, 200);
+      let q = admin.from(src.table).select(src.select).eq(src.companyCol ?? "company_id", companyId).order("created_at", { ascending: true }).order("id", { ascending: true }).limit(pageSize);
       // (created_at, id) の組でカーソル。同じ created_at が大量にある（Excel 一括取込）ので created_at だけでは取りこぼす
       if (cursorAt && cursorId) q = q.or(`created_at.gt.${cursorAt},and(created_at.eq.${cursorAt},id.gt.${cursorId})`);
       else if (cursorAt) q = q.gt("created_at", cursorAt);
@@ -144,7 +145,7 @@ export async function indexSemantic(admin: AdminLike, companyId: string, embed: 
       bySource[src.name] = inserts.length;
       remaining -= rows.length;
       // 取り切れていない（limit いっぱい返った）なら次の tick へ
-      if ((data ?? []).length >= 200) done = false;
+      if ((data ?? []).length >= pageSize) done = false;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`${src.name}: ${msg}`);
