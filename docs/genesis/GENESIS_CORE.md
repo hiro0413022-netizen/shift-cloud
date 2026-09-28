@@ -58,6 +58,10 @@ cron は各アプリが持つが、記録は `gn_job_runs` 1つ（`withJobRun(ad
 
 `gn_embeddings`（768次元・Gemini）。対象は `packages/genesis-core/src/semantic.ts` の `SOURCES`（L3 は入れない）。取り込みは cron:execute の `embed:index`（増分・(created_at,id) カーソル）。検索は Tool `search.semantic@1`。source を足すときは SOURCES に1行（text / title / entity / at）。
 
+## Projects（P4-d・#303）
+
+`gn_projects` ＋ `gn_project_items`。Tool `project.list / card / create / link`。案件の記憶は `memory.remember` の scope=project・scope_id=案件 id。画面 /projects。
+
 ## 次（P1）
 
 Command Bar（Ctrl+K）＋ Block Renderer ＋ Person Entity（member-os `/search` の名寄せを core へ）。Tool を使う画面から `@yozan/ui` に揃えていく。

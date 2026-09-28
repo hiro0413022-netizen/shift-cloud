@@ -28,6 +28,7 @@
     "./embed": "./src/embed.ts",
     "./semantic": "./src/semantic.ts",
     "./tools/memory": "./src/tools/memory.ts",
+    "./tools/project": "./src/tools/project.ts",
     "./skills": "./src/skills/index.ts",
     "./scheduler": "./src/scheduler.ts",
     "./tools/waiting": "./src/tools/waiting.ts"

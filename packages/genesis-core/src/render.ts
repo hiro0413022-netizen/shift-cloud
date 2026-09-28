@@ -55,6 +55,20 @@ const ADAPTERS: Record<string, (o: Row, ref: string) => Row> = {
     if (ref.startsWith("walkin.add")) return { kind: "person", id: String(o.walkin_id ?? ""), title: String(o.guest ?? ""), subtitle: `受付台帳 ${o.visited_on ?? ""}${o.already ? "（登録済み）" : ""}`, fields: [] };
     if (ref.startsWith("waiting.create")) return { kind: "waiting", id: String(o.waiting_id ?? ""), title: "待ちを登録しました", subtitle: `期限 ${String(o.expected_by ?? "").slice(0, 10)} を過ぎると Inbox に「そろそろフォロー」が出ます`, fields: [] };
     if (ref.startsWith("waiting.close")) return { kind: "waiting", id: String(o.waiting_id ?? ""), title: "待ちを閉じました", subtitle: "", fields: [] };
+    if (ref.startsWith("project.card")) {
+      const p = (o.project as Row | null) ?? null;
+      if (!o.found || !p) return { kind: "project", id: "", title: "該当する案件が見つかりませんでした", subtitle: "案件名の一部か slug で探せます（project.list で一覧）", fields: [] };
+      const mems = Array.isArray(o.memories) ? (o.memories as Row[]) : [];
+      const items = Array.isArray(o.items) ? (o.items as Row[]) : [];
+      const fields: Row[] = [
+        { k: "目的", v: p.goal }, { k: "状態", v: p.status }, { k: "期限", v: p.due_on },
+        ...mems.slice(0, 8).map((m) => ({ k: `記憶${Number(m.confidence ?? 1) < 1 ? "（推定）" : ""}`, v: m.value })),
+        ...items.slice(0, 12).map((i) => ({ k: String(i.kind), v: i.url ? `${i.label} ${i.url}` : i.label })),
+      ];
+      return { kind: "project", id: String(p.id ?? ""), title: String(p.name ?? ""), subtitle: `${p.slug ?? ""} · 記憶 ${mems.length} · 紐づき ${items.length}`, fields, href: `/projects/${p.slug ?? p.id}` };
+    }
+    if (ref.startsWith("project.create")) return { kind: "project", id: String(o.project_id ?? ""), title: `案件を作りました: ${o.name ?? ""}`, subtitle: String(o.slug ?? ""), fields: [], href: `/projects/${o.slug ?? o.project_id}` };
+    if (ref.startsWith("project.link")) return { kind: "project", id: String(o.project_id ?? ""), title: `${o.project_name ?? "案件"} に紐づけました`, subtitle: "", fields: [], href: "/projects" };
     if (ref.startsWith("memory.remember")) return { kind: "memory", id: String(o.memory_id ?? ""), title: o.replaced ? "記憶を更新しました" : "覚えました", subtitle: Number(o.confidence ?? 1) < 1 ? "AI の推定として保存（経営メモで確認すると確定）" : "確認済みの記憶として保存", fields: [], href: "/memories" };
     if (ref.startsWith("memory.confirm")) return { kind: "memory", id: String(o.memory_id ?? ""), title: "記憶を確定しました", subtitle: "", fields: [], href: "/memories" };
     if (ref.startsWith("memory.forget")) return { kind: "memory", id: String(o.memory_id ?? ""), title: "忘れました", subtitle: "取り消せます（経営メモ）", fields: [], href: "/memories" };
@@ -84,7 +98,8 @@ export function blocksFromExecution(blocks: BlockRegistry, r: ExecutionResult): 
   const list: BlockInstance[] = [main];
   // 履歴を持つ出力（person.card）は Timeline も添える
   if (Array.isArray(out.timeline) && (out.timeline as Row[]).length) {
-    list.push(blocks.make("Timeline", { entity: `person:${String((out.person as Row | null)?.name ?? "")}`, items: out.timeline as Row[] }, meta));
+    const ent = out.person ? `person:${String((out.person as Row).name ?? "")}` : out.project ? `project:${String((out.project as Row).name ?? "")}` : r.tool;
+    list.push(blocks.make("Timeline", { entity: ent, items: out.timeline as Row[] }, meta));
   }
   // Ask Data 以外の読み Tool にも出典を添える（数字の信頼性・GO条件15）
   if (name !== "SourceNote" && r.sources.length) {

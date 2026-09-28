@@ -100,6 +100,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/decisions", label: "決定事項ログ", keywords: ["決定", "DECISIONS"] },
       { href: "/events", label: "出来事ログ", keywords: ["イベント", "履歴"] },
       { href: "/memories", label: "経営メモ（AIの記憶）", keywords: ["記憶", "メモ"] },
+      { href: "/projects", label: "案件", keywords: ["案件", "プロジェクト", "2号店", "24時間"] },
     ],
   },
   {

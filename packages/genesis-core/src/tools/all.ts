@@ -15,8 +15,9 @@ import { WAITING_TOOLS } from "./waiting.ts";
 import { SKILL_TOOLS } from "../skills/index.ts";
 import { MEMORY_TOOLS } from "./memory.ts";
 import { SEARCH_TOOLS } from "./search.ts";
+import { PROJECT_TOOLS } from "./project.ts";
 
-export const CORE_TOOLS: ToolContract[] = [...OPS_TOOLS, ...CUSTOMER_TOOLS, ...FINANCE_TOOLS, ...GROWTH_TOOLS, ...DEV_TOOLS, ...WAITING_TOOLS, ...MEMORY_TOOLS, ...SEARCH_TOOLS, ...SKILL_TOOLS];
+export const CORE_TOOLS: ToolContract[] = [...OPS_TOOLS, ...CUSTOMER_TOOLS, ...FINANCE_TOOLS, ...GROWTH_TOOLS, ...DEV_TOOLS, ...WAITING_TOOLS, ...MEMORY_TOOLS, ...SEARCH_TOOLS, ...PROJECT_TOOLS, ...SKILL_TOOLS];
 
 export function createGenesisCore(opts: { tools?: ToolContract[]; blocks?: BlockContract[]; events?: EventContract[] } = {}) {
   const blocks = createBlockRegistry(opts.blocks ?? []);

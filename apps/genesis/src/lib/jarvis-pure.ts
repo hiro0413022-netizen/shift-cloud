@@ -37,6 +37,7 @@ export const NAV_MAP: NavEntry[] = [
   { href: "/library", label: "資料室", about: "社内資料" },
   { href: "/network", label: "システム相関図", about: "全システムの接続と死活" },
   { href: "/memories", label: "経営メモ", about: "AIが覚えている経営判断" },
+  { href: "/projects", label: "案件", about: "進めている案件ごとに記憶・待ち・判断を束ねる" },
   { href: "/decisions", label: "決定事項ログ", about: "過去の決定" },
   { href: "/dev-requests", label: "開発依頼", about: "JARVISが受けた開発依頼のキュー" },
   { href: "/dev", label: "開発状況", about: "各モジュールの進捗" },
