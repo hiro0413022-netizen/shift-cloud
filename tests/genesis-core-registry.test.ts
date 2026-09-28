@@ -85,3 +85,23 @@ test("block registry: 形に合わない data は SourceNote に落として壊�
   const unknown = b.make("Nope", {}, { kind: "fact" });
   assert.equal(unknown.block, "SourceNote");
 });
+
+test("render: Tool の出力を Block にし、出典（SourceNote）を必ず添える。失敗は SourceNote に落ちる", async () => {
+  const { blocksFromExecution } = await import("../packages/genesis-core/src/render.ts");
+  const blocks = createBlockRegistry();
+  const ok = blocksFromExecution(blocks, {
+    status: "ok", executionId: "x", tool: "booking.list@1", output: { rows: [{ booked_date: "2026-09-29", start_time: "10:00", customer_name: "田中" }], count: 1, date: "2026-09-29" },
+    sources: [{ table: "gnv_bookings", updatedAt: "2026-09-28T10:00:00Z", verified: true }], kind: "fact", rowCount: 1, silentZero: false, policy: null, error: null, durationMs: 1, logs: [], renders: "BookingList",
+  });
+  assert.equal(ok[0].block, "BookingList");
+  assert.equal((ok[0].data.items as unknown[]).length, 1);
+  assert.equal(ok[1].block, "Table");
+  assert.equal(ok.at(-1)?.block, "SourceNote");
+  assert.equal(ok[0].meta.kind, "fact");
+  const ng = blocksFromExecution(blocks, { status: "denied", executionId: null, tool: "x.y@1", output: null, sources: [], kind: "fact", rowCount: null, silentZero: false, policy: null, error: "権限不足", durationMs: 1, logs: [], renders: "Table" });
+  assert.equal(ng[0].block, "SourceNote");
+  const kpi = blocksFromExecution(blocks, { status: "ok", executionId: "x", tool: "sales.daily@1", output: { rows: [], count: 0, date: "2026-09-27", total: 120000, prev_total: 100000 }, sources: [{ table: "gnv_sales" }], kind: "calculated", rowCount: 0, silentZero: false, policy: null, error: null, durationMs: 1, logs: [], renders: "KPI" });
+  assert.equal(kpi[0].block, "KPI");
+  assert.equal(kpi[0].data.delta, 20000);
+  assert.equal(kpi[0].meta.kind, "calculated");
+});

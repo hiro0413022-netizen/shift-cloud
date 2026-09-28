@@ -16,7 +16,7 @@ export function openPalette(q = "") {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { q } }));
 }
 
-type Row = { kind: "screen" | "person" | "action"; label: string; sub: string; href: string; external: boolean };
+type Row = { kind: "screen" | "person" | "action" | "ask"; label: string; sub: string; href: string; external: boolean };
 
 function flatten(hits: SearchHit[]): Row[] {
   const rows: Row[] = [];
@@ -78,7 +78,8 @@ export function CommandPalette() {
       try {
         const hits = await searchEverything(q);
         if (my === seq.current) {
-          setRows(flatten(hits));
+          // #290: 何を打っても最後に「Genesisに聞く」が出る＝入力欄は1つ（Universal Command Bar）
+          setRows([...flatten(hits), { kind: "ask", label: `Genesisに聞く「${q.trim()}」`, sub: "予約・売上・会員・シフト・履歴を表で出す", href: `/?ask=${encodeURIComponent(q.trim())}`, external: false }]);
           setSel(0);
         }
       } finally {
@@ -93,7 +94,10 @@ export function CommandPalette() {
       if (!r) return;
       setOpen(false);
       if (r.external) window.open(r.href, "_blank", "noopener");
-      else router.push(r.href);
+      else if (r.kind === "ask" && window.location.pathname === "/") {
+        // ホームに居るときは遷移せず JARVIS にそのまま渡す
+        window.dispatchEvent(new CustomEvent("gn:ask", { detail: { q: r.label.replace(/^Genesisに聞く「|」$/g, "") } }));
+      } else router.push(r.href);
     },
     [router]
   );
@@ -145,11 +149,11 @@ export function CommandPalette() {
               }`}
             >
               <Icon
-                name={r.kind === "screen" ? "arrow" : r.kind === "person" ? "user" : "send"}
+                name={r.kind === "screen" ? "arrow" : r.kind === "person" ? "user" : r.kind === "ask" ? "search" : "send"}
                 size={18}
                 className={i === sel ? "text-(--color-accent)" : "text-(--color-dim)"}
               />
-              <span className={`text-[15px] ${r.kind === "action" ? "text-(--color-dim)" : "font-bold"}`}>{r.label}</span>
+              <span className={`text-[15px] ${r.kind === "action" ? "text-(--color-dim)" : r.kind === "ask" ? "text-(--color-accent)" : "font-bold"}`}>{r.label}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-(--color-faint)">{r.sub}</span>
               {r.external && <span className="text-[11px] text-(--color-faint)">別タブ</span>}
             </button>

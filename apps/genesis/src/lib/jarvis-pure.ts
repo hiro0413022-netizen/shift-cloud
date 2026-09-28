@@ -155,8 +155,10 @@ export function openingLine(b: JarvisBriefing, hour: number = jstHour()): string
    （黙るくらいなら、整形されていなくても答えを返すほうがまし）。
 ------------------------------------------------------------ */
 export type Decision = {
-  intent: "data" | "navigate" | "dev" | "talk" | "act";
+  intent: "data" | "navigate" | "dev" | "talk" | "act" | "tool";
   reply?: string;
+  /** #290: Genesis Core の読み Tool（risk 0/1）を呼ぶ。ref は 'booking.list' など */
+  tool?: { ref?: string; args?: Record<string, unknown> };
   question?: string;
   href?: string;
   dev?: { title?: string; app?: string; priority?: string };
@@ -164,7 +166,7 @@ export type Decision = {
   act?: { type?: string; args?: Record<string, unknown> };
 };
 
-const INTENTS = ["data", "navigate", "dev", "talk", "act"];
+const INTENTS = ["data", "navigate", "dev", "talk", "act", "tool"];
 
 /* ------------------------------------------------------------
    JARVISが実行してよい操作（#186）

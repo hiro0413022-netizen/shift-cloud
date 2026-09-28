@@ -8,6 +8,8 @@ import { detectWake, pauseMs, detectScreenCommand, splitSentences, createVad, cl
 import { Icon } from "./icons";
 import { openPalette } from "./command-palette";
 import type { JarvisReply } from "@/lib/jarvis";
+import type { BlockInstance } from "@yozan/genesis-core/blocks";
+import { BlockList } from "./blocks";
 
 /* ============================================================
    JARVIS — ホームの対話AI（DECISIONS #182 / #184）
@@ -38,6 +40,8 @@ type Msg = {
   sql?: string | null;
   rowCount?: number | null;
   intent?: string;
+  /** #290: Tool の結果（Block）。SourceNote も含む */
+  blocks?: BlockInstance[];
 };
 
 // 2026-09-15: 「急にしゃべりだすのをやめてほしい」→ 声は最初オフ。
@@ -272,7 +276,7 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
         const r: JarvisReply = await talkToJarvis(q, history, inputMode);
         setMsgs((prev) => [
           ...prev,
-          { role: "assistant", text: r.reply, link: r.link, dev: r.dev, act: r.act, sql: r.sql, rowCount: r.rowCount, intent: r.intent },
+          { role: "assistant", text: r.reply, link: r.link, dev: r.dev, act: r.act, sql: r.sql, rowCount: r.rowCount, intent: r.intent, blocks: r.blocks },
         ]);
         // #244: 案内先が決まった返事は、ボタンを押させずにそのまま開く（声で操作できるように）
         if (r.intent === "navigate" && r.link?.href) router.push(r.link.href);
@@ -299,6 +303,27 @@ export function Jarvis({ opening, name }: { opening: string; name: string }) {
     },
     [speak, router]
   );
+
+  // #290: Ctrl K（Command Bar）から「Genesisに聞く」で来たときは、開いた瞬間にその質問を送る（URL の ?ask= は消す）
+  const askedRef = useRef(false);
+  useEffect(() => {
+    if (askedRef.current) return;
+    const sp = new URLSearchParams(window.location.search);
+    const ask = sp.get("ask")?.trim();
+    if (!ask) return;
+    askedRef.current = true;
+    sp.delete("ask");
+    window.history.replaceState(null, "", `${window.location.pathname}${sp.toString() ? "?" + sp.toString() : ""}`);
+    void send(ask, "text");
+  }, [send]);
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const q = (e as CustomEvent<{ q?: string }>).detail?.q?.trim();
+      if (q) void send(q, "text");
+    };
+    window.addEventListener("gn:ask", onAsk);
+    return () => window.removeEventListener("gn:ask", onAsk);
+  }, [send]);
 
   /* #248: 呼びかけに気づいたら小さく「ピコッ」と鳴らす（聞こえたことが分かるように。喋りはしない） */
   const chime = useCallback(() => {
@@ -961,9 +986,10 @@ function Bubble({ msg }: { msg: Msg }) {
 }
 
 function Extras({ msg }: { msg: Msg }) {
-  if (!msg.link && !msg.dev && !msg.act && !msg.sql) return null;
+  if (!msg.link && !msg.dev && !msg.act && !msg.sql && !msg.blocks?.length) return null;
   return (
     <div className="mt-2 space-y-2">
+      <BlockList blocks={msg.blocks} />
       {msg.link && (
         <Link href={msg.link.href} className="btn-main inline-block">
           {msg.link.label}を開く →

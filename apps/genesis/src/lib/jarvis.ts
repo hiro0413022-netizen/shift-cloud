@@ -26,6 +26,7 @@ import {
   type JarvisBriefing,
 } from "@/lib/jarvis-pure";
 import { enqueueAction } from "@/lib/ai-execution";
+import type { BlockInstance } from "@yozan/genesis-core/blocks";
 
 // 純粋な部分は jarvis-pure.ts（テスト tests/jarvis.test.ts で固定）。画面からはここ経由で使う。
 export { toBriefing, openingLine, jstHour, NAV_MAP, alertTag };
@@ -92,7 +93,7 @@ export type JarvisTurnInput = {
 };
 
 export type JarvisReply = {
-  intent: "data" | "navigate" | "dev" | "talk" | "act" | "error";
+  intent: "data" | "navigate" | "dev" | "talk" | "act" | "tool" | "error";
   reply: string;
   link: { href: string; label: string } | null;
   dev: { id: string; title: string } | null;
@@ -103,9 +104,11 @@ export type JarvisReply = {
   rows: Record<string, unknown>[];
   error: string | null;
   elapsedMs: number;
+  /** #290: 会話内に出す Block（Tool の結果・出典）。画面は BlockView で描く */
+  blocks: BlockInstance[];
 };
 
-function systemPrompt(b: JarvisBriefing): string {
+function systemPrompt(b: JarvisBriefing, toolCatalog: string): string {
   return [
     "あなたは株式会社YOZANの統合AI「GENESIS」です。社長（古川博庸）の分身として、全社の状況を常に見ています。",
     "話し方: 落ち着いた執事。**声で読み上げる前提の話し言葉**で、1〜2文・40字以内を基本にする（長い説明を求められたときだけ3〜4文）。",
@@ -141,12 +144,16 @@ function systemPrompt(b: JarvisBriefing): string {
     "   **日付は必ず YYYY-MM-DD に直す**（「明日」は上の日付から計算）。時刻は HH:MM。",
     "   **足りない情報があるときは act にしない**。talk で1つだけ聞き返す（例: お名前は？ 何時からですか？）。",
     "   reply には「何を・いつ・誰の分で入れるか」と「5分以内なら取り消せる」ことを必ず入れる。",
+    "6. tool — 予約・受付・シフト・勤怠・売上・会員・体験・問い合わせ・システム状態を**画面に表として出す**（数字はDBが計算し、出典つきで表示される）。",
+    "   「見せて」「一覧」「今日の予約」「明日の体制」「昨日の売上」「田中さんの履歴」のような質問はこれ。data より速く、表で見える。",
+    "   tool.ref は次の一覧から選び、args は各行の {…} の形で。日付は YYYY-MM-DD に直す:",
+    ...toolCatalog.split("\n").map((l) => `     ${l}`),
     "5. dev — システムの追加・修正・不具合の依頼。「〜できるようにして」「〜が動かない」「〜を直して」など。",
     "   dev.title に一行で要件、dev.app に触りそうなアプリ（genesis / member-os / lesson-os / shift-cloud / money-os / swing-cortex / craft-os / minutes / frank-golf / その他）、",
     "   dev.priority に urgent | normal | low。",
     "",
     "## 出力形式（JSONのみ。前後に文章やコードフェンスを付けない）",
-    '{"intent":"talk|data|navigate|dev|act","reply":"読み上げる日本語","question":"dataのときだけ","href":"navigateのときだけ","dev":{"title":"","app":"","priority":""},"act":{"type":"","args":{}}}',
+    '{"intent":"talk|data|navigate|dev|act|tool","reply":"読み上げる日本語","question":"dataのときだけ","href":"navigateのときだけ","dev":{"title":"","app":"","priority":""},"act":{"type":"","args":{}},"tool":{"ref":"","args":{}}}',
     "",
     "## 厳守",
     "- ブリーフィングに無い数字を自分で書かない（推測・概算・一般論の数字は禁止）。数字が要るなら intent=data。",
@@ -174,7 +181,7 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
   const admin = createAdmin();
 
   const base: JarvisReply = {
-    intent: "talk", reply: "", link: null, dev: null, act: null, sql: null, rowCount: null, rows: [], error: null, elapsedMs: 0,
+    intent: "talk", reply: "", link: null, dev: null, act: null, sql: null, rowCount: null, rows: [], error: null, elapsedMs: 0, blocks: [],
   };
 
   if (!said) return { ...base, intent: "error", reply: "もう一度お願いします。", error: "empty", elapsedMs: 0 };
@@ -186,7 +193,9 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
     { role: "user" as const, content: said },
   ];
 
-  const raw = await callClaude(systemPrompt(briefing), messages, 700, { admin, companyId: input.actor.companyId, task: "plan" });
+  const { getCore } = await import("@/core/registry");
+  const toolCatalog = getCore().registry.catalogText({ maxRisk: 1 });
+  const raw = await callClaude(systemPrompt(briefing, toolCatalog), messages, 900, { admin, companyId: input.actor.companyId, task: "plan" });
   if (!raw) {
     const out = {
       ...base,
@@ -226,6 +235,36 @@ export async function jarvisTurn(input: JarvisTurnInput): Promise<JarvisReply> {
       rows: ask.rows.slice(0, 20),
       error: ask.error,
     };
+    const { getCore } = await import("@/core/registry");
+    const blocks = getCore().blocks;
+    out.blocks = [
+      ...(ask.rows.length ? [blocks.make("Table", { title: q, columns: Object.keys(ask.rows[0]), rows: ask.rows.slice(0, 50) }, { kind: "calculated", sources: [{ table: "gnv_* (ask-data)" }], rowCount: ask.rowCount })] : []),
+    ];
+  } else if (decision.intent === "tool") {
+    const ref = String(decision.tool?.ref ?? "").trim();
+    const { getCore } = await import("@/core/registry");
+    const { runTool } = await import("@/core/run");
+    const { blocksFromExecution } = await import("@yozan/genesis-core/render");
+    const core = getCore();
+    const tool = core.registry.has(ref) ? core.registry.resolve(ref) : null;
+    if (!tool || tool.risk > 1) {
+      out = { ...out, intent: "talk", reply: out.reply || "その確認はまだできません。" };
+    } else {
+      const r = await runTool({ actor: input.actor, ref, input: (decision.tool?.args ?? {}) as Record<string, unknown>, surface: input.inputMode === "voice" ? "voice" : "web", origin: "jarvis", said });
+      const bl = blocksFromExecution(core.blocks, r);
+      const count = r.rowCount ?? (r.output && typeof r.output.count === "number" ? Number(r.output.count) : null);
+      out = {
+        ...out,
+        intent: "tool",
+        blocks: bl,
+        rowCount: count,
+        error: r.status === "ok" || r.status === "idempotent" ? null : r.error ?? r.status,
+        reply:
+          r.status === "ok" || r.status === "idempotent"
+            ? out.reply || (count != null ? `${count}件です。表に出しました。` : "表に出しました。")
+            : `確認できませんでした（${r.error ?? r.status}）。`,
+      };
+    }
   } else if (decision.intent === "navigate") {
     const hit = findNav(decision.href);
     out = {

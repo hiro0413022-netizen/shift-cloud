@@ -20,7 +20,8 @@
     "./tools/finance": "./src/tools/finance.ts",
     "./tools/growth": "./src/tools/growth.ts",
     "./tools/dev": "./src/tools/dev.ts",
-    "./tools/all": "./src/tools/all.ts"
+    "./tools/all": "./src/tools/all.ts",
+    "./render": "./src/render.ts"
   },
   "peerDependencies": {
     "@supabase/supabase-js": "^2.50.0",
