@@ -14,6 +14,7 @@ import {
   lessonOption,
   grainOf,
   coveredCells,
+  planHours,
   type BookingCfg,
 } from "@yozan/core/frank-booking";
 import { handoffSecret, verifyHandoff } from "@yozan/core/frank-handoff";
@@ -27,6 +28,8 @@ import { checkOpenSlots, corporateSpec, canBookAsCorporate } from "@yozan/core/f
  * - 営業時間・定休日は @yozan/core/frank-booking（gn_site_content で上書き可）
  * - 会員認証: 会員番号＋電話番号下4桁（Web完結・パスワードレス）
  * - プラン上限: レギュラー=1日60分／マスター=1日120分／ライト=1日60分+月4回まで（#136b・ユーザー確定）
+ * - ライト会員の時間帯: 平日10:00〜15:00 のみ・土日祝は不可（#297・2026-09-28・運営マニュアル第3版どおり）。
+ *   判定は @yozan/core/frank-booking の planHours（空き枠の一覧と予約作成の両方が通る）
  * ★ 設定と営業時間の判定はスタッフ画面(member-os)と共通。ここで独自定義しないこと。
  */
 
@@ -143,24 +146,54 @@ export async function authMember(admin: Admin, a: MemberAuth) {
   return verifyMember(admin, a.memberNo ?? "", a.phoneLast4 ?? "");
 }
 
-/** 日別の空き状況 */
-export async function getSlots(dateStr: string) {
+/**
+ * 日別の空き状況
+ *
+ * auth（任意）: 会員が分かっていれば、そのプランで予約できる時間帯に絞って返す（#297）。
+ *   ライト会員は平日10:00〜15:00だけ。土日祝は closed:true と理由を返す。
+ *   認証に失敗しても空き状況自体は返す（誰でも見られる情報。制限は予約作成で必ず効く）。
+ */
+export async function getSlots(dateStr: string, auth?: MemberAuth) {
   const admin = createAdmin();
   const cfg = await loadBookingCfg(admin);
-  const hours = businessHours(dateStr, cfg);
+  const bizHours = businessHours(dateStr, cfg);
+  const range = bookableRange(cfg);
+  // 会員が分かるときはプランの時間帯で絞る（#297）
+  let planName: string | null = null;
+  if (auth && (auth.token || auth.memberNo)) {
+    const m = await authMember(admin, auth);
+    planName = (m as unknown as { frunk_plans?: { name?: string } | null } | null)?.frunk_plans?.name ?? null;
+  }
+  const byPlan = planHours(planName, dateStr, bizHours, cfg);
+  const hours = byPlan.hours;
+  const planNote = byPlan.limited ? byPlan.reason ?? null : null;
   const { data: bays } = await admin
     .from("frunk_bays")
     .select("id, code, name, floor, equipment")
     .eq("active", true)
     .is("deleted_at", null)
     .order("sort");
-  const range = bookableRange(cfg);
   if (!hours) {
     const reason =
-      cfg.open_date && dateStr < cfg.open_date
-        ? `ご予約は ${cfg.open_date.replace(/-/g, "/")} ${cfg.open_time}〜 のオープン以降の日付で承ります`
-        : "この日は休業日です";
-    return { date: dateStr, closed: true, reason, open_date: cfg.open_date, min_date: range.min, max_date: range.max, bays: bays ?? [], slots: [], taken: {} };
+      bizHours && byPlan.limited
+        ? byPlan.reason ?? "このプランではご予約いただけない日です"
+        : cfg.open_date && dateStr < cfg.open_date
+          ? `ご予約は ${cfg.open_date.replace(/-/g, "/")} ${cfg.open_time}〜 のオープン以降の日付で承ります`
+          : "この日は休業日です";
+    return {
+      date: dateStr,
+      closed: true,
+      reason,
+      // 営業日だがプランの都合で枠が無い（画面は「休業日」と言わず理由をそのまま出す）
+      plan_limited: Boolean(bizHours && byPlan.limited),
+      plan_note: planNote,
+      open_date: cfg.open_date,
+      min_date: range.min,
+      max_date: range.max,
+      bays: bays ?? [],
+      slots: [],
+      taken: {},
+    };
   }
   // お客様に見せる開始時刻は「毎時00分」。空き判定はもっと細かいマス（grain）で行う
   const STEP = memberStartStep(cfg);
@@ -208,6 +241,9 @@ export async function getSlots(dateStr: string) {
     date: dateStr,
     closed: false,
     hours,
+    /** プランで時間帯を絞っているときの説明（ライト会員＝平日10:00〜15:00・#297）。絞っていなければ null */
+    plan_note: planNote,
+    plan_limited: byPlan.limited,
     open_date: cfg.open_date,
     min_date: range.min,
     max_date: range.max,
@@ -281,6 +317,13 @@ export async function createBooking(input: {
       companion_free?: boolean | null;
     } | null;
   }).frunk_plans;
+  // プランの時間帯（#297）。ライト会員は平日10:00〜15:00のみ・土日祝は不可。
+  // 画面の空き枠も同じ planHours で絞っているが、APIを直接叩かれても守る
+  const byPlan = planHours(plan?.name, input.date, hours, cfg);
+  if (!byPlan.hours) return { ok: false, error: byPlan.reason ?? "このプランではご予約いただけない日です" };
+  if (startMin < toMin(byPlan.hours.open) || endMin > toMin(byPlan.hours.close)) {
+    return { ok: false, error: `${byPlan.reason ?? "このプランで予約できる時間帯"}（${byPlan.hours.open}〜${byPlan.hours.close}の間で終わるようにお選びください）` };
+  }
   const dailyMax = (plan?.max_bookings_per_day ?? 1) * 60; // 時間→分
   const { data: sameDay } = await admin
     .from("frunk_bookings")

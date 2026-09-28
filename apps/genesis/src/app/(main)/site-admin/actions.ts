@@ -57,6 +57,11 @@ function lessonPrice(raw: string): number {
   return Number.isFinite(n) && n >= 0 ? n : 2500;
 }
 
+/** "HH:MM" 形式でなければ既定に戻す */
+function hhmm(raw: string, fallback: string): string {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : fallback;
+}
+
 /** 予約設定（#87: 営業時間・定休日・祝日・臨時休業・予約可能日数） */
 export async function saveBookingCfg(formData: FormData): Promise<void> {
   const admin = createAdmin();
@@ -80,6 +85,12 @@ export async function saveBookingCfg(formData: FormData): Promise<void> {
       enabled: lessonPrice(t("lesson_option_price")) > 0,
       minutes: 25,
       price: lessonPrice(t("lesson_option_price")),
+    },
+    // ライト会員の利用時間帯（#297）。平日10:00〜15:00・土日祝は不可 が既定
+    light_window: {
+      open: hhmm(t("light_open"), "10:00"),
+      close: hhmm(t("light_close"), "15:00"),
+      weekday_only: t("light_weekday_only") !== "0",
     },
     holiday_dates: dates("holiday_dates"),
     closed_dates: dates("closed_dates"),

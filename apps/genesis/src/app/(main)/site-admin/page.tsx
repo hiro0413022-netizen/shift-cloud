@@ -168,6 +168,24 @@ function BookingSection({ d, input, label, btn }: { d: Record<string, unknown>; 
           <input name="lesson_option_price" defaultValue={String(cfg.lesson_option?.price ?? 2500)} placeholder="2500" className={input} />
         </div>
       </div>
+      {/* ライト会員の利用時間帯（#297・2026-09-28）。運営マニュアル「月4回まで／平日10:00〜15:00」をここで持つ */}
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className={label}>ライト会員 利用開始（平日のみ・土日祝は不可）</label>
+          <input name="light_open" defaultValue={cfg.light_window?.open ?? "10:00"} placeholder="10:00" className={input} />
+        </div>
+        <div>
+          <label className={label}>ライト会員 利用終了（この時刻までに終わる枠だけ）</label>
+          <input name="light_close" defaultValue={cfg.light_window?.close ?? "15:00"} placeholder="15:00" className={input} />
+        </div>
+        <div>
+          <label className={label}>ライト会員の土日祝</label>
+          <select name="light_weekday_only" defaultValue={cfg.light_window?.weekday_only === false ? "0" : "1"} className={input}>
+            <option value="1">予約できない（平日のみ）</option>
+            <option value="0">上の時間帯なら予約できる</option>
+          </select>
+        </div>
+      </div>
       <button type="submit" className={btn}>予約設定を保存</button>
     </form>
   );

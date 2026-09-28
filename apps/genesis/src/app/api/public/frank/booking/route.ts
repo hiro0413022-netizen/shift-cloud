@@ -13,7 +13,7 @@ const CORS = {
 
 /**
  * FRANK GOLF 予約 公開API（#86 §3-3）
- * GET  ?date=YYYY-MM-DD               … 空き状況
+ * GET  ?date=YYYY-MM-DD               … 空き状況（t または member_no+phone_last4 を添えるとプランの時間帯で絞る・#297）
  * GET  ?my=1&member_no&phone_last4    … 自分の予約一覧
  * GET  ?my=1&t=<引き渡しトークン>      … 同上（会員ポータルからの遷移・#152）
  * GET  ?me=1&t=<引き渡しトークン>      … トークンの持ち主（氏名）を返す。ページの挨拶表示用
@@ -43,7 +43,9 @@ export async function GET(req: NextRequest) {
   }
   const date = get("date");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: "date必須" }, { status: 400, headers: CORS });
-  return NextResponse.json(await getSlots(date), { headers: CORS });
+  // 会員が分かるとき（t／member_no+phone_last4）はプランの時間帯で絞る（#297・ライト会員=平日10:00〜15:00）
+  const a = authOf(get);
+  return NextResponse.json(await getSlots(date, a.token || a.memberNo ? a : undefined), { headers: CORS });
 }
 
 export async function POST(req: NextRequest) {

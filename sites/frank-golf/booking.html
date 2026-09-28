@@ -101,6 +101,7 @@
       </p>
       </div>
       <p id="bk-who" hidden style="font-size:13px;font-weight:700;margin-bottom:10px"></p>
+      <p id="bk-plan-note" hidden style="font-size:13px;margin:0 0 10px;padding:8px 10px;border-radius:8px;background:rgba(176,141,63,.12);border:1px solid rgba(176,141,63,.4)"></p>
       <p id="bk-step2" style="font-size:12px;font-weight:700;opacity:.8;margin:16px 0 8px">2. 日付と利用時間</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <label style="font-size:12px">日付<input id="bk-date" type="date" style="width:100%;margin-top:4px;padding:10px;border-radius:10px;border:1px solid rgba(43,50,41,.25);background:rgba(43,50,41,.04);color:inherit"></label>
@@ -236,7 +237,7 @@
   var BILL_API="https://yozan-genesis.vercel.app/api/public/frank/billing";
   var OPEN="2026-09-02"; // プレオープン日（サーバー側でも同じ判定をする）
   var $=function(id){return document.getElementById(id)};
-  var sel=null, retried=false, DATA=null;
+  var sel=null, retried=false, DATA=null, loadSeq=0;
   var LABEL={30:"30分",60:"1時間",90:"1時間30分",120:"2時間",150:"2時間30分",180:"3時間"};
   function toM(t){return Number(t.slice(0,2))*60+Number(t.slice(3,5))}
   function toT(m){return ("0"+Math.floor(m/60)).slice(-2)+":"+("0"+m%60).slice(-2)}
@@ -250,6 +251,26 @@
     $("bk-tel").value=localStorage.getItem("fg_tel")||"";
   }catch(e){}
   function remember(a){try{localStorage.setItem("fg_no",a.no);localStorage.setItem("fg_tel",a.tel)}catch(e){}}
+
+  // ---- 空き枠を「そのお客様のプランで取れる時間帯」に絞る（#297・ライト会員＝平日10:00〜15:00）
+  //  会員が分かるときだけ ?date= に認証を添える。ポータルからのトークンはそのまま。
+  //  保存済みの会員番号＋下4桁は、一度 ?me=1 で通ったものだけ使う（間違った番号を日付を変えるたびに
+  //  送り続けると、総当たり対策のロック(15分)に自分でかかってしまうため）。
+  var VERIFIED=false;
+  function slotAuth(){
+    if(TOK) return "&t="+encodeURIComponent(TOK);
+    if(!VERIFIED) return "";
+    var no=$("bk-no").value.trim(), tel=$("bk-tel").value.trim();
+    if(!no||tel.length!==4) return "";
+    return "&member_no="+encodeURIComponent(no)+"&phone_last4="+tel;
+  }
+  function verifySaved(){
+    var no=$("bk-no").value.trim(), tel=$("bk-tel").value.trim();
+    if(TOK||!no||tel.length!==4) return;
+    fetch(API+"?me=1&member_no="+encodeURIComponent(no)+"&phone_last4="+tel).then(function(r){return r.json()}).then(function(j){
+      if(j&&j.ok){VERIFIED=true;load()}
+    }).catch(function(){});
+  }
 
   // ---- 会員ポータル（マイページ）からお越しの場合の引き渡し（#152）
   //  マイページでログイン済みなのに、ここでもう一度会員番号と下4桁を求めていたのをやめる。
@@ -276,7 +297,7 @@
     $("bk-step4").textContent="3. オプション（任意）";
     $("bk-bill-hint").textContent="下のボタンからお進みください。";
     var ll=$("bk-lesson-link"); if(ll) ll.href="lesson-booking.html?t="+encodeURIComponent(TOK);
-    my();
+    my(); load();
   }
   // トークンが切れていた／無効だったときは、黙って従来の入力フォームに戻す
   function dropToken(msg){
@@ -284,6 +305,7 @@
     $("bk-login").hidden=false;
     $("bk-who").hidden=true;
     if(msg) $("bk-who").hidden=false, $("bk-who").textContent=msg;
+    load(); verifySaved();
   }
   if(TOK){
     fetch(API+"?me=1&t="+encodeURIComponent(TOK)).then(function(r){return r.json()}).then(function(j){
@@ -325,6 +347,11 @@
     $("bk-lesson-label").textContent="パーソナルレッスン（"+o.minutes+"分）を追加する　＋"+yen(o.price)+"円（当日精算）";
   }
   function lessonWanted(){ return !$("bk-opt").hidden && $("bk-lesson").checked }
+  /** プランで時間帯を絞っているときの注意書き（ライト会員のみ出る） */
+  function setPlanNote(t){
+    var el=$("bk-plan-note"); if(!el) return;
+    el.hidden=!t; el.textContent=t||"";
+  }
 
   /** 選んだ枠の確認ボタン。利用時間やオプションを変えても消えないよう、決まった場所に出す */
   function renderConfirm(){
@@ -370,7 +397,7 @@
       });
     });
     $("bk-status").textContent = any
-      ? "○をタップ → 下の「この枠で予約する」を押してください（営業 "+j.hours.open+"〜"+j.hours.close+"・毎時00分スタート）"
+      ? "○をタップ → 下の「この枠で予約する」を押してください（"+(j.plan_limited?"ご予約いただける時間帯 ":"営業 ")+j.hours.open+"〜"+j.hours.close+"・毎時00分スタート）"
       : "この日は「"+(LABEL[mins]||mins+"分")+"」で続けて空いている枠がありません。利用時間や日付を変えてお試しください。";
   }
 
@@ -378,12 +405,15 @@
     var date=$("bk-date").value; if(!date) return;
     sel=null; $("bk-confirm").innerHTML="";
     $("bk-status").textContent="読み込み中…"; $("bk-grid").innerHTML="";
-    fetch(API+"?date="+date).then(function(r){return r.json()}).then(function(j){
+    var seq=++loadSeq;
+    fetch(API+"?date="+date+slotAuth()).then(function(r){return r.json()}).then(function(j){
+      if(seq!==loadSeq) return; // 後から出した読み込み（会員確認後など）が先に返っていたら、古い方は捨てる
       if(j.min_date){$("bk-date").min=j.min_date}
       if(j.max_date){$("bk-date").max=j.max_date}
+      setPlanNote(j.plan_note);
       if(j.closed){
         DATA=null;
-        $("bk-status").textContent=j.reason||"この日は休業日です。別の日付をお選びください。";
+        $("bk-status").textContent=(j.reason||"この日は休業日です。")+" 別の日付をお選びください。";
         // オープン前の日付だったら、予約できる最初の日に自動で切り替える（1回だけ）
         if(!retried && j.min_date && date<j.min_date){retried=true;$("bk-date").value=j.min_date;load()}
         return;
@@ -431,6 +461,7 @@
     var a=auth(); if(!a) return;
     fetch(API+"?my=1&"+authQuery(a)).then(function(r){return r.json()}).then(function(j){
       if(j.error){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.error+"</p>";return}
+      if(!VERIFIED){VERIFIED=true;load()} // 会員が分かったので、空き枠をそのプランの時間帯で引き直す
       if(!j.bookings.length){$("bk-mylist").innerHTML='<p style="font-size:13px;opacity:.7">'+j.name+'様の今後の予約はありません。</p>';return}
       var h='<p style="font-size:13px">'+j.name+"様の予約:</p><ul style=\"font-size:13px;list-style:none;padding:0\">";
       j.bookings.forEach(function(b){
@@ -479,7 +510,8 @@
   if(q==="success"){$("bk-bill-status").textContent="✅ カードの登録が完了しました。月会費は毎月自動でお支払いになります。";$("bk-billing").scrollIntoView()}
   if(q==="cancel"){$("bk-bill-status").textContent="カード登録は完了していません。もう一度お試しいただけます。"}
 
-  load();
+  // トークンで来た場合は ?me=1 の結果（showLoggedIn / dropToken）が load() を呼ぶ
+  if(!TOK){ load(); verifySaved(); }
 })();
 </script>
 </body>

@@ -53,6 +53,9 @@ export type BookingCfg = {
   /** 特別営業日: open_date より前でもこの日だけは予約を受け付ける（内覧会・体験会など）。
    *  営業時間はその日の曜日どおり（土日祝なら weekend）。定休曜日・臨時休業の指定より優先。 */
   special_open_dates: string[];
+  /** ライト会員が打席を予約できる時間帯（#297・2026-09-28）。既定＝平日10:00〜15:00・土日祝は不可。
+   *  運営マニュアル第3版（2026-09-01）の「ライト会員＝月4回まで／平日10:00〜15:00」を予約システムに反映。 */
+  light_window?: { open: string; close: string; weekday_only: boolean };
 };
 
 export const DEFAULT_BOOKING_CFG: BookingCfg = {
@@ -73,6 +76,7 @@ export const DEFAULT_BOOKING_CFG: BookingCfg = {
   open_date: "2026-09-02", // プレオープン日
   open_time: "10:00",
   special_open_dates: [],
+  light_window: { open: "10:00", close: "15:00", weekday_only: true },
 };
 
 /** Supabase の admin クライアント。
@@ -101,6 +105,7 @@ export async function loadBookingCfg(admin: SupabaseAdminLike): Promise<BookingC
     weekday: { ...DEFAULT_BOOKING_CFG.weekday, ...(o.weekday ?? {}) },
     weekend: { ...DEFAULT_BOOKING_CFG.weekend, ...(o.weekend ?? {}) },
     lesson_option: { ...DEFAULT_BOOKING_CFG.lesson_option!, ...(o.lesson_option ?? {}) },
+    light_window: { ...DEFAULT_BOOKING_CFG.light_window!, ...(o.light_window ?? {}) },
   };
 }
 
@@ -172,6 +177,57 @@ export function businessHours(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING
     return { open: cfg.open_time, close: base.close };
   }
   return base;
+}
+
+/** 土日祝か（祝日は自動判定＋holiday_dates の追加ぶん）。営業時間の weekday/weekend の切り替えと同じ判定 */
+export function isWeekendOrHoliday(dateStr: string, cfg: BookingCfg = DEFAULT_BOOKING_CFG): boolean {
+  const dow = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
+  const holiday = cfg.holiday_dates.includes(dateStr) || (cfg.auto_holidays !== false && isJpHoliday(dateStr));
+  return dow === 0 || dow === 6 || holiday;
+}
+
+/** ライト会員の利用時間帯の設定（既定＝平日10:00〜15:00・土日祝は不可） */
+export const lightWindow = (cfg: BookingCfg = DEFAULT_BOOKING_CFG) => ({
+  ...DEFAULT_BOOKING_CFG.light_window!,
+  ...(cfg.light_window ?? {}),
+});
+
+/** この時間帯制限がかかるプランか（プラン名で判定。法人ライトは別物なので含めない） */
+export const isLightPlan = (planName: string | null | undefined): boolean => planName === "ライト会員";
+
+/** 制限の説明文（画面のメッセージ・エラーで共通に使う） */
+export function lightWindowLabel(cfg: BookingCfg = DEFAULT_BOOKING_CFG): string {
+  const w = lightWindow(cfg);
+  return `${w.weekday_only ? "平日（土日祝を除く）" : ""}${w.open}〜${w.close}`;
+}
+
+/**
+ * プランごとの「この日に予約できる時間帯」（#297・2026-09-28）。
+ *
+ *   ライト会員 … 平日10:00〜15:00 のみ。土日祝は枠なし（hours: null・reason に理由）。
+ *   それ以外  … 営業時間そのまま。
+ *
+ * ★ 画面（空き枠の一覧）とサーバー（予約作成）の両方がこの1つを通す。
+ *   片方だけだと「○を押したのに予約できません」か、逆に制限外の予約が通る。
+ *   営業時間より狭くなるだけで、広がることはない（休業日は休業日のまま）。
+ */
+export function planHours(
+  planName: string | null | undefined,
+  dateStr: string,
+  hours: { open: string; close: string } | null,
+  cfg: BookingCfg = DEFAULT_BOOKING_CFG,
+): { hours: { open: string; close: string } | null; limited: boolean; reason?: string } {
+  if (!hours) return { hours: null, limited: false };
+  if (!isLightPlan(planName)) return { hours, limited: false };
+  const w = lightWindow(cfg);
+  const label = lightWindowLabel(cfg);
+  if (w.weekday_only && isWeekendOrHoliday(dateStr, cfg)) {
+    return { hours: null, limited: true, reason: `ライト会員のご予約は${label}のみです（土日祝はご利用いただけません）` };
+  }
+  const open = Math.max(toMin(hours.open), toMin(w.open));
+  const close = Math.min(toMin(hours.close), toMin(w.close));
+  if (close <= open) return { hours: null, limited: true, reason: `ライト会員のご予約は${label}のみです` };
+  return { hours: { open: toTime(open), close: toTime(close) }, limited: true, reason: `ライト会員のご予約は${label}のみです` };
 }
 
 /** 予約を受け付ける日付範囲。オープン前でも「オープン日から advance_days 分」は先行予約できる */
