@@ -1,6 +1,6 @@
 // lesson-fix.tsx — レッスン手当「担当プロが特定できない」をその場で直すUI
 // 警告を出すだけだと money-os を探し回ることになるため、給与画面で直接修正できるようにする。
-// - pro が空欄の明細  → 担当プロを選んで保存（mon_sales_lines.pro を埋める）
+// - pro が空欄の明細  → 担当プロを選んで保存（売上台帳は mon_sales_lines.pro、Money OS の売上入力は mon_sales.detail.pro を埋める）
 // - pro はあるが名簿に無い → 既存プロの別名に追加 / 新規プロとしてスタッフに紐付け
 // 保存後は「集計を実行」で手当に反映される。
 
@@ -20,6 +20,8 @@ export type UnlinkedLine = {
   /** 台帳の担当プロ表記（正規化済み）。null = 空欄 */
   raw_pro: string | null;
   memo: string | null;
+  /** どちらの表の行か（#286）: line＝売上台帳 mon_sales_lines / sale＝Money OS の売上入力 mon_sales */
+  source?: "line" | "sale";
 };
 
 export type ProOption = { id: string; name: string; staff_id: string | null; payout_mode: string };
@@ -105,6 +107,7 @@ function BlankProRow({ line, pros, ym }: { line: UnlinkedLine; pros: ProOption[]
       className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-amber-200 bg-white p-3"
     >
       <input type="hidden" name="line_id" value={line.line_id} />
+      <input type="hidden" name="source" value={line.source ?? "line"} />
       <input type="hidden" name="ym" value={ym} />
       <span className="text-sm tabular-nums text-zinc-500">{line.sold_on}</span>
       <span className="text-sm font-medium">{line.customer_name ?? "（名前なし）"}</span>

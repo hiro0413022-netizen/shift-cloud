@@ -228,6 +228,10 @@ export default function SalesEntry({
   function invalidReason(l: Line): string | null {
     if (num(l.amount) === 0) return "金額を入力してください（定価・割引額・個数を入れると自動で計算されます）";
     if (num(l.qty) < 1) return "個数を入力してください（1以上）";
+    // パーソナルは担当プロの件数がそのまま給与（手当）に入る（#286）。担当なしだと誰の給与にも入らない
+    if (/パーソナル/.test(l.productName.normalize("NFKC")) && !(l.pro || pro)) {
+      return "パーソナルレッスンは担当プロを選んでください（担当の給与に入ります）";
+    }
     return null;
   }
 

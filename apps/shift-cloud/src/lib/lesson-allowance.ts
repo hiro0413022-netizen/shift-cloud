@@ -1,5 +1,5 @@
 // lesson-allowance.ts — パーソナルレッスン手当の純粋ロジック（DBアクセス禁止・server-only禁止）
-// 算出元は Money OS の売上台帳（mon_sales_lines）。DB側の集計は関数 personal_lesson_counts（migration 0094）。
+// 算出元は Money OS の売上（売上台帳 mon_sales_lines ＋ 画面入力 mon_sales・#286）。DB側の集計は関数 personal_lesson_counts（0094→0207）。
 // 呼び出し元: app/admin/payroll/actions.ts（手当の取込）、app/admin/payroll/page.tsx（内訳表示）
 //
 // 決定（DECISIONS #105）:

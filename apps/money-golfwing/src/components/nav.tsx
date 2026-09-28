@@ -48,7 +48,7 @@ const GROUPS: { title: string; items: Item[] }[] = [
     title: "管理",
     items: [
       { href: "/import", label: "カード・口座の取込", sub: "オーナーのみ", icon: "bank", match: ["/import"], ownerOnly: true },
-      { href: "/settings", label: "担当プロの設定", icon: "gear", match: ["/settings"] },
+      { href: "/settings", label: "担当プロの設定", sub: "給与連携（パーソナル）", icon: "gear", match: ["/settings"] },
       { href: "/manual", label: "使い方", icon: "help", match: ["/manual"] },
     ],
   },

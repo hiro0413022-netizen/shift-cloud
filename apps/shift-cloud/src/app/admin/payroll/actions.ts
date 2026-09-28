@@ -56,7 +56,7 @@ async function syncPersonalAllowances(
         unit_price: PERSONAL_LESSON_UNIT_PRICE,
         quantity: r.qty,
         amount: r.amount,
-        memo: `パーソナル${r.qty}件（money-os売上台帳より自動取込）`,
+        memo: `パーソナル${r.qty}件（Money OS の売上より自動取込）`,
       }))
     );
     if (insErr) throw new Error(`手当の取込に失敗しました: ${insErr.message}`);
@@ -225,7 +225,11 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
 // 対象データは money-os の売上台帳 / 担当プロ名簿（同一DB・service_roleで更新）。
 // ============================================================
 
-/** 未紐付けの売上明細に担当プロを設定する（mon_sales_lines.pro を埋める） */
+/**
+ * 未紐付けの売上明細に担当プロを設定する。
+ *   source=line … 売上台帳（mon_sales_lines.pro）
+ *   source=sale … Money OS の売上入力（mon_sales.detail.pro）＝2026-08 以降の入力はこちら（#286）
+ */
 export async function assignLessonPro(formData: FormData): Promise<void> {
   const actor = await requireActor("manage_payroll");
   // 給与画面の再認証（15分）を通っていない場合は何もしない
@@ -234,9 +238,37 @@ export async function assignLessonPro(formData: FormData): Promise<void> {
   const lineId = String(formData.get("line_id") ?? "").trim();
   const pro = String(formData.get("pro") ?? "").trim();
   const ym = String(formData.get("ym") ?? "");
+  const source = String(formData.get("source") ?? "line") === "sale" ? "sale" : "line";
   if (!lineId || !pro) return;
 
   const admin = createAdmin();
+
+  if (source === "sale") {
+    const { data: before } = await admin
+      .from("mon_sales")
+      .select("id, detail, sold_on, customer_name")
+      .eq("id", lineId)
+      .eq("company_id", actor.companyId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!before) return;
+    const detail = (before.detail ?? {}) as Record<string, unknown>;
+    await admin
+      .from("mon_sales")
+      .update({ detail: { ...detail, pro }, updated_at: new Date().toISOString() })
+      .eq("id", lineId)
+      .eq("company_id", actor.companyId);
+    await logAudit(actor, "payroll.lesson_pro_assign", "mon_sales", lineId, null, {
+      ym,
+      sold_on: before.sold_on,
+      customer: before.customer_name,
+      before: detail.pro ?? null,
+      after: pro,
+    });
+    revalidatePath("/admin/payroll");
+    return;
+  }
+
   const { data: before } = await admin
     .from("mon_sales_lines")
     .select("id, pro, sold_on, customer_name")
