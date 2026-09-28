@@ -337,15 +337,22 @@ async function fetchAllRows<T>(build: (from: number, to: number) => PromiseLike<
 
 const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
-/** カテゴリ1つ・1か月分の売上を SaleFact に揃えて返す */
-export async function categoryFacts(
+/**
+ * 期間の売上を SaleFact に揃えて返す（#277 のカテゴリ詳細と #285 の集計表で共用）。
+ *   category を渡すとそのカテゴリだけ。
+ *   excludeSources: mon_sales の source のうち除くもの（集計表では forecast＝月会費の見込み、
+ *   migration / slack_import＝中身の無い月まとめ を除く。実際の取引だけを数えるため）
+ */
+export async function rangeFacts(
   companyId: string,
   storeId: string | null,
-  month: string,
-  category: string,
+  from: string,
+  to: string,
+  opts: { category?: string; excludeSources?: string[] } = {},
 ): Promise<{ facts: SaleFact[]; ledgerRollup: number }> {
   const admin = createAdmin();
-  const { from, to } = monthRange(month);
+  const category = opts.category;
+  const exclude = new Set(opts.excludeSources ?? []);
 
   type S = {
     id: string; sold_on: string; category: string; amount: number | string; customer_name: string | null;
@@ -364,12 +371,12 @@ export async function categoryFacts(
         .from("mon_sales")
         .select("id, sold_on, category, amount, customer_name, member_kind, pay_method, memo, source, detail")
         .eq("company_id", companyId)
-        .eq("category", category)
         .is("deleted_at", null)
         .gte("sold_on", from)
         .lt("sold_on", to)
         .order("id")
         .range(a, b);
+      if (category) q = q.eq("category", category);
       if (storeId) q = q.eq("store_id", storeId);
       return q;
     }),
@@ -409,6 +416,7 @@ export async function categoryFacts(
 
   for (const s of sales) {
     const amount = Number(s.amount) || 0;
+    if (exclude.has(str(s.source))) continue;
     if (s.source === "ledger") {
       ledgerRollup += amount; // 台帳のロールアップ。中身は lines から出すので、ここでは合計だけ控える
       continue;
@@ -448,13 +456,14 @@ export async function categoryFacts(
   }
 
   for (const l of lines) {
-    if (ledgerCategory(l.item_category) !== category) continue;
+    const lcat = ledgerCategory(l.item_category);
+    if (category && lcat !== category) continue;
     const amount = Number(l.amount) || 0;
     const name = str(l.product_name) || str(l.item_type) || NO_NAME;
     facts.push({
       id: l.id,
       date: String(l.sold_on).slice(0, 10),
-      category,
+      category: lcat,
       amount,
       items: [{ name, qty: Number(l.qty) || 1, amount }],
       type: str(l.item_type),
@@ -470,6 +479,17 @@ export async function categoryFacts(
 
   facts.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   return { facts, ledgerRollup };
+}
+
+/** カテゴリ1つ・1か月分の売上を SaleFact に揃えて返す */
+export async function categoryFacts(
+  companyId: string,
+  storeId: string | null,
+  month: string,
+  category: string,
+): Promise<{ facts: SaleFact[]; ledgerRollup: number }> {
+  const { from, to } = monthRange(month);
+  return rangeFacts(companyId, storeId, from, to, { category });
 }
 
 /** カテゴリ1つの月次推移（上段カードと同じ mon_sales の合計） */

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireMoneyActor } from "@/lib/auth";
 import { getCurrentStore } from "@/lib/money";
-import { Panel, Empty, Badge, yen, btnGhostCls } from "@/components/ui";
+import { Panel, Empty, Badge, yen, btnGhostCls, SubTabs } from "@/components/ui";
 import { segmentSales, categorySales, ledgerBreakdown, proSales, prevMonth } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +75,13 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="space-y-4">
+      <SubTabs
+        current="graph"
+        items={[
+          { key: "graph", href: "/analysis", label: "まとめて見る" },
+          { key: "table", href: "/analysis/table", label: "表で見る（Excelのように）" },
+        ]}
+      />
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">売上を見る — {label(month)}</h1>
