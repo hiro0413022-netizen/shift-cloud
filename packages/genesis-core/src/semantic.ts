@@ -75,6 +75,8 @@ export const SOURCES: SemanticSource[] = [
   },
 ];
 
+const UPSERT_CHUNK = 50;
+
 /** 長文は 1,500 字で分割（埋め込みの精度と表示のため） */
 export function chunkText(text: string, size = 1500): string[] {
   const t = text.replace(/\r/g, "").trim();
@@ -139,8 +141,9 @@ export async function indexSemantic(admin: AdminLike, companyId: string, embed: 
             });
           });
         }
-        if (inserts.length) {
-          const { error: upErr } = await admin.from("gn_embeddings").upsert(inserts, { onConflict: "company_id,source,source_id,chunk_no" });
+        // upsert は 50 行ずつ（HNSW の挿入が重く、200 行一括だと statement timeout に当たることがある・#310）
+        for (let i = 0; i < inserts.length; i += UPSERT_CHUNK) {
+          const { error: upErr } = await admin.from("gn_embeddings").upsert(inserts.slice(i, i + UPSERT_CHUNK), { onConflict: "company_id,source,source_id,chunk_no" });
           if (upErr) throw new Error(upErr.message);
         }
         const all = (data ?? []) as Row[];
@@ -156,6 +159,7 @@ export async function indexSemantic(admin: AdminLike, companyId: string, embed: 
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       errors.push(`${src.name}: ${msg}`);
+      done = false; // 失敗した source は取り切れていない（#310: 以前は done=true で「完了」に見えていた）
       try {
         await admin.from("gn_embed_cursors").upsert({ company_id: companyId, source: src.name, last_error: msg, updated_at: new Date().toISOString() }, { onConflict: "company_id,source" });
       } catch {

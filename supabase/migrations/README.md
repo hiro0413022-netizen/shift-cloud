@@ -82,3 +82,4 @@
 - ✅ `0213_genesis_memories.sql` — 適用済（2026-09-28、MCP name=0213_genesis_memories。Genesis Memory gn_memories（5スコープ・1表）＋ gnv_memories（hq）。business_memories 3件・decision_logs 18件を company へ取り込み、コード埋め込みルール5件（YOZAN）を seed #299）
 - ✅ `0214_genesis_embeddings.sql` — 適用済（2026-09-28、MCP name=0214_genesis_embeddings。`vector` 拡張を有効化・gn_embeddings（768次元・HNSW）・gn_embed_cursors・RPC gn_semantic_search（service_role のみ）。動作確認: ダミー1行を入れて similarity=1 が返ることを確認後に削除 #300）
 - ✅ `0215_genesis_projects.sql` — 適用済（2026-09-28、MCP name=0215_genesis_projects。gn_projects / gn_project_items / gnv_projects（hq）。初期案件3件（YOZAN） #303）
+- ✅ `0216_sc_comments_cursor_index.sql` — 適用済（2026-09-29、MCP name=0216_sc_comments_cursor_index。sc_comments (company_id, created_at, id) の索引・意味検索の取り込みカーソル用 #310）
