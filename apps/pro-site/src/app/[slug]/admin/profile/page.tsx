@@ -1,9 +1,15 @@
 import { notFound } from "next/navigation";
 import { getPro, listProfileItems } from "@/lib/data";
 import { AdminTitle, DeleteButton, Msg } from "@/components/admin-ui";
-import { deleteProfileItemAction, saveProAction, saveProfileItemAction } from "../actions";
+import { PhotoUpload } from "@/components/photo-upload";
+import { deleteProfileItemAction, removeProPhotoAction, saveProAction, saveProfileItemAction, uploadProPhotoAction } from "../actions";
 
 export const dynamic = "force-dynamic";
+
+const PHOTOS = [
+  { kind: "hero", label: "トップ写真", hint: "HPのいちばん上に大きく出ます。横長の写真がおすすめです。", maxEdge: 2400 },
+  { kind: "profile", label: "プロフィール写真", hint: "PROFILEページに出ます。縦長・上半身の写真がおすすめです。", maxEdge: 1600 },
+] as const;
 
 export default async function AdminProfile({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { slug } = await params;
@@ -16,6 +22,40 @@ export default async function AdminProfile({ params, searchParams }: { params: P
     <div>
       <AdminTitle slug={slug} title="プロフィール" hint="PROFILEページとトップの表示内容を編集します。" />
       <Msg ok={sp.ok} err={sp.err} />
+
+      <div className="mb-8 rounded-xl border border-(--color-line) bg-white p-4">
+        <p className="mb-1 font-black">写真</p>
+        <p className="mb-4 text-[11px] text-(--color-dim)">スマホの写真フォルダから選べます。大きな写真も自動で軽くしてから送ります。</p>
+        <div className="grid gap-6 md:grid-cols-2">
+          {PHOTOS.map((ph) => {
+            const current = ph.kind === "hero" ? pro.hero_image_url : pro.profile_image_url;
+            return (
+              <div key={ph.kind}>
+                <p className="text-sm font-bold">{ph.label}</p>
+                <p className="mb-2 text-[11px] text-(--color-dim)">{ph.hint}</p>
+                {current ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={current} alt={ph.label} className={`mb-2 w-full rounded-lg border border-(--color-line) object-cover ${ph.kind === "hero" ? "aspect-video" : "aspect-[4/5] max-w-[200px]"}`} />
+                ) : (
+                  <p className="mb-2 rounded-lg border border-dashed border-(--color-line) px-3 py-6 text-center text-xs text-(--color-dim)">まだ写真がありません</p>
+                )}
+                <form action={uploadProPhotoAction}>
+                  <input type="hidden" name="slug" value={slug} />
+                  <input type="hidden" name="kind" value={ph.kind} />
+                  <PhotoUpload maxEdge={ph.maxEdge} buttonLabel={current ? "この写真に差し替える" : "アップロードして表示する"} />
+                </form>
+                {current ? (
+                  <form action={removeProPhotoAction} className="mt-2">
+                    <input type="hidden" name="slug" value={slug} />
+                    <input type="hidden" name="kind" value={ph.kind} />
+                    <DeleteButton label="写真を外す" />
+                  </form>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="mb-8 rounded-xl border border-(--color-line) bg-white p-4">
         <p className="mb-3 font-black">基本情報</p>
@@ -66,14 +106,6 @@ export default async function AdminProfile({ params, searchParams }: { params: P
           <div>
             <label className="mb-1 block text-xs font-bold">YouTubeチャンネルURL</label>
             <input name="youtube_url" defaultValue={pro.youtube_url ?? ""} placeholder="https://www.youtube.com/@..." className="adm-input" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold">トップ写真URL（任意）</label>
-            <input name="hero_image_url" defaultValue={pro.hero_image_url ?? ""} placeholder="https://...（写真の追加は運営にご相談ください）" className="adm-input" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-bold">プロフィール写真URL（任意）</label>
-            <input name="profile_image_url" defaultValue={pro.profile_image_url ?? ""} className="adm-input" />
           </div>
           <button type="submit" className="adm-btn bg-(--color-ink) text-white">保存する</button>
         </form>

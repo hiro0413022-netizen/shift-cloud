@@ -233,12 +233,74 @@ export async function saveProAction(fd: FormData) {
       instagram_username: s(fd, "instagram_username").replace(/^@/, "") || null,
       x_username: s(fd, "x_username").replace(/^@/, "") || null,
       youtube_url: s(fd, "youtube_url") || null,
-      hero_image_url: s(fd, "hero_image_url") || null,
-      profile_image_url: s(fd, "profile_image_url") || null,
       world_ranking: s(fd, "world_ranking") || null,
       ranking_note: s(fd, "ranking_note") || null,
     })
     .eq("id", pro.id);
+  refresh(slug, "/profile");
+}
+
+// ---------- 写真（トップ写真・プロフィール写真）----------
+// プロ本人が管理画面からアップロードする。保存先はスポンサーと同じ公開バケットの
+// {pro_id}/photos/ 配下（バケット追加のmigration不要・書き込みはservice_roleのみ）。
+// 画面側で縮小してから送るので通常は1MB未満。縮小できなかった端末向けに4MBで線を引く
+// （Vercelの受け口が約4.5MBのため、それ以上は届く前に落ちて案内が出せない）。
+const PHOTO_MAX_BYTES = 4 * 1024 * 1024;
+const PHOTO_COLUMN = { hero: "hero_image_url", profile: "profile_image_url" } as const;
+
+function photoKind(fd: FormData): keyof typeof PHOTO_COLUMN {
+  return s(fd, "kind") === "hero" ? "hero" : "profile";
+}
+
+/** 自分がアップロードした写真（{pro_id}/photos/...）だけを消す。URL直指定の外部画像は触らない */
+async function removeOwnPhoto(admin: ReturnType<typeof createAdmin>, proId: string, url: string | null | undefined) {
+  if (!url) return;
+  const marker = `/storage/v1/object/public/${SPONSOR_BUCKET}/`;
+  const i = url.indexOf(marker);
+  if (i < 0) return;
+  const path = decodeURIComponent(url.slice(i + marker.length).split("?")[0]);
+  if (!path.startsWith(`${proId}/photos/`)) return;
+  await admin.storage.from(SPONSOR_BUCKET).remove([path]); // 失敗しても表示には影響しないので握る
+}
+
+export async function uploadProPhotoAction(fd: FormData) {
+  const slug = s(fd, "slug");
+  const pro = await guard(slug);
+  const kind = photoKind(fd);
+  const col = PHOTO_COLUMN[kind];
+  const back = `/${slug}/admin/profile`;
+  const file = fd.get("image");
+  if (!(file instanceof File) || file.size === 0) redirect(`${back}?err=file_photo`);
+  if (!file.type.startsWith("image/")) redirect(`${back}?err=filetype`);
+  if (file.size > PHOTO_MAX_BYTES) redirect(`${back}?err=photosize`);
+
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${pro.id}/photos/${kind}-${Date.now()}.${ext}`;
+  const admin = createAdmin();
+  const { data: before } = await admin.from("pgw_pros").select(col).eq("id", pro.id).maybeSingle();
+  const { error: upErr } = await admin.storage.from(SPONSOR_BUCKET).upload(path, Buffer.from(await file.arrayBuffer()), {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (upErr) redirect(`${back}?err=upload`);
+  const { data: pub } = admin.storage.from(SPONSOR_BUCKET).getPublicUrl(path);
+  const { error: dbErr } = await admin.from("pgw_pros").update({ [col]: pub.publicUrl }).eq("id", pro.id);
+  if (dbErr) {
+    await admin.storage.from(SPONSOR_BUCKET).remove([path]);
+    redirect(`${back}?err=upload`);
+  }
+  await removeOwnPhoto(admin, pro.id, (before as Record<string, string | null> | null)?.[col]);
+  refresh(slug, "/profile");
+}
+
+export async function removeProPhotoAction(fd: FormData) {
+  const slug = s(fd, "slug");
+  const pro = await guard(slug);
+  const col = PHOTO_COLUMN[photoKind(fd)];
+  const admin = createAdmin();
+  const { data: before } = await admin.from("pgw_pros").select(col).eq("id", pro.id).maybeSingle();
+  await admin.from("pgw_pros").update({ [col]: null }).eq("id", pro.id);
+  await removeOwnPhoto(admin, pro.id, (before as Record<string, string | null> | null)?.[col]);
   refresh(slug, "/profile");
 }
 
