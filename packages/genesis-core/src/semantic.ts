@@ -6,6 +6,9 @@
  *   semanticSearch()… 質問を埋め込み → gn_semantic_search（cosine）
  *
  * 取り込みは Postgres 側に書くだけ（LLM は埋め込みのみ）。検索結果には必ず出典（source / id / 日付）が付く。
+ *
+ * #311: gn_embeddings に HNSW 索引は張っていない（挿入が 185ms/本で取り込みが止まった）。4 万行なら全走査 0.4 秒で足りる。
+ *       10 万行を超えたら索引を再検討（DECISIONS #311）。
  */
 import type { AdminLike } from "./tool.ts";
 import type { GenesisContext } from "./context.ts";
