@@ -96,6 +96,9 @@ const CATEGORIES = [
   "工具",
 ];
 
+/** 単価を画面で打てる行の種類（商品マスタ由来の行は定価の正がマスタなので打たせない） */
+const PRICE_EDITABLE = new Set(["labor", "coating", "free"]);
+
 const RATE_OPTIONS = [1, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5];
 
 const yen = (n: number) => n.toLocaleString("ja-JP");
@@ -433,6 +436,21 @@ export function QuoteSheet({
                   if (!r) return <Money v={it.discount} />;
                   return <DiscountCell r={r} discount={it.discount} />;
                 },
+                // 工賃・加工・手入力の行は金額を打てる（「クラブ一式組み立て」「その他特別作業」などマスタに金額が無い工賃・2026-10-01）
+                price: (it) =>
+                  byId.has(it.id) && PRICE_EDITABLE.has(it.lineKind) ? (
+                    <input
+                      name={`lp_${it.id}`}
+                      defaultValue={it.listPrice ? String(it.listPrice) : ""}
+                      placeholder="金額"
+                      title="税抜の単価を入れてください"
+                      onBlur={(e) => {
+                        if (e.currentTarget.value !== e.currentTarget.defaultValue) e.currentTarget.form?.requestSubmit();
+                      }}
+                      inputMode="numeric"
+                      className={`${pin} text-right tabular-nums ${it.listPrice ? "" : "border-amber-400 bg-amber-50"}`}
+                    />
+                  ) : null,
                 qty: (it) =>
                   byId.has(it.id) ? (
                     <input

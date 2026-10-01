@@ -226,9 +226,17 @@ export async function updateItems(formData: FormData): Promise<void> {
         ((it.discount_rate == null ? null : Number(it.discount_rate)) !== rate ||
           (rate == null && Number(it.discount_amount ?? 0) !== discountAmount)));
 
+    // 工賃・加工・手入力の行は単価（定価欄）も画面から直せる。欄が無い行（商品マスタ由来）は触らない
+    const lpRaw = formData.get(`lp_${it.id}`);
+    const listPrice =
+      lpRaw != null && ["labor", "coating", "free"].includes(String(it.line_kind ?? ""))
+        ? Math.max(0, Math.round(num(lpRaw) ?? 0))
+        : undefined;
+
     const { error } = await admin()
       .from("gw_quote_items")
       .update({
+        ...(listPrice !== undefined ? { list_price: listPrice } : {}),
         quantity: Math.max(1, Math.trunc(qty)),
         finish_length_inch: finish,
         discount_manual: manual,

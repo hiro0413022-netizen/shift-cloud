@@ -190,6 +190,8 @@ export type PaperSlot = "sleeve" | "coating" | "grip" | "labor";
  */
 export type PaperEdit = {
   name?: (it: PaperItem) => ReactNode;
+  /** 定価（単価）セル。工賃・加工・手入力の行だけ金額を打てるようにする（2026-10-01） */
+  price?: (it: PaperItem) => ReactNode;
   discount?: (it: PaperItem) => ReactNode;
   qty?: (it: PaperItem) => ReactNode;
   empty?: (slot: PaperSlot, laborCode?: string) => ReactNode;
@@ -204,7 +206,7 @@ function ItemCells({ it, edit }: { it?: PaperItem; edit?: PaperEdit }) {
   return (
     <>
       <td style={{ ...bd("tblr"), ...cellPad, textAlign: "right" }}>
-        <Money v={it ? it.listPrice : null} />
+        {it && edit?.price ? edit.price(it) : <Money v={it ? it.listPrice : null} />}
       </td>
       <td style={{ ...bd("tblr"), ...cellPad, textAlign: "right" }}>
         {it && edit?.discount ? edit.discount(it) : <Money v={it ? it.discount : null} />}
