@@ -3,7 +3,9 @@ import { requireMoneyActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore } from "@/lib/money";
 import { monthRange } from "@/lib/money-util";
-import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen, PageHeader, Field, HowTo } from "@/components/ui";
+import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen, PageHeader, Field, HowTo, SubTabs } from "@/components/ui";
+import { buildReport, type ReportSale } from "@/lib/airregi-report";
+import { ReportView } from "./report-view";
 import { EXPENSE_CATEGORIES } from "@/lib/expense";
 import {
   reconcile,
@@ -58,7 +60,7 @@ type LineRow = {
 type CashRow = { id: string; occurred_at: string; biz_date: string; kind: "入金" | "出金"; amount: number; comment: string | null };
 type CheckRow = { id: string; ref_kind: string; ref: string; note: string | null; checked_by: string | null; checked_at: string };
 
-export default async function AirregiPage({ searchParams }: { searchParams: Promise<{ ym?: string; msg?: string; err?: string }> }) {
+export default async function AirregiPage({ searchParams }: { searchParams: Promise<{ ym?: string; msg?: string; err?: string; view?: string }> }) {
   const actor = await requireMoneyActor();
   const store = await getCurrentStore(actor);
   const admin = createAdmin();
@@ -161,6 +163,31 @@ export default async function AirregiPage({ searchParams }: { searchParams: Prom
   const cashOut = matchCashOut(cashMoves, expenses).map((x) => ({ ...x, id: (x.move as AirCash & { id: string }).id }));
   const cashKey = (m: AirCash) => `${m.occurredAt}|${m.amount}`;
 
+  // 文章型レポート（照合画面と同じ判定を使う）
+  const view = sp.view === "report" ? "report" : "fix";
+  const report = buildReport({
+    storeName: store.name,
+    ym,
+    lines,
+    sales: sales.map((x): ReportSale => {
+      const row = saleById.get(x.id);
+      const d = row?.detail ?? {};
+      return {
+        ...x,
+        category: row?.category ?? "",
+        memberKind: row?.member_kind ?? null,
+        itemType: d.item_type == null ? null : String(d.item_type),
+        maker: d.maker == null ? null : String(d.maker),
+        memo: row?.memo ?? null,
+      };
+    }),
+    cashMoves,
+    expenses: ((expRes.data ?? []) as { id: string; spent_on: string; amount: number; method: string | null; item: string | null }[]).map((e) => ({
+      id: e.id, spentOn: e.spent_on, amount: Number(e.amount), method: e.method, item: e.item,
+    })),
+    checks: new Map(((checksRes.data ?? []) as CheckRow[]).map((c) => [`${c.ref_kind}:${c.ref}`, c.note ?? ""])),
+  });
+
   // 確認済みで分ける
   const open = {
     missing: missing.filter((l) => !checkOf("air_line", lineKey(l))),
@@ -232,15 +259,25 @@ export default async function AirregiPage({ searchParams }: { searchParams: Prom
       </Panel>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Link href={`/airregi?ym=${shiftMonth(-1)}`} className={btnGhostCls}>← 前の月</Link>
+        <Link href={`/airregi?ym=${shiftMonth(-1)}${view === "report" ? "&view=report" : ""}`} className={btnGhostCls}>← 前の月</Link>
         <span className="min-w-28 text-center text-lg font-bold tabular-nums">{ymLabel}</span>
-        <Link href={`/airregi?ym=${shiftMonth(1)}`} className={btnGhostCls}>次の月 →</Link>
+        <Link href={`/airregi?ym=${shiftMonth(1)}${view === "report" ? "&view=report" : ""}`} className={btnGhostCls}>次の月 →</Link>
       </div>
+
+      <SubTabs
+        current={view}
+        items={[
+          { key: "fix", href: `/airregi?ym=${ym}`, label: "確認して直す" },
+          { key: "report", href: `/airregi?ym=${ym}&view=report`, label: "文章レポート" },
+        ]}
+      />
 
       {!hasAir ? (
         <Panel>
           <Empty>{ymLabel}の Airレジのデータはまだ取り込まれていません。上で CSV を取り込んでください。</Empty>
         </Panel>
+      ) : view === "report" ? (
+        <ReportView report={report} fixHref={`/airregi?ym=${ym}`} />
       ) : (
         <>
           <section className="grid gap-3 sm:grid-cols-4">

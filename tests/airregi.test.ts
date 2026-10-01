@@ -116,3 +116,64 @@ test("guessCategory / needsFill / similarity", () => {
   assert.deepEqual(needsFill({ customerName: null, memberKind: "会員", productName: "x", memo: "【要確認】Airレジから追加" }), ["お客様名", "要確認メモ"]);
   assert.ok(similarity("P/L会員　25分", "パーソナルレッスン２５分") > similarity("P/L会員　25分", "KGUスクール登録料"));
 });
+
+/* ---------------- 文章型レポート ---------------- */
+import { buildReport, productConflict, expectedCategory, type ReportSale } from "../apps/money-golfwing/src/lib/airregi-report.ts";
+
+const rs = (p: Partial<ReportSale> & { id: string; soldOn: string; amount: number }): ReportSale => ({
+  payMethod: "現金", productName: null, qty: 1, listPrice: null, discount: null, customerName: "テスト",
+  category: "販売", memberKind: "会員", itemType: null, maker: null, memo: null, ...p,
+});
+
+test("buildReport: 合計・差額の説明・A〜E・備考", () => {
+  const sales: ReportSale[] = [
+    rs({ id: "kgu", soldOn: "2026-09-06", amount: 2000, productName: "KGUスクール登録料", category: "利用料" }),
+    rs({ id: "pl", soldOn: "2026-09-06", amount: 2000, payMethod: "Square", productName: "パーソナルレッスン２５分", category: "利用料", customerName: "吉川" }),
+    rs({ id: "stm", soldOn: "2026-09-18", amount: 2000, qty: 1, listPrice: 2000, customerName: "豊田", memberKind: null }),
+    rs({ id: "reg", soldOn: "2026-09-23", amount: 35000, payMethod: "Airペイ", qty: 2, category: "月会費(窓口)", productName: "レギュラー月会費" }),
+    rs({ id: "pas", soldOn: "2026-09-13", amount: 2000, productName: "パーソナルレッスン２５分", category: "利用料" }),
+    rs({ id: "ext", soldOn: "2026-09-14", amount: 4000, payMethod: "Square", productName: "休会事務手数料", category: "利用料", customerName: "浅田" }),
+  ];
+  const rep = buildReport({
+    storeName: "テスト店",
+    ym: "2026-09",
+    lines: parseJournal(JOURNAL),
+    sales,
+    cashMoves: [{ occurredAt: "2026-09-13 16:25:56", bizDate: "2026-09-13", kind: "出金", amount: -200, comment: "印刷代" }],
+    expenses: [],
+  });
+  assert.match(rep.title, /^9月 テスト店：Airレジ × money-os 突き合わせ結果$/);
+  // Air: 2000+2000+4000+1620+35000+2000 = 46,620 ／ money: 47,000
+  assert.match(rep.summary[0], /Airレジ 46,620円.*money-os 47,000円 → 差額 380円（money-os が多い）/);
+  assert.match(rep.summary[1], /全部説明がつきます/);
+  const keys = rep.sections.map((s) => s.key);
+  assert.deepEqual(keys, ["A", "B", "C", "D", "E", "Z"]);
+  const A = rep.sections[0];
+  assert.equal(A.rows.length, 2);
+  assert.match(A.rows[0].cells[1], /豊田様の会計の STMグリップ 2個 → money-osは1個/);
+  assert.match(rep.text, /会員区分が空欄：9\/18 豊田様/);
+  assert.match(rep.text, /9\/23 の現金「レギュラー　１ヶ月」35,000円は 10\/1 に返品/);
+  assert.match(rep.text, /計 200円。9月の money-os 経費は0件です。/);
+});
+
+test("buildReport: 何も無ければ「すべて合っています」", () => {
+  const csv = [HEAD, row("000120260905100000001", "", "2026/09/05", "会計", "P/L会員　25分", 2000, 1, 0, [2200, 0, 0, 0])].join("\n");
+  const rep = buildReport({
+    storeName: "店", ym: "2026-09", lines: parseJournal(csv),
+    sales: [rs({ id: "a", soldOn: "2026-09-05", amount: 2000, productName: "パーソナルレッスン２５分", category: "利用料" })],
+    cashMoves: [], expenses: [],
+  });
+  assert.equal(rep.ok, true);
+  assert.match(rep.text, /すべて合っています/);
+});
+
+test("productConflict / expectedCategory", () => {
+  assert.equal(productConflict("Tour velvet ALIGN STD", "MCC+4ALIGN  STD (有)", "GOLF PRIDE"), true);
+  assert.equal(productConflict("Tour velvet", "Tour Velvet (無)"), false);
+  assert.equal(productConflict("USTマミヤ", "ATTAS SPEED F-2", "USTマミヤ"), false);
+  assert.equal(productConflict("Iomic グリップ", "sticky 1.8", "IOMIC"), false);
+  assert.equal(productConflict("フジクラ", "SPEEDER"), false); // カナだけは判定しない
+  assert.equal(expectedCategory({ itemType: "グローブ", productName: null }, null), "販売");
+  assert.equal(expectedCategory({ itemType: null, productName: null }, "110分(ビジター)"), "利用料");
+  assert.equal(expectedCategory({ itemType: "月会費（定額制）", productName: null }, null), null);
+});
