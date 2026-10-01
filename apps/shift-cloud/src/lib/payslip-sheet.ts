@@ -143,3 +143,78 @@ export function sumSheetDays(rows: SheetDay[]): {
   }
   return { workMinutes: work, overtimeMinutes: overtime, daysWorked, missingDays: missing };
 }
+
+/* ------------------------------------------------------------------
+ * シンプル版の出勤簿（ユーザー依頼 2026-10-01「給料のPDFをこの形のシンプル版にも」）
+ * Excel「出勤簿（GOLF WING）」と同じ5列＝出勤日・出勤時間・退勤時間・勤務時間・パーソナル件数。
+ * 金額は載せない（本人確認・保管用）。
+ * ------------------------------------------------------------------ */
+
+/** personal_lesson_source_rows の必要カラムだけ */
+export type PersonalSourceRow = { sold_on: string; qty: number; raw_pro: string | null };
+/** mon_pros の必要カラムだけ（名前・別名 → スタッフ） */
+export type ProLink = { name: string; aliases: string[] | null; staff_id: string | null };
+
+/**
+ * パーソナルレッスン件数を「日付 → 件数」に（そのスタッフの分だけ）。
+ * 担当プロ名 → スタッフの結び方は DB 関数 personal_lesson_counts と同じ（name 一致 か aliases に含まれる）。
+ * 返金はマイナス件数で入ってくるので、そのまま足す。
+ */
+export function personalCountsByDate(rows: PersonalSourceRow[], pros: ProLink[], staffId: string): Map<string, number> {
+  const mine = new Set<string>();
+  for (const p of pros) {
+    if (p.staff_id !== staffId) continue;
+    mine.add(p.name);
+    for (const a of p.aliases ?? []) mine.add(a);
+  }
+  const out = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.raw_pro || !mine.has(r.raw_pro)) continue;
+    out.set(r.sold_on, (out.get(r.sold_on) ?? 0) + Number(r.qty || 0));
+  }
+  return out;
+}
+
+export type SimpleRow = {
+  /** "9月2日" */
+  dateLabel: string;
+  clockIn: string;
+  clockOut: string;
+  /** "8:00" / 打刻なしは "打刻なし" */
+  work: string;
+  /** 0 は空欄で出す */
+  personal: number;
+  missing: boolean;
+};
+
+const hmm = (min: number) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
+
+/**
+ * シンプル版の行。出勤した日（＋打刻なしの日）を日付順に並べ、
+ * 出勤していない日にだけパーソナルがある場合もその日を行として出す（件数の取りこぼしを防ぐ）。
+ */
+export function buildSimpleRows(days: SheetDay[], personal: Map<string, number>): {
+  rows: SimpleRow[];
+  totalWorkLabel: string;
+  daysWorked: number;
+  personalTotal: number;
+} {
+  const label = (date: string) => `${Number(date.slice(5, 7))}月${Number(date.slice(8, 10))}日`;
+  const byDate = new Map(days.map((d) => [d.date, d]));
+  const dates = Array.from(new Set([...days.map((d) => d.date), ...Array.from(personal.keys())])).sort();
+  const rows: SimpleRow[] = dates.map((date) => {
+    const d = byDate.get(date);
+    const missing = !!d && d.workMinutes == null;
+    return {
+      dateLabel: label(date),
+      clockIn: d && !missing ? d.clockIn : "",
+      clockOut: d && !missing ? d.clockOut : "",
+      work: !d ? "" : missing ? "打刻なし" : hmm(d.workMinutes ?? 0),
+      personal: personal.get(date) ?? 0,
+      missing,
+    };
+  });
+  const t = sumSheetDays(days);
+  const personalTotal = Array.from(personal.values()).reduce((a, b) => a + b, 0);
+  return { rows, totalWorkLabel: hmm(t.workMinutes), daysWorked: t.daysWorked, personalTotal };
+}
