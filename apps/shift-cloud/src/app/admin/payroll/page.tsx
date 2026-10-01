@@ -155,10 +155,6 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                 <a href={`/admin/payroll/pdf?ym=${ym}`}>
                   <Button type="button" variant="secondary">明細PDF（出勤簿つき）</Button>
                 </a>
-                {/* 出勤簿だけのシンプル版（出勤日・時間・勤務時間・パーソナル件数。金額なし） */}
-                <a href={`/admin/payroll/pdf?ym=${ym}&style=simple`}>
-                  <Button type="button" variant="secondary">出勤簿PDF（シンプル）</Button>
-                </a>
               </>
             )}
           </div>

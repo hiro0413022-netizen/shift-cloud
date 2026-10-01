@@ -5,16 +5,8 @@ import { hasPayrollAccess } from "@/lib/reauth";
 import { logAudit } from "@/lib/audit";
 import { monthRange } from "@/lib/payroll-calc";
 import { todayJST } from "@/lib/util";
-import {
-  buildSheetDays,
-  buildSimpleRows,
-  personalCountsByDate,
-  type SheetAttendanceDay,
-  type SheetShift,
-  type PersonalSourceRow,
-  type ProLink,
-} from "@/lib/payslip-sheet";
-import { buildPayslipPdf, buildSimpleSheetPdf, type PayslipStaffInput } from "@/lib/payslip-pdf";
+import { buildSheetDays, type SheetAttendanceDay, type SheetShift } from "@/lib/payslip-sheet";
+import { buildPayslipPdf, type PayslipStaffInput } from "@/lib/payslip-pdf";
 
 /**
  * 給与明細（日別出勤簿つき）PDF — /admin/payroll の「明細PDF」ボタン
@@ -45,10 +37,7 @@ export async function GET(request: Request) {
     return new NextResponse("再認証が必要です", { status: 403 });
   }
 
-  const params = new URL(request.url).searchParams;
-  const ym = params.get("ym");
-  // style=simple … 出勤簿だけのシンプル版（出勤日・出勤/退勤・勤務時間・パーソナル件数。金額なし）
-  const simple = params.get("style") === "simple";
+  const ym = new URL(request.url).searchParams.get("ym");
   if (!ym) return new NextResponse("ym required", { status: 400 });
   let range: { from: string; to: string };
   try {
@@ -137,35 +126,6 @@ export async function GET(request: Request) {
   });
 
   const [yy, mm] = ym.split("-");
-
-  if (simple) {
-    // パーソナル件数＝給与の手当と同じ算出元（money-os 売上台帳）を日別に数える
-    const [{ data: src }, { data: pros }] = await Promise.all([
-      admin.rpc("personal_lesson_source_rows", { p_company_id: actor.companyId, p_from: range.from, p_to: range.to }),
-      admin.from("mon_pros").select("name, aliases, staff_id").eq("company_id", actor.companyId).is("deleted_at", null),
-    ]);
-    const srcRows = (src ?? []) as PersonalSourceRow[];
-    const proLinks = (pros ?? []) as ProLink[];
-    const pdf = await buildSimpleSheetPdf({
-      monthLabel: `${Number(mm)}月`,
-      ymLabel: `${yy}年${Number(mm)}月度`,
-      companyName: company?.name ?? "",
-      generatedOn: today.replaceAll("-", "/"),
-      staff: items.map((i, idx) => {
-        const st = i.staff as unknown as { name: string } | null;
-        const built = buildSimpleRows(staff[idx].days, personalCountsByDate(srcRows, proLinks, i.staff_id));
-        return { name: st?.name ?? "—", ...built };
-      }),
-    });
-    await logAudit(actor, "payroll.export_pdf", "payroll_items", period.id, null, { ym, staff: staff.length, style: "simple" });
-    return new NextResponse(Buffer.from(pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="attendance_${ym}.pdf"`,
-      },
-    });
-  }
-
   const pdf = await buildPayslipPdf({
     companyName: company?.name ?? "",
     ymLabel: `${yy}年${Number(mm)}月度`,

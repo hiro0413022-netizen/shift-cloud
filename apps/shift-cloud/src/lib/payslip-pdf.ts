@@ -4,7 +4,7 @@ import path from "path";
 import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { yen, fmtMinutes } from "@/lib/util";
-import { sumSheetDays, type SheetDay, type SimpleRow } from "@/lib/payslip-sheet";
+import { sumSheetDays, type SheetDay } from "@/lib/payslip-sheet";
 
 /**
  * 給与明細（出勤簿つき）PDF 生成 — /admin/payroll の「明細PDF」
@@ -242,107 +242,4 @@ function drawStaffPage(
     text(n, MX, y, 7.5, SUB);
     y -= 11;
   }
-}
-
-/* ------------------------------------------------------------------
- * シンプル版の出勤簿PDF（Excel「出勤簿（GOLF WING）」と同じ形）
- *   氏名　　　　　　　　　　　　9月
- *   出勤日｜出勤時間｜退勤時間｜勤務時間｜パーソナル件数
- *   …
- *   合計（出勤14日）　　　　　　112:30　｜ 件数合計
- * 金額は載せない。1スタッフ=1ページ。
- * ------------------------------------------------------------------ */
-
-export type SimpleSheetStaff = {
-  name: string;
-  rows: SimpleRow[];
-  totalWorkLabel: string;
-  daysWorked: number;
-  personalTotal: number;
-};
-
-export type SimpleSheetInput = {
-  monthLabel: string; // "9月"
-  ymLabel: string; // "2026年9月度"（フッター用）
-  companyName: string;
-  generatedOn: string;
-  staff: SimpleSheetStaff[];
-};
-
-const SIMPLE_COLS = [
-  { label: "出勤日", w: 123, align: "right" as const },
-  { label: "出勤時間", w: 98, align: "right" as const },
-  { label: "退勤時間", w: 98, align: "right" as const },
-  { label: "勤務時間", w: 98, align: "right" as const },
-  { label: "パーソナル件数", w: 98, align: "right" as const },
-];
-
-export async function buildSimpleSheetPdf(input: SimpleSheetInput): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  doc.registerFontkit(fontkit);
-  const fontBytes = readFileSync(path.join(process.cwd(), "src/assets/NotoSansJP-Regular.ttf"));
-  const font = await doc.embedFont(fontBytes); // subset:true 禁止（上記コメント）
-
-  for (const s of input.staff) {
-    const page = doc.addPage([W, H]);
-    const text = (str: string, x: number, y: number, size = 10, color = TXT) => page.drawText(str ?? "", { x, y, size, font, color });
-    const textRight = (str: string, xRight: number, y: number, size = 10, color = TXT) =>
-      page.drawText(str, { x: xRight - font.widthOfTextAtSize(str, size), y, size, font, color });
-    const box = (x: number, y: number, w: number, h: number, fill?: boolean) =>
-      page.drawRectangle({ x, y, width: w, height: h, borderColor: LINE, borderWidth: 0.7, ...(fill ? { color: GRAY } : {}) });
-
-    // 行数が多い月でも1ページに収める（31日＋見出し・合計）
-    const rowH = Math.min(22, Math.floor((H - 190) / (s.rows.length + 2)));
-    const fs = rowH >= 20 ? 11 : 10;
-
-    // 氏名と月
-    let y = H - 70;
-    text(s.name, MX, y, 15);
-    textRight(input.monthLabel, W - MX, y, 15);
-    y -= 26;
-
-    // 見出し
-    let x = MX;
-    for (const c of SIMPLE_COLS) {
-      box(x, y - rowH, c.w, rowH, true);
-      text(c.label, x + 6, y - rowH + (rowH - fs) / 2 + 1, fs - 1, SUB);
-      x += c.w;
-    }
-    y -= rowH;
-
-    if (s.rows.length === 0) {
-      box(MX, y - rowH, CW, rowH);
-      text("この月の出勤記録はありません", MX + 6, y - rowH + (rowH - fs) / 2 + 1, fs - 1, SUB);
-      y -= rowH;
-    }
-
-    for (const r of s.rows) {
-      const vals = [r.dateLabel, r.clockIn, r.clockOut, r.work, r.personal ? String(r.personal) : ""];
-      x = MX;
-      SIMPLE_COLS.forEach((c, i) => {
-        box(x, y - rowH, c.w, rowH);
-        const color = r.missing && (i === 0 || i === 3) ? RED : TXT;
-        if (vals[i]) textRight(vals[i], x + c.w - 8, y - rowH + (rowH - fs) / 2 + 1, fs, color);
-        x += c.w;
-      });
-      y -= rowH;
-    }
-
-    // 合計行：出勤日〜退勤時間をまとめる
-    const leftW = SIMPLE_COLS[0].w + SIMPLE_COLS[1].w + SIMPLE_COLS[2].w;
-    box(MX, y - rowH, leftW, rowH, true);
-    text(`合計（出勤${s.daysWorked}日）`, MX + 6, y - rowH + (rowH - fs) / 2 + 1, fs);
-    x = MX + leftW;
-    box(x, y - rowH, SIMPLE_COLS[3].w, rowH, true);
-    textRight(s.totalWorkLabel, x + SIMPLE_COLS[3].w - 8, y - rowH + (rowH - fs) / 2 + 1, fs);
-    x += SIMPLE_COLS[3].w;
-    box(x, y - rowH, SIMPLE_COLS[4].w, rowH, true);
-    if (s.personalTotal) textRight(`${s.personalTotal}件`, x + SIMPLE_COLS[4].w - 8, y - rowH + (rowH - fs) / 2 + 1, fs);
-    y -= rowH;
-
-    // フッター
-    textRight(`${input.companyName}　${input.ymLabel}　出力日 ${input.generatedOn}`, W - MX, 36, 7.5, SUB);
-    if (s.rows.some((r) => r.missing)) text("※ 赤字は確定シフトがあるのに打刻が無い日です。", MX, 36, 7.5, RED);
-  }
-  return doc.save();
 }
