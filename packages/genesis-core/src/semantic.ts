@@ -7,8 +7,8 @@
  *
  * 取り込みは Postgres 側に書くだけ（LLM は埋め込みのみ）。検索結果には必ず出典（source / id / 日付）が付く。
  *
- * #311: gn_embeddings に HNSW 索引は張っていない（挿入が 185ms/本で取り込みが止まった）。4 万行なら全走査 0.4 秒で足りる。
- *       10 万行を超えたら索引を再検討（DECISIONS #311）。
+ * #311/#313: 初回取り込み中は HNSW 索引を落として走らせ（挿入 185ms/本で止まるため）、取り切ってから一度だけ作った。
+ *       日々の増分は少ないので索引ありで取り込む（10 行ずつ）。大量取り込みをやり直すときは索引を落としてから。
  */
 import type { AdminLike } from "./tool.ts";
 import type { GenesisContext } from "./context.ts";
@@ -78,7 +78,9 @@ export const SOURCES: SemanticSource[] = [
   },
 ];
 
-const UPSERT_CHUNK = 50;
+/** #313: HNSW 索引ありの挿入は 1 本 約185ms（この DB）。10 行 ≒ 2 秒で PostgREST の 8 秒に余裕を持たせる。
+ *  大量の初回取り込み（新テナント・再埋め込み）は索引を落としてから行い、終わってから作り直す（DECISIONS #313） */
+const UPSERT_CHUNK = 10;
 
 /** 長文は 1,500 字で分割（埋め込みの精度と表示のため） */
 export function chunkText(text: string, size = 1500): string[] {
@@ -144,7 +146,7 @@ export async function indexSemantic(admin: AdminLike, companyId: string, embed: 
             });
           });
         }
-        // upsert は 50 行ずつ（HNSW の挿入が重く、200 行一括だと statement timeout に当たることがある・#310）
+        // upsert は少しずつ（HNSW の挿入が重く、まとめると statement timeout に当たる・#310/#313）
         for (let i = 0; i < inserts.length; i += UPSERT_CHUNK) {
           const { error: upErr } = await admin.from("gn_embeddings").upsert(inserts.slice(i, i + UPSERT_CHUNK), { onConflict: "company_id,source,source_id,chunk_no" });
           if (upErr) throw new Error(upErr.message);

@@ -84,3 +84,4 @@
 - ✅ `0215_genesis_projects.sql` — 適用済（2026-09-28、MCP name=0215_genesis_projects。gn_projects / gn_project_items / gnv_projects（hq）。初期案件3件（YOZAN） #303）
 - ✅ `0216_sc_comments_cursor_index.sql` — 適用済（2026-09-29、MCP name=0216_sc_comments_cursor_index。sc_comments (company_id, created_at, id) の索引・意味検索の取り込みカーソル用 #310）
 - ✅ `0217_gn_embeddings_plain_storage_no_hnsw.sql` — 適用済（2026-09-29、MCP name=0217_gn_embeddings_plain_storage_no_hnsw。embedding を PLAIN 格納・HNSW 索引を削除（挿入 185ms/本で取り込みが timeout）。既存行の書き直しと vacuum full も実施 #311）
+- ✅ `0218_gn_embeddings_hnsw_rebuild.sql` — 適用済（2026-09-30、初回取り込み完了後に HNSW 索引を一度だけ作り直し。検索 1.8〜5 秒 → 0.38 秒 #313）
