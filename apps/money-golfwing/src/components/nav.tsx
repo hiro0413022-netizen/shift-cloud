@@ -42,7 +42,10 @@ const GROUPS: { title: string; items: Item[] }[] = [
   },
   {
     title: "確認する",
-    items: [{ href: "/analysis", label: "売上を見る", sub: "月ごと・商品ごと", icon: "chart", match: ["/analysis"] }],
+    items: [
+      { href: "/analysis", label: "売上を見る", sub: "月ごと・商品ごと", icon: "chart", match: ["/analysis"] },
+      { href: "/airregi", label: "Airレジと照合", sub: "月に1回・入れ忘れチェック", icon: "check", match: ["/airregi"] },
+    ],
   },
   {
     title: "管理",
@@ -215,7 +218,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-type IconName = "home" | "cart" | "receipt" | "wallet" | "chart" | "bank" | "gear" | "help" | "menu" | "yen";
+type IconName = "home" | "cart" | "receipt" | "wallet" | "chart" | "bank" | "gear" | "help" | "menu" | "yen" | "check";
 
 const PATHS: Record<IconName, string> = {
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
@@ -223,6 +226,7 @@ const PATHS: Record<IconName, string> = {
   receipt: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6M9 16h4",
   wallet: "M3 7a2 2 0 0 1 2-2h13v4M3 7v11a2 2 0 0 0 2 2h15V9H5a2 2 0 0 1-2-2zM16 14.5h.01",
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  check: "M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9",
   bank: "M3 10h18L12 4zM5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18",
   gear: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z",
   help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5h.01",
