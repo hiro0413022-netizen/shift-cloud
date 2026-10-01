@@ -5,6 +5,7 @@ import { CountUp } from "@/components/count-up";
 import { VISIT_TYPES, VISIT_TYPE_LABEL } from "@/lib/walkin";
 import { jstYmd } from "@/lib/jst";
 import { createVisitManual, issueStoreToken } from "./actions";
+import { visibleStores, resolveStoreView } from "@/lib/store-scope";
 import { VisitRow } from "./visit-row";
 import { ManualVisitForm } from "./manual-visit-form";
 
@@ -30,7 +31,7 @@ function md(s: unknown): string {
 export default async function LedgerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string; type?: string; reception_url?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; type?: string; reception_url?: string; store?: string }>;
 }) {
   const actor = await requireReceptionActor();
   const admin = createAdmin();
@@ -40,12 +41,15 @@ export default async function LedgerPage({
   const to = /^\d{4}-\d{2}-\d{2}$/.test(sp.to ?? "") ? (sp.to as string) : today;
   const typeFilter = VISIT_TYPES.some((v) => v.value === sp.type) ? sp.type : "";
 
-  // 店舗またぎ事故の防止（#128）: オーナー以外は配属店舗のみ。所属ゼロは何も見えない
-  const scopeIds = actor.isOwner
-    ? null
-    : actor.storeIds.length > 0
-      ? actor.storeIds
-      : ["00000000-0000-0000-0000-000000000000"];
+  // 店舗またぎ事故の防止（#128）: 見てよい店舗の中から1店舗に絞って出す。
+  // 2026-10-01: オーナー・両店配属の人に全店が混ざって出ており、GOLF WING の台帳に FRANK の登録者が見えていた。
+  // 既定は主店舗。全店まとめて見たいときだけ「全店」タブ（?store=all）。
+  const visible = await visibleStores(actor);
+  const view = resolveStoreView(actor, visible.map((s) => s.id), sp.store);
+  const scopeIds: string[] = view.storeIds;
+  const storeNameById = new Map(visible.map((s) => [s.id, s.name]));
+  const showStoreName = view.selected === "all";
+  const storeQs = view.selected ? `&store=${view.selected}` : "";
 
   let q = admin
     .from("mbr_walkin_visits")
@@ -57,26 +61,26 @@ export default async function LedgerPage({
     .order("visited_on", { ascending: false })
     .order("visit_seq", { ascending: false });
   if (typeFilter) q = q.eq("visit_type", typeFilter);
-  if (scopeIds) q = q.in("store_id", scopeIds);
+  q = q.in("store_id", scopeIds);
 
   let storesQ = admin.from("stores").select("id, name").eq("company_id", actor.companyId).eq("kind", "store").is("deleted_at", null).order("name"); // 本部（kind='hq'）は店舗ではない（#253）
-  if (scopeIds) storesQ = storesQ.in("id", scopeIds);
+  storesQ = storesQ.in("id", scopeIds);
   let monthQ = admin.from("mbr_walkin_visits").select("visit_type, result")
     .eq("company_id", actor.companyId).is("deleted_at", null)
     .gte("visited_on", monthStart()).lt("visited_on", nextMonthStart());
-  if (scopeIds) monthQ = monthQ.in("store_id", scopeIds);
+  monthQ = monthQ.in("store_id", scopeIds);
 
   // 今後の来店予定（#139）: FRANKの体験はWeb予約が入った瞬間にこの台帳へ載る。
   // 既定の期間（当月1日〜今日）だと未来日の予約が一覧から漏れるので、期間に関係なく上に出す。
   let futureQ = admin
     .from("mbr_walkin_visits")
-    .select("id, visited_on, visit_type, note, source_reservation_no, mbr_guests(name, name_kana, phone, email)")
+    .select("id, visited_on, visit_type, note, source_reservation_no, store_id, mbr_guests(name, name_kana, phone, email)")
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
     .gt("visited_on", today)
     .order("visited_on", { ascending: true })
     .limit(100);
-  if (scopeIds) futureQ = futureQ.in("store_id", scopeIds);
+  futureQ = futureQ.in("store_id", scopeIds);
 
   const [{ data: visits }, { data: stores }, { data: monthAll }, { data: future }] = await Promise.all([
     q,
@@ -107,6 +111,7 @@ export default async function LedgerPage({
           <p className="text-sm text-(--color-dim)">体験・フィッティング・打席の一時利用をここで記録。紙・Excelを廃止し、体験→入会率も自動集計</p>
         </div>
         <form className="flex flex-wrap items-center gap-2">
+          {view.selected && <input type="hidden" name="store" value={view.selected} />}
           <input type="date" name="from" defaultValue={from} className={inputCls} />
           <span className="text-(--color-dim)">〜</span>
           <input type="date" name="to" defaultValue={to} className={inputCls} />
@@ -116,13 +121,33 @@ export default async function LedgerPage({
           </select>
           <button className={btnGhostCls}>表示</button>
           <a
-            href={`/api/ledger-export?from=${from}&to=${to}${typeFilter ? `&type=${typeFilter}` : ""}`}
+            href={`/api/ledger-export?from=${from}&to=${to}${typeFilter ? `&type=${typeFilter}` : ""}${storeQs}`}
             className={btnCls}
           >
             ⬇ Excel出力
           </a>
         </form>
       </header>
+
+      {/* 店舗タブ（見てよい店舗が2つ以上ある人だけ）。既定は主店舗＝他店の登録者が混ざらない */}
+      {visible.length > 1 && (
+        <nav className="flex flex-wrap gap-1 rounded-xl border border-(--color-line) bg-(--color-panel) p-1" aria-label="店舗">
+          {[...visible.map((st) => ({ id: st.id, name: st.name })), { id: "all", name: "全店" }].map((t) => {
+            const qs = new URLSearchParams({ from, to, store: t.id, ...(typeFilter ? { type: typeFilter } : {}) });
+            const on = view.selected === t.id;
+            return (
+              <a
+                key={t.id}
+                href={`/?${qs.toString()}`}
+                aria-current={on ? "page" : undefined}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold ${on ? "bg-indigo-600 text-white" : "text-(--color-dim) hover:bg-(--color-panel-2)"}`}
+              >
+                {t.name}
+              </a>
+            );
+          })}
+        </nav>
+      )}
 
       {/* 受付URL（発行直後に一度だけ表示） */}
       {receptionUrl && (
@@ -154,6 +179,11 @@ export default async function LedgerPage({
                 >
                   <span className="w-14 shrink-0 font-semibold tabular-nums text-indigo-600">{md(v.visited_on)}</span>
                   <span className="font-semibold">{g?.name ? String(g.name) : "（氏名未入力）"}</span>
+                  {showStoreName && (
+                    <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-700">
+                      {storeNameById.get(String(v.store_id ?? "")) ?? "店舗未設定"}
+                    </span>
+                  )}
                   <span className="rounded bg-(--color-panel) px-1.5 py-0.5 text-[10px] text-(--color-dim)">
                     {VISIT_TYPE_LABEL[String(v.visit_type)] ?? String(v.visit_type)}
                   </span>

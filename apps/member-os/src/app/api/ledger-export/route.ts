@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { requireReceptionActor } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
+import { visibleStores, resolveStoreView } from "@/lib/store-scope";
 import { VISIT_TYPE_LABEL, PAYMENT_LABEL, GENDER_LABEL } from "@/lib/walkin";
 import { ymdSlash, formatTel } from "@/lib/ledger-format";
 
@@ -31,9 +32,13 @@ function s(v: unknown): string {
 }
 
 export async function GET(request: Request) {
-  await requireReceptionActor();
+  const actor = await requireReceptionActor();
   const admin = createAdmin();
   const url = new URL(request.url);
+  // 2026-10-01 実障害: 会社・店舗で絞っておらず、GOLF WING の名簿Excelに FRANK GOLF の登録者（他社テナントの行も）が混ざっていた。
+  // 受付台帳の画面と同じ規則（resolveStoreView）で必ず1店舗（または明示の「全店」）に絞る。
+  const visible = await visibleStores(actor);
+  const view = resolveStoreView(actor, visible.map((s) => s.id), url.searchParams.get("store"));
   const from = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("from") ?? "") ? url.searchParams.get("from")! : "1900-01-01";
   const to = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("to") ?? "") ? url.searchParams.get("to")! : "2999-12-31";
   const type = url.searchParams.get("type") ?? "";
@@ -41,6 +46,8 @@ export async function GET(request: Request) {
   let q = admin
     .from("mbr_walkin_visits")
     .select("*, mbr_guests(name, name_kana, birth_date, gender, postal_code, prefecture, address1, building, distance_km, phone, email, occupation, contact_method), reception:staff!reception_staff_id(name)")
+    .eq("company_id", actor.companyId)
+    .in("store_id", view.storeIds)
     .is("deleted_at", null)
     .gte("visited_on", from)
     .lte("visited_on", to)
@@ -122,7 +129,8 @@ export async function GET(request: Request) {
   for (const c of [1, 5, 16, 21, 44]) ws.getColumn(c).numFmt = "@";
 
   const buf = await wb.xlsx.writeBuffer();
-  const fname = `一時利用者名簿_${from}_${to}.xlsx`;
+  const storeLabel = view.selected === "all" ? "全店" : (visible.find((x) => x.id === view.selected)?.name ?? "").replace(/\s+/g, "");
+  const fname = `一時利用者名簿_${storeLabel ? `${storeLabel}_` : ""}${from}_${to}.xlsx`;
   return new Response(buf, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

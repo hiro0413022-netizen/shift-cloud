@@ -113,3 +113,6 @@ export const companyHasFrank = cache(async (companyId: string): Promise<boolean>
     .maybeSingle();
   return !!data;
 });
+
+// 受付台帳・名簿Excelの店舗の決め方（純粋関数・テスト対象）
+export { resolveStoreView } from "./store-view.ts";
