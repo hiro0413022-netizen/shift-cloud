@@ -20,7 +20,7 @@ import { LessonUnlinkedFixer, type UnlinkedLine, type ProOption, type StaffOptio
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ ym?: string }> }) {
   const actor = await requireActor("view_payroll");
   const sp = await searchParams;
-  const ym = sp.ym ?? currentYM();
+  let ym = sp.ym ?? currentYM();
 
   if (!(await hasPayrollAccess(actor.staffId))) {
     return (
@@ -32,6 +32,13 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   }
 
   const admin = createAdmin();
+  // 月を指定せずに開いたとき、今月がまだ集計前なら前月を出す（2026-10-01 ユーザー指摘）。
+  // 月初は今月の集計が無く、明細PDF・出勤簿PDFのボタンが出ない＝「ボタンが無い」に見えていた。
+  if (!sp.ym) {
+    const { data: cur } = await admin.from("payroll_periods")
+      .select("id").eq("company_id", actor.companyId).eq("target_month", `${ym}-01`).maybeSingle();
+    if (!cur) ym = addMonths(ym, -1);
+  }
   const { data: period } = await admin.from("payroll_periods")
     .select("*").eq("company_id", actor.companyId).eq("target_month", `${ym}-01`).maybeSingle();
 
@@ -145,6 +152,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                 <input type="hidden" name="period_id" value={period.id} />
                 <Button type="submit">月締めする</Button>
               </form>
+            )}
+            {!(period && items?.length) && (
+              <p className="text-xs text-zinc-500">
+                CSV・明細PDF・出勤簿PDF（シンプル）は「集計を実行」した月に出ます
+              </p>
             )}
             {period && !!items?.length && (
               <>
