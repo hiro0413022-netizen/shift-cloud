@@ -31,7 +31,7 @@ def abs_url(path):
 
 PAGE_FILE = {
     "home": "index.html", "concept": "concept.html", "facility": "facility.html",
-    "lesson": "lesson.html", "lounge": "lounge.html", "community": "community.html",
+    "lesson": "lesson.html", "coach": "coach.html", "lounge": "lounge.html", "community": "community.html",
     "plan": "plan.html", "beginner": "beginner.html", "corporate": "corporate.html",
     "access": "access.html", "faq": "faq.html", "trial": "trial.html",
     "trial-booking": "trial-booking.html",
@@ -42,7 +42,14 @@ PAGE_FILE = {
 
 
 def page_file(page):
-    return PAGE_FILE.get(page, "index.html")
+    """ページキー → ファイル名。
+    ⚠ 未登録のキーを黙って index.html にしない（2026-10-03・#333 で踏んだ）。
+      coach.html を足したとき PAGE_FILE に入れ忘れ、canonical が index.html を指していた
+      ＝Googleに「トップの複製」と伝える状態で、新しいページが検索に出ない。
+      ここで止めればビルドの時点で気づける。"""
+    if page not in PAGE_FILE:
+        raise KeyError(f"PAGE_FILE に '{page}' がありません。新しいページは PAGE_FILE / PAGE_LABEL に登録してください")
+    return PAGE_FILE[page]
 
 
 def page_url(page):
@@ -54,7 +61,7 @@ def page_url(page):
 
 
 PAGE_LABEL = {
-    "concept": "コンセプト", "facility": "施設・設備", "lesson": "レッスン",
+    "concept": "コンセプト", "facility": "施設・設備", "lesson": "レッスン", "coach": "コーチ紹介",
     "lounge": "バー・ラウンジ", "community": "コミュニティ", "plan": "料金・会員プラン",
     "beginner": "はじめての方へ", "corporate": "法人でのご利用", "access": "アクセス",
     "faq": "よくあるご質問", "trial": "体験のご予約", "trial-booking": "体験予約フォーム",
@@ -195,6 +202,7 @@ NAV = [
     ("concept.html", "コンセプト"),
     ("facility.html", "施設"),
     ("lesson.html", "レッスン"),
+    ("coach.html", "コーチ"),
     ("lounge.html", "ラウンジ"),
     ("community.html", "コミュニティ"),
     ("plan.html", "料金"),
@@ -207,6 +215,7 @@ FOOT_NAV = [
         ("concept.html", "ブランドコンセプト"),
         ("facility.html", "施設・設備"),
         ("lesson.html", "レッスン"),
+        ("coach.html", "コーチ紹介"),
         ("lounge.html", "バー・ラウンジ"),
         ("community.html", "会員コミュニティ"),
         ("column.html", "コラム・読みもの"),
@@ -1401,6 +1410,102 @@ def build_lesson():
     b += cta_block()
     b += foot()
     write("lesson.html", b)
+
+
+def build_coach():
+    """コーチ紹介ページ（#333・2026-10-03 ユーザー依頼「コーチの紹介のページを作ってください」）
+
+    ★ 中身の正典は DB（frunk_coaches）。管理画面（Member OS > コーチ紹介）で直すと
+      lesson.html とこのページの両方が同時に変わる。下の静的HTMLはAPIが落ちたときの控え。
+    ★ 非公開のスタッフは API 側（publicCoaches）で落としている。ここに直書きしない。
+    """
+    b = head("コーチ紹介｜USGTF認定プロが2名在籍｜FRANK GOLF 姫路・土山",
+             "FRANK GOLF 姫路のコーチ紹介。USGTF（全米ゴルフ指導者連盟）認定プロが2名在籍。"
+             "YouTube「RaRa LESSON」の小川うらら、自己最長飛距離350ヤードの穴田賢太。"
+             "TrackMan 4 の数字を見ながら、飛距離アップからスコアメイクまでマンツーマンで指導します。",
+             "coach")
+    b += page_head("コーチ紹介", "OUR COACHES", "誰に教わるかで、変わる。",
+                   "USGTF（全米ゴルフ指導者連盟）認定プロが2名。タイプの違う2人から選べます。")
+
+    b += """
+<section class="sec" style="padding-top:0">
+  <div class="wrap">
+    <!-- コーチ紹介（#279 で作った枠を流用）。中身は管理画面（Member OS > コーチ紹介）で直す。
+         assets/site.js が window.FRANK.coaches で丸ごと描き替える。
+         下の静的な内容は、APIが落ちているときにそのまま出る控え。 -->
+    <div id="coachList" data-frank-coaches>
+    <div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">
+      <div class="media-frame media-tall">
+        <img src="assets/img/coach-rara.jpg" alt="FRANK GOLF 姫路の所属レッスンプロ 小川うらら" loading="lazy" width="1000" height="1250">
+        <span class="media-cap">Urara OGAWA</span>
+      </div>
+      <div>
+        <p class="card__no">HEAD COACH</p>
+        <h3 class="card__t" style="font-size:2rem">小川 うらら</h3>
+        <p class="card__t-jp" style="margin-bottom:14px">Urara OGAWA</p>
+        <p class="card__b" style="margin-bottom:14px">FRANK GOLFのメインコーチ。チャンネル登録者数約6万人のレッスン系YouTuber「RaRa LESSON」として活動し、ジュニア時代は全国大会に出場するなど競技経験も豊富です。</p>
+        <p class="card__b" style="margin-bottom:14px">「何を直せばいいか分からない」から卒業。一人ひとりに寄り添って、もっとゴルフが楽しくなるレッスンをお届けします。</p>
+        <ul class="plan__f" style="font-size:13.5px">
+          <li>USGTF（全米ゴルフ指導者連盟）レベルⅢ 認定</li>
+          <li>YouTube「RaRa LESSON」チャンネル登録者6万人超</li>
+          <li>ジュニア時代は全国大会に出場</li>
+          <li>FRANK GOLF 姫路 メインコーチ</li>
+        </ul>
+        <p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="https://www.youtube.com/channel/UC4QTQjrDLsx4WF3fdYuLHZQ" target="_blank" rel="noopener">無料レッスン動画を見る（YouTube） \u2197</a></p>
+      </div>
+    </div>
+    <div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">
+      <div class="media-frame media-tall">
+        <img src="assets/img/coach-anada.jpg" alt="FRANK GOLF 姫路のコーチ 穴田賢太" loading="lazy" width="1000" height="1250">
+        <span class="media-cap">Kenta ANADA</span>
+      </div>
+      <div>
+        <p class="card__no">COACH</p>
+        <h3 class="card__t" style="font-size:2rem">穴田 賢太</h3>
+        <p class="card__t-jp" style="margin-bottom:14px">Kenta ANADA</p>
+        <p class="card__b" style="margin-bottom:14px">「飛ばす」と「まとめる」の両方を教えられるコーチ。自己最長飛距離は350ヤードです。</p>
+        <p class="card__b" style="margin-bottom:14px">力任せではなく、体の使い方とクラブの入り方から飛距離が伸びる仕組みを組み立て、TrackManの数字で一本ずつ確かめます。スコアをつくるための考え方までお伝えするので、飛距離を伸ばしたい方にも、スコアの壁で止まっている方にも。</p>
+        <ul class="plan__f" style="font-size:13.5px">
+          <li>USGTF（全米ゴルフ指導者連盟）認定プロ</li>
+          <li>自己最長飛距離 350ヤード</li>
+          <li>飛距離アップ／スコアメイクのレッスンを担当</li>
+          <li>FRANK GOLF 姫路 コーチ</li>
+        </ul>
+      </div>
+    </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec sec--alt">
+  <div class="wrap">
+    <div class="rv" style="max-width:56ch">
+      <p class="eyebrow">Choose</p>
+      <h2 class="h-en">WHO FITS YOU</h2>
+      <p class="h-jp">どちらに習うか迷ったら</p>
+      <p class="lead">どちらのコーチもUSGTF認定プロで、初心者の方から上級者の方まで担当します。得意分野で選んでいただいても構いませんし、両方に習っていただいても構いません。</p>
+    </div>
+    <div class="grid grid--2 rv" style="margin-top:36px;gap:20px">
+      <article class="card">
+        <p class="card__no">RARA</p>
+        <h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">基礎から整えたい／何を直すべきか知りたい</h3>
+        <p class="card__b">握り方・構えから順に整えたい方、自己流で固まったスイングを一度ほどきたい方。動画で6万人に教えてきた「伝わる言葉」で説明します。</p>
+      </article>
+      <article class="card">
+        <p class="card__no">KENTA</p>
+        <h3 class="card__t-jp" style="font-size:16px;color:var(--txt-str)">飛距離を伸ばしたい／スコアの壁を越えたい</h3>
+        <p class="card__b">もう20ヤード飛ばしたい方、90・100の壁で止まっている方。飛距離の出し方と、スコアをまとめる考え方の両方から組み立てます。</p>
+      </article>
+    </div>
+    <p class="rv" style="margin-top:28px;font-size:13.5px;color:var(--txt-dim)">
+      体験レッスン（約55分・無料）では、担当コーチをご指名いただけます。ご希望があればお申し込み時または店頭でお伝えください。
+    </p>
+  </div>
+</section>
+"""
+    b += cta_block()
+    b += foot()
+    write("coach.html", b)
 
 
 def build_lounge():
@@ -2861,7 +2966,7 @@ def build_sitemap():
     today = datetime.date.today().isoformat()
     # (URL, priority)。noindex のページ（lp-trial / 404 / 会員専用の予約画面）は載せない
     urls = [("home", "1.0"),
-            ("trial", "0.9"), ("plan", "0.9"), ("lesson", "0.9"), ("access", "0.8"),
+            ("trial", "0.9"), ("plan", "0.9"), ("lesson", "0.9"), ("coach", "0.8"), ("access", "0.8"),
             ("facility", "0.8"), ("beginner", "0.8"), ("faq", "0.7"), ("trial-booking", "0.7"),
             ("concept", "0.6"), ("lounge", "0.6"), ("community", "0.6"), ("corporate", "0.6"),
             ("lp-campaign", "0.5"),
@@ -3474,6 +3579,7 @@ if __name__ == "__main__":
     build_concept()
     build_facility()
     build_lesson()
+    build_coach()
     build_lounge()
     build_community()
     build_plan()
