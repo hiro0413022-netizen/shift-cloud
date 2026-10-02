@@ -1147,7 +1147,10 @@ export async function grantTicketsManual(formData: FormData) {
   );
 }
 
-/** 店頭レッスンで1枚使う（予約を通さないぶん） */
+/** 店頭レッスンでチケットを使う（予約を通さないぶん）。
+ *  #328（2026-10-01）で**枚数と担当コーチ**を受けるようにした。
+ *  担当はインセンティブ（購入チケット1枚につき1,000円）の支払先になるので、
+ *  押した人＝担当とは限らない以上、画面で選べないと誰に出すか決まらない。 */
 export async function useTicketManual(formData: FormData) {
   const actor = await requireFrankActor();
   const admin = createAdmin();
@@ -1161,19 +1164,27 @@ export async function useTicketManual(formData: FormData) {
     .is("deleted_at", null).maybeSingle();
   if (!m) redirect(`${dest}?err=` + encodeURIComponent("会員が見つかりません"));
 
+  const qty = Math.max(1, Math.min(10, Number(str(formData.get("qty"))) || 1));
+  const coach = str(formData.get("coach_staff_id"));
   const r = await useTicket({
     companyId: actor.companyId,
     memberId: id,
     storeId: ((m as Record<string, unknown>).store_id as string | null) ?? FRANK_STORE_ID,
     staffId: actor.staffId,
+    // 選ばれていなければ押した人を担当とみなす（店頭はコーチ本人が押すのがふつう）
+    coachStaffId: coach || actor.staffId,
+    qty,
     note: "店頭でのレッスン",
   });
   const left = await ticketBalance(admin, id);
-  await logAudit(actor, "frunk.ticket_use", "frunk_lesson_tickets", id, null, { ok: r.ok, left });
+  await logAudit(actor, "frunk.ticket_use", "frunk_lesson_tickets", id, null, { ok: r.ok, used: r.used, paid: r.paid, left });
   revalidateMember(id);
   redirect(
     r.ok
-      ? `${dest}?msg=` + encodeURIComponent(`チケットを1枚使いました（残り${left}枚）。`)
+      ? `${dest}?msg=` + encodeURIComponent(
+          `チケットを${r.used}枚使いました（残り${left}枚）。` +
+            (r.paid > 0 ? `うち${r.paid}枚はご購入ぶんです。` : "すべて無料付与ぶんです（インセンティブの対象外）。")
+        )
       : `${dest}?err=` + encodeURIComponent(r.reason ?? "使えませんでした")
   );
 }

@@ -239,3 +239,82 @@ export function ticketAmountExTax(qty: number, unitExTax: number, packs: { qty: 
   for (let n = want + 1; n <= want + maxPack; n++) best = Math.min(best, greedy(n));
   return best;
 }
+
+/* ============================================================================
+   レッスンの長さぶんのチケット・購入ぶんの判定（#328・2026-10-01）
+
+   発端（林さんの報告・2026-10-01）:
+     本田様のパーソナルを50分に変えたら「チケットは1枚しか減らないのに
+     当日精算2,500円が出た」。確定済みの予約を保存し直すと、
+     **既に1枚使っているのに、もう1枚引けず料金だけ復活していた**。
+
+   決めごと（2026-10-01 ユーザー決定）:
+     ・1枚＝25分。50分なら2枚（切り上げ）
+     ・足りないときは**あるだけ使って、残りだけ当日精算**
+     ・インセンティブは**購入チケット1枚につき1,000円**。無料付与は対象外
+   ========================================================================== */
+
+/** 購入チケット1枚が使われたときに担当へ出すインセンティブ（円・2026-10-01 ユーザー決定） */
+export const TICKET_INCENTIVE_UNIT_PRICE = 1000;
+
+/**
+ * レッスンの長さに要るチケットの枚数。1枚＝ticketMinutes分、端数は切り上げ。
+ *
+ * ★ 切り上げる理由: 30分を1枚にすると、25分の方と同じ代金で5分多くなる。
+ *   「1枚で何分か」を崩さないほうが、店頭でもお客様にも説明が1行で済む。
+ */
+export function ticketsForMinutes(minutes: number, ticketMinutes = 25): number {
+  const m = Number(minutes);
+  const unit = Number(ticketMinutes) > 0 ? Number(ticketMinutes) : 25;
+  if (!Number.isFinite(m) || m <= 0) return 1;
+  return Math.max(1, Math.ceil(m / unit));
+}
+
+/** 引き当て計算に渡す台帳の1行（必要な列だけ） */
+export type TicketLedgerRow = {
+  kind: "grant" | "purchase" | "use" | "refund";
+  qty: number;
+  created_at: string;
+  /** 利用行だけ: そのうち購入ぶんだった枚数（インセンティブの対象枚数） */
+  paid_qty?: number | null;
+};
+
+/**
+ * これから使う need 枚のうち、**購入したチケット**が何枚含まれるか。
+ *
+ * ★ 引き当ては古い順（先入先出）
+ *   どれから減るかを決めないと、同じ状況でインセンティブが出たり出なかったりする。
+ *   古い順なら「先にもらったもの・先に買ったものから使う」で、お客様にもそう説明できる。
+ *
+ * ★ 無料付与（kind='grant'）は対象外
+ *   入会キャンペーンや紹介特典で配ったぶんは店に入金が無いので、
+ *   使われても担当へのインセンティブは出さない（2026-10-01 ユーザー決定）。
+ *
+ * @param ledger その会員の有効な台帳（status='granted'）。並び順は問わない
+ * @param need   これから使う枚数
+ */
+export function paidQtyForUse(ledger: TicketLedgerRow[], need: number): number {
+  const want = Math.max(0, Math.floor(Number(need) || 0));
+  if (want === 0) return 0;
+
+  // 増えた順に1枚ずつ並べる（購入かどうかの札を付けて）
+  const queue: boolean[] = []; // true = 購入ぶん
+  const plus = ledger
+    .filter((r) => (r.kind === "grant" || r.kind === "purchase") && Number(r.qty) > 0)
+    .slice()
+    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  for (const r of plus) {
+    for (let i = 0; i < Number(r.qty); i++) queue.push(r.kind === "purchase");
+  }
+
+  // すでに使った枚数ぶんは先に消えている
+  const alreadyUsed = ledger
+    .filter((r) => r.kind === "use")
+    .reduce((n, r) => n + Math.abs(Number(r.qty) || 0), 0);
+
+  let paid = 0;
+  for (let i = alreadyUsed; i < alreadyUsed + want && i < queue.length; i++) {
+    if (queue[i]) paid += 1;
+  }
+  return paid;
+}

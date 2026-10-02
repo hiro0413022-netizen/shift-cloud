@@ -13,6 +13,7 @@ import {
   mergeByStaff,
   type LessonCountRow,
 } from "@/lib/lesson-allowance";
+import { TICKET_INCENTIVE_UNIT_PRICE } from "@yozan/core/frank-lesson-tickets";
 
 /**
  * パーソナルレッスン手当を Money OS の売上台帳から取り込む（DECISIONS #105）。
@@ -60,6 +61,98 @@ async function syncPersonalAllowances(
       }))
     );
     if (insErr) throw new Error(`手当の取込に失敗しました: ${insErr.message}`);
+  }
+
+  return {
+    staff: rows.length,
+    qty: rows.reduce((s, r) => s + r.qty, 0),
+    amount: rows.reduce((s, r) => s + r.amount, 0),
+  };
+}
+
+/**
+ * チケット利用のインセンティブ（#328・2026-10-01 ユーザー決定）
+ *
+ * 「チケット購入者が利用→担当者1,000円。入会キャンペーンや紹介特典で無料で付与したものは対象外」
+ *
+ * ★ 算出元は frunk_lesson_tickets の利用行（kind='use'）の paid_qty
+ *   paid_qty は**使った瞬間に確定して書いてある**（古い順に引き当てた結果）。
+ *   ここで台帳をさかのぼって計算し直すと、あとからの付与取り消しで過去の給与が動く。
+ *
+ * ★ 既存のパーソナル手当（売上から2,000円）とは別のkindで持つ
+ *   チケットで受けたレッスンは lesson_option_fee=0 で売上が立たないので、
+ *   2,000円のほうには最初から入ってこない＝二重払いにはならない。
+ *   明細で「どちらで付いたのか」が読めるよう、行を分けておく。
+ *
+ * ★ mon_pros に載っていない人も対象にする
+ *   mon_pros は money-os の売上台帳の「担当プロ表記」を名寄せするためのマスタで、
+ *   載っているのは GOLF WING のプロだけ。FRANKのコーチは1人も載っていない。
+ *   ここで mon_pros を必須にすると**誰にもインセンティブが出ない**。
+ *   チケットは staff_id で直接紐づいているので、名寄せは要らない。
+ *   除くのは payout_mode が none（役員・月給）と outsourcing（給与明細に載せない）だけ。
+ */
+async function syncTicketIncentives(
+  admin: ReturnType<typeof createAdmin>,
+  companyId: string,
+  periodId: string,
+  from: string,
+  to: string
+): Promise<{ staff: number; qty: number; amount: number }> {
+  // その月に使われたチケットのうち、購入ぶん（paid_qty>0）だけ
+  const { data, error } = await admin
+    .from("frunk_lesson_tickets")
+    .select("coach_staff_id, paid_qty")
+    .eq("company_id", companyId)
+    .eq("kind", "use")
+    .eq("status", "granted")
+    .is("deleted_at", null)
+    .gte("created_at", `${from}T00:00:00+09:00`)
+    .lt("created_at", `${to}T00:00:00+09:00`);
+  if (error) throw new Error(`チケット利用の集計に失敗しました: ${error.message}`);
+
+  const byStaff = new Map<string, number>();
+  for (const r of (data ?? []) as Array<{ coach_staff_id: string | null; paid_qty: number | null }>) {
+    const staffId = r.coach_staff_id;
+    const paid = Number(r.paid_qty ?? 0);
+    // 担当が入っていない行は誰の手当か決まらないので取り込まない（画面の件数にも出ない）
+    if (!staffId || paid <= 0) continue;
+    byStaff.set(staffId, (byStaff.get(staffId) ?? 0) + paid);
+  }
+
+  // 給与に載せない人を外す（mon_pros に載っている人だけ判定できる。未登録はそのまま載せる）
+  const { data: pros } = await admin.from("mon_pros").select("staff_id, payout_mode").is("deleted_at", null);
+  const skip = new Set(
+    ((pros ?? []) as Array<{ staff_id: string | null; payout_mode: string | null }>)
+      .filter((p) => p.staff_id && (p.payout_mode === "none" || p.payout_mode === "outsourcing"))
+      .map((p) => String(p.staff_id)),
+  );
+
+  const rows = [...byStaff.entries()]
+    .filter(([staffId]) => !skip.has(staffId))
+    .map(([staffId, qty]) => ({ staffId, qty, amount: qty * TICKET_INCENTIVE_UNIT_PRICE }));
+
+  // 既存の自動取込分を論理削除してから入れ直す（#5 物理削除禁止）
+  await admin
+    .from("payroll_allowances")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("period_id", periodId)
+    .eq("kind", "personal_ticket")
+    .is("deleted_at", null);
+
+  if (rows.length > 0) {
+    const { error: insErr } = await admin.from("payroll_allowances").insert(
+      rows.map((r) => ({
+        company_id: companyId,
+        period_id: periodId,
+        staff_id: r.staffId,
+        kind: "personal_ticket" as const,
+        unit_price: TICKET_INCENTIVE_UNIT_PRICE,
+        quantity: r.qty,
+        amount: r.amount,
+        memo: `チケット利用 ${r.qty}枚（ご購入ぶんのみ・無料付与は対象外）`,
+      })),
+    );
+    if (insErr) throw new Error(`チケットのインセンティブ取込に失敗しました: ${insErr.message}`);
   }
 
   return {
@@ -132,9 +225,12 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
 
   // レッスン手当は money-os の売上台帳から毎回取り込む（手入力しない / DECISIONS #105）
   let lessonSync = { staff: 0, qty: 0, amount: 0 };
+  let ticketSync = { staff: 0, qty: 0, amount: 0 };
   let outsourcing: { payee: string; qty: number; amount: number }[] = [];
   try {
     lessonSync = await syncPersonalAllowances(admin, actor.companyId, period.id, from, to);
+    // チケット利用のインセンティブ（#328）。購入ぶん1枚につき1,000円・無料付与は対象外
+    ticketSync = await syncTicketIncentives(admin, actor.companyId, period.id, from, to);
     // 業務委託プロ分は給与ではなく money-os の外注費へ（#106）
     outsourcing = await syncOutsourcingExpense(admin, actor.companyId, from, to);
   } catch (e) {
@@ -213,6 +309,7 @@ export async function buildPayroll(formData: FormData): Promise<{ error?: string
     ym,
     staff: items.length,
     lesson_allowance: lessonSync,
+    ticket_incentive: ticketSync,
     lesson_outsourcing: outsourcing,
   });
   revalidatePath("/admin/payroll");

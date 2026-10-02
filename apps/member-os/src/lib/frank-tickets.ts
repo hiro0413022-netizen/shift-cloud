@@ -2,7 +2,7 @@ import "server-only";
 import { createAdmin } from "@/lib/supabase/admin";
 import { chargeCardOnFile } from "@/lib/frank-square";
 import { loadBookingCfg } from "@yozan/core/frank-booking";
-import { ticketAmountExTax, ticketBalance } from "@yozan/core/frank-lesson-tickets";
+import { ticketAmountExTax, ticketBalance, paidQtyForUse } from "@yozan/core/frank-lesson-tickets";
 import { withTax } from "@yozan/core/frank-tax";
 
 /**
@@ -128,10 +128,22 @@ export async function receiveTicketPayment(ticketId: string, staffId: string | n
 }
 
 /**
- * レッスン1回ぶんを引く。
+ * レッスンぶんのチケットを引く（#328・2026-10-01 で枚数対応に作り直し）
  *
- * bookingId を渡すと「その予約につき1枚」の一意索引が二重消費を止める。
- * 残枚数が足りなければ何もしない（マイナス残高を作らない）。
+ * ★ 1予約につき**1行**のまま、枚数は qty（負数）で持つ
+ *   50分なら qty=-2。行を2本insertする作りにすると
+ *   「1予約1枚」の一意索引を外すことになり、二重消費の歯止めが消える。
+ *
+ * ★ 同じ予約でもう一度呼ばれたら、**作り直すのではなく枚数を直す**
+ *   これが林さんの報告（2026-10-01）の原因だった。確定済みの予約を保存し直すと
+ *   insertが一意索引で弾かれ、呼び出し側がそれを「チケット無し」と読んで
+ *   **既に1枚使っているのに当日精算2,500円を復活させていた**。
+ *
+ * ★ 足りなければ**あるだけ使う**（ユーザー決定 2026-10-01）
+ *   残1枚で50分なら1枚使って、残り25分ぶんだけ当日精算。
+ *   お客様の手持ちを無駄にせず、金額も時間に見合う。
+ *
+ * @returns used = 実際に引けた枚数 / paid = そのうち購入ぶん（インセンティブ対象）
  */
 export async function useTicket(input: {
   companyId: string;
@@ -139,27 +151,79 @@ export async function useTicket(input: {
   storeId: string | null;
   bookingId?: string | null;
   staffId?: string | null;
+  /** そのレッスンの担当コーチ（インセンティブの支払先） */
+  coachStaffId?: string | null;
   note?: string | null;
-}): Promise<{ ok: boolean; reason?: string }> {
+  /** 必要枚数（既定1枚） */
+  qty?: number;
+}): Promise<{ ok: boolean; used: number; paid: number; reason?: string }> {
   const admin = createAdmin();
-  const balance = await ticketBalance(admin, input.memberId);
-  if (balance < 1) return { ok: false, reason: "チケットの残りがありません" };
+  const need = Math.max(1, Math.floor(Number(input.qty ?? 1)) || 1);
+
+  // 台帳を1回だけ読む（残枚数・購入ぶんの引き当て・この予約の既存行を同じ材料から出す）
+  const { data: rows } = await admin
+    .from("frunk_lesson_tickets")
+    .select("id, kind, qty, created_at, booking_id, paid_qty")
+    .eq("member_id", input.memberId)
+    .eq("status", "granted")
+    .is("deleted_at", null);
+  type L = { id: string; kind: string; qty: number; created_at: string; booking_id: string | null; paid_qty: number | null };
+  const ledger = ((rows ?? []) as L[]);
+
+  // この予約で既に引いている行（＝保存し直し）
+  const mine = input.bookingId ? ledger.find((r) => r.kind === "use" && r.booking_id === input.bookingId) : undefined;
+  const mineQty = mine ? Math.abs(Number(mine.qty) || 0) : 0;
+
+  // 自分の行を除いた残枚数＝これから割り当てられる上限
+  const balanceWithoutMine = ledger
+    .filter((r) => r.id !== mine?.id)
+    .reduce((n, r) => n + (Number(r.qty) || 0), 0);
+  const used = Math.min(need, balanceWithoutMine);
+  if (used < 1) {
+    // 1枚も引けない。既に引いていた行があれば戻す（枚数0の行は残さない）
+    if (mine) await admin.from("frunk_lesson_tickets").update({ status: "void", booking_id: null, updated_at: new Date().toISOString() }).eq("id", mine.id);
+    return { ok: false, used: 0, paid: 0, reason: mineQty > 0 ? "チケットの残りがありません" : "チケットの残りがありません" };
+  }
+
+  // 購入ぶんの引き当ては「自分の行を除いた台帳」で数える（自分の行は入れ替えるため）
+  const paid = paidQtyForUse(
+    ledger.filter((r) => r.id !== mine?.id).map((r) => ({
+      kind: r.kind as "grant" | "purchase" | "use" | "refund",
+      qty: Number(r.qty) || 0,
+      created_at: String(r.created_at),
+    })),
+    used,
+  );
+
+  const patch = {
+    qty: -used,
+    paid_qty: paid,
+    coach_staff_id: input.coachStaffId ?? null,
+    note: input.note ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (mine) {
+    const { error } = await admin.from("frunk_lesson_tickets").update(patch).eq("id", mine.id);
+    if (error) return { ok: false, used: 0, paid: 0, reason: "チケットを直せませんでした" };
+    return { ok: true, used, paid };
+  }
 
   const { error } = await admin.from("frunk_lesson_tickets").insert({
     company_id: input.companyId,
     store_id: input.storeId,
     member_id: input.memberId,
     kind: "use",
-    qty: -1,
+    minutes: 25,
     status: "granted",
     booking_id: input.bookingId ?? null,
-    note: input.note ?? null,
     source: "staff",
     created_by: input.staffId ?? null,
+    ...patch,
   });
-  // 一意索引での衝突＝この予約では既に1枚引いている
-  if (error) return { ok: false, reason: "この予約では既にチケットを使っています" };
-  return { ok: true };
+  // 一意索引での衝突＝ほぼ同時に2人が確定を押した。あとから来たほうは何もしない
+  if (error) return { ok: false, used: 0, paid: 0, reason: "この予約では既にチケットを使っています" };
+  return { ok: true, used, paid };
 }
 
 /**

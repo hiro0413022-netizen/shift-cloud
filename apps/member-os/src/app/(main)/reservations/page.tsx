@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ticketsForMinutes } from "@yozan/core/frank-lesson-tickets";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, canAccessGolfWing } from "@/lib/store-scope";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
@@ -517,13 +518,22 @@ export default async function ReservationsPage({
                           {b.lesson_option_staff_id ? `／${coachName(b.lesson_option_staff_id)}` : ""}
                         </Badge>
                       ) : null}
-                      {b.lesson_option_status === "confirmed" ? (
-                        Number(b.lesson_option_fee ?? -1) === 0 ? (
-                          <Badge tone="ok">🎫 チケット1枚（当日精算なし）</Badge>
-                        ) : (
-                          <Badge tone="warn">当日精算 {yen(b.lesson_option_fee ?? 2500)}</Badge>
-                        )
-                      ) : null}
+                      {/* チケットは長さぶん使う（#328）。何枚使ったかを出す＝店頭で数えずに済む。
+                          足りなかったぶんだけ当日精算になるので、両方出ることがある */}
+                      {b.lesson_option_status === "confirmed" ? (() => {
+                        const need = ticketsForMinutes(b.lesson_option_minutes ?? 25, cfg.lesson_option?.minutes ?? 25);
+                        const unit = Number(cfg.lesson_option?.price ?? 2500);
+                        const due = Number(b.lesson_option_fee ?? 0);
+                        const unpaid = unit > 0 ? Math.round(due / unit) : 0;
+                        const usedT = Math.max(0, need - unpaid);
+                        return (
+                          <>
+                            {usedT > 0 ? <Badge tone="ok">🎫 チケット{usedT}枚</Badge> : null}
+                            {due > 0 ? <Badge tone="warn">当日精算 {yen(due)}</Badge> : null}
+                            {usedT > 0 && due === 0 ? <Badge tone="ok">当日精算なし</Badge> : null}
+                          </>
+                        );
+                      })() : null}
                       {b.lesson_option_status === "declined" ? <Badge tone="default">パーソナル お断り</Badge> : null}
                       <span className="text-xs text-(--color-dim)">
                         {[b.frunk_bays?.name, b.guest_phone ?? t?.phone, t?.experience, b.party_size && b.party_size > 1 ? `${b.party_size}名` : null]

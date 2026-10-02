@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { requireReceptionActor } from "@/lib/auth";
 import { canAccessFrank, FRANK_STORE_ID } from "@/lib/store-scope";
 import { createAdmin } from "@/lib/supabase/admin";
+import { loadCoaches } from "@/lib/frank-reservation";
 import { Panel, Badge, Empty, Field, inputCls, btnCls, btnGhostCls } from "@/components/ui";
 import { NameFields } from "@/components/name-fields";
 import { AddressFields } from "@/components/address-fields";
@@ -245,9 +246,11 @@ export default async function FrunkMemberPage({
   })();
 
   // レッスンチケット（#199）。残枚数は台帳の合計＝画面と履歴が食い違わない
-  const [ticketCount, ticketRows] = await Promise.all([
+  const [ticketCount, ticketRows, coaches] = await Promise.all([
     ticketBalance(admin, id),
     listTickets(admin, id, 20),
+    // 店頭でチケットを使うときの担当コーチ候補（#328）。在籍スタッフ全員から選ぶ
+    loadCoaches(actor.companyId),
   ]);
   const ticketPending = ticketRows.filter((t) => t.status === "pending_payment");
 
@@ -383,11 +386,24 @@ export default async function FrunkMemberPage({
             </Field>
             <button className={btnGhostCls}>付与する</button>
           </form>
-          <form action={useTicketManual} className="flex items-end gap-2">
+          {/* 店頭でのレッスン（#328・2026-10-01）。
+              枚数＝レッスンの長さぶん（1枚=25分）。担当はインセンティブの支払先になるので選べるようにした。 */}
+          <form action={useTicketManual} className="flex flex-wrap items-end gap-2">
             <input type="hidden" name="id" value={id} />
             <input type="hidden" name="back" value={back} />
+            <Field label="使う枚数">
+              <input name="qty" defaultValue="1" inputMode="numeric" className={`${inputCls} w-20`} />
+            </Field>
+            <Field label="担当コーチ">
+              <select name="coach_staff_id" defaultValue="" className={`${inputCls} min-w-36`}>
+                <option value="">（操作した人）</option>
+                {coaches.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </Field>
             <button className={btnGhostCls} disabled={ticketCount < 1}>
-              1枚使う（店頭でレッスン）
+              使う（店頭でレッスン）
             </button>
           </form>
         </div>

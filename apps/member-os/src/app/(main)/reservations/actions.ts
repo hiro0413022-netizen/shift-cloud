@@ -9,6 +9,7 @@ import { FRANK_STORE_ID, toMin, toTime } from "@/lib/frank-reservation";
 import { requireStoreAccess } from "@/lib/store-scope";
 import { loadBookingCfg, businessHours } from "@yozan/core/frank-booking";
 import { useTicket, refundTicket } from "@/lib/frank-tickets";
+import { ticketsForMinutes } from "@yozan/core/frank-lesson-tickets";
 import { syncTrialWalkin, removeTrialWalkin } from "@yozan/core/frank-walkin";
 import { sendFrankMail, buildBookingRescheduleMail } from "@/lib/frank-mail";
 import { readName } from "@/lib/name";
@@ -681,8 +682,14 @@ export async function setLessonOption(formData: FormData) {
     // レッスンは打席のお時間の中で行う（はみ出す指定は受け付けない）
     const s = toMin(start);
     if (s < toMin(String(bk.start_time)) || s + minutes > toMin(String(bk.end_time))) return back(date);
-    // チケットがあれば1枚引いて、この予約のレッスン料は0円にする
-    let usedTicket = false;
+    /* チケットは**レッスンの長さぶん**引く（#328・2026-10-01）。1枚=25分なので50分は2枚。
+       足りないときは「あるだけ使って、残りだけ当日精算」（ユーザー決定）。
+       ★ 保存し直しても useTicket が同じ行の枚数を直すので、
+         「既に引いているのに当日精算が復活する」（林さんの報告）は起きない。 */
+    const unitMinutes = Number(cfg.lesson_option?.minutes ?? 25);
+    const unitPrice = Number(cfg.lesson_option?.price ?? 2500);
+    const need = ticketsForMinutes(minutes, unitMinutes);
+    let usedTickets = 0;
     if (memberId) {
       const r = await useTicket({
         companyId: actor.companyId,
@@ -690,16 +697,19 @@ export async function setLessonOption(formData: FormData) {
         storeId,
         bookingId: id,
         staffId: actor.staffId,
+        coachStaffId: staffId, // インセンティブの支払先＝そのレッスンの担当
+        qty: need,
         note: "打席予約のパーソナルレッスン",
       });
-      usedTicket = r.ok;
+      usedTickets = r.used;
     }
     patch = {
       lesson_option_status: "confirmed",
       lesson_option_staff_id: staffId,
       lesson_option_start: `${toTime(s)}:00`,
       lesson_option_minutes: minutes,
-      lesson_option_fee: usedTicket ? 0 : (cfg.lesson_option?.price ?? 2500),
+      // 足りなかったぶんだけ当日精算（全部まかなえたら0円）
+      lesson_option_fee: Math.max(0, need - usedTickets) * unitPrice,
     };
     // #224 の約束「レッスンの指名があれば担当も同じ人」。担当が未定のときだけ揃える（決まっている担当は動かさない）
     if (!bk.coach_staff_id) patch.coach_staff_id = staffId;

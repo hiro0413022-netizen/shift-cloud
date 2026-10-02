@@ -165,7 +165,7 @@ export type WageRow = {
 
 export type AllowanceRow = {
   staff_id: string;
-  kind: "personal" | "fitting_referral" | "compe" | "round_lesson" | "commute_actual" | "other";
+  kind: "personal" | "personal_ticket" | "fitting_referral" | "compe" | "round_lesson" | "commute_actual" | "other";
   amount: number;
 };
 
