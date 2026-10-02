@@ -779,8 +779,11 @@ export function OrderBottom({
         </tbody>
       </table>
 
+      {/* 振込先は赤字で出す（2026-10-03 ユーザー指示。#331 で備考の「＊…＊」を赤字にした流れで
+          「御注文書の振込先の1行も赤字に」とのご指示）。見落とされると入金が遅れる欄なので、
+          紙の上で一番目立たせたいところ。 */}
       {bank && (
-        <p className="mt-2 text-[8.5pt]">
+        <p className="mt-2 text-[8.5pt]" style={{ color: PAPER.red }}>
           振込先　{LETTERHEAD.bank}　{LETTERHEAD.bankName}
         </p>
       )}

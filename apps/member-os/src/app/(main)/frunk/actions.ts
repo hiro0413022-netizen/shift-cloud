@@ -23,7 +23,7 @@ import {
 import { usageStartSchedule, usageStartError, monthLabel, billedMonthOfChargeDate } from "@yozan/core/frank-billing-start";
 import { createCorporateUserMembers } from "@yozan/core/frank-corporate-members";
 import { nextMemberNo } from "@/lib/frank-member-no";
-import { corporateSpec, corporateSeats, corporateSeatFullMessage } from "@yozan/core/frank-corporate";
+import { corporateSpec, corporateSeats, corporateSeatFullMessage, canBookAsCorporate } from "@yozan/core/frank-corporate";
 import { grantJoinCampaignTickets, JOIN_TICKET_CAMPAIGN, ticketBalance } from "@yozan/core/frank-lesson-tickets";
 import { receiveTicketPayment, useTicket } from "@/lib/frank-tickets";
 import { parseManualSale, type ManualSale } from "@yozan/core/frank-manual-sale";
@@ -43,6 +43,15 @@ import { planChangeProration } from "@/lib/frank-billing-pure";
 import { jstYmd } from "@/lib/jst";
 import { readName } from "@/lib/name";
 import { normalizeAddress } from "@/lib/address";
+import { loadBookingCfg, businessHours } from "@yozan/core/frank-booking";
+import { toMin } from "@/lib/frank-reservation";
+import {
+  EXTRA_PRACTICE_KIND,
+  EXTRA_PRACTICE_LABEL,
+  EXTRA_PRACTICE_MINUTES,
+  EXTRA_PRACTICE_PRICE,
+  extraPracticeEnd,
+} from "@yozan/core/frank-extra-practice";
 
 const GENESIS_URL = process.env.GENESIS_URL || "https://yozan-genesis.vercel.app";
 
@@ -1553,4 +1562,140 @@ export async function voidManualPayment(saleId: string, formData: FormData): Pro
   await logAudit(actor, "frank.sale.manual_void", "mon_sales", saleId, null, { member_id: id });
   revalidatePath(`/frunk/${id}`);
   redirect(`/frunk/${id}?msg=` + encodeURIComponent("記録を取り消しました") + "#receipt");
+}
+
+/**
+ * 追加練習チケット（55分 2,750円税込・#332・2026-10-02 ユーザー依頼）
+ *
+ * ★ 制度（ユーザーの言葉）
+ *   「通常の予約枠を利用した後、次の時間に空きがあれば、チケットを購入して追加で練習できる」
+ *   購入は原則、当日店舗にて受付／利用終了時に次の枠の空きを確認し、購入・利用する／
+ *   追加回数の上限は設けず、1枠ごとに空きを確認する／事前予約や複数枠の取り置きは不可。
+ *
+ * ★ だから「お客様の画面からは取れない」。ここ（スタッフ画面）だけが入口。
+ * ★ 当日しか入れられない。前の日・先の日付は弾く＝「取り置き」になってしまう。
+ * ★ 記録は予約そのもの（customer_kind='extra'）。別の台帳は作らない。
+ *   料金は予約の amount に税込2,750円で乗せ、入金は既存の「入金を記録」で付ける。
+ *   ここで mon_sales に書くと、Square のレジで打った同じ2,750円と二重に立つ。
+ * ★ 打席はお客様に選ばせず A→B→C の空いている順で取る（体験と同じ考え方）。
+ */
+export async function addExtraPractice(formData: FormData) {
+  const actor = await requireFrankActor();
+  requireStoreAccess(actor, FRANK_STORE_ID);
+  const admin = createAdmin();
+  const id = str(formData.get("id"));
+  const dest = backTo(formData);
+  if (!id) return;
+  const fail = (m: string) => redirect(`${dest}?err=` + encodeURIComponent(m));
+
+  const { data: mRow } = await admin
+    .from("frunk_members")
+    .select("id, name, member_no, status, plan_id, corporate_parent_id, corporate_self_use, frunk_plans(name, extra_practice_ok, is_corporate, max_users, max_open_slots, companion_free)")
+    .eq("id", id)
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!mRow) fail("会員が見つかりません");
+  const m = mRow as unknown as {
+    id: string; name: string; member_no: string | null; status: string;
+    corporate_parent_id: string | null; corporate_self_use: boolean | null;
+    frunk_plans: { name?: string | null; extra_practice_ok?: boolean | null; is_corporate?: boolean | null } | null;
+  };
+  if (!["active", "approved"].includes(String(m.status))) fail("在籍中の会員のみご利用いただけます");
+  const planName = String(m.frunk_plans?.name ?? "");
+  if (m.frunk_plans?.extra_practice_ok !== true) {
+    fail(`${planName || "このプラン"}は追加練習の対象外です（ライト会員は対象外）。プラン変更をご案内ください`);
+  }
+  // 法人は「使う人はご利用者としてご登録いただく」（#206）。契約者の行は月会費を持つだけで
+  // 予約できない＝追加練習も付けない。付けると来店したのが誰か分からなくなる。
+  const asUser = canBookAsCorporate(
+    corporateSpec(m.frunk_plans as never),
+    m as { corporate_parent_id?: string | null; corporate_self_use?: boolean | null },
+  );
+  if (!asUser.ok) fail(asUser.error ?? "ご利用者としてのご登録が必要です");
+
+  const date = jstYmd();
+  const reqDate = str(formData.get("booked_date"));
+  // 事前予約・取り置きは不可（ユーザー指定）。日付欄から別の日が来たら弾く
+  if (reqDate && reqDate !== date) fail("追加練習は当日ぶんのみお受けできます（お取り置きはできません）");
+
+  const start = str(formData.get("start_time")).slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(start)) fail("開始時刻をご確認ください");
+  const end = extraPracticeEnd(start);
+  if (!end) fail("開始時刻をご確認ください");
+
+  const cfg = await loadBookingCfg(admin);
+  const hours = businessHours(date, cfg);
+  if (!hours) fail("本日は定休日です");
+  const s = toMin(start);
+  const e = toMin(end);
+  if (s < toMin(hours!.open) || e > toMin(hours!.close)) {
+    fail(`営業時間（${hours!.open}〜${hours!.close}）に収まりません`);
+  }
+  // 終わった時間には入れない（「次の枠」を押さえるものなので、過ぎた枠は意味がない）
+  const nowHm = new Date(Date.now() + 9 * 3600_000).toISOString().slice(11, 16);
+  if (e <= toMin(nowHm)) fail("もう終わっている時間です。次の空き枠をお選びください");
+
+  // 空いている打席を A→B→C の順で取る
+  const [{ data: bays }, { data: busy }, { data: slots }] = await Promise.all([
+    admin
+      .from("frunk_bays")
+      .select("id, name, trial_priority")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .eq("active", true)
+      .not("trial_priority", "is", null)
+      .is("deleted_at", null)
+      .order("trial_priority"),
+    admin
+      .from("frunk_bookings")
+      .select("bay_id, start_time, end_time")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .eq("booked_date", date)
+      .neq("status", "cancelled")
+      .is("deleted_at", null),
+    admin
+      .from("frunk_lesson_slots")
+      .select("bay_id, start_time, end_time")
+      .eq("company_id", actor.companyId)
+      .eq("store_id", FRANK_STORE_ID)
+      .eq("slot_date", date)
+      .eq("status", "open")
+      .is("deleted_at", null),
+  ]);
+  const taken = [...(busy ?? []), ...(slots ?? [])]
+    .filter((b) => s < toMin(String(b.end_time)) && e > toMin(String(b.start_time)))
+    .map((b) => String(b.bay_id ?? ""));
+  const bay = (bays ?? []).find((b) => !taken.includes(String(b.id))) as { id: string; name: string } | undefined;
+  if (!bay) fail(`${start}〜${end} は空いている打席がありません`);
+
+  const { error } = await admin.from("frunk_bookings").insert({
+    company_id: actor.companyId,
+    store_id: FRANK_STORE_ID,
+    member_id: m.id,
+    customer_kind: EXTRA_PRACTICE_KIND,
+    bay_id: bay!.id,
+    booked_date: date,
+    start_time: start,
+    end_time: end,
+    status: "confirmed",
+    source: "staff",
+    // 税込。入金は「入金を記録」で付ける（Square のレジで打った分と二重計上しない）
+    amount: EXTRA_PRACTICE_PRICE,
+    payment_status: "unpaid",
+    note: `${EXTRA_PRACTICE_LABEL}（${EXTRA_PRACTICE_MINUTES}分・税込${EXTRA_PRACTICE_PRICE.toLocaleString("ja-JP")}円）`,
+  });
+  if (error) fail(`登録できませんでした: ${error.message}`);
+  await logAudit(actor, "frank.extra_practice.add", "frunk_bookings", null, null, {
+    member_id: m.id, date, start, end, bay: bay!.name, amount: EXTRA_PRACTICE_PRICE,
+  });
+  revalidateMember(id);
+  redirect(
+    `${dest}?msg=` +
+      encodeURIComponent(
+        `${EXTRA_PRACTICE_LABEL} ${start}〜${end}（${bay!.name}）を入れました。${EXTRA_PRACTICE_PRICE.toLocaleString("ja-JP")}円をレジでお受けし、予約の「入金を記録」を付けてください`,
+      ),
+  );
 }

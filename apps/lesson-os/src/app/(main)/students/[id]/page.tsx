@@ -20,7 +20,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
 
   const { data: student } = await admin
     .from("lsn_students")
-    .select("id, store_id, name, name_kana, member_code, goal, memo, photo_path, profile, skill")
+    .select("id, store_id, name, name_kana, member_code, goal, memo, photo_path, profile, skill, focus, focus_updated_at, focus_by, focus_staff:focus_by(name)")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .is("deleted_at", null)
@@ -177,6 +177,13 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     })),
   ];
 
+  // focus_by の埋め込みは1件でも配列型に推論されることがある（#76と同種）ので両対応にする
+  const focusStaffName = (v: unknown): string | null => {
+    const row = Array.isArray(v) ? v[0] : v;
+    const name = (row as { name?: string } | null | undefined)?.name;
+    return name ? String(name) : null;
+  };
+
   let photoUrl: string | null = null;
   if (student.photo_path) {
     const { data } = await admin.storage.from("lesson-videos").createSignedUrl(student.photo_path, 3600);
@@ -190,6 +197,10 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     memberCode: student.member_code,
     goal: student.goal,
     memo: student.memo,
+    // 今の課題（#332）。更新したスタッフ名は focus_by の埋め込みから取る
+    focus: (student.focus as string | null) ?? null,
+    focusUpdatedAt: (student.focus_updated_at as string | null) ?? null,
+    focusUpdatedBy: focusStaffName(student.focus_staff),
     photoUrl,
     profile: (student.profile as Record<string, string>) ?? {},
     skill: (student.skill as Record<string, string>) ?? {},

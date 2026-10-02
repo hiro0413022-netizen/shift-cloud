@@ -53,8 +53,18 @@ import {
   rebaseBillingDayOne,
   recordManualPayment,
   voidManualPayment,
+  addExtraPractice,
 } from "../actions";
 import { MANUAL_SALE_CATEGORIES, MANUAL_PAY_METHODS } from "@yozan/core/frank-manual-sale";
+import FocusBox from "@/components/focus-box";
+import {
+  EXTRA_PRACTICE_KIND,
+  EXTRA_PRACTICE_MINUTES,
+  EXTRA_PRACTICE_PRICE,
+  extraPracticeAdvice,
+  nextHourStart,
+  suggestMasterUpgrade,
+} from "@yozan/core/frank-extra-practice";
 
 export const dynamic = "force-dynamic";
 
@@ -131,7 +141,7 @@ export default async function FrunkMemberPage({
   const admin = createAdmin();
   const { data: member } = await admin
     .from("frunk_members")
-    .select("*, frunk_plans(id, name, monthly_price, joining_fee, max_bookings_per_day, max_bookings_per_week, is_corporate, max_users, max_open_slots, companion_free)")
+    .select("*, frunk_plans(id, name, monthly_price, joining_fee, max_bookings_per_day, max_bookings_per_week, is_corporate, max_users, max_open_slots, companion_free, extra_practice_ok)")
     .eq("id", id)
     .eq("company_id", actor.companyId)
     .eq("store_id", FRANK_STORE_ID) // 店舗スコープ（#134）
@@ -163,7 +173,7 @@ export default async function FrunkMemberPage({
     memberNo
       ? admin
           .from("lsn_students")
-          .select("id, lsn_share_tokens(token, revoked_at)")
+          .select("id, focus, focus_updated_at, lsn_share_tokens(token, revoked_at)")
           .eq("company_id", actor.companyId)
           .eq("member_code", memberNo)
           .is("deleted_at", null)
@@ -238,6 +248,9 @@ export default async function FrunkMemberPage({
     .map((b) => outstanding(b.amount as number | null, b.paid_amount as number | null, String(b.payment_status)))
     .reduce((s, v) => s + v, 0);
 
+  // 今の課題（#332）。入力はレッスンノートのカルテだけ＝ここは読むだけ
+  const karte = (student ?? null) as unknown as Row | null;
+
   const shareToken = (() => {
     const st = (student ?? null) as unknown as Row | null;
     const tokens = (st?.lsn_share_tokens ?? []) as Array<{ token: string; revoked_at: string | null }>;
@@ -253,6 +266,32 @@ export default async function FrunkMemberPage({
     loadCoaches(actor.companyId),
   ]);
   const ticketPending = ticketRows.filter((t) => t.status === "pending_payment");
+
+  /* 追加練習チケット（#332）。
+     今月の利用枠数＝マスター会員へのご案内の材料（ユーザーの意図）。
+     既定の開始時刻＝本日のご予約が終わる次の正時。無ければ次の正時。
+     予約一覧（bookingList）は直近50件なので、月の件数はDBで数える（取りこぼさない）。 */
+  const extraOk = plan?.extra_practice_ok === true;
+  const extraMonthStart = `${today.slice(0, 7)}-01`;
+  const { count: extraCount } = await admin
+    .from("frunk_bookings")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", actor.companyId)
+    .eq("store_id", FRANK_STORE_ID)
+    .eq("member_id", id)
+    .eq("customer_kind", EXTRA_PRACTICE_KIND)
+    .gte("booked_date", extraMonthStart)
+    .lte("booked_date", today)
+    .neq("status", "cancelled")
+    .is("deleted_at", null);
+  const extraThisMonth = Number(extraCount ?? 0);
+  const nowHm = new Date(Date.now() + 9 * 3600_000).toISOString().slice(11, 16);
+  const todaysEnd = bookingList
+    .filter((b) => String(b.booked_date) === today && String(b.status) !== "cancelled")
+    .map((b) => String(b.end_time).slice(0, 5))
+    .sort()
+    .pop();
+  const extraDefaultStart = nextHourStart(todaysEnd && todaysEnd > nowHm ? todaysEnd : nowHm);
 
   // 領収書（#222）。金額はここで読んだ入金の行からしか作れない（人が打ち込む欄は無い）
   const sales = await loadMemberSales(id, actor.companyId);
@@ -323,6 +362,16 @@ export default async function FrunkMemberPage({
         </div>
       </header>
 
+      {/* 今の課題（#332）。受付のスタッフも会員カードを開けば分かるように、ヘッダの直下に置く。
+          編集はレッスンノートのカルテだけ＝同じ文章の入口を2つ作らない。 */}
+      <div className="reveal">
+        <FocusBox
+          focus={karte?.focus as string | null}
+          updatedAt={karte?.focus_updated_at as string | null}
+          note="入力・更新はレッスンカルテ（レッスンノート）から。会員ページにも同じ内容が出ます。"
+        />
+      </div>
+
       {sp.err && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{sp.err}</p>}
       {sp.msg && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{sp.msg}</p>}
       {/* 後日決済から戻ってきたとき（#217）。反映は入金Webhook待ちなので、その場の見え方まで書く */}
@@ -347,6 +396,61 @@ export default async function FrunkMemberPage({
           />
           <button className={btnCls}>保存</button>
         </form>
+      </Panel>
+
+      {/* 追加練習チケット（#332・2026-10-02）。
+          「通常の枠を使い終わったあと、次の時間が空いていれば買って続けて練習できる」制度。
+          事前予約・取り置きは不可なので、ここ（スタッフ画面）だけが入口で、当日ぶんしか入らない。
+          料金は予約の金額に乗るだけ＝Square のレジで打った分と二重に売上を立てない。 */}
+      <Panel
+        id="extra-practice"
+        title={`🏌 追加練習チケット（${EXTRA_PRACTICE_MINUTES}分 ${EXTRA_PRACTICE_PRICE.toLocaleString("ja-JP")}円・税込）`}
+        className="d1"
+      >
+        {extraOk ? (
+          <>
+            {extraThisMonth > 0 && (
+              <p
+                className={`mb-3 rounded-lg border px-3 py-2 text-sm ${
+                  suggestMasterUpgrade(extraThisMonth)
+                    ? "border-amber-300 bg-amber-50 text-amber-800"
+                    : "border-(--color-line) bg-(--color-panel-2) text-(--color-dim)"
+                }`}
+              >
+                {extraPracticeAdvice(extraThisMonth, plan?.name as string | null)}
+              </p>
+            )}
+            {status === "active" || status === "approved" ? (
+              <form action={addExtraPractice} className="flex flex-wrap items-end gap-2">
+                <input type="hidden" name="id" value={id} />
+                <input type="hidden" name="back" value={back} />
+                <input type="hidden" name="booked_date" value={today} />
+                <Field label={`開始時刻（本日 ${today.slice(5).replace("-", "/")}）`}>
+                  <input
+                    name="start_time"
+                    type="time"
+                    step={300}
+                    defaultValue={extraDefaultStart}
+                    className={`${inputCls} !w-auto`}
+                  />
+                </Field>
+                <button className={btnCls}>空きを確認して入れる</button>
+                <span className="text-xs text-(--color-dim)">
+                  打席はA→B→Cの空いている順で取ります。入れたあと、レジで
+                  {EXTRA_PRACTICE_PRICE.toLocaleString("ja-JP")}円をお受けして予約の【入金を記録】を付けてください。
+                </span>
+              </form>
+            ) : (
+              <p className="text-sm text-(--color-dim)">在籍中の会員のみご利用いただけます。</p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-(--color-dim)">
+            {plan?.name ? `${String(plan.name)}は` : "このプランは"}追加練習の対象外です
+            （ライト会員は平日10:00〜15:00・月4回のプランのため対象外です）。
+            ご希望があればプラン変更をご案内ください。
+          </p>
+        )}
       </Panel>
 
       {/* レッスンチケット（#199）。お支払い待ちはここで受領する。

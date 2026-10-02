@@ -19,6 +19,7 @@ import {
 } from "@yozan/core/frank-booking";
 import { handoffSecret, verifyHandoff } from "@yozan/core/frank-handoff";
 import { checkOpenSlots, corporateSpec, canBookAsCorporate } from "@yozan/core/frank-corporate";
+import { EXTRA_PRACTICE_KIND } from "@yozan/core/frank-extra-practice";
 
 /**
  * FRANK GOLF 打席予約（#86 §3-3・台帳一本化 #93）
@@ -325,12 +326,15 @@ export async function createBooking(input: {
     return { ok: false, error: `${byPlan.reason ?? "このプランで予約できる時間帯"}（${byPlan.hours.open}〜${byPlan.hours.close}の間で終わるようにお選びください）` };
   }
   const dailyMax = (plan?.max_bookings_per_day ?? 1) * 60; // 時間→分
+  // 追加練習（#332）は別料金の追加利用なので上限に数えない。
+  // 数えると、レギュラー会員は通常の1時間を使った時点で追加が買えなくなる。
   const { data: sameDay } = await admin
     .from("frunk_bookings")
     .select("start_time, end_time")
     .eq("member_id", member.id)
     .eq("booked_date", input.date)
     .neq("status", "cancelled")
+    .neq("customer_kind", EXTRA_PRACTICE_KIND)
     .is("deleted_at", null);
   const usedMin = (sameDay ?? []).reduce((s, b) => s + (toMin(String(b.end_time)) - toMin(String(b.start_time))), 0);
   if (usedMin + input.minutes > dailyMax) {
@@ -350,6 +354,9 @@ export async function createBooking(input: {
       .gte("booked_date", monthStart)
       .lt("booked_date", nextMonthStart)
       .neq("status", "cancelled")
+      // 追加練習は月4回に数えない（#332）。ライト会員は対象外プランだが、
+      // 将来対象に広げたときに回数を食わないよう、ここでも除いておく
+      .neq("customer_kind", EXTRA_PRACTICE_KIND)
       .is("deleted_at", null);
     if (monthErr) {
       // 取得に失敗したら安全側（予約を通さない）。黙って上限を無効化しない
@@ -400,6 +407,9 @@ export async function createBooking(input: {
     .in("member_id", holderIds)
     .gte("booked_date", todayJst)
     .neq("status", "cancelled")
+    // 追加練習（#332）は「消化してから次を取る」のコマ数にも数えない。
+    // その場で使い切る別料金の枠なので、翌日の予約を押さえる邪魔をしてはいけない
+    .neq("customer_kind", EXTRA_PRACTICE_KIND)
     .is("deleted_at", null);
   if (openErr) {
     // 取得に失敗したら安全側（予約を通さない）。黙って上限を無効化しない

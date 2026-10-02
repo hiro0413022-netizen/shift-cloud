@@ -3,6 +3,7 @@ import { requireMember } from "@/lib/member";
 import { createAdmin } from "@/lib/supabase/admin";
 import { CLIENT_FIELDS, latestVideoByDay, noteVideoId, diffOf } from "@yozan/core/lesson-share";
 import { LessonVideo } from "./lesson-video";
+import FocusBox from "@/components/focus-box";
 
 export const dynamic = "force-dynamic";
 type Row = Record<string, unknown>;
@@ -35,7 +36,7 @@ export default async function MemberLessonPage() {
 
   const { data: st } = await admin
     .from("lsn_students")
-    .select("id, name, goal")
+    .select("id, name, goal, focus, focus_updated_at")
     .eq("company_id", member.companyId)
     .eq("member_code", member.memberNo)
     .is("deleted_at", null)
@@ -47,6 +48,11 @@ export default async function MemberLessonPage() {
     return (
       <main className="mx-auto min-h-screen max-w-md px-5 py-8">
         <Header />
+        {/* カルテがまだ無い方にも枠は出す（#332）。枠ごと消すと「課題が無い」のか
+            「機能が無い」のか分からない */}
+        <div className="mb-4">
+          <FocusBox focus={null} updatedAt={null} />
+        </div>
         <p className="rounded-xl border border-(--color-line) bg-(--color-panel) px-4 py-6 text-center text-sm text-(--color-dim)">
           まだレッスンの記録がありません。
           <br />
@@ -157,6 +163,12 @@ export default async function MemberLessonPage() {
   return (
     <main className="mx-auto min-h-screen max-w-md px-5 py-8">
       <Header />
+
+      {/* 今の課題（#332）。いちばん上に置く＝開いた最初の一画面に必ず入る。
+          入力はレッスンノート（lesson-os）のカルテだけ＝ご本人は見るだけ。 */}
+      <div className="mb-4">
+        <FocusBox focus={student.focus as string | null} updatedAt={student.focus_updated_at as string | null} />
+      </div>
 
       {student.goal ? (
         <div className="mb-4 rounded-xl border border-(--color-gold)/40 bg-(--color-panel) px-4 py-3 text-center text-sm">

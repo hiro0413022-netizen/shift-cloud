@@ -11,6 +11,7 @@ import { sanitizePhases, type Phases } from "@/lib/phases";
 import { sanitizeTrackman, type TrackmanValues } from "@/lib/trackman";
 import { readTrackmanImage } from "@/lib/trackman-ai";
 import { writeClientExplanation } from "@/lib/lesson-note-ai";
+import { normalizeFocus } from "@yozan/core/lesson-focus";
 
 /**
  * 生徒カルテのアクション（DECISIONS #49/#50）
@@ -1268,4 +1269,36 @@ export async function loadNoteSymptoms(noteId: string): Promise<{ items?: NoteSy
     .eq("company_id", actor.companyId)
     .order("confidence", { ascending: false });
   return { items: (data ?? []).map(mapNoteSymptom) };
+}
+
+/**
+ * 「今の課題」を保存する（#332・2026-10-02 ユーザー依頼）
+ *
+ * ★ レッスンごとの記録とは別に、生徒1人に1つだけ持つ＝次回以降もそのまま出る。
+ * ★ 会員ページにもそのまま出る（会員は見るだけ）ので、保存したものを返して
+ *   画面の表示と食い違わないようにする（整形で中身が変わったことを隠さない）。
+ * ★ 更新したスタッフと日時を残す。「いつの課題か」が分からないと、
+ *   古い課題を見ながら練習してしまう。
+ */
+export async function saveFocus(
+  studentId: string,
+  text: string
+): Promise<{ error?: string; focus?: string | null; updatedAt?: string | null; updatedBy?: string | null }> {
+  const { actor, admin, ok } = await ownStudent(studentId);
+  if (!ok) return { error: "生徒が見つかりません" };
+  const focus = normalizeFocus(text);
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .from("lsn_students")
+    .update({
+      focus,
+      // 空にした（課題を消した）ときは更新者・更新日も消す＝「未登録」に戻す
+      focus_updated_at: focus ? now : null,
+      focus_by: focus ? actor.staffId : null,
+      updated_at: now,
+    })
+    .eq("id", studentId);
+  if (error) return { error: error.message };
+  revalidatePath(`/students/${studentId}`);
+  return { focus, updatedAt: focus ? now : null, updatedBy: focus ? actor.name : null };
 }

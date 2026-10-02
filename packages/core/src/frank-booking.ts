@@ -274,6 +274,9 @@ export const CUSTOMER_KIND_LABEL: Record<string, string> = {
   member: "会員",
   dropin: "都度",
   trial: "体験",
+  // 追加練習（#332）。スタッフが店頭で入れる別料金の枠。
+  // CUSTOMER_KIND（新規作成で選べる種類）には入れない＝通常の予約作成フォームからは選ばせない。
+  extra: "追加練習",
 };
 
 export const PAYMENT_STATUS_LABEL: Record<string, string> = {

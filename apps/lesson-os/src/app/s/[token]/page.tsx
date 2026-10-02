@@ -6,6 +6,7 @@ import { ShareVideo } from "./share-video";
 import { brandOf } from "@/lib/brand";
 import { type TrackmanValues } from "@/lib/trackman";
 import { CLIENT_FIELDS, latestVideoByDay, noteVideoId as pickNoteVideo, diffOf } from "@yozan/core/lesson-share";
+import { focusLines, focusUpdatedLabel } from "@yozan/core/lesson-focus";
 
 /**
  * 生徒向けマイページ（DECISIONS #50 / PGA NOTEユーザーアプリ準拠・青×白テーマ）
@@ -43,7 +44,7 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
 
   const { data: student } = await admin
     .from("lsn_students")
-    .select("id, name, name_kana, goal, photo_path, store_id")
+    .select("id, name, name_kana, goal, focus, focus_updated_at, photo_path, store_id")
     .eq("id", share.student_id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -190,6 +191,9 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
     notesByVideo.set(vid, [...(notesByVideo.get(vid) ?? []), n]);
   }
   const lessonCount = (videos ?? []).length;
+  // 今の課題（#332）。整形はカルテ・会員ページと同じ @yozan/core/lesson-focus
+  const focusItems = focusLines(student.focus as string | null);
+  const focusDay = focusUpdatedLabel(student.focus_updated_at as string | null);
   const latest = videos?.[0]?.shot_at ?? null;
 
   return (
@@ -219,6 +223,20 @@ export default async function StudentSharePage({ params }: { params: Promise<{ t
               {student.name_kana && <p className="text-xs text-gray-500">{student.name_kana}</p>}
             </div>
           </div>
+          {/* 今の課題（#332）。会員ページと同じ内容をここにも出す＝LINEで送った共有ページでも
+              「いま何を意識して練習するか」が見られる。編集はカルテだけ。 */}
+          {focusItems.length > 0 && (
+            <div className="mt-3 rounded-lg border border-[#c9a545] bg-[#fdf9ee] px-3 py-2 text-sm">
+              <p className="text-[11px] text-[#8a6d1f]">
+                今の課題{focusDay ? `（${focusDay} 更新）` : ""}
+              </p>
+              <ul className="mt-1 space-y-0.5 leading-relaxed">
+                {focusItems.map((l, i) => (
+                  <li key={i} className="break-words">{l}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {student.goal && (
             <div className="mt-3 rounded-lg border border-[#c9a545] bg-[#fdf9ee] px-3 py-2 text-center text-sm">
               <span className="mr-1 text-[#8a6d1f]">目標</span>{student.goal}

@@ -11,6 +11,7 @@ import { ProgressPanel, type ProgressItem } from "./progress-panel";
 import { ProfileForm } from "./profile-form";
 import { MeasurePanel, type MeasurementItem } from "./measure-panel";
 import { LessonNotePanel } from "./lesson-note";
+import FocusCard from "./focus-card";
 import { TRACKMAN_FIELDS } from "@/lib/trackman";
 import type { LessonNoteItem } from "./actions";
 import {
@@ -48,6 +49,10 @@ export type StudentData = {
   memberCode: string | null;
   goal: string | null;
   memo: string | null;
+  /** 今の課題（#332）。複数行・改行区切り */
+  focus: string | null;
+  focusUpdatedAt: string | null;
+  focusUpdatedBy: string | null;
   photoUrl: string | null;
   profile: Record<string, string>;
   skill: Record<string, string>;
@@ -302,6 +307,15 @@ export function KarteClient({
 
   return (
     <div className="space-y-4">
+      {/* 今の課題（#332）。過去の記録をさかのぼらずに「いま何を意識するか」を見るための枠。
+          ヘッダより上に置く＝カルテを開いた最初の一画面に必ず入る。 */}
+      <FocusCard
+        studentId={student.id}
+        focus={student.focus}
+        updatedAt={student.focusUpdatedAt}
+        updatedBy={student.focusUpdatedBy}
+      />
+
       {/* 生徒ヘッダ（PGA NOTE風: 写真＋名前＋受講理由/目標） */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-(--color-line) bg-(--color-panel) p-3 md:gap-4 md:p-4">
         {student.photoUrl ? (
