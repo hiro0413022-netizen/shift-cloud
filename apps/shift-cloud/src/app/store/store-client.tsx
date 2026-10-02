@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { dowJP, hm, fmtDateJP, addMonths } from "@/lib/util";
 import type { FittingBoard, KpiCard, StoreInfo, StoreLink, StoreMonthFeed } from "@/lib/store-dash";
-import { toggleStoreTask, addStoreTask, reorderStoreStaff, logoutStore, markFittingArrived } from "./actions";
+import { toggleStoreTask, addStoreTask, reorderStoreStaff, logoutStore, markFittingArrived, draftStoreReply } from "./actions";
+import { ReplyAssistant } from "@/components/reply-assistant";
+import { brandFromStoreName } from "@yozan/core/reply-kb";
 import { SystemLinkCards } from "@/components/system-links";
 
 /**
@@ -574,6 +576,20 @@ export function StoreDashClient({
           </div>
         </div>
       )}
+
+      {/* 返信文をつくる（公式LINE・メールの返信補助）— スタッフ版 /chat と同じ機能 */}
+      <details className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer select-none text-sm font-semibold text-zinc-700">
+          💬 返信文をつくる（公式LINE・メール）
+          <span className="ml-2 text-xs font-normal text-zinc-400">用件を押すだけで、お客様への返信案ができます</span>
+        </summary>
+        <div className="mx-auto mt-4 max-w-2xl">
+          <ReplyAssistant
+            defaultBrand={brandFromStoreName(store.name)}
+            draftFn={(input) => draftStoreReply(token, input)}
+          />
+        </div>
+      </details>
 
       {/* 業務リンク集 */}
       <div>

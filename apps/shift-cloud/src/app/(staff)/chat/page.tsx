@@ -2,7 +2,8 @@ import { requireActor, can } from "@/lib/auth";
 import { createAdmin } from "@/lib/supabase/admin";
 import { brandFromStoreName } from "@yozan/core/reply-kb";
 import { ChatClient } from "./chat-client";
-import { ReplyClient } from "./reply-client";
+import { ReplyAssistant } from "@/components/reply-assistant";
+import { draft } from "./actions";
 import { ChatTabs } from "./tabs";
 
 /**
@@ -45,7 +46,7 @@ export default async function StaffChatPage({
             />
           </>
         }
-        reply={<ReplyClient defaultBrand={brandFromStoreName(storeName)} />}
+        reply={<ReplyAssistant defaultBrand={brandFromStoreName(storeName)} draftFn={draft} />}
       />
     </div>
   );

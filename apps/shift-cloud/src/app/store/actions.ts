@@ -8,6 +8,8 @@ import { getActor, isOwner, assertStoreAccess } from "@/lib/auth";
 import { verifyStoreDevice, MEMBER_OS_URL } from "@/lib/store-dash";
 import { getStoreSession, clearStoreSession } from "@/lib/store-session";
 import { logAudit } from "@/lib/audit";
+import { draftReply, type ReplyDraftResult } from "@yozan/core/reply-draft";
+import { validateReplyInput, type ReplyDraftInput } from "@yozan/core/reply-kb";
 
 /**
  * 店舗ダッシュボードのタスク操作。
@@ -233,4 +235,17 @@ export async function markFittingArrived(
 
   revalidate(token);
   return { url: `${MEMBER_OS_URL.replace(/\/$/, "")}/reception/v/${raw}` };
+}
+
+/**
+ * 返信文をつくる（公式LINE・メールの返信補助）— 店舗ダッシュボード版。
+ * 認証は店舗端末（デバイストークン or 店舗ログインCookie）。スタッフ版（/chat）と同じナレッジ・同じ生成。
+ * 下書きを返すだけで送信はしない。お客様の文面は保存しない。
+ */
+export async function draftStoreReply(token: string | null, input: ReplyDraftInput): Promise<ReplyDraftResult> {
+  const ctx = await resolveCtx(token);
+  if (!ctx) return { reply: "", checks: [], error: "認証が無効です。ページを開き直してください。" };
+  const v = validateReplyInput(input);
+  if ("error" in v) return { reply: "", checks: [], error: v.error };
+  return draftReply(v.req);
 }

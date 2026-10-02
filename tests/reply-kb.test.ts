@@ -8,6 +8,7 @@ import {
   buildReplyUser,
   parseReplyOutput,
   brandFromStoreName,
+  validateReplyInput,
 } from "../packages/core/src/reply-kb.ts";
 
 /**
@@ -90,4 +91,14 @@ test("所属店舗名から既定ブランド", () => {
 test("公開リポジトリ: ナレッジに口座・詳細住所を書かない", () => {
   const all = Object.values(KB).join("\n");
   assert.ok(!/普通\d|口座|平井/.test(all));
+});
+
+test("入力検証（/chat と /store 共用）: 不正な窓口・空入力を弾く", () => {
+  assert.ok("error" in validateReplyInput({ brand: "other", channel: "line", intentKey: "trial" }));
+  assert.ok("error" in validateReplyInput({ brand: "frank", channel: "fax", intentKey: "trial" }));
+  assert.ok("error" in validateReplyInput({ brand: "frank", channel: "line" }));
+  assert.ok("error" in validateReplyInput({ brand: "frank", channel: "line", intentKey: "nope" }));
+  const ok = validateReplyInput({ brand: "golfwing", channel: "email", intentKey: "price" });
+  assert.ok("req" in ok && ok.req.brand === "golfwing" && ok.req.channel === "email");
+  assert.ok("req" in validateReplyInput({ brand: "yozan", channel: "line", customerMessage: "取材のお願い" }));
 });

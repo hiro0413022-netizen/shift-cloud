@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { draft } from "./actions";
 import {
   BRAND_LABEL,
   KB,
@@ -9,12 +8,20 @@ import {
   intentsFor,
   type ReplyBrand,
   type ReplyChannel,
+  type ReplyDraftInput,
 } from "@yozan/core/reply-kb";
+
+/**
+ * 返信文アシスタント（公式LINE・メール）の画面。
+ * スタッフポータル /chat（ログインスタッフ）と店舗ダッシュボード /store（店舗端末）で共用。
+ * 認証は呼び出し側のサーバーアクション（draftFn）が担う。
+ */
 
 const BRANDS: ReplyBrand[] = ["golfwing", "frank", "yozan"];
 const ADJUSTS = ["もっと短く", "もっと丁寧に", "もっとやわらかく", "体験に誘う一言を足す"];
 
 type Result = { reply: string; checks: string[] };
+type DraftFn = (input: ReplyDraftInput) => Promise<{ reply: string; checks: string[]; error: string | null }>;
 
 function Seg<T extends string>({
   value,
@@ -43,7 +50,7 @@ function Seg<T extends string>({
   );
 }
 
-export function ReplyClient({ defaultBrand }: { defaultBrand: ReplyBrand }) {
+export function ReplyAssistant({ defaultBrand, draftFn }: { defaultBrand: ReplyBrand; draftFn: DraftFn }) {
   const [brand, setBrand] = useState<ReplyBrand>(defaultBrand);
   const [channel, setChannel] = useState<ReplyChannel>("line");
   const [message, setMessage] = useState("");
@@ -63,7 +70,7 @@ export function ReplyClient({ defaultBrand }: { defaultBrand: ReplyBrand }) {
     setCopied(false);
     const intentKey = opts.intentKey !== undefined ? opts.intentKey : lastIntent;
     if (opts.intentKey !== undefined) setLastIntent(opts.intentKey);
-    const res = await draft({
+    const res = await draftFn({
       brand,
       channel,
       customerMessage: message,

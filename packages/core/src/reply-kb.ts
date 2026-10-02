@@ -304,3 +304,39 @@ export function brandFromStoreName(name: string | null | undefined): ReplyBrand 
   if (/golf ?wing|ゴルフウ[ィイ]ング|宝塚/.test(s)) return "golfwing";
   return "golfwing";
 }
+
+/* ------------------------------------------------------------
+   サーバーアクションの入力検証（/chat と /store で共用）
+------------------------------------------------------------ */
+export type ReplyDraftInput = {
+  brand: string;
+  channel: string;
+  customerMessage?: string;
+  intentKey?: string | null;
+  customerName?: string;
+  staffNote?: string;
+  previousDraft?: string;
+  adjust?: string;
+};
+
+/** 入力を検証して ReplyRequest にする。不正なら { error } */
+export function validateReplyInput(input: ReplyDraftInput): { req: ReplyRequest } | { error: string } {
+  const brand = (["golfwing", "frank", "yozan"] as const).find((b) => b === input.brand);
+  const channel = (["line", "email"] as const).find((c) => c === input.channel);
+  if (!brand || !channel) return { error: "窓口と送信先を選んでください。" };
+  if (!input.customerMessage?.trim() && !findIntent(input.intentKey) && !input.previousDraft?.trim()) {
+    return { error: "お客様の文面を貼り付けるか、用件ボタンを押してください。" };
+  }
+  return {
+    req: {
+      brand,
+      channel,
+      customerMessage: input.customerMessage,
+      intentKey: input.intentKey ?? null,
+      customerName: input.customerName,
+      staffNote: input.staffNote,
+      previousDraft: input.previousDraft,
+      adjust: input.adjust,
+    },
+  };
+}
