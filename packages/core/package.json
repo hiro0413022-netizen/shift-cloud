@@ -43,6 +43,8 @@
     "./middleware": "./src/middleware.ts",
     "./night-payroll": "./src/night-payroll.ts",
     "./person": "./src/person.ts",
+    "./reply-draft": "./src/reply-draft.ts",
+    "./reply-kb": "./src/reply-kb.ts",
     "./supabase/admin": "./src/supabase/admin.ts",
     "./supabase/server": "./src/supabase/server.ts"
   },
