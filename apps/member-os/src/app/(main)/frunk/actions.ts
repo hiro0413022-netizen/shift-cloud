@@ -799,11 +799,16 @@ export async function changePlan(formData: FormData) {
       .select("id, member_no, name, plan_id, square_subscription_id, square_customer_id, billing_status, frunk_plans(monthly_price)")
       .eq("id", id).eq("company_id", actor.companyId).eq("store_id", FRANK_STORE_ID).maybeSingle(), // 店舗スコープ（#134）
     admin.from("frunk_plans")
-      .select("id, name, monthly_price, square_variation_nofee_id")
+      .select("id, name, monthly_price, square_variation_nofee_id, staff_assignable")
       .eq("id", newPlanId).eq("company_id", actor.companyId).is("deleted_at", null).maybeSingle(),
   ]);
   if (!m || !newPlan) redirect(`${dest}?err=` + encodeURIComponent("会員またはプランが見つかりません"));
   if (String(m.plan_id) === String(newPlan.id)) redirect(`${dest}?err=` + encodeURIComponent("同じプランです"));
+  // 個別対応専用のプラン（プラチナレギュラープランなど）は現場では選べない。
+  // 画面から消すだけでは守れないのでサーバー側でも止める（#331・0220）。
+  if (newPlan.staff_assignable === false && !actor.isOwner) {
+    redirect(`${dest}?err=` + encodeURIComponent(`「${String(newPlan.name)}」は個別対応専用のプランです。本部にご連絡ください。`));
+  }
 
   const oldPrice = Number((m as unknown as { frunk_plans: { monthly_price: number | null } | null }).frunk_plans?.monthly_price ?? 0);
   const newPrice = Number(newPlan.monthly_price ?? 0);

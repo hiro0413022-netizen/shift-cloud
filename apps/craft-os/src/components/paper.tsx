@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { yenPlain } from "@/lib/format";
+import { splitRedMarks, yenPlain } from "@/lib/format";
 
 /**
  * 紙の帳票（御見積書・御注文書・Fitting Report）。
@@ -84,10 +84,47 @@ export function bd(spec: string, color = "#000"): CSSProperties {
 }
 
 /** 金額セル。Excel の書式は ¥#,##0。0 や空は空欄のまま */
+/**
+ * 金額。マイナスは赤字（赤い文字）で出す。
+ *
+ * 2026-10-02（#331）ユーザー指摘「マイナスや振り込み口座を書くときに赤字にしたい」。
+ * 店の Excel も値引き・返金はすべて赤字なので、紙の正典どおり。
+ * 金額の表示はこの1か所に集まっているので、明細の金額・割引額・小計・返金・合計が
+ * 見積書／注文書／表紙のどこでもまとめて赤字になる。
+ */
 export function Money({ v, zero = false }: { v: number | null | undefined; zero?: boolean }) {
   if (v == null) return <>{""}</>;
   if (v === 0 && !zero) return <>{""}</>;
-  return <>¥{yenPlain(v)}</>;
+  const text = `¥${yenPlain(v)}`;
+  if (v < 0) return <span style={{ color: PAPER.red }}>{text}</span>;
+  return <>{text}</>;
+}
+
+/**
+ * 備考・MEMO の本文。`*…*` ではさんだところを赤字にする。
+ *
+ * 振込先の口座や「お振込手数料はご負担ください」など、紙の上で赤くしたい一文があるため
+ * （#331）。覚えることを1つに絞るため、記法はこれだけ。
+ * 日本語入力だと全角の「＊」になりがちなので半角・全角どちらでも効くようにしてある。
+ * 閉じ忘れた「＊」はそのまま文字で出す（勝手に全部赤くしない）。
+ */
+export function RichNote({ text }: { text: string | null | undefined }) {
+  const parts = splitRedMarks(text);
+  if (parts.length === 0) return <>{""}</>;
+  if (parts.length === 1 && !parts[0].red) return <>{parts[0].text}</>;
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.red ? (
+          <span key={i} style={{ color: PAPER.red }}>
+            {p.text}
+          </span>
+        ) : (
+          <span key={i}>{p.text}</span>
+        ),
+      )}
+    </>
+  );
 }
 
 export const jpDate = (d: string | null | undefined) => {
@@ -190,6 +227,11 @@ export type PaperSlot = "sleeve" | "coating" | "grip" | "labor";
  */
 export type PaperEdit = {
   name?: (it: PaperItem) => ReactNode;
+  /**
+   * 品名そのものを打ち替える欄（2026-10-02・#331）。
+   * 返したものが品名の文字と差し替わる。固定枠（工賃の「グリップ装着」など）には出さない。
+   */
+  nameInput?: (it: PaperItem) => ReactNode;
   /** 定価（単価）セル。工賃・加工・手入力の行だけ金額を打てるようにする（2026-10-01） */
   price?: (it: PaperItem) => ReactNode;
   discount?: (it: PaperItem) => ReactNode;
@@ -250,14 +292,20 @@ function PartRow({
           <span className="shrink-0 whitespace-nowrap" style={{ width: "32%" }}>
             {label ?? ""}
           </span>
-          <span
-            className="min-w-0 flex-1 truncate"
-            title={typeof name === "string" ? name : undefined}
-            style={{ fontSize: fixedName ? "8.5pt" : undefined, letterSpacing: fixedName ? "0.08em" : undefined }}
-          >
-            {name}
-            {fixedName && it && it.name !== fixedName ? <span className="ml-1">{it.name.replace(fixedName, "")}</span> : null}
-          </span>
+          {/* 区分の文字を名前から外した行（ハドラスコーティング等）は、打ち替えると
+              マスタ名との対応が崩れるので従来どおり読み取り専用にする */}
+          {it && !fixedName && name === raw && edit?.nameInput ? (
+            <span className="min-w-0 flex-1">{edit.nameInput(it)}</span>
+          ) : (
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={typeof name === "string" ? name : undefined}
+              style={{ fontSize: fixedName ? "8.5pt" : undefined, letterSpacing: fixedName ? "0.08em" : undefined }}
+            >
+              {name}
+              {fixedName && it && it.name !== fixedName ? <span className="ml-1">{it.name.replace(fixedName, "")}</span> : null}
+            </span>
+          )}
           {it && edit?.name ? edit.name(it) : null}
           {!it && slot && edit?.empty ? edit.empty(slot, laborCode) : null}
         </div>

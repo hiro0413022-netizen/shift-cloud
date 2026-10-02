@@ -416,6 +416,20 @@ export function QuoteSheet({
                 </button>
               }
               edit={{
+                // 品名はその場で打ち替えられる。マスタ名のうしろに色・仕様を書き足す使い方が主
+                // （「ツアーベルベット ピンク」など・#331 2026-10-02）
+                nameInput: (it) =>
+                  byId.has(it.id) ? (
+                    <input
+                      name={`nm_${it.id}`}
+                      defaultValue={it.name}
+                      title="品名。マスタ名のうしろに色や仕様を書き足せます（例: ツアーベルベット ピンク）"
+                      onBlur={(e) => {
+                        if (e.currentTarget.value !== e.currentTarget.defaultValue) e.currentTarget.form?.requestSubmit();
+                      }}
+                      className="w-full rounded-sm border border-dashed border-transparent bg-transparent px-0.5 outline-none hover:border-sky-400 focus:border-sky-600 focus:bg-sky-50/50 print:border-transparent print:bg-transparent"
+                    />
+                  ) : null,
                 name: (it) =>
                   it.id > 0 ? (
                     <button
@@ -443,7 +457,7 @@ export function QuoteSheet({
                       name={`lp_${it.id}`}
                       defaultValue={it.listPrice ? String(it.listPrice) : ""}
                       placeholder="金額"
-                      title="税抜の単価を入れてください"
+                      title="税抜の単価を入れてください。マイナス（下取り・調整など）も入れられます。マイナスは赤字で出ます"
                       onBlur={(e) => {
                         if (e.currentTarget.value !== e.currentTarget.defaultValue) e.currentTarget.form?.requestSubmit();
                       }}
@@ -534,12 +548,19 @@ export function QuoteSheet({
                     { label: "合計", value: <Money v={totals.total} zero />, strong: true },
                   ]}
                   note={
-                    <textarea
-                      name="note"
-                      defaultValue={note}
-                      rows={5}
-                      className="h-[86pt] w-full resize-none bg-transparent leading-[17.2pt] outline-none focus:bg-sky-50/50"
-                    />
+                    <>
+                      <textarea
+                        name="note"
+                        defaultValue={note}
+                        rows={5}
+                        title="＊で囲んだところは印刷すると赤字になります（例: ＊お振込先 三菱UFJ銀行…＊）"
+                        className="h-[72pt] w-full resize-none bg-transparent leading-[17.2pt] outline-none focus:bg-sky-50/50"
+                      />
+                      {/* 赤字にする書き方の案内。紙には出さない（#331） */}
+                      <p className="no-print px-1 text-[8pt] leading-[10pt] text-gray-400">
+                        <span className="text-red-600">＊</span>で囲んだところは印刷すると赤字になります（例：*お振込先 三菱UFJ銀行 信濃橋支店*）
+                      </p>
+                    </>
                   }
                 />
               }

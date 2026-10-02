@@ -41,12 +41,13 @@ export async function submitSignup(_prev: SignupState, formData: FormData): Prom
     if (raw) {
       const { data: plan } = await admin
         .from("frunk_plans")
-        .select("id, active")
+        .select("id, active, public_signup")
         .eq("id", raw)
         .eq("company_id", tok.company_id as string)
         .is("deleted_at", null)
         .maybeSingle();
-      if (!plan || !plan.active) return { error: "選択されたプランが無効です。画面を更新して再度お試しください" };
+      if (!plan || !plan.active || plan.public_signup === false)
+        return { error: "選択されたプランが無効です。画面を更新して再度お試しください" };
       planId = String(plan.id);
     }
   }

@@ -18,6 +18,7 @@ import {
   sumsOf,
   toPaperItems,
   MENU_LABELS,
+  RichNote,
 } from "@/components/paper";
 import { finishInfoOf } from "@/lib/paper-data";
 import { ThanksLetter } from "@/components/thanks-letter";
@@ -213,7 +214,8 @@ function QuoteDoc({ full, doc }: { full: Priced; doc: "quote" | "order" }) {
             reveColor={work?.reve_color ?? ""}
             reveSerial={work?.reve_serial ?? ""}
             steps={ORDER_STEPS.map((s) => ({ label: s.label, value: md(work?.[s.key] ?? null) }))}
-            memo={[q.note, work?.note].filter(Boolean).join("\n")}
+            // 備考の `*…*` は赤字で出す（#331）
+            memo={<RichNote text={[q.note, work?.note].filter(Boolean).join("\n")} />}
           />
         ) : (
           <QuoteBottom
@@ -225,7 +227,7 @@ function QuoteDoc({ full, doc }: { full: Priced; doc: "quote" | "order" }) {
               ...refundRow,
               { label: "合計", value: <Money v={t.total} zero />, strong: true },
             ]}
-            note={q.note ?? ""}
+            note={<RichNote text={q.note} />}
           />
         )
       }

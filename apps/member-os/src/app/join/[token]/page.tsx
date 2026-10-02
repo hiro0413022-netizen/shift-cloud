@@ -43,6 +43,10 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
     .select("id, name, monthly_price, joining_fee, max_bookings_per_day, note")
     .eq("company_id", tok.company_id)
     .eq("active", true)
+    // お客様が自分で選べるプランだけ（#195 の public_signup をここでも見る）。
+    // ここが active だけだったため、スタッフ・テスト会員・モニター会員・
+    // プラチナレギュラープランまで招待リンクの入会フォームに並んでいた（#331）。
+    .neq("public_signup", false)
     .is("deleted_at", null)
     .order("sort_order", { ascending: true });
 

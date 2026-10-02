@@ -522,3 +522,35 @@ export function priceQuote(
 
   return { items: priced, clubCounts, refund, totals };
 }
+
+// ---------------------------------------------------------------------------
+// 明細の品名（紙の上で直す）
+// ---------------------------------------------------------------------------
+
+/**
+ * 見積書の品名欄に打たれた文字を product_name と spec に分ける。
+ *
+ * 2026-10-02（#331）ユーザー指摘「ピンクやシャフトの色などを入れれない」。
+ * 紙に出る品名は `product_name + " " + spec`。マスタの名前のうしろに色・仕様を
+ * 書き足すのが現場の使い方なので、
+ *   ・いまの product_name で始まっていれば → 残りを spec へ（マスタ名はそのまま残す）
+ *   ・まるごと違う文字なら → product_name を差し替えて spec を空に
+ * という分け方にする。マスタ名を残すのは、工賃の固定枠との突き合わせ（productName）と
+ * 発注管理の連携がマスタ名で動いているため。
+ *
+ * 空文字（全部消した）は「直さない」として null を返す。product_name は NOT NULL。
+ */
+export function splitQuoteItemName(
+  typed: string,
+  currentProductName: string,
+): { product_name: string; spec: string | null } | null {
+  const t = String(typed ?? "").replace(/[\s　]+/g, " ").trim();
+  if (t === "") return null;
+  const base = String(currentProductName ?? "").replace(/[\s　]+/g, " ").trim();
+  if (base !== "" && t === base) return { product_name: base, spec: null };
+  if (base !== "" && t.startsWith(base)) {
+    const rest = t.slice(base.length).trim();
+    return { product_name: base, spec: rest === "" ? null : rest };
+  }
+  return { product_name: t, spec: null };
+}

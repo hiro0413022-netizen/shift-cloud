@@ -6,6 +6,7 @@ import { createSale, createSales, type SaleInput, type SaveResult } from "./acti
 import ProductPicker, { invLabel, masterLabel, type InvPick } from "./ProductPicker";
 import type { MasterProduct } from "./actions";
 import CustomerPicker from "./CustomerPicker";
+import { SALES_CATEGORY_HINTS } from "@/lib/sales-category";
 
 /** 定番ボタン1つ分。unitPrice は「1個あたりの定価」（合計金額ではない） */
 export type Preset = { label: string; category: string; productName: string; unitPrice: number };
@@ -383,6 +384,10 @@ export default function SalesEntry({
           <div>
             <p className="mb-1 text-sm font-medium">区分</p>
             <Chips options={categories} value={category} onChange={setCategory} />
+            {/* 新しく足した区分は何を指すか分かりにくいので、選んだときだけ但し書きを出す（#331） */}
+            {SALES_CATEGORY_HINTS[category] && (
+              <p className="mt-1 text-xs text-(--color-dim)">{category}＝{SALES_CATEGORY_HINTS[category]}</p>
+            )}
           </div>
 
           {presets.length > 0 && (

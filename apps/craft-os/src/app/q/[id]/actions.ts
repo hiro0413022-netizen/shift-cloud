@@ -6,6 +6,7 @@ import { requireActor } from "@/lib/auth";
 import { getLaborRates, getQuote, lookupDemoShafts, searchProductsMore, type ProductRow } from "@/lib/craft";
 import { postSales } from "@/lib/sales";
 import { afterSave } from "@/lib/after-save";
+import { splitQuoteItemName } from "@yozan/core/fitting-quote";
 
 const admin = () => createAdmin();
 
@@ -206,8 +207,9 @@ export async function updateItems(formData: FormData): Promise<void> {
         rate = Math.round((1 - pct / 100) * 10000) / 10000;
       }
     } else if (rateRaw === "yen") {
+      // 金額はマイナスも通す（返金・下取りの行・#331）。空のときだけ今の値を残す
       const price = num(formData.get(`yen_${it.id}`));
-      if (price == null || price < 0) {
+      if (price == null) {
         manual = Boolean(it.discount_manual);
         rate = it.discount_rate == null ? null : Number(it.discount_rate);
         discountAmount = it.discount_amount == null ? null : Number(it.discount_amount);
@@ -226,16 +228,24 @@ export async function updateItems(formData: FormData): Promise<void> {
         ((it.discount_rate == null ? null : Number(it.discount_rate)) !== rate ||
           (rate == null && Number(it.discount_amount ?? 0) !== discountAmount)));
 
-    // 工賃・加工・手入力の行は単価（定価欄）も画面から直せる。欄が無い行（商品マスタ由来）は触らない
+    // 工賃・加工・手入力の行は単価（定価欄）も画面から直せる。欄が無い行（商品マスタ由来）は触らない。
+    // マイナスも通す（下取り・調整などで赤字の行を立てられるように・#331 2026-10-02）。
+    // 以前は Math.max(0, …) で 0 に丸めていたため、マイナスを打っても黙って消えていた。
     const lpRaw = formData.get(`lp_${it.id}`);
     const listPrice =
       lpRaw != null && ["labor", "coating", "free"].includes(String(it.line_kind ?? ""))
-        ? Math.max(0, Math.round(num(lpRaw) ?? 0))
+        ? Math.round(num(lpRaw) ?? 0)
         : undefined;
+
+    // 品名（紙の上で打ち替えた分）。マスタ名で始まっていれば残りを spec に入れる（#331）
+    const nmRaw = formData.get(`nm_${it.id}`);
+    const renamed =
+      nmRaw != null ? splitQuoteItemName(String(nmRaw), String(it.product_name ?? "")) : null;
 
     const { error } = await admin()
       .from("gw_quote_items")
       .update({
+        ...(renamed ? { product_name: renamed.product_name, spec: renamed.spec } : {}),
         ...(listPrice !== undefined ? { list_price: listPrice } : {}),
         quantity: Math.max(1, Math.trunc(qty)),
         finish_length_inch: finish,

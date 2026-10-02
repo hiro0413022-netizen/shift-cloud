@@ -5,6 +5,7 @@ import { requireMoneyActor, type MoneyActor, type AccessibleStore } from "@/lib/
 import { createAdmin } from "@/lib/supabase/admin";
 import { getCurrentStore, canWriteStore, latestCashBalance, rebalanceCashLedger, toNum } from "@/lib/money";
 import { searchPeople, nameVariants, type Person } from "@/lib/people";
+import { normalizeSalesCategory } from "@/lib/sales-category";
 
 type Admin = ReturnType<typeof createAdmin>;
 
@@ -49,8 +50,9 @@ function optNum(v: unknown): number | null {
 }
 
 /** 画面入力の売上カテゴリ。「月会費」は予約語なので「月会費(窓口)」へ寄せる。 */
+/** 区分の表記ゆれ寄せ。正典は @/lib/sales-category（#331） */
 function toSalesCategory(c: string): string {
-  return c === "月会費" ? "月会費(窓口)" : c;
+  return normalizeSalesCategory(c);
 }
 
 function normalizeInput(input: SaleInput) {

@@ -7,6 +7,7 @@ import SalesEntry, { type Preset } from "./SalesEntry";
 import SalesTable, { type SaleRow } from "./SalesTable";
 import RangePicker from "@/components/RangePicker";
 import { resolveRange, type RangePreset } from "@/lib/table-filter";
+import { SALES_CATEGORIES } from "@/lib/sales-category";
 import type { InvPick } from "./ProductPicker";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +15,8 @@ export const dynamic = "force-dynamic";
 /** 定番ボタンの最大数。増やすと押し間違いが増え、探すのに一覧を目で追うことになる */
 const PRESET_LIMIT = 10;
 
-// 「月会費」はファイン実績の予約語。窓口で受けた月会費は「月会費(窓口)」（actions.ts toSalesCategory でも寄せる）
-const CATEGORIES = ["利用料", "月会費(窓口)", "販売", "その他"];
+// 区分の正典は @/lib/sales-category（2か所に同じ配列があり片方だけ増える事故を防ぐ・#331）
+const CATEGORIES = [...SALES_CATEGORIES];
 const MEMBER_KINDS = ["会員", "ビジター", "スタッフ"];
 // 売上台帳Excelで実際に使われている決済手段に合わせる（Square 369件・金券3件の実績あり）
 const PAY_METHODS = ["現金", "Airペイ", "Square", "SBペイメント", "振込", "金券", "楽天ペイ", "その他"];

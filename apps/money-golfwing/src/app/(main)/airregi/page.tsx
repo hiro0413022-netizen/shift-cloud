@@ -7,6 +7,7 @@ import { Panel, Badge, Empty, inputCls, btnCls, btnGhostCls, yen, PageHeader, Fi
 import { buildReport, type ReportSale } from "@/lib/airregi-report";
 import { ReportView } from "./report-view";
 import { EXPENSE_CATEGORIES } from "@/lib/expense";
+import { SALES_CATEGORIES } from "@/lib/sales-category";
 import {
   reconcile,
   matchCashOut,
@@ -36,7 +37,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const CATEGORIES = ["利用料", "月会費(窓口)", "販売", "その他"];
+const CATEGORIES = [...SALES_CATEGORIES]; // 正典は @/lib/sales-category（#331）
 const MEMBER_KINDS = ["会員", "ビジター", "スタッフ"];
 
 const jstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);

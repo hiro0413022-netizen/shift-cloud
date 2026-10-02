@@ -146,7 +146,7 @@ export default async function FrunkMemberPage({
   const [{ data: plans }, { data: bookings }, { data: student }] = await Promise.all([
     admin
       .from("frunk_plans")
-      .select("id, name, monthly_price, active")
+      .select("id, name, monthly_price, active, staff_assignable")
       .eq("company_id", actor.companyId)
       .is("deleted_at", null)
       .order("sort_order"),
@@ -632,8 +632,11 @@ export default async function FrunkMemberPage({
                   </option>
                   {/* 0円プラン（スタッフ・モニター）もここに出す。以前は monthly_price>0 で弾いていたため、
                       作って保存したのに変更先に出てこなかった（2026-09-01 ユーザー指摘・#192）。 */}
+                  {/* 個別対応専用のプラン（staff_assignable=false・プラチナレギュラープランなど）は
+                      現場では選べない。オーナーだけが選べる（#331・0220）。 */}
                   {planList
                     .filter((p) => p.active !== false && p.id !== m.plan_id)
+                    .filter((p) => p.staff_assignable !== false || actor.isOwner)
                     .map((p) => (
                       <option key={String(p.id)} value={String(p.id)}>
                         {String(p.name)}（{Number(p.monthly_price ?? 0) > 0 ? yen(p.monthly_price as number | null) : "月会費なし"}）

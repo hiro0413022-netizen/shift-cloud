@@ -57,3 +57,24 @@ export function range(
   if (a && b) return a === b ? `${a}${unit}` : `${a} 〜 ${b}${unit}`;
   return `${a || b}${unit}`;
 }
+
+/**
+ * 備考・MEMO の文字を「ふつうの文字」と「赤字にする文字」に分ける。
+ *
+ * 「＊…＊」で囲んだところが赤字（#331・2026-10-02 ユーザー指摘
+ * 「マイナスや振り込み口座を書くときに赤字にしたい」）。
+ * 日本語入力だと全角の「＊」になりがちなので、半角・全角どちらでも効かせる。
+ * 閉じ忘れた「＊」はそのまま文字として出す（勝手に全部赤くしない）。
+ */
+export function splitRedMarks(text: string | null | undefined): { text: string; red: boolean }[] {
+  const src = String(text ?? "");
+  if (src === "") return [];
+  if (!src.includes("*") && !src.includes("＊")) return [{ text: src, red: false }];
+  // split に丸かっこ1組を渡すと [ふつう, 囲み, ふつう, 囲み, …] の順で返る。
+  // 「＊で始まって＊で終わるか」で判定すると、囲みに見えるだけの文字
+  // （閉じ忘れて丸ごと＊…＊に見える備考）まで赤くなるので、必ず位置で判定する。
+  return src
+    .split(/([*＊][^*＊\n]+[*＊])/g)
+    .map((part, i) => (i % 2 === 1 ? { text: part.slice(1, -1), red: true } : { text: part, red: false }))
+    .filter((p) => p.text !== "");
+}
