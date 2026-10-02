@@ -1688,3 +1688,99 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
   border-radius: 999px; padding: 4px 12px;
   font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
 }
+
+/* ============================================================
+   #335 小川うららプロの YouTube ／ 館内ツアー動画
+   ============================================================ */
+.yt-head { max-width: 760px; }
+.yt-grid {
+  display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 28px; margin-top: 34px; align-items: start;
+}
+.ytl {
+  position: relative; display: block; overflow: hidden;
+  border-radius: 22px; background: #111; aspect-ratio: 16 / 9;
+  border: 4px solid #fff; box-shadow: 0 18px 44px -26px rgba(42,51,44,.55);
+}
+.ytl img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s var(--ease); }
+.ytl:hover img { transform: scale(1.03); }
+.ytl__frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.yt-feature__t { margin-top: 12px; font-weight: 800; color: var(--txt-str); font-size: 15px; line-height: 1.6; }
+
+.yt-play {
+  position: absolute; left: 50%; top: 50%; width: 46px; height: 32px;
+  transform: translate(-50%, -50%); border-radius: 9px;
+  background: rgba(220, 0, 0, .92); box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  transition: transform .2s var(--ease), background .2s;
+}
+.yt-play::after {
+  content: ""; position: absolute; left: 50%; top: 50%;
+  transform: translate(-38%, -50%);
+  border-style: solid; border-width: 7px 0 7px 12px;
+  border-color: transparent transparent transparent #fff;
+}
+.yt-play--lg { width: 78px; height: 54px; border-radius: 14px; }
+.yt-play--lg::after { border-width: 12px 0 12px 20px; }
+.ytl:hover .yt-play, .yt-item:hover .yt-play { transform: translate(-50%, -50%) scale(1.08); background: #f00; }
+
+.yt-side__h { font-weight: 800; color: var(--txt-str); font-size: 14px; margin-bottom: 12px; }
+.yt-side__h span { display: block; font-weight: 500; color: var(--dim-soft); font-size: 12px; margin-top: 2px; }
+.yt-list { display: grid; gap: 12px; }
+.yt-item {
+  display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 8px; border-radius: 16px; background: #fff; border: 2px solid var(--border);
+  color: inherit; text-decoration: none; transition: border-color .2s, transform .2s var(--ease);
+}
+.yt-item:hover { border-color: var(--brass); transform: translateY(-2px); }
+.yt-item.is-on { border-color: var(--brass); background: var(--brass-l); }
+.yt-item__th { position: relative; display: block; border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9; background: #111; }
+.yt-item__th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.yt-item__th .yt-play { width: 32px; height: 22px; border-radius: 6px; }
+.yt-item__th .yt-play::after { border-width: 5px 0 5px 8px; }
+.yt-item__b { display: block; min-width: 0; }
+.yt-item__t {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  font-size: 13px; font-weight: 700; line-height: 1.5; color: var(--txt-str);
+}
+.yt-item__d { display: block; margin-top: 4px; font-size: 11.5px; color: var(--dim-soft); }
+.yt-cta { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+
+@media (max-width: 900px) {
+  .yt-grid { grid-template-columns: 1fr; gap: 22px; }
+}
+@media (max-width: 480px) {
+  .yt-item { grid-template-columns: 120px minmax(0, 1fr); }
+  .yt-cta .btn { width: 100%; justify-content: center; }
+}
+
+/* 館内ツアー（縦動画） */
+.tour-split { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 56px; align-items: center; justify-content: center; }
+.tour { position: relative; width: 100%; max-width: 340px; margin-inline: auto; }
+.tour__v {
+  display: block; width: 100%; height: auto; aspect-ratio: 540 / 850; object-fit: cover;
+  border-radius: 28px; background: #1b241d; border: 5px solid #fff;
+  box-shadow: 0 24px 54px -28px rgba(42,51,44,.6);
+}
+.tour__snd {
+  position: absolute; right: 14px; bottom: 14px;
+  border: 0; border-radius: 999px; padding: 8px 14px;
+  background: rgba(0,0,0,.62); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700;
+  cursor: pointer;
+}
+.tour__snd[aria-pressed="true"] { background: var(--brass); color: var(--txt-str); }
+.tour-stops { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 8px; counter-reset: stop; }
+.tour-stops li {
+  counter-increment: stop; display: flex; gap: 10px; align-items: baseline;
+  padding: 10px 14px; border-radius: 14px; background: #fff; border: 2px solid var(--border);
+  font-size: 14px;
+}
+.tour-stops li::before {
+  content: counter(stop, decimal-leading-zero); font-family: var(--f-en); font-weight: 800;
+  color: var(--brass-2); font-size: 13px; min-width: 1.6em;
+}
+.tour-stops b { color: var(--txt-str); white-space: nowrap; }
+.tour-stops span { color: var(--dim); font-size: 13px; }
+@media (max-width: 860px) {
+  .tour-split { grid-template-columns: 1fr; gap: 28px; }
+  .tour { max-width: 300px; }
+}

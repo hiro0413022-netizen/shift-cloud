@@ -13,6 +13,7 @@
     "./fitting-quote": "./src/fitting-quote.ts",
     "./frank-extra-practice": "./src/frank-extra-practice.ts",
     "./lesson-focus": "./src/lesson-focus.ts",
+    "./youtube-feed": "./src/youtube-feed.ts",
     "./fitting-walkin": "./src/fitting-walkin.ts",
     "./frank-billable": "./src/frank-billable.ts",
     "./frank-billing-start": "./src/frank-billing-start.ts",

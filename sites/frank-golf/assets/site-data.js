@@ -197,7 +197,7 @@ window.FRANK = {
     lounge:    "assets/img/lounge.jpg",   // バーカウンター
     food:      "assets/img/lesson.jpg",   // ラウンジのフード（実体は料理写真）
     community: "assets/img/community.jpg",// ソファ席・パーティースペース
-    concept:   "assets/img/play.jpg",     // コンセプト
+    concept:   "assets/img/lesson-rara-wide.jpg", // コンセプト（#335: 暗い打席写真→ららプロのレッスン）
     play:      "assets/img/play.jpg",
     lesson:    "assets/img/lesson-rara-wide.jpg",   // レッスンページ＝ららプロの実写（★lesson.jpg は料理写真なので使わない）
     // プレオープン告知バナー（SNS・LINE配布用。トップでは使わなくなりました）
@@ -232,7 +232,7 @@ window.FRANK = {
     memberHome:     "https://my.frankgolf.jp/member",
 
     instagram: "https://www.instagram.com/frank_golf_himeji",  // ★確定（2026-09-05）
-    youtube: null,
+    youtube: "https://www.youtube.com/channel/UC4QTQjrDLsx4WF3fdYuLHZQ",  // 小川うららプロ「RaRa LESSON」（#335）
   },
 
   /* ---------- お知らせ ----------

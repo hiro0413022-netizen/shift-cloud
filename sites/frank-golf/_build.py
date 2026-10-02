@@ -12,7 +12,10 @@ FRANK GOLF 公式サイト ビルドスクリプト
    ヘッダー等の共通部分を直すときは本ファイルを編集して再実行してください。
 ※ 料金・住所などの可変データは assets/site-data.js を編集してください（再実行不要）。
 """
+import json
 import os
+import re
+from html import escape as html_escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -518,6 +521,191 @@ def media(key, src, alt, cap="", tall=False, cls=""):
 
 
 
+# ------------------------------------------------------------------
+# 小川うららプロの YouTube（#335・2026-10-03）
+#   ユーザー依頼「小川を全面に出してレッスンをアピール／YouTube の URL も付ける／
+#   YouTube がアップされるたびにホームページでおすすめ動画が流れてもいい」。
+#   ・大きく出す1本（RARA_FEATURED）は固定＝FRANK GOLF の開店報告動画
+#   ・その横の「最新のレッスン動画」は自動で入れ替わる：
+#       ビルド時にチャンネルの公開フィードを読んで焼き込み（JS無効・検索エンジン向けの控え）
+#       → ブラウザでは site.js が Genesis の公開API（/api/public/site/frank-golf/videos）から最新を受け取り描き直す
+#     ＝YouTube に上がれば最長1時間でサイトが変わる。デプロイ不要。
+#   ・読み込みは軽量プレーヤー（サムネイルだけ出し、押したときに初めて YouTube を読み込む）
+# ------------------------------------------------------------------
+RARA_CHANNEL_ID = "UC4QTQjrDLsx4WF3fdYuLHZQ"
+RARA_CHANNEL_URL = "https://www.youtube.com/channel/" + RARA_CHANNEL_ID
+RARA_FEATURED = ("PMIM93hQeWY", "【ご報告】姫路にインドアゴルフスタジオを作りました！")
+RARA_VIDEOS_CACHE = os.path.join(HERE, "assets", "rara-videos.json")
+_YT_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_RARA_VIDEOS = None
+
+
+def load_rara_videos():
+    """チャンネルの新着（新しい順）。読めたらキャッシュに保存、読めなければ前回のキャッシュ。"""
+    global _RARA_VIDEOS
+    if _RARA_VIDEOS is not None:
+        return _RARA_VIDEOS
+    vids = []
+    try:
+        import urllib.request
+        import xml.etree.ElementTree as ET
+        url = "https://www.youtube.com/feeds/videos.xml?channel_id=" + RARA_CHANNEL_ID
+        with urllib.request.urlopen(url, timeout=10) as r:
+            root = ET.fromstring(r.read())
+        ns = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
+        for e in root.findall("a:entry", ns):
+            vid = (e.findtext("yt:videoId", "", ns) or "").strip()
+            title = " ".join((e.findtext("a:title", "", ns) or "").split())
+            link = e.find("a:link", ns)
+            href = link.get("href", "") if link is not None else ""
+            if not _YT_ID.match(vid) or not title:
+                continue
+            vids.append({"id": vid, "title": title,
+                         "published": (e.findtext("a:published", "", ns) or "").strip(),
+                         "short": "/shorts/" in href})
+        if vids:
+            with open(RARA_VIDEOS_CACHE, "w", encoding="utf-8") as f:
+                json.dump(vids, f, ensure_ascii=False, indent=1)
+    except Exception as ex:  # ネットが無い環境でもビルドは止めない
+        print(f"  ! YouTube フィードを読めませんでした（前回の控えを使います）: {ex}")
+        vids = []
+    if not vids and os.path.exists(RARA_VIDEOS_CACHE):
+        with open(RARA_VIDEOS_CACHE, encoding="utf-8") as f:
+            vids = [v for v in json.load(f) if _YT_ID.match(v.get("id", ""))]
+    _RARA_VIDEOS = vids
+    return vids
+
+
+def rara_latest(limit=4):
+    """固定の1本とショートを除いた新着 limit 本（足りなければショートで埋める）"""
+    pool = [v for v in load_rara_videos() if v["id"] != RARA_FEATURED[0]]
+    main = [v for v in pool if not v.get("short")]
+    return (main + [v for v in pool if v.get("short")])[:limit]
+
+
+def _yt_date(iso):
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", iso or "")
+    return f"{int(m.group(2))}月{int(m.group(3))}日" if m else ""
+
+
+def yt_item(v):
+    vid = v["id"]; t = html_escape(v["title"])
+    d = _yt_date(v.get("published"))
+    return (f'<a class="yt-item" href="https://www.youtube.com/watch?v={vid}" target="_blank" rel="noopener" data-yt-id="{vid}">'
+            f'<span class="yt-item__th"><img src="https://i.ytimg.com/vi/{vid}/hqdefault.jpg" alt="" loading="lazy" width="480" height="360"><span class="yt-play" aria-hidden="true"></span></span>'
+            f'<span class="yt-item__b"><span class="yt-item__t">{t}</span>'
+            + (f'<span class="yt-item__d">{d} 公開</span>' if d else "") +
+            '</span></a>')
+
+
+def yt_feature(vid, title, eager=False):
+    t = html_escape(title)
+    lazy = "" if eager else ' loading="lazy"'
+    return (f'<div class="yt-feature" data-yt-feature>'
+            f'<a class="ytl" href="https://www.youtube.com/watch?v={vid}" target="_blank" rel="noopener" data-yt-id="{vid}" aria-label="動画を再生：{t}">'
+            f'<img src="https://i.ytimg.com/vi/{vid}/maxresdefault.jpg" alt="{t}"{lazy} width="1280" height="720">'
+            f'<span class="yt-play yt-play--lg" aria-hidden="true"></span></a>'
+            f'<p class="yt-feature__t" data-yt-feature-title>{t}</p></div>')
+
+
+def rara_videos_section(alt=True, eager=False, first=False, heading=None):
+    """「小川うららプロのレッスン動画」セクション（左に大きく1本・右に最新4本）"""
+    latest = "".join(yt_item(v) for v in rara_latest(4))
+    cls = "sec sec--alt" if alt else "sec"
+    style = ' style="padding-top:0"' if first else ""
+    h = heading or '小川うららプロの<br><span class="mk">レッスン動画</span>'
+    return f"""
+<section class="{cls} yt-sec" id="rara-videos"{style}>
+  <div class="wrap">
+    <div class="yt-head rv">
+      <div>
+        <p class="pill">YOUTUBE</p>
+        <h2 class="ph">{h}</h2>
+        <p class="ph-sub"><span class="jb">登録者6万人超の</span><wbr><span class="jb">YouTube「RaRa LESSON」。</span><wbr><span class="jb">週2本ペースで</span><wbr><span class="jb">新しいレッスン動画を公開しています。</span><br><wbr><span class="jb">動画で見た先生に、</span><wbr><span class="jb">FRANK GOLF で直接教われます。</span></p>
+      </div>
+    </div>
+    <div class="yt-grid rv">
+      {yt_feature(RARA_FEATURED[0], RARA_FEATURED[1], eager)}
+      <div class="yt-side">
+        <p class="yt-side__h">最新のレッスン動画<span>（YouTube に上がると自動で入れ替わります）</span></p>
+        <div class="yt-list" data-yt-latest data-limit="4" data-exclude="{RARA_FEATURED[0]}">{latest}</div>
+      </div>
+    </div>
+    <p class="yt-cta rv"><a class="btn btn--brass" href="trial.html" data-cta="trial">小川プロの無料体験レッスン</a> <a class="btn btn--ghost" href="{RARA_CHANNEL_URL}?sub_confirmation=1" target="_blank" rel="noopener">YouTube でチャンネル登録 ↗</a></p>
+  </div>
+</section>
+"""
+
+
+# ------------------------------------------------------------------
+# 館内ツアー動画（#335・2026-10-03 ユーザー提供「施設紹介の動画」48秒）
+#   元は 1920×1080 の中に縦動画（9:16）を置き、上に広告用の帯を焼き込んだもの。
+#   帯と左右のぼかしを切り落として 540×850 の縦動画にした（assets/video/facility-tour.mp4）。
+#   画面に入ったら音なしで自動再生・出たら止める・「音を出す」ボタンつき。
+#   動きを減らす設定の端末では自動再生しない。preload="none" で、見るまで1バイトも読まない。
+# ------------------------------------------------------------------
+TOUR_MP4 = "assets/video/facility-tour.mp4"
+TOUR_POSTER = "assets/video/facility-tour.jpg"
+TOUR_WEBM = "assets/video/facility-tour.webm"   # H.264 を再生できないブラウザ向けの控え（VP9）
+
+
+def jsonld_tour_video():
+    """館内ツアー動画の VideoObject（Google の動画検索・施設ページのリッチ表示用）"""
+    return json.dumps({
+        "@context": "https://schema.org", "@type": "VideoObject",
+        "name": "FRANK GOLF 姫路 館内ツアー（48秒）",
+        "description": "姫路・土山のインドアゴルフ FRANK GOLF の館内を48秒でご案内。入口・受付から、DTECT・TrackMan 4・OKONGOLF の3打席、バーラウンジまで。",
+        "thumbnailUrl": abs_url(TOUR_POSTER),
+        "contentUrl": abs_url(TOUR_MP4),
+        "uploadDate": "2026-10-03",
+        "duration": "PT48S",
+    }, ensure_ascii=False, separators=(",", ":"))
+
+
+def tour_video(cls=""):
+    return (f'<div class="tour {cls}">'
+            f'<video class="tour__v" data-tour poster="{TOUR_POSTER}" muted loop playsinline preload="none" '
+            f'width="540" height="850" aria-label="FRANK GOLF 姫路の館内をご案内する48秒の動画">'
+            f'<source src="{TOUR_MP4}" type="video/mp4"><source src="{TOUR_WEBM}" type="video/webm"></video>'
+            f'<button type="button" class="tour__snd" data-tour-sound aria-pressed="false">音を出す</button>'
+            f'</div>')
+
+
+TOUR_STOPS = [
+    ("外観・入口", "駐車場20台・無料"),
+    ("1F 受付・パッティング", "受付とパッティング練習スペース"),
+    ("A打席", "DTECT"),
+    ("B打席", "TrackMan 4"),
+    ("C打席", "OKONGOLF"),
+    ("CAFE & BAR", "練習のあとはラウンジでゆっくり"),
+]
+
+
+def tour_section(alt=False, first=False, more_link=True):
+    stops = "".join(f'<li><b>{a}</b><span>{b}</span></li>' for a, b in TOUR_STOPS)
+    cls = "sec sec--alt" if alt else "sec"
+    style = ' style="padding-top:0"' if first else ""
+    more = ('<p style="margin-top:26px"><a class="btn btn--ghost" href="facility.html">施設を詳しく見る</a></p>'
+            if more_link else "")
+    return f"""
+<section class="{cls}"{style}>
+  <div class="wrap">
+    <div class="tour-split rv">
+      {tour_video()}
+      <div>
+        <p class="pill">ROOM TOUR</p>
+        <h2 class="ph">店内を、<span class="mk">48秒</span>で。</h2>
+        <p class="ph-sub"><span class="jb">入口から打席、</span><wbr><span class="jb">ラウンジまで。</span><wbr><span class="jb">はじめての方も、</span><wbr><span class="jb">来る前に雰囲気が分かります。</span></p>
+        <ol class="tour-stops">{stops}</ol>
+        {more}
+      </div>
+    </div>
+  </div>
+</section>
+"""
+
+
+
 def floormap_fig(floor, title, w, h, caption, rooms):
     """フロアマップ1枚（webp＋pngフォールバック／クリックで原寸）。"""
     chips = "".join(f'<li>{r}</li>' for r in rooms)
@@ -799,8 +987,9 @@ def build_index():
   </div>
 </section>
 
+""" + rara_videos_section(alt=True) + f"""
 <!-- 5. FRANK GOLFの魅力 -->
-<section class="sec sec--alt">
+<section class="sec">
   <div class="wrap">
     <div class="center rv">
       <p class="pill">FEATURES</p>
@@ -845,6 +1034,7 @@ def build_index():
   </div>
 </section>
 
+""" + tour_section(alt=True) + f"""
 <!-- 6. 料金 -->
 <section class="sec">
   <div class="wrap price-hero" style="max-width:900px">
@@ -1090,7 +1280,10 @@ def build_concept():
              "concept")
     b += page_head("コンセプト", "CONCEPT", "打って、教わって、語れる。",
                    "ただの練習場ではなく、ゴルフが上手くなり、仲間ができる場所。")
-    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("concept", "assets/img/concept.jpg", "FRANK GOLF 姫路・土山 会員制インドアゴルフラウンジのブランドイメージ", "CONCEPT") + '</div></section>'
+    # #335: ここは暗い打席の写真（760px を引き伸ばし）だった。ユーザー指示「ここは小川を全面に出して
+    #        レッスンをもっとアピール」→ 小川うららプロの動画を大きく出す。
+    b += rara_videos_section(alt=False, eager=True, first=True,
+                             heading='教わるのは、<br><span class="mk">小川うららプロ</span>。')
 
     b += """
 <section class="sec">
@@ -1186,10 +1379,10 @@ def build_concept():
 def build_facility():
     b = head("施設・設備｜TrackMan 4 完備の姫路のインドアゴルフ練習場｜FRANK GOLF",
              "姫路・土山のインドアゴルフ FRANK GOLF の施設・設備。TrackMan 4・DTECT・OKONGOLF のシミュレーター3打席（レフティ対応打席あり）、バーカウンター併設のラウンジ、駐車場20台無料。",
-             "facility")
+             "facility", jsonld=jsonld_tour_video())
     b += page_head("施設・設備", "FACILITY", "打って、終わりじゃない。",
                    "設備の一覧ではなく、ここでの過ごし方でご紹介します。")
-    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("play", "assets/img/play.jpg", "FRANK GOLF 姫路のインドアゴルフ打席・シミュレーターのイメージ", "FACILITY") + '</div></section>'
+    b += tour_section(first=True, more_link=False)
     # フロア見取り図
     b += '''
 <section class="sec" style="padding-top:0">
@@ -1220,16 +1413,15 @@ def build_facility():
     b += '''
 <section class="sec">
   <div class="wrap">
-    <div class="rv" style="max-width:56ch"><p class="eyebrow">Gallery</p><h2 class="h-en">INSIDE</h2><p class="h-jp">館内のようす</p><p class="lead">オープンに向けて準備中です。実際の写真は随時公開いたします。</p></div>
+    <div class="rv" style="max-width:56ch"><p class="eyebrow">Gallery</p><h2 class="h-en">INSIDE</h2><p class="h-jp">館内のようす</p><p class="lead">打席・ラウンジ・レッスンのようすです。</p></div>
     <div class="gallery rv" style="margin-top:36px">
       <div class="gallery__i"><img data-img-src="play" src="assets/img/play.jpg" alt="FRANK GOLF 姫路の打席イメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">打席</span></div>
       <div class="gallery__i"><img data-img-src="lounge" src="assets/img/lounge.jpg" alt="FRANK GOLF 姫路のバー・ラウンジイメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">ラウンジ</span></div>
       <div class="gallery__i"><img data-img-src="lesson" src="assets/img/lesson-rara-wide.jpg" alt="FRANK GOLF 姫路のレッスン。所属プロ「らら」がボール位置から指導する様子" loading="lazy" width="1200" height="800"><span class="gallery__cap">レッスン</span></div>
       <div class="gallery__i"><img data-img-src="community" src="assets/img/community.jpg" alt="FRANK GOLF 姫路の会員交流イメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">コミュニティ</span></div>
-      <div class="gallery__i"><img data-img-src="concept" src="assets/img/concept.jpg" alt="FRANK GOLF 姫路のブランドイメージ" loading="lazy" width="1280" height="720"><span class="gallery__cap">エントランス（準備中）</span></div>
-      <div class="gallery__i"><img data-img-src="hero" src="assets/img/hero.jpg" alt="FRANK GOLF 姫路の館内イメージ" loading="lazy" width="1920" height="1200"><span class="gallery__cap">館内（準備中）</span></div>
+      <div class="gallery__i"><img data-img-src="exterior" src="assets/img/hero-1.jpg" alt="FRANK GOLF 姫路の外観" loading="lazy" width="1600" height="900"><span class="gallery__cap">外観</span></div>
+      <div class="gallery__i"><img src="assets/img/hero.jpg" alt="FRANK GOLF 姫路のバーカウンター" loading="lazy" width="1920" height="1200"><span class="gallery__cap">バーカウンター</span></div>
     </div>
-    <p class="lead" style="font-size:12px;margin-top:14px">※ 掲載画像はイメージです。実際の館内写真はオープンに向けて公開いたします。</p>
   </div>
 </section>'''
 
@@ -1408,6 +1600,7 @@ def build_lesson():
   </div>
 </section>
 """
+    b += rara_videos_section(alt=True)
     b += cta_block()
     b += foot()
     write("lesson.html", b)
@@ -1505,6 +1698,7 @@ def build_coach():
   </div>
 </section>
 """
+    b += rara_videos_section(alt=False)
     b += cta_block()
     b += foot()
     write("coach.html", b)

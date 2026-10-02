@@ -755,6 +755,131 @@
       .join("");
   }
 
+  /* ---------- 小川うららプロの YouTube（#335） ----------
+     [data-yt-latest] … ビルド時に焼き込んだ「最新のレッスン動画」。枠があるページでだけ Genesis の
+       公開API（VIDEOS_API）から新着を受け取り、ここで描き直す＝YouTube に上がれば自動で入れ替わる。
+       API が落ちていれば焼き込みのまま（落ちない設計）。
+     [data-yt-id] … 押すまで YouTube を読み込まない軽量プレーヤー。一覧の動画を押すと、
+       左の大きな枠でその動画を再生する。JS が無ければ普通に YouTube へのリンクとして動く。
+     ★ id は YouTube の動画IDの形（英数 - _ の11文字）だけ通す。タイトルは必ず esc() する。 */
+  var YT_ID = /^[A-Za-z0-9_-]{11}$/;
+  var VIDEOS_API = "https://yozan-genesis.vercel.app/api/public/site/frank-golf/videos";
+
+  function ytFetch() {
+    if (!document.querySelector("[data-yt-latest]") || !window.fetch) return;
+    try {
+      fetch(VIDEOS_API).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+        if (!j || !Array.isArray(j.videos) || j.videos.length === 0) return;
+        D.videos = j.videos;
+        videos();
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function ytDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ""));
+    return m ? Number(m[2]) + "月" + Number(m[3]) + "日 公開" : "";
+  }
+
+  function videos() {
+    var list = pick("videos");
+    if (!Array.isArray(list) || list.length === 0) return;
+    document.querySelectorAll("[data-yt-latest]").forEach(function (box) {
+      var limit = Number(box.getAttribute("data-limit")) || 4;
+      var ex = (box.getAttribute("data-exclude") || "").split(",");
+      var pool = list.filter(function (v) {
+        return v && YT_ID.test(v.id) && ex.indexOf(v.id) < 0 && v.title;
+      });
+      var main = pool.filter(function (v) { return !v.short; });
+      var pickd = main.concat(pool.filter(function (v) { return v.short; })).slice(0, limit);
+      if (pickd.length === 0) return;
+      box.innerHTML = pickd
+        .map(function (v) {
+          var d = ytDate(v.published);
+          return (
+            '<a class="yt-item" href="https://www.youtube.com/watch?v=' + v.id + '" target="_blank" rel="noopener" data-yt-id="' + v.id + '">' +
+            '<span class="yt-item__th"><img src="https://i.ytimg.com/vi/' + v.id + '/hqdefault.jpg" alt="" loading="lazy" width="480" height="360">' +
+            '<span class="yt-play" aria-hidden="true"></span></span>' +
+            '<span class="yt-item__b"><span class="yt-item__t">' + esc(v.title) + "</span>" +
+            (d ? '<span class="yt-item__d">' + d + "</span>" : "") +
+            "</span></a>"
+          );
+        })
+        .join("");
+    });
+  }
+
+  function ytEmbed(id, title) {
+    var f = document.createElement("iframe");
+    f.src = "https://www.youtube-nocookie.com/embed/" + id + "?autoplay=1&rel=0&playsinline=1";
+    f.title = title || "YouTube";
+    f.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+    f.allowFullscreen = true;
+    f.className = "ytl__frame";
+    return f;
+  }
+
+  function ytWire() {
+    document.addEventListener("click", function (ev) {
+      var a = ev.target && ev.target.closest ? ev.target.closest("[data-yt-id]") : null;
+      if (!a) return;
+      var id = a.getAttribute("data-yt-id");
+      if (!YT_ID.test(id || "")) return;
+      var sec = a.closest(".yt-sec");
+      var feat = sec ? sec.querySelector("[data-yt-feature]") : null;
+      if (!feat) return;                       // 枠が無いページでは普通のリンクとして YouTube へ
+      ev.preventDefault();
+      var tEl = a.querySelector(".yt-item__t");
+      var title = tEl ? tEl.textContent : (feat.querySelector("[data-yt-feature-title]") || {}).textContent;
+      var box = feat.querySelector(".ytl");
+      if (!box) return;
+      box.innerHTML = "";
+      box.removeAttribute("href");
+      box.classList.add("is-playing");
+      box.appendChild(ytEmbed(id, title));
+      var cap = feat.querySelector("[data-yt-feature-title]");
+      if (cap && title) cap.textContent = title;
+      sec.querySelectorAll(".yt-item").forEach(function (it) {
+        it.classList.toggle("is-on", it.getAttribute("data-yt-id") === id);
+      });
+      if (a.classList.contains("yt-item")) {
+        var r = feat.getBoundingClientRect();
+        if (r.top < 60 || r.bottom > window.innerHeight) feat.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
+  }
+
+  /* ---------- 館内ツアー動画（#335） ----------
+     画面に入ったら音なしで再生・出たら止める。動きを減らす設定なら自動再生しない（押せば再生）。 */
+  function tour() {
+    var vids = document.querySelectorAll("video[data-tour]");
+    if (!vids.length) return;
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    vids.forEach(function (v) {
+      if (v.getAttribute("data-wired")) return;
+      v.setAttribute("data-wired", "1");
+      var btn = v.parentNode.querySelector("[data-tour-sound]");
+      if (btn) {
+        btn.addEventListener("click", function () {
+          v.muted = !v.muted;
+          if (!v.muted) { v.currentTime = v.currentTime > 47 ? 0 : v.currentTime; v.play().catch(function () {}); }
+          btn.textContent = v.muted ? "音を出す" : "音を消す";
+          btn.setAttribute("aria-pressed", v.muted ? "false" : "true");
+        });
+      }
+      if (reduce || !("IntersectionObserver" in window)) {
+        v.controls = true;
+        return;
+      }
+      new IntersectionObserver(function (es) {
+        es.forEach(function (e) {
+          if (e.isIntersecting) { v.play().catch(function () { v.controls = true; }); }
+          else if (!v.paused) { v.pause(); }
+        });
+      }, { threshold: 0.35 }).observe(v);
+    });
+  }
+
   /* init() は2回走る（DOMContentLoaded で1回 → cms.js が CMS を取得したあと
      FRANK_RENDER() でもう1回）。addEventListener を含む処理を毎回呼ぶと
      ハンドラが二重登録され、バーガーメニューが「開く→即閉じる」で無反応に見える。
@@ -768,6 +893,8 @@
     media();
     news();
     coaches();
+    videos();
+    tour();           // 動画ごとに二重登録を防ぐ
     campaign();
     notice();
     trialSteps();
@@ -778,6 +905,8 @@
       nav();          // burger の click / scroll
       trialForm();    // form の submit
       stickyCta();    // scroll
+      ytWire();       // YouTube の軽量プレーヤー（document に1回だけ）
+      ytFetch();      // YouTube の新着を1回だけ取りに行く
     }
   }
 
