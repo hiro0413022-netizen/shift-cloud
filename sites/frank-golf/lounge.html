@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"バー・ラウンジ","item":"https://frankgolf.jp/lounge.html"}]}</script>
 </head>
 <body data-page="lounge">
@@ -93,7 +96,7 @@
     <p class="lead">ラウンジは、打席のついでにある休憩スペースではありません。</p>
   </div>
 </section>
-<section class="sec" style="padding-top:0"><div class="wrap"><div class="media-frame  rv"><img data-img-src="lounge" src="assets/img/lounge.jpg" alt="FRANK GOLF 姫路のバー・ラウンジ。気取らない大人の社交場のイメージ" loading="lazy" decoding="async" width="1280" height="853"><span class="media-cap">BAR & LOUNGE</span></div></div></section>
+<section class="sec" style="padding-top:0"><div class="wrap"><div class="media-frame media-frame--narrow rv"><img data-img-src="lounge" src="assets/img/lounge.jpg" alt="FRANK GOLF 姫路のバーカウンター。練習の前後にゴルフの話ができるラウンジ" loading="lazy" decoding="async" width="1280" height="853"><span class="media-cap">BAR & LOUNGE</span></div></div></section>
 <section class="sec">
   <div class="wrap" style="max-width:840px">
     <div class="rv">
@@ -136,14 +139,11 @@
       <p class="eyebrow">Lounge Data</p>
       <h2 class="h-en">DETAILS</h2>
       <p class="h-jp" data-frank-badge="lounge.drink">ラウンジ概要</p>
-      <p class="lead">ドリンク・フードの内容、席数、ご利用時間は現在準備中です。決まり次第お知らせいたします。</p>
+      <p class="lead">練習の前後に、ゴルフの話ができるバーカウンター。ドリンクは店頭のメニューからお選びいただけます。</p>
     </div>
     <div class="spec rv" style="margin-top:40px">
       <div class="spec__row"><p class="spec__k">ドリンク</p><p class="spec__v" data-frank="lounge.drink">コーヒー・紅茶・ソフトドリンク 350円〜／FRANKオリジナルソーダ・ノンアルコールカクテル 500円〜（税込・会員価格あり）</p></div>
-      <div class="spec__row"><p class="spec__k">フード</p><p class="spec__v" data-frank="lounge.food">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">席数</p><p class="spec__v" data-frank="lounge.seats">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">ご利用時間</p><p class="spec__v" data-frank="lounge.hours">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">貸切利用</p><p class="spec__v" data-frank="lounge.note">元ゴルフバーのバーカウンターを承継。練習の前後に、ゴルフ談義を楽しめる交流空間です。</p></div>
+      <div class="spec__row"><p class="spec__k">ラウンジについて</p><p class="spec__v" data-frank="lounge.note">元ゴルフバーのバーカウンターを承継。練習の前後に、ゴルフ談義を楽しめる交流空間です。</p></div>
     </div>
   </div>
 </section>

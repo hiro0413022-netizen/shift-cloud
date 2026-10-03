@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"特定商取引法に基づく表記","item":"https://frankgolf.jp/tokushoho.html"}]}</script>
 </head>
 <body data-page="tokushoho">
@@ -99,7 +102,7 @@
     <div class="spec rv" style="margin-top:36px">
       <div class="spec__row"><p class="spec__k">販売事業者</p><p class="spec__v" data-frank="store.company">株式会社YOZAN</p></div>
       <div class="spec__row"><p class="spec__k">運営統括責任者</p><p class="spec__v">古川 博庸</p></div>
-      <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide></span><span data-frank="store.address">兵庫県姫路市土山6-6-1</span>（FRANK GOLF）</p></div>
+      <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide>〒670-0996 </span><span data-frank="store.address">兵庫県姫路市土山6-6-1</span>（FRANK GOLF）</p></div>
       <div class="spec__row"><p class="spec__k">電話番号</p><p class="spec__v"><a data-tel href="tel:0792606671">079-260-6671</a>（営業時間内）</p></div>
       <div class="spec__row"><p class="spec__k">メールアドレス</p><p class="spec__v">お取引・サービスに関するお問い合わせは<a href="https://lin.ee/yp2leQU" data-cta="line" target="_blank" rel="noopener" style="color:var(--brass-2)">公式LINE</a>にて承ります。メールアドレスは、ご請求をいただければ遅滞なく開示いたします。</p></div>
       <div class="spec__row"><p class="spec__k">販売価格</p><p class="spec__v">各会員プランの月会費は<a href="plan.html" style="color:var(--brass-2)">料金ページ</a>に記載のとおりです（表示は税抜・別途消費税がかかります）。体験レッスンは通常3,300円（税込）、キャンペーン期間中は無料です。</p></div>

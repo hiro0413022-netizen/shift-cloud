@@ -1784,3 +1784,29 @@ body.has-sticky-cta .foot { padding-bottom: 104px; }
   .tour-split { grid-template-columns: 1fr; gap: 28px; }
   .tour { max-width: 300px; }
 }
+
+/* #336 元の写真が小さい（760px）ものは、引き伸ばさない幅で出す */
+.media-frame--narrow { max-width: 820px; margin-inline: auto; }
+
+/* #336 ヘッダー: コーチを足してメニューが1つ増え、PC幅で電話番号が「079-260-／6671」と折り返していた */
+.nav__in { gap: 16px; }
+.nav__menu { gap: 16px; }
+.nav__tel { flex: none; }
+.nav__tel a { white-space: nowrap; }
+.nav__tel small { max-width: 12.5em; text-align: right; }
+@media (max-width: 1400px) {
+  .nav__menu { gap: 14px; }
+  .nav__menu a { font-size: 13px; }
+}
+@media (max-width: 1300px) {
+  .nav__tel { display: none; }
+}
+@media (max-width: 1080px) {
+  .nav__menu { gap: 10px; }
+  .nav__menu a { font-size: 12px; letter-spacing: 0; }
+  .nav__cta .nav__member { display: none; }
+  .nav__cta .btn--sm { padding-inline: 14px; }
+}
+@media (max-width: 960px) {
+  .nav__menu a[href="faq.html"], .nav__menu a[href="community.html"] { display: none; }
+}

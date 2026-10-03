@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"体験予約フォーム","item":"https://frankgolf.jp/trial-booking.html"}]}</script>
 </head>
 <body data-page="trial-booking">
@@ -200,7 +203,7 @@
         <div class="spec__row"><p class="spec__k">体験レッスン</p><p class="spec__v">無料（通常 3,300円 税込）・約55分</p></div>
         <div class="spec__row"><p class="spec__k">打席</p><p class="spec__v" id="tb-done-bay"></p></div>
         <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v"><span data-frank="store.address">兵庫県姫路市土山6-6-1</span><br><a data-link="store.mapUrl" href="https://www.google.com/maps/search/?api=1&query=%E5%85%B5%E5%BA%AB%E7%9C%8C%E5%A7%AB%E8%B7%AF%E5%B8%82%E5%9C%9F%E5%B1%B16-6-1" style="color:var(--brass-2);text-decoration:underline">Googleマップで見る</a></p></div>
-        <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+        <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK">手ぶらでOK（お手持ちのクラブをお持ちいただいても構いません）</p></div>
         <div class="spec__row"><p class="spec__k">当日の流れ</p><p class="spec__v" data-frank="trial.content">受付 → カウンセリング（ヒアリング） → 打席のご案内 → 体験レッスン → ご入会のご案内</p></div>
       </div>
       <div class="tb-done__line" id="tb-done-line" hidden>

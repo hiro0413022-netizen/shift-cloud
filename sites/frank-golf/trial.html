@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"体験のご予約","item":"https://frankgolf.jp/trial.html"}]}</script>
 </head>
 <body data-page="trial">
@@ -123,7 +126,7 @@
       <p class="lead" style="max-width:none;margin-top:26px">
         ホームページでどれだけ言葉を尽くしても、伝わらないものがあります。
         打席の広さ、ボールの音、ラウンジの照明の感じ、そこにいる人たちの空気。<br><br>
-        2026年9月2日、姫路・土山にプレオープンいたします。
+        2026年9月、姫路・土山にオープンしました。
         まずは一度、打ちに来てください。少し話して、合いそうだと思っていただけたら、それがいちばんです。
       </p>
       <div class="cta__btns" style="justify-content:flex-start;margin-top:26px">
@@ -194,13 +197,12 @@
     </div>
 
     <div class="spec rv" style="margin-top:44px">
-      <div class="spec__row"><p class="spec__k">体験利用料</p><p class="spec__v" data-frank="price.trialFee">0円（通常 3,300円 税込 → プレオープン記念で無料）</p></div>
+      <div class="spec__row"><p class="spec__k">体験利用料</p><p class="spec__v" data-frank="price.trialFee">0円（通常 3,300円 税込）</p></div>
       <div class="spec__row"><p class="spec__k">所要時間</p><p class="spec__v" data-frank="trial.duration">約55分</p></div>
       <div class="spec__row"><p class="spec__k">体験の内容</p><p class="spec__v" data-frank="trial.content" data-frank-fallback="打席での練習＋プロのマンツーマン指導">受付 → カウンセリング（ヒアリング） → 打席のご案内 → 体験レッスン → ご入会のご案内</p></div>
-      <div class="spec__row"><p class="spec__k">担当</p><p class="spec__v" data-frank="lesson.coaches">らら（小川 うらら）／ USGTF レベルⅢ・YouTube「RaRa LESSON」登録者6万人超 ＝ メインコーチ</p></div>
-      <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">担当</p><p class="spec__v" data-frank="lesson.coaches">小川うらら（USGTF レベルⅢ・YouTube「RaRa LESSON」登録者6万人超）／穴田賢太（USGTF認定プロ・自己最長飛距離350ヤード）</p></div>
+      <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK">手ぶらでOK（お手持ちのクラブをお持ちいただいても構いません）</p></div>
       <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v" data-frank="store.address">兵庫県姫路市土山6-6-1</p></div>
-      <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">月会費のお支払い</p><p class="spec__v">ご入会月（ご利用開始日を先の月にされた場合はご利用開始月）の月会費は無料です。Web入会時にその翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分をクレジットカードで自動でお支払いいただきます。</p></div>
       <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">2026年12月31日までのご入会は入会金（税込5,500円）が無料。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
     </div>

@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"年内入会キャンペーン","item":"https://frankgolf.jp/lp-campaign.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"キャンペーンの内容は？","acceptedAnswer":{"@type":"Answer","text":"2026年12月31日までのご入会で、入会金5,500円（税込）が無料、さらに入会月の月会費も無料になります。"}},{"@type":"Question","name":"支払いはどうなりますか？","acceptedAnswer":{"@type":"Answer","text":"クレジットカードのみです。ご入会月（ご利用開始日を先の月にされた場合はご利用開始月）は無料で、お申し込み時にその翌月・翌々月の月会費2か月分を1回でお支払いいただき、以後は毎月10日に翌月分を自動でお支払いいただきます。"}},{"@type":"Question","name":"すぐに使えますか？","acceptedAnswer":{"@type":"Answer","text":"はい。Web入会は決済完了と同時に会員番号が発行され、その場でWeb打席予約をご利用いただけます。"}},{"@type":"Question","name":"条件はありますか？","acceptedAnswer":{"@type":"Answer","text":"キャンペーンでのご入会は6か月間の継続をお願いしています。休会・退会の規定は会員規約をご確認ください。"}}]}</script>
 </head>
@@ -88,7 +91,7 @@
 
 <section class="page-head">
   <div class="wrap rv">
-    <p class="crumb">姫路・土山｜2026年9月2日 プレオープン</p>
+    <p class="crumb">姫路・土山｜2026年9月オープン</p>
     <h1 class="h-en">年内入会で、入会金0円・入会月0円。</h1>
     <p class="h-jp">オープン記念・年内入会キャンペーン（2026年12月31日まで）</p>
     <p class="lead">入会金5,500円（税込）が無料、さらに入会月の月会費も無料。

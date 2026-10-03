@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="google-site-verification" content="njgqkzKoh_eb6CZV84LxsT7y989O0Gr87etYLAPlWW4">
-<title>姫路のゴルフレッスン・ゴルフ教室｜体験無料・所属プロがマンツーマン｜FRANK GOLF</title>
+<title>姫路のゴルフレッスン・ゴルフ教室｜USGTF認定プロ2名・体験無料｜FRANK GOLF</title>
 <meta name="description" content="体験レッスンは無料（通常3,300円・約55分・手ぶらでOK）。姫路・土山の FRANK GOLF は所属レッスンプロが常駐し、TrackMan 4 の数字を見ながらマンツーマンで直します。会員のワンポイントレッスンは無料、25分マンツーマンは2,500円（税抜）。初心者歓迎のゴルフ教室です。">
 <meta name="format-detection" content="telephone=no">
 <meta property="og:site_name" content="FRANK GOLF">
-<meta property="og:title" content="姫路のゴルフレッスン・ゴルフ教室｜体験無料・所属プロがマンツーマン｜FRANK GOLF">
+<meta property="og:title" content="姫路のゴルフレッスン・ゴルフ教室｜USGTF認定プロ2名・体験無料｜FRANK GOLF">
 <meta property="og:description" content="体験レッスンは無料（通常3,300円・約55分・手ぶらでOK）。姫路・土山の FRANK GOLF は所属レッスンプロが常駐し、TrackMan 4 の数字を見ながらマンツーマンで直します。会員のワンポイントレッスンは無料、25分マンツーマンは2,500円（税抜）。初心者歓迎のゴルフ教室です。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://frankgolf.jp/lesson.html">
@@ -34,7 +34,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"レッスン","item":"https://frankgolf.jp/lesson.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"姫路市でゴルフ教室を探しています。初心者でも通えますか。","acceptedAnswer":{"@type":"Answer","text":"はい。握り方・構えから、所属プロがマンツーマンで順にお伝えします。最初は体験レッスン（約55分・無料・手ぶらでOK）で、ゴルフ歴や目標をおうかがいしてから始めます。"}},{"@type":"Question","name":"グループで習うゴルフスクールとの違いは何ですか。","acceptedAnswer":{"@type":"Answer","text":"FRANK GOLF のレッスンはマンツーマンです。完全予約制の打席で、プロがお一人のスイングだけを見ます。TrackMan 4 などのシミュレーターの数字を見ながら、いま直すべき一点をはっきりさせます。"}},{"@type":"Question","name":"レッスンの料金はいくらですか。","acceptedAnswer":{"@type":"Answer","text":"体験レッスンは無料です（通常3,300円・税込）。会員の方は月額9,800円（税抜）からで、所属プロのワンポイントレッスン（約5分）は無料、25分のマンツーマンレッスンは1回2,500円（税抜）のチケット制です。"}},{"@type":"Question","name":"どんなコーチに習えますか。","acceptedAnswer":{"@type":"Answer","text":"USGTF（全米ゴルフ指導者連盟）認定プロが2名在籍しています。YouTube「RaRa LESSON」（登録者6万人超）の小川うららプロと、自己最長飛距離350ヤードの穴田賢太プロです。体験レッスンでは担当コーチをご指名いただけます。"}},{"@type":"Question","name":"場所と駐車場を教えてください。","acceptedAnswer":{"@type":"Answer","text":"兵庫県姫路市土山6-6-1です。駐車場は20台・無料。姫路市南部のほか、たつの市・太子町・高砂市・加古川市方面からもお車でお越しいただけます。"}},{"@type":"Question","name":"仕事帰りでも通えますか。","acceptedAnswer":{"@type":"Answer","text":"平日は22:00まで営業しています（土日祝は9:00〜20:00、火曜定休）。完全予約制なので、空いている時間を見てからご予約いただけます。"}}]}</script>
 </head>
 <body data-page="lesson">
 
@@ -88,12 +92,24 @@
 <section class="page-head">
   <div class="wrap rv">
     <p class="crumb"><a href="/">HOME</a><span>/</span>レッスン</p>
-    <h1 class="h-en">LESSON</h1>
-    <p class="h-jp">プロに教わる。データで確かめる。</p>
-    <p class="lead">自己流の限界は、たいてい「何が悪いか分からない」ところから来ます。</p>
+    <p class="h-en">LESSON</p>
+    <h1 class="h-jp">姫路のゴルフレッスン・ゴルフ教室</h1>
+    <p class="lead">USGTF認定プロ2名が、マンツーマンで。TrackMan 4 の数字で、直す一点をはっきりさせます。</p>
   </div>
 </section>
 <section class="sec" style="padding-top:0"><div class="wrap"><div class="media-frame  rv"><img data-img-src="lesson" src="assets/img/lesson-rara-wide.jpg" alt="FRANK GOLF 姫路のゴルフレッスン。所属プロ「らら」がボール位置から指導する様子" loading="lazy" decoding="async" width="1280" height="853"><span class="media-cap">LESSON</span></div></div></section>
+<section class="sec">
+  <div class="wrap">
+    <div class="rv" style="max-width:60ch">
+      <p class="eyebrow">Quick Facts</p>
+      <h2 class="ph" style="font-size:clamp(1.5rem,3.4vw,2.1rem)">姫路でゴルフレッスン・<br>ゴルフ教室をお探しの方へ</h2>
+      <p class="lead">大人数で習うゴルフスクールではなく、プロがお一人を見るマンツーマンのゴルフ教室です。まずはここだけ確かめてください。</p>
+    </div>
+    <div class="spec rv" style="margin-top:32px"><div class="spec__row"><p class="spec__k">場所</p><p class="spec__v">兵庫県姫路市土山6-6-1（駐車場20台・無料）　<a href="access.html" style="color:var(--brass-2)">アクセス</a></p></div><div class="spec__row"><p class="spec__k">教える人</p><p class="spec__v">USGTF認定プロ2名（小川うらら／穴田賢太）　<a href="coach.html" style="color:var(--brass-2)">コーチ紹介</a></p></div><div class="spec__row"><p class="spec__k">形式</p><p class="spec__v">マンツーマン（グループレッスンではありません）</p></div><div class="spec__row"><p class="spec__k">はじめての方</p><p class="spec__v">体験レッスン 約55分・<b>無料</b>（通常3,300円・税込）・手ぶらでOK</p></div><div class="spec__row"><p class="spec__k">会員のレッスン</p><p class="spec__v">ワンポイントレッスン（約5分）は無料／25分マンツーマン 2,500円（税抜）</p></div><div class="spec__row"><p class="spec__k">月額</p><p class="spec__v">9,800円（税抜）から　<a href="plan.html" style="color:var(--brass-2)">料金・会員プラン</a></p></div><div class="spec__row"><p class="spec__k">営業時間</p><p class="spec__v">平日 10:00〜22:00／土日祝 9:00〜20:00（火曜定休）</p></div><div class="spec__row"><p class="spec__k">こんな方に</p><p class="spec__v"><a href="himeji-golf-school-beginner.html" style="color:var(--brass-2)">はじめての方</a>・<a href="himeji-golf-lesson-women.html" style="color:var(--brass-2)">女性の方</a>・<a href="golf-100-kiru-himeji.html" style="color:var(--brass-2)">100を切りたい方</a>・<a href="himeji-driver-magaru.html" style="color:var(--brass-2)">ドライバーが曲がる方</a></p></div></div>
+    <p class="rv" style="margin-top:26px"><a class="btn btn--brass" href="trial.html" data-cta="trial">無料体験レッスンを予約する</a></p>
+  </div>
+</section>
+
 <section class="sec">
   <div class="wrap">
     <div class="grid grid--2" style="gap:56px">
@@ -155,6 +171,25 @@
         <p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="https://www.youtube.com/channel/UC4QTQjrDLsx4WF3fdYuLHZQ" target="_blank" rel="noopener">無料レッスン動画を見る（YouTube） ↗</a></p>
       </div>
     </div>
+    <div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">
+      <div class="media-frame media-tall">
+        <img src="assets/img/coach-anada.jpg" alt="FRANK GOLF 姫路のコーチ 穴田賢太" loading="lazy" width="1000" height="1250">
+        <span class="media-cap">Kenta ANADA</span>
+      </div>
+      <div>
+        <p class="card__no">COACH</p>
+        <h3 class="card__t" style="font-size:2rem">穴田 賢太</h3>
+        <p class="card__t-jp" style="margin-bottom:14px">Kenta ANADA</p>
+        <p class="card__b" style="margin-bottom:14px">「飛ばす」と「まとめる」の両方を教えられるコーチ。自己最長飛距離は350ヤードです。</p>
+        <p class="card__b" style="margin-bottom:14px">力任せではなく、体の使い方とクラブの入り方から飛距離が伸びる仕組みを組み立て、TrackManの数字で一本ずつ確かめます。スコアをつくるための考え方までお伝えするので、飛距離を伸ばしたい方にも、スコアの壁で止まっている方にも。</p>
+        <ul class="plan__f" style="font-size:13.5px">
+          <li>USGTF（全米ゴルフ指導者連盟）認定プロ</li>
+          <li>自己最長飛距離 350ヤード</li>
+          <li>飛距離アップ／スコアメイクのレッスンを担当</li>
+          <li>FRANK GOLF 姫路 コーチ</li>
+        </ul>
+      </div>
+    </div>
     </div>
   </div>
 </section>
@@ -165,16 +200,50 @@
       <p class="eyebrow">Lesson Menu</p>
       <h2 class="h-en">DETAILS</h2>
       <p class="h-jp" data-frank-badge="lesson.style">レッスン内容</p>
-      <p class="lead">レッスンの形式・メニュー・担当コーチは現在準備中です。決まり次第、このページと公式LINEでお知らせいたします。</p>
+      <p class="lead">会員の方は、所属プロのワンポイントレッスン（約5分）が無料。じっくり見てほしい日は、25分のマンツーマンをチケットでご利用いただけます。担当コーチは<a href="coach.html" style="color:var(--brass-2)">コーチ紹介</a>をご覧ください。</p>
     </div>
     <div class="spec rv" style="margin-top:40px">
       <div class="spec__row"><p class="spec__k">レッスン形式</p><p class="spec__v" data-frank="lesson.style">所属プロによるワンポイントレッスン5分（会員は無料・受け放題感覚）／ 追加のパーソナルレッスンは25分</p></div>
       <div class="spec__row"><p class="spec__k">レッスンメニュー</p><p class="spec__v" data-frank="lesson.menu">ワンポイントレッスン（会員は受け放題感覚）／ 25分マンツーマン・チケット制も選べます</p></div>
-      <div class="spec__row"><p class="spec__k">コーチ紹介</p><p class="spec__v" data-frank="lesson.coaches">らら（小川 うらら）／ USGTF レベルⅢ・YouTube「RaRa LESSON」登録者6万人超 ＝ メインコーチ</p></div>
-      <div class="spec__row"><p class="spec__k">初心者プログラム</p><p class="spec__v" data-frank="lesson.beginnerProgram">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">コーチ紹介</p><p class="spec__v" data-frank="lesson.coaches">小川うらら（USGTF レベルⅢ・YouTube「RaRa LESSON」登録者6万人超）／穴田賢太（USGTF認定プロ・自己最長飛距離350ヤード）</p></div>
+      <div class="spec__row"><p class="spec__k">初心者プログラム</p><p class="spec__v" data-frank="lesson.beginnerProgram">握り方・構えから、所属プロがマンツーマンで順に組み立てます（体験レッスンで最初に目標をおうかがいします）</p></div>
       <div class="spec__row"><p class="spec__k">使用シミュレーター</p><p class="spec__v" data-frank="store.simulator">TrackMan 4・DTECT・OKONGOLF の最新シミュレーター 計3台</p></div>
       <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice" data-tax>25分マンツーマン 2,500円<small class="tax">（税込 2,750円）</small></p></div>
     </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap" style="max-width:860px">
+    <div class="rv">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="ph" style="font-size:clamp(1.5rem,3.4vw,2.1rem)">レッスンについて、よくあるご質問</h2>
+    </div>
+    <div class="faq rv" style="margin-top:28px">      <details>
+        <summary>姫路市でゴルフ教室を探しています。初心者でも通えますか。</summary>
+        <div class="faq__a">はい。握り方・構えから、所属プロがマンツーマンで順にお伝えします。最初は体験レッスン（約55分・無料・手ぶらでOK）で、ゴルフ歴や目標をおうかがいしてから始めます。</div>
+      </details>
+      <details>
+        <summary>グループで習うゴルフスクールとの違いは何ですか。</summary>
+        <div class="faq__a">FRANK GOLF のレッスンはマンツーマンです。完全予約制の打席で、プロがお一人のスイングだけを見ます。TrackMan 4 などのシミュレーターの数字を見ながら、いま直すべき一点をはっきりさせます。</div>
+      </details>
+      <details>
+        <summary>レッスンの料金はいくらですか。</summary>
+        <div class="faq__a">体験レッスンは無料です（通常3,300円・税込）。会員の方は月額9,800円（税抜）からで、所属プロのワンポイントレッスン（約5分）は無料、25分のマンツーマンレッスンは1回2,500円（税抜）のチケット制です。</div>
+      </details>
+      <details>
+        <summary>どんなコーチに習えますか。</summary>
+        <div class="faq__a">USGTF（全米ゴルフ指導者連盟）認定プロが2名在籍しています。YouTube「RaRa LESSON」（登録者6万人超）の小川うららプロと、自己最長飛距離350ヤードの穴田賢太プロです。体験レッスンでは担当コーチをご指名いただけます。</div>
+      </details>
+      <details>
+        <summary>場所と駐車場を教えてください。</summary>
+        <div class="faq__a">兵庫県姫路市土山6-6-1です。駐車場は20台・無料。姫路市南部のほか、たつの市・太子町・高砂市・加古川市方面からもお車でお越しいただけます。</div>
+      </details>
+      <details>
+        <summary>仕事帰りでも通えますか。</summary>
+        <div class="faq__a">平日は22:00まで営業しています（土日祝は9:00〜20:00、火曜定休）。完全予約制なので、空いている時間を見てからご予約いただけます。</div>
+      </details>
+</div>
   </div>
 </section>
 

@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"アクセス","item":"https://frankgolf.jp/access.html"}]}</script>
 </head>
 <body data-page="access">
@@ -101,14 +104,13 @@
         <div class="spec">
           <div class="spec__row"><p class="spec__k">店舗名</p><p class="spec__v">FRANK GOLF</p></div>
           <div class="spec__row"><p class="spec__k">エリア</p><p class="spec__v">姫路・土山</p></div>
-          <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide></span><span data-frank="store.address">兵庫県姫路市土山6-6-1</span></p></div>
+          <div class="spec__row"><p class="spec__k">所在地</p><p class="spec__v"><span data-frank="store.postal" data-frank-hide>〒670-0996 </span><span data-frank="store.address">兵庫県姫路市土山6-6-1</span></p></div>
           <div class="spec__row"><p class="spec__k">電話番号</p><p class="spec__v"><a data-tel href="tel:0792606671">079-260-6671</a></p></div>
           <div class="spec__row"><p class="spec__k">営業時間</p><p class="spec__v" data-frank="store.hours">平日 10:00〜22:00 ／ 土日祝 9:00〜20:00</p></div>
           <div class="spec__row"><p class="spec__k">定休日</p><p class="spec__v" data-frank="store.holiday">毎週火曜日</p></div>
           <div class="spec__row"><p class="spec__k">駐車場</p><p class="spec__v" data-frank="store.parking">最大20台・無料</p></div>
           <div class="spec__row"><p class="spec__k">アクセス</p><p class="spec__v" data-frank="store.access">お車でのご来店に便利な立地（駐車場20台完備）</p></div>
-          <div class="spec__row"><p class="spec__k">プレオープン</p><p class="spec__v"><span data-preopen>2026年9月2日</span></p></div>
-          <div class="spec__row"><p class="spec__k">グランドオープン</p><p class="spec__v" data-frank="preopen.grandOpenDate">2026年9月5日</p></div>
+          <div class="spec__row"><p class="spec__k">オープン</p><p class="spec__v">2026年9月5日</p></div>
           <div class="spec__row"><p class="spec__k">運営</p><p class="spec__v" data-frank="store.company">株式会社YOZAN</p></div>
         </div>
       </div>

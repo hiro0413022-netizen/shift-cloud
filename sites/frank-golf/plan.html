@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"料金・会員プラン","item":"https://frankgolf.jp/plan.html"}]}</script>
 </head>
 <body data-page="plan">
@@ -90,7 +93,7 @@
     <p class="crumb"><a href="/">HOME</a><span>/</span>料金・会員プラン</p>
     <h1 class="h-en">PLAN &amp; PRICE</h1>
     <p class="h-jp">会員プラン</p>
-    <p class="lead">料金・プラン内容は現在準備中です。決まり次第、本ページと公式LINEでお知らせいたします。</p>
+    <p class="lead">月額9,800円から。表示はすべて税抜で、カッコ内が税込です。</p>
   </div>
 </section>
 
@@ -140,9 +143,8 @@
       <div class="spec__row"><p class="spec__k">法人プレミアムプラン</p><p class="spec__v"><span data-frank="price.corporate.1.price" data-tax>59,800円 / 月<small class="tax">（税込 65,780円）</small></span><br><span data-frank="price.corporate.1.desc">ご利用者のご登録人数に制限なし／御社合計8コマまで／同伴のビジター様は無料</span><br><a href="corporate.html" style="color:var(--brass-2)">法人でのご利用について ↗</a></p></div>
       <div class="spec__row"><p class="spec__k">レッスン料金</p><p class="spec__v" data-frank="price.lessonPrice" data-tax>25分マンツーマン 2,500円<small class="tax">（税込 2,750円）</small></p></div>
       <div class="spec__row"><p class="spec__k">入会金</p><p class="spec__v" data-frank="price.joinFee" data-tax>5,000円<small class="tax">（税込 5,500円）</small></p></div>
-      <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">0円（通常 3,300円 税込 → プレオープン記念で無料）</p></div>
-      <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee" data-tax>近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">0円（通常 3,300円 税込）</p></div>
+      <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee" data-tax>公式LINE・お電話でお問い合わせください</p></div>
       <div class="spec__row"><p class="spec__k">月会費のお支払い</p><p class="spec__v">ご入会月（ご利用開始日を先の月にされた場合はご利用開始月）の月会費は無料です。Web入会時にその翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分をクレジットカードで自動でお支払いいただきます。</p></div>
       <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">2026年12月31日までのご入会は入会金（税込5,500円）が無料。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
       <div class="spec__row"><p class="spec__k">備考</p><p class="spec__v" data-frank="price.note">表示金額はすべて税抜です。カッコ内は税込価格（消費税10%）です。</p></div>

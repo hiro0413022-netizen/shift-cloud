@@ -114,7 +114,7 @@ def jsonld_business():
         "publicAccess": True,
         "makesOffer": [
             {"@type": "Offer", "name": "体験レッスン（約55分）", "price": "0", "priceCurrency": "JPY",
-             "description": "通常3,300円（税込）のところ、プレオープン記念で無料。所属プロのマンツーマン。",
+             "description": "通常3,300円（税込）のところ無料。所属プロのマンツーマン。",
              "url": abs_url("trial.html")},
             {"@type": "Offer", "name": "ライト会員（月4回まで・平日10:00〜15:00）", "price": "10780", "priceCurrency": "JPY",
              "priceSpecification": {"@type": "UnitPriceSpecification", "price": "10780", "priceCurrency": "JPY",
@@ -294,6 +294,9 @@ def head(title, desc, page, jsonld="", noindex=False, og_type="website"):
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 {jsonld_tag}</head>
 <body data-page="{page}">
 
@@ -493,15 +496,18 @@ def foot():
 """
 
 
-def page_head(crumb, en, jp, lead=""):
-    """下層ページの見出し"""
+def page_head(crumb, en, jp, lead="", h1_jp=False):
+    """下層ページの見出し
+    h1_jp=True … 日本語の見出しを h1 にする（検索で狙う言葉を h1 に入れたいページ用・#336）。
+                 見た目は同じ（クラスはそのまま）。"""
     lead_html = f'<p class="lead">{lead}</p>' if lead else ""
+    en_tag, jp_tag = ("p", "h1") if h1_jp else ("h1", "p")
     return f"""
 <section class="page-head">
   <div class="wrap rv">
     <p class="crumb"><a href="index.html">HOME</a><span>/</span>{crumb}</p>
-    <h1 class="h-en">{en}</h1>
-    <p class="h-jp">{jp}</p>
+    <{en_tag} class="h-en">{en}</{en_tag}>
+    <{jp_tag} class="h-jp">{jp}</{jp_tag}>
     {lead_html}
   </div>
 </section>
@@ -1244,7 +1250,7 @@ HOME_FAQ = [
     ("一人で黙々と練習したいのですが、交流は必須ですか。",
      "いいえ。イベントへの参加もラウンジのご利用も、すべて任意です。打席で集中して打って、そのままお帰りいただいて構いません。交流は「あってもいいもの」であって、義務ではありません。"),
     ("会員でなくても利用できますか。",
-     "はい。体験レッスン（約55分）をご用意しています。通常3,300円（税込）のところ、いまなら無料です。サイトのカレンダーからその場でご予約いただけます。ビジター利用の可否については、決まり次第お知らせいたします。"),
+     "はい。体験レッスン（約55分）をご用意しています。通常3,300円（税込）のところ、いまなら無料です。サイトのカレンダーからその場でご予約いただけます。ビジター利用については、公式LINE・お電話でお問い合わせください。"),
     ("予約はどのように取りますか。",
      "体験のご予約は、本サイトの「体験予約」ボタンから、カレンダーで日時を選ぶだけでその場で確定します（会員登録・ログイン不要）。会員の方の打席予約は、会員ログイン後のWeb予約からお取りいただけます。"),
     ("お酒が飲めなくてもラウンジは使えますか。",
@@ -1420,7 +1426,7 @@ def build_facility():
       <div class="gallery__i"><img data-img-src="lesson" src="assets/img/lesson-rara-wide.jpg" alt="FRANK GOLF 姫路のレッスン。所属プロ「らら」がボール位置から指導する様子" loading="lazy" width="1200" height="800"><span class="gallery__cap">レッスン</span></div>
       <div class="gallery__i"><img data-img-src="community" src="assets/img/community.jpg" alt="FRANK GOLF 姫路の会員交流イメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">コミュニティ</span></div>
       <div class="gallery__i"><img data-img-src="exterior" src="assets/img/hero-1.jpg" alt="FRANK GOLF 姫路の外観" loading="lazy" width="1600" height="900"><span class="gallery__cap">外観</span></div>
-      <div class="gallery__i"><img src="assets/img/hero.jpg" alt="FRANK GOLF 姫路のバーカウンター" loading="lazy" width="1920" height="1200"><span class="gallery__cap">バーカウンター</span></div>
+      <div class="gallery__i"><img src="assets/img/hero.jpg" alt="FRANK GOLF 姫路のバーカウンター" loading="lazy" width="760" height="500"><span class="gallery__cap">バーカウンター</span></div>
     </div>
   </div>
 </section>'''
@@ -1483,12 +1489,11 @@ def build_facility():
       <p class="eyebrow">Specification</p>
       <h2 class="h-en">FACILITY DATA</h2>
       <p class="h-jp">設備概要</p>
-      <p class="lead">下記は現在準備中の項目です。決まり次第、このページと公式LINEでお知らせいたします。</p>
     </div>
     <div class="spec rv" style="margin-top:40px">
       <div class="spec__row"><p class="spec__k">打席数</p><p class="spec__v" data-frank="store.bays">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">シミュレーター</p><p class="spec__v" data-frank="store.simulator">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">バー・ラウンジ</p><p class="spec__v" data-frank="lounge.seats">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">バー・ラウンジ</p><p class="spec__v" data-frank="store.lounge">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">営業時間</p><p class="spec__v" data-frank="store.hours">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">定休日</p><p class="spec__v" data-frank="store.holiday">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">駐車場</p><p class="spec__v" data-frank="store.parking">近日公開</p></div>
@@ -1507,14 +1512,83 @@ def build_facility():
     write("facility.html", b)
 
 
+# ------------------------------------------------------------------
+# レッスンページの早見表とよくある質問（#336）
+#   「姫路 ゴルフレッスン／姫路市 ゴルフ教室／姫路市 ゴルフスクール」で探している人が、
+#   最初の画面で 場所・誰が・形式・料金・時間 を確かめられるように。中身はサイトに既に出ている事実だけ。
+# ------------------------------------------------------------------
+LESSON_FAQ = [
+    ("姫路市でゴルフ教室を探しています。初心者でも通えますか。",
+     "はい。握り方・構えから、所属プロがマンツーマンで順にお伝えします。最初は体験レッスン（約55分・無料・手ぶらでOK）で、ゴルフ歴や目標をおうかがいしてから始めます。"),
+    ("グループで習うゴルフスクールとの違いは何ですか。",
+     "FRANK GOLF のレッスンはマンツーマンです。完全予約制の打席で、プロがお一人のスイングだけを見ます。TrackMan 4 などのシミュレーターの数字を見ながら、いま直すべき一点をはっきりさせます。"),
+    ("レッスンの料金はいくらですか。",
+     "体験レッスンは無料です（通常3,300円・税込）。会員の方は月額9,800円（税抜）からで、所属プロのワンポイントレッスン（約5分）は無料、25分のマンツーマンレッスンは1回2,500円（税抜）のチケット制です。"),
+    ("どんなコーチに習えますか。",
+     "USGTF（全米ゴルフ指導者連盟）認定プロが2名在籍しています。YouTube「RaRa LESSON」（登録者6万人超）の小川うららプロと、自己最長飛距離350ヤードの穴田賢太プロです。体験レッスンでは担当コーチをご指名いただけます。"),
+    ("場所と駐車場を教えてください。",
+     "兵庫県姫路市土山6-6-1です。駐車場は20台・無料。姫路市南部のほか、たつの市・太子町・高砂市・加古川市方面からもお車でお越しいただけます。"),
+    ("仕事帰りでも通えますか。",
+     "平日は22:00まで営業しています（土日祝は9:00〜20:00、火曜定休）。完全予約制なので、空いている時間を見てからご予約いただけます。"),
+]
+
+
+def lesson_quick_facts():
+    link = 'style="color:var(--brass-2)"'
+    rows = [
+        ("場所", f'兵庫県姫路市土山6-6-1（駐車場20台・無料）　<a href="access.html" {link}>アクセス</a>'),
+        ("教える人", f'USGTF認定プロ2名（小川うらら／穴田賢太）　<a href="coach.html" {link}>コーチ紹介</a>'),
+        ("形式", "マンツーマン（グループレッスンではありません）"),
+        ("はじめての方", "体験レッスン 約55分・<b>無料</b>（通常3,300円・税込）・手ぶらでOK"),
+        ("会員のレッスン", "ワンポイントレッスン（約5分）は無料／25分マンツーマン 2,500円（税抜）"),
+        ("月額", f'9,800円（税抜）から　<a href="plan.html" {link}>料金・会員プラン</a>'),
+        ("営業時間", "平日 10:00〜22:00／土日祝 9:00〜20:00（火曜定休）"),
+        ("こんな方に", f'<a href="himeji-golf-school-beginner.html" {link}>はじめての方</a>・'
+                       f'<a href="himeji-golf-lesson-women.html" {link}>女性の方</a>・'
+                       f'<a href="golf-100-kiru-himeji.html" {link}>100を切りたい方</a>・'
+                       f'<a href="himeji-driver-magaru.html" {link}>ドライバーが曲がる方</a>'),
+    ]
+    body = "".join(f'<div class="spec__row"><p class="spec__k">{k}</p><p class="spec__v">{v}</p></div>' for k, v in rows)
+    return f"""
+<section class="sec">
+  <div class="wrap">
+    <div class="rv" style="max-width:60ch">
+      <p class="eyebrow">Quick Facts</p>
+      <h2 class="ph" style="font-size:clamp(1.5rem,3.4vw,2.1rem)">姫路でゴルフレッスン・<br>ゴルフ教室をお探しの方へ</h2>
+      <p class="lead">大人数で習うゴルフスクールではなく、プロがお一人を見るマンツーマンのゴルフ教室です。まずはここだけ確かめてください。</p>
+    </div>
+    <div class="spec rv" style="margin-top:32px">{body}</div>
+    <p class="rv" style="margin-top:26px"><a class="btn btn--brass" href="trial.html" data-cta="trial">無料体験レッスンを予約する</a></p>
+  </div>
+</section>
+"""
+
+
+def lesson_faq_section():
+    return f"""
+<section class="sec">
+  <div class="wrap" style="max-width:860px">
+    <div class="rv">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="ph" style="font-size:clamp(1.5rem,3.4vw,2.1rem)">レッスンについて、よくあるご質問</h2>
+    </div>
+    <div class="faq rv" style="margin-top:28px">{faq_items(LESSON_FAQ)}</div>
+  </div>
+</section>
+"""
+
+
 def build_lesson():
-    b = head("姫路のゴルフレッスン・ゴルフ教室｜体験無料・所属プロがマンツーマン｜FRANK GOLF",
+    # #336: Search Console で「姫路×レッスン／教室／スクール」の14クエリが表示220・平均12位・クリック5。
+    #        このページを受け皿にするため、h1 に検索語を入れ、早見表とよくある質問（FAQPage）を足した。
+    b = head("姫路のゴルフレッスン・ゴルフ教室｜USGTF認定プロ2名・体験無料｜FRANK GOLF",
              "体験レッスンは無料（通常3,300円・約55分・手ぶらでOK）。姫路・土山の FRANK GOLF は所属レッスンプロが常駐し、TrackMan 4 の数字を見ながらマンツーマンで直します。会員のワンポイントレッスンは無料、25分マンツーマンは2,500円（税抜）。初心者歓迎のゴルフ教室です。",
-             "lesson")
-    b += page_head("レッスン", "LESSON", "プロに教わる。データで確かめる。",
-                   "自己流の限界は、たいてい「何が悪いか分からない」ところから来ます。")
+             "lesson", jsonld=jsonld_faq(LESSON_FAQ))
+    b += page_head("レッスン", "LESSON", "姫路のゴルフレッスン・ゴルフ教室",
+                   "USGTF認定プロ2名が、マンツーマンで。TrackMan 4 の数字で、直す一点をはっきりさせます。", h1_jp=True)
     b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("lesson", "assets/img/lesson-rara-wide.jpg", "FRANK GOLF 姫路のゴルフレッスン。所属プロ「らら」がボール位置から指導する様子", "LESSON") + '</div></section>'
 
+    b += lesson_quick_facts()
     b += """
 <section class="sec">
   <div class="wrap">
@@ -1577,6 +1651,25 @@ def build_lesson():
         <p style="margin-top:20px"><a class="btn btn--ghost btn--sm" href="https://www.youtube.com/channel/UC4QTQjrDLsx4WF3fdYuLHZQ" target="_blank" rel="noopener">無料レッスン動画を見る（YouTube） ↗</a></p>
       </div>
     </div>
+    <div class="grid grid--2 rv" style="margin-top:40px;gap:40px;align-items:center">
+      <div class="media-frame media-tall">
+        <img src="assets/img/coach-anada.jpg" alt="FRANK GOLF 姫路のコーチ 穴田賢太" loading="lazy" width="1000" height="1250">
+        <span class="media-cap">Kenta ANADA</span>
+      </div>
+      <div>
+        <p class="card__no">COACH</p>
+        <h3 class="card__t" style="font-size:2rem">穴田 賢太</h3>
+        <p class="card__t-jp" style="margin-bottom:14px">Kenta ANADA</p>
+        <p class="card__b" style="margin-bottom:14px">「飛ばす」と「まとめる」の両方を教えられるコーチ。自己最長飛距離は350ヤードです。</p>
+        <p class="card__b" style="margin-bottom:14px">力任せではなく、体の使い方とクラブの入り方から飛距離が伸びる仕組みを組み立て、TrackManの数字で一本ずつ確かめます。スコアをつくるための考え方までお伝えするので、飛距離を伸ばしたい方にも、スコアの壁で止まっている方にも。</p>
+        <ul class="plan__f" style="font-size:13.5px">
+          <li>USGTF（全米ゴルフ指導者連盟）認定プロ</li>
+          <li>自己最長飛距離 350ヤード</li>
+          <li>飛距離アップ／スコアメイクのレッスンを担当</li>
+          <li>FRANK GOLF 姫路 コーチ</li>
+        </ul>
+      </div>
+    </div>
     </div>
   </div>
 </section>
@@ -1587,7 +1680,7 @@ def build_lesson():
       <p class="eyebrow">Lesson Menu</p>
       <h2 class="h-en">DETAILS</h2>
       <p class="h-jp" data-frank-badge="lesson.style">レッスン内容</p>
-      <p class="lead">レッスンの形式・メニュー・担当コーチは現在準備中です。決まり次第、このページと公式LINEでお知らせいたします。</p>
+      <p class="lead">会員の方は、所属プロのワンポイントレッスン（約5分）が無料。じっくり見てほしい日は、25分のマンツーマンをチケットでご利用いただけます。担当コーチは<a href="coach.html" style="color:var(--brass-2)">コーチ紹介</a>をご覧ください。</p>
     </div>
     <div class="spec rv" style="margin-top:40px">
       <div class="spec__row"><p class="spec__k">レッスン形式</p><p class="spec__v" data-frank="lesson.style">近日公開</p></div>
@@ -1600,6 +1693,7 @@ def build_lesson():
   </div>
 </section>
 """
+    b += lesson_faq_section()
     b += rara_videos_section(alt=True)
     b += cta_block()
     b += foot()
@@ -1710,7 +1804,7 @@ def build_lounge():
              "lounge")
     b += page_head("バー・ラウンジ", "BAR &amp; LOUNGE", "ここが、FRANK GOLFの中心です。",
                    "ラウンジは、打席のついでにある休憩スペースではありません。")
-    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("lounge", "assets/img/lounge.jpg", "FRANK GOLF 姫路のバー・ラウンジ。気取らない大人の社交場のイメージ", "BAR & LOUNGE") + '</div></section>'
+    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("lounge", "assets/img/lounge.jpg", "FRANK GOLF 姫路のバーカウンター。練習の前後にゴルフの話ができるラウンジ", "BAR & LOUNGE", cls="media-frame--narrow") + '</div></section>'
 
     b += """
 <section class="sec">
@@ -1755,14 +1849,11 @@ def build_lounge():
       <p class="eyebrow">Lounge Data</p>
       <h2 class="h-en">DETAILS</h2>
       <p class="h-jp" data-frank-badge="lounge.drink">ラウンジ概要</p>
-      <p class="lead">ドリンク・フードの内容、席数、ご利用時間は現在準備中です。決まり次第お知らせいたします。</p>
+      <p class="lead">練習の前後に、ゴルフの話ができるバーカウンター。ドリンクは店頭のメニューからお選びいただけます。</p>
     </div>
     <div class="spec rv" style="margin-top:40px">
       <div class="spec__row"><p class="spec__k">ドリンク</p><p class="spec__v" data-frank="lounge.drink">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">フード</p><p class="spec__v" data-frank="lounge.food">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">席数</p><p class="spec__v" data-frank="lounge.seats">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">ご利用時間</p><p class="spec__v" data-frank="lounge.hours">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">貸切利用</p><p class="spec__v" data-frank="lounge.note">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">ラウンジについて</p><p class="spec__v" data-frank="lounge.note">近日公開</p></div>
     </div>
   </div>
 </section>
@@ -1778,7 +1869,7 @@ def build_community():
              "community")
     b += page_head("コミュニティ", "COMMUNITY", "練習仲間ができると、ゴルフはもっと面白い。",
                    "「一緒に回る人がいない」。その一言が出ないように。")
-    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("community", "assets/img/community.jpg", "FRANK GOLF 姫路の会員コンペ・ゴルフ仲間との交流イメージ", "COMMUNITY") + '</div></section>'
+    b += '<section class="sec" style="padding-top:0"><div class="wrap">' + media("community", "assets/img/community.jpg", "FRANK GOLF 姫路の会員コンペ・ゴルフ仲間との交流イメージ", "COMMUNITY", cls="media-frame--narrow") + '</div></section>'
 
     b += """
 <section class="sec">
@@ -1811,7 +1902,7 @@ def build_community():
       <article class="card"><p class="card__no">06</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">ゴルフ仲間との出会い</h3><p class="card__b">イベントに出なくても大丈夫です。ラウンジで隣に座った人と話が合えば、それがいちばん自然な出会いです。仕組みより、空気を大切にします。</p></article>
     </div>
     <p class="lead center rv" style="margin-top:40px">
-      イベントの開催時期・内容の詳細は <span class="tbd">近日公開</span> です。
+      イベントの開催のお知らせは、公式LINE・Instagramでお届けします。
     </p>
   </div>
 </section>
@@ -1845,7 +1936,7 @@ def build_plan():
              "姫路・土山のインドアゴルフ FRANK GOLF の料金。ライト9,800円／レギュラー13,800円（1日1時間 通い放題）／マスター19,800円（税抜・月額）。法人プランあり。2026年内のご入会は入会金5,500円が無料。",
              "plan")
     b += page_head("料金・会員プラン", "PLAN &amp; PRICE", "会員プラン",
-                   "料金・プラン内容は現在準備中です。決まり次第、本ページと公式LINEでお知らせいたします。")
+                   "月額9,800円から。表示はすべて税抜で、カッコ内が税込です。")
     # 料金を見ている人がいちばん動きやすいので、プラン表のすぐ上に出す（#280）
     b += campaign_band()
     b += """
@@ -1879,7 +1970,6 @@ def build_plan():
       <div class="spec__row"><p class="spec__k">入会金</p><p class="spec__v" data-frank="price.joinFee" data-tax>近日公開</p></div>
       <div class="spec__row"><p class="spec__k">体験利用</p><p class="spec__v" data-frank="price.trialFee">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">ビジター利用</p><p class="spec__v" data-frank="price.visitorFee" data-tax>近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">月会費のお支払い</p><p class="spec__v">ご入会月（ご利用開始日を先の月にされた場合はご利用開始月）の月会費は無料です。Web入会時にその翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分をクレジットカードで自動でお支払いいただきます。</p></div>
       <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">2026年12月31日までのご入会は入会金（税込5,500円）が無料。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
       <div class="spec__row"><p class="spec__k">備考</p><p class="spec__v" data-frank="price.note">近日公開</p></div>
@@ -1980,9 +2070,9 @@ def build_beginner():
 <section class="sec sec--alt">
   <div class="wrap">
     <div class="grid grid--2">
-      <article class="card rv"><p class="card__no">01</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">クラブがなくても始められます</h3><p class="card__b">まずは手ぶらでお越しください。レンタルの詳細は <span class="tbd">近日公開</span> です。</p></article>
+      <article class="card rv"><p class="card__no">01</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">クラブがなくても始められます</h3><p class="card__b">まずは手ぶらでお越しください。ご入会後のレンタルについては、受付でお気軽にお尋ねください。</p></article>
       <article class="card rv"><p class="card__no">02</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">誰にも見られません</h3><p class="card__b">屋内・少人数制です。空振りしても、誰も見ていません。天候にも季節にも左右されません。</p></article>
-      <article class="card rv"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">プロが、最初の一歩から</h3><p class="card__b">握り方、構え方、当て方。自己流の癖がつく前に、正しい形を。初心者プログラムの詳細は <span class="tbd">近日公開</span> です。</p></article>
+      <article class="card rv"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">プロが、最初の一歩から</h3><p class="card__b">握り方、構え方、当て方。自己流の癖がつく前に、正しい形を。体験レッスンで目標をおうかがいしてから、順番に組み立てます。</p></article>
       <article class="card rv"><p class="card__no">04</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">同じ立場の仲間がいます</h3><p class="card__b">初心者向けの交流会・ラウンド会をご用意します。「みんな初めて」なら、コースデビューも怖くありません。</p></article>
       <article class="card rv"><p class="card__no">05</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">数字が、上達を教えてくれます</h3><p class="card__b">シミュレーターのデータで、飛距離も方向も記録されます。先週より良くなっていることが、はっきり見えます。</p></article>
       <article class="card rv"><p class="card__no">06</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">気まずくならない空気</h3><p class="card__b">上手い人が偉い場所にはしません。スコアで値踏みされることも、知ったかぶりを求められることもありません。</p></article>
@@ -2002,7 +2092,7 @@ def build_beginner():
         ("まったくの初心者ですが、大丈夫でしょうか。",
          "はい。むしろ、これから始める方をいちばん歓迎しています。クラブの握り方からプロがお伝えします。"),
         ("クラブを持っていません。",
-         "お持ちでなくても始められます。レンタルの有無や内容については近日公開いたします。"),
+         "お持ちでなくても始められます。体験レッスンは手ぶらでOKです。ご入会後のレンタルについては、受付でお気軽にお尋ねください。"),
         ("服装はどうすればいいですか。",
          "動きやすい服装でお越しください。ドレスコードはありません。ラウンジも練習着のままで結構です。"),
         ("周りが上手い人ばかりで気まずくないですか。",
@@ -2185,8 +2275,7 @@ def build_access():
           <div class="spec__row"><p class="spec__k">定休日</p><p class="spec__v" data-frank="store.holiday">近日公開</p></div>
           <div class="spec__row"><p class="spec__k">駐車場</p><p class="spec__v" data-frank="store.parking">近日公開</p></div>
           <div class="spec__row"><p class="spec__k">アクセス</p><p class="spec__v" data-frank="store.access">近日公開</p></div>
-          <div class="spec__row"><p class="spec__k">プレオープン</p><p class="spec__v"><span data-preopen>2026年9月2日</span></p></div>
-          <div class="spec__row"><p class="spec__k">グランドオープン</p><p class="spec__v" data-frank="preopen.grandOpenDate">2026年9月5日</p></div>
+          <div class="spec__row"><p class="spec__k">オープン</p><p class="spec__v">2026年9月5日</p></div>
           <div class="spec__row"><p class="spec__k">運営</p><p class="spec__v" data-frank="store.company">株式会社YOZAN</p></div>
         </div>
       </div>
@@ -2263,7 +2352,7 @@ def build_trial():
       <p class="lead" style="max-width:none;margin-top:26px">
         ホームページでどれだけ言葉を尽くしても、伝わらないものがあります。
         打席の広さ、ボールの音、ラウンジの照明の感じ、そこにいる人たちの空気。<br><br>
-        {PREOPEN}、姫路・土山にプレオープンいたします。
+        2026年9月、姫路・土山にオープンしました。
         まずは一度、打ちに来てください。少し話して、合いそうだと思っていただけたら、それがいちばんです。
       </p>
       <div class="cta__btns" style="justify-content:flex-start;margin-top:26px">
@@ -2338,9 +2427,8 @@ def build_trial():
       <div class="spec__row"><p class="spec__k">所要時間</p><p class="spec__v" data-frank="trial.duration">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">体験の内容</p><p class="spec__v" data-frank="trial.content" data-frank-fallback="打席での練習＋プロのマンツーマン指導">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">担当</p><p class="spec__v" data-frank="lesson.coaches">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v" data-frank="store.address">近日公開</p></div>
-      <div class="spec__row"><p class="spec__k">プレオープン特典</p><p class="spec__v" data-frank="preopen.benefits">近日公開</p></div>
       <div class="spec__row"><p class="spec__k">月会費のお支払い</p><p class="spec__v">ご入会月（ご利用開始日を先の月にされた場合はご利用開始月）の月会費は無料です。Web入会時にその翌月・翌々月の2か月分の月会費をお支払いいただき、以後は毎月10日に翌月分をクレジットカードで自動でお支払いいただきます。</p></div>
       <div class="spec__row"><p class="spec__k">年内入会キャンペーン</p><p class="spec__v">2026年12月31日までのご入会は入会金（税込5,500円）が無料。キャンペーンでのご入会は6か月間の継続をお願いしています。</p></div>
     </div>
@@ -2487,7 +2575,7 @@ def build_trial_booking():
         <div class="spec__row"><p class="spec__k">体験レッスン</p><p class="spec__v">無料（通常 3,300円 税込）・約55分</p></div>
         <div class="spec__row"><p class="spec__k">打席</p><p class="spec__v" id="tb-done-bay"></p></div>
         <div class="spec__row"><p class="spec__k">場所</p><p class="spec__v"><span data-frank="store.address">近日公開</span><br><a data-link="store.mapUrl" style="color:var(--brass-2);text-decoration:underline">Googleマップで見る</a></p></div>
-        <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK（クラブレンタルの有無は近日公開）">近日公開</p></div>
+        <div class="spec__row"><p class="spec__k">持ち物</p><p class="spec__v" data-frank="trial.bring" data-frank-fallback="手ぶらでOK">近日公開</p></div>
         <div class="spec__row"><p class="spec__k">当日の流れ</p><p class="spec__v" data-frank="trial.content">近日公開</p></div>
       </div>
       <div class="tb-done__line" id="tb-done-line" hidden>
@@ -2759,7 +2847,7 @@ def build_lp_trial():
     """無料体験LP（広告・SNS・LINEの飛び先用 #136）。
     体験1点に絞ったランディングページ。導線は 体験予約 と 公式LINE のみを推す。"""
     faq = jsonld_faq([
-        ("本当に無料ですか？", "はい。通常3,300円（税込）の体験レッスン（約55分）を、プレオープン記念で無料でご案内しています。当日いただく費用はありません。"),
+        ("本当に無料ですか？", "はい。通常3,300円（税込）の体験レッスン（約55分）を、いまは無料でご案内しています。当日いただく費用はありません。"),
         ("ゴルフをやったことがなくても大丈夫ですか？", "大丈夫です。クラブを握ったことがない方も歓迎です。プロがマンツーマンで、その方のペースに合わせてご案内します。"),
         ("持ち物は必要ですか？", "手ぶらでお越しください。動きやすい服装であれば大丈夫です。"),
         ("体験に行ったら入会しないといけませんか？", "いいえ。強引な勧誘は一切いたしません。料金のご説明のみで、お持ち帰りでのご検討も歓迎です。"),
@@ -2770,10 +2858,10 @@ def build_lp_trial():
     b += f"""
 <section class="page-head">
   <div class="wrap rv">
-    <p class="crumb">姫路・土山｜{PREOPEN} プレオープン</p>
+    <p class="crumb">姫路・土山｜2026年9月オープン</p>
     <h1 class="h-en">まず、1球打ってみませんか。</h1>
     <p class="h-jp">プロのマンツーマン体験レッスン（約55分）が、いまなら無料。</p>
-    <p class="lead">通常3,300円（税込）の体験レッスンを、プレオープン記念で無料でご案内しています。
+    <p class="lead">通常3,300円（税込）の体験レッスンを、いまは無料でご案内しています。
     最新シミュレーターでスイングを数字で見ながら、所属プロがその場でひとつ、変化をつくります。
     手ぶらでOK・強引な勧誘は一切ありません。</p>
   </div>
@@ -2820,7 +2908,7 @@ def build_lp_trial():
       <p class="eyebrow">FAQ</p>
       <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">よくあるご質問</h2>
       <div style="margin-top:20px">
-        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 本当に無料ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">はい。通常3,300円（税込）の体験レッスン（約55分）を、プレオープン記念で無料でご案内しています。当日いただく費用はありません。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 本当に無料ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">はい。通常3,300円（税込）の体験レッスン（約55分）を、いまは無料でご案内しています。当日いただく費用はありません。</p></div>
         <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 初心者でも大丈夫ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">大丈夫です。クラブを握ったことがない方も歓迎。プロがその方のペースに合わせてご案内します。</p></div>
         <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 持ち物は？</p><p style="margin-top:6px;font-size:14px;opacity:.85">手ぶらでお越しください。動きやすい服装であれば大丈夫です。</p></div>
         <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 入会の勧誘はありますか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">強引な勧誘は一切いたしません。最後に料金のご説明のみで、お持ち帰りでのご検討も歓迎です。</p></div>
@@ -2849,7 +2937,7 @@ def build_lp_campaign():
     b += f"""
 <section class="page-head">
   <div class="wrap rv">
-    <p class="crumb">姫路・土山｜{PREOPEN} プレオープン</p>
+    <p class="crumb">姫路・土山｜2026年9月オープン</p>
     <h1 class="h-en">年内入会で、入会金0円・入会月0円。</h1>
     <p class="h-jp">オープン記念・年内入会キャンペーン（2026年12月31日まで）</p>
     <p class="lead">入会金5,500円（税込）が無料、さらに入会月の月会費も無料。

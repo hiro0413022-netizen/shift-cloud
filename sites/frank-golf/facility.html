@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"施設・設備","item":"https://frankgolf.jp/facility.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoObject","name":"FRANK GOLF 姫路 館内ツアー（48秒）","description":"姫路・土山のインドアゴルフ FRANK GOLF の館内を48秒でご案内。入口・受付から、DTECT・TrackMan 4・OKONGOLF の3打席、バーラウンジまで。","thumbnailUrl":"https://frankgolf.jp/assets/video/facility-tour.jpg","contentUrl":"https://frankgolf.jp/assets/video/facility-tour.mp4","uploadDate":"2026-10-03","duration":"PT48S"}</script>
 </head>
@@ -181,7 +184,7 @@
       <div class="gallery__i"><img data-img-src="lesson" src="assets/img/lesson-rara-wide.jpg" alt="FRANK GOLF 姫路のレッスン。所属プロ「らら」がボール位置から指導する様子" loading="lazy" width="1200" height="800"><span class="gallery__cap">レッスン</span></div>
       <div class="gallery__i"><img data-img-src="community" src="assets/img/community.jpg" alt="FRANK GOLF 姫路の会員交流イメージ" loading="lazy" width="1280" height="853"><span class="gallery__cap">コミュニティ</span></div>
       <div class="gallery__i"><img data-img-src="exterior" src="assets/img/hero-1.jpg" alt="FRANK GOLF 姫路の外観" loading="lazy" width="1600" height="900"><span class="gallery__cap">外観</span></div>
-      <div class="gallery__i"><img src="assets/img/hero.jpg" alt="FRANK GOLF 姫路のバーカウンター" loading="lazy" width="1920" height="1200"><span class="gallery__cap">バーカウンター</span></div>
+      <div class="gallery__i"><img src="assets/img/hero.jpg" alt="FRANK GOLF 姫路のバーカウンター" loading="lazy" width="760" height="500"><span class="gallery__cap">バーカウンター</span></div>
     </div>
   </div>
 </section>
@@ -242,12 +245,11 @@
       <p class="eyebrow">Specification</p>
       <h2 class="h-en">FACILITY DATA</h2>
       <p class="h-jp">設備概要</p>
-      <p class="lead">下記は現在準備中の項目です。決まり次第、このページと公式LINEでお知らせいたします。</p>
     </div>
     <div class="spec rv" style="margin-top:40px">
       <div class="spec__row"><p class="spec__k">打席数</p><p class="spec__v" data-frank="store.bays">全3打席（うち1打席はレフティ左右打席対応）※4打席目はオープン約3ヶ月後に増設予定</p></div>
       <div class="spec__row"><p class="spec__k">シミュレーター</p><p class="spec__v" data-frank="store.simulator">TrackMan 4・DTECT・OKONGOLF の最新シミュレーター 計3台</p></div>
-      <div class="spec__row"><p class="spec__k">バー・ラウンジ</p><p class="spec__v" data-frank="lounge.seats">近日公開</p></div>
+      <div class="spec__row"><p class="spec__k">バー・ラウンジ</p><p class="spec__v" data-frank="store.lounge">バーカウンター併設のラウンジ</p></div>
       <div class="spec__row"><p class="spec__k">営業時間</p><p class="spec__v" data-frank="store.hours">平日 10:00〜22:00 ／ 土日祝 9:00〜20:00</p></div>
       <div class="spec__row"><p class="spec__k">定休日</p><p class="spec__v" data-frank="store.holiday">毎週火曜日</p></div>
       <div class="spec__row"><p class="spec__k">駐車場</p><p class="spec__v" data-frank="store.parking">最大20台・無料</p></div>

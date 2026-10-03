@@ -33,8 +33,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"無料体験レッスン","item":"https://frankgolf.jp/lp-trial.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"本当に無料ですか？","acceptedAnswer":{"@type":"Answer","text":"はい。通常3,300円（税込）の体験レッスン（約55分）を、プレオープン記念で無料でご案内しています。当日いただく費用はありません。"}},{"@type":"Question","name":"ゴルフをやったことがなくても大丈夫ですか？","acceptedAnswer":{"@type":"Answer","text":"大丈夫です。クラブを握ったことがない方も歓迎です。プロがマンツーマンで、その方のペースに合わせてご案内します。"}},{"@type":"Question","name":"持ち物は必要ですか？","acceptedAnswer":{"@type":"Answer","text":"手ぶらでお越しください。動きやすい服装であれば大丈夫です。"}},{"@type":"Question","name":"体験に行ったら入会しないといけませんか？","acceptedAnswer":{"@type":"Answer","text":"いいえ。強引な勧誘は一切いたしません。料金のご説明のみで、お持ち帰りでのご検討も歓迎です。"}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"本当に無料ですか？","acceptedAnswer":{"@type":"Answer","text":"はい。通常3,300円（税込）の体験レッスン（約55分）を、いまは無料でご案内しています。当日いただく費用はありません。"}},{"@type":"Question","name":"ゴルフをやったことがなくても大丈夫ですか？","acceptedAnswer":{"@type":"Answer","text":"大丈夫です。クラブを握ったことがない方も歓迎です。プロがマンツーマンで、その方のペースに合わせてご案内します。"}},{"@type":"Question","name":"持ち物は必要ですか？","acceptedAnswer":{"@type":"Answer","text":"手ぶらでお越しください。動きやすい服装であれば大丈夫です。"}},{"@type":"Question","name":"体験に行ったら入会しないといけませんか？","acceptedAnswer":{"@type":"Answer","text":"いいえ。強引な勧誘は一切いたしません。料金のご説明のみで、お持ち帰りでのご検討も歓迎です。"}}]}</script>
 </head>
 <body data-page="lp-trial">
 
@@ -87,10 +90,10 @@
 
 <section class="page-head">
   <div class="wrap rv">
-    <p class="crumb">姫路・土山｜2026年9月2日 プレオープン</p>
+    <p class="crumb">姫路・土山｜2026年9月オープン</p>
     <h1 class="h-en">まず、1球打ってみませんか。</h1>
     <p class="h-jp">プロのマンツーマン体験レッスン（約55分）が、いまなら無料。</p>
-    <p class="lead">通常3,300円（税込）の体験レッスンを、プレオープン記念で無料でご案内しています。
+    <p class="lead">通常3,300円（税込）の体験レッスンを、いまは無料でご案内しています。
     最新シミュレーターでスイングを数字で見ながら、所属プロがその場でひとつ、変化をつくります。
     手ぶらでOK・強引な勧誘は一切ありません。</p>
   </div>
@@ -114,7 +117,7 @@
       <p class="eyebrow">Why FRANK GOLF</p>
       <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">選ばれる3つの理由</h2>
       <div class="flow" style="margin-top:24px">
-        <div class="flow__i"><p class="flow__n">01</p><div><h3 class="flow__t">所属レッスンプロが常駐</h3><p class="flow__b">レッスンは<span data-frank="lesson.coaches" data-frank-fallback="所属レッスンプロ">らら（小川 うらら）／ USGTF レベルⅢ・YouTube「RaRa LESSON」登録者6万人超 ＝ メインコーチ</span>が担当。会員は「求めたときに5〜10分」のワンポイント指導を受け放題感覚で。</p></div></div>
+        <div class="flow__i"><p class="flow__n">01</p><div><h3 class="flow__t">所属レッスンプロが常駐</h3><p class="flow__b">レッスンは<span data-frank="lesson.coaches" data-frank-fallback="所属レッスンプロ">小川うらら（USGTF レベルⅢ・YouTube「RaRa LESSON」登録者6万人超）／穴田賢太（USGTF認定プロ・自己最長飛距離350ヤード）</span>が担当。会員は「求めたときに5〜10分」のワンポイント指導を受け放題感覚で。</p></div></div>
         <div class="flow__i"><p class="flow__n">02</p><div><h3 class="flow__t">最新シミュレーター×完全予約制</h3><p class="flow__b"><span data-frank="store.simulator" data-frank-fallback="最新シミュレーター3打席">TrackMan 4・DTECT・OKONGOLF の最新シミュレーター 計3台</span>。完全予約制なので待ち時間ゼロ。天候も日焼けも関係なく、データで上達できます。</p></div></div>
         <div class="flow__i"><p class="flow__n">03</p><div><h3 class="flow__t">バーラウンジ併設</h3><p class="flow__b">元ゴルフバーのカウンターを承継した交流空間。練習の前後に一杯、ゴルフ談義まで楽しめる「大人のゴルフ基地」です。</p></div></div>
       </div>
@@ -141,7 +144,7 @@
       <p class="eyebrow">FAQ</p>
       <h2 class="h-en" style="font-size:clamp(1.7rem,4vw,2.5rem)">よくあるご質問</h2>
       <div style="margin-top:20px">
-        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 本当に無料ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">はい。通常3,300円（税込）の体験レッスン（約55分）を、プレオープン記念で無料でご案内しています。当日いただく費用はありません。</p></div>
+        <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 本当に無料ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">はい。通常3,300円（税込）の体験レッスン（約55分）を、いまは無料でご案内しています。当日いただく費用はありません。</p></div>
         <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 初心者でも大丈夫ですか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">大丈夫です。クラブを握ったことがない方も歓迎。プロがその方のペースに合わせてご案内します。</p></div>
         <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 持ち物は？</p><p style="margin-top:6px;font-size:14px;opacity:.85">手ぶらでお越しください。動きやすい服装であれば大丈夫です。</p></div>
         <div class="card" style="padding:18px;margin-top:10px"><p style="font-weight:700">Q. 入会の勧誘はありますか？</p><p style="margin-top:6px;font-size:14px;opacity:.85">強引な勧誘は一切いたしません。最後に料金のご説明のみで、お持ち帰りでのご検討も歓迎です。</p></div>

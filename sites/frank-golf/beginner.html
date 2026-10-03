@@ -34,6 +34,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/style.css">
 <script src="assets/site-data.js"></script>
+<!-- #336: 管理画面の内容（コーチ紹介・お知らせ・キャンペーン）を公開APIから受け取って描き直す。
+     これまで通常ページで読み込んでおらず、管理画面で直しても公式サイトに出ていなかった。 -->
+<script src="assets/cms.js" defer></script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"ホーム","item":"https://frankgolf.jp/"},{"@type":"ListItem","position":2,"name":"はじめての方へ","item":"https://frankgolf.jp/beginner.html"}]}</script>
 </head>
 <body data-page="beginner">
@@ -117,9 +120,9 @@
 <section class="sec sec--alt">
   <div class="wrap">
     <div class="grid grid--2">
-      <article class="card rv"><p class="card__no">01</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">クラブがなくても始められます</h3><p class="card__b">まずは手ぶらでお越しください。レンタルの詳細は <span class="tbd">近日公開</span> です。</p></article>
+      <article class="card rv"><p class="card__no">01</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">クラブがなくても始められます</h3><p class="card__b">まずは手ぶらでお越しください。ご入会後のレンタルについては、受付でお気軽にお尋ねください。</p></article>
       <article class="card rv"><p class="card__no">02</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">誰にも見られません</h3><p class="card__b">屋内・少人数制です。空振りしても、誰も見ていません。天候にも季節にも左右されません。</p></article>
-      <article class="card rv"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">プロが、最初の一歩から</h3><p class="card__b">握り方、構え方、当て方。自己流の癖がつく前に、正しい形を。初心者プログラムの詳細は <span class="tbd">近日公開</span> です。</p></article>
+      <article class="card rv"><p class="card__no">03</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">プロが、最初の一歩から</h3><p class="card__b">握り方、構え方、当て方。自己流の癖がつく前に、正しい形を。体験レッスンで目標をおうかがいしてから、順番に組み立てます。</p></article>
       <article class="card rv"><p class="card__no">04</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">同じ立場の仲間がいます</h3><p class="card__b">初心者向けの交流会・ラウンド会をご用意します。「みんな初めて」なら、コースデビューも怖くありません。</p></article>
       <article class="card rv"><p class="card__no">05</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">数字が、上達を教えてくれます</h3><p class="card__b">シミュレーターのデータで、飛距離も方向も記録されます。先週より良くなっていることが、はっきり見えます。</p></article>
       <article class="card rv"><p class="card__no">06</p><h3 class="card__t-jp" style="font-size:17px;color:var(--txt-str)">気まずくならない空気</h3><p class="card__b">上手い人が偉い場所にはしません。スコアで値踏みされることも、知ったかぶりを求められることもありません。</p></article>
@@ -141,7 +144,7 @@
       </details>
       <details>
         <summary>クラブを持っていません。</summary>
-        <div class="faq__a">お持ちでなくても始められます。レンタルの有無や内容については近日公開いたします。</div>
+        <div class="faq__a">お持ちでなくても始められます。体験レッスンは手ぶらでOKです。ご入会後のレンタルについては、受付でお気軽にお尋ねください。</div>
       </details>
       <details>
         <summary>服装はどうすればいいですか。</summary>
