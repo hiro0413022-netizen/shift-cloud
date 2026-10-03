@@ -857,10 +857,56 @@ def bake_site_data(html):
     return html
 
 
+# ------------------------------------------------------------------
+# CSS/JS・動画の URL に中身のハッシュを付ける（#337・2026-10-03）
+#   vercel.json で /assets/* を7日間キャッシュさせているため、style.css や site.js を直しても
+#   一度来た人のブラウザは最大7日間 古いファイルを使い続けた（#335 の動画枠が崩れ、自動再生も
+#   されなかった実例）。中身が変わると URL が変わるようにして、必ず新しい方を読ませる。
+#   手書きの予約2ページ（booking.html / lesson-booking.html）もビルドの最後に同じ処理をかける。
+# ------------------------------------------------------------------
+VERSIONED_ASSETS = ("assets/style.css", "assets/site.js", "assets/site-data.js", "assets/cms.js",
+                    "assets/hp.js", "assets/video/facility-tour.mp4", "assets/video/facility-tour.webm",
+                    "assets/video/facility-tour.jpg")
+_ASSET_VER = {}
+
+
+def asset_ver(path):
+    if path not in _ASSET_VER:
+        import hashlib
+        with open(os.path.join(HERE, path), "rb") as f:
+            _ASSET_VER[path] = hashlib.md5(f.read()).hexdigest()[:10]
+    return _ASSET_VER[path]
+
+
+def version_assets(html):
+    for a in VERSIONED_ASSETS:
+        if not os.path.exists(os.path.join(HERE, a)):
+            continue
+        html = re.sub(r'(["\'])' + re.escape(a) + r'(?:\?v=[0-9a-f]+)?(["\'])',
+                      lambda m: f"{m.group(1)}{a}?v={asset_ver(a)}{m.group(2)}", html)
+    return html
+
+
+def version_static_pages():
+    """手書きのページ（ビルド対象外）にも同じハッシュを付け直す"""
+    for name in ("booking.html", "lesson-booking.html"):
+        path = os.path.join(HERE, name)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        out = version_assets(src)
+        if out != src:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(out)
+            print("  versioned", name)
+
+
 def write(name, body):
     path = os.path.join(HERE, name)
     if name.endswith(".html"):
         body = bake_site_data(body)
+        body = version_assets(body)
     with open(path, "w", encoding="utf-8", newline="\n") as f:
         f.write(body)
     print("  wrote", name, "(%d bytes)" % len(body.encode("utf-8")))
@@ -3950,4 +3996,5 @@ if __name__ == "__main__":
     build_intent_columns()
     build_llms_txt()
     build_sitemap()
+    version_static_pages()
     print("done.")
